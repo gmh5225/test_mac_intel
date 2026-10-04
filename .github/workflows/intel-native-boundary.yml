@@ -3,7 +3,7 @@
 # Modified 2026-10-04: explicit opt-in Intel boundary experiments; one experiment
 # per dispatch, independent source/controller/workflow provenance and live evidence.
 name: Intel HVF native boundary experiments
-run-name: Intel HVF ${{ inputs.experiment }} / ${{ inputs.intel-image }} / ${{ inputs.repetitions }} repetitions / ${{ inputs.source-ref }}
+run-name: Intel HVF ${{ inputs.experiment }} / ${{ inputs.intel-image }} / ${{ inputs.repetitions }} repetitions / ${{ inputs.upload-runtime }} uploader / ${{ inputs.source-ref }}
 on:
   workflow_dispatch:
     inputs:
@@ -28,6 +28,11 @@ on:
         default: finite-deadline
         type: choice
         options: [recovery, lifecycle, instruction, instruction-reuse, instruction-vcpu-recreate, instruction-vm-recreate, instruction-owner-recreate, owner-failure-controls, recovery-reuse, recovery-vcpu-recreate, recovery-vm-recreate, finite-deadline]
+      upload-runtime:
+        description: Runtime for plan/progress uploader children only (provenance/final unchanged)
+        default: default
+        type: choice
+        options: [default, jitless]
 permissions:
   contents: read
 jobs:
@@ -36,7 +41,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      DIAGNOSTIC_COMMIT: 31afddad3edc79dad048182d28b2d20cc3b8d6b8
+      DIAGNOSTIC_COMMIT: 332dedd0bbbdb87bf9489c4e0e84e671cbb4bdb7
     steps:
       - name: Check out this comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -70,6 +75,7 @@ jobs:
           HVF_INTEL_IMAGE: ${{ inputs.intel-image }}
           HVF_REPETITIONS: ${{ inputs.repetitions }}
           HVF_EXPERIMENT: ${{ inputs.experiment }}
+          HVF_UPLOAD_RUNTIME: ${{ inputs.upload-runtime }}
         run: python3 harness/scripts/record_provenance.py
       - name: Preserve provenance before entering the hypervisor
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -141,6 +147,7 @@ jobs:
           build: source/build-hvf
           evidence: source/build-hvf/recovery-diagnostic
           upload-action: artifact-uploader
+          upload-runtime: ${{ inputs.upload-runtime }}
           repetitions: ${{ inputs.repetitions }}
           experiment: ${{ inputs.experiment }}
       - name: Preserve crash reports for failed uploader children
