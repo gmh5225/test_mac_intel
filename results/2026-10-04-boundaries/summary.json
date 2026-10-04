@@ -1,6 +1,6 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T08:45:04.882965+00:00",
+  "recorded_at": "2026-10-04T09:32:42.062991+00:00",
   "complete_native_acceptance": false,
   "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Executor reuse retains the VM and threads across iterations, while recovery still recreates cancelled vCPUs. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
   "runs": [
@@ -197,6 +197,44 @@
       "final_native_result_present": false,
       "child_retired": null,
       "verified_artifact_count": 11,
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37188626438",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37188626438",
+      "source": "392a9d1718aba9f49632da0670caf437b172db8e",
+      "controller": "392a9d1718aba9f49632da0670caf437b172db8e",
+      "workflow": "a1811c22cdabd7986e158dffd4dbf291035b9901",
+      "image": "macos-15-intel",
+      "experiment": "finite-deadline",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "GitHub annotation: hosted runner lost communication",
+      "native_passed": null,
+      "last_saved_completed": 274,
+      "last_saved_started": 275,
+      "final_native_result_present": false,
+      "child_retired": null,
+      "verified_artifact_count": 10,
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37189209307",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37189209307",
+      "source": "f35fa4bd21883eab946842358c4890d0d1480b72",
+      "controller": "f35fa4bd21883eab946842358c4890d0d1480b72",
+      "workflow": "c7303dfdafe9bc92e85f63822dc620820c895071",
+      "image": "macos-26-intel",
+      "experiment": "recovery-reuse",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "GitHub annotation: hosted runner lost communication",
+      "native_passed": null,
+      "last_saved_completed": 678,
+      "last_saved_started": 679,
+      "final_native_result_present": false,
+      "child_retired": null,
+      "verified_artifact_count": 30,
       "complete_native_acceptance": false
     }
   ]
