@@ -1,4 +1,4 @@
-# Adapted from NeverSight/NeverD, commit 20cead789b86b803b6d1b5d80199de52e3c30049.
+# Adapted from NeverSight/NeverD, commit 2abdc49c56c15cad3b35ffc08ecb3bed9c2ccc66.
 # Copyright (C) 2026 NeverD contributors. SPDX-License-Identifier: AGPL-3.0-only
 # Modified 2026-10-04: explicit opt-in Intel boundary experiments; one experiment
 # per dispatch, independent source/controller/workflow provenance and live evidence.
@@ -9,7 +9,7 @@ on:
     inputs:
       source-ref:
         description: Exact forty-character source commit to reproduce
-        default: 20cead789b86b803b6d1b5d80199de52e3c30049
+        default: 2abdc49c56c15cad3b35ffc08ecb3bed9c2ccc66
         required: true
         type: string
       intel-image:
@@ -27,7 +27,7 @@ on:
         required: true
         default: finite-deadline
         type: choice
-        options: [lifecycle, instruction, finite-deadline]
+        options: [lifecycle, instruction, instruction-reuse, finite-deadline]
 permissions:
   contents: read
 jobs:
@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      DIAGNOSTIC_COMMIT: 20cead789b86b803b6d1b5d80199de52e3c30049
+      DIAGNOSTIC_COMMIT: 2abdc49c56c15cad3b35ffc08ecb3bed9c2ccc66
     steps:
       - name: Check out this comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
