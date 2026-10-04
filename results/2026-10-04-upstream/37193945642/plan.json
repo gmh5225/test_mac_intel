@@ -1,0 +1,114 @@
+{
+  "kind": "independent-upstream-hvf-control",
+  "complete_native_acceptance": false,
+  "upstream_url": "https://gitlab.com/pmdj/hvf-edge-cases",
+  "upstream_commit": "f150b38bfff419fe19907b7a6a2d743a63b46a49",
+  "diagnostic_commit": "f35fa4bd21883eab946842358c4890d0d1480b72",
+  "workflow_commit": "6b6db50ad3390526cd65f122587b182b7f2e4aab",
+  "workflow_repository": "gmh5225/test_mac_intel",
+  "run_id": "37193945642",
+  "run_attempt": "1",
+  "runner_image": "macos-26-intel",
+  "image_version": "20260824.0517.1",
+  "source": "/Users/runner/work/test_mac_intel/test_mac_intel/upstream",
+  "tracked_source_clean": true,
+  "source_hashes": {
+    ".gitignore": "a36d0377d03a8abd6bb89016c21b60ab9dd69d7084da77a44789ecc71f546614",
+    "DOSKernel.cpp": "c20a26da55b2694c679e9fd456744fc7242a64d2ba42630cb83fbde341d7e5c5",
+    "DOSKernel.h": "ef0b39232a269faff18b001c131f3e2bd55d56ab6afe0791b2967e02823a9d22",
+    "LICENSE.txt": "cbbd29b9317d36aae507c3e1ca605486398607f81db413656c651146e459898b",
+    "Makefile": "23b11458f8396d8bd9b3601ff397ea6f349f385186878e9618ce7fb09cca5d32",
+    "README.md": "d17aaf9d39072c8f0eb642599dd28e7654f33f375f1bf0f9ce9e3a825dbe3ee0",
+    "hvdos.cpp": "66b04caf4eb1cb0d36c91f67cedc4ad7eaadb45dd1a3a7016a6264e73109f7a4",
+    "hvdos.entitlements": "c439c3ffbe9d1b486321de3360bd9f1368024751553ae131aa0490e4e49841dd",
+    "hvint-poc-hvdos/hvint-poc-hvdos.xcodeproj/project.pbxproj": "8b13336acd6b9e8a74bf71befa6c083340c2ae76b5b4f36285d8b1b7a16178bd",
+    "hvint-poc-hvdos/hvint-poc-hvdos.xcodeproj/project.xcworkspace/contents.xcworkspacedata": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f",
+    "hvint-poc-hvdos/hvint-poc-hvdos.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542",
+    "interface.h": "95fa1674f93d66f83b4bb39e902e52bc15d70e9ff66354222e868dea52cfa6e9",
+    "livewait-com.asm": "7544b876f17dd717223a14a2f69db5273fda0e96d1e6cb84298d8674dfec3840",
+    "livewait.com": "5d3c39216f66eab6f6b3a9a2095f9b9bb4b6aaee4083908138a4a5f0fc7def88",
+    "vmcs.h": "60524b2e29fec0d66089dfdcfe6ef84bc281d0828cd467f6662d2b04ce19ad1e"
+  },
+  "binary_sha256": "22c44973a22f2522bee6f4b7badd39ad4b6400c875ef1c56945462588adef5eb",
+  "command": [
+    "/Users/runner/work/test_mac_intel/test_mac_intel/upstream/hvdos",
+    "livewait.com"
+  ],
+  "build_command": [
+    "make"
+  ],
+  "timeout_seconds": 900,
+  "stdout_transport": "PTY, unchanged upstream program",
+  "limitations": [
+    "100000 counted calls are attempts; upstream ignores random interrupt return values",
+    "upstream completion can race the final interrupt; a timeout does not identify a hypervisor fault",
+    "real-mode guest and upstream build flags do not establish NeverD long-mode correctness or performance"
+  ],
+  "host_observations": [
+    {
+      "command": [
+        "sw_vers"
+      ],
+      "status": 0,
+      "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t26.6.1\nBuildVersion:\t\t25G76\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "uname",
+        "-a"
+      ],
+      "status": 0,
+      "stdout": "Darwin iad01-ar513-6e439133-1551-4a9f-bbdb-29c309d23549-1A50B573C71B.local 25.6.0 Darwin Kernel Version 25.6.0: Sat Jul 11 15:22:40 PDT 2026; root:xnu-12377.161.13~4/RELEASE_X86_64 x86_64\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "clang++",
+        "--version"
+      ],
+      "status": 0,
+      "stdout": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: x86_64-apple-darwin25.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_26.6.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "--show-sdk-version"
+      ],
+      "status": 0,
+      "stdout": "26.5\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "--show-sdk-path"
+      ],
+      "status": 0,
+      "stdout": "/Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "sysctl",
+        "kern.hv_support",
+        "kern.hv_vmm_present",
+        "machdep.cpu.brand_string",
+        "machdep.cpu.features"
+      ],
+      "status": 0,
+      "stdout": "kern.hv_support: 1\nkern.hv_vmm_present: 1\nmachdep.cpu.brand_string: Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz\nmachdep.cpu.features: FPU VME DE PSE TSC MSR PAE MCE CX8 APIC SEP MTRR PGE MCA CMOV PAT PSE36 CLFSH MMX FXSR SSE SSE2 SS HTT PBE SSE3 PCLMULQDQ DTES64 DSCPL VMX SSSE3 FMA CX16 TPR SSE4.1 SSE4.2 x2APIC MOVBE POPCNT AES VMM PCID XSAVE OSXSAVE SEGLIM64 AVX1.0 RDRAND F16C\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "file",
+        "/Users/runner/work/test_mac_intel/test_mac_intel/upstream/hvdos"
+      ],
+      "status": 0,
+      "stdout": "/Users/runner/work/test_mac_intel/test_mac_intel/upstream/hvdos: Mach-O 64-bit executable x86_64\n",
+      "stderr": ""
+    }
+  ]
+}

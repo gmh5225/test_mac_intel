@@ -215,3 +215,5 @@ English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/
 يحتفظ `recovery-reuse` بكائن Executor حول اختبار الاستعادة الأصلي `HvfExecutor.Native*`، مع استمرار تدمير vCPU وإعادة إنشائه بعد الإلغاء. يتطلب وضعا إعادة الاستخدام علامة أصلية واحدة بالضبط في كل تكرار، ويرفضان الشيفرة القديمة التي تفتقر إلى هذا الدليل. يبقى وضع `recovery` الافتراضي دون تغيير، وإعادة الاستخدام للتشخيص فقط. تحافظ المجسات المحددة زمنيًا على موعد إجمالي ثابت حتى عندما تنتهي فترة قصيرة قبل تنفيذ الضيف.
 
 بعد اجتياز فحوص الاستعادة، يشغّل **Personal Intel HVF complete validation** فحوص transport وCR8 الأصلية، وجميع أجزاء CPU الستة عشر مع مطابقة مستقلة، وفحص Darwin المنفصل. يثبت `source-ref` مصدر NeverD، وتُسجَّل إصدارات workflow والمتحكم بصورة مستقلة. تبقى القوائم وقواعد الفشل الأصلية؛ ولا تحل نتائج الاستعادة الجزئية محل القبول الكامل.
+
+[2026-10-04: independently audited Intel boundary and upstream results, all 11 languages](results/2026-10-04-investigation.md).
