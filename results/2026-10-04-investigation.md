@@ -14,6 +14,8 @@ Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreati
 
 Owner turnover did not complete its 1000-round experiment: the uploader crashed on macOS 15 with SIGTRAP in V8 string parsing (37198629082), and on macOS 26 with SIGSEGV in V8 scope lookup (37198630903). The controller then cancelled and reaped the native processes; the saved logs show 24/25 and 467/468 completed/started iterations, without a native assertion or final native result. Both runners stayed reachable and supplied matched crash reports. These are observer-triggered interruptions, not verified native passes or confirmed runner losses. The cause remains unknown; compare upload-only controls before changing the backend.
 
+Upload-only controls without a VM or guest both completed 16/16 uploads (37199672430, 37199674303), with zero exit codes, no signal or cancellation, and all 17 artifact digests per run verified. The controls share Node 24.19.0, V8 13.6.233.17-node.51 and the same binary SHA256; their Intel UUID matches the earlier crash reports, whose binary hashes were not recorded. This does not establish the crash cause or native acceptance. The next control replays each failed three-file snapshot byte for byte, 16 times on its corresponding image, from pinned payload commit `e02e8c6`, without creating a VM. [Upload evidence](2026-10-04-upload-controls/summary.json).
+
 ## zh-CN: Intel 隔离实验结果（2026-10-04）
 
 有限 owner 期限候选 `909672ca6` 仍属实验方案。原始 1000 轮恢复测试在 macOS 15 和 26 上均失联；最后保存的日志分别证明 277/278、250/251 轮已完成/已开始。同一候选的普通指令测试没有主动取消操作，在 macOS 15 上也失联（576/577）。三次均有 GitHub 失联注记，均缺少最终原生结果和进程回收记录；保存的日志不能定位最终故障。[原始证据](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries)。
@@ -27,6 +29,8 @@ Owner turnover did not complete its 1000-round experiment: the uploader crashed 
 两项生命周期对照现已在两套 Intel 镜像上均通过 1000/1000 轮：仅重建 vCPU（37195529270、37195554929），以及保留同一 owner、重建 VM 和 vCPU（37196504453、37196535787）。后一项每次运行均包含 8000 个有序原生事件及第 1001 代的最终销毁；24/27 个产物摘要、原生与控制器正常退出、子进程回收均已核验。这缩小了与完整 Executor 周转的比较范围，但尚未定位原因或证明生产修复。下一项诊断将保留 VM、更换 vCPU 和 owner 线程；原始恢复及完整 CPU/Darwin 验收仍须通过。
 
 线程更换实验未完成 1000 轮：macOS 15 上传器在 V8 字符串解析中触发 SIGTRAP（37198629082），macOS 26 上传器在 V8 作用域查找中触发 SIGSEGV（37198630903）。控制器随后取消并回收原生进程；保存的日志分别显示 24/25、467/468 轮完成/开始，没有原生断言或最终原生结果。两台 runner 均保持在线并提供匹配的崩溃报告。这属于观察器触发的中断，既不是已验证的原生通过，也不是已确认的 runner 失联。原因仍未知；先用纯上传对照比较，再决定后端变更。
+
+无 VM、无 guest 的纯上传对照均完成 16/16 次上传（37199672430、37199674303），退出码为零，无信号或取消；每次运行的 17 个产物摘要全部核验。两套对照的 Node 24.19.0、V8 13.6.233.17-node.51 和二进制 SHA256 相同，Intel UUID 与此前崩溃报告匹配，但此前未记录二进制摘要。这不能确定崩溃原因，也不代表原生验收。下一对照从固定载荷提交 `e02e8c6` 读取两次失败的原始三文件快照，在对应映像上逐字节重放各 16 次，不创建 VM。[上传证据](2026-10-04-upload-controls/summary.json)。
 
 ## zh-TW: Intel 隔離實驗結果（2026-10-04）
 
@@ -42,6 +46,8 @@ Owner turnover did not complete its 1000-round experiment: the uploader crashed 
 
 執行緒更換實驗未完成 1000 輪：macOS 15 上傳器在 V8 字串解析中觸發 SIGTRAP（37198629082），macOS 26 上傳器在 V8 作用域查找中觸發 SIGSEGV（37198630903）。控制器隨後取消並回收原生程序；保存的日誌分別顯示 24/25、467/468 輪完成/開始，沒有原生斷言或最終原生結果。兩台 runner 均保持連線並提供匹配的崩潰報告。這屬於觀察器觸發的中斷，既不是已驗證的原生通過，也不是已確認的 runner 失聯。原因仍未知；先以純上傳對照比較，再決定後端變更。
 
+無 VM、無 guest 的純上傳對照均完成 16/16 次上傳（37199672430、37199674303），退出碼為零，無訊號或取消；每次執行的 17 個產物摘要全部核驗。兩套對照的 Node 24.19.0、V8 13.6.233.17-node.51 與二進位 SHA256 相同，Intel UUID 與先前崩潰報告匹配，但先前未記錄二進位摘要。這不能確定崩潰原因，也不代表原生驗收。下一對照從固定載荷提交 `e02e8c6` 讀取兩次失敗的原始三檔快照，在對應映像上逐位元組重放各 16 次，不建立 VM。[上傳證據](2026-10-04-upload-controls/summary.json)。
+
 ## ja: Intel 分離実験の結果（2026-10-04）
 
 所有スレッドの実行期限を有限にした候補 `909672ca6` は実験段階です。元の 1000 回復旧テストは macOS 15 と 26 の両方で runner との通信を失いました。保存された末尾の完了/開始回数は 277/278 と 250/251 です。同じ候補で明示的なキャンセルを行わない通常命令テストも macOS 15 で通信を失いました（576/577）。GitHub が 3 件とも確認しています。最終ネイティブ結果とプロセス回収記録はなく、保存ログから最終的な障害箇所は特定できません。[元の証拠](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries)。
@@ -55,6 +61,8 @@ Owner turnover did not complete its 1000-round experiment: the uploader crashed 
 両 Intel イメージで、vCPU 再生成（37195529270、37195554929）と同じ owner 上での VM・vCPU 再生成（37196504453、37196535787）が、それぞれ 1000/1000 回に合格しました。後者では各実行の 8000 個のネイティブイベントの順序と最終第 1001 世代の破棄、24/27 個の成果物ハッシュ、ネイティブ処理・制御側の終了コード 0、子プロセス回収を確認しました。Executor 全体の再生成との差を絞る証拠であり、原因や製品修正の証明ではありません。次は VM を保持して vCPU と owner スレッドを交換します。元の回復試験と完全な CPU/Darwin 検証は引き続き必要です。
 
 owner 交代の1000回実験は未完了です。macOS 15のアップローダーはV8文字列解析中にSIGTRAP（37198629082）、macOS 26はV8スコープ検索中にSIGSEGV（37198630903）で停止し、制御側がネイティブ処理を中止・回収しました。保存記録は完了/開始24/25、467/468回で、ネイティブのアサーションや最終結果はありません。両runnerは接続を保ち、一致するクラッシュ報告を提供しました。観測側による中断であり、ネイティブ合格やrunner切断の証明ではありません。原因は未確定で、バックエンド変更前にアップロードのみの対照と比較します。
+
+VMもguestも使わないアップロード対照は両方とも16/16回完了しました（37199672430、37199674303）。終了コードは0、シグナルやキャンセルはなく、各17個の成果物ハッシュを検証済みです。Node 24.19.0、V8 13.6.233.17-node.51、実行ファイルのSHA256は両対照で一致し、Intel UUIDは以前のクラッシュ報告と一致します。ただし以前の実行ファイルハッシュは未記録です。原因の特定やネイティブ合格にはなりません。次は固定コミット`e02e8c6`から失敗時の3ファイルをそのまま取得し、対応する各イメージでVMなしに16回再アップロードします。[アップロードの証拠](2026-10-04-upload-controls/summary.json)。
 
 ## ko: Intel 분리 실험 결과（2026-10-04）
 
@@ -70,6 +78,8 @@ owner 交代の1000回実験は未完了です。macOS 15のアップローダ�
 
 owner 교체 1000회 실험은 완료되지 않았습니다. macOS 15 업로더는 V8 문자열 구문 분석에서 SIGTRAP(37198629082), macOS 26은 V8 범위 검색에서 SIGSEGV(37198630903)로 중단됐고 제어기가 네이티브 프로세스를 취소·회수했습니다. 보존 로그는 완료/시작 24/25회와 467/468회이며 네이티브 단언 실패나 최종 결과는 없습니다. 두 runner 모두 연결을 유지하며 일치하는 충돌 보고서를 제공했습니다. 관찰기 때문에 중단된 것으로 네이티브 통과나 runner 연결 단절의 증거가 아닙니다. 원인은 미확정이며 백엔드를 바꾸기 전에 업로드 전용 대조와 비교합니다.
 
+VM이나 guest 없는 업로드 대조는 모두 16/16회를 완료했습니다(37199672430, 37199674303). 종료 코드 0, 신호·취소 없음, 실행별 산출물 해시 17개를 모두 검증했습니다. 두 대조의 Node 24.19.0, V8 13.6.233.17-node.51과 실행 파일 SHA256은 같고 Intel UUID는 이전 충돌 보고서와 일치합니다. 이전 실행 파일 해시는 기록되지 않았습니다. 원인 규명이나 네이티브 승인을 뜻하지 않습니다. 다음 대조는 고정 커밋 `e02e8c6`의 실패 당시 원본 파일 세 개를 바이트 그대로 각 해당 이미지에서 16회 업로드하며 VM을 만들지 않습니다. [업로드 증거](2026-10-04-upload-controls/summary.json).
+
 ## fr: Résultats des expériences Intel isolées (2026-10-04)
 
 Le candidat `909672ca6`, qui impose une échéance finie au thread propriétaire, reste expérimental. Le test original de 1000 récupérations a perdu la communication avec le runner sur macOS 15 et 26 : les derniers préfixes conservés montrent 277/278 et 250/251 répétitions terminées/démarrées. Le test d’instructions ordinaires du même candidat, sans annulation explicite, a aussi perdu la communication sur macOS 15 (576/577). GitHub confirme les trois pertes. Aucun résultat natif final ni relevé de récupération du processus n’est disponible ; les préfixes ne localisent pas la panne finale. [Preuves originales](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -83,6 +93,8 @@ Le même candidat `909672ca6` a réussi instruction-reuse1000 sur les deux image
 Les deux contrôles ont désormais réussi 1000/1000 fois sur les deux images Intel : recréation du vCPU (37195529270, 37195554929), puis de la VM et du vCPU avec le même owner (37196504453, 37196535787). Ce dernier comprend 8000 événements natifs ordonnés et la destruction finale de la génération 1001 par exécution ; les 24/27 empreintes, les sorties natives et du contrôleur à zéro et la collecte des processus ont été vérifiées. Cela précise la comparaison avec le renouvellement complet d’Executor sans identifier la cause ni prouver une correction. Le prochain diagnostic conservera la VM et remplacera le vCPU et son thread propriétaire. La récupération originale et la validation CPU/Darwin complète restent nécessaires.
 
 Les 1000 tours de changement d’owner sont incomplets : l’uploader a subi SIGTRAP dans l’analyse de chaînes V8 sur macOS 15 (37198629082) et SIGSEGV dans la recherche de portée V8 sur macOS 26 (37198630903). Le contrôleur a alors annulé et collecté les processus natifs. Les journaux montrent 24/25 et 467/468 tours terminés/commencés, sans assertion native ni résultat final. Les runners sont restés joignables avec des rapports de crash concordants. Ce sont des interruptions par l’observateur, pas des validations natives ni des pertes de runner confirmées. La cause reste inconnue ; comparer les contrôles sans VM avant de modifier le backend.
+
+Les contrôles sans VM ni invité ont terminé 16/16 envois chacun (37199672430, 37199674303), avec codes zéro, sans signal ni annulation ; les 17 empreintes par exécution sont vérifiées. Ils partagent Node 24.19.0, V8 13.6.233.17-node.51 et le même SHA256 du binaire. Leur UUID Intel correspond aux rapports de crash antérieurs, qui ne consignaient pas ce SHA256. Cela ne prouve ni la cause ni la validation native. Le prochain contrôle rejoue exactement les trois fichiers de chaque instantané défaillant, 16 fois sur son image correspondante, depuis le commit figé `e02e8c6`, sans VM. [Preuves des envois](2026-10-04-upload-controls/summary.json).
 
 ## de: Ergebnisse isolierter Intel-Versuche (2026-10-04)
 
@@ -98,6 +110,8 @@ Beide Lebenszyklusvergleiche bestanden jetzt auf beiden Intel-Images jeweils 100
 
 Der owner-Wechsel beendete die 1000 Runden nicht: Der Uploader erlitt SIGTRAP beim V8-Stringparsen auf macOS 15 (37198629082) und SIGSEGV bei der V8-Scope-Suche auf macOS 26 (37198630903). Der Controller brach daraufhin die nativen Prozesse ab und sammelte sie ein. Gesichert sind 24/25 bzw. 467/468 beendete/gestartete Runden ohne native Assertion oder Endergebnis. Beide Runner blieben erreichbar und lieferten passende Crashberichte. Das sind vom Beobachter ausgelöste Abbrüche, keine nativen Erfolge oder bestätigten Runner-Verluste. Die Ursache ist offen; vor Backend-Änderungen werden reine Upload-Kontrollen verglichen.
 
+Beide Kontrollen ohne VM und Gast haben 16/16 Uploads abgeschlossen (37199672430, 37199674303), mit Exitcode null, ohne Signal oder Abbruch; alle 17 Artefakt-Prüfsummen je Lauf sind bestätigt. Node 24.19.0, V8 13.6.233.17-node.51 und der SHA256-Wert der Programmdatei stimmen überein. Die Intel-UUID entspricht den früheren Absturzberichten, in denen der Datei-Hash fehlt. Das belegt weder Ursache noch native Abnahme. Als Nächstes werden die drei Originaldateien jedes fehlgeschlagenen Snapshots aus dem festen Commit `e02e8c6` auf dem jeweiligen Image 16-mal bytegetreu hochgeladen, ohne VM. [Upload-Belege](2026-10-04-upload-controls/summary.json).
+
 ## es: Resultados de experimentos Intel aislados (2026-10-04)
 
 El candidato `909672ca6`, con plazo finito en el hilo propietario, sigue siendo experimental. La prueba original de 1000 recuperaciones perdió la comunicación con el runner en macOS 15 y 26; los últimos prefijos conservados muestran 277/278 y 250/251 iteraciones completadas/iniciadas. Las instrucciones ordinarias del mismo candidato, sin cancelación explícita, también perdieron la comunicación en macOS 15 (576/577). GitHub confirmó las tres pérdidas. Faltan el resultado nativo final y el registro de recogida del proceso; los prefijos no localizan el fallo final. [Pruebas originales](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -111,6 +125,8 @@ El mismo candidato `909672ca6` superó instruction-reuse1000 en ambas imágenes,
 Ambos controles de ciclo de vida superaron ya 1000/1000 iteraciones en las dos imágenes Intel: recreación de vCPU (37195529270, 37195554929) y de VM más vCPU conservando el mismo owner (37196504453, 37196535787). El segundo acredita 8000 eventos nativos ordenados y la destrucción final de la generación 1001 por ejecución; se verificaron las 24/27 huellas, las salidas nativas y del controlador a cero y la recogida de los procesos. Esto acota la comparación con la sustitución completa de Executor, pero no identifica la causa ni demuestra una corrección. El siguiente diagnóstico conservará la VM y sustituirá vCPU e hilo propietario. Siguen pendientes la recuperación original y la validación CPU/Darwin completa.
 
 El cambio de owner no completó 1000 rondas: el uploader sufrió SIGTRAP al analizar cadenas V8 en macOS 15 (37198629082) y SIGSEGV al buscar ámbitos V8 en macOS 26 (37198630903). El controlador canceló y recogió los procesos nativos. Los registros conservan 24/25 y 467/468 rondas completadas/iniciadas, sin aserción nativa ni resultado final. Ambos runners siguieron accesibles y entregaron informes coincidentes. Son interrupciones del observador, no aprobaciones nativas ni pérdidas confirmadas del runner. La causa sigue abierta; se compararán controles de solo subida antes de cambiar el backend.
+
+Ambos controles sin VM ni invitado completaron 16/16 cargas (37199672430, 37199674303), con salida cero, sin señal ni cancelación; se verificaron las 17 huellas por ejecución. Comparten Node 24.19.0, V8 13.6.233.17-node.51 y el SHA256 del ejecutable. Su UUID Intel coincide con los informes de caída anteriores, que no registraron ese SHA256. Esto no identifica la causa ni valida la ejecución nativa. El siguiente control repetirá exactamente los tres archivos de cada instantánea fallida, 16 veces en su imagen correspondiente, desde el commit fijado `e02e8c6`, sin VM. [Evidencia de cargas](2026-10-04-upload-controls/summary.json).
 
 ## it: Risultati degli esperimenti Intel isolati (2026-10-04)
 
@@ -126,6 +142,8 @@ Entrambi i controlli hanno ora superato 1000/1000 iterazioni sulle due immagini 
 
 Il cambio di owner non ha completato 1000 cicli: l’uploader ha subito SIGTRAP nell’analisi delle stringhe V8 su macOS 15 (37198629082) e SIGSEGV nella ricerca degli scope V8 su macOS 26 (37198630903). Il controllore ha annullato e raccolto i processi nativi. I log conservano 24/25 e 467/468 cicli completati/avviati, senza asserzione nativa o risultato finale. Entrambi i runner sono rimasti raggiungibili con rapporti di crash corrispondenti. Sono interruzioni dell’osservatore, non successi nativi o perdite confermate del runner. La causa resta ignota; confrontare controlli di solo caricamento prima di modificare il backend.
 
+I controlli senza VM né guest hanno completato entrambi 16/16 caricamenti (37199672430, 37199674303), con uscita zero, senza segnali o annullamenti; tutti i 17 hash per esecuzione sono verificati. Condividono Node 24.19.0, V8 13.6.233.17-node.51 e lo SHA256 del binario. Il loro UUID Intel coincide con i precedenti rapporti di crash, che non registravano tale hash. Non dimostra la causa né la validazione nativa. Il prossimo controllo ripeterà esattamente i tre file di ogni snapshot fallito, 16 volte sulla rispettiva immagine, dal commit fissato `e02e8c6`, senza VM. [Prove dei caricamenti](2026-10-04-upload-controls/summary.json).
+
 ## ru: Результаты изолированных экспериментов Intel (2026-10-04)
 
 Кандидат `909672ca6` с конечным сроком выполнения в потоке-владельце остаётся экспериментальным. Исходный тест 1000 восстановлений потерял связь с runner на macOS 15 и 26; последние сохранённые фрагменты содержат 277/278 и 250/251 завершённых/начатых итераций. Обычные инструкции того же кандидата без явной отмены также потеряли связь на macOS 15 (576/577). GitHub подтвердил все три случая. Итоговых нативных результатов и записей о сборе дочернего процесса нет; фрагменты не определяют место последующего сбоя. [Исходные доказательства](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -140,6 +158,8 @@ Il cambio di owner non ha completato 1000 cicli: l’uploader ha subito SIGTRAP 
 
 Эксперимент смены owner не завершил 1000 повторений: загрузчик получил SIGTRAP при разборе строк V8 на macOS 15 (37198629082) и SIGSEGV при поиске области видимости V8 на macOS 26 (37198630903). Контроллер остановил и собрал нативные процессы. Сохранены 24/25 и 467/468 завершённых/начатых итераций без нативной ошибки проверки или итогового результата. Оба runner остались доступны и предоставили соответствующие отчёты о сбое. Это прерывания наблюдателем, а не нативные успехи или подтверждённая потеря runner. Причина не установлена; до изменения backend нужны сравнения с контролем только загрузки.
 
+Оба контроля без VM и гостя завершили 16/16 загрузок (37199672430, 37199674303), с нулевыми кодами выхода, без сигналов и отмены; проверены все 17 хешей артефактов каждого запуска. Совпадают Node 24.19.0, V8 13.6.233.17-node.51 и SHA256 исполняемого файла. Intel UUID соответствует прежним отчётам о сбоях, где SHA256 файла не записан. Это не устанавливает причину и не означает нативную приёмку. Следующий контроль повторит исходные три файла каждого неудачного снимка побайтно по 16 раз на соответствующем образе, из фиксированного коммита `e02e8c6`, без VM. [Доказательства загрузок](2026-10-04-upload-controls/summary.json).
+
 ## ar: نتائج تجارب Intel المعزولة (2026-10-04)
 
 يبقى المرشح `909672ca6`، الذي يفرض مهلة محدودة على الخيط المالك، تجريبيًا. فقد اختبار الاسترداد الأصلي ذو 1000 تكرار اتصال runner على macOS 15 و26؛ وتثبت آخر الأجزاء المحفوظة 277/278 و250/251 تكرارًا مكتملًا/بدأ. وفقد اختبار التعليمات العادية للمرشح نفسه، بلا إلغاء صريح، الاتصال أيضًا على macOS 15 (576/577). أكد GitHub الحالات الثلاث. لا توجد نتيجة أصلية نهائية أو سجلات جمع العملية؛ ولا تحدد الأجزاء المحفوظة موقع العطل النهائي. [الأدلة الأصلية](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -153,3 +173,5 @@ Il cambio di owner non ha completato 1000 cicli: l’uploader ha subito SIGTRAP 
 نجح الآن ضابطا دورة الحياة في 1000/1000 تكرار على صورتي Intel: إعادة إنشاء vCPU ‏(37195529270، 37195554929)، ثم VM وvCPU مع الاحتفاظ بالمالك نفسه (37196504453، 37196535787). يثبت الثاني 8000 حدث أصلي مرتب وتدمير الجيل 1001 النهائي في كل تشغيل؛ ودُققت بصمات الملفات الـ24/27، ورموز الخروج الصفرية، وجمع العمليات الفرعية. يضيّق ذلك المقارنة مع تبديل Executor بالكامل، لكنه لا يحدد السبب ولا يثبت إصلاح المنتج. سيحتفظ التشخيص التالي بالـVM ويستبدل vCPU والخيط المالك. يبقى اختبار الاسترداد الأصلي والتحقق الكامل لـCPU/Darwin مطلوبين.
 
 لم تكتمل تجربة تبديل المالك ذات 1000 دورة: تعطل الرافع بإشارة SIGTRAP أثناء تحليل نصوص V8 على macOS 15 ‏(37198629082)، وبإشارة SIGSEGV أثناء بحث نطاق V8 على macOS 26 ‏(37198630903). ألغى المتحكم العمليات الأصلية وجمعها. تثبت السجلات 24/25 و467/468 دورة مكتملة/بدأت، دون فشل تحقق أصلي أو نتيجة أصلية نهائية. بقي runner متصلًا في الحالتين وقدّم تقرير تعطل مطابقًا. هذه مقاطعات سببها المراقب وليست نجاحًا أصليًا أو فقد اتصال مؤكدًا. السبب مجهول؛ تُقارن ضوابط الرفع وحده قبل تعديل الخلفية.
+
+أكمل ضابطا الرفع دون VM أو ضيف 16/16 عملية لكل منهما (37199672430، 37199674303)، برموز خروج صفرية ودون إشارات أو إلغاء؛ ودُققت بصمات الملفات الـ17 لكل تشغيل. تتطابق إصدارات Node 24.19.0 وV8 13.6.233.17-node.51 وبصمة SHA256 للملف التنفيذي بين الضابطين. ويطابق Intel UUID تقارير التعطل السابقة التي لم تسجل بصمة الملف. لا يحدد ذلك السبب ولا يثبت القبول الأصلي. يعيد الضابط التالي رفع الملفات الثلاثة الأصلية لكل لقطة فاشلة كما هي، 16 مرة على الصورة المقابلة، من الالتزام المثبت `e02e8c6`، دون VM. [أدلة الرفع](2026-10-04-upload-controls/summary.json).

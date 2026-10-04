@@ -1,5 +1,5 @@
 name: Intel artifact uploader control
-run-name: Intel uploader only / no guest execution / ${{ inputs.intel-image }}
+run-name: Intel uploader only / ${{ inputs.payload }} / ${{ inputs.intel-image }}
 on:
   workflow_dispatch:
     inputs:
@@ -8,6 +8,11 @@ on:
         type: choice
         default: macos-15-intel
         options: [macos-15-intel, macos-26-intel]
+      payload:
+        description: Synthetic data or exact historical snapshot (no VM or guest)
+        type: choice
+        default: synthetic
+        options: [synthetic, owner-macos-15, owner-macos-26]
 permissions:
   contents: read
 jobs:
@@ -16,6 +21,7 @@ jobs:
     timeout-minutes: 15
     env:
       DIAGNOSTIC_COMMIT: 9e74b172a3b9eb391d24af09a086a337f8fd88c9
+      UPLOAD_PAYLOAD: ${{ inputs.payload }}
     steps:
       - name: Check out comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -35,6 +41,13 @@ jobs:
           repository: actions/upload-artifact
           ref: 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
           path: artifact-uploader
+          persist-credentials: false
+      - name: Check out immutable historical payloads
+        if: inputs.payload != 'synthetic'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: e02e8c6c6861e7cc6919fda1209333a885c1ce25
+          path: payloads
           persist-credentials: false
       - name: Require native Intel host
         run: test "$(uname -m)" = x86_64

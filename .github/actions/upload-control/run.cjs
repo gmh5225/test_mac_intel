@@ -3,18 +3,23 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
 const {createHash} = require('node:crypto');
+const {loadReplay, PAYLOAD_REVISION} = require('./payload.cjs');
 const base = process.env.GITHUB_WORKSPACE;
 const {commandGroup, finishUpload} = require(path.join(base, 'diagnostics/.github/actions/hvf-intel-recovery/run.cjs'));
 const {UPLOAD_REVISION} = require(path.join(base, 'diagnostics/.github/actions/hvf-intel-diagnostic/run.cjs'));
 
 async function main() {
+  const selection = process.env.UPLOAD_PAYLOAD || 'synthetic';
   const revision = directory => spawnSync('git', ['-C', directory, 'rev-parse', 'HEAD'],
     {encoding: 'utf8', timeout: 10000});
-  for (const [directory, expected] of [['artifact-uploader', UPLOAD_REVISION],
-    ['diagnostics', process.env.DIAGNOSTIC_COMMIT]]) {
+  const checkouts = [['artifact-uploader', UPLOAD_REVISION],
+    ['diagnostics', process.env.DIAGNOSTIC_COMMIT]];
+  if (selection !== 'synthetic') checkouts.push(['payloads', PAYLOAD_REVISION]);
+  for (const [directory, expected] of checkouts) {
     const result = revision(path.join(base, directory));
     if (result.status !== 0 || result.stdout.trim() !== expected) throw new Error(`unexpected ${directory} revision`);
   }
+  const replay = selection === 'synthetic' ? null : loadReplay(path.join(base, 'payloads'), selection);
   const group = commandGroup();
   process.on('SIGTERM', () => group.cancel());
   process.on('SIGINT', () => group.cancel());
@@ -31,18 +36,25 @@ async function main() {
     v8_version: process.versions.v8, node_x86_64_uuid: uuids[0][1].toLowerCase(),
     node_sha256: createHash('sha256').update(fs.readFileSync(process.execPath)).digest('hex'),
     host_architecture: process.arch, image_version: process.env.ImageVersion,
-    requested_uploads: 16, completed_uploads: 0};
+    requested_uploads: 16, completed_uploads: 0,
+    payload: replay ? replay.manifest : {kind: 'synthetic', native_execution: false}};
   save(path.join(evidence, 'plan.json'), manifest);
   try {
     for (let index = 0; index < manifest.requested_uploads; ++index) {
       const suffix = `control-${String(index).padStart(3, '0')}`;
       const directory = path.join(evidence, suffix);
       fs.mkdirSync(directory);
-      // Similar small, compressible three-file snapshots; never native test evidence.
-      save(path.join(directory, 'metadata.json'), {...manifest, sequence: index});
-      save(path.join(directory, 'children.json'), {native_execution: false, process_groups: []});
-      fs.writeFileSync(path.join(directory, 'output-tail.log'),
-        Array.from({length: 250}, (_, i) => `Synthetic upload control line ${i}: no native guest execution.\n`).join(''), {flag: 'wx'});
+      if (replay) {
+        // Copy bytes exactly; current control identity stays in plan/result,
+        // outside the three-file payload that crashed the earlier uploader.
+        for (const [name, raw] of Object.entries(replay.data))
+          fs.writeFileSync(path.join(directory, name), raw, {flag: 'wx'});
+      } else {
+        save(path.join(directory, 'metadata.json'), {...manifest, sequence: index});
+        save(path.join(directory, 'children.json'), {native_execution: false, process_groups: []});
+        fs.writeFileSync(path.join(directory, 'output-tail.log'),
+          Array.from({length: 250}, (_, i) => `Synthetic upload control line ${i}: no native guest execution.\n`).join(''), {flag: 'wx'});
+      }
       const operation = group.start(process.execPath,
         [path.join(base, 'artifact-uploader/dist/upload/index.js')], {...process.env,
           INPUT_NAME: `intel-upload-only-attempt-${process.env.GITHUB_RUN_ATTEMPT}-${suffix}`,
