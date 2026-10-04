@@ -1,0 +1,112 @@
+{
+  "run_id": "37213681083",
+  "workflow_status": "completed",
+  "workflow_conclusion": "failure",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "fad0eadf281a6636e52ad1e20a7ea6abff55990d",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "4c702d35ae081a7d4461cc3fade686c458fcb96f",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "run_id": "37213681083",
+    "run_attempt": "1",
+    "runner_image": "macos-26-intel",
+    "image_version": "20260824.0517.1",
+    "repetitions": 1000,
+    "experiment": "recovery-vm-recreate",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261004T162948Z.json",
+  "artifacts_verified": 26,
+  "current_attempt_artifacts": 26,
+  "full_acceptance": false,
+  "observer_runtime": {
+    "kind": "actual-hvf-observer-runtime",
+    "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_version": "v24.19.0",
+    "v8_version": "13.6.233.17-node.51",
+    "host_system": "darwin",
+    "host_architecture": "x64",
+    "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+    "node_bytes": 123666640
+  },
+  "plan": {
+    "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "experiment": "recovery-vm-recreate",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfExecutor.Native*",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1",
+      "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VCPU": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VM": "1"
+    }
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-023",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller_commit": "fad0eadf281a6636e52ad1e20a7ea6abff55990d",
+      "captured_at": "2026-10-04T15:43:42.261Z",
+      "reason": "progress",
+      "sequence": 23,
+      "output": {
+        "size_at_open": 594057,
+        "first_byte": 0,
+        "copied_bytes": 594057,
+        "truncated": false
+      },
+      "progress": {
+        "last_started_iteration": 576,
+        "last_completed_iteration": 575,
+        "native_runs_in_copy": 576,
+        "native_ok_in_copy": 575
+      },
+      "identity": {
+        "native_pid": 32396,
+        "python_pid": 32387,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-04T15:43:42.261Z",
+        "stdout": "32396 32387 32396 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "[----------] 1 test from HvfExecutor (304 ms total)",
+      "",
+      "[==========] 1 test from 1 test suite ran. (304 ms total)",
+      "[  PASSED  ] 1 test.",
+      "",
+      "Repeating all tests (iteration 576) . . .",
+      "",
+      "Note: Google Test filter = HvfExecutor.Native*",
+      "[==========] Running 1 test from 1 test suite.",
+      "[----------] 1 test from HvfExecutor",
+      "[ RUN      ] HvfExecutor.NativeIntelCancellationAndCompletionFailureAllowRetry",
+      "INTEL_PROBE phase=executor_retained"
+    ]
+  },
+  "native_passed": null,
+  "final_native_result_present": false
+}
