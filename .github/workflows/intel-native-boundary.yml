@@ -27,7 +27,7 @@ on:
         required: true
         default: finite-deadline
         type: choice
-        options: [recovery, lifecycle, instruction, instruction-reuse, instruction-vcpu-recreate, instruction-vm-recreate, instruction-owner-recreate, owner-failure-controls, recovery-reuse, recovery-vcpu-recreate, recovery-vm-recreate, recovery-vm-no-host-kick, finite-deadline]
+        options: [recovery, lifecycle, instruction, instruction-reuse, instruction-vcpu-recreate, instruction-vm-recreate, instruction-owner-recreate, owner-failure-controls, recovery-reuse, recovery-vcpu-recreate, recovery-vm-recreate, recovery-vm-no-host-kick, finite-deadline, finite-vcpu-recreate, finite-vm-recreate]
       upload-runtime:
         description: Runtime for plan/progress uploader children only (provenance/final unchanged)
         default: default
@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      DIAGNOSTIC_COMMIT: 1aff847552ee507b6065a2a8ab378e5fc5321ae7
+      DIAGNOSTIC_COMMIT: 4e80b1394cfb2489fde177b30167629db71e693d
     steps:
       - name: Check out this comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
