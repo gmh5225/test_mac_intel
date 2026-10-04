@@ -10,7 +10,7 @@ These results narrow the investigation but establish no production fix. Retainin
 
 The same `909672ca6` candidate passed instruction-reuse1000 on both images, with complete native logs and retirement (37194478425, 37194538616). The next opt-in `instruction-vcpu-recreate` diagnostic retains VM and owner thread but recreates the vCPU after every original startup/32-NOP workload. It requires four ordered native lifecycle markers per iteration with continuous generation and the same owner, plus final Executor retirement and process exit. 1000 iterations mean 1000 recreations and 1001 vCPU generations; the final unused generation is destroyed on exit. This compares lifetimes and does not change production acceptance.
 
-The vCPU-only recreation control passed 1000/1000 on both Intel images (37195529270, 37195554929), including every lifecycle marker and final generation1001 retirement. The next explicit `instruction-vm-recreate` control also rebuilds the VM while retaining the same owner and VM lease. It requires eight ordered native events per iteration and final retirement; it does not establish a production fix or complete acceptance.
+Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreation (37195529270, 37195554929) and VM plus vCPU recreation on one retained owner (37196504453, 37196535787). The latter has 8000 ordered native events and final generation 1001 retirement per run; all 24/27 artifact digests, zero native/controller exits and child retirement were verified. This narrows the comparison with full Executor turnover but neither identifies the cause nor proves a production fix. The next diagnostic will retain the VM while replacing the vCPU and owner thread; original recovery and full CPU/Darwin acceptance remain required.
 
 ## zh-CN: Intel 隔离实验结果（2026-10-04）
 
@@ -22,7 +22,7 @@ The vCPU-only recreation control passed 1000/1000 on both Intel images (37195529
 
 同一 `909672ca6` 候选在两个镜像上均通过 instruction-reuse1000，完整原生日志和回收记录已核验（37194478425、37194538616）。下一项显式诊断 `instruction-vcpu-recreate` 保留 VM 和 owner 线程，在每轮原始启动探针及 32 条 NOP 后重建 vCPU。每轮必须有四个有序的原生生命周期标记、连续代际和同一 owner，最后还须证明 Executor 销毁及进程退出。1000 轮对应 1000 次重建、1001 代 vCPU，最后未执行 guest 的一代在退出时销毁。这是生命周期对照，不改变生产验收。
 
-只重建 vCPU 的对照在两套 Intel 镜像上均通过 1000/1000 轮（37195529270、37195554929），包含所有生命周期标记和第1001代的最终销毁。下一项显式诊断 `instruction-vm-recreate` 还会重建 VM，同时保留同一 owner 和 VM 排他锁。每轮要求八个有序原生事件及最终销毁完成；这不代表生产修复或完整验收。
+两项生命周期对照现已在两套 Intel 镜像上均通过 1000/1000 轮：仅重建 vCPU（37195529270、37195554929），以及保留同一 owner、重建 VM 和 vCPU（37196504453、37196535787）。后一项每次运行均包含 8000 个有序原生事件及第 1001 代的最终销毁；24/27 个产物摘要、原生与控制器正常退出、子进程回收均已核验。这缩小了与完整 Executor 周转的比较范围，但尚未定位原因或证明生产修复。下一项诊断将保留 VM、更换 vCPU 和 owner 线程；原始恢复及完整 CPU/Darwin 验收仍须通过。
 
 ## zh-TW: Intel 隔離實驗結果（2026-10-04）
 
@@ -34,7 +34,7 @@ The vCPU-only recreation control passed 1000/1000 on both Intel images (37195529
 
 同一 `909672ca6` 候選在兩個映像上均通過 instruction-reuse1000，完整原生紀錄與程序回收已核驗（37194478425、37194538616）。下一項明確啟用的診斷 `instruction-vcpu-recreate` 保留 VM 與 owner 執行緒，每輪原始啟動探針及 32 條 NOP 後重建 vCPU。每輪必須有四個有序原生生命週期標記、連續世代及相同 owner，最後須證明 Executor 銷毀與程序結束。1000 輪對應 1000 次重建、1001 代 vCPU；最後未執行 guest 的一代在結束時銷毀。此為生命週期對照，不改變正式驗收。
 
-僅重建 vCPU 的對照在兩套 Intel 映像上均通過 1000/1000 輪（37195529270、37195554929），包含所有生命週期標記與第1001代的最終銷毀。下一項明確啟用的診斷 `instruction-vm-recreate` 也會重建 VM，同時保留相同 owner 與 VM 排他鎖。每輪要求八個有序原生事件與最終銷毀完成；這不代表正式修復或完整驗收。
+兩項生命週期對照現已在兩套 Intel 映像上均通過 1000/1000 輪：僅重建 vCPU（37195529270、37195554929），以及保留相同 owner、重建 VM 與 vCPU（37196504453、37196535787）。後者每次執行均包含 8000 個有序原生事件及第 1001 代的最終銷毀；24/27 個產物摘要、原生與控制器正常退出、子程序回收均已核驗。這縮小了與完整 Executor 更替的比較範圍，但尚未定位原因或證明正式修復。下一項診斷將保留 VM、更換 vCPU 與 owner 執行緒；原始恢復及完整 CPU/Darwin 驗收仍須通過。
 
 ## ja: Intel 分離実験の結果（2026-10-04）
 
@@ -46,7 +46,7 @@ The vCPU-only recreation control passed 1000/1000 on both Intel images (37195529
 
 同じ候補 `909672ca6` は両イメージで instruction-reuse1000 に合格し、完全なログとプロセス回収を確認しました（37194478425、37194538616）。次の任意診断 `instruction-vcpu-recreate` は VM と所有スレッドを保持し、元の起動プローブと 32 個の NOP ごとに vCPU を再生成します。各回に順序どおりの 4 個のネイティブライフサイクル記録、連続した世代、同じ owner が必要で、最後に Executor の破棄とプロセス終了も要求します。1000 回は 1000 回の再生成、1001 世代を意味し、最後の未実行世代は終了時に破棄します。製品の合格条件は変更しません。
 
-vCPU のみの再生成は両 Intel イメージで 1000/1000 回に合格し（37195529270、37195554929）、全ライフサイクル記録と最終第1001世代の破棄を確認しました。次の任意診断 `instruction-vm-recreate` は同じ owner と VM 排他ロックを保持して VM も再生成します。各回の8個のネイティブイベントの順序と最終破棄が必須です。製品修正や完全な受け入れ検証を意味しません。
+両 Intel イメージで、vCPU 再生成（37195529270、37195554929）と同じ owner 上での VM・vCPU 再生成（37196504453、37196535787）が、それぞれ 1000/1000 回に合格しました。後者では各実行の 8000 個のネイティブイベントの順序と最終第 1001 世代の破棄、24/27 個の成果物ハッシュ、ネイティブ処理・制御側の終了コード 0、子プロセス回収を確認しました。Executor 全体の再生成との差を絞る証拠であり、原因や製品修正の証明ではありません。次は VM を保持して vCPU と owner スレッドを交換します。元の回復試験と完全な CPU/Darwin 検証は引き続き必要です。
 
 ## ko: Intel 분리 실험 결과（2026-10-04）
 
@@ -58,7 +58,7 @@ vCPU のみの再生成は両 Intel イメージで 1000/1000 回に合格し（
 
 동일한 후보 `909672ca6`이 두 이미지의 instruction-reuse1000을 통과했고 전체 로그와 프로세스 회수를 검증했습니다（37194478425, 37194538616）. 다음 선택 진단 `instruction-vcpu-recreate`는 VM과 소유 스레드를 유지하고 원래 시작 프로브와 32개 NOP 작업마다 vCPU를 다시 만듭니다. 매회 순서가 맞는 네 개의 네이티브 수명 표시, 연속 세대와 동일 owner가 필요하며 마지막 Executor 소멸과 프로세스 종료도 확인합니다. 1000회는 재생성 1000회와 vCPU 1001세대를 뜻하며, 실행하지 않은 마지막 세대는 종료 시 소멸합니다. 제품 승인 조건은 바꾸지 않습니다.
 
-vCPU만 재생성하는 대조가 두 Intel 이미지에서 1000/1000회를 통과했고（37195529270, 37195554929）, 모든 수명 표시와 마지막 1001세대 소멸을 확인했습니다. 다음 선택 진단 `instruction-vm-recreate`는 같은 owner와 VM 배타 잠금을 유지하면서 VM도 재생성합니다. 매회 여덟 네이티브 이벤트의 순서와 최종 소멸이 필요합니다. 제품 수정이나 전체 승인을 의미하지 않습니다.
+두 Intel 이미지에서 vCPU 재생성(37195529270, 37195554929)과 같은 owner에서 VM 및 vCPU 재생성(37196504453, 37196535787)이 각각 1000/1000회를 통과했습니다. 후자는 실행마다 네이티브 이벤트 8000개의 순서, 마지막 1001세대 소멸, 산출물 해시 24/27개, 네이티브·제어기 종료 코드 0과 자식 프로세스 회수를 검증했습니다. 전체 Executor 교체와의 차이를 좁히는 근거이며 원인이나 제품 수정의 증명은 아닙니다. 다음 진단은 VM을 유지하고 vCPU와 owner 스레드를 교체합니다. 원래 복구 시험과 전체 CPU/Darwin 검증은 여전히 필요합니다.
 
 ## fr: Résultats des expériences Intel isolées (2026-10-04)
 
@@ -70,7 +70,7 @@ Ces résultats réduisent le champ d’investigation sans établir de correction
 
 Le même candidat `909672ca6` a réussi instruction-reuse1000 sur les deux images, avec journaux complets et processus récupérés (37194478425, 37194538616). Le diagnostic facultatif suivant, `instruction-vcpu-recreate`, conserve VM et thread propriétaire, mais recrée le vCPU après chaque sonde de démarrage originale et 32 NOP. Il exige quatre marqueurs natifs ordonnés par itération, des générations continues, le même owner et la destruction finale de l’Executor suivie de la sortie du processus. 1000 itérations représentent 1000 recréations et 1001 générations ; la dernière, non exécutée, est détruite à la sortie. Les critères d’acceptation du produit restent inchangés.
 
-La recréation du seul vCPU a réussi 1000/1000 fois sur les deux images Intel (37195529270, 37195554929), avec tous les marqueurs et la destruction finale de la génération1001. Le prochain contrôle explicite `instruction-vm-recreate` recrée aussi la VM, en conservant le même owner et le verrou exclusif VM. Il exige huit événements natifs ordonnés par itération et la destruction finale ; il ne prouve ni correction du produit ni validation complète.
+Les deux contrôles ont désormais réussi 1000/1000 fois sur les deux images Intel : recréation du vCPU (37195529270, 37195554929), puis de la VM et du vCPU avec le même owner (37196504453, 37196535787). Ce dernier comprend 8000 événements natifs ordonnés et la destruction finale de la génération 1001 par exécution ; les 24/27 empreintes, les sorties natives et du contrôleur à zéro et la collecte des processus ont été vérifiées. Cela précise la comparaison avec le renouvellement complet d’Executor sans identifier la cause ni prouver une correction. Le prochain diagnostic conservera la VM et remplacera le vCPU et son thread propriétaire. La récupération originale et la validation CPU/Darwin complète restent nécessaires.
 
 ## de: Ergebnisse isolierter Intel-Versuche (2026-10-04)
 
@@ -82,7 +82,7 @@ Die Ergebnisse grenzen die Untersuchung ein, belegen aber keine Produktkorrektur
 
 Derselbe Kandidat `909672ca6` bestand instruction-reuse1000 auf beiden Images mit vollständigen Logs und eingesammelten Prozessen (37194478425, 37194538616). Die nächste optionale Diagnose `instruction-vcpu-recreate` behält VM und Besitzerthread bei, erstellt die vCPU aber nach ursprünglicher Startprobe und 32 NOPs jedes Durchlaufs neu. Sie verlangt vier geordnete native Lebenszyklusmarkierungen pro Durchlauf, lückenlose Generationen, denselben owner sowie abschließende Executor-Zerstörung und Prozessende. 1000 Durchläufe ergeben 1000 Neuerstellungen und 1001 Generationen; die letzte, unbenutzte Generation wird beim Beenden zerstört. Die Produktabnahme bleibt unverändert.
 
-Die reine vCPU-Neuerstellung bestand 1000/1000 Durchläufe auf beiden Intel-Images (37195529270, 37195554929), einschließlich aller Markierungen und der abschließenden Zerstörung von Generation1001. Der nächste explizite Vergleich `instruction-vm-recreate` erstellt zusätzlich die VM neu, behält aber owner und exklusiven VM-Lock. Acht geordnete native Ereignisse je Durchlauf und die abschließende Zerstörung sind erforderlich. Das belegt weder Produktkorrektur noch vollständige Abnahme.
+Beide Lebenszyklusvergleiche bestanden jetzt auf beiden Intel-Images jeweils 1000/1000 Durchläufe: vCPU-Neuerstellung (37195529270, 37195554929) sowie VM- und vCPU-Neuerstellung bei gleichem owner (37196504453, 37196535787). Letztere belegt je Lauf 8000 geordnete native Ereignisse und die abschließende Zerstörung von Generation 1001; alle 24/27 Artefakt-Hashes, Rückgabecodes null und das Einsammeln der Kindprozesse wurden geprüft. Das grenzt den Vergleich mit vollständigem Executor-Wechsel ein, beweist aber weder Ursache noch Produktkorrektur. Als Nächstes bleiben die VM erhalten und werden vCPU und Besitzer-Thread ersetzt. Originaler Wiederherstellungstest und vollständige CPU/Darwin-Abnahme bleiben erforderlich.
 
 ## es: Resultados de experimentos Intel aislados (2026-10-04)
 
@@ -94,7 +94,7 @@ Estos resultados acotan la investigación, pero no establecen una corrección de
 
 El mismo candidato `909672ca6` superó instruction-reuse1000 en ambas imágenes, con registros completos y procesos recogidos (37194478425, 37194538616). El siguiente diagnóstico opcional, `instruction-vcpu-recreate`, conserva VM e hilo propietario y recrea la vCPU tras cada sonda de inicio original y 32 NOP. Exige cuatro marcadores nativos ordenados por iteración, generaciones continuas, el mismo owner, destrucción final de Executor y salida del proceso. 1000 iteraciones equivalen a 1000 recreaciones y 1001 generaciones; la última no ejecutada se destruye al salir. Los criterios de aceptación del producto no cambian.
 
-La recreación solo de vCPU superó 1000/1000 iteraciones en ambas imágenes Intel (37195529270, 37195554929), con todos los marcadores y la destrucción final de la generación1001. El siguiente control explícito `instruction-vm-recreate` recrea también la VM y conserva el mismo owner y bloqueo exclusivo VM. Exige ocho eventos nativos ordenados por iteración y la destrucción final; no demuestra una corrección del producto ni aceptación completa.
+Ambos controles de ciclo de vida superaron ya 1000/1000 iteraciones en las dos imágenes Intel: recreación de vCPU (37195529270, 37195554929) y de VM más vCPU conservando el mismo owner (37196504453, 37196535787). El segundo acredita 8000 eventos nativos ordenados y la destrucción final de la generación 1001 por ejecución; se verificaron las 24/27 huellas, las salidas nativas y del controlador a cero y la recogida de los procesos. Esto acota la comparación con la sustitución completa de Executor, pero no identifica la causa ni demuestra una corrección. El siguiente diagnóstico conservará la VM y sustituirá vCPU e hilo propietario. Siguen pendientes la recuperación original y la validación CPU/Darwin completa.
 
 ## it: Risultati degli esperimenti Intel isolati (2026-10-04)
 
@@ -106,7 +106,7 @@ Questi risultati restringono l’indagine, ma non dimostrano una correzione di p
 
 Lo stesso candidato `909672ca6` ha superato instruction-reuse1000 su entrambe le immagini, con log completi e processi raccolti (37194478425, 37194538616). Il prossimo diagnostico facoltativo, `instruction-vcpu-recreate`, mantiene VM e thread proprietario, ricreando la vCPU dopo ogni sonda iniziale originale e 32 NOP. Richiede quattro marcatori nativi ordinati per iterazione, generazioni continue, lo stesso owner, distruzione finale di Executor e uscita del processo. 1000 iterazioni producono 1000 ricreazioni e 1001 generazioni; l’ultima inutilizzata viene distrutta all’uscita. I criteri di accettazione del prodotto restano invariati.
 
-La ricreazione della sola vCPU ha superato 1000/1000 iterazioni su entrambe le immagini Intel (37195529270, 37195554929), con tutti i marcatori e la distruzione finale della generazione1001. Il prossimo controllo esplicito `instruction-vm-recreate` ricrea anche la VM, mantenendo lo stesso owner e il lock esclusivo VM. Richiede otto eventi nativi ordinati per iterazione e la distruzione finale; non dimostra una correzione del prodotto o accettazione completa.
+Entrambi i controlli hanno ora superato 1000/1000 iterazioni sulle due immagini Intel: ricreazione della vCPU (37195529270, 37195554929) e di VM più vCPU con lo stesso owner (37196504453, 37196535787). Il secondo documenta 8000 eventi nativi ordinati e la distruzione finale della generazione 1001 per esecuzione; sono stati verificati tutti i 24/27 hash, le uscite native e del controllore a zero e la raccolta dei processi. Ciò restringe il confronto con il rinnovo completo di Executor, senza identificare la causa o dimostrare una correzione. Il prossimo diagnostico manterrà la VM e sostituirà vCPU e thread proprietario. Restano necessari il recupero originale e la validazione CPU/Darwin completa.
 
 ## ru: Результаты изолированных экспериментов Intel (2026-10-04)
 
@@ -118,7 +118,7 @@ La ricreazione della sola vCPU ha superato 1000/1000 iterazioni su entrambe le i
 
 Тот же кандидат `909672ca6` прошёл instruction-reuse1000 на обоих образах; полные журналы и сбор процессов проверены (37194478425, 37194538616). Следующая необязательная диагностика `instruction-vcpu-recreate` сохраняет VM и поток-владелец, но пересоздаёт vCPU после каждой исходной стартовой пробы и 32 NOP. Нужны четыре упорядоченных нативных события на итерацию, последовательные поколения, неизменный owner и окончательное уничтожение Executor с выходом процесса. 1000 итераций означают 1000 пересозданий и 1001 поколение; последнее неиспользованное поколение уничтожается при выходе. Критерии приёмки продукта не меняются.
 
-Пересоздание только vCPU прошло 1000/1000 итераций на обоих образах Intel (37195529270, 37195554929), включая все события и окончательное уничтожение поколения1001. Следующая явная диагностика `instruction-vm-recreate` также пересоздаёт VM, сохраняя того же owner и исключительную блокировку VM. Нужны восемь упорядоченных нативных событий на итерацию и окончательное уничтожение; это не доказывает исправление продукта или полную приёмку.
+Оба сравнения жизненного цикла прошли по 1000/1000 итераций на обоих образах Intel: пересоздание vCPU (37195529270, 37195554929) и VM вместе с vCPU при сохранении owner (37196504453, 37196535787). Во втором проверены 8000 упорядоченных нативных событий и окончательное уничтожение поколения 1001 на запуск, все 24/27 хешей артефактов, нулевые коды выхода и сбор дочерних процессов. Это сужает сравнение с полной заменой Executor, но не устанавливает причину и не доказывает исправление. Следующая диагностика сохранит VM, заменяя vCPU и поток-владелец. Исходный тест восстановления и полная приёмка CPU/Darwin по-прежнему необходимы.
 
 ## ar: نتائج تجارب Intel المعزولة (2026-10-04)
 
@@ -130,4 +130,4 @@ La ricreazione della sola vCPU ha superato 1000/1000 iterazioni su entrambe le i
 
 نجح المرشح نفسه `909672ca6` في instruction-reuse1000 على الصورتين، مع تدقيق السجلات الكاملة وجمع العمليات (37194478425، 37194538616). يحتفظ التشخيص الاختياري التالي `instruction-vcpu-recreate` بالـVM والخيط المالك، ويعيد إنشاء vCPU بعد كل مجس بدء أصلي و32 تعليمة NOP. يشترط أربع علامات أصلية مرتبة لكل تكرار وأجيالًا متتابعة وowner ثابتًا، ثم تدمير Executor النهائي وخروج العملية. تعني 1000 دورة 1000 إعادة إنشاء و1001 جيل؛ ويُدمَّر الجيل الأخير الذي لم ينفذ الضيف عند الخروج. لا تتغير شروط قبول المنتج.
 
-نجحت إعادة إنشاء vCPU وحدها في 1000/1000 تكرار على صورتي Intel (37195529270، 37195554929)، مع جميع العلامات والتدمير النهائي للجيل1001. يعيد التشخيص الصريح التالي `instruction-vm-recreate` إنشاء VM أيضًا مع الحفاظ على owner نفسه وقفل VM الحصري. يشترط ثمانية أحداث أصلية مرتبة لكل تكرار والتدمير النهائي؛ ولا يثبت إصلاح المنتج أو القبول الكامل.
+نجح الآن ضابطا دورة الحياة في 1000/1000 تكرار على صورتي Intel: إعادة إنشاء vCPU ‏(37195529270، 37195554929)، ثم VM وvCPU مع الاحتفاظ بالمالك نفسه (37196504453، 37196535787). يثبت الثاني 8000 حدث أصلي مرتب وتدمير الجيل 1001 النهائي في كل تشغيل؛ ودُققت بصمات الملفات الـ24/27، ورموز الخروج الصفرية، وجمع العمليات الفرعية. يضيّق ذلك المقارنة مع تبديل Executor بالكامل، لكنه لا يحدد السبب ولا يثبت إصلاح المنتج. سيحتفظ التشخيص التالي بالـVM ويستبدل vCPU والخيط المالك. يبقى اختبار الاسترداد الأصلي والتحقق الكامل لـCPU/Darwin مطلوبين.

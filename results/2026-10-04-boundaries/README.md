@@ -15,16 +15,15 @@
 | macOS 15 Intel | ordinary instruction, no explicit cancellation | 617 / 1000 retained prefix | runner communication lost; no final result | [37187116164](https://github.com/gmh5225/test_mac_intel/actions/runs/37187116164) |
 | macOS 15 Intel | revised finite-deadline | 274 / 1000 retained prefix | runner communication lost; no final result | [37188626438](https://github.com/gmh5225/test_mac_intel/actions/runs/37188626438) |
 | macOS 26 Intel | recovery-reuse | 678 / 1000 retained prefix | runner communication lost; no final result | [37189209307](https://github.com/gmh5225/test_mac_intel/actions/runs/37189209307) |
-
 | macOS 15 Intel | finite owner-deadline candidate, original recovery | 277 / 1000 retained prefix | runner communication lost; no final result | [37190649747](https://github.com/gmh5225/test_mac_intel/actions/runs/37190649747) |
 | macOS 26 Intel | finite owner-deadline candidate, original recovery | 250 / 1000 retained prefix | runner communication lost; no final result | [37190739520](https://github.com/gmh5225/test_mac_intel/actions/runs/37190739520) |
 | macOS 15 Intel | finite owner-deadline candidate, ordinary instructions | 576 / 1000 retained prefix | runner communication lost; no final result | [37191847905](https://github.com/gmh5225/test_mac_intel/actions/runs/37191847905) |
-
 | macOS 15 Intel | finite owner-deadline candidate, instruction-reuse | 1000 / 1000 | pass, process retired | [37194478425](https://github.com/gmh5225/test_mac_intel/actions/runs/37194478425) |
 | macOS 26 Intel | finite owner-deadline candidate, instruction-reuse | 1000 / 1000 | pass, process retired | [37194538616](https://github.com/gmh5225/test_mac_intel/actions/runs/37194538616) |
-
 | macOS 15 Intel | vCPU recreation, retained VM/owner | 1000 / 1000 | pass, final generation1001 retired | [37195529270](https://github.com/gmh5225/test_mac_intel/actions/runs/37195529270) |
 | macOS 26 Intel | vCPU recreation, retained VM/owner | 1000 / 1000 | pass, final generation1001 retired | [37195554929](https://github.com/gmh5225/test_mac_intel/actions/runs/37195554929) |
+| macOS 15 Intel | VM/vCPU recreation, retained owner | 1000 / 1000 | pass, final generation 1001 retired | [37196504453](https://github.com/gmh5225/test_mac_intel/actions/runs/37196504453) |
+| macOS 26 Intel | VM/vCPU recreation, retained owner | 1000 / 1000 | pass, final generation 1001 retired | [37196535787](https://github.com/gmh5225/test_mac_intel/actions/runs/37196535787) |
 
 [Updated interpretation in all 11 languages](../2026-10-04-investigation.md): candidate `909672ca6` did not resolve runner loss.
 
