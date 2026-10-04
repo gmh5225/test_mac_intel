@@ -80,8 +80,8 @@ def collect(command, cwd, evidence, environment, timeout, guard_type):
             child = subprocess.Popen(command, cwd=cwd, env=environment,
                 stdin=subprocess.DEVNULL, stdout=slave, stderr=subprocess.STDOUT,
                 start_new_session=True)
-            os.close(slave)
-            slave = -1
+            # Darwin can discard unread PTY output when its last slave closes.
+            # Retain our slave until the child has exited and the master drains.
             while True:
                 remaining = start + timeout - time.monotonic()
                 if remaining <= 0:
@@ -89,7 +89,9 @@ def collect(command, cwd, evidence, environment, timeout, guard_type):
                     # late exit zero cannot turn an expired run into success.
                     timed_out = True
                     break
-                readable, _, _ = select.select([master], [], [], min(remaining, 0.1))
+                exited_before_select = child.poll() is not None
+                readable, _, _ = select.select([master], [], [],
+                    0 if exited_before_select else min(remaining, 0.1))
                 if readable:
                     try:
                         data = os.read(master, 65536)
@@ -100,8 +102,10 @@ def collect(command, cwd, evidence, environment, timeout, guard_type):
                     if not data:
                         break
                     output.write(data)
-                # Even a reaped child may have unread bytes in the PTY.
-                # Only EOF/EIO ends collection before the fixed deadline.
+                elif exited_before_select:
+                    # Exit was observed BEFORE this empty select. No native
+                    # writer remains and every buffered byte has been drained.
+                    break
             # PTY EOF can precede waitpid by a small amount. Reap naturally
             # within the original budget before the guard retires a live child.
             if not timed_out:
