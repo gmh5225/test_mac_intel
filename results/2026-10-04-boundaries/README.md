@@ -2,34 +2,68 @@
 
 [Machine-readable results](summary.json). Completed native runs retain their original logs, plan, process/controller results and retirement record. Runner losses retain the last available original log prefix and GitHub annotation; missing final results stay explicit. All runs retain provenance, server artifact digests and extracted-file hashes. Failed experiments remain included. These are separate experiments, not a combined acceptance result.
 
-| Image | Experiment | Completed / requested | Result | Run |
-| --- | --- | ---: | --- | --- |
-| macOS 15 Intel | finite-deadline, initial probe | 100 / 100 | pass | [37187110850](https://github.com/gmh5225/test_mac_intel/actions/runs/37187110850) |
-| macOS 15 Intel | lifecycle, no guest | 1000 / 1000 | pass | [37187113495](https://github.com/gmh5225/test_mac_intel/actions/runs/37187113495) |
-| macOS 26 Intel | finite-deadline, strict exits | 100 / 100 | pass | [37187348661](https://github.com/gmh5225/test_mac_intel/actions/runs/37187348661) |
-| macOS 15 Intel | finite-deadline, strict exits | 78 / 1000 | assertion, iteration 79 | [37187857983](https://github.com/gmh5225/test_mac_intel/actions/runs/37187857983) |
-| macOS 26 Intel | finite-deadline, strict exits | 168 / 1000 | assertion, iteration 169 | [37187859944](https://github.com/gmh5225/test_mac_intel/actions/runs/37187859944) |
-| macOS 15 Intel | instruction-reuse | 1000 / 1000 | pass | [37188215751](https://github.com/gmh5225/test_mac_intel/actions/runs/37188215751) |
-| macOS 26 Intel | finite-deadline, bounded witness acquisition | 1000 / 1000 | pass | [37188627569](https://github.com/gmh5225/test_mac_intel/actions/runs/37188627569) |
-| macOS 15 Intel | recovery-reuse, original Native* body | 1000 / 1000 | pass | [37189167627](https://github.com/gmh5225/test_mac_intel/actions/runs/37189167627) |
-| macOS 15 Intel | ordinary instruction, no explicit cancellation | 617 / 1000 retained prefix | runner communication lost; no final result | [37187116164](https://github.com/gmh5225/test_mac_intel/actions/runs/37187116164) |
-| macOS 15 Intel | revised finite-deadline | 274 / 1000 retained prefix | runner communication lost; no final result | [37188626438](https://github.com/gmh5225/test_mac_intel/actions/runs/37188626438) |
-| macOS 26 Intel | recovery-reuse | 678 / 1000 retained prefix | runner communication lost; no final result | [37189209307](https://github.com/gmh5225/test_mac_intel/actions/runs/37189209307) |
-| macOS 15 Intel | finite owner-deadline candidate, original recovery | 277 / 1000 retained prefix | runner communication lost; no final result | [37190649747](https://github.com/gmh5225/test_mac_intel/actions/runs/37190649747) |
-| macOS 26 Intel | finite owner-deadline candidate, original recovery | 250 / 1000 retained prefix | runner communication lost; no final result | [37190739520](https://github.com/gmh5225/test_mac_intel/actions/runs/37190739520) |
-| macOS 15 Intel | finite owner-deadline candidate, ordinary instructions | 576 / 1000 retained prefix | runner communication lost; no final result | [37191847905](https://github.com/gmh5225/test_mac_intel/actions/runs/37191847905) |
-| macOS 15 Intel | finite owner-deadline candidate, instruction-reuse | 1000 / 1000 | pass, process retired | [37194478425](https://github.com/gmh5225/test_mac_intel/actions/runs/37194478425) |
-| macOS 26 Intel | finite owner-deadline candidate, instruction-reuse | 1000 / 1000 | pass, process retired | [37194538616](https://github.com/gmh5225/test_mac_intel/actions/runs/37194538616) |
-| macOS 15 Intel | vCPU recreation, retained VM/owner | 1000 / 1000 | pass, final generation1001 retired | [37195529270](https://github.com/gmh5225/test_mac_intel/actions/runs/37195529270) |
-| macOS 26 Intel | vCPU recreation, retained VM/owner | 1000 / 1000 | pass, final generation1001 retired | [37195554929](https://github.com/gmh5225/test_mac_intel/actions/runs/37195554929) |
-| macOS 15 Intel | VM/vCPU recreation, retained owner | 1000 / 1000 | pass, final generation 1001 retired | [37196504453](https://github.com/gmh5225/test_mac_intel/actions/runs/37196504453) |
-| macOS 26 Intel | VM/vCPU recreation, retained owner | 1000 / 1000 | pass, final generation 1001 retired | [37196535787](https://github.com/gmh5225/test_mac_intel/actions/runs/37196535787) |
-| macOS 15 Intel | owner handoff failure controls, no guest | 100 / 100 | pass, 300 injected checks and cleanup | [37198197978](https://github.com/gmh5225/test_mac_intel/actions/runs/37198197978) |
-| macOS 26 Intel | owner handoff failure controls, no guest | 100 / 100 | pass, 300 injected checks and cleanup | [37198200471](https://github.com/gmh5225/test_mac_intel/actions/runs/37198200471) |
-| macOS 15 Intel | owner recreation, retained VM | 24 / 1000 interrupted | uploader SIGTRAP; native cancelled and retired | [37198629082](https://github.com/gmh5225/test_mac_intel/actions/runs/37198629082) |
-| macOS 26 Intel | owner recreation, retained VM | 467 / 1000 interrupted | uploader SIGSEGV; native cancelled and retired | [37198630903](https://github.com/gmh5225/test_mac_intel/actions/runs/37198630903) |
+| Image | Experiment | Source | Completed / started / requested | Outcome | Run |
+| --- | --- | --- | ---: | --- | --- |
+| macos-15-intel | `finite-deadline` | [e2c7a4f4f](37187110850/provenance.json) | 100 / 100 / 100 | pass; child reaped | [37187110850](https://github.com/gmh5225/test_mac_intel/actions/runs/37187110850) |
+| macos-15-intel | `lifecycle` | [e2c7a4f4f](37187113495/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37187113495](https://github.com/gmh5225/test_mac_intel/actions/runs/37187113495) |
+| macos-26-intel | `finite-deadline` | [20cead789](37187348661/provenance.json) | 100 / 100 / 100 | pass; child reaped | [37187348661](https://github.com/gmh5225/test_mac_intel/actions/runs/37187348661) |
+| macos-15-intel | `finite-deadline` | [20cead789](37187857983/provenance.json) | 78 / 79 / 1000 | native assertion; child reaped | [37187857983](https://github.com/gmh5225/test_mac_intel/actions/runs/37187857983) |
+| macos-26-intel | `finite-deadline` | [20cead789](37187859944/provenance.json) | 168 / 169 / 1000 | native assertion; child reaped | [37187859944](https://github.com/gmh5225/test_mac_intel/actions/runs/37187859944) |
+| macos-15-intel | `instruction-reuse` | [2abdc49c5](37188215751/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37188215751](https://github.com/gmh5225/test_mac_intel/actions/runs/37188215751) |
+| macos-26-intel | `finite-deadline` | [392a9d171](37188627569/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37188627569](https://github.com/gmh5225/test_mac_intel/actions/runs/37188627569) |
+| macos-15-intel | `recovery-reuse` | [f35fa4bd2](37189167627/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37189167627](https://github.com/gmh5225/test_mac_intel/actions/runs/37189167627) |
+| macos-15-intel | `instruction` | [e2c7a4f4f](37187116164/provenance.json) | 617 / 618 / 1000 | runner lost communication; native result and retirement unknown | [37187116164](https://github.com/gmh5225/test_mac_intel/actions/runs/37187116164) |
+| macos-15-intel | `finite-deadline` | [392a9d171](37188626438/provenance.json) | 274 / 275 / 1000 | runner lost communication; native result and retirement unknown | [37188626438](https://github.com/gmh5225/test_mac_intel/actions/runs/37188626438) |
+| macos-26-intel | `recovery-reuse` | [f35fa4bd2](37189209307/provenance.json) | 678 / 679 / 1000 | runner lost communication; native result and retirement unknown | [37189209307](https://github.com/gmh5225/test_mac_intel/actions/runs/37189209307) |
+| macos-15-intel | `recovery` | [909672ca6](37190649747/provenance.json) | 277 / 278 / 1000 | runner lost communication; native result and retirement unknown | [37190649747](https://github.com/gmh5225/test_mac_intel/actions/runs/37190649747) |
+| macos-26-intel | `recovery` | [909672ca6](37190739520/provenance.json) | 250 / 251 / 1000 | runner lost communication; native result and retirement unknown | [37190739520](https://github.com/gmh5225/test_mac_intel/actions/runs/37190739520) |
+| macos-15-intel | `instruction` | [909672ca6](37191847905/provenance.json) | 576 / 577 / 1000 | runner lost communication; native result and retirement unknown | [37191847905](https://github.com/gmh5225/test_mac_intel/actions/runs/37191847905) |
+| macos-15-intel | `instruction-reuse` | [909672ca6](37194478425/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37194478425](https://github.com/gmh5225/test_mac_intel/actions/runs/37194478425) |
+| macos-26-intel | `instruction-reuse` | [909672ca6](37194538616/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37194538616](https://github.com/gmh5225/test_mac_intel/actions/runs/37194538616) |
+| macos-15-intel | `instruction-vcpu-recreate` | [74e3b59a1](37195529270/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37195529270](https://github.com/gmh5225/test_mac_intel/actions/runs/37195529270) |
+| macos-26-intel | `instruction-vcpu-recreate` | [74e3b59a1](37195554929/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37195554929](https://github.com/gmh5225/test_mac_intel/actions/runs/37195554929) |
+| macos-15-intel | `instruction-vm-recreate` | [9eccca62d](37196504453/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37196504453](https://github.com/gmh5225/test_mac_intel/actions/runs/37196504453) |
+| macos-26-intel | `instruction-vm-recreate` | [9eccca62d](37196535787/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37196535787](https://github.com/gmh5225/test_mac_intel/actions/runs/37196535787) |
+| macos-15-intel | `owner-failure-controls` | [9e74b172a](37198197978/provenance.json) | 100 / 100 / 100 | pass; child reaped | [37198197978](https://github.com/gmh5225/test_mac_intel/actions/runs/37198197978) |
+| macos-26-intel | `owner-failure-controls` | [9e74b172a](37198200471/provenance.json) | 100 / 100 / 100 | pass; child reaped | [37198200471](https://github.com/gmh5225/test_mac_intel/actions/runs/37198200471) |
+| macos-15-intel | `instruction-owner-recreate` | [9e74b172a](37198629082/provenance.json) | 24 / 25 / 1000 | uploader SIGTRAP; native result unknown; child reaped | [37198629082](https://github.com/gmh5225/test_mac_intel/actions/runs/37198629082) |
+| macos-26-intel | `instruction-owner-recreate` | [9e74b172a](37198630903/provenance.json) | 467 / 468 / 1000 | uploader SIGSEGV; native result unknown; child reaped | [37198630903](https://github.com/gmh5225/test_mac_intel/actions/runs/37198630903) |
+| macos-15-intel | `recovery-reuse` | [9e74b172a](37203540596/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37203540596](https://github.com/gmh5225/test_mac_intel/actions/runs/37203540596) |
+| macos-26-intel | `recovery-reuse` | [9e74b172a](37203542459/provenance.json) | 772 / 773 / 1000 | native assertion; child reaped | [37203542459](https://github.com/gmh5225/test_mac_intel/actions/runs/37203542459) |
+| macos-15-intel | `recovery` | [faad8299b](37202068724/provenance.json) | 302 / 303 / 1000 | runner lost communication; native result and retirement unknown | [37202068724](https://github.com/gmh5225/test_mac_intel/actions/runs/37202068724) |
+| macos-26-intel | `recovery` | [faad8299b](37202070988/provenance.json) | 225 / 226 / 1000 | runner lost communication; native result and retirement unknown | [37202070988](https://github.com/gmh5225/test_mac_intel/actions/runs/37202070988) |
+| macos-15-intel | `recovery-reuse` | [7dd7342ec](37204841332/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37204841332](https://github.com/gmh5225/test_mac_intel/actions/runs/37204841332) |
+| macos-26-intel | `recovery-reuse` | [7dd7342ec](37204843517/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37204843517](https://github.com/gmh5225/test_mac_intel/actions/runs/37204843517) |
+| macos-26-intel | `recovery-vcpu-recreate` | [7dd7342ec](37215098793/provenance.json) | 403 / 404 / 1000 | uploader SIGSEGV; native result unknown; child reaped | [37215098793](https://github.com/gmh5225/test_mac_intel/actions/runs/37215098793) |
+| macos-15-intel | `recovery-vcpu-recreate` | [7dd7342ec](37215096822/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37215096822](https://github.com/gmh5225/test_mac_intel/actions/runs/37215096822) |
+| macos-15-intel | `recovery-vm-recreate` | [7dd7342ec](37213675739/provenance.json) | 502 / 503 / 1000 | runner lost communication; native result and retirement unknown | [37213675739](https://github.com/gmh5225/test_mac_intel/actions/runs/37213675739) |
+| macos-26-intel | `recovery-vm-recreate` | [7dd7342ec](37213681083/provenance.json) | 575 / 576 / 1000 | runner lost communication; native result and retirement unknown | [37213681083](https://github.com/gmh5225/test_mac_intel/actions/runs/37213681083) |
+| macos-15-intel | `recovery-vcpu-recreate` (jitless) | [7dd7342ec](37217523688/provenance.json) | — / — / 1000 | plan uploader incompatible; recovery not started | [37217523688](https://github.com/gmh5225/test_mac_intel/actions/runs/37217523688) |
+| macos-26-intel | `recovery-vcpu-recreate` (jitless) | [7dd7342ec](37217525863/provenance.json) | — / — / 1000 | plan uploader incompatible; recovery not started | [37217525863](https://github.com/gmh5225/test_mac_intel/actions/runs/37217525863) |
+| macos-15-intel | `recovery-vcpu-recreate` (js-interpreter) | [7dd7342ec](37218629672/provenance.json) | 460 / 461 / 1000 | uploader SIGSEGV; native result unknown; child reaped | [37218629672](https://github.com/gmh5225/test_mac_intel/actions/runs/37218629672) |
+| macos-26-intel | `recovery-vcpu-recreate` (js-interpreter) | [7dd7342ec](37218631679/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37218631679](https://github.com/gmh5225/test_mac_intel/actions/runs/37218631679) |
 
 [Updated interpretation in all 11 languages](../2026-10-04-investigation.md): candidate `909672ca6` did not resolve runner loss.
+
+The table is generated from every entry in `summary.json` by
+`python3 scripts/render_boundary_index.py` from the repository root. Source links
+open each run's exact provenance; different source revisions and uploader modes
+are separate experiments.
+
+The supplementary [finite observation audit](37188627569/finite-observation-audit.json)
+reconciles the unchanged 1,000-iteration output from run 37188627569 against
+ordered begin/end/capture events, fresh store witnesses, fixed first-loop budgets
+and both MTF observations. The [auditor](../../scripts/finite_probe_contract.py)
+and its 19 [regression tests](../../scripts/test_finite_probe_contract.py) are
+retained. This is a replay of saved evidence, not a new native run; provenance,
+native exit, lifecycle and process retirement remain separate checks. Reproduce
+the observation audit from the repository root:
+
+```sh
+python3 scripts/finite_probe_contract.py \
+  results/2026-10-04-boundaries/37188627569/execution-output.log \
+  --repetitions 1000 --preparation-phase prepare_with_watchdog
+```
 
 **English.** The two finite-probe failures assumed that a 5 ms slice necessarily executes a guest store. A timer can expire before the first guest instruction; the assertion triggered GoogleTest SIGTRAP and both children retired. The revised probe retains one total deadline while allowing empty slices and requires a fresh store witness. Executor reuse retains the VM and executor threads across iterations; cancellation still recreates the vCPU. These controls do not establish a production fix or full CPU/Darwin acceptance. The initial 100-loop probe lacked the later exit allowlist; its saved returns were audited separately. Pending runs are not included as passes. Later, GitHub confirmed runner communication loss for the macOS 15 revised finite probe (274 complete / 275 started in the retained prefix) and macOS 26 recovery-reuse (678 / 679). Those prefixes do not locate the eventual fault; reuse is not an established fix.
 
