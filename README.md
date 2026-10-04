@@ -48,6 +48,8 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 
 `instruction-reuse` runs the same ordinary-instruction test while retaining one Executor across iterations. VM, vCPU, owner/watchdog threads and native state survive together; each fixture still retires its mappings. The controller isolates diagnostic environment switches. This compares executor lifetimes and cannot attribute a difference solely to VM destruction.
 
+`recovery-reuse` retains the Executor around the original `HvfExecutor.Native*` recovery test, including its actual vCPU destruction/recreation after cancellation. Both reuse modes require exactly one native retention marker in every iteration and reject older source without that evidence. Default `recovery` is unchanged; reuse is diagnostic evidence only. Finite probes keep one fixed overall witness budget across short slices that may expire before guest execution.
+
 ## 中文（简体）
 
 在 Actions 中选择 **Personal Intel HVF recovery diagnosis** 并手动运行，无需本地 Intel Mac。默认使用 `macos-26-intel`，对固定的 NeverD 源码在同一进程连续测试 1,000 轮；也可选择 `macos-15-intel` 或 100 轮诊断。产物保留版本、计划、实时进度和最终结果。排队时间与运行稳定性分别判断；单次恢复测试通过不能代表完整 CPU、macOS 或 iOS 覆盖。[完整指南](https://github.com/NeverSight/NeverD/blob/dev/docs/zh-CN/macos-hvf.md)。
@@ -57,6 +59,8 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 新增 `Intel HVF native boundary experiments` 工作流：`lifecycle` 只创建和回收 VM/vCPU 与映射，不运行客体；`instruction` 验证真实启动探针和普通指令；`finite-deadline` 使用原有长模式准备，记录有限、过期和短期限调用的原生写入见证、时间、RIP、寄存器和退出原因。有限调用不使用异步 watchdog，准备和重试仍使用原有执行路径。不支持计时器或出现意外退出会失败。每次运行只选一个实验和一个镜像，可选 100/1000 轮；三个仓库版本分别留档。诊断通过不代表完整验收，也不代表失联已经修复。
 
 `instruction-reuse` 执行相同的普通指令测试，跨轮次保留一个执行器，其中 VM、vCPU、工作线程、watchdog 线程和原生状态一同保留；每轮映射仍会回收。控制器隔离诊断环境开关。此对照研究执行器寿命，不能仅据差异归因于 VM 销毁。
+
+`recovery-reuse` 在原有 `HvfExecutor.Native*` 恢复测试外保留执行器，取消后仍真实销毁和重建 vCPU。两个复用模式都要求每轮恰好一个原生保留标记，旧源码缺少证据会失败。默认 `recovery` 不变，复用仅属诊断。有限期限探针对尚未执行客体就到期的短分段继续观察，共用固定总期限。
 
 ## 中文（繁體）
 
@@ -68,6 +72,8 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 
 `instruction-reuse` 執行相同的一般指令測試，跨輪次保留同一執行器，包含 VM、vCPU、工作執行緒、watchdog 執行緒與原生狀態；每輪仍回收映射。控制器隔離診斷環境開關。此對照研究執行器生命週期，不能僅憑差異歸因於 VM 銷毀。
 
+`recovery-reuse` 在原有 `HvfExecutor.Native*` 復原測試外保留執行器，取消後仍實際銷毀並重建 vCPU。兩種復用模式每輪均須恰有一個原生保留標記，舊原始碼缺少證據即失敗。預設 `recovery` 不變，復用僅屬診斷。有限期限探針對尚未執行客體就到期的短分段繼續觀察，共用固定總期限。
+
 ## 日本語
 
 Actions で **Personal Intel HVF recovery diagnosis** を手動実行します。手元に Intel Mac は不要です。既定では `macos-26-intel` と固定した NeverD ソースを使い、同じプロセスで 1,000 回連続実行します。`macos-15-intel` と 100 回の診断も選択できます。成果物にはリビジョン、計画、進捗、最終結果を保存します。待ち時間と実行の安定性は別々に評価し、この復旧テストの成功を CPU・macOS・iOS 全体の検証とは扱いません。[詳細ガイド](https://github.com/NeverSight/NeverD/blob/dev/docs/ja/macos-hvf.md)。
@@ -77,6 +83,8 @@ Actions で **Personal Intel HVF recovery diagnosis** を手動実行します�
 新しい `Intel HVF native boundary experiments` は、ゲストを実行せず VM/vCPU とマッピングを生成・破棄する `lifecycle`、実際の起動プローブと通常命令を検証する `instruction`、元のロングモード準備を使う `finite-deadline` を分離します。有限・期限切れ・短期限の呼出しごとにネイティブ書込みの証拠、時間、RIP、レジスタ、終了理由を記録します。有限呼出しは非同期 watchdog を使わず、準備と再試行は既存経路です。タイマー非対応や想定外の終了は失敗です。各実行は実験とイメージを一つずつ選び、100/1000回を指定し、三つのリポジトリの版を個別に保存します。診断成功は完全検証や接続喪失の修正を意味しません。
 
 `instruction-reuse` は同じ通常命令テストで一つの Executor を反復間に保持します。VM、vCPU、実行・watchdog スレッドとネイティブ状態を一緒に保持し、各回のマッピングは解放します。診断用環境変数はコントローラーが分離します。実行器の寿命を比較するための対照であり、差異を VM の破棄だけに帰属できません。
+
+`recovery-reuse` は元の `HvfExecutor.Native*` 回復テストの周囲で Executor を保持し、キャンセル後の vCPU の破棄・再生成はそのまま実行します。両方の再利用モードは各回にネイティブ保持マーカーを一つだけ要求し、証拠のない旧ソースを拒否します。既定の `recovery` は変更せず、再利用は診断専用です。有限期限プローブは、ゲスト実行前に短い区間が期限切れになっても、固定された全体期限の中で観測を続けます。
 
 ## 한국어
 
@@ -88,6 +96,8 @@ Actions에서 **Personal Intel HVF recovery diagnosis**를 수동 실행합니�
 
 `instruction-reuse`는 같은 일반 명령 테스트에서 반복 간 하나의 Executor를 유지합니다. VM, vCPU, 실행·watchdog 스레드와 네이티브 상태가 함께 유지되고 매핑은 매회 해제됩니다. 컨트롤러는 진단 환경 변수를 격리합니다. 실행기 수명을 비교하는 대조이므로 차이를 VM 파괴만의 영향으로 단정할 수 없습니다.
 
+`recovery-reuse`는 기존 `HvfExecutor.Native*` 복구 테스트 주위에 Executor를 유지하며 취소 후 실제 vCPU 해제·재생성은 그대로 수행합니다. 두 재사용 모드는 매회 하나의 네이티브 유지 표시를 요구하고, 증거가 없는 이전 소스는 거부합니다. 기본 `recovery`는 변경하지 않으며 재사용은 진단 전용입니다. 유한 기한 프로브는 게스트 실행 전에 짧은 구간이 만료되어도 고정된 전체 기한 내에서 관찰을 이어 갑니다.
+
 ## Français
 
 Lancez **Personal Intel HVF recovery diagnosis** dans Actions, sans Mac Intel local. Par défaut, `macos-26-intel` exécute 1 000 répétitions dans un seul processus avec une révision fixe de NeverD. Vous pouvez aussi choisir `macos-15-intel` ou un diagnostic de 100 répétitions. Les artefacts conservent les révisions, le plan, la progression et le résultat final. Évaluez séparément l'attente et la stabilité ; réussir ce test de récupération ne valide pas toute la couverture CPU, macOS ou iOS. [Guide complet](https://github.com/NeverSight/NeverD/blob/dev/docs/fr/macos-hvf.md).
@@ -97,6 +107,8 @@ Lancez **Personal Intel HVF recovery diagnosis** dans Actions, sans Mac Intel lo
 Le nouveau workflow `Intel HVF native boundary experiments` sépare `lifecycle` (création et destruction VM/vCPU et mappings sans invité), `instruction` (sonde initiale réelle et instructions normales) et `finite-deadline` (préparation long mode originale). Les appels à échéance finie, expirée ou courte enregistrent écriture native témoin, temps, RIP, registres et motif de sortie. Les appels finis évitent le watchdog asynchrone ; préparation et reprise gardent le transport existant. Un timer indisponible ou une sortie inattendue fait échouer l’expérience. Chaque lancement choisit une expérience, une image et 100/1000 répétitions ; les trois révisions restent distinctes. Un succès ne prouve ni validation complète ni correction des déconnexions.
 
 `instruction-reuse` exécute le même test d’instructions en conservant un Executor entre les répétitions. VM, vCPU, threads d’exécution et watchdog, ainsi que l’état natif, sont conservés ensemble ; les mappings sont libérés à chaque fois. Le contrôleur isole les variables de diagnostic. Ce contrôle compare la durée de vie de l’exécuteur sans attribuer une différence à la seule destruction de VM.
+
+`recovery-reuse` conserve l’Executor autour du test original `HvfExecutor.Native*`, qui détruit et recrée toujours le vCPU après annulation. Les deux modes de réutilisation exigent un unique marqueur natif par répétition et rejettent les anciennes sources sans cette preuve. Le mode `recovery` par défaut reste inchangé ; la réutilisation sert uniquement au diagnostic. Les sondes finies gardent un budget global fixe lorsque des tranches courtes expirent avant l’exécution de l’invité.
 
 ## Deutsch
 
@@ -108,6 +120,8 @@ Der neue Workflow `Intel HVF native boundary experiments` trennt `lifecycle` (VM
 
 `instruction-reuse` führt denselben Instruktionstest aus und behält einen Executor zwischen den Wiederholungen. VM, vCPU, Ausführungs- und Watchdog-Threads sowie nativer Zustand bleiben gemeinsam bestehen; die Mappings werden jeweils freigegeben. Der Controller isoliert die Diagnose-Umgebungsvariablen. Der Vergleich untersucht die Executor-Lebensdauer und kann Unterschiede nicht allein der VM-Zerstörung zuordnen.
 
+`recovery-reuse` behält den Executor um den ursprünglichen Test `HvfExecutor.Native*`; nach Abbruch wird die vCPU weiterhin tatsächlich zerstört und neu erstellt. Beide Wiederverwendungsmodi verlangen genau einen nativen Marker pro Runde und lehnen ältere Quellen ohne diesen Nachweis ab. Das normale `recovery` bleibt unverändert; Wiederverwendung ist nur Diagnose. Endliche Proben behalten eine feste Gesamtfrist, auch wenn kurze Abschnitte vor der Gastausführung ablaufen.
+
 ## Español
 
 Ejecute manualmente **Personal Intel HVF recovery diagnosis** en Actions; no necesita un Mac Intel local. Por defecto, `macos-26-intel` ejecuta 1.000 repeticiones en un solo proceso con una revisión fija de NeverD. También puede elegir `macos-15-intel` o un diagnóstico de 100 repeticiones. Los artefactos conservan las revisiones, el plan, el progreso y el resultado final. Evalúe por separado la espera y la estabilidad: superar esta prueba de recuperación no valida toda la cobertura de CPU, macOS o iOS. [Guía completa](https://github.com/NeverSight/NeverD/blob/dev/docs/es/macos-hvf.md).
@@ -117,6 +131,8 @@ Ejecute manualmente **Personal Intel HVF recovery diagnosis** en Actions; no nec
 El nuevo workflow `Intel HVF native boundary experiments` separa `lifecycle` (crear y retirar VM/vCPU y mapeos sin huésped), `instruction` (sondeo inicial real e instrucciones normales) y `finite-deadline` (preparación original en long mode). Las llamadas con plazo finito, vencido o corto registran escritura nativa testigo, tiempo, RIP, registros y motivo de salida. Las llamadas finitas evitan el watchdog asíncrono; preparación y reintento conservan el transporte original. Un temporizador no compatible o una salida inesperada hace fallar el experimento. Cada ejecución elige un experimento, una imagen y 100/1000 repeticiones; se conservan tres revisiones independientes. El éxito no demuestra aceptación completa ni desconexiones corregidas.
 
 `instruction-reuse` ejecuta la misma prueba de instrucciones conservando un Executor entre repeticiones. VM, vCPU, hilos de ejecución y watchdog y estado nativo se conservan juntos; los mapeos se liberan cada vez. El controlador aísla las variables de diagnóstico. Esta comparación estudia la vida del ejecutor y no permite atribuir diferencias únicamente a la destrucción de VM.
+
+`recovery-reuse` conserva el Executor durante la prueba original `HvfExecutor.Native*`, que sigue destruyendo y recreando la vCPU tras la cancelación. Ambos modos de reutilización exigen un único marcador nativo por repetición y rechazan fuentes antiguas sin esa prueba. El modo `recovery` predeterminado no cambia; la reutilización es solo diagnóstica. Los sondeos finitos conservan un plazo total fijo cuando intervalos cortos vencen antes de ejecutar el huésped.
 
 ## Italiano
 
@@ -128,6 +144,8 @@ Il nuovo workflow `Intel HVF native boundary experiments` separa `lifecycle` (cr
 
 `instruction-reuse` esegue lo stesso test di istruzioni mantenendo un Executor tra le ripetizioni. VM, vCPU, thread di esecuzione e watchdog e stato nativo rimangono insieme; i mapping sono liberati ogni volta. Il controller isola le variabili diagnostiche. Il confronto riguarda la durata dell’esecutore e non attribuisce eventuali differenze alla sola distruzione della VM.
 
+`recovery-reuse` mantiene l’Executor intorno al test originale `HvfExecutor.Native*`, che continua a distruggere e ricreare la vCPU dopo l’annullamento. Entrambe le modalità di riuso richiedono esattamente un marcatore nativo per ripetizione e rifiutano sorgenti precedenti senza tale prova. Il normale `recovery` non cambia; il riuso è soltanto diagnostico. Le sonde finite conservano una scadenza complessiva fissa quando intervalli brevi scadono prima dell’esecuzione guest.
+
 ## Русский
 
 Запустите **Personal Intel HVF recovery diagnosis** вручную в Actions; собственный Intel Mac не нужен. По умолчанию `macos-26-intel` выполняет 1 000 повторений в одном процессе для фиксированной ревизии NeverD. Можно выбрать `macos-15-intel` или диагностику из 100 повторений. Артефакты сохраняют ревизии, план, ход выполнения и итог. Время ожидания и стабильность выполнения оцениваются отдельно: успешный тест восстановления не подтверждает полное покрытие CPU, macOS или iOS. [Полное руководство](https://github.com/NeverSight/NeverD/blob/dev/docs/ru/macos-hvf.md).
@@ -137,6 +155,8 @@ Il nuovo workflow `Intel HVF native boundary experiments` separa `lifecycle` (cr
 Новый workflow `Intel HVF native boundary experiments` разделяет `lifecycle` (создание и освобождение VM/vCPU и отображений без гостя), `instruction` (реальная стартовая проба и обычные инструкции) и `finite-deadline` (исходная подготовка long mode). Вызовы с конечным, истёкшим и коротким сроком записывают нативную запись-маркер, время, RIP, регистры и причину выхода. Конечные вызовы обходят асинхронный watchdog; подготовка и повтор используют прежний транспорт. Неподдерживаемый таймер или неожиданный выход означает ошибку. Каждый запуск выбирает один опыт, образ и 100/1000 повторов; три ревизии сохраняются отдельно. Успех не доказывает полную приёмку или исправление потери связи.
 
 `instruction-reuse` выполняет тот же тест инструкций, сохраняя один Executor между повторами. VM, vCPU, рабочий поток, watchdog и нативное состояние сохраняются вместе; отображения освобождаются каждый раз. Контроллер изолирует диагностические переменные среды. Этот опыт сравнивает время жизни исполнителя и не позволяет приписать различие только уничтожению VM.
+
+`recovery-reuse` сохраняет Executor вокруг исходного теста `HvfExecutor.Native*`, который по-прежнему уничтожает и создаёт vCPU после отмены. Оба режима повторного использования требуют ровно один нативный маркер в каждом повторе и отклоняют старый код без такого доказательства. Обычный `recovery` не меняется; повторное использование служит только диагностике. Конечные пробы сохраняют общий неизменный срок, даже когда короткий интервал истекает до выполнения гостя.
 
 ## العربية
 
@@ -149,3 +169,5 @@ Il nuovo workflow `Intel HVF native boundary experiments` separa `lifecycle` (cr
 English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/macos-hvf.md).
 
 يشغّل `instruction-reuse` اختبار التعليمات نفسه مع الاحتفاظ بكائن Executor واحد بين التكرارات. تُحفظ VM وvCPU وخيوط التنفيذ وwatchdog والحالة الأصلية معًا، بينما تُحرَّر التعيينات في كل مرة. يعزل المتحكم متغيرات التشخيص. تقارن التجربة عمر المنفّذ ولا تسمح بإرجاع أي فرق إلى تدمير VM وحده.
+
+يحتفظ `recovery-reuse` بكائن Executor حول اختبار الاستعادة الأصلي `HvfExecutor.Native*`، مع استمرار تدمير vCPU وإعادة إنشائه بعد الإلغاء. يتطلب وضعا إعادة الاستخدام علامة أصلية واحدة بالضبط في كل تكرار، ويرفضان الشيفرة القديمة التي تفتقر إلى هذا الدليل. يبقى وضع `recovery` الافتراضي دون تغيير، وإعادة الاستخدام للتشخيص فقط. تحافظ المجسات المحددة زمنيًا على موعد إجمالي ثابت حتى عندما تنتهي فترة قصيرة قبل تنفيذ الضيف.
