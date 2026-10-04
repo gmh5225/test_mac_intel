@@ -35,6 +35,8 @@ Observed results from **2026-10-04** are retained with original test-output pref
 
 The native command requested 1,000 repetitions in each recovery run. None of the retained prefixes proves that gate passed or identifies the eventual fault location. The first personal jobs started in 8 and 5 seconds; the earlier organization control also started in 5 seconds. These observations do not establish a repository-level queue-speed improvement. GitHub documents nested virtualization as [experimental and unsupported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners); that policy alone does not establish this failure's cause.
 
+After the recovery gates pass, **Personal Intel HVF complete validation** runs the upstream transport and CR8 checks, all sixteen CPU shards with independent reconciliation, and the separate Darwin workload gate. `source-ref` pins NeverD, while wrapper and controller revisions are recorded separately. It preserves the original inventories and failure rules; partial recovery results cannot replace full acceptance.
+
 ## Native boundary experiments
 
 The separate [Intel HVF native boundary experiments](.github/workflows/intel-native-boundary.yml) workflow isolates these paths: `lifecycle` creates and retires the VM/vCPU and mappings without guest execution; `instruction` runs the real startup probe and ordinary checked steps; `finite-deadline` observes finite, expired and short `hv_vcpu_run_until` calls through the original long-mode preparation. It records a fresh native store witness and per-call time, RIP, register and exit-reason observations. Setup and retry use the existing transport; the finite calls themselves bypass the asynchronous watchdog. Unsupported timers and unexpected exits fail the experiment. A successful diagnostic is **not** full native acceptance or evidence that runner disconnects are fixed.
@@ -62,6 +64,8 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 
 `recovery-reuse` 在原有 `HvfExecutor.Native*` 恢复测试外保留执行器，取消后仍真实销毁和重建 vCPU。两个复用模式都要求每轮恰好一个原生保留标记，旧源码缺少证据会失败。默认 `recovery` 不变，复用仅属诊断。有限期限探针对尚未执行客体就到期的短分段继续观察，共用固定总期限。
 
+恢复关卡通过后，**Personal Intel HVF complete validation** 执行上游原有 transport、CR8、16 个 CPU 分片及独立汇总，以及单独的 Darwin 工作负载关卡。`source-ref` 固定 NeverD 源码，入口 workflow 和控制器版本分别记录。保留原始清单与失败规则；部分恢复结果不能替代完整验收。
+
 ## 中文（繁體）
 
 在 Actions 選擇 **Personal Intel HVF recovery diagnosis** 手動執行，不需要本機 Intel Mac。預設以 `macos-26-intel` 對固定的 NeverD 原始碼，在同一程序連續測試 1,000 輪；亦可選擇 `macos-15-intel` 或 100 輪診斷。產物保留版本、計畫、即時進度及最終結果。排隊時間與執行穩定性須分別判斷；單次恢復測試通過不代表完整 CPU、macOS 或 iOS 覆蓋。[完整指南](https://github.com/NeverSight/NeverD/blob/dev/docs/zh-TW/macos-hvf.md)。
@@ -73,6 +77,8 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 `instruction-reuse` 執行相同的一般指令測試，跨輪次保留同一執行器，包含 VM、vCPU、工作執行緒、watchdog 執行緒與原生狀態；每輪仍回收映射。控制器隔離診斷環境開關。此對照研究執行器生命週期，不能僅憑差異歸因於 VM 銷毀。
 
 `recovery-reuse` 在原有 `HvfExecutor.Native*` 復原測試外保留執行器，取消後仍實際銷毀並重建 vCPU。兩種復用模式每輪均須恰有一個原生保留標記，舊原始碼缺少證據即失敗。預設 `recovery` 不變，復用僅屬診斷。有限期限探針對尚未執行客體就到期的短分段繼續觀察，共用固定總期限。
+
+恢復關卡通過後，**Personal Intel HVF complete validation** 執行上游原有 transport、CR8、16 個 CPU 分片及獨立彙總，以及單獨的 Darwin 工作負載關卡。`source-ref` 固定 NeverD 原始碼，入口 workflow 和控制器版本分別記錄。保留原始清單與失敗規則；部分恢復結果不能替代完整驗收。
 
 ## 日本語
 
@@ -86,6 +92,8 @@ Actions で **Personal Intel HVF recovery diagnosis** を手動実行します�
 
 `recovery-reuse` は元の `HvfExecutor.Native*` 回復テストの周囲で Executor を保持し、キャンセル後の vCPU の破棄・再生成はそのまま実行します。両方の再利用モードは各回にネイティブ保持マーカーを一つだけ要求し、証拠のない旧ソースを拒否します。既定の `recovery` は変更せず、再利用は診断専用です。有限期限プローブは、ゲスト実行前に短い区間が期限切れになっても、固定された全体期限の中で観測を続けます。
 
+復旧ゲートの合格後、**Personal Intel HVF complete validation** は上流の transport、CR8、全 16 CPU シャードと独立照合、別個の Darwin ワークロードを実行します。`source-ref` は NeverD ソースを固定し、入口 workflow とコントローラーの版は別々に記録します。元の一覧と失敗条件を維持し、部分的な復旧結果を完全な合格の代わりにはしません。
+
 ## 한국어
 
 Actions에서 **Personal Intel HVF recovery diagnosis**를 수동 실행합니다. 로컬 Intel Mac은 필요하지 않습니다. 기본값은 `macos-26-intel`이며, 고정된 NeverD 소스를 같은 프로세스에서 1,000회 연속 테스트합니다. `macos-15-intel` 또는 100회 진단도 선택할 수 있습니다. 산출물에는 버전, 계획, 진행 상황과 최종 결과가 보존됩니다. 대기 시간과 실행 안정성은 따로 평가해야 하며, 복구 테스트 한 번의 성공이 전체 CPU·macOS·iOS 검증을 의미하지는 않습니다. [전체 안내](https://github.com/NeverSight/NeverD/blob/dev/docs/ko/macos-hvf.md).
@@ -97,6 +105,8 @@ Actions에서 **Personal Intel HVF recovery diagnosis**를 수동 실행합니�
 `instruction-reuse`는 같은 일반 명령 테스트에서 반복 간 하나의 Executor를 유지합니다. VM, vCPU, 실행·watchdog 스레드와 네이티브 상태가 함께 유지되고 매핑은 매회 해제됩니다. 컨트롤러는 진단 환경 변수를 격리합니다. 실행기 수명을 비교하는 대조이므로 차이를 VM 파괴만의 영향으로 단정할 수 없습니다.
 
 `recovery-reuse`는 기존 `HvfExecutor.Native*` 복구 테스트 주위에 Executor를 유지하며 취소 후 실제 vCPU 해제·재생성은 그대로 수행합니다. 두 재사용 모드는 매회 하나의 네이티브 유지 표시를 요구하고, 증거가 없는 이전 소스는 거부합니다. 기본 `recovery`는 변경하지 않으며 재사용은 진단 전용입니다. 유한 기한 프로브는 게스트 실행 전에 짧은 구간이 만료되어도 고정된 전체 기한 내에서 관찰을 이어 갑니다.
+
+복구 관문 통과 후 **Personal Intel HVF complete validation**은 원래 transport 및 CR8 검사, CPU 분할 16개 전체와 독립 대조, 별도 Darwin 작업 부하를 실행합니다. `source-ref`는 NeverD 소스를 고정하며 진입 workflow와 컨트롤러 버전은 따로 기록합니다. 원래 목록과 실패 규칙을 유지하므로 일부 복구 결과는 전체 검증을 대신할 수 없습니다.
 
 ## Français
 
@@ -110,6 +120,8 @@ Le nouveau workflow `Intel HVF native boundary experiments` sépare `lifecycle` 
 
 `recovery-reuse` conserve l’Executor autour du test original `HvfExecutor.Native*`, qui détruit et recrée toujours le vCPU après annulation. Les deux modes de réutilisation exigent un unique marqueur natif par répétition et rejettent les anciennes sources sans cette preuve. Le mode `recovery` par défaut reste inchangé ; la réutilisation sert uniquement au diagnostic. Les sondes finies gardent un budget global fixe lorsque des tranches courtes expirent avant l’exécution de l’invité.
 
+Après les contrôles de récupération, **Personal Intel HVF complete validation** exécute les vérifications amont transport et CR8, les seize lots CPU avec rapprochement indépendant et le contrôle Darwin distinct. `source-ref` fixe NeverD ; les révisions du workflow et du contrôleur sont consignées séparément. Les inventaires et règles d’échec d’origine sont conservés ; une récupération partielle ne remplace pas la validation complète.
+
 ## Deutsch
 
 Starten Sie **Personal Intel HVF recovery diagnosis** manuell unter Actions; ein eigener Intel-Mac ist nicht erforderlich. Standardmäßig führt `macos-26-intel` mit einer festgelegten NeverD-Revision 1.000 Wiederholungen in einem Prozess aus. Alternativ sind `macos-15-intel` oder 100 Wiederholungen möglich. Artefakte sichern Revisionen, Plan, Fortschritt und Endergebnis. Wartezeit und Laufzeitstabilität werden getrennt bewertet. Ein erfolgreicher Wiederherstellungstest bestätigt keine vollständige CPU-, macOS- oder iOS-Abdeckung. [Vollständige Anleitung](https://github.com/NeverSight/NeverD/blob/dev/docs/de/macos-hvf.md).
@@ -121,6 +133,8 @@ Der neue Workflow `Intel HVF native boundary experiments` trennt `lifecycle` (VM
 `instruction-reuse` führt denselben Instruktionstest aus und behält einen Executor zwischen den Wiederholungen. VM, vCPU, Ausführungs- und Watchdog-Threads sowie nativer Zustand bleiben gemeinsam bestehen; die Mappings werden jeweils freigegeben. Der Controller isoliert die Diagnose-Umgebungsvariablen. Der Vergleich untersucht die Executor-Lebensdauer und kann Unterschiede nicht allein der VM-Zerstörung zuordnen.
 
 `recovery-reuse` behält den Executor um den ursprünglichen Test `HvfExecutor.Native*`; nach Abbruch wird die vCPU weiterhin tatsächlich zerstört und neu erstellt. Beide Wiederverwendungsmodi verlangen genau einen nativen Marker pro Runde und lehnen ältere Quellen ohne diesen Nachweis ab. Das normale `recovery` bleibt unverändert; Wiederverwendung ist nur Diagnose. Endliche Proben behalten eine feste Gesamtfrist, auch wenn kurze Abschnitte vor der Gastausführung ablaufen.
+
+Nach bestandenen Wiederherstellungstests führt **Personal Intel HVF complete validation** die ursprünglichen Transport- und CR8-Prüfungen, alle sechzehn CPU-Teile mit unabhängigem Abgleich sowie die separate Darwin-Prüfung aus. `source-ref` fixiert NeverD; Workflow- und Controller-Version werden getrennt erfasst. Ursprüngliche Inventare und Fehlerregeln bleiben erhalten; Teilergebnisse ersetzen keine vollständige Abnahme.
 
 ## Español
 
@@ -134,6 +148,8 @@ El nuevo workflow `Intel HVF native boundary experiments` separa `lifecycle` (cr
 
 `recovery-reuse` conserva el Executor durante la prueba original `HvfExecutor.Native*`, que sigue destruyendo y recreando la vCPU tras la cancelación. Ambos modos de reutilización exigen un único marcador nativo por repetición y rechazan fuentes antiguas sin esa prueba. El modo `recovery` predeterminado no cambia; la reutilización es solo diagnóstica. Los sondeos finitos conservan un plazo total fijo cuando intervalos cortos vencen antes de ejecutar el huésped.
 
+Tras superar la recuperación, **Personal Intel HVF complete validation** ejecuta las comprobaciones originales de transport y CR8, los dieciséis fragmentos CPU con conciliación independiente y la comprobación Darwin separada. `source-ref` fija NeverD; las revisiones del workflow y del controlador se registran por separado. Conserva los inventarios y las reglas de fallo originales; la recuperación parcial no sustituye la aceptación completa.
+
 ## Italiano
 
 Avviare manualmente **Personal Intel HVF recovery diagnosis** da Actions; non serve un Mac Intel locale. Per impostazione predefinita, `macos-26-intel` esegue 1.000 ripetizioni in un unico processo su una revisione fissa di NeverD. Sono disponibili anche `macos-15-intel` e una diagnosi di 100 ripetizioni. Gli artefatti conservano revisioni, piano, avanzamento e risultato finale. Valutare separatamente l'attesa e la stabilità: il successo di questo test di recupero non convalida l'intera copertura CPU, macOS o iOS. [Guida completa](https://github.com/NeverSight/NeverD/blob/dev/docs/it/macos-hvf.md).
@@ -146,6 +162,8 @@ Il nuovo workflow `Intel HVF native boundary experiments` separa `lifecycle` (cr
 
 `recovery-reuse` mantiene l’Executor intorno al test originale `HvfExecutor.Native*`, che continua a distruggere e ricreare la vCPU dopo l’annullamento. Entrambe le modalità di riuso richiedono esattamente un marcatore nativo per ripetizione e rifiutano sorgenti precedenti senza tale prova. Il normale `recovery` non cambia; il riuso è soltanto diagnostico. Le sonde finite conservano una scadenza complessiva fissa quando intervalli brevi scadono prima dell’esecuzione guest.
 
+Dopo il superamento dei controlli di recupero, **Personal Intel HVF complete validation** esegue i controlli originali transport e CR8, tutti i sedici gruppi CPU con riconciliazione indipendente e il controllo Darwin separato. `source-ref` fissa NeverD; le revisioni di workflow e controller sono registrate separatamente. Mantiene inventari e regole di errore originali; il recupero parziale non sostituisce l’accettazione completa.
+
 ## Русский
 
 Запустите **Personal Intel HVF recovery diagnosis** вручную в Actions; собственный Intel Mac не нужен. По умолчанию `macos-26-intel` выполняет 1 000 повторений в одном процессе для фиксированной ревизии NeverD. Можно выбрать `macos-15-intel` или диагностику из 100 повторений. Артефакты сохраняют ревизии, план, ход выполнения и итог. Время ожидания и стабильность выполнения оцениваются отдельно: успешный тест восстановления не подтверждает полное покрытие CPU, macOS или iOS. [Полное руководство](https://github.com/NeverSight/NeverD/blob/dev/docs/ru/macos-hvf.md).
@@ -157,6 +175,8 @@ Il nuovo workflow `Intel HVF native boundary experiments` separa `lifecycle` (cr
 `instruction-reuse` выполняет тот же тест инструкций, сохраняя один Executor между повторами. VM, vCPU, рабочий поток, watchdog и нативное состояние сохраняются вместе; отображения освобождаются каждый раз. Контроллер изолирует диагностические переменные среды. Этот опыт сравнивает время жизни исполнителя и не позволяет приписать различие только уничтожению VM.
 
 `recovery-reuse` сохраняет Executor вокруг исходного теста `HvfExecutor.Native*`, который по-прежнему уничтожает и создаёт vCPU после отмены. Оба режима повторного использования требуют ровно один нативный маркер в каждом повторе и отклоняют старый код без такого доказательства. Обычный `recovery` не меняется; повторное использование служит только диагностике. Конечные пробы сохраняют общий неизменный срок, даже когда короткий интервал истекает до выполнения гостя.
+
+После прохождения проверок восстановления **Personal Intel HVF complete validation** выполняет исходные проверки transport и CR8, все шестнадцать частей CPU с независимой сверкой и отдельную проверку Darwin. `source-ref` фиксирует NeverD; версии workflow и контроллера записываются отдельно. Исходные списки и правила ошибок сохранены; частичное восстановление не заменяет полную приёмку.
 
 ## العربية
 
@@ -171,3 +191,5 @@ English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/
 يشغّل `instruction-reuse` اختبار التعليمات نفسه مع الاحتفاظ بكائن Executor واحد بين التكرارات. تُحفظ VM وvCPU وخيوط التنفيذ وwatchdog والحالة الأصلية معًا، بينما تُحرَّر التعيينات في كل مرة. يعزل المتحكم متغيرات التشخيص. تقارن التجربة عمر المنفّذ ولا تسمح بإرجاع أي فرق إلى تدمير VM وحده.
 
 يحتفظ `recovery-reuse` بكائن Executor حول اختبار الاستعادة الأصلي `HvfExecutor.Native*`، مع استمرار تدمير vCPU وإعادة إنشائه بعد الإلغاء. يتطلب وضعا إعادة الاستخدام علامة أصلية واحدة بالضبط في كل تكرار، ويرفضان الشيفرة القديمة التي تفتقر إلى هذا الدليل. يبقى وضع `recovery` الافتراضي دون تغيير، وإعادة الاستخدام للتشخيص فقط. تحافظ المجسات المحددة زمنيًا على موعد إجمالي ثابت حتى عندما تنتهي فترة قصيرة قبل تنفيذ الضيف.
+
+بعد اجتياز فحوص الاستعادة، يشغّل **Personal Intel HVF complete validation** فحوص transport وCR8 الأصلية، وجميع أجزاء CPU الستة عشر مع مطابقة مستقلة، وفحص Darwin المنفصل. يثبت `source-ref` مصدر NeverD، وتُسجَّل إصدارات workflow والمتحكم بصورة مستقلة. تبقى القوائم وقواعد الفشل الأصلية؛ ولا تحل نتائج الاستعادة الجزئية محل القبول الكامل.
