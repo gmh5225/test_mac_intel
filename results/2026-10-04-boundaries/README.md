@@ -20,6 +20,9 @@
 | macOS 26 Intel | finite owner-deadline candidate, original recovery | 250 / 1000 retained prefix | runner communication lost; no final result | [37190739520](https://github.com/gmh5225/test_mac_intel/actions/runs/37190739520) |
 | macOS 15 Intel | finite owner-deadline candidate, ordinary instructions | 576 / 1000 retained prefix | runner communication lost; no final result | [37191847905](https://github.com/gmh5225/test_mac_intel/actions/runs/37191847905) |
 
+| macOS 15 Intel | finite owner-deadline candidate, instruction-reuse | 1000 / 1000 | pass, process retired | [37194478425](https://github.com/gmh5225/test_mac_intel/actions/runs/37194478425) |
+| macOS 26 Intel | finite owner-deadline candidate, instruction-reuse | 1000 / 1000 | pass, process retired | [37194538616](https://github.com/gmh5225/test_mac_intel/actions/runs/37194538616) |
+
 [Updated interpretation in all 11 languages](../2026-10-04-investigation.md): candidate `909672ca6` did not resolve runner loss.
 
 **English.** The two finite-probe failures assumed that a 5 ms slice necessarily executes a guest store. A timer can expire before the first guest instruction; the assertion triggered GoogleTest SIGTRAP and both children retired. The revised probe retains one total deadline while allowing empty slices and requires a fresh store witness. Executor reuse retains the VM and executor threads across iterations; cancellation still recreates the vCPU. These controls do not establish a production fix or full CPU/Darwin acceptance. The initial 100-loop probe lacked the later exit allowlist; its saved returns were audited separately. Pending runs are not included as passes. Later, GitHub confirmed runner communication loss for the macOS 15 revised finite probe (274 complete / 275 started in the retained prefix) and macOS 26 recovery-reuse (678 / 679). Those prefixes do not locate the eventual fault; reuse is not an established fix.
