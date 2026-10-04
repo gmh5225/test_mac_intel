@@ -269,3 +269,29 @@ English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/
 **ru.** Оба сравнения жизненного цикла прошли по 1000/1000 итераций на обоих образах Intel: пересоздание vCPU (37195529270, 37195554929) и VM вместе с vCPU при сохранении owner (37196504453, 37196535787). Во втором проверены 8000 упорядоченных нативных событий и окончательное уничтожение поколения 1001 на запуск, все 24/27 хешей артефактов, нулевые коды выхода и сбор дочерних процессов. Это сужает сравнение с полной заменой Executor, но не устанавливает причину и не доказывает исправление. Следующая диагностика сохранит VM, заменяя vCPU и поток-владелец. Исходный тест восстановления и полная приёмка CPU/Darwin по-прежнему необходимы.
 
 **ar.** نجح الآن ضابطا دورة الحياة في 1000/1000 تكرار على صورتي Intel: إعادة إنشاء vCPU ‏(37195529270، 37195554929)، ثم VM وvCPU مع الاحتفاظ بالمالك نفسه (37196504453، 37196535787). يثبت الثاني 8000 حدث أصلي مرتب وتدمير الجيل 1001 النهائي في كل تشغيل؛ ودُققت بصمات الملفات الـ24/27، ورموز الخروج الصفرية، وجمع العمليات الفرعية. يضيّق ذلك المقارنة مع تبديل Executor بالكامل، لكنه لا يحدد السبب ولا يثبت إصلاح المنتج. سيحتفظ التشخيص التالي بالـVM ويستبدل vCPU والخيط المالك. يبقى اختبار الاسترداد الأصلي والتحقق الكامل لـCPU/Darwin مطلوبين.
+
+### Owner-thread recreation control
+
+`source-ref=9e74b172a3b9eb391d24af09a086a337f8fd88c9` · `owner-failure-controls: repetitions=100` · `instruction-owner-recreate: repetitions=1000` · `macos-15-intel` / `macos-26-intel`
+
+**en.** The next diagnostic is `instruction-owner-recreate`: retain VM, replace the vCPU and owner after each unchanged instruction workload. First run `owner-failure-controls` with 100 repetitions (300 injected checks, real HVF calls but no guest execution); require verified cleanup before the 1000-round guest experiment. Neither mode replaces original acceptance.
+
+**zh-CN.** 下一项诊断为 `instruction-owner-recreate`：保留 VM，在每轮不变的指令负载后更换 vCPU 和 owner。先运行 100 轮 `owner-failure-controls`（300 项注入检查，调用真实 HVF，但不执行 guest），核验清理完成后再跑 1000 轮指令实验。两者均不替代原始验收。
+
+**zh-TW.** 下一項診斷為 `instruction-owner-recreate`：保留 VM，在每輪不變的指令負載後更換 vCPU 與 owner。先執行 100 輪 `owner-failure-controls`（300 項注入檢查，呼叫真實 HVF，但不執行 guest），核驗清理完成後再跑 1000 輪指令實驗。兩者均不取代原始驗收。
+
+**ja.** 次の診断 `instruction-owner-recreate` は VM を保持し、元の指令負荷ごとに vCPU と owner を交換します。先に `owner-failure-controls` を100回実施し（300件の障害注入確認、実際のHVF呼び出し、guest実行なし）、後処理を検証してから1000回の指令実験を行います。元の受け入れ試験の代わりにはなりません。
+
+**ko.** 다음 진단 `instruction-owner-recreate`는 VM을 유지하고 기존 명령 부하마다 vCPU와 owner를 교체합니다. 먼저 `owner-failure-controls`를 100회 실행합니다(300개 오류 주입 검사, 실제 HVF 호출, guest 실행 없음). 정리를 검증한 뒤 1000회 명령 실험을 진행하며 원래 승인 시험을 대체하지 않습니다.
+
+**fr.** Le prochain diagnostic `instruction-owner-recreate` conserve la VM et remplace vCPU et owner après chaque charge inchangée. Exécuter d’abord 100 tours de `owner-failure-controls` (300 vérifications injectées, appels HVF réels sans guest), vérifier le nettoyage puis lancer les 1000 tours avec guest. Aucun mode ne remplace la validation originale.
+
+**de.** Der nächste Vergleich `instruction-owner-recreate` behält die VM und ersetzt vCPU und owner nach jeder unveränderten Instruktionslast. Zuerst laufen 100 Wiederholungen von `owner-failure-controls` (300 injizierte Prüfungen, echte HVF-Aufrufe ohne Gast). Erst nach bestätigter Bereinigung folgen 1000 Gastdurchläufe. Die ursprüngliche Abnahme bleibt erforderlich.
+
+**es.** El siguiente diagnóstico `instruction-owner-recreate` conserva VM y sustituye vCPU y owner tras cada carga original. Primero se ejecutan 100 rondas de `owner-failure-controls` (300 comprobaciones con fallos inyectados, llamadas HVF reales sin guest); tras verificar la limpieza, se realizan 1000 rondas con guest. No sustituyen la aceptación original.
+
+**it.** Il prossimo diagnostico `instruction-owner-recreate` mantiene VM e sostituisce vCPU e owner dopo ogni carico originale. Prima eseguire 100 cicli di `owner-failure-controls` (300 verifiche con errori iniettati, chiamate HVF reali senza guest); verificata la pulizia, eseguire 1000 cicli con guest. Non sostituiscono la validazione originale.
+
+**ru.** Следующая диагностика `instruction-owner-recreate` сохраняет VM и заменяет vCPU и owner после каждой исходной нагрузки. Сначала выполняются 100 повторений `owner-failure-controls` (300 проверок внедрённых ошибок, реальные вызовы HVF без гостя). После проверки очистки запускаются 1000 повторений с гостем. Исходная приёмка остаётся обязательной.
+
+**ar.** يحتفظ التشخيص التالي `instruction-owner-recreate` بالـVM ويبدّل vCPU والمالك بعد كل حمل تعليمات أصلي. يُشغّل أولًا `owner-failure-controls` مئة مرة (300 فحص بأخطاء محقونة، واستدعاءات HVF حقيقية دون تنفيذ الضيف)، ثم يُتحقق من التنظيف قبل تجربة الضيف ذات 1000 تكرار. لا يحل أي منهما محل القبول الأصلي.
