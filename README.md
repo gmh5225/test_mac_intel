@@ -9,7 +9,7 @@ Open **Actions → Personal Intel HVF recovery diagnosis → Run workflow**. Def
 | Intel image | `macos-26-intel` (`macos-15-intel` is also available) |
 | Tested NeverD source | `bd284894c60427cf4e6a60e661a1fa0df8a070f5` |
 | Repetitions | `1000` in one native process; `100` is an optional shorter diagnosis |
-| Diagnostic implementation | `a3a620b63a34c81a1cd1131c9905a8087b96c723`, pinned in the workflow |
+| Diagnostic implementation | `5488132130f41822e9f4b3dc41220bc708cc7af4`, pinned in the workflow |
 
 The workflow requires native `x86_64`, a working signed HVF VM/vCPU probe, and `NEVERD_REQUIRE_HVF=1`. It builds only `NeverDHvfTests` with Release and HVF enabled, then uses the original `HvfExecutor.Native*` command, deadlines and assertions. It does not retry failed iterations. NeverD dependency submodule revisions and Actions implementations are pinned. The workflow has read-only repository permissions and does not retain checkout credentials.
 
