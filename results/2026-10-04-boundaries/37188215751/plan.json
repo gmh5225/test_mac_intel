@@ -1,0 +1,35 @@
+{
+  "kind": "instrumented-partial-hvf-recovery-plan",
+  "complete_inventory": false,
+  "executed": false,
+  "commit": "2abdc49c56c15cad3b35ffc08ecb3bed9c2ccc66",
+  "source_dirty": false,
+  "source": "/Users/runner/work/test_mac_intel/test_mac_intel/source",
+  "build": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf",
+  "controller_commit": "aadab23962ac55c3cde53a259496c0873246ea07",
+  "host_system": "Darwin",
+  "host_architecture": "x86_64",
+  "host_release": "24.6.0",
+  "llvm_prebuilt": "OFF",
+  "inventory_sha256": "5cb2133adc646949a4270da45ff6bcadc7950fef43f1237a7e3b1ec2bf5e1ae4",
+  "experiment": "instruction-reuse",
+  "native_execution": true,
+  "required_for_acceptance": false,
+  "executor_reuse": true,
+  "native_name": "HvfIntelProbe.InstructionOnly",
+  "required_ctest_name": "HvfIntelProbe.InstructionOnly",
+  "command": [
+    "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+    "--gtest_filter=HvfIntelProbe.InstructionOnly",
+    "--gtest_repeat=1000",
+    "--gtest_break_on_failure"
+  ],
+  "working_directory": "/Users/runner/work/test_mac_intel/test_mac_intel/source",
+  "repetitions": 1000,
+  "timeout_seconds": 600,
+  "native_requirements": {
+    "NEVERD_REQUIRE_HVF": "1",
+    "NEVERD_HVF_INTEL_PROBE": "1",
+    "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1"
+  }
+}

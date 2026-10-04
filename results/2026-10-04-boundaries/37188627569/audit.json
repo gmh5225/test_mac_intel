@@ -1,0 +1,179 @@
+{
+  "run_id": "37188627569",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "a1811c22cdabd7986e158dffd4dbf291035b9901",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "392a9d1718aba9f49632da0670caf437b172db8e",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "392a9d1718aba9f49632da0670caf437b172db8e",
+    "run_id": "37188627569",
+    "run_attempt": "1",
+    "runner_image": "macos-26-intel",
+    "image_version": "20260824.0517.1",
+    "repetitions": 1000,
+    "experiment": "finite-deadline",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261004T083111Z.json",
+  "artifacts_verified": 28,
+  "full_acceptance": false,
+  "plan": {
+    "commit": "392a9d1718aba9f49632da0670caf437b172db8e",
+    "experiment": "finite-deadline",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfIntelProbe.FiniteDeadline",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1"
+    }
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-024",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "392a9d1718aba9f49632da0670caf437b172db8e",
+      "controller_commit": "a1811c22cdabd7986e158dffd4dbf291035b9901",
+      "captured_at": "2026-10-04T08:27:43.219Z",
+      "reason": "progress",
+      "sequence": 24,
+      "output": {
+        "size_at_open": 1983114,
+        "first_byte": 934538,
+        "copied_bytes": 1048576,
+        "truncated": true
+      },
+      "progress": {
+        "last_started_iteration": 983,
+        "last_completed_iteration": 982,
+        "native_runs_in_copy": 519,
+        "native_ok_in_copy": 519
+      },
+      "identity": {
+        "native_pid": 19403,
+        "python_pid": 18930,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-04T08:27:43.219Z",
+        "stdout": "19403 18930 19403 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "",
+      "[==========] 1 test from 1 test suite ran. (41 ms total)",
+      "[  PASSED  ] 1 test.",
+      "",
+      "Repeating all tests (iteration 983) . . .",
+      "",
+      "Note: Google Test filter = HvfIntelProbe.FiniteDeadline",
+      "[==========] Running 1 test from 1 test suite.",
+      "[----------] 1 test from HvfIntelProbe",
+      "[ RUN      ] HvfIntelProbe.FiniteDeadline",
+      "INTEL_PROBE phase=executor_initialization",
+      "INTEL_PROBE phase=startup_probe"
+    ]
+  },
+  "native_passed": true,
+  "repetitions": {
+    "started_repetitions": 1000,
+    "completed_repetitions": 1000,
+    "next_expected_event": "iteration",
+    "error": null
+  },
+  "native_status": {
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfIntelProbe.FiniteDeadline",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "working_directory": "/Users/runner/work/test_mac_intel/test_mac_intel/source",
+    "timeout_seconds": 600,
+    "status": 0,
+    "timed_out": false,
+    "child_retired": true,
+    "test_environment": {},
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1"
+    }
+  },
+  "retirement": [
+    {
+      "pid": 19403,
+      "status": 0,
+      "retired": true
+    }
+  ],
+  "controller": {
+    "kind": "diagnostic-controller-child",
+    "started_at": "2026-10-04T08:26:54.985Z",
+    "completed_at": "2026-10-04T08:27:44.292Z",
+    "exit_status": 0,
+    "signal": null,
+    "termination_reason": null,
+    "spawn_error": null
+  },
+  "output_sha256": "e8080890e307c8a4a5b3910780eeb39649de829ffad4ee3cdbf4cc59bf19c945",
+  "finite_captures": [
+    {
+      "phase": "expired_mtf",
+      "reason": 52,
+      "rip_delta": 0,
+      "count": 1000
+    },
+    {
+      "phase": "finite_loop",
+      "reason": 1,
+      "rip_delta": 0,
+      "count": 19
+    },
+    {
+      "phase": "finite_loop",
+      "reason": 1,
+      "rip_delta": 3,
+      "count": 121
+    },
+    {
+      "phase": "finite_loop",
+      "reason": 52,
+      "rip_delta": 0,
+      "count": 121
+    },
+    {
+      "phase": "finite_loop",
+      "reason": 52,
+      "rip_delta": 3,
+      "count": 879
+    },
+    {
+      "phase": "finite_mtf",
+      "reason": 1,
+      "rip_delta": 0,
+      "count": 5
+    },
+    {
+      "phase": "finite_mtf",
+      "reason": 37,
+      "rip_delta": 3,
+      "count": 995
+    }
+  ]
+}
