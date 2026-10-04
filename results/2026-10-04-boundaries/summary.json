@@ -1,6 +1,6 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T16:30:18.614865+00:00",
+  "recorded_at": "2026-10-04T16:53:06.776080+00:00",
   "complete_native_acceptance": false,
   "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Reuse retains the Executor; explicitly named recreation modes replace vCPUs, VMs, or owner threads at fixture boundaries. Recovery also recreates cancelled vCPUs internally, so recovery-vm-recreate reports boundary-only vCPU generations and leaves the total unknown. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
   "runs": [
@@ -734,6 +734,54 @@
       "child_retired": null,
       "verified_artifact_count": 26,
       "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37217523688",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37217523688",
+      "source": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller": "332dedd0bbbdb87bf9489c4e0e84e671cbb4bdb7",
+      "workflow": "1bcedb19ee839ee28ccd5df46d9700e60ffe6c97",
+      "image": "macos-15-intel",
+      "experiment": "recovery-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "pre-native uploader compatibility failure: WebAssembly unavailable",
+      "recovery_command_started": false,
+      "native_passed": null,
+      "final_native_result_present": false,
+      "child_retired": null,
+      "verified_artifact_count": 2,
+      "complete_native_acceptance": false,
+      "uploader_runtime": {
+        "mode": "jitless",
+        "scope": "recovery-plan-and-progress-children"
+      },
+      "plan_source": "recovered-final",
+      "independent_plan_upload_succeeded": false
+    },
+    {
+      "run_id": "37217525863",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37217525863",
+      "source": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller": "332dedd0bbbdb87bf9489c4e0e84e671cbb4bdb7",
+      "workflow": "1bcedb19ee839ee28ccd5df46d9700e60ffe6c97",
+      "image": "macos-26-intel",
+      "experiment": "recovery-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "pre-native uploader compatibility failure: WebAssembly unavailable",
+      "recovery_command_started": false,
+      "native_passed": null,
+      "final_native_result_present": false,
+      "child_retired": null,
+      "verified_artifact_count": 2,
+      "complete_native_acceptance": false,
+      "uploader_runtime": {
+        "mode": "jitless",
+        "scope": "recovery-plan-and-progress-children"
+      },
+      "plan_source": "recovered-final",
+      "independent_plan_upload_succeeded": false
     }
   ]
 }

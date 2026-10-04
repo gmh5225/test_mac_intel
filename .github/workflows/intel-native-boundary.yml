@@ -32,7 +32,7 @@ on:
         description: Runtime for plan/progress uploader children only (provenance/final unchanged)
         default: default
         type: choice
-        options: [default, jitless]
+        options: [default, js-interpreter]
 permissions:
   contents: read
 jobs:
@@ -41,7 +41,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      DIAGNOSTIC_COMMIT: 332dedd0bbbdb87bf9489c4e0e84e671cbb4bdb7
+      DIAGNOSTIC_COMMIT: caeb594ad45322e22db43445c1eb77c606688913
     steps:
       - name: Check out this comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
