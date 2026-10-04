@@ -39,7 +39,7 @@ After the recovery gates pass, **Personal Intel HVF complete validation** runs t
 
 ## Native boundary experiments
 
-**Independent upstream Intel HVF control** builds [HVF edge cases](https://gitlab.com/pmdj/hvf-edge-cases/-/tree/f150b38bfff419fe19907b7a6a2d743a63b46a49) at the pinned revision with its unchanged Makefile and real-mode guest. It observes 100000 random interrupt **attempts**, a fixed 300-second limit, PTY output, immutable live snapshots and child retirement. Upstream ignores the random-call return codes and its completion can race the final interrupt, so timeout alone does not identify an HVF fault. This control neither measures NeverD performance nor replaces its recovery, CPU or Darwin gates.
+**Independent upstream Intel HVF control** builds [HVF edge cases](https://gitlab.com/pmdj/hvf-edge-cases/-/tree/f150b38bfff419fe19907b7a6a2d743a63b46a49) at the pinned revision with its unchanged Makefile and real-mode guest. It observes 100000 random interrupt **attempts**, a fixed 900-second limit, PTY output, immutable live snapshots and child retirement. Upstream ignores the random-call return codes and its completion can race the final interrupt, so timeout alone does not identify an HVF fault. This control neither measures NeverD performance nor replaces its recovery, CPU or Darwin gates.
 
 The separate [Intel HVF native boundary experiments](.github/workflows/intel-native-boundary.yml) workflow isolates these paths: `lifecycle` creates and retires the VM/vCPU and mappings without guest execution; `instruction` runs the real startup probe and ordinary checked steps; `finite-deadline` observes finite, expired and short `hv_vcpu_run_until` calls through the original long-mode preparation. It records a fresh native store witness and per-call time, RIP, register and exit-reason observations. Setup and retry use the existing transport; the finite calls themselves bypass the asynchronous watchdog. Unsupported timers and unexpected exits fail the experiment. A successful diagnostic is **not** full native acceptance or evidence that runner disconnects are fixed.
 
@@ -56,7 +56,7 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 
 ## 中文（简体）
 
-**Independent upstream Intel HVF control** 固定公开 HVF 测试程序的版本，保留原 Makefile 与实模式 guest，观察 100000 次随机中断调用尝试。单进程期限固定为 300 秒，保留 PTY 原始输出、实时快照和进程回收记录。上游未检查随机调用的返回码，结束逻辑也可能与最后一次中断竞争，因此超时本身不能证明 HVF 故障；它不代表 NeverD 性能，也不替代恢复、CPU 或 Darwin 验收。
+**Independent upstream Intel HVF control** 固定公开 HVF 测试程序的版本，保留原 Makefile 与实模式 guest，观察 100000 次随机中断调用尝试。单进程期限固定为 900 秒，保留 PTY 原始输出、实时快照和进程回收记录。上游未检查随机调用的返回码，结束逻辑也可能与最后一次中断竞争，因此超时本身不能证明 HVF 故障；它不代表 NeverD 性能，也不替代恢复、CPU 或 Darwin 验收。
 
 在 Actions 中选择 **Personal Intel HVF recovery diagnosis** 并手动运行，无需本地 Intel Mac。默认使用 `macos-26-intel`，对固定的 NeverD 源码在同一进程连续测试 1,000 轮；也可选择 `macos-15-intel` 或 100 轮诊断。产物保留版本、计划、实时进度和最终结果。排队时间与运行稳定性分别判断；单次恢复测试通过不能代表完整 CPU、macOS 或 iOS 覆盖。[完整指南](https://github.com/NeverSight/NeverD/blob/dev/docs/zh-CN/macos-hvf.md)。
 
@@ -72,7 +72,7 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 
 ## 中文（繁體）
 
-**Independent upstream Intel HVF control** 固定公開 HVF 測試程式的版本，保留原 Makefile 與實模式 guest，觀察 100000 次隨機中斷呼叫嘗試。單程序期限固定為 300 秒，保留 PTY 原始輸出、即時快照和程序回收紀錄。上游未檢查隨機呼叫的回傳碼，結束邏輯也可能與最後一次中斷競爭，因此逾時本身不能證明 HVF 故障；它不代表 NeverD 效能，也不取代復原、CPU 或 Darwin 驗收。
+**Independent upstream Intel HVF control** 固定公開 HVF 測試程式的版本，保留原 Makefile 與實模式 guest，觀察 100000 次隨機中斷呼叫嘗試。單程序期限固定為 900 秒，保留 PTY 原始輸出、即時快照和程序回收紀錄。上游未檢查隨機呼叫的回傳碼，結束邏輯也可能與最後一次中斷競爭，因此逾時本身不能證明 HVF 故障；它不代表 NeverD 效能，也不取代復原、CPU 或 Darwin 驗收。
 
 在 Actions 選擇 **Personal Intel HVF recovery diagnosis** 手動執行，不需要本機 Intel Mac。預設以 `macos-26-intel` 對固定的 NeverD 原始碼，在同一程序連續測試 1,000 輪；亦可選擇 `macos-15-intel` 或 100 輪診斷。產物保留版本、計畫、即時進度及最終結果。排隊時間與執行穩定性須分別判斷；單次恢復測試通過不代表完整 CPU、macOS 或 iOS 覆蓋。[完整指南](https://github.com/NeverSight/NeverD/blob/dev/docs/zh-TW/macos-hvf.md)。
 
@@ -88,7 +88,7 @@ gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
 
 ## 日本語
 
-**Independent upstream Intel HVF control** は公開 HVF テストの版を固定し、元の Makefile と実モード guest を変更せず、100000 回のランダム割り込み呼び出しを試みます。単一プロセスの制限は 300 秒で、PTY 生出力、ライブスナップショット、終了確認を保存します。上流はランダム呼び出しの戻り値を確認せず、終了処理と最後の割り込みにも競合があるため、タイムアウトだけでは HVF 障害を特定できません。NeverD の性能測定や復旧・CPU・Darwin 検証の代わりにはなりません。
+**Independent upstream Intel HVF control** は公開 HVF テストの版を固定し、元の Makefile と実モード guest を変更せず、100000 回のランダム割り込み呼び出しを試みます。単一プロセスの制限は 900 秒で、PTY 生出力、ライブスナップショット、終了確認を保存します。上流はランダム呼び出しの戻り値を確認せず、終了処理と最後の割り込みにも競合があるため、タイムアウトだけでは HVF 障害を特定できません。NeverD の性能測定や復旧・CPU・Darwin 検証の代わりにはなりません。
 
 Actions で **Personal Intel HVF recovery diagnosis** を手動実行します。手元に Intel Mac は不要です。既定では `macos-26-intel` と固定した NeverD ソースを使い、同じプロセスで 1,000 回連続実行します。`macos-15-intel` と 100 回の診断も選択できます。成果物にはリビジョン、計画、進捗、最終結果を保存します。待ち時間と実行の安定性は別々に評価し、この復旧テストの成功を CPU・macOS・iOS 全体の検証とは扱いません。[詳細ガイド](https://github.com/NeverSight/NeverD/blob/dev/docs/ja/macos-hvf.md)。
 
@@ -104,7 +104,7 @@ Actions で **Personal Intel HVF recovery diagnosis** を手動実行します�
 
 ## 한국어
 
-**Independent upstream Intel HVF control**은 공개 HVF 테스트 버전을 고정하고 원래 Makefile과 real mode guest를 그대로 사용하여 임의 인터럽트 호출 100000회를 시도합니다. 한 프로세스의 제한은 300초이며 PTY 원본 출력, 실시간 스냅샷, 프로세스 종료 기록을 보존합니다. 상위 코드는 임의 호출의 반환 코드를 검사하지 않고 마지막 인터럽트와 종료 처리가 경쟁할 수 있으므로 시간 초과만으로 HVF 결함을 단정할 수 없습니다. NeverD 성능 측정이나 복구·CPU·Darwin 검증을 대신하지 않습니다.
+**Independent upstream Intel HVF control**은 공개 HVF 테스트 버전을 고정하고 원래 Makefile과 real mode guest를 그대로 사용하여 임의 인터럽트 호출 100000회를 시도합니다. 한 프로세스의 제한은 900초이며 PTY 원본 출력, 실시간 스냅샷, 프로세스 종료 기록을 보존합니다. 상위 코드는 임의 호출의 반환 코드를 검사하지 않고 마지막 인터럽트와 종료 처리가 경쟁할 수 있으므로 시간 초과만으로 HVF 결함을 단정할 수 없습니다. NeverD 성능 측정이나 복구·CPU·Darwin 검증을 대신하지 않습니다.
 
 Actions에서 **Personal Intel HVF recovery diagnosis**를 수동 실행합니다. 로컬 Intel Mac은 필요하지 않습니다. 기본값은 `macos-26-intel`이며, 고정된 NeverD 소스를 같은 프로세스에서 1,000회 연속 테스트합니다. `macos-15-intel` 또는 100회 진단도 선택할 수 있습니다. 산출물에는 버전, 계획, 진행 상황과 최종 결과가 보존됩니다. 대기 시간과 실행 안정성은 따로 평가해야 하며, 복구 테스트 한 번의 성공이 전체 CPU·macOS·iOS 검증을 의미하지는 않습니다. [전체 안내](https://github.com/NeverSight/NeverD/blob/dev/docs/ko/macos-hvf.md).
 
@@ -120,7 +120,7 @@ Actions에서 **Personal Intel HVF recovery diagnosis**를 수동 실행합니�
 
 ## Français
 
-**Independent upstream Intel HVF control** fixe la version d’un test HVF public et conserve son Makefile et son invité en mode réel : 100000 tentatives d’interruption aléatoires, limite fixe de 300 secondes, sortie PTY brute, instantanés en direct et confirmation de fin du processus. Le programme amont ignore les codes de retour des appels aléatoires et sa fin peut entrer en concurrence avec la dernière interruption ; un délai dépassé ne suffit donc pas à identifier une panne HVF. Ce contrôle ne mesure pas les performances de NeverD et ne remplace pas les validations de récupération, CPU ou Darwin.
+**Independent upstream Intel HVF control** fixe la version d’un test HVF public et conserve son Makefile et son invité en mode réel : 100000 tentatives d’interruption aléatoires, limite fixe de 900 secondes, sortie PTY brute, instantanés en direct et confirmation de fin du processus. Le programme amont ignore les codes de retour des appels aléatoires et sa fin peut entrer en concurrence avec la dernière interruption ; un délai dépassé ne suffit donc pas à identifier une panne HVF. Ce contrôle ne mesure pas les performances de NeverD et ne remplace pas les validations de récupération, CPU ou Darwin.
 
 Lancez **Personal Intel HVF recovery diagnosis** dans Actions, sans Mac Intel local. Par défaut, `macos-26-intel` exécute 1 000 répétitions dans un seul processus avec une révision fixe de NeverD. Vous pouvez aussi choisir `macos-15-intel` ou un diagnostic de 100 répétitions. Les artefacts conservent les révisions, le plan, la progression et le résultat final. Évaluez séparément l'attente et la stabilité ; réussir ce test de récupération ne valide pas toute la couverture CPU, macOS ou iOS. [Guide complet](https://github.com/NeverSight/NeverD/blob/dev/docs/fr/macos-hvf.md).
 
@@ -136,7 +136,7 @@ Après les contrôles de récupération, **Personal Intel HVF complete validatio
 
 ## Deutsch
 
-**Independent upstream Intel HVF control** verwendet eine feste Version eines öffentlichen HVF-Tests mit unverändertem Makefile und Real-Mode-Gast: 100000 zufällige Interrupt-Aufrufversuche, feste 300-Sekunden-Frist, rohe PTY-Ausgabe, laufende Momentaufnahmen und bestätigtes Prozessende. Der Ursprungscode prüft die Rückgabewerte der zufälligen Aufrufe nicht; zudem kann sein Abschluss mit dem letzten Interrupt konkurrieren. Ein Zeitablauf allein belegt daher keinen HVF-Fehler. Der Kontrolllauf misst keine NeverD-Leistung und ersetzt keine Wiederherstellungs-, CPU- oder Darwin-Abnahme.
+**Independent upstream Intel HVF control** verwendet eine feste Version eines öffentlichen HVF-Tests mit unverändertem Makefile und Real-Mode-Gast: 100000 zufällige Interrupt-Aufrufversuche, feste 900-Sekunden-Frist, rohe PTY-Ausgabe, laufende Momentaufnahmen und bestätigtes Prozessende. Der Ursprungscode prüft die Rückgabewerte der zufälligen Aufrufe nicht; zudem kann sein Abschluss mit dem letzten Interrupt konkurrieren. Ein Zeitablauf allein belegt daher keinen HVF-Fehler. Der Kontrolllauf misst keine NeverD-Leistung und ersetzt keine Wiederherstellungs-, CPU- oder Darwin-Abnahme.
 
 Starten Sie **Personal Intel HVF recovery diagnosis** manuell unter Actions; ein eigener Intel-Mac ist nicht erforderlich. Standardmäßig führt `macos-26-intel` mit einer festgelegten NeverD-Revision 1.000 Wiederholungen in einem Prozess aus. Alternativ sind `macos-15-intel` oder 100 Wiederholungen möglich. Artefakte sichern Revisionen, Plan, Fortschritt und Endergebnis. Wartezeit und Laufzeitstabilität werden getrennt bewertet. Ein erfolgreicher Wiederherstellungstest bestätigt keine vollständige CPU-, macOS- oder iOS-Abdeckung. [Vollständige Anleitung](https://github.com/NeverSight/NeverD/blob/dev/docs/de/macos-hvf.md).
 
@@ -152,7 +152,7 @@ Nach bestandenen Wiederherstellungstests führt **Personal Intel HVF complete va
 
 ## Español
 
-**Independent upstream Intel HVF control** fija una versión de un test HVF público y conserva su Makefile y huésped en modo real: 100000 intentos de interrupción aleatoria, límite fijo de 300 segundos, salida PTY original, instantáneas en directo y confirmación de finalización del proceso. El programa original no comprueba los códigos de retorno aleatorios y su finalización puede competir con la última interrupción; un tiempo agotado no identifica por sí solo un fallo de HVF. No mide el rendimiento de NeverD ni sustituye las validaciones de recuperación, CPU o Darwin.
+**Independent upstream Intel HVF control** fija una versión de un test HVF público y conserva su Makefile y huésped en modo real: 100000 intentos de interrupción aleatoria, límite fijo de 900 segundos, salida PTY original, instantáneas en directo y confirmación de finalización del proceso. El programa original no comprueba los códigos de retorno aleatorios y su finalización puede competir con la última interrupción; un tiempo agotado no identifica por sí solo un fallo de HVF. No mide el rendimiento de NeverD ni sustituye las validaciones de recuperación, CPU o Darwin.
 
 Ejecute manualmente **Personal Intel HVF recovery diagnosis** en Actions; no necesita un Mac Intel local. Por defecto, `macos-26-intel` ejecuta 1.000 repeticiones en un solo proceso con una revisión fija de NeverD. También puede elegir `macos-15-intel` o un diagnóstico de 100 repeticiones. Los artefactos conservan las revisiones, el plan, el progreso y el resultado final. Evalúe por separado la espera y la estabilidad: superar esta prueba de recuperación no valida toda la cobertura de CPU, macOS o iOS. [Guía completa](https://github.com/NeverSight/NeverD/blob/dev/docs/es/macos-hvf.md).
 
@@ -168,7 +168,7 @@ Tras superar la recuperación, **Personal Intel HVF complete validation** ejecut
 
 ## Italiano
 
-**Independent upstream Intel HVF control** fissa la versione di un test HVF pubblico, mantenendone Makefile e guest in modalità reale: 100000 tentativi di interruzione casuale, limite fisso di 300 secondi, output PTY originale, istantanee in tempo reale e conferma della terminazione del processo. Il codice originale ignora i valori restituiti dalle chiamate casuali e la conclusione può concorrere con l’ultima interruzione; un timeout da solo non identifica quindi un guasto HVF. Il controllo non misura le prestazioni di NeverD né sostituisce le verifiche di ripristino, CPU o Darwin.
+**Independent upstream Intel HVF control** fissa la versione di un test HVF pubblico, mantenendone Makefile e guest in modalità reale: 100000 tentativi di interruzione casuale, limite fisso di 900 secondi, output PTY originale, istantanee in tempo reale e conferma della terminazione del processo. Il codice originale ignora i valori restituiti dalle chiamate casuali e la conclusione può concorrere con l’ultima interruzione; un timeout da solo non identifica quindi un guasto HVF. Il controllo non misura le prestazioni di NeverD né sostituisce le verifiche di ripristino, CPU o Darwin.
 
 Avviare manualmente **Personal Intel HVF recovery diagnosis** da Actions; non serve un Mac Intel locale. Per impostazione predefinita, `macos-26-intel` esegue 1.000 ripetizioni in un unico processo su una revisione fissa di NeverD. Sono disponibili anche `macos-15-intel` e una diagnosi di 100 ripetizioni. Gli artefatti conservano revisioni, piano, avanzamento e risultato finale. Valutare separatamente l'attesa e la stabilità: il successo di questo test di recupero non convalida l'intera copertura CPU, macOS o iOS. [Guida completa](https://github.com/NeverSight/NeverD/blob/dev/docs/it/macos-hvf.md).
 
@@ -184,7 +184,7 @@ Dopo il superamento dei controlli di recupero, **Personal Intel HVF complete val
 
 ## Русский
 
-**Independent upstream Intel HVF control** фиксирует версию общедоступного теста HVF, сохраняя исходные Makefile и гостя в реальном режиме: 100000 попыток случайного прерывания, единый предел 300 секунд, исходный вывод PTY, текущие снимки и подтверждение завершения процесса. Исходный код не проверяет результаты случайных вызовов; завершение может конкурировать с последним прерыванием. Поэтому один тайм-аут не доказывает сбой HVF. Этот контроль не измеряет производительность NeverD и не заменяет проверки восстановления, CPU или Darwin.
+**Independent upstream Intel HVF control** фиксирует версию общедоступного теста HVF, сохраняя исходные Makefile и гостя в реальном режиме: 100000 попыток случайного прерывания, единый предел 900 секунд, исходный вывод PTY, текущие снимки и подтверждение завершения процесса. Исходный код не проверяет результаты случайных вызовов; завершение может конкурировать с последним прерыванием. Поэтому один тайм-аут не доказывает сбой HVF. Этот контроль не измеряет производительность NeverD и не заменяет проверки восстановления, CPU или Darwin.
 
 Запустите **Personal Intel HVF recovery diagnosis** вручную в Actions; собственный Intel Mac не нужен. По умолчанию `macos-26-intel` выполняет 1 000 повторений в одном процессе для фиксированной ревизии NeverD. Можно выбрать `macos-15-intel` или диагностику из 100 повторений. Артефакты сохраняют ревизии, план, ход выполнения и итог. Время ожидания и стабильность выполнения оцениваются отдельно: успешный тест восстановления не подтверждает полное покрытие CPU, macOS или iOS. [Полное руководство](https://github.com/NeverSight/NeverD/blob/dev/docs/ru/macos-hvf.md).
 
@@ -200,7 +200,7 @@ Dopo il superamento dei controlli di recupero, **Personal Intel HVF complete val
 
 ## العربية
 
-يثبّت **Independent upstream Intel HVF control** إصدار اختبار HVF عام ويحافظ على Makefile والضيف في الوضع الحقيقي دون تعديل: 100000 محاولة استدعاء مقاطعة عشوائية، ومهلة ثابتة قدرها 300 ثانية، ومخرجات PTY الأصلية، ولقطات مباشرة، وتأكيد انتهاء العملية. لا يفحص البرنامج الأصلي قيم إرجاع الاستدعاءات العشوائية، وقد يتسابق الإنهاء مع آخر مقاطعة؛ لذلك لا يثبت انتهاء المهلة وحده خللًا في HVF. لا يقيس هذا الاختبار أداء NeverD ولا يحل محل اختبارات الاستعادة أو CPU أو Darwin.
+يثبّت **Independent upstream Intel HVF control** إصدار اختبار HVF عام ويحافظ على Makefile والضيف في الوضع الحقيقي دون تعديل: 100000 محاولة استدعاء مقاطعة عشوائية، ومهلة ثابتة قدرها 900 ثانية، ومخرجات PTY الأصلية، ولقطات مباشرة، وتأكيد انتهاء العملية. لا يفحص البرنامج الأصلي قيم إرجاع الاستدعاءات العشوائية، وقد يتسابق الإنهاء مع آخر مقاطعة؛ لذلك لا يثبت انتهاء المهلة وحده خللًا في HVF. لا يقيس هذا الاختبار أداء NeverD ولا يحل محل اختبارات الاستعادة أو CPU أو Darwin.
 
 شغّل **Personal Intel HVF recovery diagnosis** يدوياً من Actions؛ لا تحتاج إلى جهاز Mac بمعالج Intel محلياً. يستخدم الإعداد الافتراضي `macos-26-intel` لتنفيذ 1,000 تكرار متتالٍ في عملية واحدة على إصدار محدد من NeverD. ويمكن اختيار `macos-15-intel` أو تشخيص من 100 تكرار. تحفظ ملفات النتائج الإصدارات والخطة والتقدم والنتيجة النهائية. يُقيّم وقت الانتظار واستقرار التنفيذ كلٌّ على حدة؛ نجاح اختبار الاستعادة هذا لا يثبت اكتمال تغطية CPU أو macOS أو iOS. [الدليل الكامل](https://github.com/NeverSight/NeverD/blob/dev/docs/ar/macos-hvf.md).
 

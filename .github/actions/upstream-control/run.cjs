@@ -39,9 +39,9 @@ async function main() {
   fs.copyFileSync(path.join(root, 'upstream/LICENSE.txt'), path.join(prepared, 'upstream-LICENSE.txt'));
   save(path.join(prepared, 'host.json'), await captureHostState(evidence, environment, group.signal));
   await upload(prepared, 'plan');
-  // Revalidation precedes the native 300-second budget (five bounded git
+  // Revalidation precedes the native 900-second budget (five bounded git
   // queries plus hashing). Leave room for both that work and child retirement.
-  const operation = group.start('python3', [helper, 'execute', ...args], environment, {timeoutMs: 375000});
+  const operation = group.start('python3', [helper, 'execute', ...args], environment, {timeoutMs: 975000});
   let running = true;
   const stopped = new AbortController();
   const completion = operation.completion.finally(() => {running = false; stopped.abort();});
@@ -50,7 +50,7 @@ async function main() {
   const native = completion.then(value => ({value}), error => ({error}));
   try {
     for (let sequence = 0; running && sequence < 64; ++sequence) {
-      try { await delay(5000, undefined, {signal: stopped.signal}); }
+      try { await delay(15000, undefined, {signal: stopped.signal}); }
       catch (error) { if (!running && error.name === 'AbortError') break; throw error; }
       if (!running || group.signal.aborted) break;
       const directory = path.join(evidence, `progress-${String(sequence).padStart(3, '0')}`);

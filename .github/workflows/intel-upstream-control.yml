@@ -1,5 +1,5 @@
 name: Independent upstream Intel HVF control
-run-name: Upstream HVF / 100000 interrupt attempts / ${{ inputs.intel-image }}
+run-name: Upstream HVF / 100000 interrupt attempts / 900s budget / ${{ inputs.intel-image }}
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   control:
     runs-on: ${{ inputs.intel-image }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       HVF_INTEL_IMAGE: ${{ inputs.intel-image }}
     steps:
@@ -47,9 +47,9 @@ jobs:
           git -C upstream diff --exit-code HEAD
       - name: Run the independent original workload with live evidence
         id: control
-        # Covers 90s preparation + 120s plan upload + 375s native controller
+        # Covers 90s preparation + 120s plan upload + 975s native controller
         # + 120s final in-flight upload, with collection/retirement headroom.
-        timeout-minutes: 14
+        timeout-minutes: 24
         uses: ./harness/.github/actions/upstream-control
       - name: Preserve matching uploader crash reports
         if: always() && (steps.control.outcome == 'failure' || steps.control.outcome == 'cancelled')

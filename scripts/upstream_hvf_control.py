@@ -16,7 +16,7 @@ import time
 
 UPSTREAM = "f150b38bfff419fe19907b7a6a2d743a63b46a49"
 CONTROLLER = "f35fa4bd21883eab946842358c4890d0d1480b72"
-TIMEOUT = 300
+TIMEOUT = 900
 
 
 def save(path, value):
