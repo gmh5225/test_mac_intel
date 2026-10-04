@@ -42,6 +42,8 @@
 | macos-26-intel | `recovery-vcpu-recreate` (jitless) | [7dd7342ec](37217525863/provenance.json) | — / — / 1000 | plan uploader incompatible; recovery not started | [37217525863](https://github.com/gmh5225/test_mac_intel/actions/runs/37217525863) |
 | macos-15-intel | `recovery-vcpu-recreate` (js-interpreter) | [7dd7342ec](37218629672/provenance.json) | 460 / 461 / 1000 | uploader SIGSEGV; native result unknown; child reaped | [37218629672](https://github.com/gmh5225/test_mac_intel/actions/runs/37218629672) |
 | macos-26-intel | `recovery-vcpu-recreate` (js-interpreter) | [7dd7342ec](37218631679/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37218631679](https://github.com/gmh5225/test_mac_intel/actions/runs/37218631679) |
+| macos-15-intel | `recovery-vm-no-host-kick` (default) | [023a4a68d](37221649736/provenance.json) | 778 / 779 / 1000 | runner lost communication; native result and retirement unknown | [37221649736](https://github.com/gmh5225/test_mac_intel/actions/runs/37221649736) |
+| macos-26-intel | `recovery-vm-no-host-kick` (default) | [023a4a68d](37221651593/provenance.json) | 300 / 301 / 1000 | runner lost communication; native result and retirement unknown | [37221651593](https://github.com/gmh5225/test_mac_intel/actions/runs/37221651593) |
 
 [Updated interpretation in all 11 languages](../2026-10-04-investigation.md): candidate `909672ca6` did not resolve runner loss.
 

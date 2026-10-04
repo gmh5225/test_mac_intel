@@ -1,6 +1,6 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T17:11:16.612543+00:00",
+  "recorded_at": "2026-10-04T18:43:14.022076+00:00",
   "complete_native_acceptance": false,
   "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Reuse retains the Executor; explicitly named recreation modes replace vCPUs, VMs, or owner threads at fixture boundaries. Recovery also recreates cancelled vCPUs internally, so recovery-vm-recreate reports boundary-only vCPU generations and leaves the total unknown. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
   "runs": [
@@ -849,6 +849,56 @@
         "mode": "js-interpreter",
         "scope": "recovery-plan-and-progress-children"
       }
+    },
+    {
+      "run_id": "37221649736",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37221649736",
+      "source": "023a4a68d44bd3dc4d75becbd32901526d73ba49",
+      "controller": "1aff847552ee507b6065a2a8ab378e5fc5321ae7",
+      "workflow": "ac479747b272d4212e0da7df5cb79f345131b8c7",
+      "image": "macos-15-intel",
+      "experiment": "recovery-vm-no-host-kick",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "GitHub annotation: hosted runner lost communication",
+      "native_passed": null,
+      "last_saved_completed": 778,
+      "last_saved_started": 779,
+      "final_native_result_present": false,
+      "child_retired": null,
+      "verified_artifact_count": 34,
+      "complete_native_acceptance": false,
+      "uploader_runtime": {
+        "mode": "default",
+        "scope": "recovery-plan-and-progress-children"
+      },
+      "unsolicited_host_kick": false,
+      "omission_markers_in_verified_prefix": 779
+    },
+    {
+      "run_id": "37221651593",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37221651593",
+      "source": "023a4a68d44bd3dc4d75becbd32901526d73ba49",
+      "controller": "1aff847552ee507b6065a2a8ab378e5fc5321ae7",
+      "workflow": "ac479747b272d4212e0da7df5cb79f345131b8c7",
+      "image": "macos-26-intel",
+      "experiment": "recovery-vm-no-host-kick",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "GitHub annotation: hosted runner lost communication",
+      "native_passed": null,
+      "last_saved_completed": 300,
+      "last_saved_started": 301,
+      "final_native_result_present": false,
+      "child_retired": null,
+      "verified_artifact_count": 15,
+      "complete_native_acceptance": false,
+      "uploader_runtime": {
+        "mode": "default",
+        "scope": "recovery-plan-and-progress-children"
+      },
+      "unsolicited_host_kick": false,
+      "omission_markers_in_verified_prefix": 300
     }
   ]
 }
