@@ -12,7 +12,7 @@ The same `909672ca6` candidate passed instruction-reuse1000 on both images, with
 
 Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreation (37195529270, 37195554929) and VM plus vCPU recreation on one retained owner (37196504453, 37196535787). The latter has 8000 ordered native events and final generation 1001 retirement per run; all 24/27 artifact digests, zero native/controller exits and child retirement were verified. This narrows the comparison with full Executor turnover but neither identifies the cause nor proves a production fix. The next diagnostic will retain the VM while replacing the vCPU and owner thread; original recovery and full CPU/Darwin acceptance remain required.
 
-The owner-handoff failure controls passed on both images (37198197978, 37198200471): 100 rounds and 300 injected checks per image, complete ordered state/cleanup markers, zero exit and process retirement. They execute native HVF calls without guest instructions. The separate 1000-round owner-turnover guest experiments are pending; these controls do not establish production stability.
+Owner turnover did not complete its 1000-round experiment: the uploader crashed on macOS 15 with SIGTRAP in V8 string parsing (37198629082), and on macOS 26 with SIGSEGV in V8 scope lookup (37198630903). The controller then cancelled and reaped the native processes; the saved logs show 24/25 and 467/468 completed/started iterations, without a native assertion or final native result. Both runners stayed reachable and supplied matched crash reports. These are observer-triggered interruptions, not verified native passes or confirmed runner losses. The cause remains unknown; compare upload-only controls before changing the backend.
 
 ## zh-CN: Intel 隔离实验结果（2026-10-04）
 
@@ -26,7 +26,7 @@ The owner-handoff failure controls passed on both images (37198197978, 371982004
 
 两项生命周期对照现已在两套 Intel 镜像上均通过 1000/1000 轮：仅重建 vCPU（37195529270、37195554929），以及保留同一 owner、重建 VM 和 vCPU（37196504453、37196535787）。后一项每次运行均包含 8000 个有序原生事件及第 1001 代的最终销毁；24/27 个产物摘要、原生与控制器正常退出、子进程回收均已核验。这缩小了与完整 Executor 周转的比较范围，但尚未定位原因或证明生产修复。下一项诊断将保留 VM、更换 vCPU 和 owner 线程；原始恢复及完整 CPU/Darwin 验收仍须通过。
 
-线程交接故障控制已在两个镜像通过（37198197978、37198200471）：各 100 轮、300 项注入检查，状态与清理标记完整有序，正常退出并回收进程。这些控制调用真实 HVF，但不执行 guest 指令。独立的 1000 轮线程更换指令实验仍在运行；故障控制通过不代表生产稳定性已验证。
+线程更换实验未完成 1000 轮：macOS 15 上传器在 V8 字符串解析中触发 SIGTRAP（37198629082），macOS 26 上传器在 V8 作用域查找中触发 SIGSEGV（37198630903）。控制器随后取消并回收原生进程；保存的日志分别显示 24/25、467/468 轮完成/开始，没有原生断言或最终原生结果。两台 runner 均保持在线并提供匹配的崩溃报告。这属于观察器触发的中断，既不是已验证的原生通过，也不是已确认的 runner 失联。原因仍未知；先用纯上传对照比较，再决定后端变更。
 
 ## zh-TW: Intel 隔離實驗結果（2026-10-04）
 
@@ -40,7 +40,7 @@ The owner-handoff failure controls passed on both images (37198197978, 371982004
 
 兩項生命週期對照現已在兩套 Intel 映像上均通過 1000/1000 輪：僅重建 vCPU（37195529270、37195554929），以及保留相同 owner、重建 VM 與 vCPU（37196504453、37196535787）。後者每次執行均包含 8000 個有序原生事件及第 1001 代的最終銷毀；24/27 個產物摘要、原生與控制器正常退出、子程序回收均已核驗。這縮小了與完整 Executor 更替的比較範圍，但尚未定位原因或證明正式修復。下一項診斷將保留 VM、更換 vCPU 與 owner 執行緒；原始恢復及完整 CPU/Darwin 驗收仍須通過。
 
-執行緒交接故障控制已在兩個映像通過（37198197978、37198200471）：各 100 輪、300 項注入檢查，狀態與清理標記完整有序，正常退出並回收程序。這些控制呼叫真實 HVF，但不執行 guest 指令。獨立的 1000 輪執行緒更換指令實驗仍在執行；故障控制通過不代表正式穩定性已驗證。
+執行緒更換實驗未完成 1000 輪：macOS 15 上傳器在 V8 字串解析中觸發 SIGTRAP（37198629082），macOS 26 上傳器在 V8 作用域查找中觸發 SIGSEGV（37198630903）。控制器隨後取消並回收原生程序；保存的日誌分別顯示 24/25、467/468 輪完成/開始，沒有原生斷言或最終原生結果。兩台 runner 均保持連線並提供匹配的崩潰報告。這屬於觀察器觸發的中斷，既不是已驗證的原生通過，也不是已確認的 runner 失聯。原因仍未知；先以純上傳對照比較，再決定後端變更。
 
 ## ja: Intel 分離実験の結果（2026-10-04）
 
@@ -54,7 +54,7 @@ The owner-handoff failure controls passed on both images (37198197978, 371982004
 
 両 Intel イメージで、vCPU 再生成（37195529270、37195554929）と同じ owner 上での VM・vCPU 再生成（37196504453、37196535787）が、それぞれ 1000/1000 回に合格しました。後者では各実行の 8000 個のネイティブイベントの順序と最終第 1001 世代の破棄、24/27 個の成果物ハッシュ、ネイティブ処理・制御側の終了コード 0、子プロセス回収を確認しました。Executor 全体の再生成との差を絞る証拠であり、原因や製品修正の証明ではありません。次は VM を保持して vCPU と owner スレッドを交換します。元の回復試験と完全な CPU/Darwin 検証は引き続き必要です。
 
-owner 交代時の障害制御は両イメージで合格しました（37198197978、37198200471）。各100回・300件の注入確認、順序どおりの状態・後処理記録、正常終了とプロセス回収を検証済みです。実際のHVFを呼びますがguest命令は実行しません。別の1000回のowner交代指令実験は実行中で、製品の安定性の証明ではありません。
+owner 交代の1000回実験は未完了です。macOS 15のアップローダーはV8文字列解析中にSIGTRAP（37198629082）、macOS 26はV8スコープ検索中にSIGSEGV（37198630903）で停止し、制御側がネイティブ処理を中止・回収しました。保存記録は完了/開始24/25、467/468回で、ネイティブのアサーションや最終結果はありません。両runnerは接続を保ち、一致するクラッシュ報告を提供しました。観測側による中断であり、ネイティブ合格やrunner切断の証明ではありません。原因は未確定で、バックエンド変更前にアップロードのみの対照と比較します。
 
 ## ko: Intel 분리 실험 결과（2026-10-04）
 
@@ -68,7 +68,7 @@ owner 交代時の障害制御は両イメージで合格しました（37198197
 
 두 Intel 이미지에서 vCPU 재생성(37195529270, 37195554929)과 같은 owner에서 VM 및 vCPU 재생성(37196504453, 37196535787)이 각각 1000/1000회를 통과했습니다. 후자는 실행마다 네이티브 이벤트 8000개의 순서, 마지막 1001세대 소멸, 산출물 해시 24/27개, 네이티브·제어기 종료 코드 0과 자식 프로세스 회수를 검증했습니다. 전체 Executor 교체와의 차이를 좁히는 근거이며 원인이나 제품 수정의 증명은 아닙니다. 다음 진단은 VM을 유지하고 vCPU와 owner 스레드를 교체합니다. 원래 복구 시험과 전체 CPU/Darwin 검증은 여전히 필요합니다.
 
-owner 교체 오류 제어가 두 이미지에서 통과했습니다(37198197978, 37198200471). 각 100회·300개 주입 검사, 순서대로 된 상태·정리 기록, 정상 종료와 프로세스 회수를 확인했습니다. 실제 HVF를 호출하지만 guest 명령은 실행하지 않습니다. 별도의 1000회 owner 교체 명령 실험은 진행 중이며 제품 안정성이 입증된 것은 아닙니다.
+owner 교체 1000회 실험은 완료되지 않았습니다. macOS 15 업로더는 V8 문자열 구문 분석에서 SIGTRAP(37198629082), macOS 26은 V8 범위 검색에서 SIGSEGV(37198630903)로 중단됐고 제어기가 네이티브 프로세스를 취소·회수했습니다. 보존 로그는 완료/시작 24/25회와 467/468회이며 네이티브 단언 실패나 최종 결과는 없습니다. 두 runner 모두 연결을 유지하며 일치하는 충돌 보고서를 제공했습니다. 관찰기 때문에 중단된 것으로 네이티브 통과나 runner 연결 단절의 증거가 아닙니다. 원인은 미확정이며 백엔드를 바꾸기 전에 업로드 전용 대조와 비교합니다.
 
 ## fr: Résultats des expériences Intel isolées (2026-10-04)
 
@@ -82,7 +82,7 @@ Le même candidat `909672ca6` a réussi instruction-reuse1000 sur les deux image
 
 Les deux contrôles ont désormais réussi 1000/1000 fois sur les deux images Intel : recréation du vCPU (37195529270, 37195554929), puis de la VM et du vCPU avec le même owner (37196504453, 37196535787). Ce dernier comprend 8000 événements natifs ordonnés et la destruction finale de la génération 1001 par exécution ; les 24/27 empreintes, les sorties natives et du contrôleur à zéro et la collecte des processus ont été vérifiées. Cela précise la comparaison avec le renouvellement complet d’Executor sans identifier la cause ni prouver une correction. Le prochain diagnostic conservera la VM et remplacera le vCPU et son thread propriétaire. La récupération originale et la validation CPU/Darwin complète restent nécessaires.
 
-Les contrôles d’échec du transfert ont réussi sur les deux images (37198197978, 37198200471) : 100 tours et 300 injections chacun, états et nettoyages ordonnés, sortie zéro et processus collectés. Ils appellent HVF sans instructions invitées. Les expériences distinctes de 1000 tours avec guest sont en cours ; la stabilité du produit reste à démontrer.
+Les 1000 tours de changement d’owner sont incomplets : l’uploader a subi SIGTRAP dans l’analyse de chaînes V8 sur macOS 15 (37198629082) et SIGSEGV dans la recherche de portée V8 sur macOS 26 (37198630903). Le contrôleur a alors annulé et collecté les processus natifs. Les journaux montrent 24/25 et 467/468 tours terminés/commencés, sans assertion native ni résultat final. Les runners sont restés joignables avec des rapports de crash concordants. Ce sont des interruptions par l’observateur, pas des validations natives ni des pertes de runner confirmées. La cause reste inconnue ; comparer les contrôles sans VM avant de modifier le backend.
 
 ## de: Ergebnisse isolierter Intel-Versuche (2026-10-04)
 
@@ -96,7 +96,7 @@ Derselbe Kandidat `909672ca6` bestand instruction-reuse1000 auf beiden Images mi
 
 Beide Lebenszyklusvergleiche bestanden jetzt auf beiden Intel-Images jeweils 1000/1000 Durchläufe: vCPU-Neuerstellung (37195529270, 37195554929) sowie VM- und vCPU-Neuerstellung bei gleichem owner (37196504453, 37196535787). Letztere belegt je Lauf 8000 geordnete native Ereignisse und die abschließende Zerstörung von Generation 1001; alle 24/27 Artefakt-Hashes, Rückgabecodes null und das Einsammeln der Kindprozesse wurden geprüft. Das grenzt den Vergleich mit vollständigem Executor-Wechsel ein, beweist aber weder Ursache noch Produktkorrektur. Als Nächstes bleiben die VM erhalten und werden vCPU und Besitzer-Thread ersetzt. Originaler Wiederherstellungstest und vollständige CPU/Darwin-Abnahme bleiben erforderlich.
 
-Die Fehlerkontrollen der Übergabe bestanden auf beiden Images (37198197978, 37198200471): jeweils 100 Runden und 300 Injektionen, geordnete Zustands- und Bereinigungsnachweise, Exit null und eingesammelte Prozesse. Sie rufen HVF ohne Gastinstruktionen auf. Die getrennten 1000 Gastdurchläufe mit owner-Wechsel laufen noch; Produktstabilität ist damit nicht belegt.
+Der owner-Wechsel beendete die 1000 Runden nicht: Der Uploader erlitt SIGTRAP beim V8-Stringparsen auf macOS 15 (37198629082) und SIGSEGV bei der V8-Scope-Suche auf macOS 26 (37198630903). Der Controller brach daraufhin die nativen Prozesse ab und sammelte sie ein. Gesichert sind 24/25 bzw. 467/468 beendete/gestartete Runden ohne native Assertion oder Endergebnis. Beide Runner blieben erreichbar und lieferten passende Crashberichte. Das sind vom Beobachter ausgelöste Abbrüche, keine nativen Erfolge oder bestätigten Runner-Verluste. Die Ursache ist offen; vor Backend-Änderungen werden reine Upload-Kontrollen verglichen.
 
 ## es: Resultados de experimentos Intel aislados (2026-10-04)
 
@@ -110,7 +110,7 @@ El mismo candidato `909672ca6` superó instruction-reuse1000 en ambas imágenes,
 
 Ambos controles de ciclo de vida superaron ya 1000/1000 iteraciones en las dos imágenes Intel: recreación de vCPU (37195529270, 37195554929) y de VM más vCPU conservando el mismo owner (37196504453, 37196535787). El segundo acredita 8000 eventos nativos ordenados y la destrucción final de la generación 1001 por ejecución; se verificaron las 24/27 huellas, las salidas nativas y del controlador a cero y la recogida de los procesos. Esto acota la comparación con la sustitución completa de Executor, pero no identifica la causa ni demuestra una corrección. El siguiente diagnóstico conservará la VM y sustituirá vCPU e hilo propietario. Siguen pendientes la recuperación original y la validación CPU/Darwin completa.
 
-Los controles de fallo del relevo pasaron en ambas imágenes (37198197978, 37198200471): 100 rondas y 300 inyecciones por imagen, estados y limpieza ordenados, salida cero y procesos recogidos. Llaman a HVF sin instrucciones guest. Los experimentos separados de 1000 rondas con guest siguen en curso; no se ha demostrado estabilidad del producto.
+El cambio de owner no completó 1000 rondas: el uploader sufrió SIGTRAP al analizar cadenas V8 en macOS 15 (37198629082) y SIGSEGV al buscar ámbitos V8 en macOS 26 (37198630903). El controlador canceló y recogió los procesos nativos. Los registros conservan 24/25 y 467/468 rondas completadas/iniciadas, sin aserción nativa ni resultado final. Ambos runners siguieron accesibles y entregaron informes coincidentes. Son interrupciones del observador, no aprobaciones nativas ni pérdidas confirmadas del runner. La causa sigue abierta; se compararán controles de solo subida antes de cambiar el backend.
 
 ## it: Risultati degli esperimenti Intel isolati (2026-10-04)
 
@@ -124,7 +124,7 @@ Lo stesso candidato `909672ca6` ha superato instruction-reuse1000 su entrambe le
 
 Entrambi i controlli hanno ora superato 1000/1000 iterazioni sulle due immagini Intel: ricreazione della vCPU (37195529270, 37195554929) e di VM più vCPU con lo stesso owner (37196504453, 37196535787). Il secondo documenta 8000 eventi nativi ordinati e la distruzione finale della generazione 1001 per esecuzione; sono stati verificati tutti i 24/27 hash, le uscite native e del controllore a zero e la raccolta dei processi. Ciò restringe il confronto con il rinnovo completo di Executor, senza identificare la causa o dimostrare una correzione. Il prossimo diagnostico manterrà la VM e sostituirà vCPU e thread proprietario. Restano necessari il recupero originale e la validazione CPU/Darwin completa.
 
-I controlli di errore del passaggio hanno superato entrambe le immagini (37198197978, 37198200471): 100 cicli e 300 iniezioni ciascuno, stati e pulizia ordinati, uscita zero e processi raccolti. Chiamano HVF senza istruzioni guest. Gli esperimenti separati di 1000 cicli con guest sono in corso; la stabilità del prodotto resta da dimostrare.
+Il cambio di owner non ha completato 1000 cicli: l’uploader ha subito SIGTRAP nell’analisi delle stringhe V8 su macOS 15 (37198629082) e SIGSEGV nella ricerca degli scope V8 su macOS 26 (37198630903). Il controllore ha annullato e raccolto i processi nativi. I log conservano 24/25 e 467/468 cicli completati/avviati, senza asserzione nativa o risultato finale. Entrambi i runner sono rimasti raggiungibili con rapporti di crash corrispondenti. Sono interruzioni dell’osservatore, non successi nativi o perdite confermate del runner. La causa resta ignota; confrontare controlli di solo caricamento prima di modificare il backend.
 
 ## ru: Результаты изолированных экспериментов Intel (2026-10-04)
 
@@ -138,7 +138,7 @@ I controlli di errore del passaggio hanno superato entrambe le immagini (3719819
 
 Оба сравнения жизненного цикла прошли по 1000/1000 итераций на обоих образах Intel: пересоздание vCPU (37195529270, 37195554929) и VM вместе с vCPU при сохранении owner (37196504453, 37196535787). Во втором проверены 8000 упорядоченных нативных событий и окончательное уничтожение поколения 1001 на запуск, все 24/27 хешей артефактов, нулевые коды выхода и сбор дочерних процессов. Это сужает сравнение с полной заменой Executor, но не устанавливает причину и не доказывает исправление. Следующая диагностика сохранит VM, заменяя vCPU и поток-владелец. Исходный тест восстановления и полная приёмка CPU/Darwin по-прежнему необходимы.
 
-Контроли ошибок передачи прошли на обоих образах (37198197978, 37198200471): по 100 повторений и 300 внедрённых проверок, упорядоченные состояния и очистка, выход с кодом ноль и сбор процессов. Они вызывают HVF без гостевых инструкций. Отдельные 1000 повторений со сменой owner и гостем ещё выполняются; стабильность продукта не доказана.
+Эксперимент смены owner не завершил 1000 повторений: загрузчик получил SIGTRAP при разборе строк V8 на macOS 15 (37198629082) и SIGSEGV при поиске области видимости V8 на macOS 26 (37198630903). Контроллер остановил и собрал нативные процессы. Сохранены 24/25 и 467/468 завершённых/начатых итераций без нативной ошибки проверки или итогового результата. Оба runner остались доступны и предоставили соответствующие отчёты о сбое. Это прерывания наблюдателем, а не нативные успехи или подтверждённая потеря runner. Причина не установлена; до изменения backend нужны сравнения с контролем только загрузки.
 
 ## ar: نتائج تجارب Intel المعزولة (2026-10-04)
 
@@ -152,4 +152,4 @@ I controlli di errore del passaggio hanno superato entrambe le immagini (3719819
 
 نجح الآن ضابطا دورة الحياة في 1000/1000 تكرار على صورتي Intel: إعادة إنشاء vCPU ‏(37195529270، 37195554929)، ثم VM وvCPU مع الاحتفاظ بالمالك نفسه (37196504453، 37196535787). يثبت الثاني 8000 حدث أصلي مرتب وتدمير الجيل 1001 النهائي في كل تشغيل؛ ودُققت بصمات الملفات الـ24/27، ورموز الخروج الصفرية، وجمع العمليات الفرعية. يضيّق ذلك المقارنة مع تبديل Executor بالكامل، لكنه لا يحدد السبب ولا يثبت إصلاح المنتج. سيحتفظ التشخيص التالي بالـVM ويستبدل vCPU والخيط المالك. يبقى اختبار الاسترداد الأصلي والتحقق الكامل لـCPU/Darwin مطلوبين.
 
-نجحت ضوابط أخطاء تسليم الخيط على الصورتين (37198197978، 37198200471): مئة دورة و300 فحص محقون لكل صورة، مع ترتيب كامل لحالات الفحص والتنظيف، وخروج صفري وجمع العمليات. تستدعي HVF دون تعليمات ضيف. تجارب الضيف المنفصلة ذات 1000 تكرار لتبديل المالك ما زالت جارية؛ ولم تُثبت بعد استقرارية المنتج.
+لم تكتمل تجربة تبديل المالك ذات 1000 دورة: تعطل الرافع بإشارة SIGTRAP أثناء تحليل نصوص V8 على macOS 15 ‏(37198629082)، وبإشارة SIGSEGV أثناء بحث نطاق V8 على macOS 26 ‏(37198630903). ألغى المتحكم العمليات الأصلية وجمعها. تثبت السجلات 24/25 و467/468 دورة مكتملة/بدأت، دون فشل تحقق أصلي أو نتيجة أصلية نهائية. بقي runner متصلًا في الحالتين وقدّم تقرير تعطل مطابقًا. هذه مقاطعات سببها المراقب وليست نجاحًا أصليًا أو فقد اتصال مؤكدًا. السبب مجهول؛ تُقارن ضوابط الرفع وحده قبل تعديل الخلفية.

@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const {spawnSync} = require('node:child_process');
+const {createHash} = require('node:crypto');
 const base = process.env.GITHUB_WORKSPACE;
 const {commandGroup, finishUpload} = require(path.join(base, 'diagnostics/.github/actions/hvf-intel-recovery/run.cjs'));
 const {UPLOAD_REVISION} = require(path.join(base, 'diagnostics/.github/actions/hvf-intel-diagnostic/run.cjs'));
@@ -20,9 +21,15 @@ async function main() {
   const evidence = path.join(base, 'evidence/upload-control');
   fs.mkdirSync(path.join(evidence, 'uploads'), {recursive: true});
   const save = (file, value) => fs.writeFileSync(file, JSON.stringify(value, null, 2) + '\n', {flag: 'wx'});
+  const macho = spawnSync('/usr/bin/dwarfdump', ['--uuid', process.execPath],
+    {encoding: 'utf8', timeout: 10000});
+  const uuids = [...(macho.stdout || '').matchAll(/^UUID: ([0-9a-f-]+) \(x86_64\)/gim)];
+  if (macho.status !== 0 || uuids.length !== 1) throw new Error('native Intel Node UUID unavailable');
   const manifest = {kind: 'artifact-upload-only-control', native_execution: false,
     workflow_commit: process.env.GITHUB_SHA, diagnostic_commit: process.env.DIAGNOSTIC_COMMIT,
     upload_commit: UPLOAD_REVISION, node_version: process.version, node_executable: process.execPath,
+    v8_version: process.versions.v8, node_x86_64_uuid: uuids[0][1].toLowerCase(),
+    node_sha256: createHash('sha256').update(fs.readFileSync(process.execPath)).digest('hex'),
     host_architecture: process.arch, image_version: process.env.ImageVersion,
     requested_uploads: 16, completed_uploads: 0};
   save(path.join(evidence, 'plan.json'), manifest);

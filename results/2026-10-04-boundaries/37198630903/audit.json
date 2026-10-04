@@ -1,0 +1,180 @@
+{
+  "run_id": "37198630903",
+  "workflow_status": "completed",
+  "workflow_conclusion": "failure",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "bf0e6445bd33f913af38cddd3c67f8103e7b5219",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+    "run_id": "37198630903",
+    "run_attempt": "1",
+    "runner_image": "macos-26-intel",
+    "image_version": "20260824.0517.1",
+    "repetitions": 1000,
+    "experiment": "instruction-owner-recreate",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261004T113226Z.json",
+  "artifacts_verified": 8,
+  "full_acceptance": false,
+  "plan": {
+    "commit": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+    "experiment": "instruction-owner-recreate",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfIntelProbe.InstructionOnly",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1",
+      "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VCPU": "1",
+      "NEVERD_HVF_INTEL_RECREATE_OWNER": "1"
+    }
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-004",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+      "controller_commit": "bf0e6445bd33f913af38cddd3c67f8103e7b5219",
+      "captured_at": "2026-10-04T11:30:49.939Z",
+      "reason": "progress",
+      "sequence": 4,
+      "output": {
+        "size_at_open": 596863,
+        "first_byte": 0,
+        "copied_bytes": 596863,
+        "truncated": false
+      },
+      "progress": {
+        "last_started_iteration": 364,
+        "last_completed_iteration": 363,
+        "native_runs_in_copy": 364,
+        "native_ok_in_copy": 363
+      },
+      "identity": {
+        "native_pid": 94022,
+        "python_pid": 94008,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-04T11:30:49.939Z",
+        "stdout": "94022 94008 94022 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "[==========] 1 test from 1 test suite ran. (18 ms total)",
+      "[  PASSED  ] 1 test.",
+      "",
+      "Repeating all tests (iteration 364) . . .",
+      "",
+      "Note: Google Test filter = HvfIntelProbe.InstructionOnly",
+      "[==========] Running 1 test from 1 test suite.",
+      "[----------] 1 test from HvfIntelProbe",
+      "[ RUN      ] HvfIntelProbe.InstructionOnly",
+      "INTEL_PROBE phase=executor_initialization",
+      "INTEL_PROBE phase=executor_retained",
+      "INTEL_PROBE phase=startup_probe"
+    ]
+  },
+  "native_passed": null,
+  "final_native_result_present": false,
+  "observer_interruption": {
+    "classification": "uploader runtime crash followed by controller cancellation",
+    "native_repetitions": {
+      "started_repetitions": 468,
+      "completed_repetitions": 467,
+      "next_expected_event": "ok",
+      "error": "incomplete repetition evidence"
+    },
+    "native_result_missing": true,
+    "native_passed": null,
+    "native_retirement": [
+      {
+        "pid": 94022,
+        "status": -9,
+        "retired": true
+      }
+    ],
+    "controller": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-04T11:30:39.431Z",
+      "completed_at": "2026-10-04T11:30:52.212Z",
+      "exit_status": 143,
+      "signal": null,
+      "termination_reason": "progress-evidence-failure",
+      "spawn_error": null
+    },
+    "failed_upload": "uploads/progress-005.json",
+    "upload_result": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-04T11:30:51.896Z",
+      "completed_at": "2026-10-04T11:30:52.137Z",
+      "exit_status": null,
+      "signal": "SIGSEGV",
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 94287,
+      "parent_pid": 93653,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node"
+    },
+    "node_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "exception": {
+      "codes": "0x0000000000000001, 0x000000054c7264b0",
+      "rawCodes": [
+        1,
+        22757401776
+      ],
+      "type": "EXC_BAD_ACCESS",
+      "signal": "SIGSEGV",
+      "subtype": "KERN_INVALID_ADDRESS at 0x000000054c7264b0"
+    },
+    "top_frames": [
+      {
+        "symbol": "v8::internal::Variable* v8::internal::Scope::Lookup<(v8::internal::Scope::ScopeLookupMode)0>(v8::internal::VariableProxy*, v8::internal::Scope*, v8::internal::Scope*, v8::internal::Scope*, bool)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::Scope::ResolveVariablesRecursively(v8::internal::Scope*)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::Scope::ResolveVariablesRecursively(v8::internal::Scope*)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::Scope::ResolveVariablesRecursively(v8::internal::Scope*)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::DeclarationScope::AllocateVariables(v8::internal::ParseInfo*)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::DeclarationScope::Analyze(v8::internal::ParseInfo*)",
+        "image": "node"
+      }
+    ],
+    "output_sha256": "d793c9bc804cb9efe18ab3da77fbb2460ef9356d85759d91b908ec36e0b74ad1",
+    "no_native_assertion_observed_in_saved_prefix": true,
+    "runner_loss_established": false,
+    "root_cause_established": false
+  }
+}
