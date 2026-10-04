@@ -27,7 +27,7 @@ on:
         required: true
         default: finite-deadline
         type: choice
-        options: [recovery, lifecycle, instruction, instruction-reuse, instruction-vcpu-recreate, instruction-vm-recreate, instruction-owner-recreate, owner-failure-controls, recovery-reuse, recovery-vm-recreate, finite-deadline]
+        options: [recovery, lifecycle, instruction, instruction-reuse, instruction-vcpu-recreate, instruction-vm-recreate, instruction-owner-recreate, owner-failure-controls, recovery-reuse, recovery-vcpu-recreate, recovery-vm-recreate, finite-deadline]
 permissions:
   contents: read
 jobs:
@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      DIAGNOSTIC_COMMIT: 4c702d35ae081a7d4461cc3fade686c458fcb96f
+      DIAGNOSTIC_COMMIT: 31afddad3edc79dad048182d28b2d20cc3b8d6b8
     steps:
       - name: Check out this comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
