@@ -1,0 +1,184 @@
+{
+  "run_id": "37218631679",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "e6d054c45d388935858c88285a0cab4b83ae2467",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "caeb594ad45322e22db43445c1eb77c606688913",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "run_id": "37218631679",
+    "run_attempt": "1",
+    "runner_image": "macos-26-intel",
+    "image_version": "20260824.0517.1",
+    "repetitions": 1000,
+    "experiment": "recovery-vcpu-recreate",
+    "uploader_runtime": "js-interpreter",
+    "uploader_runtime_scope": "recovery-plan-and-progress-children",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261004T171110Z.json",
+  "artifacts_verified": 43,
+  "current_attempt_artifacts": 43,
+  "full_acceptance": false,
+  "observer_runtime": {
+    "kind": "actual-hvf-observer-runtime",
+    "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_version": "v24.19.0",
+    "v8_version": "13.6.233.17-node.51",
+    "host_system": "darwin",
+    "host_architecture": "x64",
+    "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+    "node_bytes": 123666640
+  },
+  "uploader_runtime": {
+    "kind": "hvf-uploader-runtime-contract",
+    "scope": "recovery-plan-and-progress-children",
+    "mode": "js-interpreter",
+    "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "arguments": [
+      "--no-turbofan",
+      "--no-maglev",
+      "--no-sparkplug",
+      "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+    ],
+    "node_options_present": false,
+    "parent_exec_argv": []
+  },
+  "plan": {
+    "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "experiment": "recovery-vcpu-recreate",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfExecutor.Native*",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1",
+      "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VCPU": "1"
+    }
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-039",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller_commit": "e6d054c45d388935858c88285a0cab4b83ae2467",
+      "captured_at": "2026-10-04T17:07:22.936Z",
+      "reason": "progress",
+      "sequence": 39,
+      "output": {
+        "size_at_open": 761970,
+        "first_byte": 0,
+        "copied_bytes": 761970,
+        "truncated": false
+      },
+      "progress": {
+        "last_started_iteration": 983,
+        "last_completed_iteration": 982,
+        "native_runs_in_copy": 983,
+        "native_ok_in_copy": 982
+      },
+      "identity": {
+        "native_pid": 28048,
+        "python_pid": 28041,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-04T17:07:22.935Z",
+        "stdout": "28048 28041 28048 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "[----------] 1 test from HvfExecutor (505 ms total)",
+      "",
+      "[==========] 1 test from 1 test suite ran. (505 ms total)",
+      "[  PASSED  ] 1 test.",
+      "",
+      "Repeating all tests (iteration 983) . . .",
+      "",
+      "Note: Google Test filter = HvfExecutor.Native*",
+      "[==========] Running 1 test from 1 test suite.",
+      "[----------] 1 test from HvfExecutor",
+      "[ RUN      ] HvfExecutor.NativeIntelCancellationAndCompletionFailureAllowRetry",
+      "INTEL_PROBE phase=executor_retained"
+    ]
+  },
+  "native_passed": true,
+  "repetitions": {
+    "started_repetitions": 1000,
+    "completed_repetitions": 1000,
+    "next_expected_event": "iteration",
+    "error": null
+  },
+  "native_status": {
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfExecutor.Native*",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "working_directory": "/Users/runner/work/test_mac_intel/test_mac_intel/source",
+    "timeout_seconds": 600,
+    "status": 0,
+    "timed_out": false,
+    "child_retired": true,
+    "test_environment": {},
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1"
+    }
+  },
+  "retirement": [
+    {
+      "pid": 28048,
+      "status": 0,
+      "retired": true
+    }
+  ],
+  "controller": {
+    "kind": "diagnostic-controller-child",
+    "started_at": "2026-10-04T17:02:53.541Z",
+    "completed_at": "2026-10-04T17:07:31.162Z",
+    "exit_status": 0,
+    "signal": null,
+    "termination_reason": null,
+    "spawn_error": null
+  },
+  "output_sha256": "7474dfc354651ef6f4e3f550331cbb30f0ca2ef8f1d3dc09450ec4040042b493",
+  "lifecycle": {
+    "events": {
+      "vcpu_destroy_begin": 1000,
+      "vcpu_destroy_end": 1000,
+      "vcpu_create_begin": 1000,
+      "vcpu_create_end": 1000,
+      "executor_retire_begin": 1,
+      "executor_retire_end": 1
+    },
+    "owner": "67693",
+    "executed_vcpu_generations": null,
+    "total_vcpu_generations": null,
+    "total_vm_generations": 1,
+    "final_unused_generation_retired": true,
+    "vcpu_boundary_generations": 1001,
+    "completed_recovery_iterations_with_vcpu_boundary": 1000,
+    "vcpu_counter_scope": "fixture boundaries only; internal recovery resets uncounted"
+  }
+}

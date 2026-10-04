@@ -1,0 +1,216 @@
+{
+  "run_id": "37218629672",
+  "workflow_status": "completed",
+  "workflow_conclusion": "failure",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "e6d054c45d388935858c88285a0cab4b83ae2467",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "caeb594ad45322e22db43445c1eb77c606688913",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "run_id": "37218629672",
+    "run_attempt": "1",
+    "runner_image": "macos-15-intel",
+    "image_version": "20260824.0482.1",
+    "repetitions": 1000,
+    "experiment": "recovery-vcpu-recreate",
+    "uploader_runtime": "js-interpreter",
+    "uploader_runtime_scope": "recovery-plan-and-progress-children",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261004T170720Z.json",
+  "artifacts_verified": 21,
+  "current_attempt_artifacts": 21,
+  "full_acceptance": false,
+  "observer_runtime": {
+    "kind": "actual-hvf-observer-runtime",
+    "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_version": "v24.19.0",
+    "v8_version": "13.6.233.17-node.51",
+    "host_system": "darwin",
+    "host_architecture": "x64",
+    "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+    "node_bytes": 123666640
+  },
+  "uploader_runtime": {
+    "kind": "hvf-uploader-runtime-contract",
+    "scope": "recovery-plan-and-progress-children",
+    "mode": "js-interpreter",
+    "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "arguments": [
+      "--no-turbofan",
+      "--no-maglev",
+      "--no-sparkplug",
+      "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+    ],
+    "node_options_present": false,
+    "parent_exec_argv": []
+  },
+  "plan": {
+    "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "experiment": "recovery-vcpu-recreate",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfExecutor.Native*",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1",
+      "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VCPU": "1"
+    }
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-017",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller_commit": "e6d054c45d388935858c88285a0cab4b83ae2467",
+      "captured_at": "2026-10-04T17:04:52.241Z",
+      "reason": "progress",
+      "sequence": 17,
+      "output": {
+        "size_at_open": 336115,
+        "first_byte": 0,
+        "copied_bytes": 336115,
+        "truncated": false
+      },
+      "progress": {
+        "last_started_iteration": 432,
+        "last_completed_iteration": 431,
+        "native_runs_in_copy": 432,
+        "native_ok_in_copy": 431
+      },
+      "identity": {
+        "native_pid": 59973,
+        "python_pid": 59924,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-04T17:04:52.241Z",
+        "stdout": "59973 59924 59973 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "[----------] 1 test from HvfExecutor (131 ms total)",
+      "",
+      "[==========] 1 test from 1 test suite ran. (131 ms total)",
+      "[  PASSED  ] 1 test.",
+      "",
+      "Repeating all tests (iteration 432) . . .",
+      "",
+      "Note: Google Test filter = HvfExecutor.Native*",
+      "[==========] Running 1 test from 1 test suite.",
+      "[----------] 1 test from HvfExecutor",
+      "[ RUN      ] HvfExecutor.NativeIntelCancellationAndCompletionFailureAllowRetry",
+      "INTEL_PROBE phase=executor_retained"
+    ]
+  },
+  "native_passed": null,
+  "final_native_result_present": false,
+  "observer_interruption": {
+    "classification": "uploader runtime crash followed by controller cancellation",
+    "native_repetitions": {
+      "started_repetitions": 461,
+      "completed_repetitions": 460,
+      "next_expected_event": "ok",
+      "error": "incomplete repetition evidence"
+    },
+    "native_result_missing": true,
+    "native_passed": null,
+    "native_retirement": [
+      {
+        "pid": 59973,
+        "status": -9,
+        "retired": true
+      }
+    ],
+    "controller": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-04T17:03:06.340Z",
+      "completed_at": "2026-10-04T17:05:00.389Z",
+      "exit_status": 143,
+      "signal": null,
+      "termination_reason": "progress-evidence-failure",
+      "spawn_error": null
+    },
+    "failed_upload": "uploads/progress-018.json",
+    "upload_result": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-04T17:04:58.824Z",
+      "completed_at": "2026-10-04T17:05:00.367Z",
+      "exit_status": null,
+      "signal": "SIGSEGV",
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 62812,
+      "parent_pid": 59666,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "--no-turbofan",
+        "--no-maglev",
+        "--no-sparkplug",
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "node_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "exception": {
+      "codes": "0x0000000000000001, 0x0000000080000000",
+      "rawCodes": [
+        1,
+        2147483648
+      ],
+      "type": "EXC_BAD_ACCESS",
+      "signal": "SIGSEGV",
+      "subtype": "KERN_INVALID_ADDRESS at 0x0000000080000000"
+    },
+    "top_frames": [
+      {
+        "symbol": "void v8::internal::MarkingVisitorBase<v8::internal::ConcurrentMarkingVisitor>::ProcessWeakHeapObject<v8::internal::FullHeapObjectSlot>(v8::internal::Tagged<v8::internal::HeapObject>, v8::internal::FullHeapObjectSlot, v8::internal::Tagged<v8::internal::HeapObject>)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::ConcurrentMarking::RunMajor(v8::JobDelegate*, v8::base::EnumSet<v8::internal::CodeFlushMode, int>, unsigned int, bool)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::internal::ConcurrentMarking::JobTaskMajor::Run(v8::JobDelegate*)",
+        "image": "node"
+      },
+      {
+        "symbol": "v8::platform::DefaultJobWorker::Run()",
+        "image": "node"
+      },
+      {
+        "symbol": "node::(anonymous namespace)::PlatformWorkerThread(void*)",
+        "image": "node"
+      },
+      {
+        "symbol": "_pthread_start",
+        "image": "libsystem_pthread.dylib"
+      }
+    ],
+    "crash_proc_path": "/Users/USER/*/node",
+    "crash_proc_path_redacted": true,
+    "output_sha256": "fdcb410b5a33bd098c6ec8f904e3bca4b8e9f4be5e2d084a1801b1e721958f44",
+    "no_native_assertion_observed_in_saved_prefix": true,
+    "runner_loss_established": false,
+    "root_cause_established": false
+  }
+}

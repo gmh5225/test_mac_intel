@@ -1,6 +1,6 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T16:53:06.776080+00:00",
+  "recorded_at": "2026-10-04T17:11:16.612543+00:00",
   "complete_native_acceptance": false,
   "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Reuse retains the Executor; explicitly named recreation modes replace vCPUs, VMs, or owner threads at fixture boundaries. Recovery also recreates cancelled vCPUs internally, so recovery-vm-recreate reports boundary-only vCPU generations and leaves the total unknown. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
   "runs": [
@@ -782,6 +782,73 @@
       },
       "plan_source": "recovered-final",
       "independent_plan_upload_succeeded": false
+    },
+    {
+      "run_id": "37218629672",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37218629672",
+      "source": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller": "caeb594ad45322e22db43445c1eb77c606688913",
+      "workflow": "e6d054c45d388935858c88285a0cab4b83ae2467",
+      "image": "macos-15-intel",
+      "experiment": "recovery-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "failure",
+      "classification": "uploader SIGSEGV; controller cancelled native command",
+      "native_passed": null,
+      "last_saved_completed": 460,
+      "last_saved_started": 461,
+      "final_native_result_present": false,
+      "child_retired": true,
+      "verified_artifact_count": 21,
+      "complete_native_acceptance": false,
+      "uploader_runtime": {
+        "mode": "js-interpreter",
+        "scope": "recovery-plan-and-progress-children"
+      }
+    },
+    {
+      "run_id": "37218631679",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37218631679",
+      "source": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller": "caeb594ad45322e22db43445c1eb77c606688913",
+      "workflow": "e6d054c45d388935858c88285a0cab4b83ae2467",
+      "image": "macos-26-intel",
+      "experiment": "recovery-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 1000,
+        "completed_repetitions": 1000,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 43,
+      "complete_native_acceptance": false,
+      "lifecycle": {
+        "events": {
+          "vcpu_destroy_begin": 1000,
+          "vcpu_destroy_end": 1000,
+          "vcpu_create_begin": 1000,
+          "vcpu_create_end": 1000,
+          "executor_retire_begin": 1,
+          "executor_retire_end": 1
+        },
+        "owner": "67693",
+        "executed_vcpu_generations": null,
+        "total_vcpu_generations": null,
+        "total_vm_generations": 1,
+        "final_unused_generation_retired": true,
+        "vcpu_boundary_generations": 1001,
+        "completed_recovery_iterations_with_vcpu_boundary": 1000,
+        "vcpu_counter_scope": "fixture boundaries only; internal recovery resets uncounted"
+      },
+      "uploader_runtime": {
+        "mode": "js-interpreter",
+        "scope": "recovery-plan-and-progress-children"
+      }
     }
   ]
 }
