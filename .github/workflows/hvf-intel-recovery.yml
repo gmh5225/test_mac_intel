@@ -1,4 +1,4 @@
-# Adapted from NeverSight/NeverD, commit 52a7a07243223f85b99f818bb104e8a8e573f257.
+# Adapted from NeverSight/NeverD, commit 6b6ba9fb2342a09dc2d83e5c0b71fc745f2e4da6.
 # Copyright (C) 2026 NeverD contributors. SPDX-License-Identifier: AGPL-3.0-only
 # Modified 2026-10-04: personal-repository wrapper, pinned upstream checkouts,
 # separate provenance; native recovery command and deadlines are unchanged.
@@ -30,7 +30,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCCACHE_GHA_ENABLED: 'true'
-      DIAGNOSTIC_COMMIT: 52a7a07243223f85b99f818bb104e8a8e573f257
+      DIAGNOSTIC_COMMIT: 6b6ba9fb2342a09dc2d83e5c0b71fc745f2e4da6
     steps:
       - name: Check out this comparison harness
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -92,7 +92,7 @@ jobs:
       - name: Check diagnostic contracts before compilation
         working-directory: diagnostics
         run: |
-          python3 -m unittest scripts.tests.test_diagnose_hvf_methods scripts.tests.test_diagnose_hvf_recovery -q
+          python3 -m unittest scripts.tests.test_diagnose_hvf_methods scripts.tests.test_diagnose_hvf_recovery scripts.tests.test_collect_hvf_upload_crashes -q
           node --test .github/actions/hvf-intel-diagnostic/*.test.cjs .github/actions/hvf-intel-recovery/*.test.cjs
       - name: Install build tools
         run: brew install ninja
@@ -126,6 +126,7 @@ jobs:
         timeout-minutes: 30
         run: cmake --build build-hvf --config Release --target NeverDHvfTests --parallel 4
       - name: Preserve live recovery progress without pausing native iterations
+        id: recovery
         uses: ./diagnostics/.github/actions/hvf-intel-recovery
         timeout-minutes: 20
         with:
@@ -134,6 +135,10 @@ jobs:
           evidence: source/build-hvf/recovery-diagnostic
           upload-action: artifact-uploader
           repetitions: ${{ inputs.repetitions }}
+      - name: Preserve crash reports for failed uploader children
+        if: always() && (steps.recovery.outcome == 'failure' || steps.recovery.outcome == 'cancelled')
+        timeout-minutes: 1
+        run: python3 diagnostics/scripts/collect_hvf_upload_crashes.py --evidence source/build-hvf/recovery-diagnostic
       - name: Preserve final or incomplete evidence while the host remains reachable
         if: always()
         timeout-minutes: 2
