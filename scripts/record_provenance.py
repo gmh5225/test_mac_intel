@@ -36,6 +36,7 @@ def main():
         "runner_image": os.environ["HVF_INTEL_IMAGE"],
         "image_version": os.environ.get("ImageVersion"),
         "repetitions": int(os.environ["HVF_REPETITIONS"]),
+        "experiment": os.environ.get("HVF_EXPERIMENT", "recovery"),
         "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
         "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
         "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
