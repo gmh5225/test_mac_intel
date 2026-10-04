@@ -1,6 +1,6 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T10:19:57.795833+00:00",
+  "recorded_at": "2026-10-04T10:40:41.343224+00:00",
   "complete_native_acceptance": false,
   "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Executor reuse retains the VM and threads across iterations, while recovery still recreates cancelled vCPUs. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
   "runs": [
@@ -336,6 +336,50 @@
       "exit_status": 0,
       "child_retired": true,
       "verified_artifact_count": 13,
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37195529270",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37195529270",
+      "source": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+      "controller": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+      "workflow": "6fe1b79f7e531180adfdd40da102221d16d3c1e4",
+      "image": "macos-15-intel",
+      "experiment": "instruction-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 1000,
+        "completed_repetitions": 1000,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 15,
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37195554929",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37195554929",
+      "source": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+      "controller": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+      "workflow": "6fe1b79f7e531180adfdd40da102221d16d3c1e4",
+      "image": "macos-26-intel",
+      "experiment": "instruction-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 1000,
+        "completed_repetitions": 1000,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 15,
       "complete_native_acceptance": false
     }
   ]

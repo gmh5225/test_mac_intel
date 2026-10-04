@@ -1,0 +1,151 @@
+{
+  "run_id": "37195529270",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "6fe1b79f7e531180adfdd40da102221d16d3c1e4",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+    "run_id": "37195529270",
+    "run_attempt": "1",
+    "runner_image": "macos-15-intel",
+    "image_version": "20260824.0482.1",
+    "repetitions": 1000,
+    "experiment": "instruction-vcpu-recreate",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261004T103942Z.json",
+  "artifacts_verified": 15,
+  "full_acceptance": false,
+  "plan": {
+    "commit": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+    "experiment": "instruction-vcpu-recreate",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfIntelProbe.InstructionOnly",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1",
+      "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VCPU": "1"
+    }
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-011",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "74e3b59a1fceec59e8190b1280216b63c89c9dea",
+      "controller_commit": "6fe1b79f7e531180adfdd40da102221d16d3c1e4",
+      "captured_at": "2026-10-04T10:35:58.368Z",
+      "reason": "progress",
+      "sequence": 11,
+      "output": {
+        "size_at_open": 825927,
+        "first_byte": 0,
+        "copied_bytes": 825927,
+        "truncated": false
+      },
+      "progress": {
+        "last_started_iteration": 958,
+        "last_completed_iteration": 957,
+        "native_runs_in_copy": 958,
+        "native_ok_in_copy": 957
+      },
+      "identity": {
+        "native_pid": 19674,
+        "python_pid": 19665,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-04T10:35:58.368Z",
+        "stdout": "19674 19665 19674 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "[==========] 1 test from 1 test suite ran. (14 ms total)",
+      "[  PASSED  ] 1 test.",
+      "",
+      "Repeating all tests (iteration 958) . . .",
+      "",
+      "Note: Google Test filter = HvfIntelProbe.InstructionOnly",
+      "[==========] Running 1 test from 1 test suite.",
+      "[----------] 1 test from HvfIntelProbe",
+      "[ RUN      ] HvfIntelProbe.InstructionOnly",
+      "INTEL_PROBE phase=executor_initialization",
+      "INTEL_PROBE phase=executor_retained",
+      "INTEL_PROBE phase=startup_probe"
+    ]
+  },
+  "native_passed": true,
+  "repetitions": {
+    "started_repetitions": 1000,
+    "completed_repetitions": 1000,
+    "next_expected_event": "iteration",
+    "error": null
+  },
+  "native_status": {
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfIntelProbe.InstructionOnly",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "working_directory": "/Users/runner/work/test_mac_intel/test_mac_intel/source",
+    "timeout_seconds": 600,
+    "status": 0,
+    "timed_out": false,
+    "child_retired": true,
+    "test_environment": {},
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1"
+    }
+  },
+  "retirement": [
+    {
+      "pid": 19674,
+      "status": 0,
+      "retired": true
+    }
+  ],
+  "controller": {
+    "kind": "diagnostic-controller-child",
+    "started_at": "2026-10-04T10:35:38.315Z",
+    "completed_at": "2026-10-04T10:35:59.578Z",
+    "exit_status": 0,
+    "signal": null,
+    "termination_reason": null,
+    "spawn_error": null
+  },
+  "output_sha256": "7a03bced1e84d1694267143492079efb3c4db4bed651950bc7847922eb512488",
+  "lifecycle": {
+    "events": {
+      "vcpu_destroy_begin": 1000,
+      "vcpu_destroy_end": 1000,
+      "vcpu_create_begin": 1000,
+      "vcpu_create_end": 1000,
+      "executor_retire_begin": 1,
+      "executor_retire_end": 1
+    },
+    "owner": "45298",
+    "executed_vcpu_generations": 1000,
+    "total_vcpu_generations": 1001,
+    "final_unused_generation_retired": true
+  }
+}

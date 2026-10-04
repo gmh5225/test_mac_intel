@@ -243,3 +243,29 @@ English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/
 **ru.** Тот же кандидат `909672ca6` прошёл instruction-reuse1000 на обоих образах; полные журналы и сбор процессов проверены (37194478425, 37194538616). Следующая необязательная диагностика `instruction-vcpu-recreate` сохраняет VM и поток-владелец, но пересоздаёт vCPU после каждой исходной стартовой пробы и 32 NOP. Нужны четыре упорядоченных нативных события на итерацию, последовательные поколения, неизменный owner и окончательное уничтожение Executor с выходом процесса. 1000 итераций означают 1000 пересозданий и 1001 поколение; последнее неиспользованное поколение уничтожается при выходе. Критерии приёмки продукта не меняются.
 
 **ar.** نجح المرشح نفسه `909672ca6` في instruction-reuse1000 على الصورتين، مع تدقيق السجلات الكاملة وجمع العمليات (37194478425، 37194538616). يحتفظ التشخيص الاختياري التالي `instruction-vcpu-recreate` بالـVM والخيط المالك، ويعيد إنشاء vCPU بعد كل مجس بدء أصلي و32 تعليمة NOP. يشترط أربع علامات أصلية مرتبة لكل تكرار وأجيالًا متتابعة وowner ثابتًا، ثم تدمير Executor النهائي وخروج العملية. تعني 1000 دورة 1000 إعادة إنشاء و1001 جيل؛ ويُدمَّر الجيل الأخير الذي لم ينفذ الضيف عند الخروج. لا تتغير شروط قبول المنتج.
+
+### VM recreation control
+
+`experiment=instruction-vm-recreate` · `source-ref=9eccca62dc22b5df7a1d2d15f01488d35821f1ba` · `repetitions=1000` · `intel-image=macos-15-intel` / `macos-26-intel`
+
+**en.** The vCPU-only recreation control passed 1000/1000 on both Intel images (37195529270, 37195554929), including every lifecycle marker and final generation1001 retirement. The next explicit `instruction-vm-recreate` control also rebuilds the VM while retaining the same owner and VM lease. It requires eight ordered native events per iteration and final retirement; it does not establish a production fix or complete acceptance.
+
+**zh-CN.** 只重建 vCPU 的对照在两套 Intel 镜像上均通过 1000/1000 轮（37195529270、37195554929），包含所有生命周期标记和第1001代的最终销毁。下一项显式诊断 `instruction-vm-recreate` 还会重建 VM，同时保留同一 owner 和 VM 排他锁。每轮要求八个有序原生事件及最终销毁完成；这不代表生产修复或完整验收。
+
+**zh-TW.** 僅重建 vCPU 的對照在兩套 Intel 映像上均通過 1000/1000 輪（37195529270、37195554929），包含所有生命週期標記與第1001代的最終銷毀。下一項明確啟用的診斷 `instruction-vm-recreate` 也會重建 VM，同時保留相同 owner 與 VM 排他鎖。每輪要求八個有序原生事件與最終銷毀完成；這不代表正式修復或完整驗收。
+
+**ja.** vCPU のみの再生成は両 Intel イメージで 1000/1000 回に合格し（37195529270、37195554929）、全ライフサイクル記録と最終第1001世代の破棄を確認しました。次の任意診断 `instruction-vm-recreate` は同じ owner と VM 排他ロックを保持して VM も再生成します。各回の8個のネイティブイベントの順序と最終破棄が必須です。製品修正や完全な受け入れ検証を意味しません。
+
+**ko.** vCPU만 재생성하는 대조가 두 Intel 이미지에서 1000/1000회를 통과했고（37195529270, 37195554929）, 모든 수명 표시와 마지막 1001세대 소멸을 확인했습니다. 다음 선택 진단 `instruction-vm-recreate`는 같은 owner와 VM 배타 잠금을 유지하면서 VM도 재생성합니다. 매회 여덟 네이티브 이벤트의 순서와 최종 소멸이 필요합니다. 제품 수정이나 전체 승인을 의미하지 않습니다.
+
+**fr.** La recréation du seul vCPU a réussi 1000/1000 fois sur les deux images Intel (37195529270, 37195554929), avec tous les marqueurs et la destruction finale de la génération1001. Le prochain contrôle explicite `instruction-vm-recreate` recrée aussi la VM, en conservant le même owner et le verrou exclusif VM. Il exige huit événements natifs ordonnés par itération et la destruction finale ; il ne prouve ni correction du produit ni validation complète.
+
+**de.** Die reine vCPU-Neuerstellung bestand 1000/1000 Durchläufe auf beiden Intel-Images (37195529270, 37195554929), einschließlich aller Markierungen und der abschließenden Zerstörung von Generation1001. Der nächste explizite Vergleich `instruction-vm-recreate` erstellt zusätzlich die VM neu, behält aber owner und exklusiven VM-Lock. Acht geordnete native Ereignisse je Durchlauf und die abschließende Zerstörung sind erforderlich. Das belegt weder Produktkorrektur noch vollständige Abnahme.
+
+**es.** La recreación solo de vCPU superó 1000/1000 iteraciones en ambas imágenes Intel (37195529270, 37195554929), con todos los marcadores y la destrucción final de la generación1001. El siguiente control explícito `instruction-vm-recreate` recrea también la VM y conserva el mismo owner y bloqueo exclusivo VM. Exige ocho eventos nativos ordenados por iteración y la destrucción final; no demuestra una corrección del producto ni aceptación completa.
+
+**it.** La ricreazione della sola vCPU ha superato 1000/1000 iterazioni su entrambe le immagini Intel (37195529270, 37195554929), con tutti i marcatori e la distruzione finale della generazione1001. Il prossimo controllo esplicito `instruction-vm-recreate` ricrea anche la VM, mantenendo lo stesso owner e il lock esclusivo VM. Richiede otto eventi nativi ordinati per iterazione e la distruzione finale; non dimostra una correzione del prodotto o accettazione completa.
+
+**ru.** Пересоздание только vCPU прошло 1000/1000 итераций на обоих образах Intel (37195529270, 37195554929), включая все события и окончательное уничтожение поколения1001. Следующая явная диагностика `instruction-vm-recreate` также пересоздаёт VM, сохраняя того же owner и исключительную блокировку VM. Нужны восемь упорядоченных нативных событий на итерацию и окончательное уничтожение; это не доказывает исправление продукта или полную приёмку.
+
+**ar.** نجحت إعادة إنشاء vCPU وحدها في 1000/1000 تكرار على صورتي Intel (37195529270، 37195554929)، مع جميع العلامات والتدمير النهائي للجيل1001. يعيد التشخيص الصريح التالي `instruction-vm-recreate` إنشاء VM أيضًا مع الحفاظ على owner نفسه وقفل VM الحصري. يشترط ثمانية أحداث أصلية مرتبة لكل تكرار والتدمير النهائي؛ ولا يثبت إصلاح المنتج أو القبول الكامل.
