@@ -1,0 +1,57 @@
+name: Intel artifact uploader control
+run-name: Intel uploader only / no guest execution / ${{ inputs.intel-image }}
+on:
+  workflow_dispatch:
+    inputs:
+      intel-image:
+        description: Native Intel runner image
+        type: choice
+        default: macos-15-intel
+        options: [macos-15-intel, macos-26-intel]
+permissions:
+  contents: read
+jobs:
+  upload-control:
+    runs-on: ${{ inputs.intel-image }}
+    timeout-minutes: 15
+    env:
+      DIAGNOSTIC_COMMIT: a3a620b63a34c81a1cd1131c9905a8087b96c723
+    steps:
+      - name: Check out comparison harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: harness
+          persist-credentials: false
+      - name: Check out pinned diagnostic helpers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.DIAGNOSTIC_COMMIT }}
+          path: diagnostics
+          persist-credentials: false
+      - name: Check out unchanged official uploader
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: actions/upload-artifact
+          ref: 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          path: artifact-uploader
+          persist-credentials: false
+      - name: Require native Intel host
+        run: test "$(uname -m)" = x86_64
+      - name: Upload sixteen sealed snapshots without a VM or native guest
+        id: control
+        timeout-minutes: 10
+        uses: ./harness/.github/actions/upload-control
+      - name: Preserve matching uploader crash reports
+        if: always() && (steps.control.outcome == 'failure' || steps.control.outcome == 'cancelled')
+        timeout-minutes: 1
+        run: python3 diagnostics/scripts/collect_hvf_upload_crashes.py --evidence evidence/upload-control
+      - name: Preserve complete control evidence
+        if: always()
+        timeout-minutes: 2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: intel-upload-only-attempt-${{ github.run_attempt }}-final
+          path: evidence/upload-control/
+          if-no-files-found: warn
+          retention-days: 7
