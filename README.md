@@ -21,6 +21,20 @@ The adapted workflow is from [NeverD](https://github.com/NeverSight/NeverD) unde
 
 The separate **Intel artifact uploader control** workflow uploads 16 synthetic snapshots with the same Node 24 runtime and pinned official uploader, without creating a VM or running NeverD. It isolates the upload path; a successful control is not a passing HVF recovery test. Its manifests explicitly record `native_execution=false`.
 
+
+Observed results from **2026-10-04** are retained with original test-output prefixes and artifact SHA-256 digests in [the evidence summary](results/2026-10-04/summary.json). The full guides below include these results in all eleven languages.
+
+| Run | Purpose | Final result | Retained native evidence |
+| --- | --- | --- | --- |
+| [37175472452](https://github.com/gmh5225/test_mac_intel/actions/runs/37175472452) | macOS 26 baseline | Upload subprocess failed; native child cancelled and retired | 3 complete / 4 started |
+| [37175511460](https://github.com/gmh5225/test_mac_intel/actions/runs/37175511460) | macOS 15 baseline | Upload subprocess failed; native child cancelled and retired | 105 complete / 106 started |
+| [37176652285](https://github.com/gmh5225/test_mac_intel/actions/runs/37176652285) | Diagnostic contract check | Fixture readiness race; fixed upstream | No native execution |
+| [37176652027](https://github.com/gmh5225/test_mac_intel/actions/runs/37176652027) | macOS 26 with enhanced diagnostics | Hosted runner lost communication | Last snapshot: 175 complete / 176 started |
+| [37176990174](https://github.com/gmh5225/test_mac_intel/actions/runs/37176990174) | macOS 15 with corrected fixture | Hosted runner lost communication | Last snapshot: 326 complete / 327 started |
+| [37177383621](https://github.com/gmh5225/test_mac_intel/actions/runs/37177383621) | Uploader-only control | 16/16 uploads passed | No native execution |
+
+The native command requested 1,000 repetitions in each recovery run. None of the retained prefixes proves that gate passed or identifies the eventual fault location. The first personal jobs started in 8 and 5 seconds; the earlier organization control also started in 5 seconds. These observations do not establish a repository-level queue-speed improvement. GitHub documents nested virtualization as [experimental and unsupported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners); that policy alone does not establish this failure's cause.
+
 ## 中文（简体）
 
 在 Actions 中选择 **Personal Intel HVF recovery diagnosis** 并手动运行，无需本地 Intel Mac。默认使用 `macos-26-intel`，对固定的 NeverD 源码在同一进程连续测试 1,000 轮；也可选择 `macos-15-intel` 或 100 轮诊断。产物保留版本、计划、实时进度和最终结果。排队时间与运行稳定性分别判断；单次恢复测试通过不能代表完整 CPU、macOS 或 iOS 覆盖。[完整指南](https://github.com/NeverSight/NeverD/blob/dev/docs/zh-CN/macos-hvf.md)。
