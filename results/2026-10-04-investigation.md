@@ -12,6 +12,8 @@ The same `909672ca6` candidate passed instruction-reuse1000 on both images, with
 
 Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreation (37195529270, 37195554929) and VM plus vCPU recreation on one retained owner (37196504453, 37196535787). The latter has 8000 ordered native events and final generation 1001 retirement per run; all 24/27 artifact digests, zero native/controller exits and child retirement were verified. This narrows the comparison with full Executor turnover but neither identifies the cause nor proves a production fix. The next diagnostic will retain the VM while replacing the vCPU and owner thread; original recovery and full CPU/Darwin acceptance remain required.
 
+The owner-handoff failure controls passed on both images (37198197978, 37198200471): 100 rounds and 300 injected checks per image, complete ordered state/cleanup markers, zero exit and process retirement. They execute native HVF calls without guest instructions. The separate 1000-round owner-turnover guest experiments are pending; these controls do not establish production stability.
+
 ## zh-CN: Intel 隔离实验结果（2026-10-04）
 
 有限 owner 期限候选 `909672ca6` 仍属实验方案。原始 1000 轮恢复测试在 macOS 15 和 26 上均失联；最后保存的日志分别证明 277/278、250/251 轮已完成/已开始。同一候选的普通指令测试没有主动取消操作，在 macOS 15 上也失联（576/577）。三次均有 GitHub 失联注记，均缺少最终原生结果和进程回收记录；保存的日志不能定位最终故障。[原始证据](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries)。
@@ -23,6 +25,8 @@ Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreati
 同一 `909672ca6` 候选在两个镜像上均通过 instruction-reuse1000，完整原生日志和回收记录已核验（37194478425、37194538616）。下一项显式诊断 `instruction-vcpu-recreate` 保留 VM 和 owner 线程，在每轮原始启动探针及 32 条 NOP 后重建 vCPU。每轮必须有四个有序的原生生命周期标记、连续代际和同一 owner，最后还须证明 Executor 销毁及进程退出。1000 轮对应 1000 次重建、1001 代 vCPU，最后未执行 guest 的一代在退出时销毁。这是生命周期对照，不改变生产验收。
 
 两项生命周期对照现已在两套 Intel 镜像上均通过 1000/1000 轮：仅重建 vCPU（37195529270、37195554929），以及保留同一 owner、重建 VM 和 vCPU（37196504453、37196535787）。后一项每次运行均包含 8000 个有序原生事件及第 1001 代的最终销毁；24/27 个产物摘要、原生与控制器正常退出、子进程回收均已核验。这缩小了与完整 Executor 周转的比较范围，但尚未定位原因或证明生产修复。下一项诊断将保留 VM、更换 vCPU 和 owner 线程；原始恢复及完整 CPU/Darwin 验收仍须通过。
+
+线程交接故障控制已在两个镜像通过（37198197978、37198200471）：各 100 轮、300 项注入检查，状态与清理标记完整有序，正常退出并回收进程。这些控制调用真实 HVF，但不执行 guest 指令。独立的 1000 轮线程更换指令实验仍在运行；故障控制通过不代表生产稳定性已验证。
 
 ## zh-TW: Intel 隔離實驗結果（2026-10-04）
 
@@ -36,6 +40,8 @@ Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreati
 
 兩項生命週期對照現已在兩套 Intel 映像上均通過 1000/1000 輪：僅重建 vCPU（37195529270、37195554929），以及保留相同 owner、重建 VM 與 vCPU（37196504453、37196535787）。後者每次執行均包含 8000 個有序原生事件及第 1001 代的最終銷毀；24/27 個產物摘要、原生與控制器正常退出、子程序回收均已核驗。這縮小了與完整 Executor 更替的比較範圍，但尚未定位原因或證明正式修復。下一項診斷將保留 VM、更換 vCPU 與 owner 執行緒；原始恢復及完整 CPU/Darwin 驗收仍須通過。
 
+執行緒交接故障控制已在兩個映像通過（37198197978、37198200471）：各 100 輪、300 項注入檢查，狀態與清理標記完整有序，正常退出並回收程序。這些控制呼叫真實 HVF，但不執行 guest 指令。獨立的 1000 輪執行緒更換指令實驗仍在執行；故障控制通過不代表正式穩定性已驗證。
+
 ## ja: Intel 分離実験の結果（2026-10-04）
 
 所有スレッドの実行期限を有限にした候補 `909672ca6` は実験段階です。元の 1000 回復旧テストは macOS 15 と 26 の両方で runner との通信を失いました。保存された末尾の完了/開始回数は 277/278 と 250/251 です。同じ候補で明示的なキャンセルを行わない通常命令テストも macOS 15 で通信を失いました（576/577）。GitHub が 3 件とも確認しています。最終ネイティブ結果とプロセス回収記録はなく、保存ログから最終的な障害箇所は特定できません。[元の証拠](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries)。
@@ -47,6 +53,8 @@ Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreati
 同じ候補 `909672ca6` は両イメージで instruction-reuse1000 に合格し、完全なログとプロセス回収を確認しました（37194478425、37194538616）。次の任意診断 `instruction-vcpu-recreate` は VM と所有スレッドを保持し、元の起動プローブと 32 個の NOP ごとに vCPU を再生成します。各回に順序どおりの 4 個のネイティブライフサイクル記録、連続した世代、同じ owner が必要で、最後に Executor の破棄とプロセス終了も要求します。1000 回は 1000 回の再生成、1001 世代を意味し、最後の未実行世代は終了時に破棄します。製品の合格条件は変更しません。
 
 両 Intel イメージで、vCPU 再生成（37195529270、37195554929）と同じ owner 上での VM・vCPU 再生成（37196504453、37196535787）が、それぞれ 1000/1000 回に合格しました。後者では各実行の 8000 個のネイティブイベントの順序と最終第 1001 世代の破棄、24/27 個の成果物ハッシュ、ネイティブ処理・制御側の終了コード 0、子プロセス回収を確認しました。Executor 全体の再生成との差を絞る証拠であり、原因や製品修正の証明ではありません。次は VM を保持して vCPU と owner スレッドを交換します。元の回復試験と完全な CPU/Darwin 検証は引き続き必要です。
+
+owner 交代時の障害制御は両イメージで合格しました（37198197978、37198200471）。各100回・300件の注入確認、順序どおりの状態・後処理記録、正常終了とプロセス回収を検証済みです。実際のHVFを呼びますがguest命令は実行しません。別の1000回のowner交代指令実験は実行中で、製品の安定性の証明ではありません。
 
 ## ko: Intel 분리 실험 결과（2026-10-04）
 
@@ -60,6 +68,8 @@ Both lifecycle controls now passed 1000/1000 on both Intel images: vCPU recreati
 
 두 Intel 이미지에서 vCPU 재생성(37195529270, 37195554929)과 같은 owner에서 VM 및 vCPU 재생성(37196504453, 37196535787)이 각각 1000/1000회를 통과했습니다. 후자는 실행마다 네이티브 이벤트 8000개의 순서, 마지막 1001세대 소멸, 산출물 해시 24/27개, 네이티브·제어기 종료 코드 0과 자식 프로세스 회수를 검증했습니다. 전체 Executor 교체와의 차이를 좁히는 근거이며 원인이나 제품 수정의 증명은 아닙니다. 다음 진단은 VM을 유지하고 vCPU와 owner 스레드를 교체합니다. 원래 복구 시험과 전체 CPU/Darwin 검증은 여전히 필요합니다.
 
+owner 교체 오류 제어가 두 이미지에서 통과했습니다(37198197978, 37198200471). 각 100회·300개 주입 검사, 순서대로 된 상태·정리 기록, 정상 종료와 프로세스 회수를 확인했습니다. 실제 HVF를 호출하지만 guest 명령은 실행하지 않습니다. 별도의 1000회 owner 교체 명령 실험은 진행 중이며 제품 안정성이 입증된 것은 아닙니다.
+
 ## fr: Résultats des expériences Intel isolées (2026-10-04)
 
 Le candidat `909672ca6`, qui impose une échéance finie au thread propriétaire, reste expérimental. Le test original de 1000 récupérations a perdu la communication avec le runner sur macOS 15 et 26 : les derniers préfixes conservés montrent 277/278 et 250/251 répétitions terminées/démarrées. Le test d’instructions ordinaires du même candidat, sans annulation explicite, a aussi perdu la communication sur macOS 15 (576/577). GitHub confirme les trois pertes. Aucun résultat natif final ni relevé de récupération du processus n’est disponible ; les préfixes ne localisent pas la panne finale. [Preuves originales](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -71,6 +81,8 @@ Ces résultats réduisent le champ d’investigation sans établir de correction
 Le même candidat `909672ca6` a réussi instruction-reuse1000 sur les deux images, avec journaux complets et processus récupérés (37194478425, 37194538616). Le diagnostic facultatif suivant, `instruction-vcpu-recreate`, conserve VM et thread propriétaire, mais recrée le vCPU après chaque sonde de démarrage originale et 32 NOP. Il exige quatre marqueurs natifs ordonnés par itération, des générations continues, le même owner et la destruction finale de l’Executor suivie de la sortie du processus. 1000 itérations représentent 1000 recréations et 1001 générations ; la dernière, non exécutée, est détruite à la sortie. Les critères d’acceptation du produit restent inchangés.
 
 Les deux contrôles ont désormais réussi 1000/1000 fois sur les deux images Intel : recréation du vCPU (37195529270, 37195554929), puis de la VM et du vCPU avec le même owner (37196504453, 37196535787). Ce dernier comprend 8000 événements natifs ordonnés et la destruction finale de la génération 1001 par exécution ; les 24/27 empreintes, les sorties natives et du contrôleur à zéro et la collecte des processus ont été vérifiées. Cela précise la comparaison avec le renouvellement complet d’Executor sans identifier la cause ni prouver une correction. Le prochain diagnostic conservera la VM et remplacera le vCPU et son thread propriétaire. La récupération originale et la validation CPU/Darwin complète restent nécessaires.
+
+Les contrôles d’échec du transfert ont réussi sur les deux images (37198197978, 37198200471) : 100 tours et 300 injections chacun, états et nettoyages ordonnés, sortie zéro et processus collectés. Ils appellent HVF sans instructions invitées. Les expériences distinctes de 1000 tours avec guest sont en cours ; la stabilité du produit reste à démontrer.
 
 ## de: Ergebnisse isolierter Intel-Versuche (2026-10-04)
 
@@ -84,6 +96,8 @@ Derselbe Kandidat `909672ca6` bestand instruction-reuse1000 auf beiden Images mi
 
 Beide Lebenszyklusvergleiche bestanden jetzt auf beiden Intel-Images jeweils 1000/1000 Durchläufe: vCPU-Neuerstellung (37195529270, 37195554929) sowie VM- und vCPU-Neuerstellung bei gleichem owner (37196504453, 37196535787). Letztere belegt je Lauf 8000 geordnete native Ereignisse und die abschließende Zerstörung von Generation 1001; alle 24/27 Artefakt-Hashes, Rückgabecodes null und das Einsammeln der Kindprozesse wurden geprüft. Das grenzt den Vergleich mit vollständigem Executor-Wechsel ein, beweist aber weder Ursache noch Produktkorrektur. Als Nächstes bleiben die VM erhalten und werden vCPU und Besitzer-Thread ersetzt. Originaler Wiederherstellungstest und vollständige CPU/Darwin-Abnahme bleiben erforderlich.
 
+Die Fehlerkontrollen der Übergabe bestanden auf beiden Images (37198197978, 37198200471): jeweils 100 Runden und 300 Injektionen, geordnete Zustands- und Bereinigungsnachweise, Exit null und eingesammelte Prozesse. Sie rufen HVF ohne Gastinstruktionen auf. Die getrennten 1000 Gastdurchläufe mit owner-Wechsel laufen noch; Produktstabilität ist damit nicht belegt.
+
 ## es: Resultados de experimentos Intel aislados (2026-10-04)
 
 El candidato `909672ca6`, con plazo finito en el hilo propietario, sigue siendo experimental. La prueba original de 1000 recuperaciones perdió la comunicación con el runner en macOS 15 y 26; los últimos prefijos conservados muestran 277/278 y 250/251 iteraciones completadas/iniciadas. Las instrucciones ordinarias del mismo candidato, sin cancelación explícita, también perdieron la comunicación en macOS 15 (576/577). GitHub confirmó las tres pérdidas. Faltan el resultado nativo final y el registro de recogida del proceso; los prefijos no localizan el fallo final. [Pruebas originales](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -95,6 +109,8 @@ Estos resultados acotan la investigación, pero no establecen una corrección de
 El mismo candidato `909672ca6` superó instruction-reuse1000 en ambas imágenes, con registros completos y procesos recogidos (37194478425, 37194538616). El siguiente diagnóstico opcional, `instruction-vcpu-recreate`, conserva VM e hilo propietario y recrea la vCPU tras cada sonda de inicio original y 32 NOP. Exige cuatro marcadores nativos ordenados por iteración, generaciones continuas, el mismo owner, destrucción final de Executor y salida del proceso. 1000 iteraciones equivalen a 1000 recreaciones y 1001 generaciones; la última no ejecutada se destruye al salir. Los criterios de aceptación del producto no cambian.
 
 Ambos controles de ciclo de vida superaron ya 1000/1000 iteraciones en las dos imágenes Intel: recreación de vCPU (37195529270, 37195554929) y de VM más vCPU conservando el mismo owner (37196504453, 37196535787). El segundo acredita 8000 eventos nativos ordenados y la destrucción final de la generación 1001 por ejecución; se verificaron las 24/27 huellas, las salidas nativas y del controlador a cero y la recogida de los procesos. Esto acota la comparación con la sustitución completa de Executor, pero no identifica la causa ni demuestra una corrección. El siguiente diagnóstico conservará la VM y sustituirá vCPU e hilo propietario. Siguen pendientes la recuperación original y la validación CPU/Darwin completa.
+
+Los controles de fallo del relevo pasaron en ambas imágenes (37198197978, 37198200471): 100 rondas y 300 inyecciones por imagen, estados y limpieza ordenados, salida cero y procesos recogidos. Llaman a HVF sin instrucciones guest. Los experimentos separados de 1000 rondas con guest siguen en curso; no se ha demostrado estabilidad del producto.
 
 ## it: Risultati degli esperimenti Intel isolati (2026-10-04)
 
@@ -108,6 +124,8 @@ Lo stesso candidato `909672ca6` ha superato instruction-reuse1000 su entrambe le
 
 Entrambi i controlli hanno ora superato 1000/1000 iterazioni sulle due immagini Intel: ricreazione della vCPU (37195529270, 37195554929) e di VM più vCPU con lo stesso owner (37196504453, 37196535787). Il secondo documenta 8000 eventi nativi ordinati e la distruzione finale della generazione 1001 per esecuzione; sono stati verificati tutti i 24/27 hash, le uscite native e del controllore a zero e la raccolta dei processi. Ciò restringe il confronto con il rinnovo completo di Executor, senza identificare la causa o dimostrare una correzione. Il prossimo diagnostico manterrà la VM e sostituirà vCPU e thread proprietario. Restano necessari il recupero originale e la validazione CPU/Darwin completa.
 
+I controlli di errore del passaggio hanno superato entrambe le immagini (37198197978, 37198200471): 100 cicli e 300 iniezioni ciascuno, stati e pulizia ordinati, uscita zero e processi raccolti. Chiamano HVF senza istruzioni guest. Gli esperimenti separati di 1000 cicli con guest sono in corso; la stabilità del prodotto resta da dimostrare.
+
 ## ru: Результаты изолированных экспериментов Intel (2026-10-04)
 
 Кандидат `909672ca6` с конечным сроком выполнения в потоке-владельце остаётся экспериментальным. Исходный тест 1000 восстановлений потерял связь с runner на macOS 15 и 26; последние сохранённые фрагменты содержат 277/278 и 250/251 завершённых/начатых итераций. Обычные инструкции того же кандидата без явной отмены также потеряли связь на macOS 15 (576/577). GitHub подтвердил все три случая. Итоговых нативных результатов и записей о сборе дочернего процесса нет; фрагменты не определяют место последующего сбоя. [Исходные доказательства](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -120,6 +138,8 @@ Entrambi i controlli hanno ora superato 1000/1000 iterazioni sulle due immagini 
 
 Оба сравнения жизненного цикла прошли по 1000/1000 итераций на обоих образах Intel: пересоздание vCPU (37195529270, 37195554929) и VM вместе с vCPU при сохранении owner (37196504453, 37196535787). Во втором проверены 8000 упорядоченных нативных событий и окончательное уничтожение поколения 1001 на запуск, все 24/27 хешей артефактов, нулевые коды выхода и сбор дочерних процессов. Это сужает сравнение с полной заменой Executor, но не устанавливает причину и не доказывает исправление. Следующая диагностика сохранит VM, заменяя vCPU и поток-владелец. Исходный тест восстановления и полная приёмка CPU/Darwin по-прежнему необходимы.
 
+Контроли ошибок передачи прошли на обоих образах (37198197978, 37198200471): по 100 повторений и 300 внедрённых проверок, упорядоченные состояния и очистка, выход с кодом ноль и сбор процессов. Они вызывают HVF без гостевых инструкций. Отдельные 1000 повторений со сменой owner и гостем ещё выполняются; стабильность продукта не доказана.
+
 ## ar: نتائج تجارب Intel المعزولة (2026-10-04)
 
 يبقى المرشح `909672ca6`، الذي يفرض مهلة محدودة على الخيط المالك، تجريبيًا. فقد اختبار الاسترداد الأصلي ذو 1000 تكرار اتصال runner على macOS 15 و26؛ وتثبت آخر الأجزاء المحفوظة 277/278 و250/251 تكرارًا مكتملًا/بدأ. وفقد اختبار التعليمات العادية للمرشح نفسه، بلا إلغاء صريح، الاتصال أيضًا على macOS 15 (576/577). أكد GitHub الحالات الثلاث. لا توجد نتيجة أصلية نهائية أو سجلات جمع العملية؛ ولا تحدد الأجزاء المحفوظة موقع العطل النهائي. [الأدلة الأصلية](https://github.com/gmh5225/test_mac_intel/tree/main/results/2026-10-04-boundaries).
@@ -131,3 +151,5 @@ Entrambi i controlli hanno ora superato 1000/1000 iterazioni sulle due immagini 
 نجح المرشح نفسه `909672ca6` في instruction-reuse1000 على الصورتين، مع تدقيق السجلات الكاملة وجمع العمليات (37194478425، 37194538616). يحتفظ التشخيص الاختياري التالي `instruction-vcpu-recreate` بالـVM والخيط المالك، ويعيد إنشاء vCPU بعد كل مجس بدء أصلي و32 تعليمة NOP. يشترط أربع علامات أصلية مرتبة لكل تكرار وأجيالًا متتابعة وowner ثابتًا، ثم تدمير Executor النهائي وخروج العملية. تعني 1000 دورة 1000 إعادة إنشاء و1001 جيل؛ ويُدمَّر الجيل الأخير الذي لم ينفذ الضيف عند الخروج. لا تتغير شروط قبول المنتج.
 
 نجح الآن ضابطا دورة الحياة في 1000/1000 تكرار على صورتي Intel: إعادة إنشاء vCPU ‏(37195529270، 37195554929)، ثم VM وvCPU مع الاحتفاظ بالمالك نفسه (37196504453، 37196535787). يثبت الثاني 8000 حدث أصلي مرتب وتدمير الجيل 1001 النهائي في كل تشغيل؛ ودُققت بصمات الملفات الـ24/27، ورموز الخروج الصفرية، وجمع العمليات الفرعية. يضيّق ذلك المقارنة مع تبديل Executor بالكامل، لكنه لا يحدد السبب ولا يثبت إصلاح المنتج. سيحتفظ التشخيص التالي بالـVM ويستبدل vCPU والخيط المالك. يبقى اختبار الاسترداد الأصلي والتحقق الكامل لـCPU/Darwin مطلوبين.
+
+نجحت ضوابط أخطاء تسليم الخيط على الصورتين (37198197978، 37198200471): مئة دورة و300 فحص محقون لكل صورة، مع ترتيب كامل لحالات الفحص والتنظيف، وخروج صفري وجمع العمليات. تستدعي HVF دون تعليمات ضيف. تجارب الضيف المنفصلة ذات 1000 تكرار لتبديل المالك ما زالت جارية؛ ولم تُثبت بعد استقرارية المنتج.

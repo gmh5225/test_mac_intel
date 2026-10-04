@@ -295,3 +295,25 @@ English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/
 **ru.** Следующая диагностика `instruction-owner-recreate` сохраняет VM и заменяет vCPU и owner после каждой исходной нагрузки. Сначала выполняются 100 повторений `owner-failure-controls` (300 проверок внедрённых ошибок, реальные вызовы HVF без гостя). После проверки очистки запускаются 1000 повторений с гостем. Исходная приёмка остаётся обязательной.
 
 **ar.** يحتفظ التشخيص التالي `instruction-owner-recreate` بالـVM ويبدّل vCPU والمالك بعد كل حمل تعليمات أصلي. يُشغّل أولًا `owner-failure-controls` مئة مرة (300 فحص بأخطاء محقونة، واستدعاءات HVF حقيقية دون تنفيذ الضيف)، ثم يُتحقق من التنظيف قبل تجربة الضيف ذات 1000 تكرار. لا يحل أي منهما محل القبول الأصلي.
+
+**en.** The owner-handoff failure controls passed on both images (37198197978, 37198200471): 100 rounds and 300 injected checks per image, complete ordered state/cleanup markers, zero exit and process retirement. They execute native HVF calls without guest instructions. The separate 1000-round owner-turnover guest experiments are pending; these controls do not establish production stability.
+
+**zh-CN.** 线程交接故障控制已在两个镜像通过（37198197978、37198200471）：各 100 轮、300 项注入检查，状态与清理标记完整有序，正常退出并回收进程。这些控制调用真实 HVF，但不执行 guest 指令。独立的 1000 轮线程更换指令实验仍在运行；故障控制通过不代表生产稳定性已验证。
+
+**zh-TW.** 執行緒交接故障控制已在兩個映像通過（37198197978、37198200471）：各 100 輪、300 項注入檢查，狀態與清理標記完整有序，正常退出並回收程序。這些控制呼叫真實 HVF，但不執行 guest 指令。獨立的 1000 輪執行緒更換指令實驗仍在執行；故障控制通過不代表正式穩定性已驗證。
+
+**ja.** owner 交代時の障害制御は両イメージで合格しました（37198197978、37198200471）。各100回・300件の注入確認、順序どおりの状態・後処理記録、正常終了とプロセス回収を検証済みです。実際のHVFを呼びますがguest命令は実行しません。別の1000回のowner交代指令実験は実行中で、製品の安定性の証明ではありません。
+
+**ko.** owner 교체 오류 제어가 두 이미지에서 통과했습니다(37198197978, 37198200471). 각 100회·300개 주입 검사, 순서대로 된 상태·정리 기록, 정상 종료와 프로세스 회수를 확인했습니다. 실제 HVF를 호출하지만 guest 명령은 실행하지 않습니다. 별도의 1000회 owner 교체 명령 실험은 진행 중이며 제품 안정성이 입증된 것은 아닙니다.
+
+**fr.** Les contrôles d’échec du transfert ont réussi sur les deux images (37198197978, 37198200471) : 100 tours et 300 injections chacun, états et nettoyages ordonnés, sortie zéro et processus collectés. Ils appellent HVF sans instructions invitées. Les expériences distinctes de 1000 tours avec guest sont en cours ; la stabilité du produit reste à démontrer.
+
+**de.** Die Fehlerkontrollen der Übergabe bestanden auf beiden Images (37198197978, 37198200471): jeweils 100 Runden und 300 Injektionen, geordnete Zustands- und Bereinigungsnachweise, Exit null und eingesammelte Prozesse. Sie rufen HVF ohne Gastinstruktionen auf. Die getrennten 1000 Gastdurchläufe mit owner-Wechsel laufen noch; Produktstabilität ist damit nicht belegt.
+
+**es.** Los controles de fallo del relevo pasaron en ambas imágenes (37198197978, 37198200471): 100 rondas y 300 inyecciones por imagen, estados y limpieza ordenados, salida cero y procesos recogidos. Llaman a HVF sin instrucciones guest. Los experimentos separados de 1000 rondas con guest siguen en curso; no se ha demostrado estabilidad del producto.
+
+**it.** I controlli di errore del passaggio hanno superato entrambe le immagini (37198197978, 37198200471): 100 cicli e 300 iniezioni ciascuno, stati e pulizia ordinati, uscita zero e processi raccolti. Chiamano HVF senza istruzioni guest. Gli esperimenti separati di 1000 cicli con guest sono in corso; la stabilità del prodotto resta da dimostrare.
+
+**ru.** Контроли ошибок передачи прошли на обоих образах (37198197978, 37198200471): по 100 повторений и 300 внедрённых проверок, упорядоченные состояния и очистка, выход с кодом ноль и сбор процессов. Они вызывают HVF без гостевых инструкций. Отдельные 1000 повторений со сменой owner и гостем ещё выполняются; стабильность продукта не доказана.
+
+**ar.** نجحت ضوابط أخطاء تسليم الخيط على الصورتين (37198197978، 37198200471): مئة دورة و300 فحص محقون لكل صورة، مع ترتيب كامل لحالات الفحص والتنظيف، وخروج صفري وجمع العمليات. تستدعي HVF دون تعليمات ضيف. تجارب الضيف المنفصلة ذات 1000 تكرار لتبديل المالك ما زالت جارية؛ ولم تُثبت بعد استقرارية المنتج.

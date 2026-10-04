@@ -1,8 +1,8 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T10:58:36.136017+00:00",
+  "recorded_at": "2026-10-04T11:24:24.591597+00:00",
   "complete_native_acceptance": false,
-  "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Executor reuse retains the VM and threads across iterations, while recovery still recreates cancelled vCPUs. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
+  "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Executor reuse retains the VM and threads across iterations, while recovery still recreates cancelled vCPUs. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established. Owner failure controls execute real HVF calls without guest instructions; each run verifies 300 injected error branches and cleanup, separately from guest execution and production acceptance.",
   "runs": [
     {
       "run_id": "37187110850",
@@ -424,6 +424,50 @@
       "exit_status": 0,
       "child_retired": true,
       "verified_artifact_count": 27,
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37198197978",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37198197978",
+      "source": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+      "controller": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+      "workflow": "bf0e6445bd33f913af38cddd3c67f8103e7b5219",
+      "image": "macos-15-intel",
+      "experiment": "owner-failure-controls",
+      "requested_repetitions": 100,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 100,
+        "completed_repetitions": 100,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 4,
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37198200471",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37198200471",
+      "source": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+      "controller": "9e74b172a3b9eb391d24af09a086a337f8fd88c9",
+      "workflow": "bf0e6445bd33f913af38cddd3c67f8103e7b5219",
+      "image": "macos-26-intel",
+      "experiment": "owner-failure-controls",
+      "requested_repetitions": 100,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 100,
+        "completed_repetitions": 100,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 4,
       "complete_native_acceptance": false
     }
   ]

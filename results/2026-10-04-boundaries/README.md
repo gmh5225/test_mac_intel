@@ -24,6 +24,8 @@
 | macOS 26 Intel | vCPU recreation, retained VM/owner | 1000 / 1000 | pass, final generation1001 retired | [37195554929](https://github.com/gmh5225/test_mac_intel/actions/runs/37195554929) |
 | macOS 15 Intel | VM/vCPU recreation, retained owner | 1000 / 1000 | pass, final generation 1001 retired | [37196504453](https://github.com/gmh5225/test_mac_intel/actions/runs/37196504453) |
 | macOS 26 Intel | VM/vCPU recreation, retained owner | 1000 / 1000 | pass, final generation 1001 retired | [37196535787](https://github.com/gmh5225/test_mac_intel/actions/runs/37196535787) |
+| macOS 15 Intel | owner handoff failure controls, no guest | 100 / 100 | pass, 300 injected checks and cleanup | [37198197978](https://github.com/gmh5225/test_mac_intel/actions/runs/37198197978) |
+| macOS 26 Intel | owner handoff failure controls, no guest | 100 / 100 | pass, 300 injected checks and cleanup | [37198200471](https://github.com/gmh5225/test_mac_intel/actions/runs/37198200471) |
 
 [Updated interpretation in all 11 languages](../2026-10-04-investigation.md): candidate `909672ca6` did not resolve runner loss.
 
