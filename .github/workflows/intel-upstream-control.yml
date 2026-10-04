@@ -1,0 +1,66 @@
+name: Independent upstream Intel HVF control
+run-name: Upstream HVF / 100000 interrupt attempts / ${{ inputs.intel-image }}
+on:
+  workflow_dispatch:
+    inputs:
+      intel-image:
+        description: Native Intel runner image
+        type: choice
+        default: macos-15-intel
+        options: [macos-15-intel, macos-26-intel]
+permissions:
+  contents: read
+jobs:
+  control:
+    runs-on: ${{ inputs.intel-image }}
+    timeout-minutes: 25
+    env:
+      HVF_INTEL_IMAGE: ${{ inputs.intel-image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: f35fa4bd21883eab946842358c4890d0d1480b72
+          path: diagnostics
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: actions/upload-artifact
+          ref: 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          path: artifact-uploader
+          persist-credentials: false
+      - name: Verify observer process and evidence contracts
+        run: |
+          HVF_TEST_DIAGNOSTICS="$GITHUB_WORKSPACE/diagnostics" python3 harness/scripts/test_upstream_hvf_control.py -q
+          node --test harness/.github/actions/upstream-control/snapshot.test.cjs
+      - name: Build the unchanged upstream program
+        timeout-minutes: 3
+        run: |
+          test "$(uname -m)" = x86_64
+          git clone --no-checkout https://gitlab.com/pmdj/hvf-edge-cases.git upstream
+          git -C upstream checkout --detach f150b38bfff419fe19907b7a6a2d743a63b46a49
+          make -C upstream
+          git -C upstream diff --exit-code HEAD
+      - name: Run the independent original workload with live evidence
+        id: control
+        # Covers 90s preparation + 120s plan upload + 375s native controller
+        # + 120s final in-flight upload, with collection/retirement headroom.
+        timeout-minutes: 14
+        uses: ./harness/.github/actions/upstream-control
+      - name: Preserve matching uploader crash reports
+        if: always() && (steps.control.outcome == 'failure' || steps.control.outcome == 'cancelled')
+        timeout-minutes: 1
+        run: python3 diagnostics/scripts/collect_hvf_upload_crashes.py --evidence evidence/upstream-control
+      - name: Preserve final or incomplete independent evidence
+        if: always()
+        timeout-minutes: 2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: intel-upstream-attempt-${{ github.run_attempt }}-final
+          path: evidence/upstream-control/
+          if-no-files-found: warn
+          retention-days: 7
