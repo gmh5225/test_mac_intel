@@ -35,11 +35,24 @@ Observed results from **2026-10-04** are retained with original test-output pref
 
 The native command requested 1,000 repetitions in each recovery run. None of the retained prefixes proves that gate passed or identifies the eventual fault location. The first personal jobs started in 8 and 5 seconds; the earlier organization control also started in 5 seconds. These observations do not establish a repository-level queue-speed improvement. GitHub documents nested virtualization as [experimental and unsupported](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners); that policy alone does not establish this failure's cause.
 
+## Native boundary experiments
+
+The separate [Intel HVF native boundary experiments](.github/workflows/intel-native-boundary.yml) workflow isolates three paths: `lifecycle` creates and retires the VM/vCPU and mappings without guest execution; `instruction` runs the real startup probe and ordinary checked steps; `finite-deadline` observes finite, expired and short `hv_vcpu_run_until` calls through the original long-mode preparation. It records a fresh native store witness and per-call time, RIP, register and exit-reason observations. Setup and retry use the existing transport; the finite calls themselves bypass the asynchronous watchdog. Unsupported timers and unexpected exits fail the experiment. A successful diagnostic is **not** full native acceptance or evidence that runner disconnects are fixed.
+
+Each dispatch selects one experiment, one of `macos-15-intel` / `macos-26-intel`, and `100` / `1000` repetitions. Source and diagnostic revisions are independently pinned; all three repository identities remain in provenance. Live evidence uploads retain the original whole-process deadline. The opt-in probes require `NEVERD_HVF_INTEL_PROBE=1` and do not change production guest execution.
+
+```sh
+gh workflow run intel-native-boundary.yml -R gmh5225/test_mac_intel --ref main \
+  -f experiment=finite-deadline -f intel-image=macos-15-intel -f repetitions=100
+```
+
 ## 中文（简体）
 
 在 Actions 中选择 **Personal Intel HVF recovery diagnosis** 并手动运行，无需本地 Intel Mac。默认使用 `macos-26-intel`，对固定的 NeverD 源码在同一进程连续测试 1,000 轮；也可选择 `macos-15-intel` 或 100 轮诊断。产物保留版本、计划、实时进度和最终结果。排队时间与运行稳定性分别判断；单次恢复测试通过不能代表完整 CPU、macOS 或 iOS 覆盖。[完整指南](https://github.com/NeverSight/NeverD/blob/dev/docs/zh-CN/macos-hvf.md)。
 
 另有 `Intel artifact uploader control` 工作流：连续上传 16 份模拟快照，不启动 VM；它只用于排查上传器，成功不代表 HVF 测试通过。
+
+新增 `Intel HVF native boundary experiments` 工作流：`lifecycle` 只创建和回收 VM/vCPU 与映射，不运行客体；`instruction` 验证真实启动探针和普通指令；`finite-deadline` 使用原有长模式准备，记录有限、过期和短期限调用的原生写入见证、时间、RIP、寄存器和退出原因。有限调用不使用异步 watchdog，准备和重试仍使用原有执行路径。不支持计时器或出现意外退出会失败。每次运行只选一个实验和一个镜像，可选 100/1000 轮；三个仓库版本分别留档。诊断通过不代表完整验收，也不代表失联已经修复。
 
 ## 中文（繁體）
 
@@ -47,11 +60,15 @@ The native command requested 1,000 repetitions in each recovery run. None of the
 
 另有 `Intel artifact uploader control` 工作流程：連續上傳 16 份模擬快照，不啟動 VM；它只用於診斷上傳器，成功不代表 HVF 測試通過。
 
+新增 `Intel HVF native boundary experiments` 工作流程：`lifecycle` 僅建立和回收 VM/vCPU 與映射，不執行客體；`instruction` 驗證真實啟動探針與一般指令；`finite-deadline` 使用原有長模式準備，記錄有限、過期及短期限呼叫的原生寫入見證、時間、RIP、暫存器和退出原因。有限呼叫不使用非同步 watchdog，準備與重試仍使用原有路徑。不支援計時器或意外退出皆失敗。每次只選一個實驗與鏡像，可選 100/1000 輪；三個儲存庫版本分別留存。診斷通過不代表完整驗收或失聯已修復。
+
 ## 日本語
 
 Actions で **Personal Intel HVF recovery diagnosis** を手動実行します。手元に Intel Mac は不要です。既定では `macos-26-intel` と固定した NeverD ソースを使い、同じプロセスで 1,000 回連続実行します。`macos-15-intel` と 100 回の診断も選択できます。成果物にはリビジョン、計画、進捗、最終結果を保存します。待ち時間と実行の安定性は別々に評価し、この復旧テストの成功を CPU・macOS・iOS 全体の検証とは扱いません。[詳細ガイド](https://github.com/NeverSight/NeverD/blob/dev/docs/ja/macos-hvf.md)。
 
 `Intel artifact uploader control` は VM を起動せず、合成スナップショットを 16 回アップロードします。アップローダーの診断専用であり、成功しても HVF の検証完了を意味しません。
+
+新しい `Intel HVF native boundary experiments` は、ゲストを実行せず VM/vCPU とマッピングを生成・破棄する `lifecycle`、実際の起動プローブと通常命令を検証する `instruction`、元のロングモード準備を使う `finite-deadline` を分離します。有限・期限切れ・短期限の呼出しごとにネイティブ書込みの証拠、時間、RIP、レジスタ、終了理由を記録します。有限呼出しは非同期 watchdog を使わず、準備と再試行は既存経路です。タイマー非対応や想定外の終了は失敗です。各実行は実験とイメージを一つずつ選び、100/1000回を指定し、三つのリポジトリの版を個別に保存します。診断成功は完全検証や接続喪失の修正を意味しません。
 
 ## 한국어
 
@@ -59,11 +76,15 @@ Actions에서 **Personal Intel HVF recovery diagnosis**를 수동 실행합니�
 
 `Intel artifact uploader control`은 VM 없이 합성 스냅샷 16개를 업로드합니다. 업로더 진단용이며, 성공해도 HVF 검증 완료를 뜻하지 않습니다.
 
+새 `Intel HVF native boundary experiments`는 게스트 실행 없이 VM/vCPU와 매핑을 생성·회수하는 `lifecycle`, 실제 시작 프로브와 일반 명령을 검증하는 `instruction`, 기존 long mode 준비를 사용하는 `finite-deadline`을 분리합니다. 유한·만료·짧은 기한 호출마다 네이티브 쓰기 증거, 시간, RIP, 레지스터와 종료 이유를 기록합니다. 유한 호출은 비동기 watchdog을 사용하지 않으며 준비와 재시도는 기존 경로입니다. 타이머 미지원과 예기치 않은 종료는 실패입니다. 실행마다 실험과 이미지를 하나씩 선택하고 100/1000회를 지정하며 세 저장소 버전을 독립적으로 보존합니다. 진단 통과는 전체 검증이나 연결 끊김 수정의 증거가 아닙니다.
+
 ## Français
 
 Lancez **Personal Intel HVF recovery diagnosis** dans Actions, sans Mac Intel local. Par défaut, `macos-26-intel` exécute 1 000 répétitions dans un seul processus avec une révision fixe de NeverD. Vous pouvez aussi choisir `macos-15-intel` ou un diagnostic de 100 répétitions. Les artefacts conservent les révisions, le plan, la progression et le résultat final. Évaluez séparément l'attente et la stabilité ; réussir ce test de récupération ne valide pas toute la couverture CPU, macOS ou iOS. [Guide complet](https://github.com/NeverSight/NeverD/blob/dev/docs/fr/macos-hvf.md).
 
 `Intel artifact uploader control` téléverse 16 instantanés synthétiques sans lancer de VM. Ce contrôle de l’outil de téléversement ne valide pas HVF.
+
+Le nouveau workflow `Intel HVF native boundary experiments` sépare `lifecycle` (création et destruction VM/vCPU et mappings sans invité), `instruction` (sonde initiale réelle et instructions normales) et `finite-deadline` (préparation long mode originale). Les appels à échéance finie, expirée ou courte enregistrent écriture native témoin, temps, RIP, registres et motif de sortie. Les appels finis évitent le watchdog asynchrone ; préparation et reprise gardent le transport existant. Un timer indisponible ou une sortie inattendue fait échouer l’expérience. Chaque lancement choisit une expérience, une image et 100/1000 répétitions ; les trois révisions restent distinctes. Un succès ne prouve ni validation complète ni correction des déconnexions.
 
 ## Deutsch
 
@@ -71,11 +92,15 @@ Starten Sie **Personal Intel HVF recovery diagnosis** manuell unter Actions; ein
 
 `Intel artifact uploader control` lädt 16 synthetische Snapshots ohne VM hoch. Dieser Upload-Test bestätigt bei Erfolg keine HVF-Funktionalität.
 
+Der neue Workflow `Intel HVF native boundary experiments` trennt `lifecycle` (VM/vCPU und Mappings erzeugen und beenden, ohne Gast), `instruction` (echte Startprobe und normale Instruktionen) und `finite-deadline` (ursprüngliche Long-Mode-Vorbereitung). Aufrufe mit endlicher, abgelaufener oder kurzer Frist protokollieren native Schreibmarker, Zeit, RIP, Register und Austrittsgrund. Endliche Aufrufe umgehen den asynchronen Watchdog; Vorbereitung und Wiederholung behalten den bestehenden Transport. Fehlender Timer oder unerwarteter Austritt bedeutet Fehler. Jeder Start wählt eine Untersuchung, ein Image und 100/1000 Wiederholungen; drei Revisionen bleiben getrennt. Erfolg belegt weder vollständige Abnahme noch behobene Verbindungsabbrüche.
+
 ## Español
 
 Ejecute manualmente **Personal Intel HVF recovery diagnosis** en Actions; no necesita un Mac Intel local. Por defecto, `macos-26-intel` ejecuta 1.000 repeticiones en un solo proceso con una revisión fija de NeverD. También puede elegir `macos-15-intel` o un diagnóstico de 100 repeticiones. Los artefactos conservan las revisiones, el plan, el progreso y el resultado final. Evalúe por separado la espera y la estabilidad: superar esta prueba de recuperación no valida toda la cobertura de CPU, macOS o iOS. [Guía completa](https://github.com/NeverSight/NeverD/blob/dev/docs/es/macos-hvf.md).
 
 `Intel artifact uploader control` carga 16 instantáneas sintéticas sin iniciar una VM. Este diagnóstico de carga no valida HVF aunque termine correctamente.
+
+El nuevo workflow `Intel HVF native boundary experiments` separa `lifecycle` (crear y retirar VM/vCPU y mapeos sin huésped), `instruction` (sondeo inicial real e instrucciones normales) y `finite-deadline` (preparación original en long mode). Las llamadas con plazo finito, vencido o corto registran escritura nativa testigo, tiempo, RIP, registros y motivo de salida. Las llamadas finitas evitan el watchdog asíncrono; preparación y reintento conservan el transporte original. Un temporizador no compatible o una salida inesperada hace fallar el experimento. Cada ejecución elige un experimento, una imagen y 100/1000 repeticiones; se conservan tres revisiones independientes. El éxito no demuestra aceptación completa ni desconexiones corregidas.
 
 ## Italiano
 
@@ -83,16 +108,22 @@ Avviare manualmente **Personal Intel HVF recovery diagnosis** da Actions; non se
 
 `Intel artifact uploader control` carica 16 istantanee sintetiche senza avviare una VM. Il successo di questa diagnosi del caricamento non convalida HVF.
 
+Il nuovo workflow `Intel HVF native boundary experiments` separa `lifecycle` (creazione e ritiro di VM/vCPU e mapping senza guest), `instruction` (sonda iniziale reale e istruzioni normali) e `finite-deadline` (preparazione originale in long mode). Le chiamate con scadenza finita, scaduta o breve registrano scrittura nativa di riscontro, tempi, RIP, registri e motivo di uscita. Le chiamate finite evitano il watchdog asincrono; preparazione e ripetizione mantengono il trasporto originale. Timer non supportato o uscita inattesa fanno fallire l’esperimento. Ogni avvio sceglie un esperimento, un’immagine e 100/1000 ripetizioni; tre revisioni restano distinte. Il successo non dimostra accettazione completa o disconnessioni risolte.
+
 ## Русский
 
 Запустите **Personal Intel HVF recovery diagnosis** вручную в Actions; собственный Intel Mac не нужен. По умолчанию `macos-26-intel` выполняет 1 000 повторений в одном процессе для фиксированной ревизии NeverD. Можно выбрать `macos-15-intel` или диагностику из 100 повторений. Артефакты сохраняют ревизии, план, ход выполнения и итог. Время ожидания и стабильность выполнения оцениваются отдельно: успешный тест восстановления не подтверждает полное покрытие CPU, macOS или iOS. [Полное руководство](https://github.com/NeverSight/NeverD/blob/dev/docs/ru/macos-hvf.md).
 
 `Intel artifact uploader control` загружает 16 синтетических снимков без запуска VM. Успех этой проверки загрузчика не означает успешную проверку HVF.
 
+Новый workflow `Intel HVF native boundary experiments` разделяет `lifecycle` (создание и освобождение VM/vCPU и отображений без гостя), `instruction` (реальная стартовая проба и обычные инструкции) и `finite-deadline` (исходная подготовка long mode). Вызовы с конечным, истёкшим и коротким сроком записывают нативную запись-маркер, время, RIP, регистры и причину выхода. Конечные вызовы обходят асинхронный watchdog; подготовка и повтор используют прежний транспорт. Неподдерживаемый таймер или неожиданный выход означает ошибку. Каждый запуск выбирает один опыт, образ и 100/1000 повторов; три ревизии сохраняются отдельно. Успех не доказывает полную приёмку или исправление потери связи.
+
 ## العربية
 
 شغّل **Personal Intel HVF recovery diagnosis** يدوياً من Actions؛ لا تحتاج إلى جهاز Mac بمعالج Intel محلياً. يستخدم الإعداد الافتراضي `macos-26-intel` لتنفيذ 1,000 تكرار متتالٍ في عملية واحدة على إصدار محدد من NeverD. ويمكن اختيار `macos-15-intel` أو تشخيص من 100 تكرار. تحفظ ملفات النتائج الإصدارات والخطة والتقدم والنتيجة النهائية. يُقيّم وقت الانتظار واستقرار التنفيذ كلٌّ على حدة؛ نجاح اختبار الاستعادة هذا لا يثبت اكتمال تغطية CPU أو macOS أو iOS. [الدليل الكامل](https://github.com/NeverSight/NeverD/blob/dev/docs/ar/macos-hvf.md).
 
 يرفع `Intel artifact uploader control` ست عشرة لقطة اصطناعية دون تشغيل VM. هذا فحص لأداة الرفع فقط، ولا يعني نجاحه اجتياز اختبارات HVF.
+
+يفصل workflow الجديد `Intel HVF native boundary experiments` بين `lifecycle` لإنشاء VM/vCPU والتعيينات وتحريرها دون تشغيل ضيف، و`instruction` لمجس البدء الحقيقي والتعليمات العادية، و`finite-deadline` مع إعداد long mode الأصلي. تسجل الاستدعاءات ذات الموعد المحدد أو المنتهي أو القصير شاهد كتابة أصلية والوقت وRIP والسجلات وسبب الخروج. تتجاوز الاستدعاءات المحددة watchdog غير المتزامن، بينما يبقى الإعداد وإعادة المحاولة على المسار الأصلي. يفشل الاختبار عند عدم دعم المؤقت أو الخروج غير المتوقع. يختار كل تشغيل تجربة وصورة واحدة و100/1000 تكرار، مع حفظ إصدارات المستودعات الثلاثة مستقلة. النجاح لا يثبت قبولًا كاملًا أو إصلاح انقطاع الاتصال.
 
 English: [full NeverD guide](https://github.com/NeverSight/NeverD/blob/dev/docs/macos-hvf.md).
