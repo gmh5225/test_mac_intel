@@ -46,6 +46,8 @@
 | macos-26-intel | `recovery-vm-no-host-kick` (default) | [023a4a68d](37221651593/provenance.json) | 300 / 301 / 1000 | runner lost communication; native result and retirement unknown | [37221651593](https://github.com/gmh5225/test_mac_intel/actions/runs/37221651593) |
 | macos-15-intel | `finite-vcpu-recreate` (default) | [7dd7342ec](37226727488/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37226727488](https://github.com/gmh5225/test_mac_intel/actions/runs/37226727488) |
 | macos-26-intel | `finite-vcpu-recreate` (default) | [7dd7342ec](37226729664/provenance.json) | 1000 / 1000 / 1000 | pass; child reaped | [37226729664](https://github.com/gmh5225/test_mac_intel/actions/runs/37226729664) |
+| macos-15-intel | `finite-vm-recreate` (default) | [7dd7342ec](37250462574/provenance.json) | 742 / 743 / 1000 | runner lost communication; native result and retirement unknown | [37250462574](https://github.com/gmh5225/test_mac_intel/actions/runs/37250462574) |
+| macos-26-intel | `finite-vm-recreate` (default) | [7dd7342ec](37250464732/provenance.json) | 796 / 797 / 1000 | runner lost communication; native result and retirement unknown | [37250464732](https://github.com/gmh5225/test_mac_intel/actions/runs/37250464732) |
 
 [Updated interpretation in all 11 languages](../2026-10-04-investigation.md): candidate `909672ca6` did not resolve runner loss.
 

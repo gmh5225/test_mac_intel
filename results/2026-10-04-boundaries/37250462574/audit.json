@@ -1,0 +1,131 @@
+{
+  "run_id": "37250462574",
+  "workflow_status": "completed",
+  "workflow_conclusion": "failure",
+  "provenance": {
+    "kind": "personal-repository-hvf-comparison",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "workflow_commit": "7f5d6fc8903930fce91c2ddff748914c7b587798",
+    "diagnostic_repository": "NeverSight/NeverD",
+    "diagnostic_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+    "tested_repository": "NeverSight/NeverD",
+    "tested_commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "run_id": "37250462574",
+    "run_attempt": "1",
+    "runner_image": "macos-15-intel",
+    "image_version": "20260824.0482.1",
+    "repetitions": 1000,
+    "experiment": "finite-vm-recreate",
+    "uploader_runtime": "default",
+    "uploader_runtime_scope": "recovery-plan-and-progress-children",
+    "comparison_run": "https://github.com/NeverSight/NeverD/actions/runs/37159724276",
+    "comparison_source_commit": "bd284894c60427cf4e6a60e661a1fa0df8a070f5",
+    "comparison_diagnostic_commit": "e4a8169e69eb668ed3795efe4bd5f42cf4f287c2",
+    "legacy_controller_commit_meaning": "plan.json controller_commit identifies the workflow commit"
+  },
+  "artifact_manifest": "manifest-20261005T020200Z.json",
+  "artifacts_verified": 16,
+  "current_attempt_artifacts": 16,
+  "full_acceptance": false,
+  "observer_runtime": {
+    "kind": "actual-hvf-observer-runtime",
+    "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_version": "v24.19.0",
+    "v8_version": "13.6.233.17-node.51",
+    "host_system": "darwin",
+    "host_architecture": "x64",
+    "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+    "node_bytes": 123666640
+  },
+  "uploader_runtime": {
+    "kind": "hvf-uploader-runtime-contract",
+    "scope": "recovery-plan-and-progress-children",
+    "mode": "default",
+    "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "arguments": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+    ],
+    "node_options_present": false,
+    "parent_exec_argv": []
+  },
+  "plan": {
+    "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+    "experiment": "finite-vm-recreate",
+    "native_execution": true,
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+      "--gtest_filter=HvfIntelProbe.FiniteDeadline",
+      "--gtest_repeat=1000",
+      "--gtest_break_on_failure"
+    ],
+    "repetitions": 1000,
+    "timeout_seconds": 600,
+    "native_requirements": {
+      "NEVERD_REQUIRE_HVF": "1",
+      "NEVERD_HVF_INTEL_PROBE": "1",
+      "NEVERD_HVF_INTEL_REUSE_EXECUTOR": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VCPU": "1",
+      "NEVERD_HVF_INTEL_RECREATE_VM": "1"
+    },
+    "native_name": "HvfIntelProbe.FiniteDeadline",
+    "finite_observation_audit_required": true,
+    "finite_slice_ns": 5000000,
+    "finite_witness_loop_budget_ns": 2000000000,
+    "finite_witness_loop_max_calls": 4096,
+    "finite_mtf_observations_per_iteration": 2
+  },
+  "last_progress": {
+    "artifact": "hvf-intel-recovery-attempt-1-progress-013",
+    "metadata": {
+      "kind": "instrumented-partial-hvf-recovery-progress",
+      "complete_inventory": false,
+      "commit": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller_commit": "7f5d6fc8903930fce91c2ddff748914c7b587798",
+      "captured_at": "2026-10-05T01:16:32.383Z",
+      "reason": "progress",
+      "sequence": 13,
+      "output": {
+        "size_at_open": 2012758,
+        "first_byte": 964182,
+        "copied_bytes": 1048576,
+        "truncated": true
+      },
+      "progress": {
+        "last_started_iteration": 743,
+        "last_completed_iteration": 742,
+        "native_runs_in_copy": 384,
+        "native_ok_in_copy": 384
+      },
+      "identity": {
+        "native_pid": 43132,
+        "python_pid": 42982,
+        "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests",
+        "observed_at": "2026-10-05T01:16:32.383Z",
+        "stdout": "43132 42982 43132 /Users/runner/work/test_mac_intel/test_mac_intel/source/build-hvf/bin/NeverDHvfTests\n",
+        "stderr": "",
+        "status": 0,
+        "verified": true
+      },
+      "execution_running_at_seal": true,
+      "cancelled": false
+    },
+    "last_lines": [
+      "INTEL_PROBE end=expired_mtf call=4 status=0 mach_before=1909505923179 mach_after=1909505969337",
+      "INTEL_PROBE capture=expired_mtf call=4 exec_before=7893448 exec_after=7936699 reason_before=37 reason=52 rip_before=65543 rip=65543 rax=1909502983901 nonce=1909502983901 witness=0",
+      "INTEL_PROBE phase=prepare_with_transport",
+      "INTEL_PROBE begin=finite_mtf call=5 deadline=1909512267742 rip=65543 nonce=1909506083278 witness=0",
+      "INTEL_PROBE end=finite_mtf call=5 status=0 mach_before=1909507296072 mach_after=1909507729013",
+      "INTEL_PROBE capture=finite_mtf call=5 exec_before=8292948 exec_after=8638370 reason_before=37 reason=37 rip_before=65543 rip=65546 rax=1909506083279 nonce=1909506083278 witness=0",
+      "INTEL_PROBE phase=verified_retry",
+      "INTEL_PROBE phase=prepare_with_transport",
+      "INTEL_PROBE phase=finite_retirement",
+      "INTEL_LIFECYCLE phase=vcpu_destroy_begin generation=743 owner=98184",
+      "INTEL_LIFECYCLE phase=vcpu_destroy_end generation=743 owner=98184",
+      "INTEL_LIFECYCLE phase=vm_destroy_begin generation=743 owner=98184"
+    ]
+  },
+  "native_passed": null,
+  "final_native_result_present": false
+}
