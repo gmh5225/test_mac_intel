@@ -1,6 +1,6 @@
 {
   "kind": "isolated-intel-hvf-boundary-experiments",
-  "recorded_at": "2026-10-04T18:43:14.022076+00:00",
+  "recorded_at": "2026-10-05T01:11:37.840816+00:00",
   "complete_native_acceptance": false,
   "interpretation": "Independent opt-in diagnostics, not full CPU/Darwin or original non-reuse recovery acceptance. Lifecycle executes no guest. Reuse retains the Executor; explicitly named recreation modes replace vCPUs, VMs, or owner threads at fixture boundaries. Recovery also recreates cancelled vCPUs internally, so recovery-vm-recreate reports boundary-only vCPU generations and leaves the total unknown. Finite probe failures on 37187857983/37187859944 are zero-progress slice assertions followed by gtest SIGTRAP, not hosted-runner losses. Revised finite probes require an actual fresh store within the unchanged total budget. No root cause or production fix is established.",
   "runs": [
@@ -899,6 +899,206 @@
       },
       "unsolicited_host_kick": false,
       "omission_markers_in_verified_prefix": 300
+    },
+    {
+      "run_id": "37226727488",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37226727488",
+      "source": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller": "4e80b1394cfb2489fde177b30167629db71e693d",
+      "workflow": "7f5d6fc8903930fce91c2ddff748914c7b587798",
+      "image": "macos-15-intel",
+      "experiment": "finite-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 1000,
+        "completed_repetitions": 1000,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 28,
+      "complete_native_acceptance": false,
+      "lifecycle": {
+        "events": {
+          "vcpu_destroy_begin": 1000,
+          "vcpu_destroy_end": 1000,
+          "vcpu_create_begin": 1000,
+          "vcpu_create_end": 1000,
+          "executor_retire_begin": 1,
+          "executor_retire_end": 1
+        },
+        "owner": "72860",
+        "executed_vcpu_generations": 1000,
+        "total_vcpu_generations": 1001,
+        "total_vm_generations": 1,
+        "final_unused_generation_retired": true
+      },
+      "finite_observations": {
+        "complete_iterations": 1000,
+        "timer_store_witnesses": 1000,
+        "expired_mtf_observations": 1000,
+        "finite_mtf_observations": 1000,
+        "all_call_triplets_ordered": true,
+        "all_fixed_witness_budgets_verified": true,
+        "max_calls_in_one_witness": 9,
+        "no_progress_timer_slices": 0,
+        "stale_mtf_no_entry_observations": 0,
+        "preparation_phase": "prepare_with_transport",
+        "captures": [
+          {
+            "phase": "expired_mtf",
+            "reason": 52,
+            "rip_delta": 0,
+            "count": 1000
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 1,
+            "rip_delta": 0,
+            "count": 205
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 1,
+            "rip_delta": 3,
+            "count": 244
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 52,
+            "rip_delta": 0,
+            "count": 244
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 52,
+            "rip_delta": 3,
+            "count": 756
+          },
+          {
+            "phase": "finite_mtf",
+            "reason": 1,
+            "rip_delta": 0,
+            "count": 16
+          },
+          {
+            "phase": "finite_mtf",
+            "reason": 37,
+            "rip_delta": 3,
+            "count": 984
+          }
+        ]
+      },
+      "uploader_runtime": {
+        "mode": "default",
+        "scope": "recovery-plan-and-progress-children"
+      }
+    },
+    {
+      "run_id": "37226729664",
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37226729664",
+      "source": "7dd7342ecddbecdcd76e766f90a0751b29e51d6f",
+      "controller": "4e80b1394cfb2489fde177b30167629db71e693d",
+      "workflow": "7f5d6fc8903930fce91c2ddff748914c7b587798",
+      "image": "macos-26-intel",
+      "experiment": "finite-vcpu-recreate",
+      "requested_repetitions": 1000,
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "repetitions": {
+        "started_repetitions": 1000,
+        "completed_repetitions": 1000,
+        "next_expected_event": "iteration",
+        "error": null
+      },
+      "exit_status": 0,
+      "child_retired": true,
+      "verified_artifact_count": 28,
+      "complete_native_acceptance": false,
+      "lifecycle": {
+        "events": {
+          "vcpu_destroy_begin": 1000,
+          "vcpu_destroy_end": 1000,
+          "vcpu_create_begin": 1000,
+          "vcpu_create_end": 1000,
+          "executor_retire_begin": 1,
+          "executor_retire_end": 1
+        },
+        "owner": "84044",
+        "executed_vcpu_generations": 1000,
+        "total_vcpu_generations": 1001,
+        "total_vm_generations": 1,
+        "final_unused_generation_retired": true
+      },
+      "finite_observations": {
+        "complete_iterations": 1000,
+        "timer_store_witnesses": 1000,
+        "expired_mtf_observations": 1000,
+        "finite_mtf_observations": 1000,
+        "all_call_triplets_ordered": true,
+        "all_fixed_witness_budgets_verified": true,
+        "max_calls_in_one_witness": 7,
+        "no_progress_timer_slices": 2,
+        "stale_mtf_no_entry_observations": 0,
+        "preparation_phase": "prepare_with_transport",
+        "captures": [
+          {
+            "phase": "expired_mtf",
+            "reason": 52,
+            "rip_delta": 0,
+            "count": 1000
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 1,
+            "rip_delta": 0,
+            "count": 271
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 1,
+            "rip_delta": 3,
+            "count": 344
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 52,
+            "rip_delta": 0,
+            "count": 346
+          },
+          {
+            "phase": "finite_loop",
+            "reason": 52,
+            "rip_delta": 3,
+            "count": 656
+          },
+          {
+            "phase": "finite_mtf",
+            "reason": 1,
+            "rip_delta": 0,
+            "count": 43
+          },
+          {
+            "phase": "finite_mtf",
+            "reason": 37,
+            "rip_delta": 3,
+            "count": 955
+          },
+          {
+            "phase": "finite_mtf",
+            "reason": 52,
+            "rip_delta": 0,
+            "count": 2
+          }
+        ]
+      },
+      "uploader_runtime": {
+        "mode": "default",
+        "scope": "recovery-plan-and-progress-children"
+      }
     }
   ]
 }
