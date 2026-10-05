@@ -1,5 +1,7 @@
 # Independent finite Intel HVF API lifecycle
 
+**Intel Actions are suspended (2026-10-05). No physical Intel Mac validation has been performed.** See the [current policy in eleven languages](../README.md). The workflow instructions below are historical; existing evidence is preserved and failures remain unresolved.
+
 [The manual workflow](../.github/workflows/intel-api-lifecycle.yml) builds an
 authored derivative of the real-mode setup from
 [hvf-edge-cases at f150b38bfff419fe19907b7a6a2d743a63b46a49](https://gitlab.com/pmdj/hvf-edge-cases/-/tree/f150b38bfff419fe19907b7a6a2d743a63b46a49).

@@ -47,6 +47,7 @@ env:
   HVF_RECOVERY_REPETITIONS: ${{ inputs.recovery-repetitions || '100' }}
 jobs:
   native-hvf:
+    if: ${{ false }} # Intel HVF Actions suspended on 2026-10-05.
     # Both choices must create a real VM/vCPU before the LLVM build starts.
     strategy:
       fail-fast: false
@@ -363,7 +364,7 @@ jobs:
 
   complete-intel-inventory:
     needs: native-hvf
-    if: always() && inputs.runner == 'hosted-intel' && inputs.validation == 'full'
+    if: ${{ false }} # Intel HVF Actions suspended on 2026-10-05.
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
