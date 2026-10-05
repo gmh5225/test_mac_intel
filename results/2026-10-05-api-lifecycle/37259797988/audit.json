@@ -1,0 +1,249 @@
+{
+  "kind": "independent-api-evidence-reconciliation",
+  "run_id": "37259797988",
+  "workflow_status": "completed",
+  "workflow_conclusion": "success",
+  "workflow_commit": "ac717e4288a5ff1e6ce7c93d73568e2739b9c58b",
+  "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+  "artifact_manifest": "manifest-20261005T033748Z.json",
+  "verified_artifacts": 2,
+  "complete_native_acceptance": false,
+  "native_passed": true,
+  "child_retired": true,
+  "mode": "vcpu",
+  "scope": "isolated authored real-mode control; not NeverD recovery, CPU or Darwin acceptance",
+  "plan": {
+    "kind": "independent-real-mode-finite-control",
+    "complete_native_acceptance": false,
+    "workflow_commit": "ac717e4288a5ff1e6ce7c93d73568e2739b9c58b",
+    "source_commit": "ac717e4288a5ff1e6ce7c93d73568e2739b9c58b",
+    "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+    "source_hashes": {
+      "native/hvf_intel_real_mode.c": "5a17244891184162bab8e62975ff13051fa18f3959123d06a29b0cbf1112ae56",
+      "native/hvf_lifecycle.h": "dc149f2a02484bc304f335e802d9a952a38e375aca76f833e406a9ab908af568",
+      "native/HVFDOS-LICENSE.txt": "f772eb4a3c485e1b012084b0c2278e81866fcb82a02dffd0ff2655e33d29ce96",
+      "native/hypervisor.entitlements": "70d65ae13874e183526aa48e55bb330f2156da94effca24f89b5e2f940262723",
+      "native/test_hvf_lifecycle.c": "0e830c3e286a87a7507f80643df2cb1870b872870a529393a98931d919cdea0e",
+      "scripts/intel_api_contract.py": "22d61fd043e90d3293636c43a8f5018b66ffeb43328928db06f18321c48a8122",
+      "scripts/test_intel_api_contract.py": "d06ad597c472c9177ab40bbbf7c258474d4315fcd558d7ec1d7678c5e2cbc985",
+      "scripts/intel_api_lifecycle.py": "dbceadb9983db075b30cbcfb6e4c6cf955331fcdb09e10d0e5d986b66483926c",
+      "scripts/test_intel_api_lifecycle.py": "bfbdfb26d7b244c7d737d6d26f893754291c31311cd1fcc1e81a4379554c5106",
+      "scripts/upstream_hvf_control.py": "54ad6857161d542792967f72e1f7e134dac92a2a23fd5d4c57b7710a8f4359df",
+      "scripts/test_upstream_hvf_control.py": "c8ea968af9b187c6226b292562c9d7b94356e7839c146992c689c8914fabe0ed",
+      ".github/workflows/intel-api-lifecycle.yml": "c49e4d7627b3fa189ceaece7b2445668f4fb118267b210eb50ff39406c648222",
+      ".github/actions/intel-api-control/action.yml": "30e05d7ea2409af8c77963b78fced5af465585d903c58230f4d1da2e609e59b4",
+      ".github/actions/intel-api-control/run.cjs": "ede4f9af0e339f41762e82cc3b6d35f8d8c1048cef8c23415defac7f50d5f267",
+      ".github/actions/intel-api-control/observation.cjs": "088f243e481f58c47c0f638ab8ed307980f8bc72a403454b418e8f6eefc098b8",
+      ".github/actions/intel-api-control/observation.test.cjs": "57d5fff2b3a644c32fa02ea53c5cfa4a3afb3e0b591e7782b130b458545650c0",
+      ".github/actions/intel-api-control/snapshot.cjs": "82fe0d2e37b3410f413488fc11fada533beb7db76afd61b28d95c3a2e237639b",
+      ".github/actions/intel-api-control/snapshot.test.cjs": "b3d2bb2313ede7107a8927ef2f4318c3b66248b9b261e14f5b5984675294f388"
+    },
+    "binary_sha256": "c77c3d2d1f163031af12c9869b133940b8b3a15df98aee264c0dc1e872914ae5",
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+      "vcpu",
+      "1000"
+    ],
+    "mode": "vcpu",
+    "observation": "final-only",
+    "event_version": 2,
+    "iterations": 1000,
+    "timeout_seconds": 600,
+    "guest_hex": "a30002ebfe",
+    "slice_ns": 5000000,
+    "budget_ns": 2000000000,
+    "call_limit": 4096,
+    "event_limit": 65536,
+    "max_output_bytes": 33554432,
+    "vm_generations": 1,
+    "cpu_generations": 1000,
+    "source": "/Users/runner/work/test_mac_intel/test_mac_intel/harness",
+    "binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+    "stdout_transport": "bounded PTY collector with OPOST disabled",
+    "run_id": "37259797988",
+    "run_attempt": "1",
+    "runner_image": "macos-15-intel",
+    "image_version": "20260824.0482.1",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "limitations": [
+      "authored derivative of hvdos real-mode setup, not unchanged upstream",
+      "no NeverD long-mode state, managed MSRs, projection, LLVM or cancellation controller",
+      "one owner and retained backing, vCPU destroy then unmap then optional VM destroy",
+      "final-only removes concurrent live observation as a bundle and can lose all native evidence on runner loss",
+      "pass does not exonerate omitted components or establish physical Intel Mac behavior"
+    ],
+    "host_observations": [
+      {
+        "command": [
+          "sw_vers"
+        ],
+        "status": 0,
+        "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "uname",
+          "-a"
+        ],
+        "status": 0,
+        "stdout": "Darwin sjc20-av656-68759fa3-8f2f-4e4b-b660-e0de58da7d8b-96FDC8A535BD.local 24.6.0 Darwin Kernel Version 24.6.0: Tue Jul 21 20:50:07 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_X86_64 x86_64\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "clang",
+          "--version"
+        ],
+        "status": 0,
+        "stdout": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "xcrun",
+          "--show-sdk-version"
+        ],
+        "status": 0,
+        "stdout": "15.5\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "xcrun",
+          "--show-sdk-path"
+        ],
+        "status": 0,
+        "stdout": "/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "sysctl",
+          "kern.hv_support",
+          "kern.hv_vmm_present",
+          "machdep.cpu.brand_string",
+          "machdep.cpu.features"
+        ],
+        "status": 0,
+        "stdout": "kern.hv_support: 1\nkern.hv_vmm_present: 1\nmachdep.cpu.brand_string: Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz\nmachdep.cpu.features: FPU VME DE PSE TSC MSR PAE MCE CX8 APIC SEP MTRR PGE MCA CMOV PAT PSE36 CLFSH MMX FXSR SSE SSE2 SS HTT PBE SSE3 PCLMULQDQ DTES64 DSCPL VMX SSSE3 FMA CX16 TPR SSE4.1 SSE4.2 x2APIC MOVBE POPCNT AES VMM PCID XSAVE OSXSAVE SEGLIM64 AVX1.0 RDRAND F16C\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "file",
+          "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode"
+        ],
+        "status": 0,
+        "stdout": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode: Mach-O 64-bit executable x86_64\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "image": "macos-15-intel",
+  "observer_runtime": {
+    "kind": "actual-hvf-observer-runtime",
+    "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_version": "v24.19.0",
+    "v8_version": "13.6.233.17-node.51",
+    "host_system": "darwin",
+    "host_architecture": "x64",
+    "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+    "node_bytes": 123666640
+  },
+  "uploader_runtime": {
+    "kind": "hvf-uploader-runtime-contract",
+    "scope": "independent-api-plan-and-progress-children",
+    "mode": "default",
+    "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "arguments": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+    ],
+    "node_options_present": false,
+    "parent_exec_argv": [],
+    "runtime": {
+      "kind": "actual-hvf-observer-runtime",
+      "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "node_version": "v24.19.0",
+      "v8_version": "13.6.233.17-node.51",
+      "host_system": "darwin",
+      "host_architecture": "x64",
+      "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+      "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+      "node_bytes": 123666640
+    }
+  },
+  "native_status": {
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+      "vcpu",
+      "1000"
+    ],
+    "pid": 25123,
+    "status": 0,
+    "timed_out": false,
+    "elapsed_seconds": 105.8375475339999,
+    "child_retired": true,
+    "controller_interrupted": false,
+    "collection_error": null,
+    "output_sha256": "d84037fbdcce1c4f59ea0702be5ab9851873df5fd98c2240e1dc79c6fa98a804",
+    "pty_output_processing": false
+  },
+  "retirement": [
+    {
+      "pid": 25123,
+      "status": 0,
+      "retired": true
+    }
+  ],
+  "controller": {
+    "kind": "diagnostic-controller-child",
+    "started_at": "2026-10-05T03:32:50.320Z",
+    "completed_at": "2026-10-05T03:34:37.789Z",
+    "exit_status": 0,
+    "signal": null,
+    "termination_reason": null,
+    "spawn_error": null
+  },
+  "native_audit": {
+    "kind": "independent-real-mode-finite-audit",
+    "mode": "vcpu",
+    "iterations": 1000,
+    "owner": 64832,
+    "vm_generations": 1,
+    "cpu_generations": 1000,
+    "calls": 2347,
+    "max_calls_per_iteration": 9,
+    "empty_timer_slices": 0,
+    "irq_exits": 1347,
+    "complete_native_acceptance": false,
+    "scope": "event contract only; native exit and child retirement require separate verification",
+    "output_sha256": "d84037fbdcce1c4f59ea0702be5ab9851873df5fd98c2240e1dc79c6fa98a804"
+  },
+  "native_audit_error": null,
+  "uploads": {
+    "plan": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T03:32:48.801Z",
+      "completed_at": "2026-10-05T03:32:50.317Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 24989,
+      "parent_pid": 24947,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    }
+  },
+  "output_sha256": "d84037fbdcce1c4f59ea0702be5ab9851873df5fd98c2240e1dc79c6fa98a804",
+  "output_bytes": 5153049,
+  "matched_uploader_crashes": [],
+  "failed_uploads": {},
+  "final_native_result_present": true
+}
