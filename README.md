@@ -2,6 +2,10 @@
 
 A small harness for comparing NeverD's Intel Hypervisor.framework recovery on a personal repository and the organization repository. No Intel Mac is needed locally to dispatch this workflow.
 
+The separate [independent finite Intel HVF API lifecycle control](native/README.md)
+has its own manual workflow and eleven-language scope notes. It compares vCPU
+and VM recreation using a small real-mode guest with checked finite calls.
+
 Open **Actions → Personal Intel HVF recovery diagnosis → Run workflow**. Defaults:
 
 | Input | Value |

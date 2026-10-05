@@ -1,0 +1,82 @@
+name: Independent finite Intel HVF API lifecycle
+run-name: Independent HVF / ${{ inputs.mode }} / 1000 iterations / ${{ inputs.intel-image }}
+on:
+  workflow_dispatch:
+    inputs:
+      intel-image:
+        description: Native Intel runner image
+        type: choice
+        default: macos-15-intel
+        options: [macos-15-intel, macos-26-intel]
+      mode:
+        description: Retain VM and recreate vCPU, or recreate both
+        type: choice
+        default: vcpu
+        options: [vcpu, vm]
+permissions:
+  contents: read
+jobs:
+  control:
+    runs-on: ${{ inputs.intel-image }}
+    timeout-minutes: 30
+    env:
+      HVF_INTEL_IMAGE: ${{ inputs.intel-image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 4e80b1394cfb2489fde177b30167629db71e693d
+          path: diagnostics
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: actions/upload-artifact
+          ref: 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+          path: artifact-uploader
+          persist-credentials: false
+      - name: Verify native architecture and evidence contracts
+        timeout-minutes: 3
+        run: |
+          test "$(uname -m)" = x86_64
+          python3 harness/scripts/test_intel_api_contract.py -q
+          python3 harness/scripts/test_intel_api_lifecycle.py -q
+          HVF_TEST_DIAGNOSTICS="$GITHUB_WORKSPACE/diagnostics" python3 harness/scripts/test_upstream_hvf_control.py -q
+          node --test harness/.github/actions/intel-api-control/snapshot.test.cjs
+          mkdir -p evidence-bin
+          clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined \
+            harness/native/test_hvf_lifecycle.c -o evidence-bin/resource-contract
+          evidence-bin/resource-contract
+      - name: Build and sign the independent authored derivative
+        timeout-minutes: 3
+        run: |
+          clang -arch x86_64 -std=c11 -mmacosx-version-min=12.0 -Wall -Wextra -Werror -O2 \
+            harness/native/hvf_intel_real_mode.c -framework Hypervisor -o evidence-bin/hvf-intel-real-mode
+          codesign --force --sign - --entitlements harness/native/hypervisor.entitlements evidence-bin/hvf-intel-real-mode
+          codesign --verify --strict evidence-bin/hvf-intel-real-mode
+          codesign -d --entitlements :- evidence-bin/hvf-intel-real-mode
+          test "$(lipo -archs evidence-bin/hvf-intel-real-mode)" = x86_64
+      - name: Run independent finite API control with bounded live evidence
+        id: control
+        # 120s prepare + 120s plan upload + 690s controller + 120s in-flight
+        # upload + host collection/retirement headroom. Native budget is 600s.
+        timeout-minutes: 20
+        uses: ./harness/.github/actions/intel-api-control
+        with:
+          mode: ${{ inputs.mode }}
+      - name: Preserve matching uploader crash reports
+        if: always() && (steps.control.outcome == 'failure' || steps.control.outcome == 'cancelled')
+        timeout-minutes: 1
+        run: python3 diagnostics/scripts/collect_hvf_upload_crashes.py --evidence evidence/api-control
+      - name: Preserve final or incomplete independent evidence
+        if: always()
+        timeout-minutes: 2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: intel-api-attempt-${{ github.run_attempt }}-final
+          path: evidence/api-control/
+          if-no-files-found: warn
+          retention-days: 7
