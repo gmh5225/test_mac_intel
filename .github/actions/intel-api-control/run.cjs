@@ -19,13 +19,15 @@ async function main() {
   if(revision.status!==0||revision.stdout.trim()!==UPLOAD_REVISION) throw new Error('uploader pin mismatch');
   const mode=process.env.INPUT_MODE;
   if(!['vcpu','vm'].includes(mode)) throw new Error('unknown lifecycle mode');
+  const guest=process.env.INPUT_GUEST;
+  if(!['timer','halt'].includes(guest)) throw new Error('unknown guest');
   const observation=process.env.INPUT_OBSERVATION;
   if(!['live','final-only'].includes(observation)) throw new Error('unknown observation mode');
   const evidence=path.join(root,'evidence/api-control'),harness=path.join(root,'harness');
   const helper=path.join(harness,'scripts/intel_api_lifecycle.py');
   const args=['--source',harness,'--diagnostics',path.join(root,'diagnostics'),'--binary',
     path.join(root,'evidence-bin/hvf-intel-real-mode'),'--evidence',evidence,'--mode',mode,
-    '--observation',observation];
+    '--observation',observation,'--guest',guest];
   if(await group.start('python3',[helper,'prepare',...args],environment,{timeoutMs:120000}).completion!==0)
     throw new Error('control preparation failed');
   const plan=JSON.parse(fs.readFileSync(path.join(evidence,'plan.json')));

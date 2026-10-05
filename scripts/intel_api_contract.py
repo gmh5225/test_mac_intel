@@ -6,6 +6,7 @@ SLICE_NS = 5_000_000
 BUDGET_NS = 2_000_000_000
 CALL_LIMIT = 4096
 EVENT_LIMIT = 65536
+GUESTS = {'timer': ('a30002ebfe', 52), 'halt': ('a30002f4', 12)}
 # Architectural VMCS encodings from Apple's hv_arch_vmx.h / Intel SDM.
 CONTROLS = [(0x4000, 9, 0), (0x4002, (1 << 31) | (1 << 7), (1 << 27) | (1 << 21)),
             (0x401e, (1 << 1) | (1 << 7), 0), (0x4012, 1 << 15, 1 << 9)]
@@ -107,12 +108,14 @@ def accounting(reader, call, begin, returned, capture, previous_exec, previous_t
     return item
 
 
-def audit(raw, mode, iterations=1000):
+def audit(raw, mode, iterations=1000, guest='timer'):
     require(mode in ('vcpu', 'vm'), 'invalid mode')
+    require(guest in GUESTS, 'invalid guest')
+    guest_hex, target_exit = GUESTS[guest]
     require(type(iterations) is int and 1 <= iterations <= 1000, 'invalid audit iteration count')
     reader = Reader(records(raw))
-    program = reader.take('program', version=3, mode=mode, iterations=iterations, memory_bytes=65536,
-        guest_hex='a30002ebfe', timebase_numer=None, timebase_denom=None,
+    program = reader.take('program', version=4, mode=mode, iterations=iterations, memory_bytes=65536,
+        guest=guest, guest_hex=guest_hex, timebase_numer=None, timebase_denom=None,
         slice_ns=SLICE_NS, budget_ns=BUDGET_NS, call_limit=CALL_LIMIT, event_limit=EVENT_LIMIT)
     numer, denom = program['timebase_numer'], program['timebase_denom']
     require(0 < numer < 2**32 and 0 < denom < 2**32, 'invalid timebase')
@@ -121,7 +124,7 @@ def audit(raw, mode, iterations=1000):
     require(0 < slice_ticks <= budget_ticks < 2**64, 'invalid tick durations')
     if mode == 'vcpu':
         reader.resource('vm_create')
-    calls = empty_slices = irqs = 0
+    calls = empty_slices = irqs = timer_retries = 0
     last_capture = thread_ns = 0
     max_calls = 0
     for nonce in range(1, iterations + 1):
@@ -168,25 +171,28 @@ def audit(raw, mode, iterations=1000):
             exec_ns, thread_ns = measured['exec_after_ns'], measured['thread_after_ns']
             require(previous <= begin['before'] <= entered < end and entered <= after <= captured <= end,
                     'late or nonmonotonic call/capture')
-            require(capture['reason'] in (1, 52), 'unexpected/full VM-entry failure reason')
+            require(capture['reason'] in (1, 52, target_exit), 'unexpected/full VM-entry failure reason')
             require((capture['rip'], capture['witness']) in ((0x100, 0), (0x103, nonce)), 'false RIP/witness')
+            require(capture['reason'] != 12 or (capture['rip'], capture['witness']) == (0x103, nonce),
+                    'invalid halt witness')
             require(not saw_store or (capture['rip'], capture['witness']) == (0x103, nonce), 'guest progress regressed')
             saw_store |= capture['witness'] == nonce
             calls += 1
             previous = measured['post_finished']
-            if capture['reason'] == 52 and capture['witness'] == nonce:
+            if capture['reason'] == target_exit and capture['witness'] == nonce:
                 reader.take('witness', call=call, nonce=nonce, captured=captured)
                 last_capture = measured['post_finished']
                 max_calls = max(max_calls, call)
                 completed = True
                 break
             if capture['reason'] == 52:
-                empty_slices += 1
+                timer_retries += 1
+                empty_slices += capture['witness'] == 0
                 require(captured + slice_ticks < 2**64 - 1, 'renewal overflow')
                 deadline = min(end, captured + slice_ticks)
             else:
                 irqs += 1
-        require(completed, 'no timer/store witness before call limit')
+        require(completed, 'no target exit/store witness before call limit')
         reader.resource('cpu_destroy')
         reader.resource('unmap')
         if mode == 'vm':
@@ -197,9 +203,9 @@ def audit(raw, mode, iterations=1000):
     reader.take('backing_released')
     reader.take('complete', iterations=iterations, live_resources=0)
     require(reader.index == len(reader.values), 'unexpected suffix')
-    return {'kind': 'independent-real-mode-finite-audit', 'mode': mode, 'iterations': iterations,
+    return {'kind': 'independent-real-mode-finite-audit', 'mode': mode, 'guest': guest, 'iterations': iterations,
             'owner': reader.owner, 'vm_generations': reader.vm, 'cpu_generations': reader.cpu,
             'calls': calls, 'max_calls_per_iteration': max_calls, 'empty_timer_slices': empty_slices,
-            'irq_exits': irqs, 'complete_native_acceptance': False,
+            'irq_exits': irqs, 'timer_transport_exits': timer_retries, 'complete_native_acceptance': False,
             'scope': 'event contract only; native exit and child retirement require separate verification',
             'output_sha256': hashlib.sha256(raw).hexdigest()}

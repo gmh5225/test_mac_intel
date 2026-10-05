@@ -23,9 +23,17 @@ class LifecycleController(unittest.TestCase):
                              {k:v for k,v in final.items() if k!='observation'})
             self.assertEqual((live['observation'],final['observation']),('live','final-only'))
             self.assertNotEqual(live,final)
+            halt=contract(source,diagnostics,binary,'vcpu','final-only','halt')
+            self.assertEqual(halt['command'],['/binary','vcpu','1000','halt'])
+            self.assertEqual((halt['guest'],halt['guest_hex'],halt['target_exit']),('halt','a30002f4',12))
+            self.assertEqual(halt['event_version'],4)
+            self.assertNotEqual(final,halt)
         for value in (None,'','silent','final'):
             with mock.patch('intel_api_lifecycle.git',side_effect=AssertionError('must reject first')):
                 with self.assertRaises(ValueError): contract(source,diagnostics,binary,'vcpu',value)
+        for guest in ('',None,'unknown'):
+            with mock.patch('intel_api_lifecycle.git',side_effect=AssertionError('must reject first')):
+                with self.assertRaises(ValueError):contract(source,diagnostics,binary,'vcpu','final-only',guest)
     def test_complete_output_cannot_override_missing_exit_or_retirement(self):
         status=dict(status=0,timed_out=False,child_retired=True,controller_interrupted=False,
                     collection_error=None,output_sha256='raw')

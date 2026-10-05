@@ -1,10 +1,10 @@
 import copy
 import json
 import unittest
-from intel_api_contract import audit, CONTROLS, STATE_FIELDS, SLICE_NS, BUDGET_NS, CALL_LIMIT
+from intel_api_contract import audit, CONTROLS, STATE_FIELDS, SLICE_NS, BUDGET_NS, CALL_LIMIT, GUESTS
 
 
-def fixture(mode='vcpu', iterations=2, retries=()):
+def fixture(mode='vcpu', iterations=2, retries=(), guest='timer'):
     events=[]; vm=cpu=iteration=thread_ns=0
     def event(kind, **kw):
         events.append(dict(event=kind, seq=len(events)+1, iteration=iteration, owner=57,
@@ -14,8 +14,8 @@ def fixture(mode='vcpu', iterations=2, retries=()):
         event('resource',operation=operation,phase='begin')
         vm+=operation=='vm_create'; cpu+=operation=='cpu_create'
         event('resource',operation=operation,phase='end',status=0)
-    event('program',version=3,mode=mode,iterations=iterations,memory_bytes=65536,
-          guest_hex='a30002ebfe',timebase_numer=1,timebase_denom=1,
+    event('program',version=4,mode=mode,iterations=iterations,memory_bytes=65536,
+          guest=guest,guest_hex=GUESTS[guest][0],timebase_numer=1,timebase_denom=1,
           slice_ns=SLICE_NS,budget_ns=BUDGET_NS,call_limit=CALL_LIMIT,event_limit=65536)
     if mode=='vcpu': resource('vm_create')
     for iteration in range(1,iterations+1):
@@ -32,7 +32,7 @@ def fixture(mode='vcpu', iterations=2, retries=()):
         start=iteration*10*BUDGET_NS; end=start+BUDGET_NS; deadline=start+SLICE_NS; now=start
         event('budget',start=start,end=end,slice_ticks=SLICE_NS,budget_ticks=BUDGET_NS)
         exec_ns=13
-        for call,reason in enumerate([*retries,52],1):
+        for call,reason in enumerate([*retries,GUESTS[guest][1]],1):
             progress=call==len(retries)+1
             event('call_begin',call=call,before=now,deadline=deadline)
             pre_started,pre_finished=now+1,now+2
@@ -60,6 +60,39 @@ def raw(events): return ('\n'.join(json.dumps(e) for e in events)+'\n').encode()
 
 
 class Contract(unittest.TestCase):
+    def test_halt_requires_fresh_store_and_exact_explicit_exit(self):
+        for mode in ('vcpu','vm'):
+            result=audit(raw(fixture(mode,1000,guest='halt')),mode,guest='halt')
+            self.assertEqual((result['iterations'],result['guest']),(1000,'halt'))
+        for key,value in [('reason',52),('reason',1),('reason',12|(1<<31)),('reason',13),
+                          ('witness',0),('rip',0x104)]:
+            events=fixture(guest='halt'); next(e for e in events if e['event']=='capture')[key]=value
+            with self.subTest(key=key,value=value),self.assertRaises(ValueError):
+                audit(raw(events),'vcpu',2,guest='halt')
+        events=fixture(guest='halt');capture=next(e for e in events if e['event']=='capture')
+        capture.update(rip=0x100,witness=0)
+        with self.assertRaisesRegex(ValueError,'invalid halt witness'):audit(raw(events),'vcpu',2,guest='halt')
+    def test_halt_transport_returns_do_not_authorize_success(self):
+        events=fixture(retries=[1,52,1],guest='halt')
+        for event in events:
+            if event['event']=='capture':event.update(rip=0x103,witness=event['iteration'])
+        result=audit(raw(events),'vcpu',2,guest='halt')
+        self.assertEqual((result['irq_exits'],result['timer_transport_exits'],result['empty_timer_slices']),(4,2,0))
+        for kind,call in [('irq',2),('timer',3)]:
+            changed=copy.deepcopy(events)
+            begin=next(e for e in changed if e['event']=='call_begin' and e['call']==call)
+            begin['deadline']+=1
+            with self.subTest(kind=kind),self.assertRaises(ValueError):audit(raw(changed),'vcpu',2,guest='halt')
+    def test_guest_identity_bytes_and_target_cannot_be_borrowed(self):
+        for guest in ('timer','halt'):
+            data=raw(fixture(guest=guest))
+            with self.assertRaises(ValueError):audit(data,'vcpu',2,guest='halt' if guest=='timer' else 'timer')
+        for key,value in [('guest','unknown'),('guest_hex','a3000290')]:
+            events=fixture(guest='halt');events[0][key]=value
+            with self.assertRaises(ValueError):audit(raw(events),'vcpu',2,guest='halt')
+        events=fixture(guest='halt');events[0].pop('guest')
+        with self.assertRaises(ValueError):audit(raw(events),'vcpu',2,guest='halt')
+        with self.assertRaises(ValueError):audit(raw(fixture()),'vcpu',2,guest='unknown')
     def test_accounting_reset_is_per_vcpu_and_thread_is_continuous(self):
         result=audit(raw(fixture(retries=[1,52,1])),'vcpu',2)
         self.assertEqual(result['cpu_generations'],2)

@@ -14,7 +14,7 @@ import plistlib
 import re
 import subprocess
 import sys
-from intel_api_contract import audit
+from intel_api_contract import audit, GUESTS
 from upstream_hvf_control import collect
 
 HELPER = '4e80b1394cfb2489fde177b30167629db71e693d'
@@ -48,9 +48,11 @@ def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], timeout=10, text=True).strip()
 
 
-def contract(source, diagnostics, binary, mode, observation):
+def contract(source, diagnostics, binary, mode, observation, guest='timer'):
     if observation not in ('live', 'final-only'):
         raise ValueError('unknown observation mode')
+    if guest not in GUESTS or mode not in ('vcpu', 'vm'):
+        raise ValueError('unknown guest or lifecycle mode')
     workflow = os.environ.get('GITHUB_SHA', '')
     if not re.fullmatch('[0-9a-f]{40}', workflow) or git(source, 'rev-parse', 'HEAD') != workflow:
         raise ValueError('workflow/source identity mismatch')
@@ -64,14 +66,15 @@ def contract(source, diagnostics, binary, mode, observation):
     return {'kind': 'independent-real-mode-finite-control', 'complete_native_acceptance': False,
             'workflow_commit': workflow, 'source_commit': workflow, 'helper_commit': HELPER,
             'source_hashes': {name: digest(source/name) for name in SOURCES},
-            'binary_sha256': digest(binary), 'command': [str(binary), mode, '1000'],
-            'mode': mode, 'observation': observation, 'event_version': 3,
+            'binary_sha256': digest(binary), 'command': [str(binary), mode, '1000', guest],
+            'mode': mode, 'observation': observation, 'event_version': 4, 'guest': guest,
             'accounting': ['hv_vcpu_get_exec_time', 'CLOCK_THREAD_CPUTIME_ID',
                            'Mach-bracketed cumulative nanoseconds; not physical guest CPU time'],
             'accounting_units': {'intel_hv_exec': 'nanoseconds per Intel hv.h',
                                  'thread_cpu': 'nanoseconds', 'sample_brackets': 'Mach absolute ticks'},
             'iterations': 1000, 'timeout_seconds': TIMEOUT,
-            'guest_hex': 'a30002ebfe', 'slice_ns': 5_000_000, 'budget_ns': 2_000_000_000,
+            'guest_hex': GUESTS[guest][0], 'target_exit': GUESTS[guest][1],
+            'slice_ns': 5_000_000, 'budget_ns': 2_000_000_000,
             'call_limit': 4096, 'event_limit': 65536, 'max_output_bytes': 32*1024*1024,
             'vm_generations': 1000 if mode == 'vm' else 1, 'cpu_generations': 1000,
             'source': str(source), 'binary': str(binary),
@@ -83,6 +86,7 @@ def contract(source, diagnostics, binary, mode, observation):
                 'no NeverD long-mode state, managed MSRs, projection, LLVM or cancellation controller',
                 'one owner and retained backing, vCPU destroy then unmap then optional VM destroy',
                 'final-only removes concurrent live observation as a bundle and can lose all native evidence on runner loss',
+                'halt has shorter exposure and cannot satisfy the original timer workload gate',
                 'pass does not exonerate omitted components or establish physical Intel Mac behavior']}
 
 
@@ -125,12 +129,13 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--mode', choices=['vcpu', 'vm'], required=True)
     parser.add_argument('--observation', choices=['live', 'final-only'], required=True)
+    parser.add_argument('--guest', choices=['timer', 'halt'], required=True)
     args=parser.parse_args()
     source, diagnostics, binary, evidence=(p.resolve() for p in
         (args.source,args.diagnostics,args.binary,args.evidence))
     if platform.system()!='Darwin' or platform.machine()!='x86_64':
         raise ValueError('native Intel macOS required')
-    current=contract(source,diagnostics,binary,args.mode,args.observation)
+    current=contract(source,diagnostics,binary,args.mode,args.observation,args.guest)
     verify_binary(binary)
     if args.stage=='prepare':
         evidence.mkdir(parents=True,exist_ok=False)
@@ -148,7 +153,7 @@ def main():
     try:
         if output.stat().st_size>current['max_output_bytes']:
             raise ValueError('native output exceeded explicit limit')
-        audited=audit(output.read_bytes(),args.mode)
+        audited=audit(output.read_bytes(),args.mode,guest=args.guest)
     except ValueError as failure:
         error=str(failure)
     passed=result_passed(status,audited,error)

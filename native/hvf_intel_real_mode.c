@@ -225,7 +225,7 @@ static bool sample_accounting(struct accounting_sample *sample) {
   sample->finished=mach_absolute_time();
   return true;
 }
-static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
+static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness,uint64_t target_exit) {
   uint64_t slice_ticks=0,budget_ticks=0,end=0,deadline=0;
   if (!ticks(SLICE_NS,&slice_ticks) || !ticks(BUDGET_NS,&budget_ticks)) return false;
   uint64_t start=mach_absolute_time();
@@ -293,13 +293,15 @@ static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
     g.thread_cpu_ns=post.thread_ns;
     if (after<entered || captured<after || after>end || captured>end)
       return error("late_or_nonmonotonic_capture",call);
-    if ((reason!=1 && reason!=52) || rax!=nonce ||
+    if ((reason!=1 && reason!=52 && reason!=target_exit) || rax!=nonce ||
         !((rip==0x100 && stored==0) || (rip==0x103 && stored==nonce)))
       return error("invalid_exit_or_witness",call);
     if (saw_store && (rip!=0x103 || stored!=nonce))
       return error("guest_progress_regressed",call);
     if (stored==nonce) saw_store=true;
-    if (reason==52 && rip==0x103 && stored==nonce) {
+    if (reason==12 && (rip!=0x103 || stored!=nonce))
+      return error("invalid_halt_witness",call);
+    if (reason==target_exit && rip==0x103 && stored==nonce) {
       event("witness",",\"call\":%u,\"nonce\":%u,\"captured\":%"PRIu64,call,nonce,captured);
       return true;
     }
@@ -313,10 +315,12 @@ static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
   return error("call_limit",CALL_LIMIT);
 }
 int main(int argc,char **argv) {
-  if (argc!=3 || (strcmp(argv[1],"vcpu") && strcmp(argv[1],"vm")) || strcmp(argv[2],"1000")) {
-    fputs("usage: hvf-intel-real-mode {vcpu|vm} 1000\n",stderr); return 2;
+  if (argc!=4 || (strcmp(argv[1],"vcpu") && strcmp(argv[1],"vm")) || strcmp(argv[2],"1000") ||
+      (strcmp(argv[3],"timer") && strcmp(argv[3],"halt"))) {
+    fputs("usage: hvf-intel-real-mode {vcpu|vm} 1000 {timer|halt}\n",stderr); return 2;
   }
   bool recreate_vm=!strcmp(argv[1],"vm");
+  bool halt_guest=!strcmp(argv[3],"halt");
   setvbuf(stdout,NULL,_IONBF,0);
   g.owner=owner();
   int translated=0; size_t length=sizeof(translated);
@@ -328,15 +332,16 @@ int main(int argc,char **argv) {
   if (page<=0 || ((uint64_t)page&((uint64_t)page-1)) || MEMORY_BYTES%(uint64_t)page ||
       posix_memalign(&g.memory,(size_t)page,MEMORY_BYTES)) return 2;
   memset(g.memory,0,MEMORY_BYTES);
-  const unsigned char code[]={0xa3,0x00,0x02,0xeb,0xfe};
-  memcpy((unsigned char *)g.memory+0x100,code,sizeof(code));
+  const unsigned char code[]={0xa3,0x00,0x02,halt_guest?0xf4:0xeb,0xfe};
+  memcpy((unsigned char *)g.memory+0x100,code,halt_guest?4:sizeof(code));
   _Atomic(uint16_t) *witness=(_Atomic(uint16_t) *)((unsigned char *)g.memory+0x200);
   atomic_init(witness,0);
   if (!atomic_is_lock_free(witness)) { free(g.memory); return 2; }
-  event("program",",\"version\":3,\"mode\":\"%s\",\"iterations\":%u,\"memory_bytes\":%u"
-        ",\"guest_hex\":\"a30002ebfe\",\"timebase_numer\":%u,\"timebase_denom\":%u"
+  event("program",",\"version\":4,\"mode\":\"%s\",\"iterations\":%u,\"memory_bytes\":%u"
+        ",\"guest\":\"%s\",\"guest_hex\":\"%s\",\"timebase_numer\":%u,\"timebase_denom\":%u"
         ",\"slice_ns\":%"PRIu64",\"budget_ns\":%"PRIu64",\"call_limit\":%u,\"event_limit\":%u",
-        argv[1],ITERATIONS,MEMORY_BYTES,g.timebase.numer,g.timebase.denom,SLICE_NS,BUDGET_NS,CALL_LIMIT,EVENT_LIMIT);
+        argv[1],ITERATIONS,MEMORY_BYTES,argv[3],halt_guest?"a30002f4":"a30002ebfe",
+        g.timebase.numer,g.timebase.denom,SLICE_NS,BUDGET_NS,CALL_LIMIT,EVENT_LIMIT);
   struct hvf_resources resources={.backing=true,.operations={
     create_vm,map,create_cpu,destroy_cpu,unmap,destroy_vm,release_backing}};
   bool success=true;
@@ -348,7 +353,8 @@ int main(int argc,char **argv) {
     atomic_store_explicit(witness,0,memory_order_seq_cst);
     uint16_t reset=atomic_load_explicit(witness,memory_order_seq_cst);
     event("reset",",\"value\":%u",reset);
-    if (reset!=0 || !prepare((uint16_t)g.iteration) || !run_finite((uint16_t)g.iteration,witness)) {
+    if (reset!=0 || !prepare((uint16_t)g.iteration) ||
+        !run_finite((uint16_t)g.iteration,witness,halt_guest?12:52)) {
       resources.failed=true; success=false; break;
     }
     if (!hvf_retire_resources(&resources,recreate_vm)) { success=false; break; }

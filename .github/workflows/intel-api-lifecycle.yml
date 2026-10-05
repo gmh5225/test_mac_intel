@@ -1,8 +1,13 @@
 name: Independent finite Intel HVF API lifecycle
-run-name: Independent HVF / ${{ inputs.mode }} / ${{ inputs.observation }} / 1000 iterations / ${{ inputs.intel-image }}
+run-name: Independent HVF / ${{ inputs.guest }} / ${{ inputs.mode }} / ${{ inputs.observation }} / 1000 iterations / ${{ inputs.intel-image }}
 on:
   workflow_dispatch:
     inputs:
+      guest:
+        description: Store then wait for timer, or explicitly exit with HLT
+        type: choice
+        default: timer
+        options: [timer, halt]
       intel-image:
         description: Native Intel runner image
         type: choice
@@ -73,6 +78,7 @@ jobs:
         uses: ./harness/.github/actions/intel-api-control
         with:
           mode: ${{ inputs.mode }}
+          guest: ${{ inputs.guest }}
           observation: ${{ inputs.observation }}
       - name: Preserve matching uploader crash reports
         if: always() && (steps.control.outcome == 'failure' || steps.control.outcome == 'cancelled')
