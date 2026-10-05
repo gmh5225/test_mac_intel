@@ -14,7 +14,7 @@ def fixture(mode='vcpu', iterations=2, retries=()):
         event('resource',operation=operation,phase='begin')
         vm+=operation=='vm_create'; cpu+=operation=='cpu_create'
         event('resource',operation=operation,phase='end',status=0)
-    event('program',version=1,mode=mode,iterations=iterations,memory_bytes=65536,
+    event('program',version=2,mode=mode,iterations=iterations,memory_bytes=65536,
           guest_hex='a30002ebfe',timebase_numer=1,timebase_denom=1,
           slice_ns=SLICE_NS,budget_ns=BUDGET_NS,call_limit=CALL_LIMIT,event_limit=65536)
     if mode=='vcpu': resource('vm_create')
@@ -34,8 +34,8 @@ def fixture(mode='vcpu', iterations=2, retries=()):
         for call,reason in enumerate([*retries,52],1):
             progress=call==len(retries)+1
             event('call_begin',call=call,before=now,deadline=deadline)
-            now+=50
-            event('call_end',call=call,after=now,status=0)
+            entered=now+3; now+=50
+            event('call_end',call=call,entered=entered,after=now,status=0)
             now+=5
             event('capture',call=call,captured=now,reason=reason,rip=0x103 if progress else 0x100,
                   rax=iteration,witness=iteration if progress else 0)
@@ -53,6 +53,24 @@ def raw(events): return ('\n'.join(json.dumps(e) for e in events)+'\n').encode()
 
 
 class Contract(unittest.TestCase):
+    def test_lf_framing_preserves_json_whitespace_but_rejects_blank_records(self):
+        data=raw(fixture())
+        for ending in (b'\n',b'\r\n',b'\r\r\n'):
+            self.assertEqual(audit(data.replace(b'\n',ending),'vcpu',2)['iterations'],2)
+        for value in (data.replace(b'\n',b'\n\n',1),data.replace(b'\n',b'\r\n\r\n',1)):
+            with self.assertRaises(ValueError):audit(value,'vcpu',2)
+    def test_entry_time_excludes_logging_and_requires_remaining_budget(self):
+        for entered in (19_999_999_999,22_000_000_000,22_000_000_001):
+            events=fixture();next(e for e in events if e['event']=='call_end')['entered']=entered
+            with self.assertRaises(ValueError):audit(raw(events),'vcpu',2)
+        events=fixture();returned=next(e for e in events if e['event']=='call_end')
+        returned['entered']=returned['after']+1
+        with self.assertRaises(ValueError):audit(raw(events),'vcpu',2)
+    def test_rejected_entry_or_api_failure_cannot_supply_a_capture(self):
+        for kind in ('entry_rejected','error'):
+            events=fixture();index=next(i for i,e in enumerate(events) if e['event']=='call_end')
+            events[index]['event']=kind
+            with self.assertRaises(ValueError):audit(raw(events),'vcpu',2)
     def test_complete_both_lifetimes(self):
         for mode in ['vcpu','vm']:
             result=audit(raw(fixture(mode,1000)),mode)

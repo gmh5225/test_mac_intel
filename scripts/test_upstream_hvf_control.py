@@ -45,13 +45,38 @@ class UpstreamControlTests(unittest.TestCase):
         self.assertTrue(witnesses(log + "Status: STOP/UNSUPPORTED\n")["passed"])
         self.assertTrue(witnesses(log.replace("interrupts finished\nDone\n", "Done\ninterrupts finished\n"))["passed"])
 
-    def run_child(self, code, timeout=2):
+    def run_child(self, code, timeout=2, **options):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         directory = Path(temporary.name)
         status = collect([sys.executable, "-c", code], directory, directory,
-                         shared.test_environment(os.environ), timeout, shared.NativeChildren)
+                         shared.test_environment(os.environ), timeout, shared.NativeChildren, **options)
         return directory, status
+
+    def test_raw_output_is_byte_exact_under_backpressure(self):
+        payload=(b'{"event":"sample","value":1}\n' + b'CR\rCRLF\r\nCRCRLF\r\r\n') * 10000
+        directory,status=self.run_child(
+            "import os; assert os.isatty(1); "
+            "data=(b'{\"event\":\"sample\",\"value\":1}\\n'+b'CR\\rCRLF\\r\\nCRCRLF\\r\\r\\n')*10000; "
+            "offset=0\nwhile offset<len(data): offset+=os.write(1,data[offset:offset+8192])",timeout=10,raw_output=True)
+        self.assertEqual(status['status'],0)
+        self.assertTrue(status['child_retired'])
+        self.assertIs(status['pty_output_processing'],False)
+        self.assertEqual((directory/'output.log').read_bytes(),payload)
+
+    def test_raw_output_timeout_keeps_prefix_and_reaps(self):
+        directory,status=self.run_child("import os,time; os.write(1,b'prefix\\n'); time.sleep(30)",
+                                        timeout=0.2,raw_output=True)
+        self.assertTrue(status['timed_out'])
+        self.assertTrue(status['child_retired'])
+        self.assertEqual(status['status'],-signal.SIGKILL)
+        self.assertEqual((directory/'output.log').read_bytes(),b'prefix\n')
+
+    def test_raw_output_flag_must_read_back_disabled(self):
+        import termios
+        with mock.patch.object(termios,'tcsetattr',side_effect=lambda fd,when,attributes:None):
+            with self.assertRaisesRegex(ValueError,'remained enabled'):
+                self.run_child("raise SystemExit('must not start')",raw_output=True)
 
     def test_pty_preserves_output_and_reaps_success(self):
         log = complete_log()
@@ -113,12 +138,18 @@ class UpstreamControlTests(unittest.TestCase):
         self.assertEqual((directory / "output.log").read_text(), log)
 
     def test_controller_cancellation_retires_independent_native_group(self):
+        self.check_controller_cancellation(raw_output=False)
+
+    def test_raw_controller_cancellation_retires_independent_native_group(self):
+        self.check_controller_cancellation(raw_output=True)
+
+    def check_controller_cancellation(self, raw_output):
         with tempfile.TemporaryDirectory() as tmp:
             destination = Path(tmp)
             code = ("import sys; from pathlib import Path; from upstream_hvf_control import collect; "
                 f"sys.path.insert(0, {str(DIAGNOSTICS)!r}); "
                 "from scripts.diagnose_hvf_methods import NativeChildren; "
-                f"collect([sys.executable, '-c', 'import time; time.sleep(30)'], {tmp!r}, Path({tmp!r}), {{}}, 20, NativeChildren)")
+                f"collect([sys.executable, '-c', 'import time; time.sleep(30)'], {tmp!r}, Path({tmp!r}), {{}}, 20, NativeChildren, raw_output={raw_output!r})")
             child = subprocess.Popen([sys.executable, "-c", code], cwd=Path(__file__).parent)
             try:
                 deadline = time.monotonic() + 5

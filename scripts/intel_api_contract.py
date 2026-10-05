@@ -47,7 +47,9 @@ def records(raw):
     require(len(raw) <= 32*1024*1024, 'output exceeds byte limit')
     require(raw.endswith(b'\n'), 'unterminated output')
     result = []
-    for line in raw.splitlines():
+    # JSONL is LF-delimited. CR/CRCR before LF are JSON whitespace, not
+    # additional records; real blank LF records remain invalid JSON.
+    for line in raw.split(b'\n')[:-1]:
         item = json.loads(line, object_pairs_hook=_object,
                           parse_float=lambda value: (_ for _ in ()).throw(ValueError(value)),
                           parse_constant=lambda value: (_ for _ in ()).throw(ValueError(value)))
@@ -94,7 +96,7 @@ def audit(raw, mode, iterations=1000):
     require(mode in ('vcpu', 'vm'), 'invalid mode')
     require(type(iterations) is int and 1 <= iterations <= 1000, 'invalid audit iteration count')
     reader = Reader(records(raw))
-    program = reader.take('program', version=1, mode=mode, iterations=iterations, memory_bytes=65536,
+    program = reader.take('program', version=2, mode=mode, iterations=iterations, memory_bytes=65536,
         guest_hex='a30002ebfe', timebase_numer=None, timebase_denom=None,
         slice_ns=SLICE_NS, budget_ns=BUDGET_NS, call_limit=CALL_LIMIT, event_limit=EVENT_LIMIT)
     numer, denom = program['timebase_numer'], program['timebase_denom']
@@ -142,10 +144,11 @@ def audit(raw, mode, iterations=1000):
         saw_store = False
         for call in range(1, CALL_LIMIT + 1):
             begin = reader.take('call_begin', call=call, before=None, deadline=deadline)
-            after = reader.take('call_end', call=call, after=None, status=0)['after']
+            returned = reader.take('call_end', call=call, entered=None, after=None, status=0)
+            entered, after = returned['entered'], returned['after']
             capture = reader.take('capture', call=call, captured=None, reason=None, rip=None, rax=nonce, witness=None)
             captured = capture['captured']
-            require(previous <= begin['before'] < end and begin['before'] <= after <= captured <= end,
+            require(previous <= begin['before'] <= entered < end and entered <= after <= captured <= end,
                     'late or nonmonotonic call/capture')
             require(capture['reason'] in (1, 52), 'unexpected/full VM-entry failure reason')
             require((capture['rip'], capture['witness']) in ((0x100, 0), (0x103, nonce)), 'false RIP/witness')

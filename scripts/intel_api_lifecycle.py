@@ -24,7 +24,8 @@ SOURCES = ['native/hvf_intel_real_mode.c', 'native/hvf_lifecycle.h',
            'native/test_hvf_lifecycle.c', 'scripts/intel_api_contract.py',
            'scripts/test_intel_api_contract.py', 'scripts/intel_api_lifecycle.py',
            'scripts/test_intel_api_lifecycle.py',
-           'scripts/upstream_hvf_control.py', '.github/workflows/intel-api-lifecycle.yml',
+           'scripts/upstream_hvf_control.py', 'scripts/test_upstream_hvf_control.py',
+           '.github/workflows/intel-api-lifecycle.yml',
            '.github/actions/intel-api-control/action.yml',
            '.github/actions/intel-api-control/run.cjs',
            '.github/actions/intel-api-control/observation.cjs',
@@ -64,11 +65,13 @@ def contract(source, diagnostics, binary, mode, observation):
             'workflow_commit': workflow, 'source_commit': workflow, 'helper_commit': HELPER,
             'source_hashes': {name: digest(source/name) for name in SOURCES},
             'binary_sha256': digest(binary), 'command': [str(binary), mode, '1000'],
-            'mode': mode, 'observation': observation, 'iterations': 1000, 'timeout_seconds': TIMEOUT,
+            'mode': mode, 'observation': observation, 'event_version': 2,
+            'iterations': 1000, 'timeout_seconds': TIMEOUT,
             'guest_hex': 'a30002ebfe', 'slice_ns': 5_000_000, 'budget_ns': 2_000_000_000,
             'call_limit': 4096, 'event_limit': 65536, 'max_output_bytes': 32*1024*1024,
             'vm_generations': 1000 if mode == 'vm' else 1, 'cpu_generations': 1000,
-            'source': str(source), 'binary': str(binary), 'stdout_transport': 'bounded PTY collector',
+            'source': str(source), 'binary': str(binary),
+            'stdout_transport': 'bounded PTY collector with OPOST disabled',
             'run_id': os.environ.get('GITHUB_RUN_ID'), 'run_attempt': os.environ.get('GITHUB_RUN_ATTEMPT'),
             'runner_image': os.environ.get('HVF_INTEL_IMAGE'), 'image_version': os.environ.get('ImageVersion'),
             'workflow_repository': os.environ.get('GITHUB_REPOSITORY'),
@@ -135,7 +138,7 @@ def main():
         raise ValueError('sealed control inputs changed')
     sys.path.insert(0,str(diagnostics))
     from scripts.diagnose_hvf_methods import NativeChildren, test_environment
-    status=collect(current['command'],source,evidence,test_environment(os.environ),TIMEOUT,NativeChildren)
+    status=collect(current['command'],source,evidence,test_environment(os.environ),TIMEOUT,NativeChildren,raw_output=True)
     error=None; audited=None
     output=evidence/'output.log'
     try:

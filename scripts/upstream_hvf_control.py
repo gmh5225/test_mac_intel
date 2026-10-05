@@ -12,6 +12,7 @@ import re
 import select
 import subprocess
 import sys
+import termios
 import time
 
 UPSTREAM = "f150b38bfff419fe19907b7a6a2d743a63b46a49"
@@ -69,13 +70,21 @@ def witnesses(log):
             "interrupt_checkpoints": checkpoints, "summaries": summaries}
 
 
-def collect(command, cwd, evidence, environment, timeout, guard_type):
+def collect(command, cwd, evidence, environment, timeout, guard_type, *, raw_output=False):
     master, slave = pty.openpty()
     start = time.monotonic()
     timed_out = False
     child = None
     failure = None
+    output_processing = None
     try:
+        if raw_output:
+            attributes = termios.tcgetattr(slave)
+            attributes[1] &= ~termios.OPOST
+            termios.tcsetattr(slave, termios.TCSANOW, attributes)
+            output_processing = bool(termios.tcgetattr(slave)[1] & termios.OPOST)
+            if output_processing:
+                raise ValueError('PTY output processing remained enabled')
         with guard_type(evidence), (evidence / "output.log").open("xb", buffering=0) as output:
             child = subprocess.Popen(command, cwd=cwd, env=environment,
                 stdin=subprocess.DEVNULL, stdout=slave, stderr=subprocess.STDOUT,
@@ -133,6 +142,8 @@ def collect(command, cwd, evidence, environment, timeout, guard_type):
             "controller_interrupted": isinstance(failure, (SystemExit, KeyboardInterrupt)),
             "collection_error": type(failure).__name__ if failure else None,
             "output_sha256": digest(output_file) if output_file.exists() else None}
+        if raw_output:
+            status['pty_output_processing'] = output_processing
         save(evidence / "native-status.json", status)
     return status
 

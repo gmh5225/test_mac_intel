@@ -209,18 +209,42 @@ static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
     uint64_t before=mach_absolute_time();
     if (before>=end) return error("budget_exhausted_before_entry",call);
     event("call_begin",",\"call\":%u,\"before\":%"PRIu64",\"deadline\":%"PRIu64,call,before,deadline);
+    /* Logging can block. This is the host instant before calling HVF, not
+     * proof of VM entry; the call interval can still include host scheduling. */
+    uint64_t entered=mach_absolute_time();
+    if (entered<before || entered>=end) {
+      event("entry_rejected",",\"call\":%u,\"observed\":%"PRIu64",\"end\":%"PRIu64,call,entered,end);
+      return error("budget_or_clock_invalid_at_entry",call);
+    }
     hv_return_t status=hv_vcpu_run_until(g.cpu,deadline);
     uint64_t after=mach_absolute_time();
-    event("call_end",",\"call\":%u,\"after\":%"PRIu64",\"status\":%u",call,after,(uint32_t)status);
-    if (!checked(status,"run_until")) return false;
-    uint64_t reason=0,rip=0,rax=0;
-    if (!read_field(VMCS_RO_EXIT_REASON,&reason) || !get_register(HV_X86_RIP,&rip) ||
-        !get_register(HV_X86_RAX,&rax)) return false;
-    uint16_t stored=atomic_load_explicit(witness,memory_order_seq_cst);
-    uint64_t captured=mach_absolute_time();
+    uint64_t reason=0,rip=0,rax=0,captured=0;
+    uint16_t stored=0;
+    hv_return_t capture_status=HV_SUCCESS;
+    const char *capture_operation="read_exit_reason";
+    if (status==HV_SUCCESS) {
+      capture_status=hv_vmx_vcpu_read_vmcs(g.cpu,VMCS_RO_EXIT_REASON,&reason);
+      if (capture_status==HV_SUCCESS) {
+        capture_operation="read_rip";
+        capture_status=hv_vcpu_read_register(g.cpu,HV_X86_RIP,&rip);
+      }
+      if (capture_status==HV_SUCCESS) {
+        capture_operation="read_rax";
+        capture_status=hv_vcpu_read_register(g.cpu,HV_X86_RAX,&rax);
+      }
+      if (capture_status==HV_SUCCESS) {
+        stored=atomic_load_explicit(witness,memory_order_seq_cst);
+        captured=mach_absolute_time();
+      }
+    }
+    /* Record completion after capturing state, so neither interval contains
+     * call_end printing. Errors preserve a real return without fake capture. */
+    event("call_end",",\"call\":%u,\"entered\":%"PRIu64",\"after\":%"PRIu64
+          ",\"status\":%u",call,entered,after,(uint32_t)status);
+    if (!checked(status,"run_until") || !checked(capture_status,capture_operation)) return false;
     event("capture",",\"call\":%u,\"captured\":%"PRIu64",\"reason\":%"PRIu64
           ",\"rip\":%"PRIu64",\"rax\":%"PRIu64",\"witness\":%u",call,captured,reason,rip,rax,stored);
-    if (after<before || captured<after || after>end || captured>end)
+    if (after<entered || captured<after || after>end || captured>end)
       return error("late_or_nonmonotonic_capture",call);
     if ((reason!=1 && reason!=52) || rax!=nonce ||
         !((rip==0x100 && stored==0) || (rip==0x103 && stored==nonce)))
@@ -262,7 +286,7 @@ int main(int argc,char **argv) {
   _Atomic(uint16_t) *witness=(_Atomic(uint16_t) *)((unsigned char *)g.memory+0x200);
   atomic_init(witness,0);
   if (!atomic_is_lock_free(witness)) { free(g.memory); return 2; }
-  event("program",",\"version\":1,\"mode\":\"%s\",\"iterations\":%u,\"memory_bytes\":%u"
+  event("program",",\"version\":2,\"mode\":\"%s\",\"iterations\":%u,\"memory_bytes\":%u"
         ",\"guest_hex\":\"a30002ebfe\",\"timebase_numer\":%u,\"timebase_denom\":%u"
         ",\"slice_ns\":%"PRIu64",\"budget_ns\":%"PRIu64",\"call_limit\":%u,\"event_limit\":%u",
         argv[1],ITERATIONS,MEMORY_BYTES,g.timebase.numer,g.timebase.denom,SLICE_NS,BUDGET_NS,CALL_LIMIT,EVENT_LIMIT);
