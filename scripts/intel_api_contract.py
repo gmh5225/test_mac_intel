@@ -92,11 +92,26 @@ class Reader:
         self.take('resource', operation=operation, phase='end', status=0)
 
 
+def accounting(reader, call, begin, returned, capture, previous_exec, previous_thread):
+    item = reader.take('accounting', call=call, pre_started=None, pre_finished=None,
+        exec_before_ns=None, thread_before_ns=None, post_started=None, post_finished=None,
+        exec_after_ns=None, thread_after_ns=None)
+    require(begin['before'] <= item['pre_started'] <= item['pre_finished'] <= returned['entered'],
+            'invalid pre-call accounting bracket')
+    require(capture['captured'] <= item['post_started'] <= item['post_finished'],
+            'invalid post-call accounting bracket')
+    require(previous_exec <= item['exec_before_ns'] <= item['exec_after_ns'],
+            'nonmonotonic vCPU accounting')
+    require(previous_thread <= item['thread_before_ns'] <= item['thread_after_ns'],
+            'nonmonotonic thread accounting')
+    return item
+
+
 def audit(raw, mode, iterations=1000):
     require(mode in ('vcpu', 'vm'), 'invalid mode')
     require(type(iterations) is int and 1 <= iterations <= 1000, 'invalid audit iteration count')
     reader = Reader(records(raw))
-    program = reader.take('program', version=2, mode=mode, iterations=iterations, memory_bytes=65536,
+    program = reader.take('program', version=3, mode=mode, iterations=iterations, memory_bytes=65536,
         guest_hex='a30002ebfe', timebase_numer=None, timebase_denom=None,
         slice_ns=SLICE_NS, budget_ns=BUDGET_NS, call_limit=CALL_LIMIT, event_limit=EVENT_LIMIT)
     numer, denom = program['timebase_numer'], program['timebase_denom']
@@ -107,7 +122,7 @@ def audit(raw, mode, iterations=1000):
     if mode == 'vcpu':
         reader.resource('vm_create')
     calls = empty_slices = irqs = 0
-    last_capture = 0
+    last_capture = thread_ns = 0
     max_calls = 0
     for nonce in range(1, iterations + 1):
         reader.iteration = nonce
@@ -142,12 +157,15 @@ def audit(raw, mode, iterations=1000):
         previous = start
         completed = False
         saw_store = False
+        exec_ns = 0
         for call in range(1, CALL_LIMIT + 1):
             begin = reader.take('call_begin', call=call, before=None, deadline=deadline)
             returned = reader.take('call_end', call=call, entered=None, after=None, status=0)
             entered, after = returned['entered'], returned['after']
             capture = reader.take('capture', call=call, captured=None, reason=None, rip=None, rax=nonce, witness=None)
             captured = capture['captured']
+            measured = accounting(reader, call, begin, returned, capture, exec_ns, thread_ns)
+            exec_ns, thread_ns = measured['exec_after_ns'], measured['thread_after_ns']
             require(previous <= begin['before'] <= entered < end and entered <= after <= captured <= end,
                     'late or nonmonotonic call/capture')
             require(capture['reason'] in (1, 52), 'unexpected/full VM-entry failure reason')
@@ -155,10 +173,10 @@ def audit(raw, mode, iterations=1000):
             require(not saw_store or (capture['rip'], capture['witness']) == (0x103, nonce), 'guest progress regressed')
             saw_store |= capture['witness'] == nonce
             calls += 1
-            previous = captured
+            previous = measured['post_finished']
             if capture['reason'] == 52 and capture['witness'] == nonce:
                 reader.take('witness', call=call, nonce=nonce, captured=captured)
-                last_capture = captured
+                last_capture = measured['post_finished']
                 max_calls = max(max_calls, call)
                 completed = True
                 break

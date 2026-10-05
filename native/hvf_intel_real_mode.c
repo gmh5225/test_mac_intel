@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define MEMORY_BYTES 65536u
@@ -32,7 +33,7 @@
 static struct {
   void *memory;
   hv_vcpuid_t cpu;
-  uint64_t owner, sequence, vm_generation, cpu_generation;
+  uint64_t owner, sequence, vm_generation, cpu_generation, thread_cpu_ns;
   unsigned iteration;
   mach_timebase_info_data_t timebase;
 } g;
@@ -196,6 +197,34 @@ static bool future(uint64_t now,uint64_t duration,uint64_t *result) {
   if (now>=UINT64_MAX-duration) return error("deadline_overflow",duration);
   *result=now+duration; return true;
 }
+struct accounting_sample {
+  uint64_t started,finished,exec_ns,thread_ns,status;
+  const char *operation;
+};
+/* Intel hv.h specifies nanoseconds for hv_vcpu_get_exec_time. These are
+ * cumulative framework/current-thread counters in the hosted OS, not
+ * physical guest CPU time. Do not print inside either sample bracket. */
+static bool sample_accounting(struct accounting_sample *sample) {
+  sample->started=mach_absolute_time();
+  sample->operation="get_exec_time";
+  hv_return_t status=hv_vcpu_get_exec_time(g.cpu,&sample->exec_ns);
+  if (status!=HV_SUCCESS) { sample->status=(uint32_t)status; return false; }
+  sample->operation="thread_cpu_clock";
+  struct timespec value={0};
+  errno=0;
+  if (clock_gettime(CLOCK_THREAD_CPUTIME_ID,&value)) {
+    sample->status=errno?(unsigned)errno:1; return false;
+  }
+  sample->operation="thread_cpu_clock_value";
+  if (value.tv_sec<0 || value.tv_nsec<0 || value.tv_nsec>=1000000000) {
+    sample->status=1; return false;
+  }
+  __uint128_t wide=(__uint128_t)value.tv_sec*UINT64_C(1000000000)+(uint64_t)value.tv_nsec;
+  if (wide>=UINT64_MAX) { sample->status=1; return false; }
+  sample->thread_ns=(uint64_t)wide;
+  sample->finished=mach_absolute_time();
+  return true;
+}
 static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
   uint64_t slice_ticks=0,budget_ticks=0,end=0,deadline=0;
   if (!ticks(SLICE_NS,&slice_ticks) || !ticks(BUDGET_NS,&budget_ticks)) return false;
@@ -205,14 +234,18 @@ static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
   event("budget",",\"start\":%"PRIu64",\"end\":%"PRIu64",\"slice_ticks\":%"PRIu64
         ",\"budget_ticks\":%"PRIu64,start,end,slice_ticks,budget_ticks);
   bool saw_store=false;
+  uint64_t previous_exec_ns=0,previous_accounting_end=start;
   for (unsigned call=1;call<=CALL_LIMIT;++call) {
     uint64_t before=mach_absolute_time();
     if (before>=end) return error("budget_exhausted_before_entry",call);
     event("call_begin",",\"call\":%u,\"before\":%"PRIu64",\"deadline\":%"PRIu64,call,before,deadline);
-    /* Logging can block. This is the host instant before calling HVF, not
+    struct accounting_sample pre={0},post={0};
+    if (!sample_accounting(&pre)) return error(pre.operation,pre.status);
+    /* Logging and getters can block. This is the host instant before HVF, not
      * proof of VM entry; the call interval can still include host scheduling. */
     uint64_t entered=mach_absolute_time();
-    if (entered<before || entered>=end) {
+    if (before<previous_accounting_end || pre.started<before || pre.finished<pre.started ||
+        entered<pre.finished || entered>=end || pre.exec_ns<previous_exec_ns || pre.thread_ns<g.thread_cpu_ns) {
       event("entry_rejected",",\"call\":%u,\"observed\":%"PRIu64",\"end\":%"PRIu64,call,entered,end);
       return error("budget_or_clock_invalid_at_entry",call);
     }
@@ -237,6 +270,8 @@ static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
         captured=mach_absolute_time();
       }
     }
+    bool accounted=false;
+    if (status==HV_SUCCESS && capture_status==HV_SUCCESS) accounted=sample_accounting(&post);
     /* Record completion after capturing state, so neither interval contains
      * call_end printing. Errors preserve a real return without fake capture. */
     event("call_end",",\"call\":%u,\"entered\":%"PRIu64",\"after\":%"PRIu64
@@ -244,6 +279,18 @@ static bool run_finite(uint16_t nonce,_Atomic(uint16_t) *witness) {
     if (!checked(status,"run_until") || !checked(capture_status,capture_operation)) return false;
     event("capture",",\"call\":%u,\"captured\":%"PRIu64",\"reason\":%"PRIu64
           ",\"rip\":%"PRIu64",\"rax\":%"PRIu64",\"witness\":%u",call,captured,reason,rip,rax,stored);
+    if (!accounted) return error(post.operation,post.status);
+    event("accounting",",\"call\":%u,\"pre_started\":%"PRIu64",\"pre_finished\":%"PRIu64
+          ",\"exec_before_ns\":%"PRIu64",\"thread_before_ns\":%"PRIu64
+          ",\"post_started\":%"PRIu64",\"post_finished\":%"PRIu64
+          ",\"exec_after_ns\":%"PRIu64",\"thread_after_ns\":%"PRIu64,
+          call,pre.started,pre.finished,pre.exec_ns,pre.thread_ns,
+          post.started,post.finished,post.exec_ns,post.thread_ns);
+    if (post.started<captured || post.finished<post.started || post.exec_ns<pre.exec_ns ||
+        post.thread_ns<pre.thread_ns) return error("nonmonotonic_accounting",call);
+    previous_exec_ns=post.exec_ns;
+    previous_accounting_end=post.finished;
+    g.thread_cpu_ns=post.thread_ns;
     if (after<entered || captured<after || after>end || captured>end)
       return error("late_or_nonmonotonic_capture",call);
     if ((reason!=1 && reason!=52) || rax!=nonce ||
@@ -286,7 +333,7 @@ int main(int argc,char **argv) {
   _Atomic(uint16_t) *witness=(_Atomic(uint16_t) *)((unsigned char *)g.memory+0x200);
   atomic_init(witness,0);
   if (!atomic_is_lock_free(witness)) { free(g.memory); return 2; }
-  event("program",",\"version\":2,\"mode\":\"%s\",\"iterations\":%u,\"memory_bytes\":%u"
+  event("program",",\"version\":3,\"mode\":\"%s\",\"iterations\":%u,\"memory_bytes\":%u"
         ",\"guest_hex\":\"a30002ebfe\",\"timebase_numer\":%u,\"timebase_denom\":%u"
         ",\"slice_ns\":%"PRIu64",\"budget_ns\":%"PRIu64",\"call_limit\":%u,\"event_limit\":%u",
         argv[1],ITERATIONS,MEMORY_BYTES,g.timebase.numer,g.timebase.denom,SLICE_NS,BUDGET_NS,CALL_LIMIT,EVENT_LIMIT);
