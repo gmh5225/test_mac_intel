@@ -1,0 +1,54 @@
+{
+  "kind": "validated-Intel-HVF-and-Darwin-reported-accounting",
+  "event_version": 3,
+  "native_passed": false,
+  "complete_native_acceptance": false,
+  "output_sha256": "441c5ff1ea8c28fce343e01cedc4f61570e0678ce07ca6d3ce2cd30bae516a06",
+  "completed_iterations": 781,
+  "observed_calls": 1845,
+  "largest_pre_call_intervals": [
+    {
+      "iteration": 782,
+      "call": 1,
+      "precall_to_return_ns": 2068336979,
+      "begin_log_interval_ns": 8003,
+      "return_to_capture_ns": 3849,
+      "pre_sample_width_ns": 1888,
+      "post_sample_width_ns": 4361,
+      "reported_exec_delta_ns": 2062825920,
+      "reported_thread_delta_ns": 2068043512,
+      "reason": 1,
+      "rip": 259,
+      "witness": 782
+    },
+    {
+      "iteration": 296,
+      "call": 1,
+      "precall_to_return_ns": 1190518944,
+      "begin_log_interval_ns": 17803,
+      "return_to_capture_ns": 3252,
+      "pre_sample_width_ns": 2741,
+      "post_sample_width_ns": 4765,
+      "reported_exec_delta_ns": 1186178069,
+      "reported_thread_delta_ns": 1190483224,
+      "reason": 1,
+      "rip": 259,
+      "witness": 296
+    },
+    {
+      "iteration": 443,
+      "call": 1,
+      "precall_to_return_ns": 998970061,
+      "begin_log_interval_ns": 8373,
+      "return_to_capture_ns": 3795,
+      "pre_sample_width_ns": 2076,
+      "post_sample_width_ns": 21885,
+      "reported_exec_delta_ns": 995053522,
+      "reported_thread_delta_ns": 998909907,
+      "reason": 1,
+      "rip": 259,
+      "witness": 443
+    }
+  ],
+  "scope": "Each counter delta spans its getter samples, including different small setup/capture overheads. The pre-call interval excludes those getters and logs but includes scheduling. These reported counters in nested macOS do not prove physical guest CPU time, scheduling duration, kernel root cause or a performance improvement."
+}

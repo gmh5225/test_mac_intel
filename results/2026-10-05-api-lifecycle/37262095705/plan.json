@@ -1,0 +1,138 @@
+{
+  "kind": "independent-real-mode-finite-control",
+  "complete_native_acceptance": false,
+  "workflow_commit": "fb7a9d2c9cf0bb5294daf3611c74cdff54f7858b",
+  "source_commit": "fb7a9d2c9cf0bb5294daf3611c74cdff54f7858b",
+  "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+  "source_hashes": {
+    "native/hvf_intel_real_mode.c": "e794b33a40953363ffc872d41c126392aa0a11beb6a866181d1a3cb5ab3faf75",
+    "native/hvf_lifecycle.h": "dc149f2a02484bc304f335e802d9a952a38e375aca76f833e406a9ab908af568",
+    "native/HVFDOS-LICENSE.txt": "f772eb4a3c485e1b012084b0c2278e81866fcb82a02dffd0ff2655e33d29ce96",
+    "native/hypervisor.entitlements": "70d65ae13874e183526aa48e55bb330f2156da94effca24f89b5e2f940262723",
+    "native/test_hvf_lifecycle.c": "0e830c3e286a87a7507f80643df2cb1870b872870a529393a98931d919cdea0e",
+    "scripts/intel_api_contract.py": "ae6e795b31dd809944bd5a2a2d50f678c6308419db6beee06ca29d1df43c3add",
+    "scripts/test_intel_api_contract.py": "305a6bfc9717b98237d5ef552810feea1ba62544b500a51fbfe8b84bb2a103d3",
+    "scripts/intel_api_lifecycle.py": "81d1111665860497d0c2e629bcc26d9d686a191151779fb128454f7efd1a89e5",
+    "scripts/test_intel_api_lifecycle.py": "bfbdfb26d7b244c7d737d6d26f893754291c31311cd1fcc1e81a4379554c5106",
+    "scripts/upstream_hvf_control.py": "54ad6857161d542792967f72e1f7e134dac92a2a23fd5d4c57b7710a8f4359df",
+    "scripts/test_upstream_hvf_control.py": "c8ea968af9b187c6226b292562c9d7b94356e7839c146992c689c8914fabe0ed",
+    ".github/workflows/intel-api-lifecycle.yml": "c49e4d7627b3fa189ceaece7b2445668f4fb118267b210eb50ff39406c648222",
+    ".github/actions/intel-api-control/action.yml": "30e05d7ea2409af8c77963b78fced5af465585d903c58230f4d1da2e609e59b4",
+    ".github/actions/intel-api-control/run.cjs": "ede4f9af0e339f41762e82cc3b6d35f8d8c1048cef8c23415defac7f50d5f267",
+    ".github/actions/intel-api-control/observation.cjs": "088f243e481f58c47c0f638ab8ed307980f8bc72a403454b418e8f6eefc098b8",
+    ".github/actions/intel-api-control/observation.test.cjs": "57d5fff2b3a644c32fa02ea53c5cfa4a3afb3e0b591e7782b130b458545650c0",
+    ".github/actions/intel-api-control/snapshot.cjs": "82fe0d2e37b3410f413488fc11fada533beb7db76afd61b28d95c3a2e237639b",
+    ".github/actions/intel-api-control/snapshot.test.cjs": "b3d2bb2313ede7107a8927ef2f4318c3b66248b9b261e14f5b5984675294f388"
+  },
+  "binary_sha256": "c75121947254cef0d1bb5563a45b3dcb16a041797ae18a74d33f07c64431d531",
+  "command": [
+    "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+    "vcpu",
+    "1000"
+  ],
+  "mode": "vcpu",
+  "observation": "final-only",
+  "event_version": 3,
+  "accounting": [
+    "hv_vcpu_get_exec_time",
+    "CLOCK_THREAD_CPUTIME_ID",
+    "Mach-bracketed cumulative nanoseconds; not physical guest CPU time"
+  ],
+  "accounting_units": {
+    "intel_hv_exec": "nanoseconds per Intel hv.h",
+    "thread_cpu": "nanoseconds",
+    "sample_brackets": "Mach absolute ticks"
+  },
+  "iterations": 1000,
+  "timeout_seconds": 600,
+  "guest_hex": "a30002ebfe",
+  "slice_ns": 5000000,
+  "budget_ns": 2000000000,
+  "call_limit": 4096,
+  "event_limit": 65536,
+  "max_output_bytes": 33554432,
+  "vm_generations": 1,
+  "cpu_generations": 1000,
+  "source": "/Users/runner/work/test_mac_intel/test_mac_intel/harness",
+  "binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+  "stdout_transport": "bounded PTY collector with OPOST disabled",
+  "run_id": "37262095705",
+  "run_attempt": "1",
+  "runner_image": "macos-15-intel",
+  "image_version": "20260824.0482.1",
+  "workflow_repository": "gmh5225/test_mac_intel",
+  "limitations": [
+    "authored derivative of hvdos real-mode setup, not unchanged upstream",
+    "no NeverD long-mode state, managed MSRs, projection, LLVM or cancellation controller",
+    "one owner and retained backing, vCPU destroy then unmap then optional VM destroy",
+    "final-only removes concurrent live observation as a bundle and can lose all native evidence on runner loss",
+    "pass does not exonerate omitted components or establish physical Intel Mac behavior"
+  ],
+  "host_observations": [
+    {
+      "command": [
+        "sw_vers"
+      ],
+      "status": 0,
+      "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "uname",
+        "-a"
+      ],
+      "status": 0,
+      "stdout": "Darwin iad01-dz248-9fa2ef17-45f2-4207-91be-ba49a9ba6b59-7A6DC8E5FD3F.local 24.6.0 Darwin Kernel Version 24.6.0: Tue Jul 21 20:50:07 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_X86_64 x86_64\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "clang",
+        "--version"
+      ],
+      "status": 0,
+      "stdout": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "--show-sdk-version"
+      ],
+      "status": 0,
+      "stdout": "15.5\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "xcrun",
+        "--show-sdk-path"
+      ],
+      "status": 0,
+      "stdout": "/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "sysctl",
+        "kern.hv_support",
+        "kern.hv_vmm_present",
+        "machdep.cpu.brand_string",
+        "machdep.cpu.features"
+      ],
+      "status": 0,
+      "stdout": "kern.hv_support: 1\nkern.hv_vmm_present: 1\nmachdep.cpu.brand_string: Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz\nmachdep.cpu.features: FPU VME DE PSE TSC MSR PAE MCE CX8 APIC SEP MTRR PGE MCA CMOV PAT PSE36 CLFSH MMX FXSR SSE SSE2 SS HTT PBE SSE3 PCLMULQDQ DTES64 DSCPL VMX SSSE3 FMA CX16 TPR SSE4.1 SSE4.2 x2APIC MOVBE POPCNT AES VMM PCID XSAVE OSXSAVE SEGLIM64 AVX1.0 RDRAND F16C\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "file",
+        "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode"
+      ],
+      "status": 0,
+      "stdout": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode: Mach-O 64-bit executable x86_64\n",
+      "stderr": ""
+    }
+  ]
+}
