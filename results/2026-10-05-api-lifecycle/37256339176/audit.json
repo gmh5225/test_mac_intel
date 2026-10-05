@@ -1,0 +1,564 @@
+{
+  "kind": "independent-api-evidence-reconciliation",
+  "run_id": "37256339176",
+  "workflow_status": "completed",
+  "workflow_conclusion": "failure",
+  "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+  "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+  "artifact_manifest": "manifest-20261005T024509Z.json",
+  "verified_artifacts": 7,
+  "complete_native_acceptance": false,
+  "native_passed": null,
+  "child_retired": true,
+  "mode": "vcpu",
+  "scope": "isolated authored real-mode control; not NeverD recovery, CPU or Darwin acceptance",
+  "plan": {
+    "kind": "independent-real-mode-finite-control",
+    "complete_native_acceptance": false,
+    "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+    "source_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+    "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+    "source_hashes": {
+      "native/hvf_intel_real_mode.c": "f90fc746bd2bfb6c1105d4b88bb1ecab46c25af3b19a0d9a9fc332c002c0139e",
+      "native/hvf_lifecycle.h": "dc149f2a02484bc304f335e802d9a952a38e375aca76f833e406a9ab908af568",
+      "native/HVFDOS-LICENSE.txt": "f772eb4a3c485e1b012084b0c2278e81866fcb82a02dffd0ff2655e33d29ce96",
+      "native/hypervisor.entitlements": "70d65ae13874e183526aa48e55bb330f2156da94effca24f89b5e2f940262723",
+      "native/test_hvf_lifecycle.c": "0e830c3e286a87a7507f80643df2cb1870b872870a529393a98931d919cdea0e",
+      "scripts/intel_api_contract.py": "26fe8a60d50f1ecfc0af05d6ceceafab836d5536fa8dde8d404eda2b9563a4a4",
+      "scripts/test_intel_api_contract.py": "3325f623e84f555e787dabc0bc431b18833b52ca651fb448dfe72f8e4e9120db",
+      "scripts/intel_api_lifecycle.py": "d3e11aa3f865a80a9f39776551957aeb5cab53a4aed0ed2bc704633dbe1e8aa4",
+      "scripts/test_intel_api_lifecycle.py": "3b0b45752b21e170ae03ecce64b84bec37cc4f5e983fb786e81b5a7371913174",
+      "scripts/upstream_hvf_control.py": "acb81293e503b2452515e4388adac6dd621a21c128757d0c6d11dc2ec77c8416",
+      ".github/workflows/intel-api-lifecycle.yml": "bf501b62e145cd8a8de51718be45cecbd161e806cbc95e1dc03e02a11ac24be8",
+      ".github/actions/intel-api-control/action.yml": "f525755c7ee5e819ea7f3a2ea014d2a453e79000e554f54da6653a65394aa355",
+      ".github/actions/intel-api-control/run.cjs": "9d0d0b1a443edfb42003f020664cd8a19c85489c87b4c4ff9d5f85f8d4d21bbf",
+      ".github/actions/intel-api-control/snapshot.cjs": "82fe0d2e37b3410f413488fc11fada533beb7db76afd61b28d95c3a2e237639b",
+      ".github/actions/intel-api-control/snapshot.test.cjs": "b3d2bb2313ede7107a8927ef2f4318c3b66248b9b261e14f5b5984675294f388"
+    },
+    "binary_sha256": "410572e4bf50c3aa2a4d73f09867ed582bbb2e1b81c948f2c492416529080bff",
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+      "vcpu",
+      "1000"
+    ],
+    "mode": "vcpu",
+    "iterations": 1000,
+    "timeout_seconds": 600,
+    "guest_hex": "a30002ebfe",
+    "slice_ns": 5000000,
+    "budget_ns": 2000000000,
+    "call_limit": 4096,
+    "event_limit": 65536,
+    "max_output_bytes": 33554432,
+    "vm_generations": 1,
+    "cpu_generations": 1000,
+    "source": "/Users/runner/work/test_mac_intel/test_mac_intel/harness",
+    "binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+    "stdout_transport": "bounded PTY collector",
+    "run_id": "37256339176",
+    "run_attempt": "1",
+    "runner_image": "macos-15-intel",
+    "image_version": "20260824.0482.1",
+    "workflow_repository": "gmh5225/test_mac_intel",
+    "limitations": [
+      "authored derivative of hvdos real-mode setup, not unchanged upstream",
+      "no NeverD long-mode state, managed MSRs, projection, LLVM or cancellation controller",
+      "one owner and retained backing, vCPU destroy then unmap then optional VM destroy",
+      "pass does not exonerate omitted components or establish physical Intel Mac behavior"
+    ],
+    "host_observations": [
+      {
+        "command": [
+          "sw_vers"
+        ],
+        "status": 0,
+        "stdout": "ProductName:\t\tmacOS\nProductVersion:\t\t15.7.9\nBuildVersion:\t\t24G830\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "uname",
+          "-a"
+        ],
+        "status": 0,
+        "stdout": "Darwin sjc20-bb655-8799ddf9-d8d3-41bb-9ff8-1f9bdbdc4869-5AE8B8FF76D5.local 24.6.0 Darwin Kernel Version 24.6.0: Tue Jul 21 20:50:07 PDT 2026; root:xnu-11417.140.69.711.44~1/RELEASE_X86_64 x86_64\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "clang",
+          "--version"
+        ],
+        "status": 0,
+        "stdout": "Apple clang version 17.0.0 (clang-1700.0.13.5)\nTarget: x86_64-apple-darwin24.6.0\nThread model: posix\nInstalledDir: /Applications/Xcode_16.4.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "xcrun",
+          "--show-sdk-version"
+        ],
+        "status": 0,
+        "stdout": "15.5\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "xcrun",
+          "--show-sdk-path"
+        ],
+        "status": 0,
+        "stdout": "/Applications/Xcode_16.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "sysctl",
+          "kern.hv_support",
+          "kern.hv_vmm_present",
+          "machdep.cpu.brand_string",
+          "machdep.cpu.features"
+        ],
+        "status": 0,
+        "stdout": "kern.hv_support: 1\nkern.hv_vmm_present: 1\nmachdep.cpu.brand_string: Intel(R) Core(TM) i7-8700B CPU @ 3.20GHz\nmachdep.cpu.features: FPU VME DE PSE TSC MSR PAE MCE CX8 APIC SEP MTRR PGE MCA CMOV PAT PSE36 CLFSH MMX FXSR SSE SSE2 SS HTT PBE SSE3 PCLMULQDQ DTES64 DSCPL VMX SSSE3 FMA CX16 TPR SSE4.1 SSE4.2 x2APIC MOVBE POPCNT AES VMM PCID XSAVE OSXSAVE SEGLIM64 AVX1.0 RDRAND F16C\n",
+        "stderr": ""
+      },
+      {
+        "command": [
+          "file",
+          "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode"
+        ],
+        "status": 0,
+        "stdout": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode: Mach-O 64-bit executable x86_64\n",
+        "stderr": ""
+      }
+    ]
+  },
+  "image": "macos-15-intel",
+  "observer_runtime": {
+    "kind": "actual-hvf-observer-runtime",
+    "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "node_version": "v24.19.0",
+    "v8_version": "13.6.233.17-node.51",
+    "host_system": "darwin",
+    "host_architecture": "x64",
+    "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+    "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+    "node_bytes": 123666640
+  },
+  "uploader_runtime": {
+    "kind": "hvf-uploader-runtime-contract",
+    "scope": "independent-api-plan-and-progress-children",
+    "mode": "default",
+    "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+    "arguments": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+    ],
+    "node_options_present": false,
+    "parent_exec_argv": [],
+    "runtime": {
+      "kind": "actual-hvf-observer-runtime",
+      "node_executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "node_realpath": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "node_version": "v24.19.0",
+      "v8_version": "13.6.233.17-node.51",
+      "host_system": "darwin",
+      "host_architecture": "x64",
+      "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+      "node_sha256": "1052eb9c7d6c60a79b968e09f75af55a73462b0f6dff0964336d63b5e13eb63c",
+      "node_bytes": 123666640
+    }
+  },
+  "partial_progress": {
+    "contiguous_bytes": 1423080,
+    "sha256": "3f495d8df64fa7fa2019d692343f1a5e39331f408e4fad6e450689f8ed6dfdd8",
+    "identical_overlaps": true,
+    "snapshots": [
+      {
+        "artifact": "intel-api-attempt-1-progress-000",
+        "first_byte": 0,
+        "bytes": 93680,
+        "sha256": "60c2a186fff7bb9e1a8c9d3af8c053c30116a2fcbe688b2940cd4e8ce623122f",
+        "metadata": {
+          "kind": "independent-real-mode-partial-progress",
+          "complete_native_acceptance": false,
+          "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+          "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+          "captured_at": "2026-10-05T02:41:41.104Z",
+          "reason": "registered",
+          "sequence": 0,
+          "output": {
+            "size_at_open": 93680,
+            "first_byte": 0,
+            "copied_bytes": 93680,
+            "truncated": false
+          },
+          "progress": {
+            "last_completed_in_window": 18,
+            "last_started_in_window": 19
+          },
+          "identity": {
+            "native_pid": 7637,
+            "python_pid": 7627,
+            "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+            "observed_at": "2026-10-05T02:41:41.104Z",
+            "stdout": " 7637  7627  7637 /Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode\n",
+            "stderr": "",
+            "status": 0,
+            "verified": true
+          },
+          "execution_running_at_seal": true,
+          "cancelled": false
+        }
+      },
+      {
+        "artifact": "intel-api-attempt-1-progress-001",
+        "first_byte": 0,
+        "bytes": 343366,
+        "sha256": "e8ca5c11994cffc119840a595da995a48264dead5356f3d0a58bd6fd9b7490e9",
+        "metadata": {
+          "kind": "independent-real-mode-partial-progress",
+          "complete_native_acceptance": false,
+          "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+          "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+          "captured_at": "2026-10-05T02:41:42.656Z",
+          "reason": "progress",
+          "sequence": 1,
+          "output": {
+            "size_at_open": 343366,
+            "first_byte": 0,
+            "copied_bytes": 343366,
+            "truncated": false
+          },
+          "progress": {
+            "last_completed_in_window": 67,
+            "last_started_in_window": 68
+          },
+          "identity": {
+            "native_pid": 7637,
+            "python_pid": 7627,
+            "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+            "observed_at": "2026-10-05T02:41:42.656Z",
+            "stdout": " 7637  7627  7637 /Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode\n",
+            "stderr": "",
+            "status": 0,
+            "verified": true
+          },
+          "execution_running_at_seal": true,
+          "cancelled": false
+        }
+      },
+      {
+        "artifact": "intel-api-attempt-1-progress-002",
+        "first_byte": 0,
+        "bytes": 593009,
+        "sha256": "bb8734cf1021c1a101f0fe62cc670a5d3e2ef867a6949af097531bc02f3768d4",
+        "metadata": {
+          "kind": "independent-real-mode-partial-progress",
+          "complete_native_acceptance": false,
+          "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+          "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+          "captured_at": "2026-10-05T02:41:44.398Z",
+          "reason": "progress",
+          "sequence": 2,
+          "output": {
+            "size_at_open": 593009,
+            "first_byte": 0,
+            "copied_bytes": 593009,
+            "truncated": false
+          },
+          "progress": {
+            "last_completed_in_window": 115,
+            "last_started_in_window": 116
+          },
+          "identity": {
+            "native_pid": 7637,
+            "python_pid": 7627,
+            "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+            "observed_at": "2026-10-05T02:41:44.398Z",
+            "stdout": " 7637  7627  7637 /Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode\n",
+            "stderr": "",
+            "status": 0,
+            "verified": true
+          },
+          "execution_running_at_seal": true,
+          "cancelled": false
+        }
+      },
+      {
+        "artifact": "intel-api-attempt-1-progress-003",
+        "first_byte": 0,
+        "bytes": 914431,
+        "sha256": "3a48f714d97d98c793ff993094f052cf33a3a9df57327a04fb50e23dde0f234f",
+        "metadata": {
+          "kind": "independent-real-mode-partial-progress",
+          "complete_native_acceptance": false,
+          "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+          "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+          "captured_at": "2026-10-05T02:41:46.109Z",
+          "reason": "progress",
+          "sequence": 3,
+          "output": {
+            "size_at_open": 914431,
+            "first_byte": 0,
+            "copied_bytes": 914431,
+            "truncated": false
+          },
+          "progress": {
+            "last_completed_in_window": 178,
+            "last_started_in_window": 179
+          },
+          "identity": {
+            "native_pid": 7637,
+            "python_pid": 7627,
+            "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+            "observed_at": "2026-10-05T02:41:46.109Z",
+            "stdout": " 7637  7627  7637 /Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode\n",
+            "stderr": "",
+            "status": 0,
+            "verified": true
+          },
+          "execution_running_at_seal": true,
+          "cancelled": false
+        }
+      },
+      {
+        "artifact": "intel-api-attempt-1-progress-004",
+        "first_byte": 0,
+        "bytes": 1423080,
+        "sha256": "3f495d8df64fa7fa2019d692343f1a5e39331f408e4fad6e450689f8ed6dfdd8",
+        "metadata": {
+          "kind": "independent-real-mode-partial-progress",
+          "complete_native_acceptance": false,
+          "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+          "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+          "captured_at": "2026-10-05T02:41:47.785Z",
+          "reason": "progress",
+          "sequence": 4,
+          "output": {
+            "size_at_open": 1423080,
+            "first_byte": 0,
+            "copied_bytes": 1423080,
+            "truncated": false
+          },
+          "progress": {
+            "last_completed_in_window": 273,
+            "last_started_in_window": 274
+          },
+          "identity": {
+            "native_pid": 7637,
+            "python_pid": 7627,
+            "expected_binary": "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+            "observed_at": "2026-10-05T02:41:47.785Z",
+            "stdout": " 7637  7627  7637 /Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode\n",
+            "stderr": "",
+            "status": 0,
+            "verified": true
+          },
+          "execution_running_at_seal": true,
+          "cancelled": false
+        }
+      }
+    ],
+    "native_exit_verified": false,
+    "last_observed": {
+      "last_completed_in_window": 273,
+      "last_started_in_window": 274
+    }
+  },
+  "verified_partial_contract": {
+    "complete_iterations": 411,
+    "verified_events": 11547,
+    "unverified_trailing_bytes": 0,
+    "native_exit_verified": false
+  },
+  "native_status": {
+    "command": [
+      "/Users/runner/work/test_mac_intel/test_mac_intel/evidence-bin/hvf-intel-real-mode",
+      "vcpu",
+      "1000"
+    ],
+    "pid": 7637,
+    "status": -9,
+    "timed_out": false,
+    "elapsed_seconds": 9.798692604000053,
+    "child_retired": true,
+    "controller_interrupted": true,
+    "collection_error": "SystemExit",
+    "output_sha256": "02e52a2247520f40121ac5291691eb36595e6d3baee96e53afa89d392d8aa288"
+  },
+  "retirement": [
+    {
+      "pid": 7637,
+      "status": -9,
+      "retired": true
+    }
+  ],
+  "controller": {
+    "kind": "diagnostic-controller-child",
+    "started_at": "2026-10-05T02:41:39.090Z",
+    "completed_at": "2026-10-05T02:41:49.948Z",
+    "exit_status": 143,
+    "signal": null,
+    "termination_reason": "evidence-failure",
+    "spawn_error": null
+  },
+  "native_audit": null,
+  "native_audit_error": "missing call_end",
+  "uploads": {
+    "plan": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:36.938Z",
+      "completed_at": "2026-10-05T02:41:39.081Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7550,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "progress-000": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:41.107Z",
+      "completed_at": "2026-10-05T02:41:42.641Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7644,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "progress-001": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:42.659Z",
+      "completed_at": "2026-10-05T02:41:44.381Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7653,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "progress-002": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:44.401Z",
+      "completed_at": "2026-10-05T02:41:46.087Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7662,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "progress-003": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:46.110Z",
+      "completed_at": "2026-10-05T02:41:47.759Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7669,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "progress-004": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:47.788Z",
+      "completed_at": "2026-10-05T02:41:49.441Z",
+      "exit_status": 0,
+      "signal": null,
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7676,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    },
+    "progress-005": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:49.488Z",
+      "completed_at": "2026-10-05T02:41:49.915Z",
+      "exit_status": null,
+      "signal": "SIGSEGV",
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7824,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    }
+  },
+  "output_sha256": "02e52a2247520f40121ac5291691eb36595e6d3baee96e53afa89d392d8aa288",
+  "output_bytes": 2160350,
+  "matched_uploader_crashes": [
+    {
+      "upload": "progress-005",
+      "pid": 7824,
+      "report": "uploads/crashes/progress-005.ips",
+      "report_sha256": "48c8fae2c571635dab3c13bf993106a3c57cebda2fd9a0a5b3ae30342980fe7c",
+      "signal": "SIGSEGV",
+      "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+      "exception": {
+        "codes": "0x0000000000000001, 0x000025300000001b",
+        "rawCodes": [
+          1,
+          40888088657947
+        ],
+        "type": "EXC_BAD_ACCESS",
+        "signal": "SIGSEGV",
+        "subtype": "KERN_INVALID_ADDRESS at 0x000025300000001b"
+      },
+      "top_frame": {
+        "imageOffset": 18322061,
+        "symbol": "Builtins_LoadIC_NoFeedback",
+        "symbolLocation": 13,
+        "imageIndex": 0
+      }
+    }
+  ],
+  "failed_uploads": {
+    "progress-005": {
+      "kind": "diagnostic-controller-child",
+      "started_at": "2026-10-05T02:41:49.488Z",
+      "completed_at": "2026-10-05T02:41:49.915Z",
+      "exit_status": null,
+      "signal": "SIGSEGV",
+      "termination_reason": null,
+      "spawn_error": null,
+      "pid": 7824,
+      "parent_pid": 7378,
+      "executable": "/Users/runner/actions-runner/cached/2.337.0/externals/node24/bin/node",
+      "arguments": [
+        "/Users/runner/work/test_mac_intel/test_mac_intel/artifact-uploader/dist/upload/index.js"
+      ]
+    }
+  },
+  "final_native_result_present": false,
+  "runner_loss_explicitly_reported": false,
+  "annotations": []
+}

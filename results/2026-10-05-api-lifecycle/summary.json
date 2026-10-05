@@ -1,0 +1,90 @@
+{
+  "kind": "isolated-authored-real-mode-hvf-controls",
+  "recorded_at": "2026-10-05T02:57:25.000647+00:00",
+  "complete_native_acceptance": false,
+  "interpretation": "Native real-mode finite controls, distinct from unchanged upstream and NeverD long-mode experiments. A pass requires complete native state/witness/lifecycle evidence plus exit and retirement. An uploader crash followed by cancellation leaves the native outcome unknown. No root cause, physical Intel Mac stability, performance claim or complete NeverD recovery/CPU/Darwin acceptance is established.",
+  "runs": [
+    {
+      "run_id": "37256339176",
+      "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+      "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+      "mode": "vcpu",
+      "image": "macos-15-intel",
+      "workflow_conclusion": "failure",
+      "native_passed": null,
+      "child_retired": true,
+      "verified_artifacts": 7,
+      "native_audit": null,
+      "verified_partial_contract": {
+        "complete_iterations": 411,
+        "verified_events": 11547,
+        "unverified_trailing_bytes": 0,
+        "native_exit_verified": false
+      },
+      "matched_uploader_crashes": [
+        {
+          "upload": "progress-005",
+          "pid": 7824,
+          "report": "uploads/crashes/progress-005.ips",
+          "report_sha256": "48c8fae2c571635dab3c13bf993106a3c57cebda2fd9a0a5b3ae30342980fe7c",
+          "signal": "SIGSEGV",
+          "node_native_uuid": "263fab36-9357-3402-bc22-b7e100a1c357",
+          "exception": {
+            "codes": "0x0000000000000001, 0x000025300000001b",
+            "rawCodes": [
+              1,
+              40888088657947
+            ],
+            "type": "EXC_BAD_ACCESS",
+            "signal": "SIGSEGV",
+            "subtype": "KERN_INVALID_ADDRESS at 0x000025300000001b"
+          },
+          "top_frame": {
+            "imageOffset": 18322061,
+            "symbol": "Builtins_LoadIC_NoFeedback",
+            "symbolLocation": 13,
+            "imageIndex": 0
+          }
+        }
+      ],
+      "output_sha256": "02e52a2247520f40121ac5291691eb36595e6d3baee96e53afa89d392d8aa288",
+      "output_bytes": 2160350,
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37256339176",
+      "observation": "live",
+      "complete_native_acceptance": false
+    },
+    {
+      "run_id": "37256341043",
+      "workflow_commit": "d61a4910cf6a05041786c979ef570ac29a054636",
+      "helper_commit": "4e80b1394cfb2489fde177b30167629db71e693d",
+      "mode": "vcpu",
+      "image": "macos-26-intel",
+      "workflow_conclusion": "success",
+      "native_passed": true,
+      "child_retired": true,
+      "verified_artifacts": 19,
+      "native_audit": {
+        "kind": "independent-real-mode-finite-audit",
+        "mode": "vcpu",
+        "iterations": 1000,
+        "owner": 126654,
+        "vm_generations": 1,
+        "cpu_generations": 1000,
+        "calls": 2502,
+        "max_calls_per_iteration": 11,
+        "empty_timer_slices": 0,
+        "irq_exits": 1502,
+        "complete_native_acceptance": false,
+        "scope": "event contract only; native exit and child retirement require separate verification",
+        "output_sha256": "8b85f6947a7b2a8ffe54397c7d58a235bd328f3b384fed02e15401fe40f858e5"
+      },
+      "verified_partial_contract": null,
+      "matched_uploader_crashes": [],
+      "output_sha256": "8b85f6947a7b2a8ffe54397c7d58a235bd328f3b384fed02e15401fe40f858e5",
+      "output_bytes": 5226640,
+      "url": "https://github.com/gmh5225/test_mac_intel/actions/runs/37256341043",
+      "observation": "live",
+      "complete_native_acceptance": false
+    }
+  ]
+}

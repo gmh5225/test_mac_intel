@@ -27,6 +27,8 @@ SOURCES = ['native/hvf_intel_real_mode.c', 'native/hvf_lifecycle.h',
            'scripts/upstream_hvf_control.py', '.github/workflows/intel-api-lifecycle.yml',
            '.github/actions/intel-api-control/action.yml',
            '.github/actions/intel-api-control/run.cjs',
+           '.github/actions/intel-api-control/observation.cjs',
+           '.github/actions/intel-api-control/observation.test.cjs',
            '.github/actions/intel-api-control/snapshot.cjs',
            '.github/actions/intel-api-control/snapshot.test.cjs']
 
@@ -45,7 +47,9 @@ def git(root, *args):
     return subprocess.check_output(['git', '-C', str(root), *args], timeout=10, text=True).strip()
 
 
-def contract(source, diagnostics, binary, mode):
+def contract(source, diagnostics, binary, mode, observation):
+    if observation not in ('live', 'final-only'):
+        raise ValueError('unknown observation mode')
     workflow = os.environ.get('GITHUB_SHA', '')
     if not re.fullmatch('[0-9a-f]{40}', workflow) or git(source, 'rev-parse', 'HEAD') != workflow:
         raise ValueError('workflow/source identity mismatch')
@@ -60,7 +64,7 @@ def contract(source, diagnostics, binary, mode):
             'workflow_commit': workflow, 'source_commit': workflow, 'helper_commit': HELPER,
             'source_hashes': {name: digest(source/name) for name in SOURCES},
             'binary_sha256': digest(binary), 'command': [str(binary), mode, '1000'],
-            'mode': mode, 'iterations': 1000, 'timeout_seconds': TIMEOUT,
+            'mode': mode, 'observation': observation, 'iterations': 1000, 'timeout_seconds': TIMEOUT,
             'guest_hex': 'a30002ebfe', 'slice_ns': 5_000_000, 'budget_ns': 2_000_000_000,
             'call_limit': 4096, 'event_limit': 65536, 'max_output_bytes': 32*1024*1024,
             'vm_generations': 1000 if mode == 'vm' else 1, 'cpu_generations': 1000,
@@ -71,6 +75,7 @@ def contract(source, diagnostics, binary, mode):
             'limitations': ['authored derivative of hvdos real-mode setup, not unchanged upstream',
                 'no NeverD long-mode state, managed MSRs, projection, LLVM or cancellation controller',
                 'one owner and retained backing, vCPU destroy then unmap then optional VM destroy',
+                'final-only removes concurrent live observation as a bundle and can lose all native evidence on runner loss',
                 'pass does not exonerate omitted components or establish physical Intel Mac behavior']}
 
 
@@ -112,12 +117,13 @@ def main():
     parser.add_argument('--binary', type=Path, required=True)
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--mode', choices=['vcpu', 'vm'], required=True)
+    parser.add_argument('--observation', choices=['live', 'final-only'], required=True)
     args=parser.parse_args()
     source, diagnostics, binary, evidence=(p.resolve() for p in
         (args.source,args.diagnostics,args.binary,args.evidence))
     if platform.system()!='Darwin' or platform.machine()!='x86_64':
         raise ValueError('native Intel macOS required')
-    current=contract(source,diagnostics,binary,args.mode)
+    current=contract(source,diagnostics,binary,args.mode,args.observation)
     verify_binary(binary)
     if args.stage=='prepare':
         evidence.mkdir(parents=True,exist_ok=False)

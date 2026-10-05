@@ -3,7 +3,7 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const {spawnSync,execFile}=require('node:child_process');
-const {observe}=require('./snapshot.cjs');
+const {executeObserved}=require('./observation.cjs');
 const root=process.env.GITHUB_WORKSPACE;
 const helpers=path.join(root,'diagnostics/.github/actions');
 const {commandGroup,finishUpload,uploadInvocation}=require(path.join(helpers,'hvf-intel-recovery/run.cjs'));
@@ -19,10 +19,13 @@ async function main() {
   if(revision.status!==0||revision.stdout.trim()!==UPLOAD_REVISION) throw new Error('uploader pin mismatch');
   const mode=process.env.INPUT_MODE;
   if(!['vcpu','vm'].includes(mode)) throw new Error('unknown lifecycle mode');
+  const observation=process.env.INPUT_OBSERVATION;
+  if(!['live','final-only'].includes(observation)) throw new Error('unknown observation mode');
   const evidence=path.join(root,'evidence/api-control'),harness=path.join(root,'harness');
   const helper=path.join(harness,'scripts/intel_api_lifecycle.py');
   const args=['--source',harness,'--diagnostics',path.join(root,'diagnostics'),'--binary',
-    path.join(root,'evidence-bin/hvf-intel-real-mode'),'--evidence',evidence,'--mode',mode];
+    path.join(root,'evidence-bin/hvf-intel-real-mode'),'--evidence',evidence,'--mode',mode,
+    '--observation',observation];
   if(await group.start('python3',[helper,'prepare',...args],environment,{timeoutMs:120000}).completion!==0)
     throw new Error('control preparation failed');
   const plan=JSON.parse(fs.readFileSync(path.join(evidence,'plan.json')));
@@ -58,7 +61,7 @@ async function main() {
         verified:!error&&verifyIdentity(stdout,pid,parent,binary)}));
   });
   try {
-    const status=await observe(operation,{evidence,plan,identity,signal:group.signal,
+    const status=await executeObserved(operation,{evidence,plan,identity,signal:group.signal,
       upload:(folder,seq)=>upload(folder,`progress-${String(seq).padStart(3,'0')}`)});
     if(status!==0) throw new Error(`independent native control failed: ${status}`);
   } finally {

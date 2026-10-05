@@ -1,5 +1,5 @@
 name: Independent finite Intel HVF API lifecycle
-run-name: Independent HVF / ${{ inputs.mode }} / 1000 iterations / ${{ inputs.intel-image }}
+run-name: Independent HVF / ${{ inputs.mode }} / ${{ inputs.observation }} / 1000 iterations / ${{ inputs.intel-image }}
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +13,11 @@ on:
         type: choice
         default: vcpu
         options: [vcpu, vm]
+      observation:
+        description: Live snapshots/uploads or final evidence after native retirement
+        type: choice
+        default: live
+        options: [live, final-only]
 permissions:
   contents: read
 jobs:
@@ -46,6 +51,7 @@ jobs:
           python3 harness/scripts/test_intel_api_lifecycle.py -q
           HVF_TEST_DIAGNOSTICS="$GITHUB_WORKSPACE/diagnostics" python3 harness/scripts/test_upstream_hvf_control.py -q
           node --test harness/.github/actions/intel-api-control/snapshot.test.cjs
+          node --test harness/.github/actions/intel-api-control/observation.test.cjs
           mkdir -p evidence-bin
           clang -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined \
             harness/native/test_hvf_lifecycle.c -o evidence-bin/resource-contract
@@ -59,7 +65,7 @@ jobs:
           codesign --verify --strict evidence-bin/hvf-intel-real-mode
           codesign -d --entitlements :- evidence-bin/hvf-intel-real-mode
           test "$(lipo -archs evidence-bin/hvf-intel-real-mode)" = x86_64
-      - name: Run independent finite API control with bounded live evidence
+      - name: Run independent finite API control with bounded evidence
         id: control
         # 120s prepare + 120s plan upload + 690s controller + 120s in-flight
         # upload + host collection/retirement headroom. Native budget is 600s.
@@ -67,6 +73,7 @@ jobs:
         uses: ./harness/.github/actions/intel-api-control
         with:
           mode: ${{ inputs.mode }}
+          observation: ${{ inputs.observation }}
       - name: Preserve matching uploader crash reports
         if: always() && (steps.control.outcome == 'failure' || steps.control.outcome == 'cancelled')
         timeout-minutes: 1
