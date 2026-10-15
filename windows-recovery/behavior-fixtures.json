@@ -1,0 +1,1097 @@
+{
+  "authored_fixtures_only": true,
+  "fixtures": {
+    "{{H}}/.claude/settings.json": {
+      "model": "claude-sonnet-4-5-20250929"
+    },
+    "{{W}}/.claude/settings.json": {
+      "model": "claude-sonnet-5"
+    },
+    "{{W}}/.claude/settings.local.json": {
+      "model": "claude-sonnet-5-5"
+    },
+    "{{F}}/flag.json": {
+      "model": "claude-opus-5-5"
+    },
+    "{{F}}/ask-write.json": {
+      "permissions": {
+        "ask": [
+          "Write"
+        ]
+      }
+    },
+    "{{W}}/input.txt": "fixture-input\n",
+    "{{R}}/sibling/outside.txt": "outside-fixture-token\n",
+    "{{F}}/mcp.json": {
+      "mcpServers": {
+        "fixture": {
+          "type": "stdio",
+          "command": "{{HELPER}}",
+          "args": [
+            "--mcp-echo",
+            "--log",
+            "{{R}}/helper-log/mcp.jsonl"
+          ],
+          "alwaysLoad": true
+        }
+      }
+    },
+    "{{F}}/mcp-fail.json": {
+      "mcpServers": {
+        "fixture": {
+          "type": "stdio",
+          "command": "{{HELPER}}",
+          "args": [
+            "--mcp-fail"
+          ],
+          "alwaysLoad": true
+        }
+      }
+    },
+    "{{F}}/hooks-observe.json": {
+      "hooks": {
+        "SessionStart": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "observe",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2
+              }
+            ]
+          }
+        ],
+        "UserPromptSubmit": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "observe",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2
+              }
+            ]
+          }
+        ],
+        "PreToolUse": [
+          {
+            "matcher": "Read",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "observe",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Read",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "observe",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "matcher": "",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "observe",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "{{F}}/hooks-deny.json": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "deny",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "{{F}}/hooks-fail-closed.json": {
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Write",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "{{HELPER}}",
+                "args": [
+                  "--hook",
+                  "invalid-json",
+                  "--log",
+                  "{{R}}/helper-log/hooks.jsonl"
+                ],
+                "timeout": 2,
+                "onFailure": "block"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "cases": [
+    {
+      "id": "P01",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "allow",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--allowedTools",
+            "Write",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        },
+        {
+          "id": "deny_wins",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--allowedTools",
+            "Write",
+            "--disallowedTools",
+            "Write",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "P02",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "ask_none",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--settings",
+            "{{F}}/ask-write.json",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "P03",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "deny",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "host",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--settings",
+            "{{F}}/ask-write.json",
+            "--permission-prompt-tool",
+            "stdio",
+            "--input-format",
+            "stream-json"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        },
+        {
+          "id": "allow",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "host",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--settings",
+            "{{F}}/ask-write.json",
+            "--permission-prompt-tool",
+            "stdio",
+            "--input-format",
+            "stream-json"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "P04",
+      "capability": "LOOPBACK+OUTSIDE_FIXTURE_READ",
+      "variants": [
+        {
+          "id": "outside_denied",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Read",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--restricted",
+            "--allowedTools",
+            "Read",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Read",
+              "input": {
+                "file_path": "{{R}}/sibling/outside.txt"
+              }
+            }
+          }
+        },
+        {
+          "id": "add_dir_allowed",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Read",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--restricted",
+            "--add-dir",
+            "{{R}}/sibling",
+            "--allowedTools",
+            "Read",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Read",
+              "input": {
+                "file_path": "{{R}}/sibling/outside.txt"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "H01",
+      "capability": "LOOPBACK+HELPER",
+      "variants": [
+        {
+          "id": "observe",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Read",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--settings",
+            "{{F}}/hooks-observe.json",
+            "--include-hook-events",
+            "--allowedTools",
+            "Read",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Read",
+              "input": {
+                "file_path": "{{W}}/input.txt"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "H02",
+      "capability": "LOOPBACK+HELPER",
+      "variants": [
+        {
+          "id": "deny",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--settings",
+            "{{F}}/hooks-deny.json",
+            "--include-hook-events",
+            "--allowedTools",
+            "Write",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "H03",
+      "capability": "LOOPBACK+HELPER",
+      "variants": [
+        {
+          "id": "invalid_json_block",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "Write",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--settings",
+            "{{F}}/hooks-fail-closed.json",
+            "--include-hook-events",
+            "--allowedTools",
+            "Write",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "Write",
+              "input": {
+                "file_path": "{{W}}/created.txt",
+                "content": "fixture-write\n"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "M01",
+      "capability": "LOOPBACK+HELPER",
+      "variants": [
+        {
+          "id": "echo",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{{F}}/mcp.json",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--allowedTools",
+            "mcp__fixture__echo",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "tool_then_text",
+            "tool": {
+              "name": "mcp__fixture__echo",
+              "input": {
+                "text": "mcp-fixture-token"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "M02",
+      "capability": "HELPER",
+      "variants": [
+        {
+          "id": "exit_2",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{{F}}/mcp-fail.json",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--input-format",
+            "stream-json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "J01",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "fragment_replay",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--replay-user-messages",
+            "--include-partial-messages",
+            "--input-format",
+            "stream-json"
+          ],
+          "stub": {
+            "kind": "fragmented_text",
+            "text": "fixture-\u03b1-\u5b8c\u6210",
+            "split": "SSE frame and UTF-8 codepoint boundaries"
+          }
+        }
+      ]
+    },
+    {
+      "id": "J02",
+      "capability": "LOCAL",
+      "variants": [
+        {
+          "id": "bad_json",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--input-format",
+            "stream-json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "J03",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "http_400",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--",
+            "fixture prompt"
+          ],
+          "stub": {
+            "kind": "http_error",
+            "status": 400,
+            "body": {
+              "type": "error",
+              "error": {
+                "type": "invalid_request_error",
+                "message": "offline fixture error"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "T01",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "create",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--",
+            "remember fixture-session-token"
+          ],
+          "stub": {
+            "kind": "text",
+            "text": "fixture-first-reply"
+          }
+        },
+        {
+          "id": "resume",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--resume",
+            "00000000-0000-4000-8000-000000000001",
+            "--",
+            "resume fixture"
+          ],
+          "stub": {
+            "kind": "text",
+            "text": "fixture-resume-reply"
+          }
+        },
+        {
+          "id": "fork",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--resume",
+            "00000000-0000-4000-8000-000000000001",
+            "--fork-session",
+            "--",
+            "fork fixture"
+          ],
+          "stub": {
+            "kind": "text",
+            "text": "fixture-fork-reply"
+          }
+        }
+      ]
+    },
+    {
+      "id": "T02",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "ephemeral",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--no-session-persistence",
+            "--",
+            "ephemeral-fixture-token"
+          ],
+          "stub": {
+            "kind": "text",
+            "text": "fixture-ephemeral-reply"
+          }
+        },
+        {
+          "id": "resume_missing",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--resume",
+            "00000000-0000-4000-8000-000000000001",
+            "--",
+            "must not start a new session"
+          ],
+          "stub": {
+            "kind": "forbid_all_requests"
+          }
+        }
+      ]
+    },
+    {
+      "id": "T03",
+      "capability": "LOOPBACK",
+      "variants": [
+        {
+          "id": "interrupt",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--model",
+            "claude-sonnet-5",
+            "--session-id",
+            "00000000-0000-4000-8000-000000000001",
+            "--include-partial-messages",
+            "--input-format",
+            "stream-json"
+          ],
+          "stub": {
+            "kind": "hold_after_text_delta",
+            "text": "fixture-start",
+            "maximum_hold_seconds": 5
+          }
+        }
+      ]
+    }
+  ]
+}

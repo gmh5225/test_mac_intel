@@ -11,6 +11,7 @@ import urllib.request
 import uuid
 from configuration_acceptance import accept_configuration
 from native_acceptance import accept_native
+from behavior_acceptance import accept_behavior
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -126,11 +127,12 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         failures = []
         for name, action in [
             ("native", lambda: accept_native(arch, out, bun, compiler, compiler_env, clean_env, run)),
-            ("configuration", lambda: accept_configuration(out, original, builds[0], clean_env))]:
+            ("configuration", lambda: accept_configuration(out, original, builds[0], clean_env)),
+            ("behavior", lambda: accept_behavior(out, original, builds[0], clean_env))]:
             try: receipt[name] = action()
             except Exception as error: failures.append({"step": name, "error": str(error)})
         assert not failures, failures
-        receipt.update(status="smoke_configuration_and_native_load_pass", full_behavior_matrix="pending")
+        receipt.update(status="windows_offline_acceptance_pass", full_behavior_matrix="29 cases match", smoke_cases=4)
         return receipt
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise

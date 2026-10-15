@@ -121,6 +121,12 @@ int wmain(int argc,wchar_t **argv) try {
     writableLabel(root/name);
   }
   writableLabel(redirectedTemp);
+  if(fs::is_directory(root/L"sibling"))
+    grant(root/L"sibling",profile.sid,FILE_GENERIC_READ|FILE_GENERIC_EXECUTE,SUB_CONTAINERS_AND_OBJECTS_INHERIT);
+  if(fs::is_directory(root/L"helper-log")) {
+    grant(root/L"helper-log",profile.sid,FILE_ALL_ACCESS,SUB_CONTAINERS_AND_OBJECTS_INHERIT);
+    writableLabel(root/L"helper-log");
+  }
   SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
   Handle input;
   if(interactive) {

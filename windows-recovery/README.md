@@ -20,12 +20,28 @@ Only after those controls pass does the runner download the published,
 hash-pinned Windows package, extract source and assets with a helper checked
 against NeverD's manifests, and rebuild with the independent pinned runtime.
 Two native builds must match each other and the local cross-build. All 2,586
-module rows are read back before three original/rebuilt smoke cases run in
+module rows are read back before four original/rebuilt smoke cases run in
 fresh AppContainers. No original prefix, bytecode, or prelinked cache is reused.
+
+The remaining suite compares seven configuration cases and 22 offline behavior
+cases covering tool permissions, hooks, MCP, fragmented protocol messages,
+session persistence and interruption. An authored loopback server supplies
+fixed responses; every request uses a dummy credential. Its per-profile
+loopback exemption is separately qualified against a reachable external TCP
+peer, preserves existing exemptions, and is removed after descendant collection.
+It allows loopback traffic across ports; it does not grant internet capabilities.
+The implementation follows the Windows
+[configuration APIs](https://learn.microsoft.com/en-us/windows/win32/api/netfw/nf-netfw-networkisolationsetappcontainerconfig).
+
+An authored Node-API module must load before the retained audio addon is
+inspected. Retained exports are enumerated but never invoked. Materialized
+native bytes must match the pinned input asset.
 
 Only diagnostics under `windows-evidence/evidence` are uploaded. Captured
 source, original executables and rebuilt executables stay in the disposable
 runner workspace. The full offline behavior matrix and retained native-addon
-checks remain separate acceptance steps; smoke checks do not close the goal.
+checks have separate receipts. Only a passing full workflow establishes these
+bounded acceptance results; no live model service, recording device or complete
+semantic equivalence is claimed.
 
 The existing Intel HVF workflows are unrelated and retain their current state.

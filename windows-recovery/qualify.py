@@ -13,6 +13,7 @@ import zipfile
 from appcontainer_qualification import qualify_appcontainer
 from client_acceptance import accept_client
 from loopback_qualification import qualify_loopback
+from helper_qualification import qualify_helpers
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -143,9 +144,11 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
         receipt["loopback_qualification"] = qualify_loopback(out, bun, clean_env, run)
+        receipt["helper_qualification"] = qualify_helpers(out, bun, clean_env, run)
+        receipt.update(authored_inputs_only=False, scope="Authored environment qualified; published client acceptance in progress.")
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
-        receipt.update(status="windows_client_configuration_and_native_accepted",
-                       scope="Qualified authored environment, four smoke, seven configuration cases and native load-only. Remaining offline behavior matrix is pending.")
+        receipt.update(status="windows_offline_acceptance_pass",
+                       scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases and native load-only. No live model service or device exports tested.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:

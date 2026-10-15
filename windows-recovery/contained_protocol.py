@@ -56,7 +56,12 @@ class ContainedProtocol:
 
     def retain(self):
         if self.process.poll() is None:
-            self.process.kill(); self.process.wait(timeout=10)
+            if not self.process.stdin.closed: self.process.stdin.close()
+            # Let the bounded launcher collect descendants and remove its
+            # per-profile loopback grant even when a protocol assertion fails.
+            try: self.process.wait(timeout=50)
+            except subprocess.TimeoutExpired:
+                self.process.kill(); self.process.wait(timeout=10)
         for stream in ["stdout", "stderr"]:
             path = self.logs / (self.name + "-launcher." + stream)
             if not path.exists(): path.write_bytes(getattr(self.process, stream).read(65536))
