@@ -1,4 +1,4 @@
-name: NeverD source patch documentation at 477e0d721
+name: NeverD source patch documentation at 93c4142b1
 on:
   workflow_dispatch:
   push:
@@ -12,14 +12,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      FORMAT_BASE: 324f1d5f2e14bdff8d55312bc6ba0f9600c27a81
-      FORMAT_HEAD: 477e0d72105b65d3fbca308fcbf29e22b1b87bb1
+      FORMAT_BASE: 29eac30f9c7de1d25f49d044e8dd5bdfc258838c
+      FORMAT_HEAD: 93c4142b14c455f80ec6c76d224c8e3186b2afeb
     steps:
       - name: Check out the exact published NeverD documentation
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: NeverSight/NeverD
-          ref: 477e0d72105b65d3fbca308fcbf29e22b1b87bb1
+          ref: 93c4142b14c455f80ec6c76d224c8e3186b2afeb
           fetch-depth: 2
           persist-credentials: false
           submodules: false
@@ -67,6 +67,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: neverd-docs-477e0d721-${{ github.sha }}
+          name: neverd-docs-93c4142b1-${{ github.sha }}
           path: docs-evidence
           if-no-files-found: error
