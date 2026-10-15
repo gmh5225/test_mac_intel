@@ -58,6 +58,9 @@ chroot on the ARM64 host's kernel compatibility layer. Its separate 90-second
 result is setup evidence and counts as zero patch observations. The prepared
 registry is then placed in the guest; the guest still requires a successful
 90-second Wine initialization and all 30 PE launches under its ARM32 kernel.
+A persistent guest wineserver starts before initialization so short test
+processes share one runtime session. Each measured launch retains its original
+20-second deadline; the final run's longest Wine launch was 3.6 seconds.
 
 Darling and touchHLE archives are pinned by release and SHA256. Debian's actual
 package versions, guest kernel/initrd hashes, QEMU command line, CPU state,
@@ -66,3 +69,35 @@ historical evidence rather than qualified runs. This workflow does not resume
 the repository's unrelated suspended Intel HVF experiments.
 
 See NOTICE, APPLE_LICENSE, and the root LICENSE for provenance and terms.
+
+## Qualified runs and independent audit
+
+All 216 observations passed: [Linux and Wine run 38773830274](https://github.com/gmh5225/test_mac_intel/actions/runs/38773830274)
+and [Darling and touchHLE run 38771214358](https://github.com/gmh5225/test_mac_intel/actions/runs/38771214358).
+`qualified-runs.json` records the exact harness and producer commits, artifact
+IDs, sizes, SHA256 digests, and the counts for 72 images and 66 publication receipts.
+It preserves the distinction between the historical ELF producer and the new
+PE and Mach-O producers. Earlier failing attempts are not qualification.
+
+`audit_artifacts.py` independently checks downloaded GitHub artifacts against
+the input bytes at each exact harness commit. It rejects incomplete jobs,
+skipped steps, missing or duplicated observations, changed return values,
+wrong architecture or execution commands, mismatched image/source/receipt
+hashes, and incorrect native/OS qualification labels. Clone this repository
+with the qualified commits available, download the original ZIP without
+repacking it, and save the corresponding GitHub jobs and artifact metadata.
+For example, from the repository root:
+
+```sh
+gh api repos/gmh5225/test_mac_intel/actions/runs/38773830274/jobs > jobs.json
+gh api repos/gmh5225/test_mac_intel/actions/runs/38773830274/artifacts > artifacts.json
+gh api repos/gmh5225/test_mac_intel/actions/artifacts/11992169208/zip > linux.zip
+python3 emulated32/audit_artifacts.py --mode linux --repository . \
+  --jobs jobs.json --metadata artifacts.json --archive linux.zip \
+  --run 38773830274 --commit c4f514ebd41eff19cd178f8fa55cc5de40a92d8e \
+  --output linux-audit.json
+```
+
+Use `--mode darling` or `--mode touchhle` with the Apple run and the respective
+artifact and harness identity from `qualified-runs.json`. Auditing does not
+execute an image and cannot itself establish runtime or native coverage.

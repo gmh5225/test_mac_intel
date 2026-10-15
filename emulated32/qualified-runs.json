@@ -1,0 +1,120 @@
+{
+  "schema": "neverd.emulated32.qualification.v1",
+  "complete": true,
+  "observations": 216,
+  "images": 72,
+  "publication_receipts": 66,
+  "runs": [
+    {
+      "schema": "neverd.emulated32.independent-audit.v1",
+      "complete": true,
+      "mode": "linux",
+      "run_id": 38773830274,
+      "job_id": 116556209771,
+      "harness_commit": "c4f514ebd41eff19cd178f8fa55cc5de40a92d8e",
+      "source_commits": {
+        "linux-arm32": "fcee81c9a5e2f20a71090ade23ae833175f64c59",
+        "pe-arm32-wine": "a542f97ba769623d7b0f6f6c99d03c5a2cb1a0e8"
+      },
+      "artifact": {
+        "id": 11992169208,
+        "name": "emulated32-linux-c4f514ebd41eff19cd178f8fa55cc5de40a92d8e",
+        "size_in_bytes": 786265,
+        "digest": "sha256:3312f67e7228aa8383957b646e84a1fa767950f8b261d577d44dea6eb89d35ee"
+      },
+      "observations": 126,
+      "images": 42,
+      "publication_receipts": 39,
+      "source_evidence_files": 29,
+      "profiles": {
+        "linux-arm32": 96,
+        "pe-arm32-wine": 30
+      },
+      "native_hardware_qualification": false,
+      "microsoft_windows_qualification": false,
+      "apple_os_qualification": false,
+      "watchos_runtime_qualification": false
+    },
+    {
+      "schema": "neverd.emulated32.independent-audit.v1",
+      "complete": true,
+      "mode": "darling",
+      "run_id": 38771214358,
+      "job_id": 116547209905,
+      "harness_commit": "1af1cece405c0df8c2eaa125dc5865ddba334ae3",
+      "source_commits": {
+        "macos-i386": "8f5f06762d0a811860e78f0ad0ab1dd96d923b98"
+      },
+      "artifact": {
+        "id": 11990898940,
+        "name": "darling-i386-1af1cece405c0df8c2eaa125dc5865ddba334ae3",
+        "size_in_bytes": 8248,
+        "digest": "sha256:f4acc938724d87fefac167955ca27ac5a5fa7e5a9df489217d21cea47514ced3"
+      },
+      "observations": 30,
+      "images": 10,
+      "publication_receipts": 9,
+      "source_evidence_files": 33,
+      "profiles": {
+        "macos-i386": 30
+      },
+      "native_hardware_qualification": false,
+      "microsoft_windows_qualification": false,
+      "apple_os_qualification": false,
+      "watchos_runtime_qualification": false
+    },
+    {
+      "schema": "neverd.emulated32.independent-audit.v1",
+      "complete": true,
+      "mode": "touchhle",
+      "run_id": 38771214358,
+      "job_id": 116547209985,
+      "harness_commit": "1af1cece405c0df8c2eaa125dc5865ddba334ae3",
+      "source_commits": {
+        "ios-armv7": "8f5f06762d0a811860e78f0ad0ab1dd96d923b98",
+        "watchos-armv7k": "8f5f06762d0a811860e78f0ad0ab1dd96d923b98"
+      },
+      "artifact": {
+        "id": 11992051379,
+        "name": "touchhle-arm32-1af1cece405c0df8c2eaa125dc5865ddba334ae3",
+        "size_in_bytes": 5111,
+        "digest": "sha256:a0d093cfeeac32741628fe3a78b259b65a677affc41c6c69d72cb7eac267e42e"
+      },
+      "observations": 60,
+      "images": 20,
+      "publication_receipts": 18,
+      "source_evidence_files": 62,
+      "profiles": {
+        "ios-armv7": 30,
+        "watchos-armv7k": 30
+      },
+      "native_hardware_qualification": false,
+      "microsoft_windows_qualification": false,
+      "apple_os_qualification": false,
+      "watchos_runtime_qualification": false
+    }
+  ],
+  "engine_provenance": [
+    {
+      "source_commit": "a542f97ba769623d7b0f6f6c99d03c5a2cb1a0e8",
+      "engine_source_digest": "3f493dcf25fca9c76240fe1a4c187623a078d9e060e03aba0e32b1289bf5217e",
+      "git_tree_files": 3427,
+      "verified": true
+    },
+    {
+      "source_commit": "8f5f06762d0a811860e78f0ad0ab1dd96d923b98",
+      "engine_source_digest": "ababc6e69cdf293ad0d3c4288cdbf0d773b5710a6eb4fa9d37664519f45ee69b",
+      "git_tree_files": 3427,
+      "verified": true
+    }
+  ],
+  "limitations": [
+    "Full Linux system execution uses QEMU TCG, not a native ARM32 host.",
+    "Wine is not Microsoft Windows; Darling is not macOS.",
+    "touchHLE ARMv7k C execution does not qualify the watchOS runtime or WatchKit.",
+    "No old Apple SDK or physical Apple device execution was established.",
+    "These supplementary process checks do not qualify C++ exception unwinding."
+  ],
+  "neverc_changed": false,
+  "neverc_built": false
+}
