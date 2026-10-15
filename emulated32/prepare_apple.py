@@ -55,12 +55,20 @@ for profile,triple,arch,platform,cpu,subtype in profiles:
     # to form the import-only interface; its code is never used by the tests.
     run([linker,'-arch',arch,'-dylib',*platform,'-install_name','/usr/lib/system/libsystem_kernel.dylib',d/'link-only-stub.o','-o',d/'link-only-libSystem.dylib'],'stub-link')
     run([name_tool,'-id','/usr/lib/libSystem.B.dylib',d/'link-only-libSystem.dylib'],'stub-id')
+    # LC_UNIXTHREAD enters at a raw process stack, not via a C call. Supply
+    # the Darwin i386 startup alignment before entering the ordinary C main.
+    entry_symbol='_main';startup=[]
+    if arch=='i386':
+        entry_symbol='_start'
+        (d/'startup.s').write_text('.text\n.globl _start\n.p2align 4, 0x90\n_start:\n  xorl %ebp, %ebp\n  andl $-16, %esp\n  calll _main\n  ud2\n')
+        run([clang,'--target='+triple,'-c',d/'startup.s','-o',d/'startup.o'],'startup-compile')
+        startup=[d/'startup.o']
     original=d/'original'
     # Linux's normal low-address protection also applies to Darling processes.
     # Link the real i386 input above that limit rather than weakening the host.
     address_flags=['-pagezero_size','0x10000'] if arch=='i386' else []
     (d/'padding-end.bin').write_bytes(b'\0')
-    run([linker,'-arch',arch,*platform,*address_flags,'-e','_main','-headerpad','0x2000','-segalign','0x4000','-sectcreate','__TEXT','__patch_end',d/'padding-end.bin','-sectalign','__TEXT','__patch_end','0x4000','-sectalign','__TEXT','__eh_frame','0x4000','-sectalign','__TEXT','__unwind_info','0x4000','-section_order','__TEXT','__text:__symbol_stub:__stubs:__stub_helper:__unwind_info:__eh_frame:__patch_end',d/'original.o',d/'link-only-libSystem.dylib','-o',original],'original-link')
+    run([linker,'-arch',arch,*platform,*address_flags,'-e',entry_symbol,'-headerpad','0x2000','-segalign','0x4000','-sectcreate','__TEXT','__patch_end',d/'padding-end.bin','-sectalign','__TEXT','__patch_end','0x4000','-sectalign','__TEXT','__eh_frame','0x4000','-sectalign','__TEXT','__unwind_info','0x4000','-section_order','__TEXT','__text:__symbol_stub:__stubs:__stub_helper:__unwind_info:__eh_frame:__patch_end',d/'original.o',*startup,d/'link-only-libSystem.dylib','-o',original],'original-link')
     session=host.function('neverd_session_create')();addresses={}
     try:
         assert host.function('neverd_session_load')(session,os.fsencode(original))==1,host.owned_string('neverd_last_error',session)

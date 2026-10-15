@@ -44,7 +44,9 @@ and transactional publication checks remain enabled.
 `link-only-libSystem.dylib` is a symbol interface built from the included C
 stub solely for linking. It must never be installed in a runtime search path.
 The i386 link reserves a 64 KiB page-zero segment so Darling can map it under
-Linux's standard low-address protection. Darling or touchHLE supplies the actual exit implementation. No Apple SDK is
+Linux's standard low-address protection. Its real `_start` assembly entry
+aligns the raw process stack before calling C `main`; `LC_UNIXTHREAD` does not
+call `main` using the C calling convention. Darling or touchHLE supplies the actual exit implementation. No Apple SDK is
 used to link these probes, and SDK qualification is explicitly false. Clang's
 automatically selected host sysroot during header-free source compilation does
 not constitute availability of an old Apple SDK. The ARMv7k probe uses an
