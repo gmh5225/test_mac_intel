@@ -69,7 +69,7 @@ def accept_configuration(out, original, rebuilt, clean_env):
                         "stderr": (logs / (name + ".stderr")).read_text(encoding="utf-8"), "exit_code": execution["exit_code"]})
                     # Keep the allowlisted fields and each bijective identity mapping reviewable.
                     records.append({"label": label, "execution": execution, "fixture_inputs_preserved": True,
-                        "normalization": {"ids": normalizer.ids, "devices": normalizer.devices, "fields": normalizer.audit}})
+                        "normalization": {"ids": normalizer.ids, "devices": normalizer.devices, "pipes": normalizer.pipes, "fields": normalizer.audit}})
                     observations.append(observation)
                     (logs / (name + ".normalized.json")).write_text(json.dumps(observation, indent=2) + "\n", encoding="utf-8")
                 diff = differences(*observations)

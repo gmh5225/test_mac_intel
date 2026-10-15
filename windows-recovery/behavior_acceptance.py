@@ -126,7 +126,7 @@ def accept_behavior(out, original, rebuilt, clean_env):
                     observed = normalizer.value({"protocol_frames": frames, "api_request_bodies": [r["body"] for r in server.requests] if server else [],
                         "stderr": (report / "client.stderr").read_text(encoding="utf-8"), "exit_code": execution["exit_code"]})
                     row = {"case": name, "label": label, "execution": execution, "errors": errors,
-                        "normalization": {"ids": normalizer.ids, "devices": normalizer.devices, "fields": normalizer.audit},
+                        "normalization": {"ids": normalizer.ids, "devices": normalizer.devices, "pipes": normalizer.pipes, "fields": normalizer.audit},
                         "before": before, "after": {p: tree_files(root / p) for p in before}}
                     (report / "receipt.json").write_text(json.dumps(row, indent=2) + "\n", encoding="utf-8")
                     (report / "normalized.json").write_text(json.dumps(observed, indent=2) + "\n", encoding="utf-8")
