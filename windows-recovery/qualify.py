@@ -10,6 +10,7 @@ import struct
 import subprocess
 import urllib.request
 import zipfile
+from appcontainer_qualification import qualify_appcontainer
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -79,6 +80,18 @@ def main():
         observed = json.loads(run("runtime-platform", [bun, "--eval", "console.log(JSON.stringify({platform:process.platform,arch:process.arch}))"]))
         assert observed == {"platform": "win32", "arch": args.arch}, observed
         receipt["runtime"]["revision"] = revision
+        # Observe entry metadata from Bun's own unmodified compiler first.
+        control = out / "main-control"; control.mkdir()
+        (control / "entry.mjs").write_text(
+            'console.log(JSON.stringify({main:import.meta.main,url:import.meta.url,bunMain:Bun.main}));\n', encoding="utf-8")
+        (control / "build.mjs").write_text(
+            'const r=await Bun.build({entrypoints:["./entry.mjs"],target:"bun",env:"disable",macros:false,minify:false,'
+            'compile:{outfile:"./control.exe",executablePath:process.execPath}});'
+            'if(!r.success){console.error(r.logs);process.exit(1);}\n', encoding="utf-8")
+        run("build-main-control", [bun, control / "build.mjs"], cwd=control, timeout=120)
+        main_control = json.loads(run("main-control", [control / "control.exe"]))
+        assert type(main_control["main"]) is bool, main_control
+        receipt["unmodified_compiler_entry_control"] = main_control
         for name in ["raw-graph-windows-adapter", "graph-fidelity-windows-adapter", "graph-fidelity-windows-fixture-generator"]:
             run("compile-" + name, [compiler, "/nologo", "/std:c++20", "/EHsc", "/O2", ROOT / (name + ".cpp"),
                 "/Fe:" + str(out / (name + ".exe")), "/link", "bcrypt.lib"], env=compiler_env, timeout=120)
@@ -108,8 +121,9 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
             "first_difference_context": [data[max(0, different[0]-32):different[0]+96].hex()
                 for data in [first, second]] if different else []})
         observed = json.loads(run("source-graph-runtime", [clients[0]], cwd=state / "work"))
-        assert observed["ok"] and observed["sharedIdentity"] and observed["liveBinding"] == 2
-        assert observed["worker"] == "000102ff" and observed["main"] is True
+        assert observed["ok"] and observed["sharedIdentity"] and observed["liveBinding"] == 2, observed
+        assert observed["worker"] == "000102ff", observed
+        assert observed["main"] == main_control["main"], (observed, main_control)
         assert observed["bootstrapMain"] == "B:/~BUN/root/cli", observed
         assert observed["opaqueNativeBytes"] == "01020304", observed
         second_observed = json.loads(run("source-graph-runtime-repeat", [clients[1]], cwd=state / "work"))
@@ -118,6 +132,13 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt.update(status="authored_graph_runtime_qualified", native_runtime=observed,
             independent_build_sha256=sha(clients[0]), runtime_preserved=sha(bun) == exe_sha,
             scope="Authored loader/text/module/worker graph only. No original client or native addon executed; no OS sandbox claim.")
+        run("compile-appcontainer-run", [compiler, "/nologo", "/std:c++20", "/EHsc", "/O2", "/MT",
+            "/D_WIN32_WINNT=0x0A00", ROOT / "appcontainer-run.cpp", "/Fe:" + str(out / "appcontainer-run.exe"),
+            "/link", "userenv.lib", "advapi32.lib"], env=compiler_env, timeout=120)
+        receipt["isolation"] = qualify_appcontainer(out / "appcontainer-run.exe", bun, clients[0], observed,
+                                                  clean_env, logs, run)
+        receipt.update(status="authored_windows_environment_qualified",
+                       scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:
