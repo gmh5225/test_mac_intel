@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <netfw.h>
 namespace fs = std::filesystem;
 void need(bool ok, const char *what) {
   if (!ok) throw std::runtime_error(std::string(what) + ": " + std::to_string(GetLastError()));
@@ -47,6 +48,31 @@ struct Profile {
   std::wstring name;PSID sid=nullptr;
   ~Profile(){if(sid){FreeSid(sid);DeleteAppContainerProfile(name.c_str());}}
 };
+// Preserve other profiles and remove only this run's temporary exemption.
+struct LoopbackPermission {
+  PSID sid; bool active=false;
+  void change(bool allow) {
+    const auto library=LoadLibraryExW(L"FirewallAPI.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
+    need(library!=nullptr,"system FirewallAPI");
+    using Get=DWORD(WINAPI *)(DWORD *,PSID_AND_ATTRIBUTES *);
+    using Set=DWORD(WINAPI *)(DWORD,PSID_AND_ATTRIBUTES);
+    const auto get=reinterpret_cast<Get>(GetProcAddress(library,"NetworkIsolationGetAppContainerConfig"));
+    const auto setConfig=reinterpret_cast<Set>(GetProcAddress(library,"NetworkIsolationSetAppContainerConfig"));
+    if(!get||!setConfig){FreeLibrary(library);throw std::runtime_error("loopback isolation API unavailable");}
+    DWORD count=0;PSID_AND_ATTRIBUTES prior=nullptr;auto result=get(&count,&prior);
+    if(result!=ERROR_SUCCESS){FreeLibrary(library);checkCode(result,"read loopback exemptions");}
+    std::vector<SID_AND_ATTRIBUTES> updated;
+    for(DWORD i=0;i<count;i++)if(!EqualSid(prior[i].Sid,sid))updated.push_back(prior[i]);
+    if(allow)updated.push_back({sid,0});
+    result=setConfig(static_cast<DWORD>(updated.size()),updated.empty()?nullptr:updated.data());
+    for(DWORD i=0;i<count;i++)HeapFree(GetProcessHeap(),0,prior[i].Sid);
+    HeapFree(GetProcessHeap(),0,prior);FreeLibrary(library);
+    checkCode(result,allow?"enable task loopback":"remove task loopback");
+  }
+  void enable(){change(true);active=true;}
+  void close(){if(active){change(false);active=false;}}
+  ~LoopbackPermission(){if(active)try{close();}catch(const std::exception&e){std::cerr<<e.what()<<'\n';}}
+};
 void writableLabel(const fs::path &path) {
   PSECURITY_DESCRIPTOR descriptor=nullptr;
   need(ConvertStringSecurityDescriptorToSecurityDescriptorW(L"S:(ML;OICI;NW;;;LW)",
@@ -61,8 +87,15 @@ int wmain(int argc,wchar_t **argv) try {
   need(argc>=5,"stage profile deadline-ms executable [args]");
   const auto root=fs::canonical(argv[1]);
   const auto deadline=std::stoul(argv[3]);need(deadline>0&&deadline<=60000,"deadline");
-  const bool interactive=std::wstring(argv[4])==L"--interactive";
-  const int exeIndex=interactive?5:4;need(argc>exeIndex,"executable argument");
+  bool interactive=false,loopback=false;int exeIndex=4;
+  while(exeIndex<argc) {
+    const std::wstring option=argv[exeIndex];
+    if(option==L"--interactive"){need(!interactive,"duplicate stdin option");interactive=true;}
+    else if(option==L"--loopback"){need(!loopback,"duplicate loopback option");loopback=true;}
+    else break;
+    ++exeIndex;
+  }
+  need(argc>exeIndex,"executable argument");
   const std::wstring filename=argv[exeIndex];
   need(filename.find_first_of(L"/\\:")==std::wstring::npos,"executable basename");
   const auto executable=root/L"bin"/filename;
@@ -76,6 +109,7 @@ int wmain(int argc,wchar_t **argv) try {
   const auto profileResult=CreateAppContainerProfile(profile.name.c_str(),L"NeverD fixture",
       L"Disposable capability-free recovery test",nullptr,0,&profile.sid);
   if(FAILED(profileResult))throw std::runtime_error("create AppContainer HRESULT: "+std::to_string(profileResult));
+  LoopbackPermission network{profile.sid};if(loopback)network.enable();
   // Windows redirects TEMP beneath the explicit LOCALAPPDATA supplied by the
   // caller. Prepare that disposable path before applying inherited task ACLs.
   const auto redirectedTemp=root/L"home"/L"Packages"/profile.name/L"AC"/L"Temp";
@@ -157,8 +191,10 @@ int wmain(int argc,wchar_t **argv) try {
     Sleep(25);
   } while(GetTickCount64()-cleanupStarted<5000);
   need(accounting.ActiveProcesses==0,"all contained processes exited");
+  network.close();
   std::cout<<"{\"app_container\":true,\"capability_count\":0,\"exit_code\":"<<code
            <<",\"timeout\":"<<(timeout?"true":"false")<<",\"output_limit\":"<<(outputLimit?"true":"false")
-           <<",\"remaining_processes\":0}\n";
+           <<",\"remaining_processes\":0,\"loopback_exemption\":"<<(loopback?"true":"false")
+           <<",\"loopback_exemption_removed\":true}\n";
   return timeout||outputLimit?124:0;
 } catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 125;}

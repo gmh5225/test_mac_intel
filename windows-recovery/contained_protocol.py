@@ -15,10 +15,10 @@ def matches(frame, fields):
     return True
 
 class ContainedProtocol:
-    def __init__(self, launcher, root, env, executable, argv, logs, name):
+    def __init__(self, launcher, root, env, executable, argv, logs, name, *, loopback=False):
         self.root, self.logs, self.name = root, logs, name
         self.process = subprocess.Popen(list(map(str, [launcher, root, "NeverD.Protocol." + uuid.uuid4().hex,
-            "45000", "--interactive", executable, *argv])), cwd=root / "work", env=env,
+            "45000", "--interactive", *(["--loopback"] if loopback else []), executable, *argv])), cwd=root / "work", env=env,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.metadata = None
 

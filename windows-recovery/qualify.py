@@ -12,6 +12,7 @@ import urllib.request
 import zipfile
 from appcontainer_qualification import qualify_appcontainer
 from client_acceptance import accept_client
+from loopback_qualification import qualify_loopback
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -141,6 +142,7 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                                                   clean_env, logs, run)
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
+        receipt["loopback_qualification"] = qualify_loopback(out, bun, clean_env, run)
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
         receipt.update(status="windows_client_configuration_and_native_accepted",
                        scope="Qualified authored environment, four smoke, seven configuration cases and native load-only. Remaining offline behavior matrix is pending.")
