@@ -19,6 +19,7 @@ p=argparse.ArgumentParser(description=__doc__)
 p.add_argument('--repository',type=Path,required=True)
 p.add_argument('--output',type=Path,required=True)
 p.add_argument('--build',type=Path,required=True)
+p.add_argument('--profile',choices=['all','macos-i386','ios-armv7','watchos-armv7k'],default='all')
 a=p.parse_args(); r=a.repository.resolve(); out=a.output.resolve(); out.mkdir(parents=True,exist_ok=False)
 sys.path.insert(0,str(r));sys.path.insert(0,str(r/'pluginsdk/python'))
 from scripts import check_source_patch_pe_runtime as pe
@@ -42,6 +43,7 @@ profiles=[('macos-i386','i386-apple-macos10.6','i386',['-macosx_version_min','10
           ('ios-armv7','armv7-apple-ios5.0','armv7',['-iphoneos_version_min','5.0'],12,9),
           ('watchos-armv7k','armv7k-apple-watchos2.0','armv7k',['-watchos_version_min','2.0'],12,12)]
 for profile,triple,arch,platform,cpu,subtype in profiles:
+    if a.profile not in ('all',profile):continue
     d=out/profile;d.mkdir(); commands=[]
     def run(cmd, label):
         commands.append([str(x) for x in cmd]); return pe.run(commands[-1],d/(label+'.log'))
@@ -54,8 +56,11 @@ for profile,triple,arch,platform,cpu,subtype in profiles:
     run([linker,'-arch',arch,'-dylib',*platform,'-install_name','/usr/lib/system/libsystem_kernel.dylib',d/'link-only-stub.o','-o',d/'link-only-libSystem.dylib'],'stub-link')
     run([name_tool,'-id','/usr/lib/libSystem.B.dylib',d/'link-only-libSystem.dylib'],'stub-id')
     original=d/'original'
+    # Linux's normal low-address protection also applies to Darling processes.
+    # Link the real i386 input above that limit rather than weakening the host.
+    address_flags=['-pagezero_size','0x10000'] if arch=='i386' else []
     (d/'padding-end.bin').write_bytes(b'\0')
-    run([linker,'-arch',arch,*platform,'-e','_main','-headerpad','0x2000','-segalign','0x4000','-sectcreate','__TEXT','__patch_end',d/'padding-end.bin','-sectalign','__TEXT','__patch_end','0x4000','-sectalign','__TEXT','__eh_frame','0x4000','-sectalign','__TEXT','__unwind_info','0x4000','-section_order','__TEXT','__text:__symbol_stub:__stubs:__stub_helper:__unwind_info:__eh_frame:__patch_end',d/'original.o',d/'link-only-libSystem.dylib','-o',original],'original-link')
+    run([linker,'-arch',arch,*platform,*address_flags,'-e','_main','-headerpad','0x2000','-segalign','0x4000','-sectcreate','__TEXT','__patch_end',d/'padding-end.bin','-sectalign','__TEXT','__patch_end','0x4000','-sectalign','__TEXT','__eh_frame','0x4000','-sectalign','__TEXT','__unwind_info','0x4000','-section_order','__TEXT','__text:__symbol_stub:__stubs:__stub_helper:__unwind_info:__eh_frame:__patch_end',d/'original.o',d/'link-only-libSystem.dylib','-o',original],'original-link')
     session=host.function('neverd_session_create')();addresses={}
     try:
         assert host.function('neverd_session_load')(session,os.fsencode(original))==1,host.owned_string('neverd_last_error',session)
