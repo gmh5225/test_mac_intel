@@ -1,5 +1,5 @@
 """Original/rebuilt permission, hooks, MCP, protocol and session comparisons."""
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import hashlib
 import json
 import os
@@ -105,6 +105,9 @@ def accept_behavior(out, original, rebuilt, clean_env):
                                     permission = transport.wait({"type": "control_request", "request.subtype": "can_use_tool",
                                         "request.tool_name": "Write", "request.tool_use_id": "toolu_offline_fixture_1"})
                                     tool_input = replace(variant["stub"]["tool"]["input"])
+                                    # The Windows client canonicalizes separators before
+                                    # requesting host permission; all other fields stay exact.
+                                    tool_input["file_path"] = str(PureWindowsPath(tool_input["file_path"]))
                                     assert permission["request"]["input"] == tool_input, permission
                                     response = {"behavior": "allow", "updatedInput": tool_input} if variant["id"] == "allow" else {"behavior": "deny", "message": "fixture host denied"}
                                     transport.send({"type": "control_response", "response": {"subtype": "success", "request_id": permission["request_id"], "response": response}})
