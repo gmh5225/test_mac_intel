@@ -142,8 +142,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
-        receipt.update(status="windows_client_configuration_accepted",
-                       scope="Qualified authored environment, four smoke and seven configuration cases. Full behavior matrix and native addon acceptance remain pending.")
+        receipt.update(status="windows_client_configuration_and_native_accepted",
+                       scope="Qualified authored environment, four smoke, seven configuration cases and native load-only. Remaining offline behavior matrix is pending.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:
