@@ -1,0 +1,72 @@
+name: NeverD source patch documentation at 477e0d721
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/neverd-native32-probe]
+    paths:
+      - '.github/workflows/neverd-source-patch-docs.yml'
+permissions:
+  contents: read
+jobs:
+  documentation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      FORMAT_BASE: 324f1d5f2e14bdff8d55312bc6ba0f9600c27a81
+      FORMAT_HEAD: 477e0d72105b65d3fbca308fcbf29e22b1b87bb1
+    steps:
+      - name: Check out the exact published NeverD documentation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: 477e0d72105b65d3fbca308fcbf29e22b1b87bb1
+          fetch-depth: 2
+          persist-credentials: false
+          submodules: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Record the independent harness and source identities
+        shell: bash
+        run: |
+          mkdir docs-evidence
+          python - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+          source = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          parent = subprocess.check_output(['git', 'rev-parse', 'HEAD^'], text=True).strip()
+          assert source == os.environ['FORMAT_HEAD']
+          assert parent == os.environ['FORMAT_BASE']
+          files = subprocess.check_output(['git', 'diff', '--name-only', parent, source], text=True).splitlines()
+          assert len(files) == 11 and all(p.endswith('/source-patching.md') for p in files)
+          report = {'source_commit': source, 'base_commit': parent,
+                    'harness_repository': os.environ['GITHUB_REPOSITORY'],
+                    'harness_commit': os.environ['GITHUB_SHA'],
+                    'run_id': os.environ['GITHUB_RUN_ID'],
+                    'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                    'files': {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in files}}
+          Path('docs-evidence/source.json').write_text(json.dumps(report, indent=2) + '\n')
+          PY
+      - name: Test the documentation checker
+        shell: bash
+        run: python -m unittest scripts.tests.test_check_docs_i18n -q 2>&1 | tee docs-evidence/doc-tests.log
+      - name: Validate the complete documentation and translation inventory
+        shell: bash
+        run: python scripts/check_docs_i18n.py 2>&1 | tee docs-evidence/doc-check.log
+      - name: Install the pinned formatter
+        run: python -m pip install --disable-pip-version-check --no-deps clang-format==22.1.2
+      - name: Test the format checker
+        shell: bash
+        run: python -m unittest scripts.tests.test_check_clang_format -v 2>&1 | tee docs-evidence/format-tests.log
+      - name: Check the exact published diff
+        shell: bash
+        run: |
+          clang-format --version | tee docs-evidence/formatter.log
+          python scripts/check_clang_format.py --base "$FORMAT_BASE" --head "$FORMAT_HEAD" 2>&1 | tee docs-evidence/format-check.log
+      - name: Preserve validation provenance and logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: neverd-docs-477e0d721-${{ github.sha }}
+          path: docs-evidence
+          if-no-files-found: error
