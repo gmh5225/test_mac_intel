@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import platform
+import shutil
 import struct
 import subprocess
 import urllib.request
@@ -43,11 +44,17 @@ def main():
         installation = subprocess.check_output([str(vswhere), "-latest", "-products", "*", "-property", "installationPath"], text=True).strip()
         vcvars = Path(installation) / "VC/Auxiliary/Build/vcvarsall.bat"
         target = "amd64" if args.arch == "x64" else "amd64_arm64"
-        setup = subprocess.run(["cmd.exe", "/d", "/s", "/c", f'""{vcvars}" {target} >nul && set"'], capture_output=True, text=True, timeout=60, check=True)
-        compiler_env = dict(os.environ)
+        setup_file = out / "compiler-environment.cmd"
+        setup_file.write_text(f'@echo off\ncall "{vcvars}" {target} > "{logs / "compiler-setup.log"}" 2>&1\n'
+                             'if errorlevel 1 exit /b %errorlevel%\nset\n', encoding="utf-8")
+        setup = subprocess.run(["cmd.exe", "/d", "/c", str(setup_file)], capture_output=True,
+                               text=True, timeout=90, check=True)
+        compiler_env = {k.upper(): v for k, v in os.environ.items()}
         for line in setup.stdout.splitlines():
             if "=" in line and not line.startswith("="):
-                key, value = line.split("=", 1); compiler_env[key] = value
+                key, value = line.split("=", 1); compiler_env[key.upper()] = value
+        compiler = shutil.which("cl.exe", path=compiler_env["PATH"])
+        assert compiler, "MSVC environment did not provide cl.exe"
         # Target processes receive an explicit environment without Actions credentials.
         state = out / "state"; state.mkdir()
         for name in ["home", "tmp", "work"]: (state / name).mkdir()
@@ -73,7 +80,7 @@ def main():
         assert observed == {"platform": "win32", "arch": args.arch}, observed
         receipt["runtime"]["revision"] = revision
         for name in ["raw-graph-windows-adapter", "graph-fidelity-windows-adapter", "graph-fidelity-windows-fixture-generator"]:
-            run("compile-" + name, ["cl.exe", "/nologo", "/std:c++20", "/EHsc", "/O2", ROOT / (name + ".cpp"),
+            run("compile-" + name, [compiler, "/nologo", "/std:c++20", "/EHsc", "/O2", ROOT / (name + ".cpp"),
                 "/Fe:" + str(out / (name + ".exe")), "/link", "bcrypt.lib"], env=compiler_env, timeout=120)
         fixture = out / "fixture"
         run("generate", [out / "graph-fidelity-windows-fixture-generator.exe", fixture])
