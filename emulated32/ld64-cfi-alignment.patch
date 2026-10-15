@@ -1,0 +1,13 @@
+diff --git a/cctools/ld64/src/ld/ld.cpp b/cctools/ld64/src/ld/ld.cpp
+index 943ce85..c45e3c5 100644
+--- a/cctools/ld64/src/ld/ld.cpp
++++ b/cctools/ld64/src/ld/ld.cpp
+@@ -1138,7 +1138,7 @@ void InternalState::setSectionSizesAndAlignments()
+ 			// but compilers usually make the CFIs pointer sized, so we want whole section
+ 			// to start on pointer sized boundary.
+ 			if ( sect->type() == ld::Section::typeCFI )
+-				sect->alignment = 3;
++				sect->alignment = std::max<uint16_t>(sect->alignment, 3);
+ 			if ( sect->type() == ld::Section::typeTLVDefs )
+ 				this->hasThreadLocalVariableDefinitions = true;
+ 		}
