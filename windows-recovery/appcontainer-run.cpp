@@ -48,6 +48,32 @@ struct Profile {
   std::wstring name;PSID sid=nullptr;
   ~Profile(){if(sid){FreeSid(sid);DeleteAppContainerProfile(name.c_str());}}
 };
+// libuv opens NUL inside the child when a stdio stream is ignored. This device
+// needs a handle ACL; filesystem grants and inherited handles do not cover it.
+struct NullDevicePermission {
+  PSID sid;Handle device;bool active=false;
+  explicit NullDevicePermission(PSID value):sid(value),device{CreateFileW(L"\\\\.\\NUL",
+      READ_CONTROL|WRITE_DAC,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,0,nullptr)} {
+    need(device.h!=INVALID_HANDLE_VALUE,"open NUL ACL");change(true);active=true;
+  }
+  void change(bool allow) {
+    PACL prior=nullptr,updated=nullptr;PSECURITY_DESCRIPTOR descriptor=nullptr;
+    auto result=GetSecurityInfo(device.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,
+                                nullptr,nullptr,&prior,nullptr,&descriptor);
+    checkCode(result,"read NUL ACL");
+    EXPLICIT_ACCESSW access{};access.grfAccessPermissions=allow?GENERIC_READ|GENERIC_WRITE:0;
+    access.grfAccessMode=allow?GRANT_ACCESS:REVOKE_ACCESS;access.grfInheritance=NO_INHERITANCE;
+    access.Trustee.TrusteeForm=TRUSTEE_IS_SID;access.Trustee.TrusteeType=TRUSTEE_IS_WELL_KNOWN_GROUP;
+    access.Trustee.ptstrName=static_cast<LPWSTR>(sid);
+    result=SetEntriesInAclW(1,&access,prior,&updated);
+    if(result==ERROR_SUCCESS)result=SetSecurityInfo(device.h,SE_FILE_OBJECT,DACL_SECURITY_INFORMATION,
+        nullptr,nullptr,updated,nullptr);
+    if(updated)LocalFree(updated);if(descriptor)LocalFree(descriptor);
+    checkCode(result,allow?"grant task NUL access":"remove task NUL access");
+  }
+  void close(){if(active){change(false);active=false;}}
+  ~NullDevicePermission(){if(active)try{close();}catch(const std::exception&e){std::cerr<<e.what()<<'\n';}}
+};
 // Preserve other profiles and remove only this run's temporary exemption.
 struct LoopbackPermission {
   PSID sid; bool active=false;
@@ -109,6 +135,7 @@ int wmain(int argc,wchar_t **argv) try {
   const auto profileResult=CreateAppContainerProfile(profile.name.c_str(),L"NeverD fixture",
       L"Disposable capability-free recovery test",nullptr,0,&profile.sid);
   if(FAILED(profileResult))throw std::runtime_error("create AppContainer HRESULT: "+std::to_string(profileResult));
+  NullDevicePermission nullDevice{profile.sid};
   LoopbackPermission network{profile.sid};if(loopback)network.enable();
   // Windows redirects TEMP beneath the explicit LOCALAPPDATA supplied by the
   // caller. Prepare that disposable path before applying inherited task ACLs.
@@ -198,9 +225,10 @@ int wmain(int argc,wchar_t **argv) try {
   } while(GetTickCount64()-cleanupStarted<5000);
   need(accounting.ActiveProcesses==0,"all contained processes exited");
   network.close();
+  nullDevice.close();
   std::cout<<"{\"app_container\":true,\"capability_count\":0,\"exit_code\":"<<code
            <<",\"timeout\":"<<(timeout?"true":"false")<<",\"output_limit\":"<<(outputLimit?"true":"false")
            <<",\"remaining_processes\":0,\"loopback_exemption\":"<<(loopback?"true":"false")
-           <<",\"loopback_exemption_removed\":true}\n";
+           <<",\"loopback_exemption_removed\":true,\"null_device_grant_removed\":true}\n";
   return timeout||outputLimit?124:0;
 } catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 125;}

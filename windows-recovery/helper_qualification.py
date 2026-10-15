@@ -40,6 +40,7 @@ def qualify_helpers(out, bun, clean_env, run, compiler, compiler_env):
             (logs / ("win32-child-diagnostic." + stream)).write_bytes((root / ("target." + stream)).read_bytes())
         receipt["win32_child_diagnostic"] = {"execution": meta,
             "observation": json.loads((root / "target.stdout").read_bytes())}
+        print(json.dumps({"win32_child_diagnostic": receipt["win32_child_diagnostic"]}), flush=True)
         root, env = stage("bun-stdio-diagnostic")
         shutil.copyfile(bun, root / "bin/bun.exe")
         (root / "bin/diagnostic.mjs").write_text('const rows=[];for(const mode of ["ignore","inherit","pipe"])'
@@ -52,6 +53,7 @@ def qualify_helpers(out, bun, clean_env, run, compiler, compiler_env):
             (logs / ("bun-stdio-diagnostic." + stream)).write_bytes((root / ("target." + stream)).read_bytes())
         receipt["bun_stdio_diagnostic"] = {"execution": meta,
             "observation": json.loads((root / "target.stdout").read_bytes())}
+        print(json.dumps({"bun_stdio_diagnostic": receipt["bun_stdio_diagnostic"]}), flush=True)
         root, env = stage("child")
         shutil.copyfile(bun, root / "bin/bun.exe")
         peer = json.loads((logs / "loopback-qualification.json").read_text())["external_peer"]

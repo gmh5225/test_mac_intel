@@ -32,6 +32,10 @@ peer, preserves existing exemptions, and is removed after descendant collection.
 It allows loopback traffic across ports; it does not grant internet capabilities.
 The implementation follows the Windows
 [configuration APIs](https://learn.microsoft.com/en-us/windows/win32/api/netfw/nf-netfw-networkisolationsetappcontainerconfig).
+Ignored child stdio also needs a per-profile grant on the NUL device, as
+identified by [libuv's AppContainer launcher](https://github.com/oven-sh/libuv/blob/8023581113b276e7c1aee3f82da57ca0893faab1/test/appcontainer.c).
+The device grant is removed after each run; native Win32 and Bun spawn probes
+record the child and pipe boundaries separately.
 
 An authored Node-API module must load before the retained audio addon is
 inspected. Retained exports are enumerated but never invoked. Materialized
