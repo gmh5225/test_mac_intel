@@ -96,16 +96,25 @@ const r=await Bun.build({entrypoints:[p('./bootstrap.mjs')],target:'bun',env:'di
 compile:{outfile:p('./client.exe'),executablePath:process.execPath,assets:ASSETS.map(s=>p('./'+s))}});
 if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
 """.replace("ASSETS", json.dumps(names)), encoding="utf-8")
-            run(f"build-{attempt}", [bun, graph / "build.mjs"], timeout=120)
+            run(f"build-{attempt}", [bun, graph / "build.mjs"], cwd=graph, timeout=120)
             client = out / ("fixture-" + str(attempt) + ".exe")
             run(f"patch-{attempt}", [out / "graph-fidelity-windows-adapter.exe", fixture / "mapping.tsv", graph / "client.exe", client, "B:/~BUN/root/cli", "2", "15", "8"])
             clients.append(client)
-        assert sha(clients[0]) == sha(clients[1]), "independent fixture builds differ"
+        first, second = (client.read_bytes() for client in clients)
+        different = [i for i, (x, y) in enumerate(zip(first, second)) if x != y]
+        save(logs / "reproducibility.json", {
+            "hashes": [sha(client) for client in clients], "sizes": [len(first), len(second)],
+            "different_byte_count": len(different), "first_offsets": different[:64],
+            "first_difference_context": [data[max(0, different[0]-32):different[0]+96].hex()
+                for data in [first, second]] if different else []})
         observed = json.loads(run("source-graph-runtime", [clients[0]], cwd=state / "work"))
         assert observed["ok"] and observed["sharedIdentity"] and observed["liveBinding"] == 2
         assert observed["worker"] == "000102ff" and observed["main"] is True
         assert observed["bootstrapMain"] == "B:/~BUN/root/cli", observed
         assert observed["opaqueNativeBytes"] == "01020304", observed
+        second_observed = json.loads(run("source-graph-runtime-repeat", [clients[1]], cwd=state / "work"))
+        assert observed == second_observed, "authored observations differ"
+        assert first == second, "independent fixture builds differ; inspect reproducibility.json"
         receipt.update(status="authored_graph_runtime_qualified", native_runtime=observed,
             independent_build_sha256=sha(clients[0]), runtime_preserved=sha(bun) == exe_sha,
             scope="Authored loader/text/module/worker graph only. No original client or native addon executed; no OS sandbox claim.")

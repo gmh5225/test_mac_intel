@@ -74,4 +74,4 @@ void patch(const std::vector<Row>&rows,const fs::path&source,const fs::path&out)
  }
  require(seen.size()==rows.size()+1&&patched==std::count_if(rows.begin(),rows.end(),[](const Row&r){return r.loader==13;}),"missing records");write(out,b);
 }
-int main(int argc,char**argv)try{require(argc==5,"stage|patch map input output");auto rows=mapping(argv[2]);if(std::string(argv[1])=="stage")stage(rows,argv[3],argv[4]);else if(std::string(argv[1])=="patch")patch(rows,argv[3],argv[4]);else throw std::runtime_error("mode");}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
+int main(int argc,char**argv)try{require(argc==5,"stage|patch map input output");auto rows=mapping(argv[2]);if(std::string(argv[1])=="stage")stage(rows,argv[3],argv[4]);else if(std::string(argv[1])=="patch")patch(rows,argv[3],argv[4]);else throw std::runtime_error("mode");return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
