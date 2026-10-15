@@ -129,7 +129,10 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
             ("native", lambda: accept_native(arch, out, bun, compiler, compiler_env, clean_env, run)),
             ("configuration", lambda: accept_configuration(out, original, builds[0], clean_env)),
             ("behavior", lambda: accept_behavior(out, original, builds[0], clean_env))]:
-            try: receipt[name] = action()
+            try:
+                receipt[name] = action()
+                if name == "behavior" and receipt[name]["status"] != "twenty_two_behavior_cases_match":
+                    failures.append({"step": name, "error": "helper-dependent cases remain unrun"})
             except Exception as error: failures.append({"step": name, "error": str(error)})
         assert not failures, failures
         receipt.update(status="windows_offline_acceptance_pass", full_behavior_matrix="29 cases match", smoke_cases=4)

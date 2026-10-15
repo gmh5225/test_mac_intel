@@ -144,7 +144,9 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
         receipt["loopback_qualification"] = qualify_loopback(out, bun, clean_env, run)
-        receipt["helper_qualification"] = qualify_helpers(out, bun, clean_env, run)
+        try: receipt["helper_qualification"] = qualify_helpers(out, bun, clean_env, run, compiler, compiler_env)
+        except Exception as error:
+            receipt["helper_qualification"] = {"status": "failed", "error": str(error)}
         receipt.update(authored_inputs_only=False, scope="Authored environment qualified; published client acceptance in progress.")
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
         receipt.update(status="windows_offline_acceptance_pass",
