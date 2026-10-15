@@ -1,0 +1,45 @@
+name: NeverD Linux ARM32 direct kernel compatibility
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/neverd-native32-probe]
+    paths:
+      - 'linux-arm32/**'
+      - '.github/workflows/neverd-linux-arm32-compatibility.yml'
+permissions:
+  contents: read
+jobs:
+  arm-thumb:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: harness
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: NeverSight/NeverD
+          ref: fcee81c9a5e2f20a71090ade23ae833175f64c59
+          path: contracts
+          persist-credentials: false
+          submodules: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install the real ARM32 glibc kernel interpreter
+        run: |
+          sudo dpkg --add-architecture armhf
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes libc6:armhf
+      - name: Check direct-execution admission
+        run: python -m unittest discover -s harness/linux-arm32 -p 'test_*.py' -v
+      - name: Execute all 96 ARM and Thumb patch observations
+        run: python harness/linux-arm32/qualify.py --contracts contracts --output arm32-evidence
+      - name: Preserve complete or failed execution evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: linux-arm32-kernel-compatibility-${{ github.sha }}
+          path: arm32-evidence
+          if-no-files-found: error
