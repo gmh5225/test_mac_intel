@@ -51,6 +51,12 @@ not constitute availability of an old Apple SDK. The ARMv7k probe uses an
 ordinary C entry in an iPhone HLE bundle; it exercises neither WatchKit nor the
 watchOS loader, signing, boot process, or device services.
 
+Wine's first registry installation runs with the same ARM32 packages in a
+chroot on the ARM64 host's kernel compatibility layer. Its separate 90-second
+result is setup evidence and counts as zero patch observations. The prepared
+registry is then placed in the guest; the guest still requires a successful
+90-second Wine initialization and all 30 PE launches under its ARM32 kernel.
+
 Darling and touchHLE archives are pinned by release and SHA256. Debian's actual
 package versions, guest kernel/initrd hashes, QEMU command line, CPU state,
 stdout/stderr and every return code are archived. Failed attempts remain

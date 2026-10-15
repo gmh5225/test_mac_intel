@@ -29,7 +29,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y qemu-system-arm debootstrap e2fsprogs
           sudo debootstrap --arch=armhf --variant=minbase --include=python3,linux-image-armmp,busybox,wine32,xvfb,x11-utils bookworm guest https://deb.debian.org/debian 2>&1 | tee emulated32-evidence/bootstrap.log
           sudo mkdir -p guest/work
-          sudo cp linux-arm32/qualified-images.zip emulated32/linux_guest.py emulated32/capture_process.py guest/work/
+          sudo cp linux-arm32/qualified-images.zip emulated32/linux_guest.py emulated32/linux_prefix.py emulated32/capture_process.py guest/work/
           sudo cp -r emulated32/pe-arm32 guest/work/
           sudo tee guest/neverd-init >/dev/null <<'SH'
           #!/bin/sh
@@ -58,10 +58,27 @@ jobs:
           printf '127.0.0.1 localhost neverd-guest\n::1 localhost neverd-guest\n' | sudo tee guest/etc/hosts >/dev/null
           sudo chmod +x guest/neverd-init
           sudo chroot guest dpkg-query -W > emulated32-evidence/packages.txt
+      - name: Prepare the Wine registry on the ARM64 kernel compatibility layer
+        shell: bash
+        run: |
+          sudo unshare --mount --propagation private bash -eu <<'SH'
+          mount -t proc proc guest/proc
+          mount -t sysfs sysfs guest/sys
+          mount --rbind /dev guest/dev
+          mount --make-rslave guest/dev
+          chroot guest /usr/bin/python3 /work/linux_prefix.py
+          SH
           truncate -s 3G guest.ext4
           sudo mkfs.ext4 -q -F -d guest guest.ext4
       - name: Boot and verify every guest observation
         run: python3 emulated32/linux_vm.py
+      - name: Preserve prefix installation evidence
+        if: always()
+        run: |
+          for file in guest/work/prefix-installation.json guest/work/prefix-xvfb.log; do
+            if sudo test -f "$file"; then sudo cp "$file" emulated32-evidence/; fi
+          done
+          sudo chmod -R a+rX emulated32-evidence
       - name: Preserve full guest and host evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

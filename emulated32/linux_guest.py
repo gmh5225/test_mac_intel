@@ -68,6 +68,8 @@ try:
     report['pe_manifest']=pe
     report['pe_manifest_sha256']=sha(ROOT/'pe-arm32/manifest.json')
     # Initialize the real Wine ARM32 loader before any measured patch launch.
+    report['wine_prefix_installation']=json.loads((ROOT/'prefix-installation.json').read_text())
+    assert report['wine_prefix_installation']['complete'] and report['wine_prefix_installation']['counted_patch_observations']==0
     report['wine_environment']={
         'hostname':platform.node(),
         'mounts':Path('/proc/mounts').read_text(),
