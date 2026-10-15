@@ -10,6 +10,7 @@ import plistlib
 import shutil
 import struct
 import subprocess
+from capture_process import run_capture
 
 EXPECTED={'original':9, **{case+'-'+route:code for case,code in [('nonleaf',87),('writable-pointer',92),('floating-stack',93)] for route in ['ir','object','supplied-object']}}
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
@@ -51,7 +52,11 @@ def main():
         if a.mode=='darling':
             assert platform.system()=='Linux' and platform.machine()=='x86_64'
             env=dict(os.environ,DPREFIX=str(out/'darling-prefix'))
-            init=subprocess.run([str(exe),'shell','uname','-a'],capture_output=True,timeout=60,env=env)
+            try:
+                init=run_capture([str(exe),'shell','uname','-a'],timeout=60,env=env)
+            except subprocess.TimeoutExpired as error:
+                report['initialization']={'timeout_seconds':60,'stdout':(error.output or b'').decode(errors='replace'),'stderr':(error.stderr or b'').decode(errors='replace')}
+                raise
             report['initialization']={'actual':init.returncode,'stdout':init.stdout.decode(errors='replace'),'stderr':init.stderr.decode(errors='replace')}
             assert init.returncode==0
         else:env=dict(os.environ)
@@ -73,7 +78,7 @@ def main():
                     obs={'profile':profile,'case':row['case'],'repeat':repeat,'expected':EXPECTED[row['case']],
                          'sha256':row['sha256'],'command':cmd}
                     try:
-                        run=subprocess.run(cmd,capture_output=True,timeout=20,env=env,cwd=exe.parent if a.mode=='touchhle' else None)
+                        run=run_capture(cmd,timeout=20,env=env,cwd=exe.parent if a.mode=='touchhle' else None)
                         obs.update(actual=run.returncode,stdout=run.stdout.decode(errors='replace'),stderr=run.stderr.decode(errors='replace'))
                     except (OSError,subprocess.TimeoutExpired) as e:obs['error']=repr(e)
                     report['observations'].append(obs);save()

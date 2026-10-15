@@ -5,6 +5,8 @@ on:
     branches: [codex/neverd-native32-probe]
     paths:
       - 'emulated32/linux_*'
+      - 'emulated32/capture_process.py'
+      - 'emulated32/test_capture_process.py'
       - 'emulated32/pe-arm32/**'
       - '.github/workflows/neverd-emulated32-linux.yml'
 permissions:
@@ -17,15 +19,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Verify process capture and real deadlines
+        run: python3 emulated32/test_capture_process.py
       - name: Install QEMU and build a Debian ARM32 guest
         shell: bash
         run: |
           mkdir emulated32-evidence
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y qemu-system-arm debootstrap e2fsprogs
-          sudo debootstrap --arch=armhf --variant=minbase --include=python3,linux-image-armmp,busybox,wine32 bookworm guest https://deb.debian.org/debian 2>&1 | tee emulated32-evidence/bootstrap.log
+          sudo debootstrap --arch=armhf --variant=minbase --include=python3,linux-image-armmp,busybox,wine32,xvfb,x11-utils bookworm guest https://deb.debian.org/debian 2>&1 | tee emulated32-evidence/bootstrap.log
           sudo mkdir -p guest/work
-          sudo cp linux-arm32/qualified-images.zip emulated32/linux_guest.py guest/work/
+          sudo cp linux-arm32/qualified-images.zip emulated32/linux_guest.py emulated32/capture_process.py guest/work/
           sudo cp -r emulated32/pe-arm32 guest/work/
           sudo tee guest/neverd-init >/dev/null <<'SH'
           #!/bin/sh
@@ -39,6 +43,14 @@ jobs:
           /bin/busybox ip link set lo up
           export PATH=/usr/sbin:/usr/bin:/sbin:/bin
           export HOME=/root
+          Xvfb :99 -screen 0 640x480x24 -nolisten tcp >/work/xvfb.log 2>&1 &
+          export DISPLAY=:99
+          ready=0
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if xdpyinfo >/dev/null 2>&1; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then cat /work/xvfb.log; exit 1; fi
           python3 /work/linux_guest.py
           sync
           /bin/busybox poweroff -f

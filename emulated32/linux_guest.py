@@ -9,6 +9,7 @@ import platform
 import struct
 import subprocess
 import zipfile
+from capture_process import run_capture
 
 ROOT = Path('/work')
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
@@ -43,7 +44,7 @@ try:
             obs={'profile':kind,'case':row['case'],'sha256':row['sha256'],'repeat':repeat,
                  'expected':code,'command':cmd}
             try:
-                r=subprocess.run(cmd,capture_output=True,timeout=20,env=dict(os.environ,WINEDEBUG='-all',WINEPREFIX='/root/wine32',WINEARCH='win32'))
+                r=run_capture(cmd,timeout=20,env=dict(os.environ,WINEDEBUG='-all',WINEPREFIX='/root/wine32',WINEARCH='win32'))
                 obs.update(actual=r.returncode,stdout=r.stdout.decode(errors='replace'),stderr=r.stderr.decode(errors='replace'))
             except (OSError,subprocess.TimeoutExpired) as e: obs['error']=str(e)
             report['observations'].append(obs)
@@ -74,8 +75,8 @@ try:
         'hosts':Path('/etc/hosts').read_text(),
     }
     try:
-        init=subprocess.run(['/usr/lib/wine/wine','wineboot','-u'],capture_output=True,timeout=90,
-            env=dict(os.environ,WINEDEBUG='+timestamp,+pid,+process,+seh',WINEPREFIX='/root/wine32',WINEARCH='win32'))
+        init=run_capture(['/usr/lib/wine/wine','wineboot','-u'],timeout=90,
+            env=dict(os.environ,WINEDEBUG='+timestamp,+pid,+seh',WINEPREFIX='/root/wine32',WINEARCH='win32'))
         report['wine_initialization']={'actual':init.returncode,'stdout':init.stdout.decode(errors='replace'),'stderr':init.stderr.decode(errors='replace')}
         assert init.returncode==0
     except subprocess.TimeoutExpired as e:

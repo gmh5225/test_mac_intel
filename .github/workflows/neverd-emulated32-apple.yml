@@ -5,6 +5,8 @@ on:
     branches: [codex/neverd-native32-probe]
     paths:
       - 'emulated32/run_apple.py'
+      - 'emulated32/capture_process.py'
+      - 'emulated32/test_capture_process.py'
       - 'emulated32/test_manifest.py'
       - 'emulated32/apple/**'
       - '.github/workflows/neverd-emulated32-apple.yml'
@@ -19,7 +21,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify manifest rejection controls
-        run: python3 emulated32/test_manifest.py
+        run: |
+          python3 emulated32/test_manifest.py
+          python3 emulated32/test_capture_process.py
       - name: Install the pinned upstream Darling release
         shell: bash
         run: |
