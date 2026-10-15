@@ -67,10 +67,25 @@ try:
     report['pe_manifest']=pe
     report['pe_manifest_sha256']=sha(ROOT/'pe-arm32/manifest.json')
     # Initialize the real Wine ARM32 loader before any measured patch launch.
-    init=subprocess.run(['/usr/lib/wine/wine','wineboot','-u'],capture_output=True,timeout=90,
-        env=dict(os.environ,WINEDEBUG='-all',WINEPREFIX='/root/wine32',WINEARCH='win32'))
-    report['wine_initialization']={'actual':init.returncode,'stdout':init.stdout.decode(errors='replace'),'stderr':init.stderr.decode(errors='replace')}
-    assert init.returncode==0
+    report['wine_environment']={
+        'hostname':platform.node(),
+        'mounts':Path('/proc/mounts').read_text(),
+        'network':Path('/proc/net/dev').read_text(),
+        'hosts':Path('/etc/hosts').read_text(),
+    }
+    try:
+        init=subprocess.run(['/usr/lib/wine/wine','wineboot','-u'],capture_output=True,timeout=90,
+            env=dict(os.environ,WINEDEBUG='+timestamp,+pid,+process,+seh',WINEPREFIX='/root/wine32',WINEARCH='win32'))
+        report['wine_initialization']={'actual':init.returncode,'stdout':init.stdout.decode(errors='replace'),'stderr':init.stderr.decode(errors='replace')}
+        assert init.returncode==0
+    except subprocess.TimeoutExpired as e:
+        report['wine_initialization']={'timeout_seconds':90,'stdout':(e.stdout or b'').decode(errors='replace'),'stderr':(e.stderr or b'').decode(errors='replace')}
+        report['processes']=[]
+        for proc in Path('/proc').glob('[0-9]*'):
+            try:
+                report['processes'].append({'pid':proc.name,'command':(proc/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace'),'wchan':(proc/'wchan').read_text()})
+            except OSError:pass
+        raise
     for row in pe['images']:
         run_image(row,'pe-arm32-wine',['/usr/lib/wine/wine',str(ROOT/'pe-arm32'/row['path'])],expected_pe[row['case']])
     assert len(report['observations'])==126

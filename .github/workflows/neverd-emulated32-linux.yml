@@ -32,14 +32,18 @@ jobs:
           mount -t proc proc /proc
           mount -t sysfs sysfs /sys
           mount -t devtmpfs devtmpfs /dev
-          mkdir -p /dev/pts /tmp /run
+          mkdir -p /dev/pts /dev/shm /tmp /run
           mount -t devpts devpts /dev/pts
+          mount -t tmpfs -o mode=1777 tmpfs /dev/shm
+          /bin/busybox hostname neverd-guest
+          /bin/busybox ip link set lo up
           export PATH=/usr/sbin:/usr/bin:/sbin:/bin
           export HOME=/root
           python3 /work/linux_guest.py
           sync
           /bin/busybox poweroff -f
           SH
+          printf '127.0.0.1 localhost neverd-guest\n::1 localhost neverd-guest\n' | sudo tee guest/etc/hosts >/dev/null
           sudo chmod +x guest/neverd-init
           sudo chroot guest dpkg-query -W > emulated32-evidence/packages.txt
           truncate -s 3G guest.ext4
