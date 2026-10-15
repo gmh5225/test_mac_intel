@@ -67,7 +67,8 @@ try:
             obj=json.loads(receipt.read_text());assert obj['schema']=='neverd.source-patch.v1' and obj['success'] and len(obj['installed'])==1
     report['pe_manifest']=pe
     report['pe_manifest_sha256']=sha(ROOT/'pe-arm32/manifest.json')
-    # Initialize the real Wine ARM32 loader before any measured patch launch.
+    # Boot the installed runtime normally. -u forces the installer to repeat
+    # every registry and DLL setup operation; that belongs to linux_prefix.py.
     report['wine_prefix_installation']=json.loads((ROOT/'prefix-installation.json').read_text())
     assert report['wine_prefix_installation']['complete'] and report['wine_prefix_installation']['counted_patch_observations']==0
     report['wine_environment']={
@@ -77,9 +78,9 @@ try:
         'hosts':Path('/etc/hosts').read_text(),
     }
     try:
-        init=run_capture(['/usr/lib/wine/wine','wineboot','-u'],timeout=90,
+        init=run_capture(['/usr/lib/wine/wine','wineboot','--init'],timeout=90,
             env=dict(os.environ,WINEDEBUG='+timestamp,+pid,+seh',WINEPREFIX='/root/wine32',WINEARCH='win32'))
-        report['wine_initialization']={'actual':init.returncode,'stdout':init.stdout.decode(errors='replace'),'stderr':init.stderr.decode(errors='replace')}
+        report['wine_initialization']={'command':['/usr/lib/wine/wine','wineboot','--init'],'actual':init.returncode,'stdout':init.stdout.decode(errors='replace'),'stderr':init.stderr.decode(errors='replace')}
         assert init.returncode==0
     except subprocess.TimeoutExpired as e:
         report['wine_initialization']={'timeout_seconds':90,'stdout':(e.stdout or b'').decode(errors='replace'),'stderr':(e.stderr or b'').decode(errors='replace')}
