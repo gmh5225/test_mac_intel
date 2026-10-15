@@ -11,6 +11,7 @@ import subprocess
 import urllib.request
 import zipfile
 from appcontainer_qualification import qualify_appcontainer
+from client_acceptance import accept_client
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -139,6 +140,9 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                                                   clean_env, logs, run)
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
+        receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
+        receipt.update(status="windows_client_smoke_accepted",
+                       scope="Qualified authored environment and three original/rebuilt smoke cases. Full behavior matrix and native addon acceptance remain pending.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:

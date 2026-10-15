@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <algorithm>
 namespace fs = std::filesystem;
 void need(bool ok, const char *what) {
   if (!ok) throw std::runtime_error(std::string(what) + ": " + std::to_string(GetLastError()));
@@ -65,15 +66,25 @@ int wmain(int argc,wchar_t **argv) try {
   const auto executable=root/L"bin"/filename;
   need(fs::is_regular_file(executable),"executable file");
   Profile profile{argv[2]};
+  need(profile.name.size()>=16&&profile.name.size()<=64&&
+       std::all_of(profile.name.begin(),profile.name.end(),[](wchar_t c){
+         return (c>=L'a'&&c<=L'z')||(c>=L'A'&&c<=L'Z')||(c>=L'0'&&c<=L'9')||c==L'.';}),"profile name");
+  std::transform(profile.name.begin(),profile.name.end(),profile.name.begin(),
+                 [](wchar_t c){return c>=L'A'&&c<=L'Z'?c-L'A'+L'a':c;});
   const auto profileResult=CreateAppContainerProfile(profile.name.c_str(),L"NeverD fixture",
       L"Disposable capability-free recovery test",nullptr,0,&profile.sid);
   if(FAILED(profileResult))throw std::runtime_error("create AppContainer HRESULT: "+std::to_string(profileResult));
+  // Windows redirects TEMP beneath the explicit LOCALAPPDATA supplied by the
+  // caller. Prepare that disposable path before applying inherited task ACLs.
+  const auto redirectedTemp=root/L"home"/L"Packages"/profile.name/L"AC"/L"Temp";
+  fs::create_directories(redirectedTemp);
   grant(root,profile.sid,FILE_TRAVERSE|FILE_READ_ATTRIBUTES|SYNCHRONIZE,NO_INHERITANCE);
   grant(root/L"bin",profile.sid,FILE_GENERIC_READ|FILE_GENERIC_EXECUTE,SUB_CONTAINERS_AND_OBJECTS_INHERIT);
   for(const auto *name:{L"work",L"home",L"tmp"}) {
     grant(root/name,profile.sid,FILE_ALL_ACCESS,SUB_CONTAINERS_AND_OBJECTS_INHERIT);
     writableLabel(root/name);
   }
+  writableLabel(redirectedTemp);
   SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
   Handle input{CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&inherit,OPEN_EXISTING,0,nullptr)};
   Handle output{CreateFileW((root/L"target.stdout").c_str(),GENERIC_WRITE|GENERIC_READ,FILE_SHARE_READ,
