@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 import struct
 import subprocess
+import time
 import zipfile
 from capture_process import run_capture
 
@@ -43,10 +44,14 @@ try:
         for repeat in range(3):
             obs={'profile':kind,'case':row['case'],'sha256':row['sha256'],'repeat':repeat,
                  'expected':code,'command':cmd}
+            started=time.monotonic()
             try:
                 r=run_capture(cmd,timeout=20,env=dict(os.environ,WINEDEBUG='-all',WINEPREFIX='/root/wine32',WINEARCH='win32'))
                 obs.update(actual=r.returncode,stdout=r.stdout.decode(errors='replace'),stderr=r.stderr.decode(errors='replace'))
-            except (OSError,subprocess.TimeoutExpired) as e: obs['error']=str(e)
+            except subprocess.TimeoutExpired as e:
+                obs.update(error=str(e),stdout=(e.output or b'').decode(errors='replace'),stderr=(e.stderr or b'').decode(errors='replace'))
+            except OSError as e:obs['error']=str(e)
+            obs['elapsed_seconds']=time.monotonic()-started
             report['observations'].append(obs)
         assert sha(path)==row['sha256']
     for row in manifest['images']:
@@ -90,6 +95,14 @@ try:
                 report['processes'].append({'pid':proc.name,'command':(proc/'cmdline').read_bytes().replace(b'\0',b' ').decode(errors='replace'),'wchan':(proc/'wchan').read_text()})
             except OSError:pass
         raise
+    # Keep one measured runtime session alive for this batch. Otherwise Wine
+    # can shut down its idle server and reboot services between short probes.
+    persistent=run_capture(['/usr/lib/wine/wineserver32','-p'],timeout=20,
+        env=dict(os.environ,WINEPREFIX='/root/wine32',WINEARCH='win32'))
+    report['wine_server_session']={'command':['/usr/lib/wine/wineserver32','-p'],
+        'actual':persistent.returncode,'stdout':persistent.stdout.decode(errors='replace'),
+        'stderr':persistent.stderr.decode(errors='replace')}
+    assert persistent.returncode==0
     for row in pe['images']:
         run_image(row,'pe-arm32-wine',['/usr/lib/wine/wine',str(ROOT/'pe-arm32'/row['path'])],expected_pe[row['case']])
     assert len(report['observations'])==126
