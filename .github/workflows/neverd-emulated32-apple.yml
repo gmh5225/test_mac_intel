@@ -1,0 +1,71 @@
+name: NeverD legacy Mach-O compatibility and HLE
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/neverd-native32-probe]
+    paths:
+      - 'emulated32/run_apple.py'
+      - 'emulated32/test_manifest.py'
+      - 'emulated32/apple/**'
+      - '.github/workflows/neverd-emulated32-apple.yml'
+permissions:
+  contents: read
+jobs:
+  darling-i386:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify manifest rejection controls
+        run: python3 emulated32/test_manifest.py
+      - name: Install the pinned upstream Darling release
+        shell: bash
+        run: |
+          mkdir darling-setup
+          curl --fail --location --retry 3 --max-time 120 https://github.com/darlinghq/darling/releases/download/v0.1.20260608/debs_20260608.zip -o darling-setup/debs.zip
+          echo '27469ef3932da2e91dd7fb34b70e3628a3e54b7af9fb5480051f44af35eca1fd  darling-setup/debs.zip' | sha256sum --check
+          unzip -q darling-setup/debs.zip -d darling-setup
+          sudo apt-get update
+          sudo apt-get install -y ./darling-setup/debs_20260609/*.deb 2>&1 | tee darling-setup/install.log
+          dpkg-query -W 'darling*' > darling-setup/packages.txt
+      - name: Execute all thirty i386 C patch observations
+        run: python3 emulated32/run_apple.py --mode darling --executable /usr/bin/darling --inputs emulated32/apple --output darling-evidence
+      - name: Preserve all outcomes
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: darling-i386-${{ github.sha }}
+          path: |
+            darling-evidence/runtime.json
+            darling-setup/install.log
+            darling-setup/packages.txt
+          if-no-files-found: error
+  touchhle-arm32:
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Install and authenticate touchHLE 0.3.0
+        shell: bash
+        run: |
+          mkdir touchhle-setup touchhle-portable
+          curl --fail --location --retry 3 --max-time 120 https://github.com/touchHLE/touchHLE/releases/download/v0.3.0/touchHLE_v0.3.0_macOS_x86_x64.zip -o touchhle-setup/release.zip
+          echo '24cabca7a0640bef749ec459d650614563c88002b94ea89439978ba2239fa9fc  touchhle-setup/release.zip' | shasum -a 256 --check
+          unzip -q touchhle-setup/release.zip -d touchhle-setup
+          hdiutil attach -readonly -nobrowse -mountpoint "$PWD/touchhle-mount" touchhle-setup/touchHLE.dmg
+          cp touchhle-mount/touchHLE.app/Contents/MacOS/touchHLE touchhle-portable/
+          cp -R touchhle-mount/touchHLE.app/Contents/Resources/. touchhle-portable/
+          hdiutil detach "$PWD/touchhle-mount"
+      - name: Execute sixty ARMv7 and ARMv7k C observations with the iOS HLE
+        run: python3 emulated32/run_apple.py --mode touchhle --executable touchhle-portable/touchHLE --inputs emulated32/apple --output touchhle-evidence
+      - name: Preserve all outcomes without claiming watchOS runtime support
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: touchhle-arm32-${{ github.sha }}
+          path: touchhle-evidence/runtime.json
+          if-no-files-found: error
