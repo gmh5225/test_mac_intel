@@ -56,11 +56,11 @@ def qualify_appcontainer(launcher, bun, client, graph_observed, clean_env, logs,
         meta, data = contained("isolation-negative-control", root, env, "bun.exe", argv)
         assert meta["exit_code"] == 0 and not meta["timeout"] and not meta["output_limit"], meta
         negative = json.loads(data)
+        observations.update(positive=positive, negative=negative)
         assert all(v == {"ok": True, "value": k} for k, v in negative["writes"].items()), negative
         assert negative["binRead"]["ok"], negative
         assert all(not negative[k]["ok"] for k in ["outsideRead", "binWrite", "ipv4", "ipv6"]), negative
         assert outside.read_text() == "authored host-only canary" and canary.read_text() == "authored read-only canary"
-        observations.update(positive=positive, negative=negative)
         root, env = stage("graph")
         shutil.copyfile(client, root / "bin/fixture.exe")
         meta, data = contained("isolated-source-graph", root, env, "fixture.exe")

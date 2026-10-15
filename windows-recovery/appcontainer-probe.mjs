@@ -19,13 +19,15 @@ function connect(host, port) {
 }
 const [outside, readOnly, port4, port6] = process.argv.slice(2);
 const writes = {};
-for (const [name, dir] of Object.entries({work: process.cwd(), home: process.env.HOME, tmp: process.env.TEMP})) {
+const directories = {work: process.cwd(), home: process.env.HOME, tmp: process.env.TEMP};
+for (const [name, dir] of Object.entries(directories)) {
   writes[name] = attempt(() => {
     const file = path.join(dir, "authored-write-canary");
     fs.writeFileSync(file, name); return fs.readFileSync(file, "utf8");
   });
 }
 console.log(JSON.stringify({
+  directories,
   writes,
   outsideRead: attempt(() => fs.readFileSync(outside, "utf8")),
   binRead: attempt(() => fs.readFileSync(readOnly, "utf8")),
