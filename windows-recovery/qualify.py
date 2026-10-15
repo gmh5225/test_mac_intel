@@ -74,6 +74,7 @@ def main():
             receipt["steps"].append({"name": label, "exit_code": result.returncode,
                                      "stdout_sha256": sha(logs / (label + ".stdout")),
                                      "stderr_sha256": sha(logs / (label + ".stderr"))})
+            print(json.dumps({"step": label, "exit_code": result.returncode}), flush=True)
             assert result.returncode == expected, f"{label}: exit {result.returncode}; inspect retained logs"
             return result.stdout
         revision = run("runtime-revision", [bun, "--revision"]).decode().strip()
@@ -141,8 +142,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
-        receipt.update(status="windows_client_smoke_accepted",
-                       scope="Qualified authored environment and three original/rebuilt smoke cases. Full behavior matrix and native addon acceptance remain pending.")
+        receipt.update(status="windows_client_configuration_accepted",
+                       scope="Qualified authored environment, four smoke and seven configuration cases. Full behavior matrix and native addon acceptance remain pending.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:

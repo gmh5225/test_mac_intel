@@ -6,6 +6,7 @@ import shutil
 import socket
 import tempfile
 import uuid
+from contained_protocol import ContainedProtocol
 
 ROOT = Path(__file__).resolve().parent
 
@@ -66,6 +67,21 @@ def qualify_appcontainer(launcher, bun, client, graph_observed, clean_env, logs,
         meta, data = contained("isolated-source-graph", root, env, "fixture.exe")
         assert meta["exit_code"] == 0 and not meta["timeout"] and not meta["output_limit"], meta
         assert json.loads(data) == graph_observed, "contained graph semantics changed"
+        root, env = stage("interactive")
+        shutil.copyfile(bun, root / "bin/bun.exe")
+        (root / "bin/echo.mjs").write_text(
+            'import readline from "node:readline";'
+            'for await(const line of readline.createInterface({input:process.stdin}))'
+            'console.log(JSON.stringify({echo:JSON.parse(line)}));\n', encoding="utf-8")
+        transport = ContainedProtocol(launcher, root, env, "bun.exe", [root / "bin/echo.mjs"], logs, "isolation-interactive")
+        try:
+            transport.send({"message": "authored α"})
+            transport.wait({"echo.message": "authored α"})
+            transport.send({"message": "second"})
+            transport.wait({"echo.message": "second"})
+            observations["stages"]["interactive"] = transport.finish()
+            assert observations["stages"]["interactive"]["exit_code"] == 0
+        finally: transport.retain()
         root, env = stage("deadline")
         shutil.copyfile(bun, root / "bin/bun.exe")
         meta, _ = contained("isolation-deadline", root, env, "bun.exe",

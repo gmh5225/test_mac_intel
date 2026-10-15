@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 import urllib.request
 import uuid
+from configuration_acceptance import accept_configuration
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -89,7 +90,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt["readback"] = json.loads(run("client-readback", [out / "extract-pinned-graph.exe", builds[0], sha(builds[0]), readback]))
         assert sha(readback / "mapping.tsv") == pins["mapping"], "rebuilt module metadata or bytes changed"
         assert receipt["matches_local_cross_build"], "native/cross compiler artifacts differ; inspect before runtime acceptance"
-        for case, argv in [("version", ["--version"]), ("help", ["--help"]), ("mcp-help", ["mcp", "--help"])]:
+        for case, argv, expected_exit in [("version", ["--version"], 0), ("help", ["--help"], 0),
+            ("mcp-help", ["mcp", "--help"], 0), ("unknown-option", ["--neverd-isolation-unknown-option"], 1)]:
             results = []
             for label, executable in [("original", original), ("rebuilt", builds[0])]:
                 root = Path(tempfile.mkdtemp(prefix=f"neverd-client-{label}-{case}-", dir=os.environ["SystemDrive"] + "\\"))
@@ -112,7 +114,7 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                         if path.exists():
                             with path.open("rb") as source:
                                 (logs / (name + "." + stream)).write_bytes(source.read(2 * 1024 * 1024))
-                assert meta["exit_code"] == 0 and not meta["timeout"] and not meta["output_limit"], (name, meta)
+                assert meta["exit_code"] == expected_exit and not meta["timeout"] and not meta["output_limit"], (name, meta)
                 assert meta["app_container"] and meta["capability_count"] == 0 and meta["remaining_processes"] == 0, meta
                 assert sha(root / "bin/client.exe") == sha(executable), "executed input mutated"
                 results.append({"label": label, "execution": meta,
@@ -120,7 +122,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
             assert all(results[0][key] == results[1][key] for key in ["stdout_sha256", "stderr_sha256"]), (case, results)
             receipt["cases"].append({"case": case, "matches": True, "results": results})
         assert sha(original) == pins["original"] and sha(mapping) == pins["mapping"], "input preservation"
-        receipt.update(status="three_smoke_cases_match", full_behavior_matrix="pending", native_addon_load="pending")
+        receipt["configuration"] = accept_configuration(out, original, builds[0], clean_env)
+        receipt.update(status="four_smoke_and_seven_configuration_cases_match", full_behavior_matrix="pending", native_addon_load="pending")
         return receipt
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise

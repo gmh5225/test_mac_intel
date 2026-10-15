@@ -61,7 +61,9 @@ int wmain(int argc,wchar_t **argv) try {
   need(argc>=5,"stage profile deadline-ms executable [args]");
   const auto root=fs::canonical(argv[1]);
   const auto deadline=std::stoul(argv[3]);need(deadline>0&&deadline<=60000,"deadline");
-  const std::wstring filename=argv[4];
+  const bool interactive=std::wstring(argv[4])==L"--interactive";
+  const int exeIndex=interactive?5:4;need(argc>exeIndex,"executable argument");
+  const std::wstring filename=argv[exeIndex];
   need(filename.find_first_of(L"/\\:")==std::wstring::npos,"executable basename");
   const auto executable=root/L"bin"/filename;
   need(fs::is_regular_file(executable),"executable file");
@@ -86,7 +88,11 @@ int wmain(int argc,wchar_t **argv) try {
   }
   writableLabel(redirectedTemp);
   SECURITY_ATTRIBUTES inherit{sizeof(SECURITY_ATTRIBUTES),nullptr,TRUE};
-  Handle input{CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&inherit,OPEN_EXISTING,0,nullptr)};
+  Handle input;
+  if(interactive) {
+    need(DuplicateHandle(GetCurrentProcess(),GetStdHandle(STD_INPUT_HANDLE),GetCurrentProcess(),
+                         &input.h,0,TRUE,DUPLICATE_SAME_ACCESS),"interactive stdin handle");
+  } else input.h=CreateFileW(L"NUL",GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,&inherit,OPEN_EXISTING,0,nullptr);
   Handle output{CreateFileW((root/L"target.stdout").c_str(),GENERIC_WRITE|GENERIC_READ,FILE_SHARE_READ,
       &inherit,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr)};
   Handle error{CreateFileW((root/L"target.stderr").c_str(),GENERIC_WRITE|GENERIC_READ,FILE_SHARE_READ,
@@ -113,7 +119,7 @@ int wmain(int argc,wchar_t **argv) try {
   STARTUPINFOEXW startup{};startup.StartupInfo.cb=sizeof(startup);
   startup.StartupInfo.dwFlags=STARTF_USESTDHANDLES;startup.StartupInfo.hStdInput=input.h;
   startup.StartupInfo.hStdOutput=output.h;startup.StartupInfo.hStdError=error.h;startup.lpAttributeList=attributes;
-  std::wstring command=quoted(executable.wstring());for(int i=5;i<argc;i++)command+=L" "+quoted(argv[i]);
+  std::wstring command=quoted(executable.wstring());for(int i=exeIndex+1;i<argc;i++)command+=L" "+quoted(argv[i]);
   PROCESS_INFORMATION process{};
   const auto created=CreateProcessW(executable.c_str(),command.data(),nullptr,nullptr,TRUE,
       EXTENDED_STARTUPINFO_PRESENT|CREATE_SUSPENDED|CREATE_UNICODE_ENVIRONMENT,nullptr,

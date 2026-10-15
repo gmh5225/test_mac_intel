@@ -1,0 +1,224 @@
+{
+  "authored_fixtures_only": true,
+  "fixtures": {
+    "{{H}}/.claude/settings.json": {
+      "model": "claude-sonnet-4-5-20250929"
+    },
+    "{{W}}/.claude/settings.json": {
+      "model": "claude-sonnet-5"
+    },
+    "{{W}}/.claude/settings.local.json": {
+      "model": "claude-sonnet-5-5"
+    },
+    "{{F}}/flag.json": {
+      "model": "claude-opus-5-5"
+    }
+  },
+  "cases": [
+    {
+      "id": "C01",
+      "variants": [
+        {
+          "id": "user",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "user",
+            "--tools",
+            "",
+            "--input-format",
+            "stream-json"
+          ]
+        },
+        {
+          "id": "project",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "user,project",
+            "--tools",
+            "",
+            "--input-format",
+            "stream-json"
+          ]
+        },
+        {
+          "id": "local",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "user,project,local",
+            "--tools",
+            "",
+            "--input-format",
+            "stream-json"
+          ]
+        },
+        {
+          "id": "flag",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "user,project,local",
+            "--tools",
+            "",
+            "--settings",
+            "{{F}}/flag.json",
+            "--input-format",
+            "stream-json"
+          ]
+        },
+        {
+          "id": "cli",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "user,project,local",
+            "--tools",
+            "",
+            "--settings",
+            "{{F}}/flag.json",
+            "--model",
+            "claude-haiku-5-5",
+            "--input-format",
+            "stream-json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C02",
+      "variants": [
+        {
+          "id": "empty_sources",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "",
+            "--tools",
+            "",
+            "--settings",
+            "{{F}}/flag.json",
+            "--input-format",
+            "stream-json"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "C03",
+      "variants": [
+        {
+          "id": "bad_local",
+          "argv": [
+            "-p",
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--strict-mcp-config",
+            "--mcp-config",
+            "{\"mcpServers\":{}}",
+            "--no-chrome",
+            "--disable-slash-commands",
+            "--permission-mode",
+            "manual",
+            "--permission-prompts",
+            "none",
+            "--system-prompt",
+            "Offline fixture. Use only the supplied fixture data.",
+            "--setting-sources",
+            "user,project,local",
+            "--tools",
+            "",
+            "--input-format",
+            "stream-json"
+          ]
+        }
+      ]
+    }
+  ]
+}
