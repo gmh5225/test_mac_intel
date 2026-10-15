@@ -5,7 +5,12 @@ TIMING={'duration_ms','duration_api_ms','ttft_stream_ms','ttft_ms','first_conten
 def differences(a,b,path=''):
     if type(a)!=type(b):return [{'path':path,'original':a,'candidate':b}]
     if isinstance(a,dict):
-        return [d for k in sorted(a.keys()|b.keys()) for d in differences(a.get(k),b.get(k),path+'/'+k)]
+        out=[]
+        for k in sorted(a.keys()|b.keys()):
+            if k not in a or k not in b:
+                out.append({'path':path+'/'+k,'original_present':k in a,'candidate_present':k in b})
+            else:out.extend(differences(a[k],b[k],path+'/'+k))
+        return out
     if isinstance(a,list):
         out=[] if len(a)==len(b) else [{'path':path,'original_length':len(a),'candidate_length':len(b)}]
         return out+[d for i,(x,y) in enumerate(zip(a,b)) for d in differences(x,y,path+'/'+str(i))]
