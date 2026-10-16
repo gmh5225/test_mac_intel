@@ -1,0 +1,54 @@
+name: Native Bash sandbox reconstruction
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - seccomp-helper/**
+      - .github/workflows/claude-bash-sandbox.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qualify:
+    name: Native ${{ matrix.arch }} actual Bash sandbox
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Obtain the previously qualified public search dependency
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-search-helper-1
+          path: public-search-helper
+          run-id: 38874053349
+          github-token: ${{ github.token }}
+      - name: Install namespace and proxy tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap=0.6.1-1ubuntu0.3 socat
+      - name: Check authored validators and build the public helper
+        run: |
+          python3 -m unittest discover -s seccomp-helper -p 'test_*.py' -v
+          python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build --require-helper-command
+      - name: Rebuild privately and compare the enforced Bash tool
+        run: |
+          python3 seccomp-helper/original_acceptance.py --arch ${{ matrix.arch }} --build seccomp-helper-build --output seccomp-bash-acceptance --bash-rg public-search-helper/rg
+      - name: Retain diagnostic evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-${{ matrix.arch }}-bash-sandbox-diagnostics-${{ github.run_attempt }}
+          path: seccomp-bash-acceptance/diagnostics/
+          if-no-files-found: warn
+          retention-days: 14

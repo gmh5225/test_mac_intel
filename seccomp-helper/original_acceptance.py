@@ -36,6 +36,7 @@ def main():
     parser.add_argument("--arch", choices=["x64", "arm64"], required=True)
     parser.add_argument("--build", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--bash-rg", type=Path, help="Also rebuild and qualify both actual Bash sandbox clients with this pinned public rg")
     args = parser.parse_args()
     assert platform.system() == "Linux" and {"x86_64": "x64", "aarch64": "arm64"}.get(platform.machine()) == args.arch
     assert os.getuid() != 0
@@ -264,6 +265,9 @@ def main():
             descriptor_cases.append({"case": case, "observed": observed, "matches": True})
         from extended_comparison import accept_extended
         extended = accept_extended(isolated, state_parent, original, candidate, args.arch, receipt.setdefault("extended", {}))
+        if args.bash_rg:
+            from bash_acceptance import accept_bash
+            receipt["bash"] = accept_bash(args.arch, original, out, logs, run, bwrap, package, args.bash_rg.resolve(), receipt.setdefault("bash", {}))
         assert sha(original) == pin["sha256"]
         receipt.update(status="native_role_candidate_matches_extended_bounded_cases", descriptor_cases=descriptor_cases, extended=extended,
             namespace_normalization="Only three kernel-assigned namespace inode identities; each must be valid and differ from the same invocation's outer namespace recorded by the authored exec driver. Every other process-state field is exact.",
