@@ -53,7 +53,7 @@ def main():
     home = out / "home"; home.mkdir()
     tools = {name: shutil.which(name) for name in ["cc", "c++", "cmake", "ctest", "make", "pkg-config", "readelf"]}
     assert all(tools.values()), "A required native public build tool is unavailable"
-    tool_path = ":".join(dict.fromkeys([str(Path(path).parent) for path in tools.values()] + ["/usr/bin", "/bin"]))
+    tool_path = ":".join(dict.fromkeys([str(Path(path).parent) for path in tools.values()] + ["/usr/bin", "/bin", "/usr/sbin", "/sbin"]))
     env = dict(PATH=tool_path, HOME=str(home), LANG="C.UTF-8", LC_ALL="C.UTF-8",
                GIT_CEILING_DIRECTORIES=str(sources), CFLAGS="-O2", CXXFLAGS="-O2",
                CPPFLAGS="-I" + str(prefix / "include"),
@@ -144,7 +144,25 @@ def main():
         run("bfs-configure", [bfs / "configure", "--enable-release", "--with-oniguruma",
             "--without-libacl", "--without-libcap", "--without-libselinux", "--without-liburing"], cwd=bfs)
         make("bfs-build", bfs)
-        make("bfs-check", bfs, "check")
+        try:
+            make("bfs-check", bfs, "check")
+        except BaseException:
+            # Retain the failing public binary and a minimal public-account
+            # lookup stack before any candidate can be admitted or embedded.
+            candidate = bfs / "bin/bfs"
+            if candidate.is_file():
+                shutil.copyfile(candidate, logs / "unqualified-bfs")
+                gdb = shutil.which("gdb")
+                if gdb:
+                    result = subprocess.run([gdb, "-nx", "-nh", "--batch",
+                        "-ex", "set auto-load safe-path /unavailable", "-ex", "run", "-ex", "bt",
+                        "--args", str(candidate), ".", "-user", "neverd_missing_public_fixture_user_21296"],
+                        env=env, cwd=bfs, capture_output=True, timeout=45)
+                    (logs / "bfs-user-lookup-gdb.stdout").write_bytes(result.stdout)
+                    (logs / "bfs-user-lookup-gdb.stderr").write_bytes(result.stderr)
+                nss = Path("/etc/nsswitch.conf")
+                if nss.is_file(): shutil.copyfile(nss, logs / "public-runner-nsswitch.conf")
+            raise
         binaries = {"ugrep": ug / "bin/ugrep", "bfs": bfs / "bin/bfs"}
         for name, binary in binaries.items():
             data = binary.read_bytes()
