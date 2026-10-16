@@ -1,5 +1,5 @@
-name: NeverD source patch expansion macOS SDK repair
-run-name: macOS SDK qualification at ${{ inputs.source || '61fb1d3e759f6796d23341782e7f4d624295f27c' }}
+name: NeverD source patch expansion macOS native host
+run-name: macOS native qualification at ${{ inputs.source || '76ce83e138de639b8d75206c78bd5ccbb9cfd8dd' }}
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +7,7 @@ on:
         description: Exact NeverD source commit
         type: string
         required: true
-        default: 61fb1d3e759f6796d23341782e7f4d624295f27c
+        default: 76ce83e138de639b8d75206c78bd5ccbb9cfd8dd
       runner:
         description: Failed macOS profile to qualify
         type: choice
@@ -19,7 +19,7 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '61fb1d3e759f6796d23341782e7f4d624295f27c' }}
+  SOURCE_COMMIT: ${{ inputs.source || '76ce83e138de639b8d75206c78bd5ccbb9cfd8dd' }}
   SCCACHE_GHA_ENABLED: 'true'
 concurrency:
   group: neverd-expansion-macos-${{ github.run_id }}
@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ${{ fromJSON(inputs.runner == 'macos-15-intel' && '{"runner":"macos-15-intel","arch":"x64","jobs":4}' || '{"runner":"macos-15","arch":"arm64","jobs":3}') }}
+          - ${{ fromJSON((inputs.runner == 'macos-15-intel' || github.event_name == 'push') && '{"runner":"macos-15-intel","arch":"x64","jobs":4}' || '{"runner":"macos-15","arch":"arm64","jobs":3}') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
@@ -60,6 +60,11 @@ jobs:
           test -x "$producer/clang"
           echo "$producer" >> "$GITHUB_PATH"
           echo "SOURCE_CLANG=$producer/clang" >> "$GITHUB_ENV"
+          native_arch='${{ matrix.arch }}'
+          if [ "$native_arch" = x64 ]; then native_arch=x86_64; fi
+          test "$(uname -m)" = "$native_arch"
+          # Pinned Unicorn otherwise selects universal2 slices for a single-host JIT.
+          echo "ARCHFLAGS=-arch $native_arch" >> "$GITHUB_ENV"
       - name: Verify source and evidence contracts
         shell: bash
         run: |
@@ -75,8 +80,10 @@ jobs:
           # CMake must discover the same SDK spelling used by FindLibEdit and
           # FindBacktrace, so the SDK C headers stay implicit after libc++.
           sdk="$(xcrun --show-sdk-path)"
+          native_arch="${ARCHFLAGS#-arch }"
           cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release \
             "-DCMAKE_OSX_SYSROOT=$sdk" \
+            "-DCMAKE_OSX_ARCHITECTURES=$native_arch" \
             "-DCMAKE_AR=$(xcrun --find ar)" "-DCMAKE_RANLIB=$(xcrun --find ranlib)" \
             "-DCMAKE_C_COMPILER_AR=$(xcrun --find ar)" "-DCMAKE_CXX_COMPILER_AR=$(xcrun --find ar)" \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
@@ -88,6 +95,19 @@ jobs:
             "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$SOURCE_CLANG" 2>&1 | tee expansion-logs/configure.log
           # The Apple linker requires Darwin archives, including long member names.
           cmake -LA -N build-expansion | sed -n '/^CMAKE_.*\(AR\|RANLIB\).*=/p' | tee expansion-logs/archive-tools.log
+          python - <<'PY'
+          import json, os, pathlib, platform, shlex, subprocess
+          expected = os.environ['ARCHFLAGS'].split()
+          assert expected == ['-arch', platform.machine()]
+          target = 'third_party/unicorn/CMakeFiles/x86_64-softmmu.dir/qemu/tcg/tcg.c.o'
+          command = subprocess.check_output(['ninja', '-C', 'build-expansion', '-t', 'commands', target], text=True)
+          words = shlex.split(command)
+          slices = [words[i + 1] for i, word in enumerate(words) if word == '-arch']
+          assert slices == [platform.machine()], slices
+          record = {'source_commit': os.environ['SOURCE_COMMIT'], 'host': platform.machine(),
+                    'archflags': os.environ['ARCHFLAGS'], 'tcg_host_slices': slices, 'command': command}
+          pathlib.Path('expansion-logs/host-architecture.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
           cmake --build build-expansion --target neverd_shared NeverDSourcePatchTests NeverDSourcePatchMatrixTests NeverDSourcePatchLayoutTests NeverDSourcePatchCallbackTests NeverDNativeExceptionRewriteContractTests --parallel '${{ matrix.jobs }}' 2>&1 | tee expansion-logs/build.log
       - name: Require the complete native and CPU inventories
         shell: bash
