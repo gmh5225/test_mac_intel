@@ -73,9 +73,9 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
     (root / "etc/hosts").write_text("127.0.0.1 localhost\n::1 localhost\n")
     (root / "etc/nsswitch.conf").write_text("hosts: files\npasswd: files\ngroup: files\n")
     dependencies = []
-    def copy_public(source, destination):
+    def copy_public(source, destination, *, executable=False):
         target = root / destination.lstrip("/"); target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, target); target.chmod(source.stat().st_mode & 0o555)
+        shutil.copy2(source, target); target.chmod(0o500 if executable else source.stat().st_mode & 0o555)
         dependencies.append({"source": str(source), "destination": destination, "sha256": sha(target), "mode": oct(target.stat().st_mode & 0o777)})
     # Public runner executables only; no host root/home is bind-mounted.
     for name in ["bash", "sh", "bwrap", "socat", "env", "which", "readlink", "pwd", "mkdir", "rm", "sleep", "cat", "dirname", "basename",
@@ -102,7 +102,7 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
     copy_public(inputs / "bash-driver", "/runtime/bash-driver")
     copy_public(inputs / "bash-payload", "/runtime/bash-payload")
     copy_public(inputs / "bash-payload-dynamic", "/runtime/bash-payload-dynamic")
-    copy_public(rg, "/runtime/search/rg")
+    copy_public(rg, "/runtime/search/rg", executable=True)
     for name in ["apply-seccomp", "claude", "claude-preserved"]:
         source = seccomp_package / name; assert source.is_file()
         # Artifacts may omit executable modes; the digest gates an owned copy.
@@ -153,7 +153,11 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         assert control["sandboxed"] is False and control["unix_errno"] == 0 and control["write_denied_errno"] == 0 and control["read_bytes"] == 21
         assert (state / "protected/forbidden").is_file()
         controls.append(control)
-    partial.update(status="authored_bash_boundary_qualified", network_controls=rows, boundary_controls=controls, client_cases=[], client_invocations=[], differential_pairs=[])
+    search, _ = execute("bash-boundary-search-version", ["/runtime/search/rg", "--version"], text_spec)
+    assert search["exit_code"] == 0 and not search["stderr"] and search["stdout"].startswith("ripgrep 14.1.1")
+    assert "PCRE2 10.45 is available (JIT is available)" in search["stdout"]
+    partial.update(status="authored_bash_boundary_qualified", network_controls=rows, boundary_controls=controls,
+                   public_search_version=search["stdout"], client_cases=[], client_invocations=[], differential_pairs=[])
     (logs / "qualified-before-bash-client.json").write_text(json.dumps(partial, indent=2) + "\n")
     built = build_clients(arch, original, out / "native-build", logs, run)
     partial["native_build"] = built
