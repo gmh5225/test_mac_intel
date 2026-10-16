@@ -43,13 +43,16 @@ class Projection:
             if hard:
                 source=self.root/target;assert source.is_file() and not source.is_symlink();os.link(source,path)
             else:path.symlink_to(os.path.relpath(self.root/target,path.parent))
-def prepare(arch,out,logs):
+def prepare(arch,out,logs,*,cache=None):
     pins=ROOT/'glibc-sysroot-pins.json';profile=json.loads(pins.read_bytes())['profiles'][arch]
     archives=out/'sysroot-inputs';archives.mkdir();root=out/'sysroot';root.mkdir()
     receipt=dict(status='started',arch=arch,pins_sha256=sha(pins),sources=[],extracts=[])
     def download(label,record):
         path=archives/label;size=0;digest=hashlib.sha256()
-        with urllib.request.urlopen(record['url'],timeout=90) as source,path.open('xb') as target:
+        cached=cache/Path(record['url']).name if cache is not None else None
+        if cached is not None:assert cached.is_file() and not cached.is_symlink()
+        source=cached.open('rb') if cached is not None else urllib.request.urlopen(record['url'],timeout=90)
+        with source,path.open('xb') as target:
             while block:=source.read(1048576):
                 size+=len(block);assert size<=record['bytes'];digest.update(block);target.write(block)
         assert size==record['bytes'] and digest.hexdigest()==record['sha256']
@@ -68,12 +71,17 @@ def prepare(arch,out,logs):
     try:
         for row in profile['debs']:deb(download(row['name']+'.deb',row))
         gcc=download('gcc-13-focal.tar.gz',profile['gcc']);gcc_debs=archives/'gcc-debs';gcc_debs.mkdir();count=0
+        excluded=[]
         with tarfile.open(gcc,'r:gz') as stream:
             for member in stream:
                 rel=relative(member.name)
                 if rel is None or member.isdir():continue
                 assert member.isfile() and member.size<=256*1024*1024
                 if not rel.name.endswith('.deb'):continue
+                # Bun uses its pinned Clang. Keep every GCC runtime/header
+                # package, while omitting the three unrelated compiler drivers.
+                if rel.name.split('_')[0] in ['cpp-13','g++-13','gcc-13']:
+                    excluded.append(dict(file=rel.name,bytes=member.size));continue
                 target=gcc_debs/rel.name;assert not target.exists()
                 target.write_bytes(stream.extractfile(member).read());assert target.stat().st_size==member.size
                 count+=1;assert count<=128;deb(target)
@@ -87,8 +95,8 @@ def prepare(arch,out,logs):
             elif path.is_file():rows.append(dict(file=path.relative_to(root).as_posix(),bytes=path.stat().st_size,sha256=sha(path)))
         inventory=logs/'sysroot-files.json';inventory.write_text(json.dumps(dict(files=rows),indent=2)+'\n')
         receipt.update(status='pinned_upstream_focal_gcc13_sysroot_prepared',inventory_sha256=sha(inventory),files=len(rows),bytes=projection.bytes,
-            absolute_links_projected_inside_root=True,upstream_base_image_omitted=True,
-            scope='Five exact libc/header packages and every GCC archive deb. Only sysroot paths are materialized; host configuration is unchanged.')
+            absolute_links_projected_inside_root=True,upstream_base_image_omitted=True,excluded_compiler_executables=excluded,
+            scope='Five exact libc/header packages and all GCC runtime/header packages. The three unused GCC compiler driver packages are omitted; Bun uses pinned Clang. Host configuration is unchanged.')
         return root
     except Exception as error:receipt.update(status='failed',error=str(error));raise
     finally:(logs/'sysroot-receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

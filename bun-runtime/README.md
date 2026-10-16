@@ -37,3 +37,10 @@ It checks the resulting core's version needs against the upstream glibc 2.17
 floor before accepting any runtime. Sysroot projection preserves regular bytes,
 defers internal links and refuses traversal or conflicting materialization;
 it does not change the runner's libraries or namespace policy.
+
+The sysroot includes every runtime/header package in the pinned GCC archive.
+Its three unused GCC compiler driver packages are omitted because Bun uses
+the pinned Clang toolchain. This avoids projecting unrelated large compiler
+executables. Linux's case-distinct headers require a case-sensitive output
+filesystem; an APFS bind-mount collision is retained as a refused local
+preparation, and the unchanged projection passes on an owned Linux VM volume.
