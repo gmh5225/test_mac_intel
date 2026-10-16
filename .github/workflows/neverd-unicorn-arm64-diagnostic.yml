@@ -1,0 +1,118 @@
+name: NeverD Unicorn ARM64 closure diagnostic
+run-name: Native ARM64 Unicorn original/corrected closure comparison
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/source-patch-expansion]
+    paths: ['.github/workflows/neverd-unicorn-arm64-diagnostic.yml']
+permissions:
+  contents: read
+jobs:
+  host-dependency:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {variant: original-handler-control, handler: '0'}
+          - {variant: arm64-handler-candidate, handler: '1'}
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 81d829add1f7c2c19724f3e16f8ba4f9277656a3
+          persist-credentials: false
+      - name: Check out the exact Unicorn input
+        shell: pwsh
+        run: |
+          git submodule update --init --depth 1 third_party/unicorn
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned Unicorn checkout failed' }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: build-expansion-harness
+          ref: ${{ github.sha }}
+          sparse-checkout: expansion
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.13'
+          architecture: arm64
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Install Ninja
+        shell: pwsh
+        run: |
+          choco install ninja --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Ninja installation failed' }
+      - name: Build the pinned Unicorn for the native ARM64 host
+        env:
+          NEVERD_UNICORN_ARM64_HANDLER: ${{ matrix.handler }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory expansion-logs
+          $archive = Join-Path $env:RUNNER_TEMP 'llvm-mingw-20260519-ucrt-aarch64.zip'
+          Invoke-WebRequest 'https://github.com/mstorsjo/llvm-mingw/releases/download/20260519/llvm-mingw-20260519-ucrt-aarch64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne '7bb5e3c9964dc29555cababb55e69eea02a51e98e1240eb9513e6540c7bae0ea') { throw 'LLVM-MinGW digest mismatch' }
+          Expand-Archive $archive -DestinationPath $env:RUNNER_TEMP
+          $tool = Join-Path $env:RUNNER_TEMP 'llvm-mingw-20260519-ucrt-aarch64'
+          $cc = Join-Path $tool 'bin\aarch64-w64-mingw32-clang.exe'
+          $env:PATH = 'C:\Program Files\Git\bin;' + $env:PATH
+          python -m unittest discover -s build-expansion-harness/expansion -p test_prepare_arm64_unicorn.py -v 2>&1 | Tee-Object expansion-logs/unicorn-overlay-tests.log
+          if ($LASTEXITCODE -ne 0) { throw 'Unicorn overlay input tests failed' }
+          python build-expansion-harness/expansion/prepare_arm64_unicorn.py 2>&1 | Tee-Object expansion-logs/unicorn-prepare.log
+          if ($LASTEXITCODE -ne 0) { throw 'Unicorn build overlay validation failed' }
+          cmake -S build-unicorn-input -B build-unicorn -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 "-DCMAKE_C_COMPILER=$cc" -DCMAKE_C_FLAGS=-D__USE_MINGW_SETJMP_NON_SEH -DBUILD_SHARED_LIBS=ON -DUNICORN_LEGACY_STATIC_ARCHIVE=OFF '-DUNICORN_ARCH=x86;arm;aarch64' -DUNICORN_BUILD_TESTS=OFF -DUNICORN_INSTALL=OFF 2>&1 | Tee-Object expansion-logs/unicorn-configure.log
+          if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn configure failed' }
+          cmake --build build-unicorn --target unicorn --parallel 4 --verbose 2>&1 | Tee-Object expansion-logs/unicorn-build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn build failed' }
+          $images = @(Get-ChildItem build-unicorn -Recurse -Filter '*unicorn*.dll')
+          if ($images.Count -ne 1) { throw 'Unicorn DLL inventory differs' }
+          $dll = $images[0]
+          $reader = Join-Path $tool 'bin\llvm-readobj.exe'
+          $headers = & $reader --file-headers $dll.FullName
+          $headers | Set-Content expansion-logs/unicorn-headers.log
+          if ($LASTEXITCODE -ne 0 -or ($headers -join "`n") -notmatch 'IMAGE_FILE_MACHINE_ARM64') { throw 'Unicorn is not an ARM64 image' }
+          $exports = & $reader --coff-exports $dll.FullName
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot inspect Unicorn exports' }
+          $exports | Set-Content expansion-logs/unicorn-exports.log
+          $names = @($exports | ForEach-Object { if ($_ -match '^\s+Name: (uc_[A-Za-z0-9_]+)$') { $Matches[1] } } | Sort-Object -Unique)
+          if ($names.Count -lt 25 -or 'uc_open' -notin $names -or 'uc_context_free' -notin $names) { throw 'Unicorn C API exports incomplete' }
+          $definition = Join-Path $dll.DirectoryName 'unicorn.def'
+          @("LIBRARY $($dll.Name)", 'EXPORTS') + $names | Set-Content -Encoding ascii $definition
+          $import = Join-Path $dll.DirectoryName 'unicorn-msvc.lib'
+          lib.exe /nologo /machine:arm64 "/def:$definition" "/out:$import" 2>&1 | Tee-Object expansion-logs/unicorn-import.log
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC import library generation failed' }
+          $root = (Get-Location).Path.Replace('\','/')
+          $dllPath = $dll.FullName.Replace('\','/')
+          $importPath = $import.Replace('\','/')
+          $overlay = Join-Path $env:RUNNER_TEMP 'neverd-arm64-unicorn.cmake'
+          @"
+          add_library(unicorn SHARED IMPORTED GLOBAL)
+          set_target_properties(unicorn PROPERTIES IMPORTED_LOCATION "$dllPath" IMPORTED_IMPLIB "$importPath" INTERFACE_INCLUDE_DIRECTORIES "$root/third_party/unicorn/include")
+          target_compile_definitions(unicorn INTERFACE NOMINMAX)
+          "@ | Set-Content -Encoding utf8 $overlay
+          "UNICORN_OVERLAY=$($overlay.Replace('\','/'))" >> $env:GITHUB_ENV
+          $runtime = Join-Path $tool 'aarch64-w64-mingw32\bin'
+          New-Item -ItemType Directory -Force build-expansion/bin | Out-Null
+          Copy-Item $dll.FullName build-expansion/bin
+          Copy-Item "$runtime\*.dll" build-expansion/bin
+          $dll.DirectoryName >> $env:GITHUB_PATH
+          $runtime >> $env:GITHUB_PATH
+          Copy-Item $dll.FullName expansion-logs
+          Copy-Item $import expansion-logs
+          cl.exe /nologo /W4 /O2 /MD /DTRACE_HOST_FAILURE /Ithird_party/unicorn/include build-expansion-harness/expansion/unicorn_host_smoke.c /Febuild-expansion/bin/unicorn_host_smoke.exe /Fobuild-expansion/unicorn_host_smoke.obj /link $import 2>&1 | Tee-Object expansion-logs/unicorn-smoke-build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Native MSVC consumer build failed' }
+          python -c "import subprocess; subprocess.run(['build-expansion/bin/unicorn_host_smoke.exe'], check=True, timeout=15)" 2>&1 | Tee-Object expansion-logs/unicorn-smoke.log
+          if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn host smoke checks failed' }
+          Copy-Item build-expansion/bin/unicorn_host_smoke.exe expansion-logs
+          Copy-Item build-expansion-harness/expansion/unicorn_host_smoke.c expansion-logs
+          [ordered]@{source_commit=(git -C third_party/unicorn rev-parse HEAD); host='ARM64'; producer_sha256='7bb5e3c9964dc29555cababb55e69eea02a51e98e1240eb9513e6540c7bae0ea'; dll=$dll.Name; dll_sha256=(Get-FileHash $dll.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); import_sha256=(Get-FileHash $import -Algorithm SHA256).Hash.ToLowerInvariant()} | ConvertTo-Json | Set-Content expansion-logs/unicorn-provenance.json
+      - name: Preserve the complete diagnostic evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: unicorn-arm64-${{ matrix.variant }}
+          path: expansion-logs
+          if-no-files-found: error

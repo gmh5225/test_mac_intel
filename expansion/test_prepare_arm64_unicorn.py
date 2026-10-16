@@ -1,7 +1,7 @@
 """Check checkout normalization without weakening source authentication."""
 
 import unittest
-from unicorn_header_input import corrected_header
+from unicorn_header_input import corrected_handler, corrected_header
 
 
 class HeaderInputTests(unittest.TestCase):
@@ -30,3 +30,37 @@ class HeaderInputTests(unittest.TestCase):
         changed = self.original + self.original
         with self.assertRaisesRegex(ValueError, "setjmp guard"):
             corrected_header(changed, changed)
+
+
+class HandlerInputTests(unittest.TestCase):
+    original = (
+        b"/* retained license */\n#ifdef _WIN64\n    ptr = closure;\nretained body\n"
+    )
+
+    def test_native_handler_preserves_the_existing_x64_body(self):
+        result = corrected_handler(self.original, self.original)
+        self.assertTrue(
+            result.startswith(b"/* retained license */\n#if defined(__aarch64__)\n")
+        )
+        self.assertTrue(
+            result.endswith(
+                b"#elif defined(_WIN64)\n    ptr = closure;\nretained body\n"
+            )
+        )
+        self.assertIn(
+            b"FlushInstructionCache(GetCurrentProcess(), closure, 32);", result
+        )
+
+    def test_crlf_handler_has_the_same_compiler_input(self):
+        self.assertEqual(
+            corrected_handler(self.original.replace(b"\n", b"\r\n"), self.original),
+            corrected_handler(self.original, self.original),
+        )
+
+    def test_changed_or_ambiguous_handler_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "pinned Git input"):
+            corrected_handler(self.original + b"changed", self.original)
+        with self.assertRaisesRegex(ValueError, "exception closure"):
+            corrected_handler(
+                self.original + self.original, self.original + self.original
+            )
