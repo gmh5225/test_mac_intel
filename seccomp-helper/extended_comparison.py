@@ -22,6 +22,8 @@ def expected_events(arch, *, encoded=True):
 def validate_events(raw, identity, arch, mode):
     assert identity["owned_descendant"] is True and isinstance(identity["worker_pid"], int) and identity["worker_pid"] > 0
     events = [json.loads(line) for line in raw.splitlines()]
+    if mode in ["encoded", "backpressure"]:
+        assert events and events.pop(0) == {"encodedCommand": "fixture%20command"}, "encoded-command header differs"
     for row in events:
         assert row["pid"] == identity["worker_pid"], "event PID must be this invocation's proven owned worker"
         row["pid"] = "<owned-worker>"
@@ -38,8 +40,8 @@ def validate_events(raw, identity, arch, mode):
     return events
 
 
-def accept_extended(isolated, state_parent, original, candidate, arch):
-    signals = []
+def accept_extended(isolated, state_parent, original, candidate, arch, partial):
+    signals = partial.setdefault("external_signals", [])
     for sig in [signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGQUIT, signal.SIGUSR1, signal.SIGUSR2]:
         for mode in ["default", "caught"]:
             label = f"external-{int(sig)}-{mode}"
@@ -54,7 +56,7 @@ def accept_extended(isolated, state_parent, original, candidate, arch):
             assert json.loads(lines[0]) == {"external_signal": int(sig), "delivery": mode,
                 "helper_exit": 37 if mode == "caught" else 128 + int(sig), "worker_gone": True, "both_forwarders_ready": True}
             signals.append({"case": label, "matches": True, "observed": observed})
-    observers = []
+    observers = partial.setdefault("observers", [])
     for mode in ["encoded", "no-encoded", "missing", "drop", "backpressure"]:
         observed = {}; events = {}; files = {}
         for name, exe in [("original", original), ("candidate", candidate)]:
@@ -80,6 +82,6 @@ def accept_extended(isolated, state_parent, original, candidate, arch):
         if mode != "backpressure": assert events["original"] == events["candidate"]
         observers.append({"case": mode, "matches": True, "observed": observed, "events": events,
                           "files": files, "event_count_equal_required": mode != "backpressure"})
-    return {"external_signals": signals, "observers": observers,
-            "normalization": "Only observer PIDs, validated as this invocation's owned worker; backpressure event counts may differ because the source explicitly drops queued telemetry. All received event contents/order are checked.",
-            "observer_is_enforcement": False}
+    partial.update(normalization="Only observer PIDs, validated as this invocation's owned worker; backpressure event counts may differ because the source explicitly drops queued telemetry. All received event contents/order are checked.",
+                   observer_is_enforcement=False)
+    return partial

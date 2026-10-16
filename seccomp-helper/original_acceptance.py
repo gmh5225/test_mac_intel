@@ -161,6 +161,11 @@ def main():
                 argv += ["--setenv", "NEVERD_ROUTE_FD3", "1"]
             command = ["/runtime/driver", entrypoint] if role else [entrypoint]
             result = run(label, [*argv, "--", *command, *arguments], expected=expected, timeout=30, limited=True)
+            if entrypoint == "/runtime/supervision-control":
+                evidence = logs / "supervision" / label
+                evidence.mkdir(parents=True)
+                for name in ["events.jsonl", "observer-worker.json"]:
+                    if (state / name).is_file(): shutil.copyfile(state / name, evidence / name)
             if role:
                 first, separator, rest = result["stdout"].partition("\n")
                 prefix = "NEVERD_OUTER_NAMESPACE "
@@ -258,7 +263,7 @@ def main():
                     "fd3_valid_before_close": True, "fd3_result_after_close": -1, "errno": 9}
             descriptor_cases.append({"case": case, "observed": observed, "matches": True})
         from extended_comparison import accept_extended
-        extended = accept_extended(isolated, state_parent, original, candidate, args.arch)
+        extended = accept_extended(isolated, state_parent, original, candidate, args.arch, receipt.setdefault("extended", {}))
         assert sha(original) == pin["sha256"]
         receipt.update(status="native_role_candidate_matches_extended_bounded_cases", descriptor_cases=descriptor_cases, extended=extended,
             namespace_normalization="Only three kernel-assigned namespace inode identities; each must be valid and differ from the same invocation's outer namespace recorded by the authored exec driver. Every other process-state field is exact.",

@@ -6,14 +6,14 @@ from extended_comparison import expected_events, validate_events
 
 
 class ObserverEvidenceTests(unittest.TestCase):
-    def wire(self, rows):
-        return "".join(json.dumps({**row, "pid": 42}) + "\n" for row in rows)
+    def wire(self, rows, *, encoded=True):
+        return (json.dumps({"encodedCommand": "fixture%20command"}) + "\n" if encoded else "") + "".join(json.dumps({**row, "pid": 42}) + "\n" for row in rows)
 
     def test_exact_architectures(self):
         for arch in ["x64", "arm64"]:
             for mode in ["encoded", "no-encoded"]:
                 rows = expected_events(arch, encoded=mode != "no-encoded")
-                self.assertEqual(validate_events(self.wire(rows), {"owned_descendant": True, "worker_pid": 42}, arch, mode), rows)
+                self.assertEqual(validate_events(self.wire(rows, encoded=mode != "no-encoded"), {"owned_descendant": True, "worker_pid": 42}, arch, mode), rows)
 
     def test_reject_semantic_mutations(self):
         rows = expected_events("x64")
