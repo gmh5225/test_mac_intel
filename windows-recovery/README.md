@@ -23,6 +23,14 @@ Two native builds must match each other and the local cross-build. All 2,586
 module rows are read back before four original/rebuilt smoke cases run in
 fresh AppContainers. No original prefix, bytecode, or prelinked cache is reused.
 
+The editable-source probe changes one unique CLI version literal in a separate
+copy of the captured source. Both the before/after source hashes and the complete
+edited module inventory are pinned. Two independent native rebuilds must match
+the local editable cross-build, all 2,586 rows are read back, and the modified
+version output must run in the same capability-free AppContainer. This proves
+that the edited source is used by the executable; it does not establish
+equivalence for arbitrary edits or restore erased source names and types.
+
 The remaining suite compares seven configuration cases and 22 offline behavior
 cases covering tool permissions, hooks, MCP, fragmented protocol messages,
 session persistence and interruption. An authored loopback server supplies

@@ -12,6 +12,7 @@ import uuid
 from configuration_acceptance import accept_configuration
 from native_acceptance import accept_native
 from behavior_acceptance import accept_behavior
+from editable_acceptance import accept_editable
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -32,7 +33,7 @@ PINS = {
 }
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
-def accept_client(arch, out, bun, compiler, compiler_env, clean_env, run, overall):
+def accept_client(arch, out, bun, compiler, compiler_env, clean_env, run, overall, editable_probe=False):
     pins = PINS[arch]
     logs = out / "evidence"
     receipt = {"status": "started", "architecture": arch, "version": "2.1.296",
@@ -124,6 +125,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
             assert all(results[0][key] == results[1][key] for key in ["stdout_sha256", "stderr_sha256"]), (case, results)
             receipt["cases"].append({"case": case, "matches": True, "results": results})
         assert sha(original) == pins["original"] and sha(mapping) == pins["mapping"], "input preservation"
+        if editable_probe:
+            receipt["editable"] = accept_editable(arch, out, bun, clean_env, run, extraction, pins)
         failures = []
         for name, action in [
             ("native", lambda: accept_native(arch, out, bun, compiler, compiler_env, clean_env, run)),

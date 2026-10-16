@@ -27,6 +27,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arch", choices=list(PINS), required=True)
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--editable-probe", action="store_true")
     args = ap.parse_args()
     out = args.output.resolve(); out.mkdir()
     logs = out / "evidence"; logs.mkdir()
@@ -148,7 +149,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         except Exception as error:
             receipt["helper_qualification"] = {"status": "failed", "error": str(error)}
         receipt.update(authored_inputs_only=False, scope="Authored environment qualified; published client acceptance in progress.")
-        receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt)
+        receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt,
+                                                     editable_probe=args.editable_probe)
         receipt.update(status="windows_offline_acceptance_pass",
                        scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases and native load-only. No live model service or device exports tested.")
     except Exception as error:

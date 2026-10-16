@@ -28,7 +28,7 @@ jobs:
           persist-credentials: false
       - name: Qualify environment and compare pinned client
         shell: pwsh
-        run: python windows-recovery/qualify.py --arch ${{ matrix.arch }} --output windows-evidence
+        run: python windows-recovery/qualify.py --arch ${{ matrix.arch }} --output windows-evidence --editable-probe
       - name: Retain diagnostic receipts only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
