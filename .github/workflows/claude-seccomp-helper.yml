@@ -10,15 +10,27 @@ permissions:
   contents: read
 jobs:
   build:
-    name: Native ${{ matrix.arch }} seccomp helper and policy
+    name: Native ${{ matrix.arch }} seccomp on ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
             runner: ubuntu-24.04
+            os: ubuntu24
+            command_check: ''
           - arch: arm64
             runner: ubuntu-24.04-arm
+            os: ubuntu24
+            command_check: ''
+          - arch: x64
+            runner: ubuntu-22.04
+            os: ubuntu22
+            command_check: --require-helper-command
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            os: ubuntu22
+            command_check: --require-helper-command
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
     steps:
@@ -28,11 +40,11 @@ jobs:
       - name: Build pinned public sources and run native kernel controls
         run: |
           python3 -m unittest discover -s seccomp-helper -p test_controls.py -v
-          python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build
+          python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build ${{ matrix.command_check }}
       - name: Retain public helper sources and binaries
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: public-linux-${{ matrix.arch }}-seccomp-helper-${{ github.run_attempt }}
+          name: public-linux-${{ matrix.arch }}-${{ matrix.os }}-seccomp-helper-${{ github.run_attempt }}
           path: seccomp-helper-build/public-seccomp-helper/
           if-no-files-found: error
           retention-days: 14
@@ -40,7 +52,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: public-linux-${{ matrix.arch }}-seccomp-helper-diagnostics-${{ github.run_attempt }}
+          name: public-linux-${{ matrix.arch }}-${{ matrix.os }}-seccomp-helper-diagnostics-${{ github.run_attempt }}
           path: seccomp-helper-build/diagnostics/
           if-no-files-found: error
           retention-days: 14

@@ -65,6 +65,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", choices=["x64", "arm64"], required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--require-helper-command", action="store_true")
     args = parser.parse_args()
     native = {"x86_64": "x64", "aarch64": "arm64"}.get(platform.machine())
     assert platform.system() == "Linux" and native == args.arch, "A matching native Linux host is required"
@@ -84,6 +85,11 @@ def main():
                "native_machine": platform.machine(), "kernel": platform.release(),
                "public_sources_only": True, "captured_client_executed": False,
                "commands": [], "sources": []}
+    receipt["host_policy"] = {str(p): p.read_text().strip() if p.exists() else None for p in [
+        Path("/proc/sys/kernel/apparmor_restrict_unprivileged_userns"),
+        Path("/proc/sys/kernel/unprivileged_userns_clone"), Path("/proc/sys/user/max_user_namespaces")]}
+    receipt["os_release"] = platform.freedesktop_os_release()
+    receipt["helper_command_required"] = args.require_helper_command
 
     def run(label, command, expected=0, timeout=120):
         command = list(map(str, command))
@@ -177,6 +183,10 @@ def main():
         assert reports["filter"]["cases"] == reports["filter-exec"]["cases"]
         _, stdout, stderr = run("control-malformed-filter", [control, "malformed-filter"], timeout=15)
         assert not stderr and json.loads(stdout) == {"case": "malformed-filter", "result": -1, "errno": errno.EINVAL}
+        _, stdout, stderr = run("control-process-state", [control, "process-state"], timeout=15)
+        assert not stderr
+        baseline_state = json.loads(stdout)
+        assert baseline_state["cap_effective"] == baseline_state["cap_ambient"] == 0
         # This observation cannot convert an unavailable namespace into a pass.
         code, stdout, stderr = run("helper-command", [helper, control, "exit-37"], expected=None, timeout=15)
         assert not stdout
@@ -187,9 +197,31 @@ def main():
             report = json.loads(stdout)
             check_report(report, "baseline", True)
             helper_command["policy"] = report
+            _, stdout, stderr = run("helper-process-state", [helper, control, "process-state"], timeout=15)
+            assert not stderr
+            state = json.loads(stdout)
+            assert state["pid"] == 2 and state["ppid"] == 1 and state["visible_pids"] == 2
+            assert state["uid"] == os.getuid() and state["gid"] == os.getgid()
+            assert state["cap_effective"] == state["cap_ambient"] == 0
+            assert state["no_new_privs"] == 1 and state["seccomp"] == 2
+            assert all(state[key] != baseline_state[key] for key in ["pid_ns", "user_ns", "mount_ns"])
+            helper_command["baseline_state"] = baseline_state
+            helper_command["isolated_state"] = state
+            helper_command["child_signal_exits"] = {}
+            for mode, code in [("raise-term", 143), ("raise-kill", 137)]:
+                _, stdout, stderr = run("helper-" + mode, [helper, control, mode], expected=code, timeout=15)
+                assert not stdout and not stderr
+                helper_command["child_signal_exits"][mode] = code
+            absent = build / "intentionally-absent-command"
+            assert not absent.exists()
+            _, stdout, stderr = run("helper-absent-command", [helper, absent], expected=1, timeout=15)
+            assert not stdout and stderr == "apply-seccomp: execvp: No such file or directory\n"
+            helper_command["missing_executable_rejected"] = True
         else:
             assert code == 1 and namespace_unavailable(stderr), "Unexpected helper command failure"
             helper_command = {"status": "unavailable_in_runner", "exit_code": code, "stderr": stderr}
+        receipt["helper_command"] = helper_command
+        assert not args.require_helper_command or helper_command["status"] == "exit_status_relay_observed", "Required helper command path unavailable"
         receipt.update(status="public_helper_built_and_native_filter_controlled", native_kernel_controls=reports,
                        malformed_filter_rejected=True, helper_command=helper_command,
                        binaries={name: {"sha256": sha(build / name), "bytes": (build / name).stat().st_size}

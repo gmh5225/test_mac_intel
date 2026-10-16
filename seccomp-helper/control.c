@@ -1,9 +1,11 @@
 /* Authored controls: create/close sockets only; no connections or host writes. */
 #define _GNU_SOURCE
 #include <errno.h>
+#include <dirent.h>
 #include <linux/filter.h>
 #include <linux/seccomp.h>
 #include <stdint.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -72,9 +74,49 @@ static void report(const char *mode) {
     puts("]}");
 }
 
+static void process_state(void) {
+    unsigned long long effective = 0, ambient = 0;
+    int fields = 0;
+    char line[512];
+    FILE *status = fopen("/proc/self/status", "r");
+    if (!status) fail("status");
+    while (fgets(line, sizeof(line), status)) {
+        if (sscanf(line, "CapEff: %llx", &effective) == 1) fields |= 1;
+        if (sscanf(line, "CapAmb: %llx", &ambient) == 1) fields |= 2;
+    }
+    fclose(status);
+    if (fields != 3) exit(73);
+    char pid_ns[80], user_ns[80], mount_ns[80];
+    char *values[] = {pid_ns, user_ns, mount_ns};
+    const char *paths[] = {"/proc/self/ns/pid", "/proc/self/ns/user", "/proc/self/ns/mnt"};
+    for (size_t i = 0; i < 3; ++i) {
+        ssize_t n = readlink(paths[i], values[i], 79);
+        if (n < 1 || n >= 79) fail("namespace link");
+        values[i][n] = '\0';
+    }
+    DIR *proc = opendir("/proc");
+    if (!proc) fail("proc directory");
+    struct dirent *entry;
+    int visible = 0;
+    while ((entry = readdir(proc))) {
+        if (entry->d_name[0] >= '1' && entry->d_name[0] <= '9' &&
+            strspn(entry->d_name, "0123456789") == strlen(entry->d_name)) ++visible;
+    }
+    closedir(proc);
+    printf("{\"pid\":%d,\"ppid\":%d,\"uid\":%d,\"gid\":%d,\"cap_effective\":%llu,"
+           "\"cap_ambient\":%llu,\"no_new_privs\":%d,\"seccomp\":%d,\"visible_pids\":%d,"
+           "\"pid_ns\":\"%s\",\"user_ns\":\"%s\",\"mount_ns\":\"%s\"}\n",
+           (int)getpid(), (int)getppid(), (int)getuid(), (int)getgid(), effective, ambient,
+           prctl(PR_GET_NO_NEW_PRIVS, 0, 0, 0, 0), prctl(PR_GET_SECCOMP), visible,
+           pid_ns, user_ns, mount_ns);
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) return 64;
     if (strcmp(argv[1], "exit-37") == 0) return 37;
+    if (strcmp(argv[1], "process-state") == 0) { process_state(); return 0; }
+    if (strcmp(argv[1], "raise-term") == 0) { raise(SIGTERM); return 74; }
+    if (strcmp(argv[1], "raise-kill") == 0) { raise(SIGKILL); return 74; }
     if (strcmp(argv[1], "malformed-filter") == 0) {
         struct sock_filter code = {.code = 0xffff};
         struct sock_fprog prog = {.len = 1, .filter = &code};

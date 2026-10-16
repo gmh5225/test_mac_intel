@@ -23,8 +23,14 @@ The baseline records pre-existing io_uring denial separately.
 The public helper also attempts to run an authored exit-status control using
 its own namespace setup. If the runner prevents namespace creation, the
 receipt records that limitation. A successful command gets an additional
-policy check. Neither result proves equivalence to the original client's full
-helper implementation, supervisor, optional observer, or native dispatcher.
+policy check, PID/user/mount namespace checks, capability checks, child signal
+exit relay and missing-executable rejection. `--require-helper-command` makes
+an unavailable command path fail the build. The Ubuntu 22.04 jobs require
+this path; Ubuntu 24.04 retains its measured namespace restriction. Host
+policy is recorded, and the workflow does not change it.
+
+These checks do not prove equivalence to the original client's full helper
+implementation, supervisor, optional observer, or native dispatcher.
 
 Artifacts contain public sources, licenses, exact inputs, static executables,
 receipts and diagnostics. No captured client or recovered client source is
