@@ -1,0 +1,70 @@
+{
+  "profiles": {
+    "x64": {
+      "image": "python@sha256:80f5d259a5969c86f6c92145d572de4a68c68e0edd28d4367dec0fb411b42af3",
+      "library": "/usr/lib/x86_64-linux-gnu/libseccomp.so.2.5.4",
+      "library_sha256": "df79d556924ecb71a946482802a0a0d584c30a7a25e564eccf19b7b72996bbbe",
+      "elf_machine": 62,
+      "filter_arch": "x86_64",
+      "docker_platform": "linux/amd64"
+    },
+    "arm64": {
+      "image": "python@sha256:b6e215e1d3d8787fe1e0f1507c7d2418b16fe19acef77cf971b2d965570ced41",
+      "library": "/usr/lib/aarch64-linux-gnu/libseccomp.so.2.5.4",
+      "library_sha256": "37ab5fe229e2edbd12350516158d4940337ceec093f0a498583636a0b4b54375",
+      "elf_machine": 183,
+      "filter_arch": "aarch64",
+      "docker_platform": "linux/arm64"
+    }
+  },
+  "filters": {
+    "x86_64": {
+      "bytes": 136,
+      "sha256": "9f5a4bdf5539a9cdacc93cdb1dd2778de21b773db3ca20170c46b571e9b9b207",
+      "define": "__x86_64__"
+    },
+    "aarch64": {
+      "bytes": 120,
+      "sha256": "29e0dc4080a3e5629f7d7cc4941f8a4be04ed60a68bd8a724b1acea44d824c27",
+      "define": "__aarch64__"
+    }
+  },
+  "sources": [
+    {
+      "file": "sandbox-runtime/LICENSE",
+      "url": "https://raw.githubusercontent.com/anthropics/sandbox-runtime/9520430507ce3c354a71b1518e29e76121407ed1/LICENSE",
+      "bytes": 11339,
+      "sha256": "1210bc93eb85dd786c33192d5bcb7153a93922fa99fbc1512af6a7199cb41080"
+    },
+    {
+      "file": "sandbox-runtime/vendor/seccomp-src/apply-seccomp.c",
+      "url": "https://raw.githubusercontent.com/anthropics/sandbox-runtime/9520430507ce3c354a71b1518e29e76121407ed1/vendor/seccomp-src/apply-seccomp.c",
+      "bytes": 37104,
+      "sha256": "74e2ddfdef60edaf849ce13ab03def2d3ef42bf784ed79b86bab2823098f15dc"
+    },
+    {
+      "file": "sandbox-runtime/vendor/seccomp-src/seccomp-unix-block.c",
+      "url": "https://raw.githubusercontent.com/anthropics/sandbox-runtime/9520430507ce3c354a71b1518e29e76121407ed1/vendor/seccomp-src/seccomp-unix-block.c",
+      "bytes": 5418,
+      "sha256": "6802faf04898a488d0ba1d512ef23fc65a43545c017a8d516a567063a2b315dc"
+    },
+    {
+      "file": "libseccomp/include/seccomp.h.in",
+      "url": "https://raw.githubusercontent.com/seccomp/libseccomp/f33f95014b36f97b42f0c2290e96d5c31647ed10/include/seccomp.h.in",
+      "bytes": 25571,
+      "sha256": "b09c74515147beab1d6e59a07aca84053b2c12a01cc724dd0802c54e26c28a17"
+    },
+    {
+      "file": "libseccomp/include/seccomp-syscalls.h",
+      "url": "https://raw.githubusercontent.com/seccomp/libseccomp/f33f95014b36f97b42f0c2290e96d5c31647ed10/include/seccomp-syscalls.h",
+      "bytes": 50328,
+      "sha256": "d7214b476963d743ab3fe663b7dd3bcec291df395e5b82c3ee9a1f4bf1fcd3b1"
+    },
+    {
+      "file": "libseccomp/LICENSE",
+      "url": "https://raw.githubusercontent.com/seccomp/libseccomp/f33f95014b36f97b42f0c2290e96d5c31647ed10/LICENSE",
+      "bytes": 24428,
+      "sha256": "102900208eef27b766380135906d431dba87edaa7ec6aa72e6ebd3dd67f3a97b"
+    }
+  ]
+}
