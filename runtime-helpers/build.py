@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import tarfile
@@ -41,14 +42,18 @@ def unpack(archive, root, prefix):
                 path.write_bytes(tar.extractfile(member).read()); path.chmod(member.mode & 0o777)
 
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, required=True); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--arch", choices=["x64", "arm64"], default="x64"); args = parser.parse_args()
+    native = {"x86_64": "x64", "AMD64": "x64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine())
+    assert platform.system() == "Linux" and native == args.arch, "Use the requested native Linux architecture"
+    docker_platform = {"x64": "linux/amd64", "arm64": "linux/arm64"}[args.arch]
     out = args.output.resolve(); out.mkdir()
     logs = out / "diagnostics"; logs.mkdir()
     sources = out / "sources"; sources.mkdir()
     build = out / "build"; build.mkdir()
     package = out / "public-search-helper"; package.mkdir()
     receipt = {"status": "started", "public_sources_only": True, "captured_client_executed": False,
-               "container": IMAGE, "sources": [], "commands": []}
+               "container": IMAGE, "platform": "linux-" + args.arch, "native_machine": platform.machine(), "sources": [], "commands": []}
     def run(name, command, timeout=1800):
         receipt["commands"].append({"name": name, "argv": list(map(str, command))})
         with (logs / (name + ".log")).open("xb") as log:
@@ -62,8 +67,8 @@ def main():
             archive.write_bytes(data); unpack(archive, sources / label, prefix)
             receipt["sources"].append({"component": label, "url": url, "sha256": digest})
         shutil.copytree(sources / "ripgrep", build / "ripgrep", symlinks=True)
-        run("pull", ["docker", "pull", "--platform", "linux/amd64", IMAGE])
-        base = ["docker", "run", "--rm", "--platform", "linux/amd64", "--read-only", "--cap-drop", "ALL",
+        run("pull", ["docker", "pull", "--platform", docker_platform, IMAGE])
+        base = ["docker", "run", "--rm", "--platform", docker_platform, "--read-only", "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges", "--user", f"{os.getuid()}:{os.getgid()}", "--cpus", "2", "--memory", "4g",
                 "--tmpfs", "/tmp:rw,nosuid,nodev,size=256m", "--mount", f"type=bind,src={build},dst=/build",
                 "--env", "CARGO_HOME=/build/cargo-home", "--workdir", "/build/ripgrep"]

@@ -2,7 +2,7 @@
 
 The recovery's independent Bun executable lacks the original binary's native
 `argv[0]=rg` dispatcher. This job builds upstream ripgrep 14.1.1 with PCRE2
-10.45 in a pinned Rust 1.85.1 Linux container on a native x64 runner. Archives
+10.45 in a pinned Rust 1.85.1 Linux container on native x64 and ARM64 runners. Archives
 and Cargo dependencies are pinned; compilation runs offline after fetching.
 PCRE2 self-tests and authored search/regex/Unicode controls must pass.
 
@@ -22,3 +22,9 @@ locked dependency archives with licenses, build scripts and receipts. It does
 not contain a captured or recovered Claude executable. The helper must still
 be qualified and compared in the recovery harness; this job alone does not
 restore embedded multicall dispatch or establish full equivalence.
+
+Use `--arch x64` (the default) or `--arch arm64` on the corresponding native
+Linux host. The driver rejects a mismatched host before creating an output
+directory. The original measured x64 build retains its SSSE3/no-AVX2 compile
+flags; ARM64 uses its normal target baseline. Architecture-specific artifacts
+and diagnostics are uploaded separately, including all public hidden metadata.

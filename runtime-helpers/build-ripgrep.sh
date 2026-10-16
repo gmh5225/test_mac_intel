@@ -3,7 +3,11 @@ set -eu
 export CARGO_HOME=/build/cargo-home
 export CARGO_TARGET_DIR=/build/target
 export CARGO_BUILD_JOBS=2
-export RUSTFLAGS='-C target-feature=+ssse3,-avx2'
+case "$(uname -m)" in
+  x86_64) export RUSTFLAGS='-C target-feature=+ssse3,-avx2' ;;
+  aarch64) export RUSTFLAGS='' ;;
+  *) echo 'Unsupported native build architecture' >&2; exit 1 ;;
+esac
 # pcre2-sys 0.2.9 treats 1 as "compile its older vendored source".
 # Use pkg-config to select our pinned 10.45 static library instead.
 export PCRE2_SYS_STATIC=0
