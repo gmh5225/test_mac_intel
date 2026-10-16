@@ -134,6 +134,10 @@ def main():
     build = out / "build"; build.mkdir()
     package = out / "public-search-helper"; package.mkdir()
     env = dict(os.environ, CARGO_HOME=str(build / "cargo-home"), CARGO_TARGET_DIR=str(build / "target"), CARGO_BUILD_JOBS="2")
+    # The archive has no .git directory. Never let upstream build.rs report
+    # the enclosing recovery/CI repository as the ripgrep source revision.
+    env["GIT_CEILING_DIRECTORIES"] = str(build)
+    env.pop("RIPGREP_BUILD_GIT_HASH", None)
     flags = "-C target-feature=+ssse3,-avx2" if args.arch == "x64" else ""
     if system == "Windows":
         flags += " -C target-feature=+crt-static"
@@ -162,6 +166,11 @@ def main():
             projection = unpack_portable(archive, sources / label, prefix)
             receipt["sources"].append({"component": label, "url": url, "sha256": digest, "portable_projection": projection})
         shutil.copytree(sources / "ripgrep", build / "ripgrep", symlinks=True)
+        probe = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=build / "ripgrep", env=env, capture_output=True, timeout=15)
+        (logs / "git-source-boundary.stdout").write_bytes(probe.stdout)
+        (logs / "git-source-boundary.stderr").write_bytes(probe.stderr)
+        assert probe.returncode != 0 and not probe.stdout, "archive build inherited an unrelated Git repository"
+        receipt["git_parent_discovery_blocked"] = True
         run("rust-toolchain", ["rustup", "toolchain", "install", RUST_VERSION, "--profile", "minimal", "--target", target])
         cargo = ["rustup", "run", RUST_VERSION, "cargo"]
         run("rust-version", ["rustup", "run", RUST_VERSION, "rustc", "--version", "--verbose"])
@@ -221,6 +230,7 @@ def main():
         run("rg-version", [binary, "--version"], timeout=15)
         version = (logs / "rg-version.log").read_text()
         assert version.startswith("ripgrep 14.1.1") and "features:+pcre2" in version
+        assert "(rev " not in version, "archive build must not invent a source revision"
         assert "PCRE2 10.45 is available (JIT is available)" in version
         fixture = out / "fixture.txt"; fixture.write_bytes("first\nNEEDLE\npreneedle\n🐈\n".encode())
         controls = []
