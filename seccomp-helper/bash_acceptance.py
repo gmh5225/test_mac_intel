@@ -79,6 +79,9 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         source = Path(shutil.which(name)); assert source.is_absolute() and source.is_file()
         destination = "/bin/" + name
         copy_public(source, destination)
+        if source.read_bytes()[:4] != b"\x7fELF":
+            assert name == "which" and source.read_bytes().startswith(b"#!/bin/sh\n"), "Unqualified public tool interpreter"
+            continue
         result = run("bash-ldd-" + name, ["ldd", source])
         for match in re.finditer(r"(?:=>\s*)?(/(?:usr/)?lib[^\s]*)\s+\(", result["stdout"]):
             library = Path(match.group(1)); assert library.is_file()
