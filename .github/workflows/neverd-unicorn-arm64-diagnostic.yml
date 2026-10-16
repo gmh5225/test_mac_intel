@@ -1,5 +1,5 @@
 name: NeverD Unicorn ARM64 closure diagnostic
-run-name: Native ARM64 Unicorn original/corrected closure comparison
+run-name: Native ARM64 Unicorn narrow/wide pointer-mask comparison
 on:
   workflow_dispatch:
   push:
@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {variant: original-handler-control, handler: '0'}
-          - {variant: arm64-handler-candidate, handler: '1'}
+          - {variant: narrow-mask-control, handler: '1', masks: '0'}
+          - {variant: wide-mask-candidate, handler: '1', masks: '1'}
     runs-on: windows-11-arm
     timeout-minutes: 30
     steps:
@@ -49,6 +49,7 @@ jobs:
       - name: Build the pinned Unicorn for the native ARM64 host
         env:
           NEVERD_UNICORN_ARM64_HANDLER: ${{ matrix.handler }}
+          NEVERD_UNICORN_ARM64_WIDE_MASKS: ${{ matrix.masks }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory expansion-logs

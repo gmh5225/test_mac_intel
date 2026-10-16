@@ -1,7 +1,7 @@
 """Check checkout normalization without weakening source authentication."""
 
 import unittest
-from unicorn_header_input import corrected_handler, corrected_header
+from unicorn_header_input import corrected_handler, corrected_header, corrected_masks
 
 
 class HeaderInputTests(unittest.TestCase):
@@ -64,3 +64,24 @@ class HandlerInputTests(unittest.TestCase):
             corrected_handler(
                 self.original + self.original, self.original + self.original
             )
+
+
+class ImmediateMaskTests(unittest.TestCase):
+    original = (
+        b"prefix\nt1 = t0 & ~(0xffffUL << s0);\nt2 = t1 & ~(0xffffUL << s1);\nsuffix\n"
+    )
+
+    def test_both_masks_are_wide_and_the_other_bytes_are_preserved(self):
+        expected = self.original.replace(b"0xffffUL", b"0xffffULL")
+        self.assertEqual(corrected_masks(self.original, self.original), expected)
+        self.assertEqual(
+            corrected_masks(self.original.replace(b"\n", b"\r\n"), self.original),
+            expected,
+        )
+
+    def test_changed_or_missing_mask_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "pinned Git input"):
+            corrected_masks(self.original + b"changed", self.original)
+        changed = self.original.replace(b"0xffffUL << s1", b"other")
+        with self.assertRaisesRegex(ValueError, "immediate mask"):
+            corrected_masks(changed, changed)

@@ -37,3 +37,13 @@ def corrected_handler(original: bytes, committed: bytes) -> bytes:
 #elif defined(_WIN64)
     ptr = closure;"""
     return committed.replace(old, new)
+
+
+def corrected_masks(original: bytes, committed: bytes) -> bytes:
+    authenticate(original, committed)
+    for shift in (b"s0", b"s1"):
+        old = b"0xffffUL << " + shift
+        if committed.count(old) != 1:
+            raise ValueError("unexpected ARM64 immediate mask")
+        committed = committed.replace(old, b"0xffffULL << " + shift)
+    return committed

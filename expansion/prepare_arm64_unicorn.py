@@ -6,7 +6,12 @@ import json
 import os
 import shutil
 import subprocess
-from unicorn_header_input import authenticate, corrected_handler, corrected_header
+from unicorn_header_input import (
+    authenticate,
+    corrected_handler,
+    corrected_header,
+    corrected_masks,
+)
 
 root = Path.cwd()
 source = root / "third_party/unicorn"
@@ -67,6 +72,27 @@ evidence["handler"] = {
         "https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions",
         "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-flushinstructioncache",
     ],
+}
+mask_path = Path("qemu/tcg/aarch64/tcg-target.inc.c")
+mask_original = (source / mask_path).read_bytes()
+mask_committed = subprocess.check_output(
+    ["git", "-C", str(source), "show", commit + ":" + mask_path.as_posix()]
+)
+authenticate(mask_original, mask_committed)
+apply_masks = os.environ.get("NEVERD_UNICORN_ARM64_WIDE_MASKS", "1") == "1"
+mask_compiled = (
+    corrected_masks(mask_original, mask_committed) if apply_masks else mask_committed
+)
+(destination / mask_path).write_bytes(mask_compiled)
+(logs / "unicorn-original-tcg-target.inc.c").write_bytes(mask_original)
+(logs / "unicorn-compiled-tcg-target.inc.c").write_bytes(mask_compiled)
+evidence["immediate_masks"] = {
+    "path": mask_path.as_posix(),
+    "applied": apply_masks,
+    "original_sha256": hashlib.sha256(mask_original).hexdigest(),
+    "committed_sha256": hashlib.sha256(mask_committed).hexdigest(),
+    "compiled_sha256": hashlib.sha256(mask_compiled).hexdigest(),
+    "reason": "Windows LLP64 unsigned long is 32 bits; immediate construction requires 64-bit mask complements to preserve native function-pointer high bits",
 }
 (logs / "unicorn-build-overlay.json").write_text(json.dumps(evidence, indent=2) + "\n")
 print(json.dumps(evidence, indent=2))

@@ -5,8 +5,10 @@
 #ifdef TRACE_HOST_FAILURE
 #include <windows.h>
 static LONG CALLBACK trace_exception(PEXCEPTION_POINTERS exception) {
+  static unsigned reports;
   unsigned char bytes[16];
   SIZE_T count = 0;
+  if (reports++ >= 16) return EXCEPTION_CONTINUE_SEARCH;
   fprintf(stderr, "EXCEPTION code=%08lx pc=%p fault=%p\n",
           exception->ExceptionRecord->ExceptionCode,
           exception->ExceptionRecord->ExceptionAddress,
