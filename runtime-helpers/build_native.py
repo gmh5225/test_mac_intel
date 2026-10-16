@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -180,6 +181,7 @@ def main():
         install = build / "install"
         cmake = ["cmake", "-S", sources / "pcre2", "-B", build / "pcre2-build", "-G", "Ninja",
                  "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_INSTALL_PREFIX=" + str(install),
+                 "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                  "-DBUILD_SHARED_LIBS=OFF", "-DBUILD_STATIC_LIBS=ON", "-DPCRE2_BUILD_PCRE2_8=ON",
                  "-DPCRE2_BUILD_PCRE2_16=OFF", "-DPCRE2_BUILD_PCRE2_32=OFF", "-DPCRE2_BUILD_PCRE2GREP=OFF",
                  "-DPCRE2_BUILD_TESTS=ON", "-DPCRE2_SUPPORT_JIT=ON", "-DPCRE2_STATIC_RUNTIME=ON"]
@@ -187,7 +189,18 @@ def main():
             cmake += ["-DCMAKE_OSX_ARCHITECTURES=" + {"x64": "x86_64", "arm64": "arm64"}[args.arch],
                       "-DCMAKE_OSX_DEPLOYMENT_TARGET=13.0"]
             env["MACOSX_DEPLOYMENT_TARGET"] = "13.0"
+        else:
+            # CMake's CMP0091 model can supply /MD independently of the
+            # legacy PCRE2_STATIC_RUNTIME flag. Match Rust's +crt-static.
+            cmake += ["-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded"]
         run("pcre2-configure", cmake)
+        shutil.copyfile(build / "pcre2-build/CMakeCache.txt", logs / "pcre2-CMakeCache.txt")
+        compile_commands = build / "pcre2-build/compile_commands.json"
+        shutil.copyfile(compile_commands, logs / "pcre2-compile-commands.json")
+        if system == "Windows":
+            commands = json.loads(compile_commands.read_text())
+            assert commands and all(re.search(r"(?:^|\s)[/-]MT(?:\s|$)", row["command"]) for row in commands)
+            assert all(not re.search(r"(?:^|\s)[/-]MDd?(?:\s|$)", row["command"]) for row in commands)
         run("pcre2-build", ["cmake", "--build", build / "pcre2-build", "--parallel", "2"])
         run("pcre2-tests", ["ctest", "--test-dir", build / "pcre2-build", "--output-on-failure"], timeout=600)
         run("pcre2-install", ["cmake", "--install", build / "pcre2-build"])
@@ -195,6 +208,10 @@ def main():
         filename = library_name + ".lib" if system == "Windows" else "lib" + library_name + ".a"
         libraries = list(install.rglob(filename))
         assert len(libraries) == 1
+        if system == "Windows":
+            run("pcre2-crt-directives", ["dumpbin", "/directives", libraries[0]])
+            directives = (logs / "pcre2-crt-directives.log").read_text(errors="replace").upper()
+            assert "DEFAULTLIB:LIBCMT" in directives and "DEFAULTLIB:MSVCRT" not in directives
         env["RECOVERY_PCRE2_LIBDIR"] = str(libraries[0].parent)
         env["RECOVERY_PCRE2_LIBNAME"] = library_name
         receipt["pcre2_static_library"] = {"file": str(libraries[0].relative_to(out)), "sha256": sha(libraries[0])}
