@@ -1,0 +1,100 @@
+name: NeverD source patch expansion macOS SDK repair
+run-name: macOS SDK qualification at ${{ inputs.source || '61fb1d3e759f6796d23341782e7f4d624295f27c' }}
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Exact NeverD source commit
+        type: string
+        required: true
+        default: 61fb1d3e759f6796d23341782e7f4d624295f27c
+      runner:
+        description: Failed macOS profile to qualify
+        type: choice
+        options: [macos-15, macos-15-intel]
+        default: macos-15
+  push:
+    branches: [codex/source-patch-expansion]
+    paths: ['.github/workflows/neverd-source-patch-expansion-macos.yml']
+permissions:
+  contents: read
+env:
+  SOURCE_COMMIT: ${{ inputs.source || '61fb1d3e759f6796d23341782e7f4d624295f27c' }}
+  SCCACHE_GHA_ENABLED: 'true'
+concurrency:
+  group: neverd-expansion-macos-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  macos:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ${{ fromJSON(inputs.runner == 'macos-15-intel' && '{"runner":"macos-15-intel","arch":"x64","jobs":4}' || '{"runner":"macos-15","arch":"arm64","jobs":3}') }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.SOURCE_COMMIT }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: '3.12'}
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with: {version: v0.16.0}
+      - name: Select an explicit macOS source producer
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ '${{ matrix.arch }}' = x64 ]; then
+            # This Intel runner includes upstream Clang 18. Its IR is consumed
+            # by the same pinned integrated NeverD LLVM as every other job.
+            producer="$(brew --prefix llvm@18)/bin"
+          else
+            brew install llvm@22 lld@22 ninja
+            producer="$(brew --prefix llvm@22)/bin"
+            echo "$(brew --prefix lld@22)/bin" >> "$GITHUB_PATH"
+          fi
+          test -x "$producer/clang"
+          echo "$producer" >> "$GITHUB_PATH"
+          echo "SOURCE_CLANG=$producer/clang" >> "$GITHUB_ENV"
+      - name: Verify source and evidence contracts
+        shell: bash
+        run: |
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          mkdir expansion-logs
+          "$SOURCE_CLANG" --version | tee expansion-logs/producer.log
+          PYTHONPATH=pluginsdk/python python -m unittest scripts.tests.test_check_source_patch_expansion_runtime scripts.tests.test_run_lift_qualification -v 2>&1 | tee expansion-logs/evidence-tests.log
+          PYTHONPATH=pluginsdk/python python -m unittest discover -s pluginsdk/python/tests -p test_api.py -v 2>&1 | tee expansion-logs/python-api.log
+      - name: Build the pinned NeverD LLVM and patch owners
+        shell: bash
+        run: |
+          # CMake must discover the same SDK spelling used by FindLibEdit and
+          # FindBacktrace, so the SDK C headers stay implicit after libc++.
+          sdk="$(xcrun --show-sdk-path)"
+          cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            "-DCMAKE_OSX_SYSROOT=$sdk" \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON \
+            -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF \
+            -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON \
+            "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$SOURCE_CLANG" 2>&1 | tee expansion-logs/configure.log
+          cmake --build build-expansion --target neverd_shared NeverDSourcePatchTests NeverDSourcePatchMatrixTests NeverDSourcePatchLayoutTests NeverDSourcePatchCallbackTests NeverDNativeExceptionRewriteContractTests --parallel '${{ matrix.jobs }}' 2>&1 | tee expansion-logs/build.log
+      - name: Require the complete native and CPU inventories
+        shell: bash
+        run: |
+          python scripts/qualify_source_patch_expansion.py --build build-expansion --clang "$SOURCE_CLANG" --source-commit "$SOURCE_COMMIT" --expected-arch '${{ matrix.arch }}' --output expansion-evidence 2>&1 | tee expansion-logs/qualification.log
+      - name: Retain all evidence including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: expansion-${{ matrix.runner }}-${{ env.SOURCE_COMMIT }}
+          path: |
+            expansion-logs
+            expansion-evidence
+          if-no-files-found: error
