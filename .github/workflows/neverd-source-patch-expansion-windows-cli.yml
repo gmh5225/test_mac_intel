@@ -1,5 +1,5 @@
-name: NeverD source patch expansion Windows CLI repair
-run-name: Windows CLI qualification at ${{ inputs.source || '6e6c816e4337b5ef5619428d77ff06dface2e9aa' }}
+name: NeverD source patch expansion Windows native qualification
+run-name: Windows native qualification at ${{ inputs.source || '76ce83e138de639b8d75206c78bd5ccbb9cfd8dd' }}
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +7,7 @@ on:
         description: Exact NeverD source commit
         type: string
         required: true
-        default: 6e6c816e4337b5ef5619428d77ff06dface2e9aa
+        default: 76ce83e138de639b8d75206c78bd5ccbb9cfd8dd
       runner:
         description: Failed Windows profile to qualify after the CLI compiler repair
         type: choice
@@ -19,7 +19,7 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '6e6c816e4337b5ef5619428d77ff06dface2e9aa' }}
+  SOURCE_COMMIT: ${{ inputs.source || '76ce83e138de639b8d75206c78bd5ccbb9cfd8dd' }}
   SCCACHE_GHA_ENABLED: 'true'
 concurrency:
   group: neverd-expansion-windows-cli-${{ github.run_id }}
@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - ${{ fromJSON(inputs.runner == 'windows-11-arm' && '{"runner":"windows-11-arm","arch":"arm64"}' || '{"runner":"windows-2025","arch":"x64"}') }}
+          - ${{ fromJSON((inputs.runner == 'windows-11-arm' || github.event_name == 'push') && '{"runner":"windows-11-arm","arch":"arm64"}' || '{"runner":"windows-2025","arch":"x64"}') }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
@@ -110,9 +110,13 @@ jobs:
           $importPath = $import.Replace('\','/')
           $overlay = Join-Path $env:RUNNER_TEMP 'neverd-arm64-unicorn.cmake'
           @"
+          if(NOT WIN32)
+            message(FATAL_ERROR "Unicorn import target requires the initialized Windows platform")
+          endif()
           add_library(unicorn SHARED IMPORTED GLOBAL)
           set_target_properties(unicorn PROPERTIES IMPORTED_LOCATION "$dllPath" IMPORTED_IMPLIB "$importPath" INTERFACE_INCLUDE_DIRECTORIES "$root/third_party/unicorn/include")
           target_compile_definitions(unicorn INTERFACE NOMINMAX)
+          file(GENERATE OUTPUT "$root/expansion-logs/unicorn-link-target.txt" CONTENT "$<TARGET_LINKER_FILE:unicorn>\n$<TARGET_FILE:unicorn>\n")
           "@ | Set-Content -Encoding utf8 $overlay
           "UNICORN_OVERLAY=$($overlay.Replace('\','/'))" >> $env:GITHUB_ENV
           $runtime = Join-Path $tool 'aarch64-w64-mingw32\bin'
@@ -141,8 +145,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Evidence tests failed' }
           python -m unittest discover -s pluginsdk/python/tests -p test_api.py -v 2>&1 | Tee-Object expansion-logs/python-api.log
           if ($LASTEXITCODE -ne 0) { throw 'Python API tests failed' }
-          cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=$env:UNICORN_OVERLAY" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$env:SOURCE_CLANG" 2>&1 | Tee-Object expansion-logs/configure.log
+          # Run after project(NeverD) initializes WIN32, before any dependency consumers.
+          cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_PROJECT_NeverD_INCLUDE=$env:UNICORN_OVERLAY" -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$env:SOURCE_CLANG" 2>&1 | Tee-Object expansion-logs/configure.log
           if ($LASTEXITCODE -ne 0) { throw 'Configure failed' }
+          if ('${{ matrix.arch }}' -eq 'arm64') {
+            $targets = @(Get-Content expansion-logs/unicorn-link-target.txt)
+            if ($targets.Count -ne 2 -or $targets[0] -notmatch '/unicorn-msvc\.lib$' -or $targets[1] -notmatch '/libunicorn\.dll$') { throw 'Unicorn linker/runtime target selection differs' }
+            $provenance = Get-Content expansion-logs/unicorn-provenance.json -Raw | ConvertFrom-Json
+            if ((Get-FileHash $targets[0] -Algorithm SHA256).Hash.ToLowerInvariant() -ne $provenance.import_sha256 -or (Get-FileHash $targets[1] -Algorithm SHA256).Hash.ToLowerInvariant() -ne $provenance.dll_sha256) { throw 'Unicorn target file authentication failed' }
+          }
       - name: Build the pinned NeverD LLVM and patch owners
         shell: pwsh
         run: |
