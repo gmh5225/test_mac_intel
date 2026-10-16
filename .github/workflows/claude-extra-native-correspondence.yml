@@ -4,9 +4,7 @@ on:
   push:
     branches: [codex/claude-windows-recovery]
     paths:
-      - native-role-comparison/original_acceptance.py
-      - native-role-comparison/role-transport.c
-      - native-role-comparison/accepted-candidates.json
+      - native-role-comparison/**
       - .github/workflows/claude-extra-native-correspondence.yml
 permissions:
   contents: read
@@ -38,6 +36,8 @@ jobs:
           path: public-candidates
           run-id: 38961650575
           github-token: ${{ github.token }}
+      - name: Check exact byte and exit validators
+        run: python3 -B -m unittest discover -s native-role-comparison -p 'test_*.py' -v
       - name: Qualify authored controls then compare actual original roles
         run: python3 native-role-comparison/original_acceptance.py --arch ${{ matrix.arch }} --package public-candidates --output component-correspondence
       - name: Retain diagnostics only

@@ -19,3 +19,10 @@ its NSS modules, while retaining the private static Oniguruma library. Its
 measured glibc requirement is recorded separately; the original glibc 2.17
 floor is not established by this standalone candidate. No system NSS policy or
 upstream test exclusion is changed to admit a binary.
+
+Real original-role comparisons require SSE2 on Linux x64 Ugrep and NEON on
+ARM64. The earlier x64 no-SSE2 candidate fails exact version correspondence and
+is retained as a refused profile. Bfs's original version output also exposes
+its Clang 23/sysroot build and three compatibility poison macros; reproducing
+that portable build context remains open. Version differences are preserved
+as failures rather than rewritten or normalized.

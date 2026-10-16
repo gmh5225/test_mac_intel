@@ -6,6 +6,13 @@ ROOT=Path(__file__).resolve().parent
 def sha(p):
     with p.open('rb') as f:return hashlib.file_digest(f,'sha256').hexdigest()
 
+def differences(original,candidate,expected):
+    result=[]
+    if original['exit_code']!=expected or candidate['exit_code']!=expected:result.append('exit status')
+    for field in ['stdout','stderr']:
+        if original[field]!=candidate[field]:result.append(field)
+    return result
+
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('--arch',required=True,choices=['x64','arm64']);ap.add_argument('--package',required=True,type=Path);ap.add_argument('--output',required=True,type=Path);a=ap.parse_args()
     assert platform.system()=='Linux' and {'x86_64':'x64','aarch64':'arm64'}[platform.machine()]==a.arch and os.getuid()!=0
@@ -102,11 +109,12 @@ def main():
         for label,role,args,expected in cases:
             candidate=candidates[role];assert sha(candidate)==pin['binaries'][role]['sha256']
             left=execute('original-'+label,original,role,args);right=execute('candidate-'+label,candidate,role,args)
-            assert left['exit_code']==right['exit_code']==expected,(label,left['exit_code'],right['exit_code'])
-            assert left==right,label+' differs; inspect exact raw output'
-            receipt['captured_client_executed']=True
-            receipt['cases'].append(dict(case=label,role=role,exit_code=expected,stdout_sha256=hashlib.sha256(left['stdout']).hexdigest(),stderr_sha256=hashlib.sha256(left['stderr']).hexdigest()))
+            if left['exit_code']!=126:receipt['captured_client_executed']=True
+            mismatch=differences(left,right,expected)
+            receipt['cases'].append(dict(case=label,role=role,expected_exit_code=expected,original_exit_code=left['exit_code'],candidate_exit_code=right['exit_code'],matches=not mismatch,differences=mismatch,original_stdout_sha256=hashlib.sha256(left['stdout']).hexdigest(),candidate_stdout_sha256=hashlib.sha256(right['stdout']).hexdigest(),original_stderr_sha256=hashlib.sha256(left['stderr']).hexdigest(),candidate_stderr_sha256=hashlib.sha256(right['stderr']).hexdigest()))
         assert sha(original)==original_pin['sha256']
+        receipt['mismatches']=[row['case'] for row in receipt['cases'] if not row['matches']]
+        assert not receipt['mismatches'],'Exact mismatches: '+', '.join(receipt['mismatches'])
         receipt.update(status='original_and_source_component_cases_match_exactly',differential_pairs=len(cases),original=original_pin,scope='Bounded standalone Ugrep/Bfs correspondence, with actual argv[0] role selection in the original. No static engine integration, portability-floor or exact transitive-version claim.')
     except BaseException as error:receipt.update(status='failed',error_type=type(error).__name__,error=str(error));raise
     finally:(logs/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

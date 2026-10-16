@@ -135,7 +135,6 @@ def main():
                        "--with-pcre2=" + str(prefix), "--with-zlib=" + str(prefix),
                        "--with-bzlib=" + str(prefix), "--with-zstd=" + str(prefix),
                        "--with-brotli=" + str(prefix)]
-            if args.arch == "x64": options.append("--disable-sse2")
             run("ugrep-configure", [ug / "configure", *options], cwd=ug)
             make("ugrep-build", ug)
             make("ugrep-check", ug, "check")
@@ -189,6 +188,7 @@ def main():
             version = run(name + "-version", [binary, "--version"]).stdout.decode()
             assert ("7.8.4" if name == "ugrep" else "4.1.1") in version
             if name == "ugrep":
+                assert ("+sse2" if args.arch == "x64" else "+neon") in version, version
                 assert "; -P:pcre2jit" in version, version
                 assert "; -z:zlib,bzip2,zstd,brotli,7z,tar/pax/cpio/zip" in version, version
                 assert "lzma" not in version and "lz4" not in version
