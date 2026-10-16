@@ -13,6 +13,7 @@ from configuration_acceptance import accept_configuration
 from native_acceptance import accept_native
 from behavior_acceptance import accept_behavior
 from editable_acceptance import accept_editable
+from readable_acceptance import accept_readable
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -33,7 +34,8 @@ PINS = {
 }
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
-def accept_client(arch, out, bun, compiler, compiler_env, clean_env, run, overall, editable_probe=False):
+def accept_client(arch, out, bun, compiler, compiler_env, clean_env, run, overall, editable_probe=False,
+                  formatter_root=None, formatter_manifest_sha256=None):
     pins = PINS[arch]
     logs = out / "evidence"
     receipt = {"status": "started", "architecture": arch, "version": "2.1.296",
@@ -93,37 +95,41 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt["readback"] = json.loads(run("client-readback", [out / "extract-pinned-graph.exe", builds[0], sha(builds[0]), readback]))
         assert sha(readback / "mapping.tsv") == pins["mapping"], "rebuilt module metadata or bytes changed"
         assert receipt["matches_local_cross_build"], "native/cross compiler artifacts differ; inspect before runtime acceptance"
-        for case, argv, expected_exit in [("version", ["--version"], 0), ("help", ["--help"], 0),
-            ("mcp-help", ["mcp", "--help"], 0), ("unknown-option", ["--neverd-isolation-unknown-option"], 1)]:
-            results = []
-            for label, executable in [("original", original), ("rebuilt", builds[0])]:
-                root = Path(tempfile.mkdtemp(prefix=f"neverd-client-{label}-{case}-", dir=os.environ["SystemDrive"] + "\\"))
-                for part in ["bin", "work", "home", "tmp"]: (root / part).mkdir()
-                shutil.copyfile(executable, root / "bin/client.exe")
-                env = dict(clean_env)
-                env.update(HOME=str(root / "home"), USERPROFILE=str(root / "home"), APPDATA=str(root / "home"),
-                    LOCALAPPDATA=str(root / "home"), TEMP=str(root / "tmp"), TMP=str(root / "tmp"),
-                    CLAUDE_CONFIG_DIR=str(root / "home/.claude"), CLAUDE_CODE_TMPDIR=str(root / "tmp"),
-                    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1", DISABLE_AUTOUPDATER="1", ENABLE_CLAUDEAI_MCP_SERVERS="false")
-                name = f"client-{label}-{case}"
-                try:
-                    overall["captured_client_executed"] = None
-                    meta = json.loads(run(name + "-launcher", [out / "appcontainer-run.exe", root,
-                        "NeverD.Client." + uuid.uuid4().hex, "30000", "client.exe", *argv], env=env))
-                    overall["captured_client_executed"] = True
-                finally:
-                    for stream in ["stdout", "stderr"]:
-                        path = root / ("target." + stream)
-                        if path.exists():
-                            with path.open("rb") as source:
-                                (logs / (name + "." + stream)).write_bytes(source.read(2 * 1024 * 1024))
-                assert meta["exit_code"] == expected_exit and not meta["timeout"] and not meta["output_limit"], (name, meta)
-                assert meta["app_container"] and meta["capability_count"] == 0 and meta["remaining_processes"] == 0, meta
-                assert sha(root / "bin/client.exe") == sha(executable), "executed input mutated"
-                results.append({"label": label, "execution": meta,
-                    "stdout_sha256": sha(logs / (name + ".stdout")), "stderr_sha256": sha(logs / (name + ".stderr"))})
-            assert all(results[0][key] == results[1][key] for key in ["stdout_sha256", "stderr_sha256"]), (case, results)
-            receipt["cases"].append({"case": case, "matches": True, "results": results})
+        def smoke(original, rebuilt, prefix="client"):
+            cases = []
+            for case, argv, expected_exit in [("version", ["--version"], 0), ("help", ["--help"], 0),
+                ("mcp-help", ["mcp", "--help"], 0), ("unknown-option", ["--neverd-isolation-unknown-option"], 1)]:
+                results = []
+                for label, executable in [("original", original), ("rebuilt", rebuilt)]:
+                    root = Path(tempfile.mkdtemp(prefix=f"neverd-client-{label}-{case}-", dir=os.environ["SystemDrive"] + "\\"))
+                    for part in ["bin", "work", "home", "tmp"]: (root / part).mkdir()
+                    shutil.copyfile(executable, root / "bin/client.exe")
+                    env = dict(clean_env)
+                    env.update(HOME=str(root / "home"), USERPROFILE=str(root / "home"), APPDATA=str(root / "home"),
+                        LOCALAPPDATA=str(root / "home"), TEMP=str(root / "tmp"), TMP=str(root / "tmp"),
+                        CLAUDE_CONFIG_DIR=str(root / "home/.claude"), CLAUDE_CODE_TMPDIR=str(root / "tmp"),
+                        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1", DISABLE_AUTOUPDATER="1", ENABLE_CLAUDEAI_MCP_SERVERS="false")
+                    name = f"{prefix}-{label}-{case}"
+                    try:
+                        overall["captured_client_executed"] = None
+                        meta = json.loads(run(name + "-launcher", [out / "appcontainer-run.exe", root,
+                            "NeverD.Client." + uuid.uuid4().hex, "30000", "client.exe", *argv], env=env))
+                        overall["captured_client_executed"] = True
+                    finally:
+                        for stream in ["stdout", "stderr"]:
+                            path = root / ("target." + stream)
+                            if path.exists():
+                                with path.open("rb") as source:
+                                    (logs / (name + "." + stream)).write_bytes(source.read(2 * 1024 * 1024))
+                    assert meta["exit_code"] == expected_exit and not meta["timeout"] and not meta["output_limit"], (name, meta)
+                    assert meta["app_container"] and meta["capability_count"] == 0 and meta["remaining_processes"] == 0, meta
+                    assert sha(root / "bin/client.exe") == sha(executable), "executed input mutated"
+                    results.append({"label": label, "execution": meta,
+                        "stdout_sha256": sha(logs / (name + ".stdout")), "stderr_sha256": sha(logs / (name + ".stderr"))})
+                assert all(results[0][key] == results[1][key] for key in ["stdout_sha256", "stderr_sha256"]), (case, results)
+                cases.append({"case": case, "matches": True, "results": results})
+            return cases
+        receipt["cases"] = smoke(original, builds[0])
         assert sha(original) == pins["original"] and sha(mapping) == pins["mapping"], "input preservation"
         if editable_probe:
             receipt["editable"] = accept_editable(arch, out, bun, clean_env, run, extraction, pins)
@@ -138,6 +144,9 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                     failures.append({"step": name, "error": "helper-dependent cases remain unrun"})
             except Exception as error: failures.append({"step": name, "error": str(error)})
         assert not failures, failures
+        if formatter_root is not None:
+            receipt["readable"] = accept_readable(arch, out, bun, clean_env, run, extraction, original, pins,
+                                                 formatter_root, formatter_manifest_sha256, smoke)
         receipt.update(status="windows_offline_acceptance_pass", full_behavior_matrix="29 cases match", smoke_cases=4)
         return receipt
     except Exception as error:

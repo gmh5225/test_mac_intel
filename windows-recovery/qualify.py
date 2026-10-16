@@ -28,7 +28,10 @@ def main():
     ap.add_argument("--arch", choices=list(PINS), required=True)
     ap.add_argument("--output", type=Path, required=True)
     ap.add_argument("--editable-probe", action="store_true")
+    ap.add_argument("--readable-formatter", type=Path)
+    ap.add_argument("--formatter-manifest-sha256")
     args = ap.parse_args()
+    assert bool(args.readable_formatter) == bool(args.formatter_manifest_sha256), "formatter and manifest pin are required together"
     out = args.output.resolve(); out.mkdir()
     logs = out / "evidence"; logs.mkdir()
     receipt = {"status": "started", "authored_inputs_only": True, "captured_client_executed": False,
@@ -150,7 +153,9 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
             receipt["helper_qualification"] = {"status": "failed", "error": str(error)}
         receipt.update(authored_inputs_only=False, scope="Authored environment qualified; published client acceptance in progress.")
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt,
-                                                     editable_probe=args.editable_probe)
+                                                     editable_probe=args.editable_probe,
+                                                     formatter_root=args.readable_formatter.resolve() if args.readable_formatter else None,
+                                                     formatter_manifest_sha256=args.formatter_manifest_sha256)
         receipt.update(status="windows_offline_acceptance_pass",
                        scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases and native load-only. No live model service or device exports tested.")
     except Exception as error:

@@ -7,8 +7,9 @@ Bun 1.4.3 runtime pinned by archive and executable SHA-256.
 It builds the PE graph adapters with MSVC, independently rebuilds the same
 authored graph twice, and checks original virtual paths, text encodings,
 module identity, live bindings and worker resource loading. The generated
-program is a fixture, not Claude Code. No source samples or executable files
-are uploaded; the artifact contains diagnostic output and a JSON receipt.
+program is a fixture, not Claude Code. Captured source samples and client
+executables are never uploaded; client artifacts contain diagnostic output
+and JSON receipts.
 
 The next stage qualifies a capability-free AppContainer with a Job Object:
 fresh HOME/work/temp writes, denied host-canary reads and binary-directory
@@ -31,7 +32,23 @@ version output must run in the same capability-free AppContainer. This proves
 that the edited source is used by the executable; it does not establish
 equivalence for arbitrary edits or restore erased source names and types.
 
-The remaining suite compares seven configuration cases and 22 offline behavior
+The all-readable stage builds the shared NeverD source recovery owner from the
+pinned public commit in `formatter_bundle.py`. Five owner tests must pass before
+the formatter and matching MSVC runtime libraries are packaged. Both native
+hosts verify every file against the manifest hash passed by the producing job,
+then run seven authored formatting/refusal controls. Windows ARM64 executes
+this x64 analysis tool under Windows emulation; the client runtime and both
+client rebuilds still use native ARM64 Bun.
+
+Every one of the 2,343 JavaScript sources is formatted by that owner with a
+same-parser-tree check. All source/asset rows must match the locally verified
+all-readable selection. Two independent native rebuilds must match the pinned
+local build; all 2,586 rows are then extracted and compared again. Four smoke,
+seven configuration and 22 offline behavior cases compare the original against
+this all-readable executable in fresh disposable state. Baseline observations
+and the all-readable observations have separate diagnostic directories.
+
+The suite compares seven configuration cases and 22 offline behavior
 cases covering tool permissions, hooks, MCP, fragmented protocol messages,
 session persistence and interruption. An authored loopback server supplies
 fixed responses; every request uses a dummy credential. Its per-profile
@@ -49,7 +66,9 @@ An authored Node-API module must load before the retained audio addon is
 inspected. Retained exports are enumerated but never invoked. Materialized
 native bytes must match the pinned input asset.
 
-Only diagnostics under `windows-evidence/evidence` are uploaded. Captured
+Only client diagnostics under `windows-evidence/evidence` are uploaded. A
+separate artifact holds the publicly built formatter, licenses, owner-test
+result and exact runtime libraries. Captured
 source, original executables and rebuilt executables stay in the disposable
 runner workspace. The full offline behavior matrix and retained native-addon
 checks have separate receipts. Only a passing full workflow establishes these
