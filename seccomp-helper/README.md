@@ -32,6 +32,21 @@ policy is recorded, and the workflow does not change it.
 These checks do not prove equivalence to the original client's full helper
 implementation, supervisor, optional observer, or native dispatcher.
 
-Artifacts contain public sources, licenses, exact inputs, static executables,
-receipts and diagnostics. No captured client or recovered client source is
-downloaded or uploaded by this workflow.
+Public build artifacts contain public sources, licenses, exact inputs, static
+executables, receipts and diagnostics.
+
+The separate Ubuntu 22.04 original-role acceptance downloads the SHA-512-pinned
+published client only after authored controls qualify an empty-root bubblewrap
+boundary. It exposes fixed public runtime libraries, the test executable and
+owned fixture directories, with separate network/process/user/mount namespaces.
+Seven native-role cases compare the original against the public helper. A small
+authored exec driver records the outer namespace identities for each invocation,
+so the nested namespace check cannot pass merely because two separate tests
+have different namespace IDs. Only three kernel-assigned namespace identities
+are normalized; PID relationships, capabilities, policy results, exit codes and
+all other output remain exact.
+
+This additional artifact contains diagnostics and authored recipes only. It
+uploads neither the captured client nor recovered client source. The public
+helper's optional observer, external signal forwarding and rebuilt client
+integration remain separate work.

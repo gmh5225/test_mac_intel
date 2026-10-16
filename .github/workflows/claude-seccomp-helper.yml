@@ -38,15 +38,35 @@ jobs:
         with:
           persist-credentials: false
       - name: Build pinned public sources and run native kernel controls
+        id: public_helper
         run: |
           python3 -m unittest discover -s seccomp-helper -p test_controls.py -v
           python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build ${{ matrix.command_check }}
+      - name: Install fixed namespace boundary tool
+        if: matrix.os == 'ubuntu22'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap=0.6.1-1ubuntu0.3
+      - name: Qualify boundary and compare the pinned original native role
+        if: matrix.os == 'ubuntu22'
+        run: |
+          python3 -m unittest discover -s seccomp-helper -p test_original_comparison.py -v
+          python3 seccomp-helper/original_acceptance.py --arch ${{ matrix.arch }} --build seccomp-helper-build --output seccomp-original-acceptance
       - name: Retain public helper sources and binaries
+        if: always() && steps.public_helper.outcome == 'success'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: public-linux-${{ matrix.arch }}-${{ matrix.os }}-seccomp-helper-${{ github.run_attempt }}
           path: seccomp-helper-build/public-seccomp-helper/
           if-no-files-found: error
+          retention-days: 14
+      - name: Retain original-role diagnostics only
+        if: always() && matrix.os == 'ubuntu22'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-${{ matrix.arch }}-seccomp-role-diagnostics-${{ github.run_attempt }}
+          path: seccomp-original-acceptance/diagnostics/
+          if-no-files-found: warn
           retention-days: 14
       - name: Retain diagnostics
         if: always()
