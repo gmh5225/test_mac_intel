@@ -37,7 +37,10 @@ def main():
     package = out / "public-extra-components"; package.mkdir()
     prefix = out / "dependencies"; prefix.mkdir()
     home = out / "home"; home.mkdir()
-    env = dict(PATH="/usr/bin:/bin", HOME=str(home), LANG="C.UTF-8", LC_ALL="C.UTF-8",
+    tools = {name: shutil.which(name) for name in ["cc", "c++", "cmake", "ctest", "make", "pkg-config", "readelf"]}
+    assert all(tools.values()), "A required native public build tool is unavailable"
+    tool_path = ":".join(dict.fromkeys([str(Path(path).parent) for path in tools.values()] + ["/usr/bin", "/bin"]))
+    env = dict(PATH=tool_path, HOME=str(home), LANG="C.UTF-8", LC_ALL="C.UTF-8",
                GIT_CEILING_DIRECTORIES=str(sources), CFLAGS="-O2", CXXFLAGS="-O2",
                CPPFLAGS="-I" + str(prefix / "include"),
                LDFLAGS="-static -L" + str(prefix / "lib"),
@@ -46,9 +49,11 @@ def main():
     receipt = dict(status="started", arch=args.arch, host=platform.platform(),
                    public_sources_only=True, captured_client_executed=False,
                    exact_original_transitive_versions_proven=False, commands=[],
-                   sources=pins["files"], controls=[])
+                   sources=pins["files"], controls=[],
+                   tools={name: dict(path=path, sha256=sha(Path(path))) for name, path in tools.items()})
 
     def run(label, argv, *, cwd=None, expected=0, timeout=1200, data=None):
+        argv = [tools.get(str(argv[0]), argv[0]), *argv[1:]]
         receipt["commands"].append(dict(label=label, argv=list(map(str, argv)), cwd=str(cwd) if cwd else None))
         result = subprocess.run(list(map(str, argv)), cwd=cwd, env=env, input=data,
                                 capture_output=True, timeout=timeout)
@@ -136,8 +141,9 @@ def main():
             version = run(name + "-version", [binary, "--version"]).stdout.decode()
             assert ("7.8.4" if name == "ugrep" else "4.1.1") in version
             if name == "ugrep":
-                assert all(s in version for s in ["+pcre2_jit", "+zlib", "+bzip2", "+zstd", "+brotli"]), version
-                assert "+lzma" not in version and "+lz4" not in version
+                assert "; -P:pcre2jit" in version, version
+                assert "; -z:zlib,bzip2,zstd,brotli,7z,tar/pax/cpio/zip" in version, version
+                assert "lzma" not in version and "lz4" not in version
             else:
                 assert "oniguruma" in version.lower(), version
             shutil.copyfile(binary, package / name); (package / name).chmod(0o555)
