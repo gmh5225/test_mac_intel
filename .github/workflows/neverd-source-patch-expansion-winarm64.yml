@@ -1,5 +1,5 @@
 name: NeverD source patch expansion native Windows ARM64
-run-name: Windows ARM64 qualification at ${{ inputs.source || '1096c060c067fff1275cf0253e3c78e8834aa750' }}
+run-name: Windows ARM64 qualification at ${{ inputs.source || '81d829add1f7c2c19724f3e16f8ba4f9277656a3' }}
 on:
   workflow_dispatch:
     inputs:
@@ -7,14 +7,14 @@ on:
         description: Exact NeverD source commit
         type: string
         required: true
-        default: 1096c060c067fff1275cf0253e3c78e8834aa750
+        default: 81d829add1f7c2c19724f3e16f8ba4f9277656a3
   push:
     branches: [codex/source-patch-expansion]
     paths: ['.github/workflows/neverd-source-patch-expansion-winarm64.yml']
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '1096c060c067fff1275cf0253e3c78e8834aa750' }}
+  SOURCE_COMMIT: ${{ inputs.source || '81d829add1f7c2c19724f3e16f8ba4f9277656a3' }}
   SCCACHE_GHA_ENABLED: 'true'
 concurrency:
   group: neverd-expansion-winarm64-${{ github.run_id }}

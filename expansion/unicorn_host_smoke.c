@@ -66,7 +66,9 @@ int main(void) {
   uc_engine *engine;
   uc_context *saved;
   uint64_t value = 0;
-  const unsigned char normal[] = {0xb8, 7, 0, 0, 0};
+  const unsigned char normal[] = {
+      0xb8, 7, 0, 0, 0,
+      0x48, 0xbb, 0xa4, 0x2a, 0x37, 0x22, 0xfa, 0x7f, 0, 0};
   const unsigned char invalid[] = {0x0f, 0x0b};
   const unsigned char read_unmapped[] = {0x48, 0xa1, 0, 0, 0, 0, 0, 0, 0, 0};
   const unsigned char outer[] = {0xb8, 5, 0, 0, 0, 0x90, 0x83, 0xc0, 3};
@@ -81,6 +83,8 @@ int main(void) {
   CHECK(uc_emu_start(engine, base, base + sizeof(normal), 1000000, 1000) ==
         UC_ERR_OK);
   CHECK(uc_reg_read(engine, UC_X86_REG_RAX, &value) == UC_ERR_OK && value == 7);
+  CHECK(uc_reg_read(engine, UC_X86_REG_RBX, &value) == UC_ERR_OK &&
+        value == UINT64_C(0x7ffa22372aa4));
   puts("PASS normal-execution");
   CHECK(uc_context_alloc(engine, &saved) == UC_ERR_OK);
   CHECK(uc_context_save(engine, saved) == UC_ERR_OK);

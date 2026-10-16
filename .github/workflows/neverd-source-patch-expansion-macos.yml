@@ -77,6 +77,8 @@ jobs:
           sdk="$(xcrun --show-sdk-path)"
           cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release \
             "-DCMAKE_OSX_SYSROOT=$sdk" \
+            "-DCMAKE_AR=$(xcrun --find ar)" "-DCMAKE_RANLIB=$(xcrun --find ranlib)" \
+            "-DCMAKE_C_COMPILER_AR=$(xcrun --find ar)" "-DCMAKE_CXX_COMPILER_AR=$(xcrun --find ar)" \
             -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON \
@@ -84,6 +86,8 @@ jobs:
             -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF \
             -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON \
             "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$SOURCE_CLANG" 2>&1 | tee expansion-logs/configure.log
+          # The Apple linker requires Darwin archives, including long member names.
+          cmake -LA -N build-expansion | sed -n '/^CMAKE_.*\(AR\|RANLIB\).*=/p' | tee expansion-logs/archive-tools.log
           cmake --build build-expansion --target neverd_shared NeverDSourcePatchTests NeverDSourcePatchMatrixTests NeverDSourcePatchLayoutTests NeverDSourcePatchCallbackTests NeverDNativeExceptionRewriteContractTests --parallel '${{ matrix.jobs }}' 2>&1 | tee expansion-logs/build.log
       - name: Require the complete native and CPU inventories
         shell: bash
