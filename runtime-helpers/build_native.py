@@ -116,6 +116,79 @@ def native_machine(path, system, arch):
     return machine
 
 
+def build_launchers(out, package, system, arch, binary, run, env):
+    suffix = ".exe" if system == "Windows" else ""
+    control = out / ("authored-launcher-control" + suffix)
+
+    def compile(label, source, target, engine=None):
+        if system == "Windows":
+            argv = ["cl", "/nologo", "/std:c++20", "/O2", "/EHsc", "/MT", "/W4", "/WX"]
+            if engine:
+                argv += ['/DENGINE_NAME=L"' + engine + '"']
+            argv += [str(source), "/Fo" + str(out / (label + ".obj")), "/Fe" + str(target)]
+        else:
+            argv = ["c++", "-std=c++20", "-O2", "-Wall", "-Wextra", "-Werror", "-mmacosx-version-min=13.0"]
+            if engine:
+                argv += ['-DENGINE_NAME="' + engine + '"']
+            argv += [str(source), "-o", str(target)]
+        run(label, argv)
+        native_machine(target, system, arch)
+
+    compile("compile-launcher-control", ROOT / "native-launcher-control.cpp", control)
+    controls = []
+    launchers = {}
+    payload = ["", "plain", "two words", 'quote"here', "slash\\back", "ending\\", "开始 🐈 café", "--dash",
+               'one\\"quoted', 'two\\\\"quoted', '\\\\\\"']
+    for layout, launcher_name in [("preserved", "claude-preserved"), ("readable", "claude")]:
+        engine_name = "client-" + layout + suffix
+        launcher = package / (launcher_name + suffix)
+        compile("compile-" + layout + "-launcher", ROOT / "managed-native-launcher.cpp", launcher, engine_name)
+        launcher.chmod(0o555)
+        launchers[layout] = {"file": launcher.name, "sha256": sha(launcher), "engine_name": engine_name}
+        fixture = out / "launcher-controls" / layout / "owned space-🐈"
+        fixture.mkdir(parents=True)
+        local = fixture / launcher.name
+        shutil.copyfile(launcher, local); local.chmod(0o500)
+        engine = fixture / engine_name
+        shutil.copyfile(control, engine); engine.chmod(0o500)
+        helpers = fixture / "search"; helpers.mkdir()
+        search = helpers / binary.name
+        shutil.copyfile(binary, search); search.chmod(0o500)
+        child_env = dict(env, PATH="RECOVERY_PRIOR_PATH", USE_BUILTIN_RIPGREP="true", RIPGREP_CONFIG_PATH="unusable-config")
+
+        def observe(label, expected):
+            result = subprocess.run([str(local), *payload], env=child_env, stdin=subprocess.DEVNULL, capture_output=True, timeout=15)
+            stdout = result.stdout.decode("utf-8"); stderr = result.stderr.decode("utf-8")
+            assert result.returncode == expected, (label, result.returncode, stderr)
+            controls.append({"layout": layout, "case": label, "exit_code": result.returncode, "stdout": stdout, "stderr": stderr})
+            return result
+
+        result = observe("unicode-argv-env-and-exit", 37)
+        assert not result.stderr
+        rows = [line.split("\t", 1) for line in result.stdout.decode().splitlines()]
+        arguments = [bytes.fromhex(value).decode() for key, value in rows if key == "arg"]
+        assert arguments == [str(engine), *payload]
+        values = {key: (None if value == "<unset>" else bytes.fromhex(value).decode()) for key, value in rows if key != "arg"}
+        assert values == {"USE_BUILTIN_RIPGREP": "false", "RIPGREP_CONFIG_PATH": None,
+                          "PATH": str(helpers) + (";" if system == "Windows" else ":") + "RECOVERY_PRIOR_PATH"}
+        engine.unlink()
+        result = observe("missing-engine", 126); assert b"client unavailable" in result.stderr
+        engine.mkdir()
+        result = observe("directory-engine", 126); assert b"client unavailable" in result.stderr
+        engine.rmdir(); engine.symlink_to(control)
+        result = observe("symlink-engine", 126); assert b"client unavailable" in result.stderr
+        engine.unlink(); shutil.copyfile(control, engine); engine.chmod(0o500)
+        search.unlink()
+        result = observe("missing-search", 126); assert b"search helper unavailable" in result.stderr
+    receipt = {"status": "qualified", "authored_only": True, "captured_client_executed": False,
+               "source_sha256": sha(ROOT / "managed-native-launcher.cpp"),
+               "control_source_sha256": sha(ROOT / "native-launcher-control.cpp"),
+               "launchers": launchers, "controls": controls,
+               "scope": "Two managed search layouts, exact valid Unicode/quoting/environment/exit propagation and dependency refusal. Original native Bun dispatch and AppContainer/Seatbelt client execution are separate."}
+    (package / "launcher-qualification.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n")
+    return receipt
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", required=True, choices=["x64", "arm64"])
@@ -247,9 +320,10 @@ def main():
             controls.append({"case": label, "exit_code": code, "stdout": observed_out, "stderr": observed_err})
         shutil.copyfile(binary, package / binary.name)
         (package / binary.name).chmod(0o555)
+        receipt["managed_launcher_qualification"] = build_launchers(out, package, system, args.arch, binary, run, env)
         for name in ["ripgrep.tar.gz", "pcre2.tar.gz"]:
             shutil.copyfile(sources / name, package / name)
-        for name in ["build_native.py", "build.py", "prepare_pcre2.py"]:
+        for name in ["build_native.py", "build.py", "prepare_pcre2.py", "managed-native-launcher.cpp", "native-launcher-control.cpp"]:
             shutil.copyfile(ROOT / name, package / name)
         for name in ["pcre2-overlay", "pcre2-sys-overlay"]:
             shutil.copytree(build / name, package / name)
