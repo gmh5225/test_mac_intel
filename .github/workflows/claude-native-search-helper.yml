@@ -22,15 +22,19 @@ jobs:
           - arch: x64
             platform: darwin-x64
             runner: macos-15-intel
+            shell: bash
           - arch: arm64
             platform: darwin-arm64
             runner: macos-15
+            shell: bash
           - arch: x64
             platform: win32-x64
             runner: windows-2022
+            shell: pwsh
           - arch: arm64
             platform: win32-arm64
             runner: windows-11-arm
+            shell: pwsh
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 40
     steps:
@@ -45,12 +49,10 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
       - name: Check archive and native-link boundary controls
-        shell: bash
-        run: |
-          python -m unittest discover -s runtime-helpers -p test_archive.py -v
-          python -m unittest discover -s runtime-helpers -p test_native_build.py -v
+        shell: ${{ matrix.shell }}
+        run: python -m unittest discover -s runtime-helpers -p 'test_*.py' -v
       - name: Build and test pinned public PCRE2 and ripgrep
-        shell: bash
+        shell: ${{ matrix.shell }}
         run: python runtime-helpers/build_native.py --arch ${{ matrix.arch }} --output native-search-build
       - name: Retain public helper and exact dependency sources
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
