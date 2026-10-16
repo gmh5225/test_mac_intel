@@ -35,7 +35,7 @@ def cases():
     ]
 
 
-def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package, rg, partial):
+def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package, rg, partial, *, source_bun=None, source_bun_sha256=None):
     assert sha(rg) == RG_SHA[arch]
     out = output / "bash"; out.mkdir()
     logs = parent_logs / "bash"; logs.mkdir()
@@ -44,6 +44,9 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
                  "native_client_build.py", "format_recipe.py", "extract-linux-graph.cpp", "native-graph-location.h",
                  "raw-graph-linux-adapter.cpp", "graph-fidelity-linux-adapter.cpp"]:
         shutil.copyfile(ROOT / name, sources / name)
+    if source_bun is not None:
+        for name in ['source_runtime.py', 'source-runtime-pins.json', 'native_search_acceptance.py']:
+            shutil.copyfile(ROOT / name, sources / name)
     (logs / "case-matrix.json").write_text(json.dumps(cases(), ensure_ascii=False, indent=2) + "\n")
     profile = PINS["profiles"][arch]
     triplet = {"x64": "x86_64-linux-gnu", "arm64": "aarch64-linux-gnu"}[arch]
@@ -94,6 +97,10 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
             continue
         stage_dependencies(source, name)
     stage_dependencies(rg, "managed-rg")
+    if source_bun is not None:
+        assert sha(source_bun) == source_bun_sha256
+        stage_dependencies(source_bun, "source-bun")
+        (root / "runtime/source-bun").touch()
     for name in ["librt.so.1", "libpthread.so.0", "libdl.so.2", "libm.so.6"]:
         library = Path("/lib") / triplet / name
         if not (root / library.relative_to("/")).exists(): copy_public(library, str(library))
@@ -121,10 +128,13 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
     (logs / "public-root-inputs.json").write_text(json.dumps({"files": dependencies, "rg_sha256": RG_SHA[arch], "host_directories_mounted": False,
                                                            "managed_binaries": managed_binaries, "dynamic_control_needed_matches_original": required}, indent=2) + "\n")
     states = out / "states"; states.mkdir()
-    def execute(label, command, spec, *, client=None, arguments=()):
+    def execute(label, command, spec, *, client=None, arguments=(), work_input="fixture input\n", fixture_files=None, extra_env=None):
         state = states / label; state.mkdir()
         for directory in ["work", "home", "protected", "report"]: (state / directory).mkdir()
-        (state / "work/input.txt").write_text("fixture input\n")
+        (state / "work/input.txt").write_bytes(work_input.encode())
+        for name, contents in (fixture_files or {}).items():
+            assert Path(name).name == name
+            (state / "home" / name).write_text(contents)
         (state / "report/spec.json").write_text(json.dumps(spec, ensure_ascii=False) + "\n")
         (root / "runtime/client-preserved").touch(exist_ok=True); (root / "runtime/client-readable").touch(exist_ok=True)
         (root / "runtime/original").touch(exist_ok=True)
@@ -135,10 +145,12 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
             for name, source in client.items(): argv += ["--ro-bind", source, "/runtime/" + name]
         argv += ["--chdir", "/work", "--clearenv"]
         env = {"HOME": "/home/test", "TMPDIR": "/tmp", "XDG_CONFIG_HOME": "/home/test/config", "XDG_CACHE_HOME": "/home/test/cache",
-               "BUN_INSTALL_CACHE_DIR": "/home/test/bun-cache", "BUN_RUNTIME_TRANSPILER_CACHE_PATH": "0", "PATH": "/runtime/search:/bin:/usr/bin",
+               "BUN_INSTALL_CACHE_DIR": "/home/test/bun-cache", "BUN_RUNTIME_TRANSPILER_CACHE_PATH": "0", "PATH": "/bin:/usr/bin" if source_bun else "/runtime/search:/bin:/usr/bin",
                "LANG": "C", "LC_ALL": "C", "NO_COLOR": "1", "SHELL": "/bin/bash", "CLAUDE_CODE_SHELL": "/bin/bash",
                "ANTHROPIC_API_KEY": "sk-ant-api03-offline-fixture-not-a-real-credential", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-               "DISABLE_AUTOUPDATER": "1", "ENABLE_CLAUDEAI_MCP_SERVERS": "false", "USE_BUILTIN_RIPGREP": "false"}
+               "DISABLE_AUTOUPDATER": "1", "ENABLE_CLAUDEAI_MCP_SERVERS": "false", "USE_BUILTIN_RIPGREP": "true" if source_bun else "false"}
+        assert set(extra_env or {}) <= {"RIPGREP_CONFIG_PATH"}
+        env.update(extra_env or {})
         for key, value in env.items(): argv += ["--setenv", key, value]
         result = None
         try:
@@ -166,10 +178,28 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
     search, _ = execute("bash-boundary-search-version", ["/runtime/search/rg", "--version"], text_spec)
     assert search["exit_code"] == 0 and not search["stderr"] and search["stdout"].startswith("ripgrep 14.1.1")
     assert "PCRE2 10.45 is available (JIT is available)" in search["stdout"]
+    if source_bun is not None:
+        authored, _ = execute("bash-boundary-source-bun", ["/runtime/source-bun", "--eval",
+            "console.log(JSON.stringify({arch:process.arch,version:Bun.version,removed:process.env.ARGV0===undefined}))"],
+            text_spec, client={"source-bun": source_bun})
+        assert authored["exit_code"] == 0 and not authored["stderr"]
+        assert json.loads(authored["stdout"]) == {"arch": arch, "version": "1.4.3", "removed": True}
+        partial["authored_source_bun_boundary"] = authored
     partial.update(status="authored_bash_boundary_qualified", network_controls=rows, boundary_controls=controls,
                    public_search_version=search["stdout"], client_cases=[], client_invocations=[], differential_pairs=[])
     (logs / "qualified-before-bash-client.json").write_text(json.dumps(partial, indent=2) + "\n")
-    built = build_clients(arch, original, out / "native-build", logs, run)
+    built = build_clients(arch, original, out / "native-build", logs, run,
+                          source_bun=source_bun, source_bun_sha256=source_bun_sha256)
+    if source_bun is not None:
+        repeat_logs = logs / "repeat-build"; repeat_logs.mkdir()
+        def repeat_run(label, command, **kwargs):
+            return run("repeat-" + label, command, **kwargs)
+        repeated = build_clients(arch, original, out / "repeat-native-build", repeat_logs, repeat_run,
+                                 source_bun=source_bun, source_bun_sha256=source_bun_sha256)
+        assert {name: row["sha256"] for name, row in repeated["clients"].items()} == {
+            name: row["sha256"] for name, row in built["clients"].items()}, "independent source-built client hashes differ"
+        partial["repeat_native_build"] = repeated
+        partial["two_independent_builds_equal"] = True
     partial["native_build"] = built
     selected = {name: Path(info["path"]) for name, info in built["clients"].items()}
     config = {"sandbox": {"enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False,
@@ -183,7 +213,8 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
             observations = {}
             for label in ["original", "preserved", "readable"]:
                 name = "bash-" + label + "-" + case["id"]
-                executable = "/runtime/original" if label == "original" else "/runtime/claude-preserved" if label == "preserved" else "/runtime/claude"
+                executable = "/runtime/original" if label == "original" else (
+                    "/runtime/client-" + label if source_bun else "/runtime/claude-preserved" if label == "preserved" else "/runtime/claude")
                 argv = ["-p", "--output-format", "stream-json", "--verbose", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
                         "--no-chrome", "--disable-slash-commands", "--permission-mode", "manual", "--permission-prompts", "none",
                         "--system-prompt", "Offline fixture. Use only supplied fixture data.", "--setting-sources", "", "--settings", json.dumps(config, separators=(",", ":")),
@@ -226,7 +257,12 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
                 diff = differences(observations["original"], observations[label])
                 partial["differential_pairs"].append({"case": case["id"], "layout": label, "equal": not diff, "differences": diff[:50]})
                 assert not diff, "Bash differential mismatch; retain all records before changing a normalizer"
-        partial.update(status="seven_real_bash_sandbox_cases_match_both_layouts", full_bash_sandbox_bounded_acceptance=True, goal_complete=False)
+        if source_bun is not None:
+            from native_search_acceptance import accept_native_search
+            partial["native_search"] = accept_native_search(execute, original, selected, logs)
+        partial.update(status="seven_real_bash_sandbox_cases_match_both_layouts", full_bash_sandbox_bounded_acceptance=True, goal_complete=False,
+                       original_descriptor_provider_preserved=source_bun is not None,
+                       original_native_revision_restored=False)
         return partial
     finally:
         (logs / "acceptance.json").write_text(json.dumps(partial, ensure_ascii=False, indent=2) + "\n")

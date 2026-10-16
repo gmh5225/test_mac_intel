@@ -58,3 +58,17 @@ The first focal-sysroot core builds pass the GLIBC_2.17 check on both native
 runners (run 38952068043); their earlier dynamic search payload does not inherit
 that portability claim. Each new embedded-payload combination still requires
 a fresh engine build and the complete captured-client acceptance suite.
+
+`claude-source-native-client.yml` consumes only independently admitted runtime
+profiles in `seccomp-helper/source-runtime-pins.json`. Admission binds the exact
+producer, complete artifact manifest, binary, glibc floor and static payload
+hashes. Its private client builds preserve the original descriptor provider;
+the readable layout applies only the pinned whitespace recipe. Each layout is
+built twice and every module row is read back before actual execution.
+
+The acceptance target includes the existing 56 bounded helper comparisons,
+seven complete Bash tool chains and thirteen built-in Grep/Glob cases against
+both layouts. The source-native route calls the rebuilt client directly and
+has no external rg on PATH. Captured clients and source stay on the runner;
+only diagnostics are uploaded. A prepared workflow or admitted public engine
+does not establish that this client acceptance has passed.

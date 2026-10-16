@@ -37,7 +37,11 @@ def main():
     parser.add_argument("--build", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--bash-rg", type=Path, help="Also rebuild and qualify both actual Bash sandbox clients with this pinned public rg")
+    parser.add_argument("--source-bun", type=Path, help="Optional public source-built runtime with native component routing")
+    parser.add_argument("--source-bun-sha256")
     args = parser.parse_args()
+    assert bool(args.source_bun) == bool(args.source_bun_sha256), "source runtime and exact digest are required together"
+    assert args.source_bun is None or args.bash_rg is not None, "source runtime requires the full client suite"
     assert platform.system() == "Linux" and {"x86_64": "x64", "aarch64": "arm64"}.get(platform.machine()) == args.arch
     assert os.getuid() != 0
     package = args.build.resolve() / "public-seccomp-helper"
@@ -267,7 +271,9 @@ def main():
         extended = accept_extended(isolated, state_parent, original, candidate, args.arch, receipt.setdefault("extended", {}))
         if args.bash_rg:
             from bash_acceptance import accept_bash
-            receipt["bash"] = accept_bash(args.arch, original, out, logs, run, bwrap, package, args.bash_rg.resolve(), receipt.setdefault("bash", {}))
+            assert bool(args.source_bun) == bool(args.source_bun_sha256)
+            receipt["bash"] = accept_bash(args.arch, original, out, logs, run, bwrap, package, args.bash_rg.resolve(), receipt.setdefault("bash", {}),
+                source_bun=args.source_bun.resolve() if args.source_bun else None, source_bun_sha256=args.source_bun_sha256)
         assert sha(original) == pin["sha256"]
         receipt.update(status="native_role_candidate_matches_extended_bounded_cases", descriptor_cases=descriptor_cases, extended=extended,
             namespace_normalization="Only three kernel-assigned namespace inode identities; each must be valid and differ from the same invocation's outer namespace recorded by the authored exec driver. Every other process-state field is exact.",

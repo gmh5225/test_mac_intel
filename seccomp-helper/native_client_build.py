@@ -17,6 +17,7 @@ import zipfile
 from build import PINS, sha
 from format_recipe import formatted
 from patch_descriptor import patch
+from source_runtime import pin as source_runtime_pin
 
 ROOT = Path(__file__).resolve().parent
 RECIPE_SHA = "324791ad6a22829f34d47b023d862d3ebb0a4d944deb84f121e2c73485107a83"
@@ -45,10 +46,16 @@ def map_rows(path):
     return rows
 
 
-def build_clients(arch, original, out, logs, run):
+def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun_sha256=None):
     assert platform.system() == "Linux" and {"x86_64": "x64", "aarch64": "arm64"}[platform.machine()] == arch
     out.mkdir()
     profile = PINS["profiles"][arch]; compiler_pin = COMPILERS[arch]
+    native_dispatch = source_bun is not None
+    assert native_dispatch == (source_bun_sha256 is not None)
+    if native_dispatch:
+        assert source_bun.is_file() and not source_bun.is_symlink()
+        assert sha(source_bun) == source_bun_sha256 and len(source_bun_sha256) == 64
+        compiler_pin = source_runtime_pin(arch, source_bun, source_bun_sha256)
     recipe_file = ROOT / "linux-readable-recipes-v1.json.gz"
     assert sha(recipe_file) == RECIPE_SHA
     recipes = json.loads(gzip.decompress(recipe_file.read_bytes()))
@@ -59,15 +66,18 @@ def build_clients(arch, original, out, logs, run):
         assert set(recipe) == {"original_bytes", "readable_bytes", "readable_sha256", "insertions"}
         assert all(isinstance(white, str) and white and set(white) <= set(" \t\r\n") for _, white in recipe["insertions"])
     toolchain = out / "toolchain"; toolchain.mkdir()
-    archive = toolchain / "bun.zip"
-    with urllib.request.urlopen(compiler_pin["url"], timeout=90) as source, archive.open("xb") as target:
-        shutil.copyfileobj(source, target)
-    assert sha(archive) == compiler_pin["zip_sha256"]
     bun = toolchain / "bun"
-    with zipfile.ZipFile(archive) as z:
-        members = [entry for entry in z.infolist() if entry.filename.endswith("/bun")]
-        assert len(members) == 1 and members[0].file_size < 160 * 1024 * 1024
-        bun.write_bytes(z.read(members[0]))
+    if native_dispatch:
+        shutil.copyfile(source_bun, bun)
+    else:
+        archive = toolchain / "bun.zip"
+        with urllib.request.urlopen(compiler_pin["url"], timeout=90) as source, archive.open("xb") as target:
+            shutil.copyfileobj(source, target)
+        assert sha(archive) == compiler_pin["zip_sha256"]
+        with zipfile.ZipFile(archive) as z:
+            members = [entry for entry in z.infolist() if entry.filename.endswith("/bun")]
+            assert len(members) == 1 and members[0].file_size < 160 * 1024 * 1024
+            bun.write_bytes(z.read(members[0]))
     assert sha(bun) == compiler_pin["binary_sha256"]; bun.chmod(0o500)
     base = ["docker", "run", "--rm", "--platform", profile["docker_platform"], "--network", "none",
             "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
@@ -84,7 +94,8 @@ def build_clients(arch, original, out, logs, run):
         {k: v for k, v in row.items() if k != "readable_sha256"} for row in expected["rows"]]
     result = {"status": "started", "recipe_sha256": RECIPE_SHA, "compiler": compiler_pin,
               "original_sha256": sha(original), "all_2589_original_rows_match_neverd": True,
-              "original_executed_during_build": False, "clients_uploaded": False, "clients": {}}
+              "original_executed_during_build": False, "clients_uploaded": False, "clients": {},
+              "native_dispatch": native_dispatch, "original_descriptor_provider_preserved": native_dispatch}
     (logs / "client-build-start.json").write_text(json.dumps(result, indent=2) + "\n")
     try:
         for layout in ["preserved", "readable"]:
@@ -92,9 +103,9 @@ def build_clients(arch, original, out, logs, run):
             selected = []
             for row in rows:
                 raw = (extracted / "input" / row["file"]).read_bytes(); assert hashlib.sha256(raw).hexdigest() == row["storage_sha256"]
-                if row["loader_id"] == 1 and (layout == "readable" or row["module_index"] == 236):
+                if row["loader_id"] == 1 and (layout == "readable" or (row["module_index"] == 236 and not native_dispatch)):
                     raw = formatted(raw, recipes["recipes"][row["storage_sha256"]])
-                    if row["module_index"] == 236: raw = patch(raw, arch)
+                    if row["module_index"] == 236 and not native_dispatch: raw = patch(raw, arch)
                 name = f"m{row['module_index']}"; (sources / name).write_bytes(raw)
                 selected.append([row["virtual_name"], row["loader_id"], row["encoding_id"], row["format_id"], row["side_id"], name,
                                  len(raw), hashlib.sha256(raw).hexdigest()])
@@ -124,10 +135,12 @@ def build_clients(arch, original, out, logs, run):
             # Hash identity connects this native build directly to the four
             # independently read-back, sealed local candidate clients.
             info = {"path": str(client), "bytes": client.stat().st_size, "sha256": sha(client),
-                    "all_module_rows_match_selected_sources": True, "matches_sealed_candidate": sha(client) == compiler_pin["clients"][layout]}
+                    "all_module_rows_match_selected_sources": True,
+                    "matches_sealed_candidate": None if native_dispatch else sha(client) == compiler_pin["clients"][layout]}
             result["clients"][layout] = info
-            assert info["matches_sealed_candidate"], "native build differs from the sealed local candidate; retain for investigation"
-        result["status"] = "both_native_clients_match_sealed_candidates"
+            if not native_dispatch:
+                assert info["matches_sealed_candidate"], "native build differs from the sealed local candidate; retain for investigation"
+        result["status"] = "both_source_bun_clients_readback_exactly" if native_dispatch else "both_native_clients_match_sealed_candidates"
         return result
     finally:
         (logs / "native-client-build.json").write_text(json.dumps(result, indent=2) + "\n")

@@ -1,0 +1,102 @@
+name: Source-built native Bun actual client acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - seccomp-helper/source-runtime-pins.json
+      - seccomp-helper/source_runtime.py
+      - seccomp-helper/native_client_build.py
+      - seccomp-helper/bash_acceptance.py
+      - seccomp-helper/original_acceptance.py
+      - seccomp-helper/native_search_acceptance.py
+      - .github/workflows/claude-source-native-client.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  profiles:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      producer_run: ${{ steps.select.outputs.producer_run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - id: select
+        name: Select only independently admitted runtime profiles
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os
+          pins=json.loads(Path('seccomp-helper/source-runtime-pins.json').read_bytes())
+          assert pins['producer_run']==38956750121 and pins['producer_head']=='eb8533774208375903ddc7d298278626e5ac1cce'
+          profiles=pins['profiles'];assert profiles and set(profiles)<={'x64','arm64'}
+          matrix={'include':[{'arch':arch,'runner':{'x64':'ubuntu-22.04','arm64':'ubuntu-22.04-arm'}[arch]} for arch in sorted(profiles)]}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('matrix='+json.dumps(matrix,separators=(',',':'))+'\n')
+              out.write('producer_run='+str(pins['producer_run'])+'\n')
+          PY
+  qualify:
+    name: Native ${{ matrix.arch }} source-engine real Bash and built-in search
+    needs: profiles
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.profiles.outputs.matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Obtain the exact public source-built runtime
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-source-bun-runtime-1
+          path: admitted-source-runtime-artifact
+          run-id: ${{ needs.profiles.outputs.producer_run }}
+          github-token: ${{ github.token }}
+      - name: Rehash every runtime artifact file before execution
+        run: python3 seccomp-helper/source_runtime.py --arch ${{ matrix.arch }} --artifact admitted-source-runtime-artifact --output admitted-source-runtime
+      - name: Obtain the qualified authored-boundary search control
+        id: public_search
+        continue-on-error: true
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-search-helper-1
+          path: public-search-helper
+          run-id: 38874053349
+          github-token: ${{ github.token }}
+      - name: Rebuild the pinned public boundary control if unavailable
+        if: steps.public_search.outcome != 'success'
+        run: |
+          python3 runtime-helpers/build.py --arch ${{ matrix.arch }} --libc glibc --output fresh-search
+          printf '%s\n' 'BASH_SEARCH_HELPER_PATH=fresh-search/public-search-helper/rg' >> "$GITHUB_ENV"
+      - name: Install the fixed namespace boundary and proxy tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap=0.6.1-1ubuntu0.3 socat
+      - name: Check validators and build the source helper
+        run: |
+          python3 -m unittest discover -s seccomp-helper -p 'test_*.py' -v
+          python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build --require-helper-command
+      - name: Rebuild both unmodified-provider clients twice, read back and run
+        run: |
+          SOURCE_RUNTIME_SHA=$(python3 -c 'import json,sys;print(json.load(open("seccomp-helper/source-runtime-pins.json"))["profiles"][sys.argv[1]]["binary_sha256"])' '${{ matrix.arch }}')
+          python3 seccomp-helper/original_acceptance.py --arch ${{ matrix.arch }} --build seccomp-helper-build --output source-native-client-acceptance --bash-rg "${BASH_SEARCH_HELPER_PATH:-public-search-helper/rg}" --source-bun admitted-source-runtime/bun --source-bun-sha256 "$SOURCE_RUNTIME_SHA"
+      - name: Retain diagnostics without captured source or client binaries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-${{ matrix.arch }}-source-bun-client-diagnostics-${{ github.run_attempt }}
+          path: |
+            source-native-client-acceptance/diagnostics/
+            admitted-source-runtime/qualification.json
+            seccomp-helper-build/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
