@@ -57,8 +57,18 @@ ordered protocol and API records, tool error states, and complete workspace
 file bytes using the existing strict normalizer. The sequential HTTP fixture
 must pass authored rendering/refusal controls and a native Bun round trip in
 AppContainer before a captured client is executed. `core-tool-acceptance.json`
-records these additional results separately. This matrix does not cover Bash,
-Grep, Glob, token-cap Read truncation, or live services.
+records these additional results separately.
+
+Seven further cases exercise the actual token-cap marker, multiline and
+UTF-16-safe long-line truncation, explicit-range rejection, model-dependent
+Edit guards, and replacement of a partial cache entry by a small ranged Read.
+These declare `CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS=8` while the authored
+count-tokens endpoint reports ten tokens. Each verifies that counting was
+exercised, the true truncation flag and a strict content prefix are present,
+Unicode pairs stay complete, and exact file bytes and ordered wire records
+match both layouts. `read-truncation-acceptance.json` records the seven-case
+supplement separately. Bash, Grep, Glob, default-limit stress cases and live
+services remain outside these matrices.
 
 The suite compares seven configuration cases and 22 offline behavior
 cases covering tool permissions, hooks, MCP, fragmented protocol messages,

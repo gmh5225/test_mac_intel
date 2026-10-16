@@ -1,0 +1,252 @@
+[
+  {
+    "id": "R01-read-token-lines",
+    "input": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "last_result_contains": [
+      "target"
+    ],
+    "last_result_excludes": [
+      "TAIL_SENTINEL"
+    ],
+    "model": "claude-sonnet-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [
+      1
+    ],
+    "untruncated_read_ordinals": [],
+    "truncation_kind": "lines",
+    "exact_read_content": null,
+    "count_token_requests_min": 1
+  },
+  {
+    "id": "R02-partial-edit-legacy",
+    "input": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "TAIL_SENTINEL",
+          "new_string": "TAIL_CHANGED"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      true
+    ],
+    "expected": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-4-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [
+      1
+    ],
+    "untruncated_read_ordinals": [],
+    "truncation_kind": "lines",
+    "exact_read_content": null,
+    "count_token_requests_min": 1
+  },
+  {
+    "id": "R03-partial-edit-current",
+    "input": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "TAIL_SENTINEL",
+          "new_string": "TAIL_CHANGED"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_CHANGED\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [
+      1
+    ],
+    "untruncated_read_ordinals": [],
+    "truncation_kind": "lines",
+    "exact_read_content": null,
+    "count_token_requests_min": 1
+  },
+  {
+    "id": "R04-explicit-range-over-cap",
+    "input": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt",
+          "offset": 1,
+          "limit": 64
+        }
+      }
+    ],
+    "tool_errors": [
+      true
+    ],
+    "expected": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "last_result_contains": [
+      "exceeds maximum allowed tokens"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [],
+    "untruncated_read_ordinals": [],
+    "truncation_kind": "lines",
+    "exact_read_content": null,
+    "count_token_requests_min": 1
+  },
+  {
+    "id": "R05-read-token-surrogate",
+    "input": "🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [
+      1
+    ],
+    "untruncated_read_ordinals": [],
+    "truncation_kind": "characters",
+    "exact_read_content": "🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈",
+    "count_token_requests_min": 1
+  },
+  {
+    "id": "R06-surrogate-edit-legacy",
+    "input": "🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "🐈",
+          "new_string": "🍂",
+          "replace_all": true
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      true
+    ],
+    "expected": "🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-4-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [
+      1
+    ],
+    "untruncated_read_ordinals": [],
+    "truncation_kind": "characters",
+    "exact_read_content": "🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈🐈",
+    "count_token_requests_min": 1
+  },
+  {
+    "id": "R07-page-overwrites-partial",
+    "input": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_SENTINEL\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt",
+          "offset": 1,
+          "limit": 1
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "TAIL_SENTINEL",
+          "new_string": "TAIL_CHANGED"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false,
+      false
+    ],
+    "expected": "target\nline00-abcdefghijk\nline01-abcdefghijk\nline02-abcdefghijk\nline03-abcdefghijk\nline04-abcdefghijk\nline05-abcdefghijk\nline06-abcdefghijk\nline07-abcdefghijk\nline08-abcdefghijk\nline09-abcdefghijk\nline10-abcdefghijk\nline11-abcdefghijk\nline12-abcdefghijk\nline13-abcdefghijk\nline14-abcdefghijk\nline15-abcdefghijk\nline16-abcdefghijk\nline17-abcdefghijk\nline18-abcdefghijk\nline19-abcdefghijk\nline20-abcdefghijk\nline21-abcdefghijk\nline22-abcdefghijk\nline23-abcdefghijk\nline24-abcdefghijk\nline25-abcdefghijk\nline26-abcdefghijk\nline27-abcdefghijk\nline28-abcdefghijk\nline29-abcdefghijk\nline30-abcdefghijk\nline31-abcdefghijk\nline32-abcdefghijk\nline33-abcdefghijk\nline34-abcdefghijk\nline35-abcdefghijk\nline36-abcdefghijk\nline37-abcdefghijk\nline38-abcdefghijk\nline39-abcdefghijk\nTAIL_CHANGED\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-4-5",
+    "disallowed": null,
+    "read_token_cap": 8,
+    "truncated_read_ordinals": [
+      1
+    ],
+    "untruncated_read_ordinals": [
+      2
+    ],
+    "truncation_kind": "lines",
+    "exact_read_content": null,
+    "count_token_requests_min": 1
+  }
+]

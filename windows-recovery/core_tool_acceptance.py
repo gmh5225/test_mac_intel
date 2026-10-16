@@ -9,9 +9,11 @@ from contained_protocol import ContainedProtocol
 from compare_observations import Normalize, differences
 from offline_server import OfflineServer
 from sequence_fixture_controls import SPEC, check_sequence_fixture
+import read_truncation as truncation_oracles
 
 ROOT = Path(__file__).resolve().parent
 MATRIX_SHA256 = "0e248970f6e292bb07d2144f5970f997dca515f9b434a4c4a216ff978d74f41c"
+TRUNCATION_MATRIX_SHA256 = "1b02b1a1c190d47c784f9e0d777183060674120bc7dbba69b052154287981f82"
 
 def sha(path):
     with path.open("rb") as source: return hashlib.file_digest(source, "sha256").hexdigest()
@@ -110,17 +112,29 @@ def check_case(case, frames, requests, execution, root, malformed):
                                  for name, value in sorted(actual.items())]
 
 def accept_core_tools(out, original, candidates, clean_env):
+    return _accept_tool_matrix(out, original, candidates, clean_env, truncation=False)
+
+def accept_read_truncation(out, original, candidates, clean_env):
+    return _accept_tool_matrix(out, original, candidates, clean_env, truncation=True)
+
+def _accept_tool_matrix(out, original, candidates, clean_env, *, truncation):
     qualified = json.loads((out / "evidence/core-tool-fixture-qualification.json").read_bytes())
     assert qualified["status"] == "qualified" and qualified["captured_client_executed"] is False
     for key, name in [("launcher_sha256", out / "appcontainer-run.exe"), ("harness_sha256", ROOT / "contained_protocol.py"),
                       ("server_sha256", ROOT / "offline_server.py"), ("fixture_controls_sha256", ROOT / "sequence_fixture_controls.py")]:
         assert sha(name) == qualified[key]
-    matrix_file = ROOT / "core-tool-cases.json"; assert sha(matrix_file) == MATRIX_SHA256
-    matrix = json.loads(matrix_file.read_bytes()); assert len(matrix) == 14
-    logs = out / "evidence/core-tools"; logs.mkdir(); shutil.copyfile(matrix_file, logs / "case-matrix.json")
+    matrix_file = ROOT / ("read-truncation-cases.json" if truncation else "core-tool-cases.json")
+    matrix_sha256 = TRUNCATION_MATRIX_SHA256 if truncation else MATRIX_SHA256
+    case_count = 7 if truncation else 14
+    suite = "read-truncation" if truncation else "core-tools"
+    receipt_name = "read-truncation-acceptance.json" if truncation else "core-tool-acceptance.json"
+    assert sha(matrix_file) == matrix_sha256
+    matrix = json.loads(matrix_file.read_bytes()); assert len(matrix) == case_count
+    if truncation: assert matrix == truncation_oracles.cases()
+    logs = out / "evidence" / suite; logs.mkdir(); shutil.copyfile(matrix_file, logs / "case-matrix.json")
     inputs = {"original": original, **candidates}; pins = {name: sha(path) for name, path in inputs.items()}
     receipt = {"status": "started", "cases": [], "case_failures": [], "input_sha256": pins,
-               "candidate_layouts": list(candidates), "matrix_sha256": MATRIX_SHA256, "goal_complete": False}
+               "candidate_layouts": list(candidates), "matrix_sha256": matrix_sha256, "goal_complete": False, "suite": suite}
     try:
         for case in matrix:
             observations = {}
@@ -145,7 +159,9 @@ def accept_core_tools(out, original, candidates, clean_env):
                     if case["disallowed"]: argv += ["--disallowedTools", case["disallowed"]]
                     argv += ["--", "fixture prompt"]
                     write(report / "argv.json", argv)
-                    transport = ContainedProtocol(out / "appcontainer-run.exe", root, environment(clean_env, root, server.port),
+                    env = environment(clean_env, root, server.port)
+                    if truncation: env["CLAUDE_CODE_FILE_READ_MAX_OUTPUT_TOKENS"] = str(case["read_token_cap"])
+                    transport = ContainedProtocol(out / "appcontainer-run.exe", root, env,
                                                   "client.exe", argv, report, "client", loopback=True)
                     execution = transport.finish(); transport.retain(); transport = None
                     frames = []; malformed = []
@@ -153,6 +169,7 @@ def accept_core_tools(out, original, candidates, clean_env):
                         try: frames.append(json.loads(line))
                         except (ValueError, UnicodeError): malformed.append(i)
                     errors, results, files = check_case(case, frames, server.requests, execution, root, malformed)
+                    if truncation: errors.extend(truncation_oracles.check(case, frames, server.requests))
                     if server.errors: errors.append("HTTP fixture error: " + str(server.errors))
                     assert execution["loopback_exemption"] and execution["loopback_exemption_removed"]
                     assert sha(root / "bin/client.exe") == sha(source) == pins[label], "input preservation"
@@ -165,7 +182,7 @@ def accept_core_tools(out, original, candidates, clean_env):
                         "normalization": {"ids": normalizer.ids, "devices": normalizer.devices, "pipes": normalizer.pipes, "fields": normalizer.audit}})
                     observations[label] = observed
                     assert not errors, errors
-                    print(json.dumps({"core_tool_case": case["id"], "label": label, "oracles": "pass"}), flush=True)
+                    print(json.dumps({"tool_suite": suite, "case": case["id"], "label": label, "oracles": "pass"}), flush=True)
                 except Exception as error:
                     failure = {"case": case["id"], "label": label, "error": str(error)}
                     receipt["case_failures"].append(failure); write(report / "failure.json", failure)
@@ -178,11 +195,14 @@ def accept_core_tools(out, original, candidates, clean_env):
                 diff = differences(observations["original"], observations[label])
                 receipt["cases"].append({"case": case["id"], "layout": label, "equal": not diff, "differences": diff[:50]})
         assert not receipt["case_failures"], receipt["case_failures"]
-        assert len(receipt["cases"]) == 14 * len(candidates) and all(row["equal"] for row in receipt["cases"]), receipt["cases"]
+        assert len(receipt["cases"]) == case_count * len(candidates) and all(row["equal"] for row in receipt["cases"]), receipt["cases"]
         assert all(sha(path) == pins[name] for name, path in inputs.items())
-        receipt.update(status="fourteen_core_tool_cases_match", unique_cases=14, differential_pairs=len(receipt["cases"]), input_preserved=True,
-            scope="Same authored Read/Edit matrix as Linux. Ordered protocol/API requests and exact workspace bytes. No shell tools, token-cap Read truncation, live services or universal equivalence.")
+        receipt.update(status="seven_read_truncation_cases_match" if truncation else "fourteen_core_tool_cases_match",
+            unique_cases=case_count, differential_pairs=len(receipt["cases"]), input_preserved=True,
+            scope=("Seven small-cap token truncation/cache/UTF-16 boundary cases. The authored count_tokens endpoint reports ten tokens and the declared read cap is eight. Ordered protocol/API requests and exact workspace bytes. "
+                   if truncation else "Fourteen ordinary Read/Edit cases. Ordered protocol/API requests and exact workspace bytes. ") +
+                  "No shell tools, live services or universal equivalence.")
         return receipt
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
-    finally: write(out / "evidence/core-tool-acceptance.json", receipt)
+    finally: write(out / "evidence" / receipt_name, receipt)

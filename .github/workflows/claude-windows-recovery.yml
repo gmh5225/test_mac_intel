@@ -38,6 +38,8 @@ jobs:
           python -m unittest discover -s windows-recovery -p test_sequence_fixture.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s windows-recovery -p test_core_tool_oracles.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_read_truncation.py -v
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         with:
           arch: x64
@@ -100,6 +102,8 @@ jobs:
           python -m unittest discover -s windows-recovery -p test_sequence_fixture.py -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           python -m unittest discover -s windows-recovery -p test_core_tool_oracles.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_read_truncation.py -v
       - name: Qualify environment and compare pinned client
         shell: pwsh
         run: python windows-recovery/qualify.py --arch ${{ matrix.arch }} --output windows-evidence --editable-probe --readable-formatter public-formatter --formatter-manifest-sha256 ${{ needs.formatter.outputs.manifest_sha256 }}

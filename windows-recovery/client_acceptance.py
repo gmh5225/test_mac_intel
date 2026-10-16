@@ -14,7 +14,7 @@ from native_acceptance import accept_native
 from behavior_acceptance import accept_behavior
 from editable_acceptance import accept_editable
 from readable_acceptance import accept_readable
-from core_tool_acceptance import accept_core_tools
+from core_tool_acceptance import accept_core_tools, accept_read_truncation
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -151,6 +151,7 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         candidates = {"preserved": builds[0]}
         if formatter_root is not None: candidates["readable"] = out / "readable-rebuilt-1.exe"
         receipt["core_tools"] = accept_core_tools(out, original, candidates, clean_env)
+        receipt["read_truncation"] = accept_read_truncation(out, original, candidates, clean_env)
         receipt.update(status="windows_offline_acceptance_pass", full_behavior_matrix="29 cases match", smoke_cases=4)
         return receipt
     except Exception as error:

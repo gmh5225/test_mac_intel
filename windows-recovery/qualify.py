@@ -159,7 +159,7 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                                                      formatter_root=args.readable_formatter.resolve() if args.readable_formatter else None,
                                                      formatter_manifest_sha256=args.formatter_manifest_sha256)
         receipt.update(status="windows_offline_acceptance_pass",
-                       scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases, fourteen Read/Edit cases per source layout and native load-only. No live model service or device exports tested.")
+                       scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases, fourteen Read/Edit plus seven token-cap cases per source layout and native load-only. No live model service or device exports tested.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:
