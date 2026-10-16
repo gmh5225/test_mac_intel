@@ -137,6 +137,9 @@ def build_launchers(out, package, system, arch, binary, run, env):
     compile("compile-launcher-control", ROOT / "native-launcher-control.cpp", control)
     controls = []
     launchers = {}
+    # On Windows chmod(0500) sets FILE_ATTRIBUTE_READONLY, which also blocks
+    # deleting our disposable fixture after the child has exited.
+    fixture_mode = 0o700 if system == "Windows" else 0o500
     payload = ["", "plain", "two words", 'quote"here', "slash\\back", "ending\\", "开始 🐈 café", "--dash",
                'one\\"quoted', 'two\\\\"quoted', '\\\\\\"']
     for layout, launcher_name in [("preserved", "claude-preserved"), ("readable", "claude")]:
@@ -150,10 +153,10 @@ def build_launchers(out, package, system, arch, binary, run, env):
         local = fixture / launcher.name
         shutil.copyfile(launcher, local); local.chmod(0o500)
         engine = fixture / engine_name
-        shutil.copyfile(control, engine); engine.chmod(0o500)
+        shutil.copyfile(control, engine); engine.chmod(fixture_mode)
         helpers = fixture / "search"; helpers.mkdir()
         search = helpers / binary.name
-        shutil.copyfile(binary, search); search.chmod(0o500)
+        shutil.copyfile(binary, search); search.chmod(fixture_mode)
         child_env = dict(env, PATH="RECOVERY_PRIOR_PATH", USE_BUILTIN_RIPGREP="true", RIPGREP_CONFIG_PATH="unusable-config")
 
         def observe(label, expected):
@@ -177,7 +180,7 @@ def build_launchers(out, package, system, arch, binary, run, env):
         result = observe("directory-engine", 126); assert b"client unavailable" in result.stderr
         engine.rmdir(); engine.symlink_to(control)
         result = observe("symlink-engine", 126); assert b"client unavailable" in result.stderr
-        engine.unlink(); shutil.copyfile(control, engine); engine.chmod(0o500)
+        engine.unlink(); shutil.copyfile(control, engine); engine.chmod(fixture_mode)
         search.unlink()
         result = observe("missing-search", 126); assert b"search helper unavailable" in result.stderr
     receipt = {"status": "qualified", "authored_only": True, "captured_client_executed": False,
