@@ -136,3 +136,12 @@ jobs:
           path: native-search-build/diagnostics/
           if-no-files-found: warn
           retention-days: 14
+      - name: Retain the exact public search binaries used by this acceptance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-win32-${{ matrix.arch }}-accepted-search-helper-${{ github.run_attempt }}
+          path: native-search-build/public-search-helper/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
