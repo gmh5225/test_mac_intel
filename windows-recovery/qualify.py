@@ -33,6 +33,7 @@ def main():
     ap.add_argument("--readable-formatter", type=Path)
     ap.add_argument("--formatter-manifest-sha256")
     ap.add_argument("--search-build", type=Path)
+    ap.add_argument("--authored-only", action="store_true", help="Stop after qualifying authored fixtures; do not download or execute a captured client")
     args = ap.parse_args()
     assert bool(args.readable_formatter) == bool(args.formatter_manifest_sha256), "formatter and manifest pin are required together"
     out = args.output.resolve(); out.mkdir()
@@ -158,6 +159,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         try: receipt["helper_qualification"] = qualify_helpers(out, bun, clean_env, run, compiler, compiler_env)
         except Exception as error:
             receipt["helper_qualification"] = {"status": "failed", "error": str(error)}
+        if args.authored_only:
+            return
         receipt.update(authored_inputs_only=False, scope="Authored environment qualified; published client acceptance in progress.")
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt,
                                                      editable_probe=args.editable_probe,
