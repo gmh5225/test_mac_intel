@@ -32,7 +32,7 @@ jobs:
         run: python3 -m unittest discover -s bun-runtime -p 'test_*.py' -v
       - name: Build pinned public payloads from source
         run: |
-          python3 runtime-helpers/build.py --arch ${{ matrix.arch }} --libc musl --output public-rg-build
+          python3 runtime-helpers/build.py --arch ${{ matrix.arch }} --libc glibc-static --output public-rg-build
           python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output public-seccomp-build
       - name: Build the public engine and reconstructed native routing
         run: python3 bun-runtime/build_linux.py --arch ${{ matrix.arch }} --rg public-rg-build/public-search-helper/rg --seccomp public-seccomp-build/public-seccomp-helper/apply-seccomp --output bun-source-build

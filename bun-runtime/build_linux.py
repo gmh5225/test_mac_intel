@@ -20,11 +20,11 @@ COMMIT = "c6da4a4d3010e5553438c60f6bd76d981976867c"
 PROFILES = {
     "x64": {"machine": 62, "docker_platform": "linux/amd64",
             "image": "ghcr.io/oven-sh/bun-development-docker-image@sha256:ee053ca8ff0a00ab51c8572378fb56dee902063d5020b4d90fb78a098fb70af2",
-            "rg_sha256": "6d4e1d852bddf621cc51557dcb1b59c4d010bbfabdeee0fb93ed4c9b82b7193e",
+            "rg_sha256": "531ee1cdda770556edc5f02fb9b3602509fa8b7d0de68e62c3d5a912c206c488",
             "seccomp_sha256": "5979576d07b50877385e2abea0534add12499074d259f0cd2d1c3694e9fe0a10"},
     "arm64": {"machine": 183, "docker_platform": "linux/arm64",
               "image": "ghcr.io/oven-sh/bun-development-docker-image@sha256:19e1898469e3ab456b90a4120c1b96644af53c019434c2f9852eb14870e13d11",
-              "rg_sha256": "24fa0f2d1462b9ddb0d8ee5c7d0484c8fe0d107cb8a6813089dc30f731db2ac9",
+              "rg_sha256": "e75f359f552c3f0d0594f752f0fd7d8540a20e4739ee9b87c30f99175a6964ac",
               "seccomp_sha256": "6b650422a7287f2e585728667510d75700d6e5c638b0ea5722ad1f9f0d7ec666"},
 }
 

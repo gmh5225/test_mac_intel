@@ -46,8 +46,15 @@ filesystem; an APFS bind-mount collision is retained as a refused local
 preparation, and the unchanged projection passes on an owned Linux VM volume.
 
 Both original glibc clients require no version newer than GLIBC_2.17. The
-previous standalone glibc rg has GLIBC_2.34 requirements, so the embedded
-search payload uses the already qualified static musl variant instead. Both
-embedded payloads must have neither an ELF interpreter nor DT_NEEDED entries.
-This keeps a dependency's loader requirement from defeating the core's
-portability check. The exact public payload hashes are pinned per architecture.
+previous standalone glibc rg has GLIBC_2.34 requirements. The first static
+musl candidate loses PCRE2 JIT on ARM64, so it is not used for the glibc
+reconstruction. The embedded search payload uses the independently rebuilt
+static GNU profile, with PCRE2 10.45 JIT on both architectures. Both embedded
+payloads must have neither an ELF interpreter nor DT_NEEDED entries. This keeps
+a dependency's loader requirement from defeating the core's portability check.
+The exact public payload hashes are pinned per architecture; their native
+producer is run 38955193889 at 4a39b2d7773ba6b43b36ed04863385d9779bb5e5.
+The first focal-sysroot core builds pass the GLIBC_2.17 check on both native
+runners (run 38952068043); their earlier dynamic search payload does not inherit
+that portability claim. Each new embedded-payload combination still requires
+a fresh engine build and the complete captured-client acceptance suite.
