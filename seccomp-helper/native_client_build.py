@@ -72,7 +72,7 @@ def build_clients(arch, original, out, logs, run):
     base = ["docker", "run", "--rm", "--platform", profile["docker_platform"], "--network", "none",
             "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
             "--user", f"{os.getuid()}:{os.getgid()}", "--cpus", "2", "--memory", "3g", "--pids-limit", "64",
-            "--tmpfs", "/tmp:rw,nosuid,nodev,size=128m", "--mount", f"type=bind,src={out},dst=/out",
+            "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m", "--mount", f"type=bind,src={out},dst=/out",
             "--mount", f"type=bind,src={ROOT},dst=/recipes,readonly"]
     for name in ["extract-linux-graph", "raw-graph-linux-adapter", "graph-fidelity-linux-adapter"]:
         run("compile-" + name, [*base, profile["image"], "g++", "-std=c++20", "-static", "-O2", "-Wall", "-Wextra",
