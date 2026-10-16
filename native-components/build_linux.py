@@ -87,12 +87,16 @@ def main():
             shutil.copyfile(rg/name,inputs/name)
         shutil.copytree(rg/'cargo-crates',inputs/'cargo-crates');shutil.copytree(rg/'pcre2-overlay',inputs/'pcre2-overlay')
         shutil.copyfile(lib,package/'recovery_lib.rs');shutil.copyfile(manifest,package/'effective-library-Cargo.toml');shutil.copyfile(probe,package/'native-role-probe')
-        for name in ['build_linux.py','build-libraries.sh','role-probe.rs','README.md']:shutil.copyfile(ROOT/name,package/name)
+        for name in ['build_linux.py','build-libraries.sh','select_artifacts.py','role-probe.rs','README.md']:shutil.copyfile(ROOT/name,package/name)
+        shutil.copyfile(work/'selected-library-artifacts.json',package/'library-artifacts.json')
         receipt.update(status='direct_link_rust_and_c_candidates_pass_zero_file_budget_controls',original_rg_main_sha256=sha(original),library_source_sha256=sha(lib),rust_libraries=[dict(file=p.name,bytes=p.stat().st_size,sha256=sha(p)) for p in sorted((package/'rust-libs').glob('*.rlib'))],whole_bun_integration_accepted=False)
         (package/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
         rows=[dict(file=p.relative_to(package).as_posix(),bytes=p.stat().st_size,sha256=sha(p)) for p in sorted(package.rglob('*')) if p.is_file()]
         (package/'MANIFEST.json').write_text(json.dumps(dict(files=rows),indent=2)+'\n')
         print(json.dumps(dict(status=receipt['status'],arch=a.arch,rlibs=len(receipt['rust_libraries']))))
     except BaseException as error:receipt.update(status='failed',error=str(error));raise
-    finally:(logs/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+    finally:
+        for name in ['cargo-artifacts.jsonl','selected-library-artifacts.json']:
+            if (work/name).is_file():shutil.copyfile(work/name,logs/name)
+        (logs/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
 if __name__=='__main__':main()

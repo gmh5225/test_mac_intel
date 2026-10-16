@@ -38,7 +38,9 @@ jobs:
       - name: Build the pinned public seccomp inputs
         run: python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output public-seccomp-build
       - name: Build library entries and run zero-file-budget controls
-        run: python3 native-components/build_linux.py --arch ${{ matrix.arch }} --rg-package retained-search --seccomp-package public-seccomp-build/public-seccomp-helper --output native-library-build
+        run: |
+          python3 -m unittest discover -s native-components -p 'test_*.py' -v
+          python3 native-components/build_linux.py --arch ${{ matrix.arch }} --rg-package retained-search --seccomp-package public-seccomp-build/public-seccomp-helper --output native-library-build
       - name: Retain public libraries and source inputs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
