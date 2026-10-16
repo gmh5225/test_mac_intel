@@ -46,6 +46,8 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         shutil.copyfile(ROOT / name, sources / name)
     (logs / "case-matrix.json").write_text(json.dumps(cases(), ensure_ascii=False, indent=2) + "\n")
     profile = PINS["profiles"][arch]
+    triplet = {"x64": "x86_64-linux-gnu", "arm64": "aarch64-linux-gnu"}[arch]
+    loader = {"x64": "/lib64/ld-linux-x86-64.so.2", "arm64": "/lib/ld-linux-aarch64.so.1"}[arch]
     inputs = out / "inputs"; inputs.mkdir()
     include = inputs / "include/nlohmann"; include.mkdir(parents=True)
     with urllib.request.urlopen("https://raw.githubusercontent.com/nlohmann/json/v3.11.3/single_include/nlohmann/json.hpp", timeout=60) as source:
@@ -60,7 +62,8 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
                                 "/recipes/bash-driver.cpp", "-pthread", "-o", "/out/bash-driver"], timeout=180)
     run("bash-compile-payload", [*compiler, "gcc", "-static", "-O2", "-Wall", "-Wextra", "-Werror", "/recipes/bash-payload.c", "-o", "/out/bash-payload"], timeout=60)
     run("bash-compile-dynamic-control", ["cc", "-O2", "-Wall", "-Wextra", "-Werror", ROOT / "bash-payload.c",
-        "-Wl,--push-state,--no-as-needed", "-lrt", "-lpthread", "-ldl", "-lm", "-Wl,--pop-state", "-o", inputs / "bash-payload-dynamic"])
+        "-Wl,--push-state,--no-as-needed", *[f"/lib/{triplet}/" + name for name in ["librt.so.1", "libpthread.so.0", "libdl.so.2", "libm.so.6"]],
+        loader, "-Wl,--pop-state", "-o", inputs / "bash-payload-dynamic"])
     root = out / "root"; root.mkdir()
     for directory in ["runtime/search", "runtime/sandbox", "bin", "usr/bin", "proc", "dev", "tmp", "report", "work", "protected", "secret", "home/test", "etc"]:
         (root / directory).mkdir(parents=True, exist_ok=True)
@@ -88,7 +91,6 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         for match in re.finditer(r"(?:=>\s*)?(/(?:usr/)?lib[^\s]*)\s+\(", result["stdout"]):
             library = Path(match.group(1)); assert library.is_file()
             if not (root / library.relative_to("/")).exists(): copy_public(library, str(library))
-    triplet = {"x64": "x86_64-linux-gnu", "arm64": "aarch64-linux-gnu"}[arch]
     for name in ["librt.so.1", "libpthread.so.0", "libdl.so.2", "libm.so.6"]:
         library = Path("/lib") / triplet / name
         if not (root / library.relative_to("/")).exists(): copy_public(library, str(library))
