@@ -9,6 +9,9 @@ export RECOVERY_SECCOMP_PAYLOAD=/payloads/apply-seccomp
 export BUN_BUILD_CACHE_DIR=/output/source-cache
 export CARGO_BUILD_JOBS=2
 export NINJA_STATUS='[%f/%t %e] '
+# Public archive owners are unrelated to this disposable compiler UID.
+# Keep extracted bytes/modes while avoiding root-only archive chown calls.
+export TAR_OPTIONS=--no-same-owner
 command -v bun
 bun --version
 python3 --version
