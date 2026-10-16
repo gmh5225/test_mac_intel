@@ -36,6 +36,18 @@ def unpack(archive, root, prefix):
     root.mkdir()
     with tarfile.open(archive, "r:gz") as tar:
         members = tar.getmembers(); assert len(members) < 10000
+        # Windows distinguishes file and directory symlinks at creation.
+        # Determine the target kind from the complete archive, including
+        # forward directory references, rather than extraction order.
+        directories = {root.resolve()}
+        for entry in members:
+            assert entry.name.startswith(prefix) or entry.name == prefix.rstrip("/")
+            relative = entry.name[len(prefix):]
+            if not relative: continue
+            candidate = root / relative
+            assert candidate.resolve().is_relative_to(root.resolve())
+            if entry.isdir(): directories.add(candidate.resolve())
+            directories.update(parent.resolve() for parent in candidate.parents if parent.is_relative_to(root))
         for member in members:
             assert member.name.startswith(prefix) or member.name == prefix.rstrip("/")
             name = member.name[len(prefix):]
@@ -44,8 +56,10 @@ def unpack(archive, root, prefix):
             if member.isdir(): path.mkdir(parents=True, exist_ok=True)
             elif member.issym():
                 assert not Path(member.linkname).is_absolute()
-                assert (path.parent / member.linkname).resolve().is_relative_to(root.resolve())
-                path.parent.mkdir(parents=True, exist_ok=True); path.symlink_to(member.linkname)
+                target = (path.parent / member.linkname).resolve()
+                assert target.is_relative_to(root.resolve())
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.symlink_to(Path(member.linkname), target_is_directory=target in directories)
             else:
                 assert member.isfile() and member.size < 16 * 1024 * 1024
                 path.parent.mkdir(parents=True, exist_ok=True)

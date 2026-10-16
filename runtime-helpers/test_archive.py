@@ -23,6 +23,10 @@ class ArchiveControls(unittest.TestCase):
         self.extract([("component/pkg/brew/file", None), ("component/HomebrewFormula", "pkg/brew")],
                      lambda root: self.assertEqual((root / "HomebrewFormula/file").read_bytes(), b"source\n"))
 
+    def test_directory_link_can_precede_its_target(self):
+        self.extract([("component/HomebrewFormula", "pkg/brew"), ("component/pkg/brew/file", None)],
+                     lambda root: self.assertEqual((root / "HomebrewFormula/file").read_bytes(), b"source\n"))
+
     def test_escaping_member_is_refused(self):
         with self.assertRaises(AssertionError): self.extract([("component/../../outside", None)])
 

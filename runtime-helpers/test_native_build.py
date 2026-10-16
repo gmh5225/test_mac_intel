@@ -1,5 +1,4 @@
 from pathlib import Path
-import io
 import struct
 import tarfile
 import tempfile
