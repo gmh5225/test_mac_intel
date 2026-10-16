@@ -18,6 +18,7 @@ int main(int argc, char **argv) try {
   };
   before("NEVERD_OUTER_PID_NS", "/proc/self/ns/pid"); before("NEVERD_OUTER_USER_NS", "/proc/self/ns/user");
   before("NEVERD_OUTER_MOUNT_NS", "/proc/self/ns/mnt");
+  before("NEVERD_OUTER_NET_NS", "/proc/self/ns/net");
   auto server = fork(); require(server >= 0, "fork owned fixture");
   if (server == 0) _exit(serve("/report/spec.json", "/report"));
   J ready;
@@ -29,6 +30,8 @@ int main(int argc, char **argv) try {
   const unsigned port = ready.at("port"); require(port > 1024 && port < 65536, "fixture port");
   auto url = "http://127.0.0.1:" + std::to_string(port);
   require(setenv("ANTHROPIC_BASE_URL", url.c_str(), 1) == 0, "fixture environment");
+  const auto portText = std::to_string(port);
+  require(setenv("NEVERD_FIXTURE_PORT", portText.c_str(), 1) == 0, "fixture port environment");
   int code;
   if (std::string(argv[1]) == "--qualification") code = probe(port, 1);
   else {

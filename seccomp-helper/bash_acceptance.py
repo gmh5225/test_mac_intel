@@ -18,7 +18,7 @@ RG_SHA = {"x64": "3984a55c6cf39c362a1ae15e5c347ea2870ba3dd883a3da4865d5082ffe35a
 def cases():
     return [
         {"id": "B01-policy", "command": "/runtime/bash-payload policy", "error": False,
-         "contains": ['"sandboxed":true', '"unix_errno":1', '"write_denied_errno":30', '"read_denied_errno":2'],
+         "contains": ['"sandboxed":true', '"unix_errno":1', '"write_denied_errno":30', '"read_denied_errno":2', '"nested_network":1', '"direct_fixture_errno":111'],
          "files": {"input.txt": "fixture input\n", "allowed": "sandbox write\n"}},
         {"id": "B02-streams-unicode", "command": "printf 'stdout α 🐈\\n'; printf 'stderr fixture\\n' >&2", "error": False,
          "contains": ["stdout α 🐈", "stderr fixture"], "files": {"input.txt": "fixture input\n"}},
