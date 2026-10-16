@@ -53,6 +53,9 @@ def main():
     root.mkdir()
     for name in ["runtime", "proc", "dev", "tmp", "work", "home/test"]:
         (root / name).mkdir(parents=True, exist_ok=True)
+    # Bind destinations must exist before the enclosing root becomes read-only.
+    for name in ["client", "control", "driver"]:
+        (root / "runtime" / name).touch(exist_ok=False)
     receipt = {"status": "started", "arch": args.arch, "boundary_qualified": False,
                "captured_client_executed": False, "captured_source_uploaded": False,
                "client_uploaded": False, "commands": [], "cases": []}
