@@ -57,7 +57,7 @@ def main():
     for name in ["client", "control", "driver"]:
         (root / "runtime" / name).touch(exist_ok=False)
     receipt = {"status": "started", "arch": args.arch, "boundary_qualified": False,
-               "captured_client_executed": False, "captured_source_uploaded": False,
+               "captured_client_executed": False, "captured_client_execution_attempted": False, "captured_source_uploaded": False,
                "client_uploaded": False, "commands": [], "cases": []}
 
     def run(label, command, *, expected=0, timeout=60, limited=False):
@@ -81,6 +81,11 @@ def main():
                 entry["timeout"] = True
                 raise
         entry["exit_code"] = code
+        if label.startswith("original-") and receipt["captured_client_executed"] is not True:
+            # Distinguish an exec failure in the authored driver from an
+            # unclassified client failure; successful role output confirms entry.
+            driver_denial = code == 126 and (logs / (label + ".stderr")).read_text().startswith("namespace driver exec: ")
+            receipt["captured_client_executed"] = False if driver_denial else None
         if expected is not None:
             assert code == expected, label + " failed; inspect diagnostics"
         return {"exit_code": code, "stdout": (logs / (label + ".stdout")).read_text(),
@@ -105,6 +110,8 @@ def main():
                 "--mount", f"type=bind,src={ROOT},dst=/recipes,readonly", profile["image"]]
         run("compile-boundary", [*base, "gcc", "-static", "-O2", "-Wall", "-Wextra", "-Werror",
                                  "/recipes/boundary-control.c", "-o", "/out/boundary-control"])
+        run("compile-boundary-dynamic", [*base, "gcc", "-O2", "-Wall", "-Wextra", "-Werror",
+                                         "/recipes/boundary-control.c", "-o", "/out/boundary-control-dynamic"])
         run("compile-driver", [*base, "gcc", "-static", "-O2", "-Wall", "-Wextra", "-Werror",
                                "/recipes/namespace-driver.c", "-o", "/out/namespace-driver"])
         triplet = {"x64": "x86_64-linux-gnu", "arm64": "aarch64-linux-gnu"}[args.arch]
@@ -112,10 +119,11 @@ def main():
         libraries = [interpreter] + [f"/lib/{triplet}/" + name for name in
                                     ["libc.so.6", "librt.so.1", "libpthread.so.0", "libdl.so.2", "libm.so.6"]]
         copy_code = "from pathlib import Path;import shutil\n"
-        copy_code += "for name in " + repr(libraries) + ":\n p=Path('/rootfs'+name);p.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(name,p)\n"
+        copy_code += "for name in " + repr(libraries) + ":\n p=Path('/rootfs'+name);p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(name,p)\n"
         run("copy-public-runtime", [*base, "python3", "-c", copy_code])
+        assert (root / interpreter.lstrip('/')).stat().st_mode & 0o111
         receipt["runtime"] = {"image": profile["image"], "files": [
-            {"file": name, "sha256": sha(root / name.lstrip('/'))} for name in libraries]}
+            {"file": name, "sha256": sha(root / name.lstrip('/')), "mode": oct((root / name.lstrip('/')).stat().st_mode & 0o777)} for name in libraries]}
         canary = out / "outside-canary"
         canary.write_text("owned outside fixture\n")
         control = package / "control"
@@ -155,6 +163,9 @@ def main():
         assert json.loads(boundary["stdout"]) == {"outside_errno": 2, "readonly_errno": 30, "shell_result": -1,
             "shell_errno": 2, "network_result": -1, "network_errno": 101, "uid": os.getuid()}
         assert (state_parent / "boundary-fixtures/allowed").read_text() == "owned fixture\n"
+        dynamic_boundary = isolated("boundary-dynamic", inputs / "boundary-control-dynamic", [])
+        assert dynamic_boundary == boundary
+        assert (state_parent / "boundary-dynamic/allowed").read_text() == "owned fixture\n"
         baseline = isolated("boundary-state", control, ["process-state"])
         assert not baseline["stderr"]
         baseline_state = json.loads(baseline["stdout"])
@@ -167,6 +178,7 @@ def main():
         nested_state = json.loads(nested["stdout"])
         compare_process_states(nested_state, nested_state, baseline_state, nested["outer_namespace"], nested["outer_namespace"])
         receipt.update(boundary_qualified=True, boundary_controls={"fixtures": json.loads(boundary["stdout"]),
+            "dynamic_fixtures": json.loads(dynamic_boundary["stdout"]),
             "outer": baseline_state, "nested_public_helper": nested_state,
             "nested_invocation_outer": nested["outer_namespace"]})
         (logs / "qualified-before-original.json").write_text(json.dumps(receipt, indent=2) + "\n")
@@ -190,7 +202,8 @@ def main():
         assert sha(original) == pin["sha256"]
         original.chmod(0o500)
         receipt["original"] = pin
-        receipt["captured_client_executed"] = True
+        receipt["captured_client_execution_attempted"] = True
+        receipt["captured_client_executed"] = None
         for case, arguments, code in [
             ("usage", [], 1), ("exit-37", ["/runtime/control", "exit-37"], 37),
             ("policy", ["/runtime/control", "baseline"], 0),
@@ -198,8 +211,11 @@ def main():
             ("child-term", ["/runtime/control", "raise-term"], 143),
             ("child-kill", ["/runtime/control", "raise-kill"], 137),
             ("missing-command", ["/runtime/absent"], 1)]:
-            observed = {name: isolated(name + "-" + case, exe, arguments, expected=code, role=True)
-                        for name, exe in [("original", original), ("candidate", candidate)]}
+            observed = {}
+            for name, exe in [("original", original), ("candidate", candidate)]:
+                observed[name] = isolated(name + "-" + case, exe, arguments, expected=code, role=True)
+                if name == "original":
+                    receipt["captured_client_executed"] = True
             if case == "process-state":
                 assert not observed["original"]["stderr"] and not observed["candidate"]["stderr"]
                 compare_process_states(json.loads(observed["original"]["stdout"]), json.loads(observed["candidate"]["stdout"]), baseline_state,
