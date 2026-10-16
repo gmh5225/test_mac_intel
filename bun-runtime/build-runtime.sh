@@ -4,8 +4,6 @@ cd /output/bun-source
 export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0=safe.directory
 export GIT_CONFIG_VALUE_0=/output/bun-source
-export RECOVERY_RG_PAYLOAD=/payloads/rg
-export RECOVERY_SECCOMP_PAYLOAD=/payloads/apply-seccomp
 export BUN_BUILD_CACHE_DIR=/output/source-cache
 export CARGO_BUILD_JOBS=2
 export NINJA_STATUS='[%f/%t %e] '

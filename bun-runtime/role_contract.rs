@@ -32,6 +32,10 @@ pub(crate) fn select_linux(environment_role: Option<&[u8]>, argv0: Option<&[u8]>
         let basename = value.rsplit(|byte| *byte == b'/').next().unwrap_or_default();
         classify(basename)
     });
+    prefer_actual(from_environment, actual)
+}
+
+pub(crate) fn prefer_actual(from_environment: Role, actual: Role) -> Role {
     if actual == Role::Runtime {
         from_environment
     } else {
