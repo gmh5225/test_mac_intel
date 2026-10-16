@@ -54,3 +54,13 @@ This additional artifact contains diagnostics and authored recipes only. It
 uploads neither the captured client nor recovered client source. The public
 helper's optional observer, external signal forwarding and rebuilt client
 integration remain separate work.
+
+`patch_descriptor.py` applies the recorded one-function provider change to an
+exact hash-pinned recovered readable module. It refuses every other revision.
+The edited provider requires an absolute helper path; it retains O_PATH,
+descriptor 3, ARGV0 and the existing close-before-payload wrapper. The authored
+managed launcher sets that path relative to its own location and checks the
+client, search helper and seccomp helper before normal startup. It also handles
+the explicit `ARGV0=apply-seccomp` role. Missing, non-executable and symlink
+helpers fail with exit 126. CI builds both static launcher variants twice;
+the public component build does not execute a reconstructed client.

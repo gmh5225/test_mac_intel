@@ -40,7 +40,7 @@ jobs:
       - name: Build pinned public sources and run native kernel controls
         id: public_helper
         run: |
-          python3 -m unittest discover -s seccomp-helper -p test_controls.py -v
+          python3 -m unittest discover -s seccomp-helper -p 'test_*.py' -v
           python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build ${{ matrix.command_check }}
       - name: Install fixed namespace boundary tool
         if: matrix.os == 'ubuntu22'

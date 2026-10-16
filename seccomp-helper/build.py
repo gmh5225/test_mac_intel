@@ -120,7 +120,8 @@ def main():
             assert len(data) == pin["bytes"] and hashlib.sha256(data).hexdigest() == pin["sha256"]
             target.write_bytes(data)
             receipt["sources"].append(pin)
-        for name in ["build.py", "control.c", "pins.json", "README.md", "test_controls.py"]:
+        for name in ["build.py", "control.c", "pins.json", "README.md", "test_controls.py",
+                     "managed-launcher.cpp", "patch_descriptor.py", "descriptor-patch-pins.json", "test_descriptor_patch.py"]:
             shutil.copyfile(ROOT / name, package / name)
         headers = build / "headers"
         headers.mkdir()
@@ -170,6 +171,18 @@ def main():
             assert binary.read_bytes() == (build / (name + "-repeat")).read_bytes()
             check_static_elf(binary, profile["elf_machine"])
             assert binary.read_bytes().count(filters[profile["filter_arch"]]) == 1
+        launchers = {}
+        for layout in ["preserved", "readable"]:
+            name = "claude-preserved" if layout == "preserved" else "claude"
+            # The launcher is authored source, bound independently of the
+            # upstream inputs. Neither compiler executes a captured client.
+            for suffix in ["", "-repeat"]:
+                source_base = base[:-1] + ["--mount", f"type=bind,src={package / 'managed-launcher.cpp'},dst=/managed-launcher.cpp,readonly", image]
+                run("build-managed-" + layout + suffix, [*source_base, "g++", "-static", "-std=c++20", "-O2", "-Wall", "-Wextra", "-Werror",
+                    '-DENGINE_NAME="client-' + layout + '"', "/managed-launcher.cpp", "-o", "/out/" + name + suffix])
+            assert (build / name).read_bytes() == (build / (name + "-repeat")).read_bytes()
+            check_static_elf(build / name, profile["elf_machine"])
+            launchers[layout] = {"file": name, "sha256": sha(build / name), "bytes": (build / name).stat().st_size}
         helper, control = build / "apply-seccomp", build / "control"
         _, stdout, stderr = run("helper-usage", [helper], expected=1)
         assert stdout == "" and stderr == f"Usage: {helper} <command> [args...]\n"
@@ -227,10 +240,11 @@ def main():
                        binaries={name: {"sha256": sha(build / name), "bytes": (build / name).stat().st_size}
                                  for name in ["apply-seccomp", "control"]},
                        independent_builds_identical=True, filters=PINS["filters"],
+                       managed_launchers_built_not_client_executed=launchers,
                        scope="Exact public filter data with native kernel controls. Full original helper equivalence and recovered client dispatch remain unqualified.")
-        for name in ["apply-seccomp", "control", "unix-block-bpf.h", "x86_64.bpf", "aarch64.bpf"]:
+        for name in ["apply-seccomp", "control", "unix-block-bpf.h", "x86_64.bpf", "aarch64.bpf", "claude", "claude-preserved"]:
             shutil.copyfile(build / name, package / name)
-        for name in ["apply-seccomp", "control"]:
+        for name in ["apply-seccomp", "control", "claude", "claude-preserved"]:
             (package / name).chmod(0o555)
         shutil.copytree(headers, package / "headers")
         (package / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
