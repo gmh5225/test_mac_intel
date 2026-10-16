@@ -1,6 +1,11 @@
 name: Native Bash sandbox reconstruction
 on:
   workflow_dispatch:
+    inputs:
+      rebuild_search:
+        description: Build the pinned public search dependency from source
+        type: boolean
+        default: false
   push:
     branches: [codex/claude-windows-recovery]
     paths:
@@ -27,12 +32,26 @@ jobs:
         with:
           persist-credentials: false
       - name: Obtain the previously qualified public search dependency
+        id: public_search
+        if: github.event_name != 'workflow_dispatch' || !inputs.rebuild_search
+        continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: public-linux-${{ matrix.arch }}-search-helper-1
           path: public-search-helper
           run-id: 38874053349
           github-token: ${{ github.token }}
+      - name: Select Python for the public source builder
+        if: steps.public_search.outcome != 'success'
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Rebuild the pinned search dependency when requested or unavailable
+        id: build_search
+        if: steps.public_search.outcome != 'success'
+        run: |
+          python runtime-helpers/build.py --arch ${{ matrix.arch }} --libc glibc --output fresh-search
+          printf '%s\n' 'BASH_SEARCH_HELPER_PATH=fresh-search/public-search-helper/rg' >> "$GITHUB_ENV"
       - name: Install namespace and proxy tools
         run: |
           sudo apt-get update -qq
@@ -43,7 +62,11 @@ jobs:
           python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build --require-helper-command
       - name: Rebuild privately and compare the enforced Bash tool
         run: |
-          python3 seccomp-helper/original_acceptance.py --arch ${{ matrix.arch }} --build seccomp-helper-build --output seccomp-bash-acceptance --bash-rg public-search-helper/rg
+          python3 seccomp-helper/original_acceptance.py --arch ${{ matrix.arch }} --build seccomp-helper-build --output seccomp-bash-acceptance --bash-rg "${BASH_SEARCH_HELPER_PATH:-public-search-helper/rg}"
+      - name: Retain public source build diagnostics when used
+        if: always() && steps.build_search.outcome != 'skipped'
+        run: |
+          python3 -c "from pathlib import Path; import shutil; source=Path('fresh-search/diagnostics'); target=Path('seccomp-bash-acceptance/diagnostics/public-search-source-build'); target.parent.mkdir(parents=True,exist_ok=True); shutil.copytree(source,target) if source.exists() else None"
       - name: Retain diagnostic evidence only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

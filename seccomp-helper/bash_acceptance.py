@@ -77,6 +77,11 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         target = root / destination.lstrip("/"); target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, target); target.chmod(0o500 if executable else source.stat().st_mode & 0o555)
         dependencies.append({"source": str(source), "destination": destination, "sha256": sha(target), "mode": oct(target.stat().st_mode & 0o777)})
+    def stage_dependencies(source, label):
+        result = run("bash-ldd-" + label, ["ldd", source])
+        for match in re.finditer(r"(?:=>\s*)?(/(?:usr/)?lib[^\s]*)\s+\(", result["stdout"]):
+            library = Path(match.group(1)); assert library.is_file()
+            if not (root / library.relative_to("/")).exists(): copy_public(library, str(library))
     # Public runner executables only; no host root/home is bind-mounted.
     for name in ["bash", "sh", "bwrap", "socat", "env", "which", "readlink", "pwd", "mkdir", "rm", "sleep", "cat", "dirname", "basename",
                  "realpath", "mktemp", "stat", "touch", "chmod", "sed", "head", "tail", "sort", "tr", "uname", "wc", "stty", "date", "grep", "ls", "timeout", "true"]:
@@ -87,10 +92,8 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
             shebang = source.read_bytes().splitlines()[0]
             assert name == "which" and re.fullmatch(rb"#![ \t]*/bin/sh[ \t]*", shebang), ("Unqualified public tool interpreter", name, shebang)
             continue
-        result = run("bash-ldd-" + name, ["ldd", source])
-        for match in re.finditer(r"(?:=>\s*)?(/(?:usr/)?lib[^\s]*)\s+\(", result["stdout"]):
-            library = Path(match.group(1)); assert library.is_file()
-            if not (root / library.relative_to("/")).exists(): copy_public(library, str(library))
+        stage_dependencies(source, name)
+    stage_dependencies(rg, "managed-rg")
     for name in ["librt.so.1", "libpthread.so.0", "libdl.so.2", "libm.so.6"]:
         library = Path("/lib") / triplet / name
         if not (root / library.relative_to("/")).exists(): copy_public(library, str(library))
@@ -103,13 +106,20 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
     copy_public(inputs / "bash-payload", "/runtime/bash-payload")
     copy_public(inputs / "bash-payload-dynamic", "/runtime/bash-payload-dynamic")
     copy_public(rg, "/runtime/search/rg", executable=True)
+    public = json.loads((seccomp_package / "receipt.json").read_text())
+    assert public["profile"] == profile and public["arch"] == arch and public["independent_builds_identical"]
+    managed_binaries = {}
     for name in ["apply-seccomp", "claude", "claude-preserved"]:
         source = seccomp_package / name; assert source.is_file()
         # Artifacts may omit executable modes; the digest gates an owned copy.
         target = root / ("runtime/sandbox/apply-seccomp" if name == "apply-seccomp" else "runtime/" + name)
         shutil.copyfile(source, target); target.chmod(0o500)
+        expected = public["binaries"][name] if name == "apply-seccomp" else public["managed_launchers_built_not_client_executed"]["readable" if name == "claude" else "preserved"]
+        assert sha(target) == expected["sha256"] and target.stat().st_size == expected["bytes"]
+        managed_binaries[name] = {"sha256": sha(target), "bytes": target.stat().st_size, "mode": "0o500"}
+    shutil.copyfile(seccomp_package / "receipt.json", logs / "public-managed-build-receipt.json")
     (logs / "public-root-inputs.json").write_text(json.dumps({"files": dependencies, "rg_sha256": RG_SHA[arch], "host_directories_mounted": False,
-                                                           "dynamic_control_needed_matches_original": required}, indent=2) + "\n")
+                                                           "managed_binaries": managed_binaries, "dynamic_control_needed_matches_original": required}, indent=2) + "\n")
     states = out / "states"; states.mkdir()
     def execute(label, command, spec, *, client=None, arguments=()):
         state = states / label; state.mkdir()
@@ -197,7 +207,11 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
                 assert len(tool_results) == 1 and bool(tool_results[0].get("is_error", False)) == case["error"]
                 content = json.dumps(tool_results[0]["content"], ensure_ascii=False)
                 assert all(value in content.replace('\\"', '"') for value in case["contains"]), "declared Bash output missing"
-                files = {p.relative_to(state / "work").as_posix(): p.read_bytes() for p in (state / "work").rglob("*") if p.is_file()}
+                paths = list((state / "work").rglob("*"))
+                assert all(not p.is_symlink() and (p.is_file() or p.is_dir()) for p in paths), "Unexpected workspace file kind"
+                assert len(paths) <= 32 and sum(p.stat().st_size for p in paths if p.is_file()) <= 65536, "Workspace evidence budget"
+                files = {p.relative_to(state / "work").as_posix(): p.read_bytes() for p in paths if p.is_file()}
+                (logs / name / "workspace-files.json").write_text(json.dumps({key: value.hex() for key, value in files.items()}, indent=2) + "\n")
                 assert files == {key: value.encode() for key, value in case["files"].items()}, "workspace bytes differ"
                 assert not list((state / "protected").iterdir()), "inner sandbox failed to protect the writable outer fixture"
                 normalizer = Normalize("/home/test")
