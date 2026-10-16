@@ -10,14 +10,26 @@ permissions:
   contents: read
 jobs:
   build:
-    name: Native ${{ matrix.arch }} public search helper
+    name: Native ${{ matrix.platform }} public search helper
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch: x64
+            libc: glibc
+            platform: linux-x64
             runner: ubuntu-24.04
           - arch: arm64
+            libc: glibc
+            platform: linux-arm64
+            runner: ubuntu-24.04-arm
+          - arch: x64
+            libc: musl
+            platform: linux-x64-musl
+            runner: ubuntu-24.04
+          - arch: arm64
+            libc: musl
+            platform: linux-arm64-musl
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -28,11 +40,11 @@ jobs:
       - name: Build pinned ripgrep and PCRE2 with authored controls
         run: |
           python3 -m unittest discover -s runtime-helpers -p test_archive.py -v
-          python3 runtime-helpers/build.py --arch ${{ matrix.arch }} --output search-helper-build
+          python3 runtime-helpers/build.py --arch ${{ matrix.arch }} --libc ${{ matrix.libc }} --output search-helper-build
       - name: Retain only public helper and dependency sources
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: public-linux-${{ matrix.arch }}-search-helper-${{ github.run_attempt }}
+          name: public-${{ matrix.platform }}-search-helper-${{ github.run_attempt }}
           path: search-helper-build/public-search-helper/
           include-hidden-files: true
           if-no-files-found: error
@@ -41,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: public-linux-${{ matrix.arch }}-search-helper-diagnostics-${{ github.run_attempt }}
+          name: public-${{ matrix.platform }}-search-helper-diagnostics-${{ github.run_attempt }}
           path: search-helper-build/diagnostics/
           if-no-files-found: error
           retention-days: 14

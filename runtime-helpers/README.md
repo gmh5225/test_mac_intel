@@ -2,7 +2,8 @@
 
 The recovery's independent Bun executable lacks the original binary's native
 `argv[0]=rg` dispatcher. This job builds upstream ripgrep 14.1.1 with PCRE2
-10.45 in a pinned Rust 1.85.1 Linux container on native x64 and ARM64 runners. Archives
+10.45 in pinned Rust 1.85.1 Linux containers on native x64 and ARM64 runners, for
+both glibc and musl. Archives
 and Cargo dependencies are pinned; compilation runs offline after fetching.
 PCRE2 self-tests and authored search/regex/Unicode controls must pass.
 
@@ -28,3 +29,16 @@ Linux host. The driver rejects a mismatched host before creating an output
 directory. The original measured x64 build retains its SSSE3/no-AVX2 compile
 flags; ARM64 uses its normal target baseline. Architecture-specific artifacts
 and diagnostics are uploaded separately, including all public hidden metadata.
+
+Use `--libc glibc` (the default) or `--libc musl`. The musl builds use pinned
+Alpine Rust image manifests, then install exact SHA-256-pinned APKs offline.
+APK signatures are checked against the pinned base image's trusted keys.
+The APK archives, Dockerfile, package pins and resulting image ID are retained.
+Compilation remains offline and non-root. The musl executable must have neither
+an ELF interpreter nor dynamic-library dependencies, and is run directly on the
+native Ubuntu host before upload.
+
+The build profile is defined once in `build.py`. The measured original ARM64
+musl helper has PCRE2 JIT disabled; the other three Linux profiles enable it.
+Each profile checks the linked library version and its JIT availability before
+running the search controls.

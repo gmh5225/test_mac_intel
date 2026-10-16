@@ -13,6 +13,16 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parent
 IMAGE = "rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7c0bc4"
+PROFILES = {
+    ("x64", "glibc"): {"image": IMAGE, "jit": True, "rustflags": "-C target-feature=+ssse3,-avx2"},
+    ("arm64", "glibc"): {"image": IMAGE, "jit": True, "rustflags": ""},
+    ("x64", "musl"): {
+        "image": "rust@sha256:813376c206852d4250641eb86720c04fd20fbc6547d1a030c93a45b22a1303a3",
+        "jit": True, "rustflags": "-C target-feature=+ssse3,-avx2,+crt-static"},
+    ("arm64", "musl"): {
+        "image": "rust@sha256:8eed1d324a486196374b67025fe0a8a724245c42d0c3687fa8d6fc953228b9e3",
+        "jit": False, "rustflags": "-C target-feature=+crt-static"},
+}
 SOURCES = [
     ("ripgrep", "https://codeload.github.com/BurntSushi/ripgrep/tar.gz/refs/tags/14.1.1", "ripgrep-14.1.1/",
      "4dad02a2f9c8c3c8d89434e47337aa654cb0e2aa50e806589132f186bf5c2b66"),
@@ -43,17 +53,22 @@ def unpack(archive, root, prefix):
 
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--arch", choices=["x64", "arm64"], default="x64"); args = parser.parse_args()
+    parser.add_argument("--arch", choices=["x64", "arm64"], default="x64")
+    parser.add_argument("--libc", choices=["glibc", "musl"], default="glibc"); args = parser.parse_args()
     native = {"x86_64": "x64", "AMD64": "x64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine())
     assert platform.system() == "Linux" and native == args.arch, "Use the requested native Linux architecture"
     docker_platform = {"x64": "linux/amd64", "arm64": "linux/arm64"}[args.arch]
+    profile = PROFILES[(args.arch, args.libc)]
+    image = profile["image"]
+    target = "linux-" + args.arch + ("-musl" if args.libc == "musl" else "")
     out = args.output.resolve(); out.mkdir()
     logs = out / "diagnostics"; logs.mkdir()
     sources = out / "sources"; sources.mkdir()
     build = out / "build"; build.mkdir()
     package = out / "public-search-helper"; package.mkdir()
     receipt = {"status": "started", "public_sources_only": True, "captured_client_executed": False,
-               "container": IMAGE, "platform": "linux-" + args.arch, "native_machine": platform.machine(), "sources": [], "commands": []}
+               "container": image, "platform": target, "libc": args.libc, "profile": profile,
+               "native_machine": platform.machine(), "sources": [], "commands": []}
     def run(name, command, timeout=1800):
         receipt["commands"].append({"name": name, "argv": list(map(str, command))})
         with (logs / (name + ".log")).open("xb") as log:
@@ -67,16 +82,39 @@ def main():
             archive.write_bytes(data); unpack(archive, sources / label, prefix)
             receipt["sources"].append({"component": label, "url": url, "sha256": digest})
         shutil.copytree(sources / "ripgrep", build / "ripgrep", symlinks=True)
-        run("pull", ["docker", "pull", "--platform", docker_platform, IMAGE])
+        run("pull", ["docker", "pull", "--platform", docker_platform, image])
+        if args.libc == "musl":
+            # The pinned Rust Alpine images contain gcc but lack make, headers and
+            # pkg-config. Retain exact, signed APKs and install them without network.
+            toolchain = sources / "musl-toolchain"; toolchain.mkdir()
+            pins = json.loads((ROOT / "alpine-toolchain-pins.json").read_text())["packages"][args.arch]
+            assert {p["package"] for p in pins} == {"make", "musl", "musl-dev", "pkgconf"}
+            for pin in pins:
+                assert Path(pin["name"]).name == pin["name"]
+                with urllib.request.urlopen(pin["url"], timeout=90) as response: data = response.read(pin["bytes"] + 1)
+                assert len(data) == pin["bytes"] and hashlib.sha256(data).hexdigest() == pin["sha256"]
+                (toolchain / pin["name"]).write_bytes(data)
+            (toolchain / "Dockerfile").write_text(
+                f"FROM {image}\nCOPY *.apk /opt/helper-toolchain/\n"
+                "RUN apk --no-network --no-cache add /opt/helper-toolchain/*.apk\n")
+            image_id = logs / "musl-toolchain-image.id"
+            run("musl-toolchain", ["docker", "build", "--platform", docker_platform, "--network", "none",
+                                  "--iidfile", image_id, toolchain])
+            image = image_id.read_text().strip()
+            assert image.startswith("sha256:") and len(image) == 71
+            receipt["musl_toolchain"] = {"base_image": profile["image"], "image_id": image, "packages": pins,
+                                         "apk_signatures_required": True, "installation_network": "none"}
+            shutil.copytree(toolchain, package / "musl-toolchain")
+            shutil.copyfile(ROOT / "alpine-toolchain-pins.json", package / "alpine-toolchain-pins.json")
         base = ["docker", "run", "--rm", "--platform", docker_platform, "--read-only", "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges", "--user", f"{os.getuid()}:{os.getgid()}", "--cpus", "2", "--memory", "4g",
                 "--tmpfs", "/tmp:rw,nosuid,nodev,size=256m", "--mount", f"type=bind,src={build},dst=/build",
                 "--env", "CARGO_HOME=/build/cargo-home", "--workdir", "/build/ripgrep"]
-        run("cargo-fetch", [*base, IMAGE, "cargo", "fetch", "--locked"])
+        run("cargo-fetch", [*base, image, "cargo", "fetch", "--locked"])
         from prepare_pcre2 import prepare
         shutil.copyfile(build / "ripgrep/Cargo.lock", package / "upstream-Cargo.lock")
         receipt["pcre2_version_overlay"] = prepare(build)
-        run("resolve-overlay", [*base, "--network", "none", IMAGE, "cargo", "update", "-p", "pcre2", "--offline"])
+        run("resolve-overlay", [*base, "--network", "none", image, "cargo", "update", "-p", "pcre2", "--offline"])
         before = tomllib.loads((package / "upstream-Cargo.lock").read_text())["package"]
         after = tomllib.loads((build / "ripgrep/Cargo.lock").read_text())["package"]
         assert [p for p in before if p["name"] != "pcre2"] == [p for p in after if p["name"] != "pcre2"]
@@ -84,11 +122,15 @@ def main():
         assert len(original) == len(patched) == 1
         assert patched[0] == {k: v for k, v in original[0].items() if k not in ("source", "checksum")}
         run("build", [*base, "--network", "none", "--mount", f"type=bind,src={sources},dst=/source,readonly",
-                      "--mount", f"type=bind,src={ROOT / 'build-ripgrep.sh'},dst=/build-script.sh,readonly", IMAGE, "sh", "/build-script.sh"])
+                      "--env", f"RUSTFLAGS={profile['rustflags']}", "--env", f"HELPER_LIBC={args.libc}",
+                      "--env", "HELPER_PCRE2_JIT=" + ("enable" if profile["jit"] else "disable"),
+                      "--mount", f"type=bind,src={ROOT / 'build-ripgrep.sh'},dst=/build-script.sh,readonly", image, "sh", "/build-script.sh"])
         binary = build / "rg"
         version = subprocess.check_output([binary, "--version"], text=True)
         assert version.startswith("ripgrep 14.1.1") and "features:+pcre2" in version
-        assert "PCRE2 10.45 is available (JIT is available)" in version
+        jit_status = "available" if profile["jit"] else "unavailable"
+        assert f"PCRE2 10.45 is available (JIT is {jit_status})" in version
+        if args.libc == "musl": shutil.copyfile(build / "static-linkage.txt", package / "static-linkage.txt")
         fixture = out / "fixture.txt"; fixture.write_text("first\nNEEDLE\npreneedle\n🐈\n", encoding="utf-8")
         controls = []
         for name, argv, code, stdout in [
