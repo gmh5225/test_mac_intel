@@ -11,6 +11,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import tarfile
 import urllib.request
 
 sys.dont_write_bytecode = True
@@ -22,6 +23,19 @@ from build import unpack
 def sha(path):
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def unpack_source(archive, root, prefix):
+    unpack(archive, root, prefix)
+    # Autotools release inputs carry generated files with deliberately newer
+    # timestamps. Extraction order must not request an unpinned regeneration.
+    with tarfile.open(archive, "r:gz") as tar:
+        for member in tar.getmembers():
+            if member.isfile():
+                assert 0 <= member.mtime < 4102444800
+                path = root / member.name[len(prefix):]
+                assert path.is_file() and not path.is_symlink()
+                os.utime(path, (member.mtime, member.mtime), follow_symlinks=False)
 
 
 def main():
@@ -85,7 +99,7 @@ def main():
             assert hashlib.sha256(data).hexdigest() == pin["sha256"]
             if "bytes" in pin: assert len(data) == pin["bytes"]
             archive.write_bytes(data)
-            unpack(archive, sources / pin["name"], pin["prefix"])
+            unpack_source(archive, sources / pin["name"], pin["prefix"])
             shutil.copyfile(archive, package / archive.name)
         zlib = sources / "zlib"
         run("zlib-configure", [zlib / "configure", "--static", "--prefix=" + str(prefix)], cwd=zlib)

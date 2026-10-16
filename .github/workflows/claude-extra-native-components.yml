@@ -29,7 +29,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build public sources and check static native candidates
-        run: python3 extra-components/build_linux.py --arch ${{ matrix.arch }} --output extra-native-build
+        run: |
+          python3 -m unittest discover -s extra-components -p 'test_*.py' -v
+          python3 extra-components/build_linux.py --arch ${{ matrix.arch }} --output extra-native-build
       - name: Retain public source candidates
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
