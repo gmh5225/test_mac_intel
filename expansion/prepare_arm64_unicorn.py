@@ -5,6 +5,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+from unicorn_header_input import corrected_header
 
 root = Path.cwd()
 source = root / "third_party/unicorn"
@@ -16,11 +17,10 @@ if commit != "81f77ad35e02822cd2052ab9440e91a0ecdb4c4d":
     raise ValueError("unexpected Unicorn input commit")
 relative = Path("qemu/include/sysemu/os-win32.h")
 original = (source / relative).read_bytes()
-old = b"#if defined(_WIN64)\n"
-new = b"#if defined(_WIN64) && !defined(__aarch64__)\n"
-if original.count(old) != 1:
-    raise ValueError("unexpected Windows setjmp guard")
-corrected = original.replace(old, new)
+committed = subprocess.check_output(
+    ["git", "-C", str(source), "show", commit + ":" + relative.as_posix()]
+)
+corrected = corrected_header(original, committed)
 shutil.copytree(source, destination, ignore=shutil.ignore_patterns(".git"))
 (destination / relative).write_bytes(corrected)
 logs = root / "expansion-logs"
@@ -30,7 +30,9 @@ evidence = {
     "source_commit": commit,
     "path": relative.as_posix(),
     "original_sha256": hashlib.sha256(original).hexdigest(),
+    "committed_sha256": hashlib.sha256(committed).hexdigest(),
     "compiled_sha256": hashlib.sha256(corrected).hexdigest(),
+    "checkout_line_endings": "CRLF" if b"\r\n" in original else "LF",
     "flags": ["-D__USE_MINGW_SETJMP_NON_SEH"],
     "reason": "ARM64 MinGW uses its non-SEH setjmp/longjmp pair; the old _WIN64 branch assumes the x64 CRT ABI",
     "references": [
