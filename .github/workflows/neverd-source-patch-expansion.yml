@@ -1,0 +1,183 @@
+name: NeverD source patch expansion
+run-name: Source patch expansion at ${{ inputs.source || '61fb1d3e759f6796d23341782e7f4d624295f27c' }}
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Exact NeverD source commit to qualify
+        type: string
+        required: true
+        default: 61fb1d3e759f6796d23341782e7f4d624295f27c
+  push:
+    branches: [codex/source-patch-expansion]
+    paths: ['.github/workflows/neverd-source-patch-expansion.yml']
+permissions:
+  contents: read
+env:
+  SOURCE_COMMIT: ${{ inputs.source || '61fb1d3e759f6796d23341782e7f4d624295f27c' }}
+  SCCACHE_GHA_ENABLED: 'true'
+concurrency:
+  group: neverd-expansion-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, arch: x64, jobs: 4}
+          - {runner: ubuntu-24.04-arm, arch: arm64, jobs: 4}
+          - {runner: macos-15-intel, arch: x64, jobs: 4}
+          - {runner: macos-15, arch: arm64, jobs: 3}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.SOURCE_COMMIT }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: '3.12'}
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with: {version: v0.16.0}
+      - name: Install Linux native compiler and linkers
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --retry 3 https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm.asc"
+          gpg --show-keys --with-colons "$RUNNER_TEMP/llvm.asc" | grep '^fpr:.*6084F3CF814B57C1CF12EFD515CF4D18AF4F7421:'
+          sudo install -m 0644 "$RUNNER_TEMP/llvm.asc" /usr/share/keyrings/neverd-llvm.asc
+          echo 'deb [signed-by=/usr/share/keyrings/neverd-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-23 main' | sudo tee /etc/apt/sources.list.d/neverd-llvm.list
+          sudo apt-get update
+          sudo apt-get install --yes clang-23 lld-23 llvm-23 ninja-build g++
+          echo /usr/lib/llvm-23/bin >> "$GITHUB_PATH"
+          echo 'SOURCE_CLANG=/usr/lib/llvm-23/bin/clang' >> "$GITHUB_ENV"
+      - name: Select an explicit macOS source producer
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ '${{ matrix.arch }}' = x64 ]; then
+            # This Intel runner includes upstream Clang 18. Its IR is consumed
+            # by the same pinned integrated NeverD LLVM as every other job.
+            producer="$(brew --prefix llvm@18)/bin"
+          else
+            brew install llvm@22 lld@22 ninja
+            producer="$(brew --prefix llvm@22)/bin"
+            echo "$(brew --prefix lld@22)/bin" >> "$GITHUB_PATH"
+          fi
+          test -x "$producer/clang"
+          echo "$producer" >> "$GITHUB_PATH"
+          echo "SOURCE_CLANG=$producer/clang" >> "$GITHUB_ENV"
+      - name: Verify source and evidence contracts
+        shell: bash
+        run: |
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
+          mkdir expansion-logs
+          "$SOURCE_CLANG" --version | tee expansion-logs/producer.log
+          PYTHONPATH=pluginsdk/python python -m unittest scripts.tests.test_check_source_patch_expansion_runtime scripts.tests.test_run_lift_qualification -v 2>&1 | tee expansion-logs/evidence-tests.log
+          PYTHONPATH=pluginsdk/python python -m unittest discover -s pluginsdk/python/tests -p test_api.py -v 2>&1 | tee expansion-logs/python-api.log
+      - name: Build the pinned NeverD LLVM and patch owners
+        shell: bash
+        run: |
+          cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON \
+            -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF \
+            -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON \
+            "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$SOURCE_CLANG" 2>&1 | tee expansion-logs/configure.log
+          cmake --build build-expansion --target neverd_shared NeverDSourcePatchTests NeverDSourcePatchMatrixTests NeverDSourcePatchLayoutTests NeverDSourcePatchCallbackTests NeverDNativeExceptionRewriteContractTests --parallel '${{ matrix.jobs }}' 2>&1 | tee expansion-logs/build.log
+      - name: Require the complete native and CPU inventories
+        shell: bash
+        run: |
+          python scripts/qualify_source_patch_expansion.py --build build-expansion --clang "$SOURCE_CLANG" --source-commit "$SOURCE_COMMIT" --expected-arch '${{ matrix.arch }}' --output expansion-evidence 2>&1 | tee expansion-logs/qualification.log
+      - name: Retain all evidence including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: expansion-${{ matrix.runner }}-${{ env.SOURCE_COMMIT }}
+          path: |
+            expansion-logs
+            expansion-evidence
+          if-no-files-found: error
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: windows-2025, arch: x64}
+          - {runner: windows-11-arm, arch: arm64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.SOURCE_COMMIT }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+          architecture: ${{ matrix.arch }}
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.arch }}
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with: {version: v0.16.0}
+      - name: Install the verified source producer
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'LLVM-22.1.6-win64.exe'
+          Invoke-WebRequest 'https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.6/LLVM-22.1.6-win64.exe' -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'e2d9a6855ff22c0acf3adc87ff1e1ad9705b8b6fc5bab2542aefc3315fc24cf7') { throw 'Clang installer digest mismatch' }
+          $install = Join-Path $env:RUNNER_TEMP 'expansion-clang'
+          $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$install") -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw 'Clang installation failed' }
+          "$install\bin" >> $env:GITHUB_PATH
+          "SOURCE_CLANG=$install\bin\clang.exe" >> $env:GITHUB_ENV
+          choco install ninja --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Ninja installation failed' }
+      - name: Verify evidence contracts and configure the native build
+        shell: pwsh
+        run: |
+          if ((git rev-parse HEAD) -ne $env:SOURCE_COMMIT -or $env:SOURCE_COMMIT -notmatch '^[0-9a-f]{40}$') { throw 'Wrong source commit' }
+          New-Item -ItemType Directory expansion-logs
+          & $env:SOURCE_CLANG --version | Tee-Object expansion-logs/producer.log
+          $env:PYTHONPATH = 'pluginsdk/python'
+          python -m unittest scripts.tests.test_check_source_patch_expansion_runtime scripts.tests.test_run_lift_qualification -v 2>&1 | Tee-Object expansion-logs/evidence-tests.log
+          if ($LASTEXITCODE -ne 0) { throw 'Evidence tests failed' }
+          python -m unittest discover -s pluginsdk/python/tests -p test_api.py -v 2>&1 | Tee-Object expansion-logs/python-api.log
+          if ($LASTEXITCODE -ne 0) { throw 'Python API tests failed' }
+          cmake -S . -B build-expansion -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=ON -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=ON "-DNEVERD_SOURCE_PATCH_TEST_CLANG_EXECUTABLE=$env:SOURCE_CLANG" 2>&1 | Tee-Object expansion-logs/configure.log
+          if ($LASTEXITCODE -ne 0) { throw 'Configure failed' }
+      - name: Build the pinned NeverD LLVM and patch owners
+        shell: pwsh
+        run: |
+          cmake --build build-expansion --target neverd_shared NeverDSourcePatchTests NeverDSourcePatchMatrixTests NeverDSourcePatchLayoutTests NeverDSourcePatchCallbackTests NeverDNativeExceptionRewriteContractTests --parallel 4 2>&1 | Tee-Object expansion-logs/build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - name: Require the complete native and CPU inventories
+        shell: pwsh
+        run: |
+          if ('${{ matrix.arch }}' -eq 'x64') {
+            $env:NEVERD_TEST_WINDOWS_CRT_LIB = Join-Path $env:VCToolsInstallDir 'lib\x64'
+            $sdkRoot = Join-Path $env:WindowsSdkDir "Lib\$($env:WindowsSDKVersion.TrimEnd('\'))"
+            $env:NEVERD_TEST_WINDOWS_UCRT_LIB = Join-Path $sdkRoot 'ucrt\x64'
+            $env:NEVERD_TEST_WINDOWS_SDK_LIB = Join-Path $sdkRoot 'um\x64'
+            $env:NEVERD_TEST_REQUIRE_WINDOWS_RUNTIME = '1'
+          }
+          python scripts/qualify_source_patch_expansion.py --build build-expansion --clang $env:SOURCE_CLANG --source-commit $env:SOURCE_COMMIT --expected-arch '${{ matrix.arch }}' --output expansion-evidence 2>&1 | Tee-Object expansion-logs/qualification.log
+          if ($LASTEXITCODE -ne 0) { throw 'Qualification failed' }
+      - name: Retain all evidence including failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: expansion-${{ matrix.runner }}-${{ env.SOURCE_COMMIT }}
+          path: |
+            expansion-logs
+            expansion-evidence
+          if-no-files-found: error
