@@ -107,12 +107,12 @@ def build_clients(arch, original, out, logs, run):
             scaffold = "import{fileURLToPath}from'node:url';\nconst path=s=>fileURLToPath(new URL(s,import.meta.url));\nawait Bun.build({entrypoints:[path('./bootstrap.mjs')],target:'bun',env:'disable',macros:false,minify:false,compile:{outfile:'/work/client',executablePath:process.execPath,assets:" + json.dumps(names, separators=(",", ":")) + ".map(s=>path('./'+s))}});\n"
             (graph / "build.isolated.mjs").write_text(scaffold)
             empty = work / "empty"; empty.mkdir()
-            command = [*base, "--mount", f"type=bind,src={work},dst=/work", "--mount", f"type=bind,src={graph},dst=/graph,readonly",
+            command = [*base, "--mount", f"type=bind,src={work},dst=/work", "--mount", f"type=bind,src={graph},dst=/project/graph,readonly",
                        "--mount", f"type=bind,src={bun},dst=/runtime/bun,readonly", "--env", "PATH=/unavailable",
-                       "--env", "BUN_RUNTIME_TRANSPILER_CACHE_PATH=0", "--workdir", "/graph"]
+                       "--env", "BUN_RUNTIME_TRANSPILER_CACHE_PATH=0", "--workdir", "/work"]
             for destination in ["/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/local/bin", "/usr/local/sbin"]:
                 command += ["--mount", f"type=bind,src={empty},dst={destination},readonly"]
-            run(layout + "-compile-source", [*command, profile["image"], "/runtime/bun", "/graph/build.isolated.mjs"], timeout=180)
+            run(layout + "-compile-source", [*command, profile["image"], "/runtime/bun", "/project/graph/build.isolated.mjs"], timeout=180)
             raw_client = work / "client"; client = work / "client-final"
             run(layout + "-restore-graph", [out / "graph-fidelity-linux-adapter", mapping, raw_client, client,
                 rows[expected["entry_index"]]["virtual_name"], str(expected["startup_count"]), str(expected["flags"] & 15), "8"], timeout=60)
