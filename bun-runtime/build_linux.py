@@ -77,7 +77,7 @@ def main():
                    "--mount", f"type=bind,src={payloads},dst=/payloads,readonly", "--entrypoint", "/bin/bash",
                    profile["image"], "/recipes/build-runtime.sh"]
         run("bun-source-build", command)
-        binary = out / "source-build/bun"
+        binary = source / "build/recovery/bun"
         assert binary.is_file()
         data = binary.read_bytes()
         assert data[:6] == b"\x7fELF\x02\x01" and struct.unpack_from("<H", data, 18)[0] == profile["machine"]
