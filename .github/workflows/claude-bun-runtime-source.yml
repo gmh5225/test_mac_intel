@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Check native entry patch boundary
-        run: python3 -m unittest discover -s bun-runtime -p test_patch.py -v
+        run: python3 -m unittest discover -s bun-runtime -p 'test_*.py' -v
       - name: Build pinned public payloads from source
         run: |
           python3 runtime-helpers/build.py --arch ${{ matrix.arch }} --libc glibc --output public-rg-build

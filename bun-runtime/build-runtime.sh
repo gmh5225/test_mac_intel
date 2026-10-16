@@ -12,6 +12,8 @@ export NINJA_STATUS='[%f/%t %e] '
 # Public archive owners are unrelated to this disposable compiler UID.
 # Keep extracted bytes/modes while avoiding root-only archive chown calls.
 export TAR_OPTIONS=--no-same-owner
+export LINUX_GLIBC_SYSROOT=/output/sysroot
+test -d "$LINUX_GLIBC_SYSROOT/usr/include/c++/13"
 command -v bun
 bun --version
 python3 --version

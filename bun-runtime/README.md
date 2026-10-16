@@ -27,3 +27,13 @@ never committed or uploaded.
 A passing build and the eight public controls are prerequisites for later
 captured-client graph rebuild, complete readback and original comparisons.
 Neither a prepared patch nor these controls establish full recovery.
+
+The first successful native source builds required glibc 2.38 because the
+development compiler image had no release sysroot. They remain component-only
+evidence and are not admitted to the Ubuntu 22.04 client suite. The builder now
+follows the pinned public Bun sysroot specification: exact focal libc/header
+debs and the upstream GCC-13 archive, projected into a fresh private directory.
+It checks the resulting core's version needs against the upstream glibc 2.17
+floor before accepting any runtime. Sysroot projection preserves regular bytes,
+defers internal links and refuses traversal or conflicting materialization;
+it does not change the runner's libraries or namespace policy.

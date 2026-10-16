@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -12,6 +13,7 @@ import sys
 
 sys.dont_write_bytecode = True
 from patch_bun import patch, sha
+from prepare_sysroot import prepare
 
 ROOT = Path(__file__).resolve().parent
 COMMIT = "c6da4a4d3010e5553438c60f6bd76d981976867c"
@@ -66,6 +68,8 @@ def main():
         actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
         assert actual == COMMIT
         receipt["source_patch"] = patch(source, logs / "source-patch")
+        prepare(args.arch, out, logs)
+        receipt["sysroot_receipt_sha256"] = sha(logs / "sysroot-receipt.json")
         run("compiler-image-pull", ["docker", "pull", "--platform", profile["docker_platform"], profile["image"]])
         run("compiler-image-inspect", ["docker", "image", "inspect", profile["image"]])
         # The public compiler image stores its toolchain under root's home;
@@ -81,6 +85,10 @@ def main():
         assert binary.is_file()
         data = binary.read_bytes()
         assert data[:6] == b"\x7fELF\x02\x01" and struct.unpack_from("<H", data, 18)[0] == profile["machine"]
+        run("runtime-version-info", ["readelf", "--version-info", binary])
+        versions = {tuple(map(int, value.split("."))) for value in re.findall(r"GLIBC_([0-9]+(?:\.[0-9]+)+)", (logs / "runtime-version-info.log").read_text())}
+        assert versions and max(versions) <= (2, 17), "Source engine exceeds the upstream glibc portability floor"
+        receipt["maximum_core_glibc_requirement"] = ".".join(map(str, max(versions)))
         controls = []
         for label, argv0, role, argv, expected_code, expected_text in [
             ("runtime-version", str(binary), None, ["--version"], 0, "1.4.3"),
@@ -106,7 +114,7 @@ def main():
             assert result.returncode == expected_code and expected_text in stdout + stderr, label
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
-        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh"]:
+        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json"]:
             shutil.copyfile(ROOT / name, package / name)
         for name in ["LICENSE.md", "Cargo.lock", "rust-toolchain.toml"]:
             shutil.copyfile(source / name, package / name)
