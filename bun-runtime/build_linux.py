@@ -68,7 +68,10 @@ def main():
         receipt["source_patch"] = patch(source, logs / "source-patch")
         run("compiler-image-pull", ["docker", "pull", "--platform", profile["docker_platform"], profile["image"]])
         run("compiler-image-inspect", ["docker", "image", "inspect", profile["image"]])
-        command = ["docker", "run", "--rm", "--platform", profile["docker_platform"], "--cap-drop", "ALL",
+        # The public compiler image stores its toolchain under root's home;
+        # its root process needs DAC override to write this freshly owned
+        # runner checkout. No captured client runs in this compiler profile.
+        command = ["docker", "run", "--rm", "--platform", profile["docker_platform"], "--cap-drop", "ALL", "--cap-add", "DAC_OVERRIDE",
                    "--security-opt", "no-new-privileges", "--cpus", "4", "--memory", "12g", "--pids-limit", "512",
                    "--mount", f"type=bind,src={out},dst=/output", "--mount", f"type=bind,src={ROOT},dst=/recipes,readonly",
                    "--mount", f"type=bind,src={payloads},dst=/payloads,readonly", "--entrypoint", "/bin/bash",
