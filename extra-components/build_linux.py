@@ -141,6 +141,10 @@ def main():
         finally:
             env = prior
         bfs = sources / "bfs"
+        # The pinned tag archive omits .git; upstream's fallback is only 4.1.
+        # Use its documented release VERSION input for the exact 4.1.1 tag.
+        env = dict(env, VERSION="4.1.1")
+        receipt["bfs_release_version_input"] = "4.1.1"
         run("bfs-configure", [bfs / "configure", "--enable-release", "--with-oniguruma",
             "--without-libacl", "--without-libcap", "--without-libselinux", "--without-liburing"], cwd=bfs)
         make("bfs-build", bfs)
