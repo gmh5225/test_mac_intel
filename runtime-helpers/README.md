@@ -10,6 +10,13 @@ PCRE2 self-tests and authored search/regex/Unicode controls must pass.
 `PKG_CONFIG_ALL_STATIC=1` links it statically. Setting the former to 1 would
 instead compile the Rust crate's older vendored PCRE2 and is inappropriate here.
 
+The pinned `pcre2` 0.2.9 Rust wrapper reports its generated binding constants
+even when linked to a newer library. A small, recorded overlay queries
+`PCRE2_CONFIG_VERSION` from the linked library instead. It uses a separate
+dependency copy and an offline Cargo path override; original archives and the
+Cargo cache remain unchanged. Both lockfiles, the exact patch and the complete
+overlay source are retained. The native version check still requires 10.45.
+
 The artifact contains only this public helper, exact upstream source archives,
 locked dependency archives with licenses, build scripts and receipts. It does
 not contain a captured or recovered Claude executable. The helper must still

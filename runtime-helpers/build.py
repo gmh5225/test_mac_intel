@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+import tomllib
 import urllib.request
 
 ROOT = Path(__file__).resolve().parent
@@ -67,6 +68,16 @@ def main():
                 "--tmpfs", "/tmp:rw,nosuid,nodev,size=256m", "--mount", f"type=bind,src={build},dst=/build",
                 "--env", "CARGO_HOME=/build/cargo-home", "--workdir", "/build/ripgrep"]
         run("cargo-fetch", [*base, IMAGE, "cargo", "fetch", "--locked"])
+        from prepare_pcre2 import prepare
+        shutil.copyfile(build / "ripgrep/Cargo.lock", package / "upstream-Cargo.lock")
+        receipt["pcre2_version_overlay"] = prepare(build)
+        run("resolve-overlay", [*base, "--network", "none", IMAGE, "cargo", "update", "-p", "pcre2", "--offline"])
+        before = tomllib.loads((package / "upstream-Cargo.lock").read_text())["package"]
+        after = tomllib.loads((build / "ripgrep/Cargo.lock").read_text())["package"]
+        assert [p for p in before if p["name"] != "pcre2"] == [p for p in after if p["name"] != "pcre2"]
+        original = [p for p in before if p["name"] == "pcre2"]; patched = [p for p in after if p["name"] == "pcre2"]
+        assert len(original) == len(patched) == 1
+        assert patched[0] == {k: v for k, v in original[0].items() if k not in ("source", "checksum")}
         run("build", [*base, "--network", "none", "--mount", f"type=bind,src={sources},dst=/source,readonly",
                       "--mount", f"type=bind,src={ROOT / 'build-ripgrep.sh'},dst=/build-script.sh,readonly", IMAGE, "sh", "/build-script.sh"])
         binary = build / "rg"
@@ -89,6 +100,11 @@ def main():
         for name in ["ripgrep.tar.gz", "pcre2.tar.gz"]: shutil.copyfile(sources / name, package / name)
         shutil.copyfile(build / "ripgrep/Cargo.lock", package / "Cargo.lock")
         shutil.copyfile(ROOT / "build-ripgrep.sh", package / "build-ripgrep.sh")
+        shutil.copyfile(ROOT / "prepare_pcre2.py", package / "prepare_pcre2.py")
+        shutil.copyfile(build / "pcre2-runtime-version.patch", package / "pcre2-runtime-version.patch")
+        shutil.copyfile(build / "pcre2-overlay.json", package / "pcre2-overlay.json")
+        shutil.copytree(build / "pcre2-overlay", package / "pcre2-overlay")
+        shutil.copyfile(build / "ripgrep/Cargo.toml", package / "effective-ripgrep-Cargo.toml")
         shutil.copyfile(Path(__file__), package / "build.py")
         # Retain exact dependency archives, which include their source/licenses.
         dependencies = package / "cargo-crates"; dependencies.mkdir()
@@ -103,7 +119,7 @@ def main():
         (package / "MANIFEST.json").write_text(json.dumps({"files": files}, indent=2) + "\n")
         print(json.dumps({"status": receipt["status"], "binary_sha256": sha(binary), "manifest_sha256": sha(package / "MANIFEST.json")}))
     except Exception as error:
-        receipt.update(status="failed", error=str(error)); raise
+        receipt.update(status="failed", error_type=type(error).__name__, error=str(error)); raise
     finally: (logs / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 if __name__ == "__main__": main()

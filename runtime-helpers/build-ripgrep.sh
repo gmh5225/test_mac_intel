@@ -15,6 +15,8 @@ cd /build/pcre2-build
 make -j2
 make check
 make install
+test "$(pkg-config --modversion libpcre2-8)" = 10.45
+pkg-config --static --libs --cflags libpcre2-8
 cd /build/ripgrep
 cargo build --release --features pcre2 --locked --offline
 cp /build/target/release/rg /build/rg
