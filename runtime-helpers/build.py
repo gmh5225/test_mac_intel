@@ -16,6 +16,8 @@ IMAGE = "rust@sha256:e51d0265072d2d9d5d320f6a44dde6b9ef13653b035098febd68cce8fa7
 PROFILES = {
     ("x64", "glibc"): {"image": IMAGE, "jit": True, "rustflags": "-C target-feature=+ssse3,-avx2"},
     ("arm64", "glibc"): {"image": IMAGE, "jit": True, "rustflags": ""},
+    ("x64", "glibc-static"): {"image": IMAGE, "jit": True, "rustflags": "-C target-feature=+ssse3,-avx2,+crt-static"},
+    ("arm64", "glibc-static"): {"image": IMAGE, "jit": True, "rustflags": "-C target-feature=+crt-static"},
     ("x64", "musl"): {
         "image": "rust@sha256:813376c206852d4250641eb86720c04fd20fbc6547d1a030c93a45b22a1303a3",
         "jit": True, "rustflags": "-C target-feature=+ssse3,-avx2,+crt-static"},
@@ -68,13 +70,13 @@ def unpack(archive, root, prefix):
 def main():
     parser = argparse.ArgumentParser(); parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--arch", choices=["x64", "arm64"], default="x64")
-    parser.add_argument("--libc", choices=["glibc", "musl"], default="glibc"); args = parser.parse_args()
+    parser.add_argument("--libc", choices=["glibc", "musl", "glibc-static"], default="glibc"); args = parser.parse_args()
     native = {"x86_64": "x64", "AMD64": "x64", "aarch64": "arm64", "arm64": "arm64"}.get(platform.machine())
     assert platform.system() == "Linux" and native == args.arch, "Use the requested native Linux architecture"
     docker_platform = {"x64": "linux/amd64", "arm64": "linux/arm64"}[args.arch]
     profile = PROFILES[(args.arch, args.libc)]
     image = profile["image"]
-    target = "linux-" + args.arch + ("-musl" if args.libc == "musl" else "")
+    target = "linux-" + args.arch + ("-musl" if args.libc == "musl" else "-glibc-static" if args.libc == "glibc-static" else "")
     out = args.output.resolve(); out.mkdir()
     logs = out / "diagnostics"; logs.mkdir()
     sources = out / "sources"; sources.mkdir()
@@ -138,13 +140,17 @@ def main():
         run("build", [*base, "--network", "none", "--mount", f"type=bind,src={sources},dst=/source,readonly",
                       "--env", f"RUSTFLAGS={profile['rustflags']}", "--env", f"HELPER_LIBC={args.libc}",
                       "--env", "HELPER_PCRE2_JIT=" + ("enable" if profile["jit"] else "disable"),
+                      "--env", "HELPER_CARGO_TARGET=" + {"x64": "x86_64-unknown-linux-gnu", "arm64": "aarch64-unknown-linux-gnu"}[args.arch],
                       "--mount", f"type=bind,src={ROOT / 'build-ripgrep.sh'},dst=/build-script.sh,readonly", image, "sh", "/build-script.sh"])
         binary = build / "rg"
+        import struct
+        header = binary.read_bytes()[:20]
+        assert header[:6] == b"\x7fELF\x02\x01" and struct.unpack_from("<H", header, 18)[0] == {"x64": 62, "arm64": 183}[args.arch]
         version = subprocess.check_output([binary, "--version"], text=True)
         assert version.startswith("ripgrep 14.1.1") and "features:+pcre2" in version
         jit_status = "available" if profile["jit"] else "unavailable"
         assert f"PCRE2 10.45 is available (JIT is {jit_status})" in version
-        if args.libc == "musl": shutil.copyfile(build / "static-linkage.txt", package / "static-linkage.txt")
+        if args.libc in ["musl", "glibc-static"]: shutil.copyfile(build / "static-linkage.txt", package / "static-linkage.txt")
         fixture = out / "fixture.txt"; fixture.write_text("first\nNEEDLE\npreneedle\n🐈\n", encoding="utf-8")
         controls = []
         for name, argv, code, stdout in [

@@ -9,7 +9,7 @@ case "${HELPER_PCRE2_JIT?Missing PCRE2 profile}" in
   *) echo 'Invalid PCRE2 JIT profile' >&2; exit 1 ;;
 esac
 case "${HELPER_LIBC?Missing libc profile}" in
-  glibc|musl) ;;
+  glibc|musl|glibc-static) ;;
   *) echo 'Invalid libc profile' >&2; exit 1 ;;
 esac
 # pcre2-sys 0.2.9 treats 1 as "compile its older vendored source".
@@ -26,13 +26,21 @@ make install
 test "$(pkg-config --modversion libpcre2-8)" = 10.45
 pkg-config --static --libs --cflags libpcre2-8
 cd /build/ripgrep
-cargo build --release --features pcre2 --locked --offline
-cp /build/target/release/rg /build/rg
-if [ "$HELPER_LIBC" = musl ]; then
+if [ "$HELPER_LIBC" = glibc-static ]; then
+  # Keep crt-static flags off host proc-macro crates by selecting the target
+  # explicitly, even though this is a native build.
+  : "${HELPER_CARGO_TARGET?Missing native GNU target}"
+  cargo build --release --features pcre2 --locked --offline --target "$HELPER_CARGO_TARGET"
+  cp "/build/target/$HELPER_CARGO_TARGET/release/rg" /build/rg
+else
+  cargo build --release --features pcre2 --locked --offline
+  cp /build/target/release/rg /build/rg
+fi
+if [ "$HELPER_LIBC" = musl ] || [ "$HELPER_LIBC" = glibc-static ]; then
   readelf --program-headers --dynamic /build/rg > /build/static-linkage.txt
   cat /build/static-linkage.txt
   if grep -E 'INTERP|NEEDED' /build/static-linkage.txt; then
-    echo 'The musl helper must have no interpreter or shared-library dependency' >&2
+    echo 'The static helper must have no interpreter or shared-library dependency' >&2
     exit 1
   fi
 else
