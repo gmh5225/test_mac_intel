@@ -26,6 +26,10 @@ cd /build/ripgrep
 export RUSTFLAGS='-C panic=abort'
 if [ "$RECOVERY_NATIVE_TARGET" = x86_64-unknown-linux-gnu ]; then
   RUSTFLAGS+=' -C target-feature=+ssse3,-avx2'
+else
+  # Emit baseline LL/SC atomics directly, avoiding hidden libgcc outlined
+  # helpers when these archives are linked into an existing Rust host.
+  RUSTFLAGS+=' -C target-feature=-outline-atomics'
 fi
 cargo build --release --lib --features pcre2 --locked --offline --target "$RECOVERY_NATIVE_TARGET" --target-dir /build/target --message-format=json-render-diagnostics > /build/cargo-artifacts.jsonl
 python3 /recipes/select_artifacts.py /build/cargo-artifacts.jsonl /build "$RECOVERY_NATIVE_TARGET" /build/rust-libs
@@ -39,5 +43,9 @@ ar d /build/librecovered_rg.a lib.rmeta
 ar s /build/librecovered_rg.a
 cc -O2 -Wall -Wextra -Werror -Dmain=neverd_recovered_seccomp_main -I/build/seccomp-source -c /build/seccomp-source/apply-seccomp.c -o /build/seccomp-source/apply-seccomp.o
 link_args=('-C' 'link-arg=/build/librecovered_rg.a' '-C' 'link-arg=/build/seccomp-source/apply-seccomp.o')
-rustc --edition=2024 -C panic=abort -C opt-level=2 --target "$RECOVERY_NATIVE_TARGET" /recipes/role-probe.rs -o /build/native-role-probe "${link_args[@]}"
+probe_flags=('-C' 'panic=abort')
+if [ "$RECOVERY_NATIVE_TARGET" = aarch64-unknown-linux-gnu ]; then
+  probe_flags+=('-C' 'target-feature=-outline-atomics')
+fi
+rustc --edition=2024 "${probe_flags[@]}" -C opt-level=2 --target "$RECOVERY_NATIVE_TARGET" /recipes/role-probe.rs -o /build/native-role-probe "${link_args[@]}"
 nm /build/native-role-probe | grep -E 'neverd_recovered_(rg|seccomp)_main$'
