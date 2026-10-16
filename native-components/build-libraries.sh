@@ -42,7 +42,12 @@ ar -D -M < /build/native-libraries.mri
 ar d /build/librecovered_rg.a lib.rmeta
 ar s /build/librecovered_rg.a
 cc -O2 -Wall -Wextra -Werror -Dmain=neverd_recovered_seccomp_main -I/build/seccomp-source -c /build/seccomp-source/apply-seccomp.c -o /build/seccomp-source/apply-seccomp.o
-link_args=('-C' 'link-arg=/build/librecovered_rg.a' '-C' 'link-arg=/build/seccomp-source/apply-seccomp.o')
+ar crsD /build/seccomp-source/libapply_seccomp.a /build/seccomp-source/apply-seccomp.o
+# Tell rustc these are native libraries, so they precede its standard-library
+# archive group. Appending them as final link-args leaves ARM64 hashbrown
+# references unresolved after GNU ld has already scanned that group.
+link_args=('-L' 'native=/build' '-l' 'static=recovered_rg'
+           '-L' 'native=/build/seccomp-source' '-l' 'static=apply_seccomp')
 probe_flags=('-C' 'panic=abort')
 if [ "$RECOVERY_NATIVE_TARGET" = aarch64-unknown-linux-gnu ]; then
   probe_flags+=('-C' 'target-feature=-outline-atomics')

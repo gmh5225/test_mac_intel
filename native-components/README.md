@@ -18,3 +18,8 @@ separately verified public inputs. Bun must compile that C source with its own
 portable flags, link the Rust archives, then pass its glibc gate and complete
 actual-client acceptance. A successful standalone host does not establish those
 later steps, recover private producer types or restore the original Bun revision.
+
+The probe links its native libraries before rustc's standard-library archive
+group. ARM64 uses baseline LL/SC atomics; no implicit outlined atomic helper
+library or second Rust standard library is supplied. Complete native probe runs
+are required on both architectures before Bun can consume these candidates.
