@@ -35,6 +35,12 @@ jobs:
           ref: ${{ env.SOURCE_COMMIT }}
           submodules: recursive
           persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          path: build-expansion-harness
+          ref: ${{ github.sha }}
+          sparse-checkout: expansion
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.13'
@@ -68,9 +74,11 @@ jobs:
           $tool = Join-Path $env:RUNNER_TEMP 'llvm-mingw-20260519-ucrt-aarch64'
           $cc = Join-Path $tool 'bin\aarch64-w64-mingw32-clang.exe'
           $env:PATH = 'C:\Program Files\Git\bin;' + $env:PATH
-          cmake -S third_party/unicorn -B build-unicorn -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 "-DCMAKE_C_COMPILER=$cc" -DBUILD_SHARED_LIBS=ON -DUNICORN_LEGACY_STATIC_ARCHIVE=OFF '-DUNICORN_ARCH=x86;arm;aarch64' -DUNICORN_BUILD_TESTS=OFF -DUNICORN_INSTALL=OFF 2>&1 | Tee-Object expansion-logs/unicorn-configure.log
+          python build-expansion-harness/expansion/prepare_arm64_unicorn.py
+          if ($LASTEXITCODE -ne 0) { throw 'Unicorn build overlay validation failed' }
+          cmake -S build-unicorn-input -B build-unicorn -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 "-DCMAKE_C_COMPILER=$cc" -DCMAKE_C_FLAGS=-D__USE_MINGW_SETJMP_NON_SEH -DBUILD_SHARED_LIBS=ON -DUNICORN_LEGACY_STATIC_ARCHIVE=OFF '-DUNICORN_ARCH=x86;arm;aarch64' -DUNICORN_BUILD_TESTS=OFF -DUNICORN_INSTALL=OFF 2>&1 | Tee-Object expansion-logs/unicorn-configure.log
           if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn configure failed' }
-          cmake --build build-unicorn --target unicorn --parallel 4 2>&1 | Tee-Object expansion-logs/unicorn-build.log
+          cmake --build build-unicorn --target unicorn --parallel 4 --verbose 2>&1 | Tee-Object expansion-logs/unicorn-build.log
           if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn build failed' }
           $images = @(Get-ChildItem build-unicorn -Recurse -Filter '*unicorn*.dll')
           if ($images.Count -ne 1) { throw 'Unicorn DLL inventory differs' }
@@ -106,6 +114,13 @@ jobs:
           $dll.DirectoryName >> $env:GITHUB_PATH
           $runtime >> $env:GITHUB_PATH
           Copy-Item $dll.FullName expansion-logs
+          Copy-Item $import expansion-logs
+          cl.exe /nologo /W4 /O2 /MD /Ithird_party/unicorn/include build-expansion-harness/expansion/unicorn_host_smoke.c /Febuild-expansion/bin/unicorn_host_smoke.exe /Fobuild-expansion/unicorn_host_smoke.obj /link $import 2>&1 | Tee-Object expansion-logs/unicorn-smoke-build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Native MSVC consumer build failed' }
+          python -c "import subprocess; subprocess.run(['build-expansion/bin/unicorn_host_smoke.exe'], check=True, timeout=15)" 2>&1 | Tee-Object expansion-logs/unicorn-smoke.log
+          if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn host smoke checks failed' }
+          Copy-Item build-expansion/bin/unicorn_host_smoke.exe expansion-logs
+          Copy-Item build-expansion-harness/expansion/unicorn_host_smoke.c expansion-logs
           [ordered]@{source_commit=(git -C third_party/unicorn rev-parse HEAD); host='ARM64'; producer_sha256='7bb5e3c9964dc29555cababb55e69eea02a51e98e1240eb9513e6540c7bae0ea'; dll=$dll.Name; dll_sha256=(Get-FileHash $dll.FullName -Algorithm SHA256).Hash.ToLowerInvariant(); import_sha256=(Get-FileHash $import -Algorithm SHA256).Hash.ToLowerInvariant()} | ConvertTo-Json | Set-Content expansion-logs/unicorn-provenance.json
       - name: Verify evidence contracts and configure the native build
         shell: pwsh
