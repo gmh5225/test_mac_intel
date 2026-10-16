@@ -80,7 +80,8 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         destination = "/bin/" + name
         copy_public(source, destination)
         if source.read_bytes()[:4] != b"\x7fELF":
-            assert name == "which" and source.read_bytes().startswith(b"#!/bin/sh\n"), "Unqualified public tool interpreter"
+            shebang = source.read_bytes().splitlines()[0]
+            assert name == "which" and re.fullmatch(rb"#![ \t]*/bin/sh[ \t]*", shebang), ("Unqualified public tool interpreter", name, shebang)
             continue
         result = run("bash-ldd-" + name, ["ldd", source])
         for match in re.finditer(r"(?:=>\s*)?(/(?:usr/)?lib[^\s]*)\s+\(", result["stdout"]):
