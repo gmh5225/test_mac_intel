@@ -20,11 +20,11 @@ COMMIT = "c6da4a4d3010e5553438c60f6bd76d981976867c"
 PROFILES = {
     "x64": {"machine": 62, "docker_platform": "linux/amd64",
             "image": "ghcr.io/oven-sh/bun-development-docker-image@sha256:ee053ca8ff0a00ab51c8572378fb56dee902063d5020b4d90fb78a098fb70af2",
-            "rg_sha256": "3984a55c6cf39c362a1ae15e5c347ea2870ba3dd883a3da4865d5082ffe35a58",
+            "rg_sha256": "6d4e1d852bddf621cc51557dcb1b59c4d010bbfabdeee0fb93ed4c9b82b7193e",
             "seccomp_sha256": "5979576d07b50877385e2abea0534add12499074d259f0cd2d1c3694e9fe0a10"},
     "arm64": {"machine": 183, "docker_platform": "linux/arm64",
               "image": "ghcr.io/oven-sh/bun-development-docker-image@sha256:19e1898469e3ab456b90a4120c1b96644af53c019434c2f9852eb14870e13d11",
-              "rg_sha256": "77d1249f185d04a63c3494fb327a5486359d0e80aef967ff3366efd82dfc8546",
+              "rg_sha256": "24fa0f2d1462b9ddb0d8ee5c7d0484c8fe0d107cb8a6813089dc30f731db2ac9",
               "seccomp_sha256": "6b650422a7287f2e585728667510d75700d6e5c638b0ea5722ad1f9f0d7ec666"},
 }
 
@@ -60,7 +60,10 @@ def main():
             assert data[:6] == b"\x7fELF\x02\x01" and struct.unpack_from("<H", data, 18)[0] == profile["machine"]
             destination = payloads / label
             destination.write_bytes(data); destination.chmod(0o555)
-            receipt["payloads"].append({"name": label, "bytes": len(data), "sha256": expected})
+            run("payload-" + label + "-elf", ["readelf", "--program-headers", "--dynamic", destination])
+            headers = (logs / ("payload-" + label + "-elf.log")).read_text()
+            assert "(NEEDED)" not in headers and "INTERP" not in headers, "Embedded payload adds an external loader dependency"
+            receipt["payloads"].append({"name": label, "bytes": len(data), "sha256": expected, "static_without_interpreter": True})
         run("git-init", ["git", "init", source])
         run("git-remote", ["git", "remote", "add", "origin", "https://github.com/oven-sh/bun.git"], cwd=source)
         run("git-fetch", ["git", "fetch", "--depth", "1", "origin", COMMIT], cwd=source)

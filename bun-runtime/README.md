@@ -44,3 +44,10 @@ the pinned Clang toolchain. This avoids projecting unrelated large compiler
 executables. Linux's case-distinct headers require a case-sensitive output
 filesystem; an APFS bind-mount collision is retained as a refused local
 preparation, and the unchanged projection passes on an owned Linux VM volume.
+
+Both original glibc clients require no version newer than GLIBC_2.17. The
+previous standalone glibc rg has GLIBC_2.34 requirements, so the embedded
+search payload uses the already qualified static musl variant instead. Both
+embedded payloads must have neither an ELF interpreter nor DT_NEEDED entries.
+This keeps a dependency's loader requirement from defeating the core's
+portability check. The exact public payload hashes are pinned per architecture.
