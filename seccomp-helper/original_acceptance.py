@@ -271,9 +271,10 @@ def main():
         assert sha(original) == pin["sha256"]
         receipt.update(status="native_role_candidate_matches_extended_bounded_cases", descriptor_cases=descriptor_cases, extended=extended,
             namespace_normalization="Only three kernel-assigned namespace inode identities; each must be valid and differ from the same invocation's outer namespace recorded by the authored exec driver. Every other process-state field is exact.",
-            scope="Seven direct and four descriptor-3 cases plus external signals and optional observer controls inside a qualified empty-root namespace boundary. Full recovered Bash integration and universal helper equivalence remain open.")
+            scope="Seven direct and four descriptor-3 cases plus external signals and optional observer controls inside a qualified empty-root namespace boundary. The optional --bash-rg suite adds seven complete offline Bash tool call chains against both layouts. Whole-helper and universal program equivalence remain open.")
         print(json.dumps({"status": receipt["status"], "arch": args.arch, "cases": len(receipt["cases"]) + len(descriptor_cases)
-                          + len(extended["external_signals"]) + len(extended["observers"])}))
+                          + len(extended["external_signals"]) + len(extended["observers"]),
+                          "bash_differential_pairs": len(receipt.get("bash", {}).get("differential_pairs", []))}))
     except Exception as error:
         receipt.update(status="failed", error_type=type(error).__name__, error=str(error))
         raise

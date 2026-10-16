@@ -29,8 +29,8 @@ an unavailable command path fail the build. The Ubuntu 22.04 jobs require
 this path; Ubuntu 24.04 retains its measured namespace restriction. Host
 policy is recorded, and the workflow does not change it.
 
-These checks do not prove equivalence to the original client's full helper
-implementation, supervisor, optional observer, or native dispatcher.
+These component controls do not prove whole-function equivalence to the
+original helper or restore the original engine's built-in dispatcher.
 
 Public build artifacts contain public sources, licenses, exact inputs, static
 executables, receipts and diagnostics.
@@ -50,10 +50,18 @@ have different namespace IDs. Only three kernel-assigned namespace identities
 are normalized; PID relationships, capabilities, policy results, exit codes and
 all other output remain exact.
 
-This additional artifact contains diagnostics and authored recipes only. It
-uploads neither the captured client nor recovered client source. The public
-helper's optional observer, external signal forwarding and rebuilt client
-integration remain separate work.
+Twelve additional cases send TERM, INT, HUP, QUIT, USR1 and USR2 to the
+driver's own helper child, checking both default termination and a caught
+signal returning 37. Workload readiness and both supervisor signal masks are
+confirmed before delivery. Five observer cases cover encoded/no-encoded
+commands, missing and disconnected consumers, and real queue backpressure.
+Normal events must have exact syscall/path order, including escaped paths,
+relative paths and dirfds. Event PIDs must identify the same invocation's
+proven owned worker. Telemetry remains best effort; enforcement is checked
+separately. There are 28 role/descriptor/supervision cases per architecture.
+
+This artifact contains diagnostics and authored recipes only. It uploads
+neither the captured client nor recovered client source.
 
 `patch_descriptor.py` applies the recorded one-function provider change to an
 exact hash-pinned recovered readable module. It refuses every other revision.
@@ -64,3 +72,27 @@ client, search helper and seccomp helper before normal startup. It also handles
 the explicit `ARGV0=apply-seccomp` role. Missing, non-executable and symlink
 helpers fail with exit 126. CI builds both static launcher variants twice;
 the public component build does not execute a reconstructed client.
+
+The separate `claude-bash-sandbox.yml` workflow reconstructs preserved and
+all-readable clients privately from the pinned published sample and Bun.
+The public formatting recipe contains hashes and whitespace insertions only;
+it reproduces previously verified NeverD output without embedding captured
+source. All 2,589 selected module/asset records must match on readback, and
+the four resulting binary hashes must match the sealed local candidates.
+
+Before client entry, authored controls qualify the empty root, isolated
+loopback fixture, writable outer test directories and the complete loader
+dependency set. Public executables and their libraries are copied explicitly;
+host directories and credentials are not exposed. The actual Bash tool then
+runs seven cases against the original and both layouts: enforced policy,
+output/error streams with Unicode, exit 37, a pipeline with file I/O, denied
+write, denied read and fd 3 closure. Ordered protocol frames, all API request
+bodies and exact workspace bytes are compared (28 differential pairs across
+both architectures). Only the previously qualified identity/time fields are
+normalized. Full Bash call chains pass these declared offline cases; wider
+semantics and the overall reconstruction remain open.
+
+`--bash-rg /path/to/pinned/rg` enables that suite in `original_acceptance.py`.
+The workflow can rebuild the search dependency from source using the
+`rebuild_search` dispatch input, and does so automatically if the retained
+public artifact is unavailable. Both paths still require the same binary hash.
