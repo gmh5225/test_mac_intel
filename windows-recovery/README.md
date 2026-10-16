@@ -48,6 +48,18 @@ seven configuration and 22 offline behavior cases compare the original against
 this all-readable executable in fresh disposable state. Baseline observations
 and the all-readable observations have separate diagnostic directories.
 
+Fourteen additional Read/Edit cases run against the original and both source
+layouts, adding 28 differential pairs per architecture. The exact matrix is
+shared with the Linux qualification: ranged UTF-8 reads, missing and directory
+errors, one/all replacements, ambiguity, CRLF and Unicode bytes, absent old
+strings, and model/Read-permission/read-cache conditions. Every case checks
+ordered protocol and API records, tool error states, and complete workspace
+file bytes using the existing strict normalizer. The sequential HTTP fixture
+must pass authored rendering/refusal controls and a native Bun round trip in
+AppContainer before a captured client is executed. `core-tool-acceptance.json`
+records these additional results separately. This matrix does not cover Bash,
+Grep, Glob, token-cap Read truncation, or live services.
+
 The suite compares seven configuration cases and 22 offline behavior
 cases covering tool permissions, hooks, MCP, fragmented protocol messages,
 session persistence and interruption. An authored loopback server supplies

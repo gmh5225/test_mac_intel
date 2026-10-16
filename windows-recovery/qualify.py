@@ -14,6 +14,7 @@ from appcontainer_qualification import qualify_appcontainer
 from client_acceptance import accept_client
 from loopback_qualification import qualify_loopback
 from helper_qualification import qualify_helpers
+from core_tool_acceptance import qualify_core_tools
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -148,6 +149,7 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt.update(status="authored_windows_environment_qualified",
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
         receipt["loopback_qualification"] = qualify_loopback(out, bun, clean_env, run)
+        receipt["core_tool_fixture_qualification"] = qualify_core_tools(out, bun, clean_env)
         try: receipt["helper_qualification"] = qualify_helpers(out, bun, clean_env, run, compiler, compiler_env)
         except Exception as error:
             receipt["helper_qualification"] = {"status": "failed", "error": str(error)}
@@ -157,7 +159,7 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                                                      formatter_root=args.readable_formatter.resolve() if args.readable_formatter else None,
                                                      formatter_manifest_sha256=args.formatter_manifest_sha256)
         receipt.update(status="windows_offline_acceptance_pass",
-                       scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases and native load-only. No live model service or device exports tested.")
+                       scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases, fourteen Read/Edit cases per source layout and native load-only. No live model service or device exports tested.")
     except Exception as error:
         receipt.update(status="failed", error=str(error)); raise
     finally:

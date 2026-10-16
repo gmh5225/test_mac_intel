@@ -9,16 +9,25 @@ def event(name, body):
     return "event: " + name + "\ndata: " + json.dumps(body, ensure_ascii=False, separators=(",", ":")) + "\n\n"
 
 def message(spec, request, ordinal):
-    tool = spec.get("kind") == "tool_then_text" and ordinal == 1
+    sequence = spec.get("kind") == "tool_sequence_then_text"
+    if sequence:
+        entries = spec.get("tools")
+        if not isinstance(entries, list) or not 1 <= len(entries) <= 8:
+            raise ValueError("tool sequence bound")
+        if any(not isinstance(entry, dict) or not isinstance(entry.get("name"), str)
+               or not isinstance(entry.get("input"), dict) for entry in entries):
+            raise ValueError("tool sequence entry")
+    tool = (spec.get("kind") == "tool_then_text" and ordinal == 1) or (sequence and 1 <= ordinal <= len(entries))
+    selected = (entries[ordinal - 1] if sequence else spec["tool"]) if tool else None
     result = event("message_start", {"type": "message_start", "message": {
         "id": "msg_offline_fixture_" + str(ordinal), "type": "message", "role": "assistant",
         "model": request.get("model", "claude-sonnet-5"), "content": [], "stop_reason": None, "stop_sequence": None,
         "usage": {"input_tokens": 10, "output_tokens": 1, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0}}})
     if tool:
         result += event("content_block_start", {"type": "content_block_start", "index": 0,
-            "content_block": {"type": "tool_use", "id": "toolu_offline_fixture_1", "name": spec["tool"]["name"], "input": {}}})
+            "content_block": {"type": "tool_use", "id": "toolu_offline_fixture_" + str(ordinal), "name": selected["name"], "input": {}}})
         result += event("content_block_delta", {"type": "content_block_delta", "index": 0,
-            "delta": {"type": "input_json_delta", "partial_json": json.dumps(spec["tool"]["input"], separators=(",", ":"))}})
+            "delta": {"type": "input_json_delta", "partial_json": json.dumps(selected["input"], separators=(",", ":"))}})
     else:
         result += event("content_block_start", {"type": "content_block_start", "index": 0,
             "content_block": {"type": "text", "text": ""}})
