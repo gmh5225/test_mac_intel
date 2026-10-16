@@ -39,7 +39,11 @@ The separate Ubuntu 22.04 original-role acceptance downloads the SHA-512-pinned
 published client only after authored controls qualify an empty-root bubblewrap
 boundary. It exposes fixed public runtime libraries, the test executable and
 owned fixture directories, with separate network/process/user/mount namespaces.
-Seven native-role cases compare the original against the public helper. A small
+Seven direct native-role cases and four descriptor-3 cases compare the original
+against the public helper. The descriptor route opens the selected executable
+with O_PATH and execs `/proc/self/fd/3` under `ARGV0=apply-seccomp`; its payload
+control confirms the descriptor is inherited and can be closed before work.
+A small
 authored exec driver records the outer namespace identities for each invocation,
 so the nested namespace check cannot pass merely because two separate tests
 have different namespace IDs. Only three kernel-assigned namespace identities

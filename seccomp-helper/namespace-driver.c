@@ -1,6 +1,9 @@
 /* Record this invocation's outer namespaces immediately before exec. */
 #define _GNU_SOURCE
+#include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 int main(int argc, char **argv) {
@@ -15,6 +18,16 @@ int main(int argc, char **argv) {
     printf("NEVERD_OUTER_NAMESPACE {\"pid_ns\":\"%s\",\"user_ns\":\"%s\",\"mount_ns\":\"%s\"}\n",
            values[0], values[1], values[2]);
     if (fflush(stdout) != 0) return 66;
+    const char *route = getenv("NEVERD_ROUTE_FD3");
+    if (route && strcmp(route, "1") == 0) {
+        int fd = open(argv[1], O_PATH);
+        if (fd < 0 || (fd != 3 && dup2(fd, 3) != 3)) return 67;
+        if (fd != 3 && close(fd) != 0) return 68;
+        argv[1] = "/proc/self/fd/3";
+        execv(argv[1], &argv[1]);
+        perror("descriptor driver exec");
+        return 126;
+    }
     execv(argv[1], &argv[1]);
     perror("namespace driver exec");
     return 126;

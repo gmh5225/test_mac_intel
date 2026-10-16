@@ -54,7 +54,7 @@ def main():
     for name in ["runtime", "proc", "dev", "tmp", "work", "home/test"]:
         (root / name).mkdir(parents=True, exist_ok=True)
     # Bind destinations must exist before the enclosing root becomes read-only.
-    for name in ["client", "control", "driver"]:
+    for name in ["client", "control", "driver", "descriptor-control"]:
         (root / "runtime" / name).touch(exist_ok=False)
     receipt = {"status": "started", "arch": args.arch, "boundary_qualified": False,
                "captured_client_executed": False, "captured_client_execution_attempted": False, "captured_source_uploaded": False,
@@ -94,7 +94,7 @@ def main():
     try:
         sources = logs / "source"
         sources.mkdir()
-        for name in ["original_acceptance.py", "original-pins.json", "boundary-control.c", "namespace-driver.c", "test_original_comparison.py"]:
+        for name in ["original_acceptance.py", "original-pins.json", "boundary-control.c", "namespace-driver.c", "descriptor-control.c", "test_original_comparison.py"]:
             shutil.copyfile(ROOT / name, sources / name)
         bwrap = Path(shutil.which("bwrap"))
         package_version = run("bwrap-package", ["dpkg-query", "-W", "-f=${Version}", "bubblewrap"])
@@ -114,6 +114,8 @@ def main():
                                          "/recipes/boundary-control.c", "-o", "/out/boundary-control-dynamic"])
         run("compile-driver", [*base, "gcc", "-static", "-O2", "-Wall", "-Wextra", "-Werror",
                                "/recipes/namespace-driver.c", "-o", "/out/namespace-driver"])
+        run("compile-descriptor-control", [*base, "gcc", "-static", "-O2", "-Wall", "-Wextra", "-Werror",
+                                           "/recipes/descriptor-control.c", "-o", "/out/descriptor-control"])
         triplet = {"x64": "x86_64-linux-gnu", "arm64": "aarch64-linux-gnu"}[args.arch]
         interpreter = {"x64": "/lib64/ld-linux-x86-64.so.2", "arm64": "/lib/ld-linux-aarch64.so.1"}[args.arch]
         libraries = [interpreter] + [f"/lib/{triplet}/" + name for name in
@@ -132,19 +134,23 @@ def main():
             assert sha(package / name) == public["binaries"][name]["sha256"]
         state_parent = out / "state"
         state_parent.mkdir()
-        def isolated(label, executable, arguments, *, expected=0, role=False):
+        def isolated(label, executable, arguments, *, expected=0, role=False, descriptor=False):
             state = state_parent / label
             state.mkdir()
             argv = [bwrap, "--unshare-all", "--die-with-parent", "--new-session", "--cap-drop", "ALL",
                     "--uid", str(os.getuid()), "--gid", str(os.getgid()), "--ro-bind", root, "/",
                     "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--bind", state, "/work",
                     "--ro-bind", executable, "/runtime/client", "--ro-bind", control, "/runtime/control",
+                    "--ro-bind", inputs / "descriptor-control", "/runtime/descriptor-control",
                     "--chdir", "/work", "--clearenv", "--setenv", "HOME", "/home/test",
                     "--setenv", "PATH", "/unavailable", "--setenv", "LANG", "C", "--setenv", "LC_ALL", "C",
                     "--setenv", "BOUNDARY_OUTSIDE", str(canary)]
             if role:
                 argv += ["--setenv", "ARGV0", "apply-seccomp"]
                 argv += ["--ro-bind", inputs / "namespace-driver", "/runtime/driver"]
+            if descriptor:
+                assert role
+                argv += ["--setenv", "NEVERD_ROUTE_FD3", "1"]
             command = ["/runtime/driver", "/runtime/client"] if role else ["/runtime/client"]
             result = run(label, [*argv, "--", *command, *arguments], expected=expected, timeout=30, limited=True)
             if role:
@@ -226,11 +232,28 @@ def main():
             if case == "policy":
                 check_report(json.loads(observed["original"]["stdout"]), "baseline", True)
             receipt["cases"].append({"case": case, "observed": observed, "matches": True})
+        descriptor_cases = []
+        for case, arguments, code in [
+            ("fd3-usage", [], 1), ("fd3-exit-37", ["/runtime/control", "exit-37"], 37),
+            ("fd3-policy", ["/runtime/control", "baseline"], 0),
+            ("fd3-close-before-payload", ["/runtime/descriptor-control", "close-and-report"], 0)]:
+            observed = {name: isolated(name + "-" + case, exe, arguments, expected=code, role=True, descriptor=True)
+                        for name, exe in [("original", original), ("candidate", candidate)]}
+            assert {k: v for k, v in observed["original"].items() if k != "outer_namespace"} == {
+                k: v for k, v in observed["candidate"].items() if k != "outer_namespace"}, case + " differs"
+            if case == "fd3-usage":
+                assert observed["original"]["stderr"] == "Usage: /proc/self/fd/3 <command> [args...]\n"
+            elif case == "fd3-policy":
+                check_report(json.loads(observed["original"]["stdout"]), "baseline", True)
+            elif case == "fd3-close-before-payload":
+                assert json.loads(observed["original"]["stdout"]) == {
+                    "fd3_valid_before_close": True, "fd3_result_after_close": -1, "errno": 9}
+            descriptor_cases.append({"case": case, "observed": observed, "matches": True})
         assert sha(original) == pin["sha256"]
-        receipt.update(status="native_role_candidate_matches_seven_bounded_cases",
+        receipt.update(status="native_role_candidate_matches_eleven_bounded_cases", descriptor_cases=descriptor_cases,
             namespace_normalization="Only three kernel-assigned namespace inode identities; each must be valid and differ from the same invocation's outer namespace recorded by the authored exec driver. Every other process-state field is exact.",
-            scope="Seven apply-seccomp role cases inside a qualified empty-root namespace boundary. Optional observer, external signal forwarding, all edge cases and recovered client integration remain open.")
-        print(json.dumps({"status": receipt["status"], "arch": args.arch, "cases": len(receipt["cases"])}))
+            scope="Seven direct apply-seccomp role cases and four descriptor-3 cases inside a qualified empty-root namespace boundary. Optional observer, external signal forwarding, all edge cases and recovered client integration remain open.")
+        print(json.dumps({"status": receipt["status"], "arch": args.arch, "cases": len(receipt["cases"]) + len(descriptor_cases)}))
     except Exception as error:
         receipt.update(status="failed", error_type=type(error).__name__, error=str(error))
         raise
