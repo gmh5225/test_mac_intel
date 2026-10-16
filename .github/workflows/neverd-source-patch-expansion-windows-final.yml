@@ -1,5 +1,5 @@
 name: NeverD source patch expansion Windows final
-run-name: Windows qualification at ${{ inputs.source || '1096c060c067fff1275cf0253e3c78e8834aa750' }}
+run-name: Windows qualification at ${{ inputs.source || '81d829add1f7c2c19724f3e16f8ba4f9277656a3' }}
 on:
   workflow_dispatch:
     inputs:
@@ -7,14 +7,14 @@ on:
         description: Exact NeverD source commit
         type: string
         required: true
-        default: 1096c060c067fff1275cf0253e3c78e8834aa750
+        default: 81d829add1f7c2c19724f3e16f8ba4f9277656a3
   push:
     branches: [codex/source-patch-expansion]
     paths: ['.github/workflows/neverd-source-patch-expansion-windows-final.yml']
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '1096c060c067fff1275cf0253e3c78e8834aa750' }}
+  SOURCE_COMMIT: ${{ inputs.source || '81d829add1f7c2c19724f3e16f8ba4f9277656a3' }}
   SCCACHE_GHA_ENABLED: 'true'
 concurrency:
   group: neverd-expansion-windows-final-${{ github.run_id }}
@@ -76,7 +76,9 @@ jobs:
           $tool = Join-Path $env:RUNNER_TEMP 'llvm-mingw-20260519-ucrt-aarch64'
           $cc = Join-Path $tool 'bin\aarch64-w64-mingw32-clang.exe'
           $env:PATH = 'C:\Program Files\Git\bin;' + $env:PATH
-          python build-expansion-harness/expansion/prepare_arm64_unicorn.py
+          python -m unittest discover -s build-expansion-harness/expansion -p test_prepare_arm64_unicorn.py -v 2>&1 | Tee-Object expansion-logs/unicorn-overlay-tests.log
+          if ($LASTEXITCODE -ne 0) { throw 'Unicorn overlay input tests failed' }
+          python build-expansion-harness/expansion/prepare_arm64_unicorn.py 2>&1 | Tee-Object expansion-logs/unicorn-prepare.log
           if ($LASTEXITCODE -ne 0) { throw 'Unicorn build overlay validation failed' }
           cmake -S build-unicorn-input -B build-unicorn -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 "-DCMAKE_C_COMPILER=$cc" -DCMAKE_C_FLAGS=-D__USE_MINGW_SETJMP_NON_SEH -DBUILD_SHARED_LIBS=ON -DUNICORN_LEGACY_STATIC_ARCHIVE=OFF '-DUNICORN_ARCH=x86;arm;aarch64' -DUNICORN_BUILD_TESTS=OFF -DUNICORN_INSTALL=OFF 2>&1 | Tee-Object expansion-logs/unicorn-configure.log
           if ($LASTEXITCODE -ne 0) { throw 'Native ARM64 Unicorn configure failed' }
