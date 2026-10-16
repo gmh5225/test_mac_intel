@@ -15,6 +15,7 @@ from client_acceptance import accept_client
 from loopback_qualification import qualify_loopback
 from helper_qualification import qualify_helpers
 from core_tool_acceptance import qualify_core_tools
+from search_component_qualification import qualify_search_component
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -31,6 +32,7 @@ def main():
     ap.add_argument("--editable-probe", action="store_true")
     ap.add_argument("--readable-formatter", type=Path)
     ap.add_argument("--formatter-manifest-sha256")
+    ap.add_argument("--search-build", type=Path)
     args = ap.parse_args()
     assert bool(args.readable_formatter) == bool(args.formatter_manifest_sha256), "formatter and manifest pin are required together"
     out = args.output.resolve(); out.mkdir()
@@ -150,6 +152,9 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
                        scope="Authored fixtures only; capability-free AppContainer and bounded Job Object controls passed. No captured client executed.")
         receipt["loopback_qualification"] = qualify_loopback(out, bun, clean_env, run)
         receipt["core_tool_fixture_qualification"] = qualify_core_tools(out, bun, clean_env)
+        search_package = None
+        if args.search_build:
+            search_package = qualify_search_component(args.arch, out, args.search_build.resolve(), clean_env)
         try: receipt["helper_qualification"] = qualify_helpers(out, bun, clean_env, run, compiler, compiler_env)
         except Exception as error:
             receipt["helper_qualification"] = {"status": "failed", "error": str(error)}
@@ -157,7 +162,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         receipt["client_acceptance"] = accept_client(args.arch, out, bun, compiler, compiler_env, clean_env, run, receipt,
                                                      editable_probe=args.editable_probe,
                                                      formatter_root=args.readable_formatter.resolve() if args.readable_formatter else None,
-                                                     formatter_manifest_sha256=args.formatter_manifest_sha256)
+                                                     formatter_manifest_sha256=args.formatter_manifest_sha256,
+                                                     search_package=search_package)
         receipt.update(status="windows_offline_acceptance_pass",
                        scope="Qualified authored environment, four smoke, seven configuration, 22 behavior cases, fourteen Read/Edit plus seven token-cap cases per source layout and native load-only. No live model service or device exports tested.")
     except Exception as error:

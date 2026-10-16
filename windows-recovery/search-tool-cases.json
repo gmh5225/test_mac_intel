@@ -1,0 +1,329 @@
+[
+  {
+    "id": "G01-content",
+    "input": "first\nNEVERD_SEARCH_NEEDLE\nlast\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "NEVERD_SEARCH_NEEDLE",
+          "path": "/work/input.txt",
+          "output_mode": "content"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "first\nNEVERD_SEARCH_NEEDLE\nlast\n",
+    "last_result_contains": [
+      "2:NEVERD_SEARCH_NEEDLE"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G02-no-match",
+    "input": "first\nlast\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "ABSENT_NEEDLE",
+          "path": "/work/input.txt",
+          "output_mode": "content"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "first\nlast\n",
+    "last_result_contains": [
+      "No matches found"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G03-count",
+    "input": "target\nother\ntarget\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "target",
+          "path": "/work/input.txt",
+          "output_mode": "count"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "target\nother\ntarget\n",
+    "last_result_contains": [
+      "2 total occurrences"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G04-case-insensitive",
+    "input": "lower\nMiXeD_NEEDLE\nlast\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "mixed_needle",
+          "path": "/work/input.txt",
+          "output_mode": "content",
+          "-i": true
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "lower\nMiXeD_NEEDLE\nlast\n",
+    "last_result_contains": [
+      "2:MiXeD_NEEDLE"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G05-invalid-regex",
+    "input": "keep\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "[",
+          "path": "/work/input.txt",
+          "output_mode": "content"
+        }
+      }
+    ],
+    "tool_errors": [
+      true
+    ],
+    "expected": "keep\n",
+    "last_result_contains": [
+      "regex parse error"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G06-filenames",
+    "input": "target\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "target",
+          "path": "/work/input.txt",
+          "output_mode": "files_with_matches"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "target\n",
+    "last_result_contains": [
+      "input.txt"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G07-pagination",
+    "input": "target-one\nother\ntarget-two\ntarget-three\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "target",
+          "path": "/work/input.txt",
+          "output_mode": "content",
+          "head_limit": 1,
+          "offset": 1
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "target-one\nother\ntarget-two\ntarget-three\n",
+    "last_result_contains": [
+      "3:target-two"
+    ],
+    "last_result_excludes": [
+      "target-one",
+      "target-three"
+    ],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G08-multiline",
+    "input": "first\nstart\nend\nlast\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "start\nend",
+          "path": "/work/input.txt",
+          "output_mode": "content",
+          "multiline": true
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "first\nstart\nend\nlast\n",
+    "last_result_contains": [
+      "start",
+      "end"
+    ],
+    "last_result_excludes": [
+      "first",
+      "last"
+    ],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G09-unicode",
+    "input": "alpha\n开始 🐈 café β\nend\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "🐈",
+          "path": "/work/input.txt",
+          "output_mode": "content"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "alpha\n开始 🐈 café β\nend\n",
+    "last_result_contains": [
+      "开始 🐈 café β"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G10-glob-found",
+    "input": "keep\n",
+    "tools": [
+      {
+        "name": "Glob",
+        "input": {
+          "pattern": "**/*.txt",
+          "path": "/work"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "keep\n",
+    "last_result_contains": [
+      "input.txt"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G11-glob-empty",
+    "input": "keep\n",
+    "tools": [
+      {
+        "name": "Glob",
+        "input": {
+          "pattern": "**/*.absent",
+          "path": "/work"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "keep\n",
+    "last_result_contains": [
+      "No files found"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G12-leading-dash",
+    "input": "first\n-needle\nlast\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "-needle",
+          "path": "/work/input.txt",
+          "output_mode": "content"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "first\n-needle\nlast\n",
+    "last_result_contains": [
+      "2:-needle"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "G13-ignore-config",
+    "input": "first\nNEVERD_SEARCH_NEEDLE\nlast\n",
+    "tools": [
+      {
+        "name": "Grep",
+        "input": {
+          "pattern": "NEVERD_SEARCH_NEEDLE",
+          "path": "/work/input.txt",
+          "output_mode": "content"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "first\nNEVERD_SEARCH_NEEDLE\nlast\n",
+    "last_result_contains": [
+      "2:NEVERD_SEARCH_NEEDLE"
+    ],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null,
+    "fixtures": {
+      "ignored-rg.conf": "--invalid-recovery-config-option\n"
+    },
+    "env": {
+      "RIPGREP_CONFIG_PATH": "/fixtures/ignored-rg.conf"
+    }
+  }
+]

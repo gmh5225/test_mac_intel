@@ -67,8 +67,26 @@ count-tokens endpoint reports ten tokens. Each verifies that counting was
 exercised, the true truncation flag and a strict content prefix are present,
 Unicode pairs stay complete, and exact file bytes and ordered wire records
 match both layouts. `read-truncation-acceptance.json` records the seven-case
-supplement separately. Bash, Grep, Glob, default-limit stress cases and live
+supplement separately. Bash, default-limit stress cases and live
 services remain outside these matrices.
+
+The optional `--search-build` stage adds thirteen Grep/Glob cases against the
+original and both rebuilt layouts. Each Windows host first builds public
+ripgrep 14.1.1 and PCRE2 10.45 with static CRT, tests PCRE2, and checks native
+helper behavior and both managed launchers. Before any captured client runs,
+three additional AppContainer controls check the real helper and both
+launchers' Unicode arguments, environment selection and exit propagation.
+Candidates select the packaged helper through those launchers; the original
+keeps its built-in dispatch. This does not restore the original Bun dispatcher.
+
+The search matrix checks content, missing matches, counts, case folding,
+invalid regex, filenames, pagination, multiline/Unicode matching, Glob hits
+and misses, a leading dash and ignored external configuration. Ordered
+protocol/API records, stderr, exit status and complete workspace bytes are
+compared. The exact Glob result's elapsed clock is normalized separately,
+using its recorded Date.now subtraction; no search payload is discarded.
+`search-tool-acceptance.json` reports these 26 pairs per architecture. This
+stage is accepted only after the full native workflow passes.
 
 The suite compares seven configuration cases and 22 offline behavior
 cases covering tool permissions, hooks, MCP, fragmented protocol messages,

@@ -15,6 +15,7 @@ from behavior_acceptance import accept_behavior
 from editable_acceptance import accept_editable
 from readable_acceptance import accept_readable
 from core_tool_acceptance import accept_core_tools, accept_read_truncation
+from search_tool_acceptance import accept_search_tools
 
 ROOT = Path(__file__).resolve().parent
 PINS = {
@@ -36,7 +37,7 @@ PINS = {
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 
 def accept_client(arch, out, bun, compiler, compiler_env, clean_env, run, overall, editable_probe=False,
-                  formatter_root=None, formatter_manifest_sha256=None):
+                  formatter_root=None, formatter_manifest_sha256=None, search_package=None):
     pins = PINS[arch]
     logs = out / "evidence"
     receipt = {"status": "started", "architecture": arch, "version": "2.1.296",
@@ -152,6 +153,8 @@ if(!r.success){for(const log of r.logs)console.error(log);process.exit(1);}
         if formatter_root is not None: candidates["readable"] = out / "readable-rebuilt-1.exe"
         receipt["core_tools"] = accept_core_tools(out, original, candidates, clean_env)
         receipt["read_truncation"] = accept_read_truncation(out, original, candidates, clean_env)
+        if search_package is not None:
+            receipt["search_tools"] = accept_search_tools(out, original, candidates, clean_env, search_package)
         receipt.update(status="windows_offline_acceptance_pass", full_behavior_matrix="29 cases match", smoke_cases=4)
         return receipt
     except Exception as error:
