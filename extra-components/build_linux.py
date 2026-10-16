@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -143,8 +144,11 @@ def main():
         bfs = sources / "bfs"
         # The pinned tag archive omits .git; upstream's fallback is only 4.1.
         # Use its documented release VERSION input for the exact 4.1.1 tag.
-        env = dict(env, VERSION="4.1.1")
+        # Account lookups must use the same libc as runner NSS modules.
+        # A static glibc copy crashes when loading x64 libnss_systemd.
+        env = dict(env, VERSION="4.1.1", LDFLAGS="-L" + str(prefix / "lib"))
         receipt["bfs_release_version_input"] = "4.1.1"
+        receipt["bfs_uses_host_dynamic_libc"] = True
         run("bfs-configure", [bfs / "configure", "--enable-release", "--with-oniguruma",
             "--without-libacl", "--without-libcap", "--without-libselinux", "--without-liburing"], cwd=bfs)
         make("bfs-build", bfs)
@@ -173,7 +177,15 @@ def main():
             assert data[:6] == b"\x7fELF\x02\x01"
             assert struct.unpack_from("<H", data, 18)[0] == {"x64": 62, "arm64": 183}[args.arch]
             linked = run(name + "-elf", ["readelf", "--program-headers", "--dynamic", binary]).stdout.decode()
-            assert "INTERP" not in linked and "(NEEDED)" not in linked
+            if name == "ugrep":
+                assert "INTERP" not in linked and "(NEEDED)" not in linked
+            else:
+                assert "INTERP" in linked and "(NEEDED)" in linked
+                versions = run("bfs-version-needs", ["readelf", "--version-info", binary]).stdout.decode()
+                needs = {tuple(map(int, v.split('.'))) for v in re.findall(r"GLIBC_([0-9]+(?:\.[0-9]+)+)", versions)}
+                assert needs
+                receipt["bfs_maximum_glibc_requirement"] = ".".join(map(str, max(needs)))
+                receipt["original_glibc_floor_established"] = False
             version = run(name + "-version", [binary, "--version"]).stdout.decode()
             assert ("7.8.4" if name == "ugrep" else "4.1.1") in version
             if name == "ugrep":
