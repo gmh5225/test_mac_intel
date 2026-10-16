@@ -29,11 +29,15 @@ if [ "$RECOVERY_NATIVE_TARGET" = x86_64-unknown-linux-gnu ]; then
 fi
 cargo build --release --lib --features pcre2 --locked --offline --target "$RECOVERY_NATIVE_TARGET" --target-dir /build/target --message-format=json-render-diagnostics > /build/cargo-artifacts.jsonl
 python3 /recipes/select_artifacts.py /build/cargo-artifacts.jsonl /build "$RECOVERY_NATIVE_TARGET" /build/rust-libs
-cc -O2 -Wall -Wextra -Werror -Dmain=neverd_recovered_seccomp_main -I/build/seccomp-source -c /build/seccomp-source/apply-seccomp.c -o /build/seccomp-source/apply-seccomp.o
-link_args=('-C' 'link-arg=-Wl,--start-group')
+printf '%s\n' 'CREATE /build/librecovered_rg.a' > /build/native-libraries.mri
 for archive in /build/rust-libs/*.rlib; do
-  link_args+=('-C' "link-arg=$archive")
+  printf 'ADDLIB %s\n' "$archive" >> /build/native-libraries.mri
 done
-link_args+=('-C' 'link-arg=/build/seccomp-source/apply-seccomp.o' '-C' 'link-arg=-Wl,--end-group')
+printf '%s\n' SAVE END >> /build/native-libraries.mri
+ar -D -M < /build/native-libraries.mri
+ar d /build/librecovered_rg.a lib.rmeta
+ar s /build/librecovered_rg.a
+cc -O2 -Wall -Wextra -Werror -Dmain=neverd_recovered_seccomp_main -I/build/seccomp-source -c /build/seccomp-source/apply-seccomp.c -o /build/seccomp-source/apply-seccomp.o
+link_args=('-C' 'link-arg=/build/librecovered_rg.a' '-C' 'link-arg=/build/seccomp-source/apply-seccomp.o')
 rustc --edition=2024 -C panic=abort -C opt-level=2 --target "$RECOVERY_NATIVE_TARGET" /recipes/role-probe.rs -o /build/native-role-probe "${link_args[@]}"
 nm /build/native-role-probe | grep -E 'neverd_recovered_(rg|seccomp)_main$'
