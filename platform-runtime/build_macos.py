@@ -1,4 +1,4 @@
-"""Build an unmodified public macOS Bun baseline with matching LLVM/Rust.
+"""Build a public macOS Bun baseline with matching LLVM/Rust.
 
 This establishes the platform build boundary before recovered native roles are
 added. It never consumes captured clients and cannot admit a recovered engine.
@@ -6,6 +6,7 @@ Both targets build on ARM64; x64 execution is a separate native Intel job.
 """
 from pathlib import Path
 import argparse
+import difflib
 import hashlib
 import json
 import os
@@ -29,6 +30,7 @@ BOOTSTRAP_SHA256 = '90987a3a16d7db556d886ac3d551e7b6d3edf0a1cf43acaed622e8676be1
 BOOTSTRAP_BYTES = 25377591
 CMAKE_ASSET = 'cmake-3.30.5-macos-universal.tar.gz'
 CMAKE_SHA256 = '3d603e507c7579b13518ef752b4ffcf3ed479fba80ee171d7d85da8153e869d0'
+CONFIG_SHA256 = '8df541c3f3f3596b5d90f74161d0e946af2097fbe500a00355be3441bb5c046e'
 
 
 def sha(path):
@@ -160,6 +162,19 @@ def main():
         record['source_tree'] = subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], cwd=source, text=True).strip()
         record['upstream_rust_toolchain_sha256'] = sha(source / 'rust-toolchain.toml')
         record['upstream_build_config_sha256'] = sha(source / 'scripts/build/config.ts')
+        assert record['upstream_build_config_sha256'] == CONFIG_SHA256
+        if args.arch == 'x64':
+            config = source / 'scripts/build/config.ts'; before = config.read_text()
+            old = '  const darwinCross = darwin && host.os !== "darwin";\n'
+            new = '  const darwinCross = darwin && (host.os !== "darwin" || host.arch !== arch);\n'
+            assert before.count(old) == 1
+            after = before.replace(old, new); config.write_text(after)
+            patch = ''.join(difflib.unified_diff(before.splitlines(True), after.splitlines(True),
+                                                fromfile='public-bun/scripts/build/config.ts',
+                                                tofile='qualified-bun/scripts/build/config.ts'))
+            (logs / 'target-architecture.patch').write_text(patch)
+            record['target_architecture_fix'] = dict(before_sha256=CONFIG_SHA256, after_sha256=sha(config),
+                                                    patch_sha256=sha(logs / 'target-architecture.patch'))
         env['RUSTUP_HOME'] = str(out / 'rustup')
         env['CARGO_HOME'] = str(out / 'cargo')
         env['RUSTUP_TOOLCHAIN'] = CHANNEL
@@ -182,15 +197,25 @@ def main():
         env['MACOSX_DEPLOYMENT_TARGET'] = '13.0'
         run('native-sdk-header-control', [toolbin / 'clang', '-x', 'c', '-fsyntax-only', '-'],
             private_input=b'#include <stdio.h>\nint main(void) { return 0; }\n')
+        extra_flags = []
+        if args.arch == 'x64':
+            control = out / 'x64-target-control.c'; control.write_text('#include <stdio.h>\nint main(void) { return 0; }\n')
+            obj = out / 'x64-target-control.o'
+            run('x64-target-object-control', [toolbin / 'clang', '--target=x86_64-apple-macosx', '-march=nehalem',
+                                              '-isysroot', sdk, '-mmacosx-version-min=13.0', '-c', control, '-o', obj])
+            assert struct.unpack_from('<II', obj.read_bytes()) == (0xfeedfacf, 0x1000007)
+            record['x64_target_object_control_sha256'] = sha(obj)
+            extra_flags = ['--macos-sdk=' + sdk]
         run('host-capacity', ['df', '-h', out])
         build_arch = 'aarch64' if args.arch == 'arm64' else 'x64'
         run('public-bun-build', [bun, 'scripts/build.ts', '--profile=release', '--arch=' + build_arch,
                                   '--os=darwin', '--osx-deployment-target=13.0',
-                                  '--build-dir=' + str(source / 'build/recovery'), '-j4'], source)
+                                  '--build-dir=' + str(source / 'build/recovery'), '-j4', *extra_flags], source)
         binary = source / 'build/recovery/bun'; assert binary.is_file()
         raw = binary.read_bytes()
         assert struct.unpack_from('<II', raw) == (0xfeedfacf, {'arm64': 0x100000c, 'x64': 0x1000007}[args.arch])
-        assert not subprocess.check_output(['git', 'status', '--porcelain'], cwd=source)
+        changed = subprocess.check_output(['git', 'status', '--porcelain'], cwd=source, text=True).splitlines()
+        assert changed == ([' M scripts/build/config.ts'] if args.arch == 'x64' else [])
         if args.arch == 'arm64':
             run('native-runtime-version', [binary, '--version'])
             assert (logs / 'native-runtime-version.log').read_text().strip() == '1.4.3'
@@ -199,7 +224,7 @@ def main():
         package = out / 'public-runtime'; package.mkdir()
         shutil.copyfile(binary, package / 'bun'); (package / 'bun').chmod(0o500)
         shutil.copyfile(Path(__file__), package / Path(__file__).name)
-        record.update(status='unmodified_public_macos_source_baseline_built',
+        record.update(status='public_macos_source_baseline_built',
                       binary_sha256=sha(binary), binary_bytes=binary.stat().st_size,
                       native_arm64_version_controlled=args.arch == 'arm64', captured_source_uploaded=False)
         (package / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
