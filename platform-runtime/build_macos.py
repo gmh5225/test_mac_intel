@@ -32,6 +32,7 @@ CMAKE_ASSET = 'cmake-3.30.5-macos-universal.tar.gz'
 CMAKE_SHA256 = '3d603e507c7579b13518ef752b4ffcf3ed479fba80ee171d7d85da8153e869d0'
 CONFIG_SHA256 = '8df541c3f3f3596b5d90f74161d0e946af2097fbe500a00355be3441bb5c046e'
 TOOLS_SHA256 = '19603bce31fd5fd47eab2d70852a48665f9cfa01761df19df0c5cc5b82599e50'
+FLAGS_SHA256 = '131cb0fbe11ae8249bace7d39486c30cd800f1e4e3903093c74c12f2b6e3395c'
 
 
 def sha(path):
@@ -172,6 +173,21 @@ def main():
         record['upstream_rust_toolchain_sha256'] = sha(source / 'rust-toolchain.toml')
         record['upstream_build_config_sha256'] = sha(source / 'scripts/build/config.ts')
         assert record['upstream_build_config_sha256'] == CONFIG_SHA256
+        flags_file = source / 'scripts/build/flags.ts'; assert sha(flags_file) == FLAGS_SHA256
+        flags_before = flags_file.read_text()
+        old = '      c.darwin && c.crossTarget !== undefined && c.osxSysroot !== undefined && c.clangResourceDir !== undefined,\n'
+        new = '      c.darwin && c.osxSysroot !== undefined && c.clangResourceDir !== undefined,\n'
+        assert flags_before.count(old) == 1
+        flags_after = flags_before.replace(old, new).replace(
+            "    // libc → SDK frameworks. Native darwin builds keep the default search.\n",
+            "    // libc → SDK frameworks. Standalone LLVM on Darwin needs this too:\n"
+            "    // its bundled libc++ headers can require symbols Apple's library lacks.\n")
+        flags_file.write_text(flags_after)
+        flags_patch = ''.join(difflib.unified_diff(flags_before.splitlines(True), flags_after.splitlines(True),
+            fromfile='public-bun/scripts/build/flags.ts', tofile='qualified-bun/scripts/build/flags.ts'))
+        (logs / 'sdk-libcxx-header.patch').write_text(flags_patch)
+        record['sdk_libcxx_header_fix'] = dict(before_sha256=FLAGS_SHA256, after_sha256=sha(flags_file),
+            patch_sha256=sha(logs / 'sdk-libcxx-header.patch'))
         if args.arch == 'x64':
             config = source / 'scripts/build/config.ts'; before = config.read_text()
             old = '  const darwinCross = darwin && host.os !== "darwin";\n'
@@ -216,6 +232,28 @@ def main():
         env['MACOSX_DEPLOYMENT_TARGET'] = '13.0'
         run('native-sdk-header-control', [toolbin / 'clang', '-x', 'c', '-fsyntax-only', '-'],
             private_input=b'#include <stdio.h>\nint main(void) { return 0; }\n')
+        run('clang-resource-directory', [toolbin / 'clang', '-print-resource-dir'])
+        resource_dir = Path((logs / 'clang-resource-directory.log').read_text().strip())
+        assert (resource_dir / 'include/stddef.h').is_file()
+        control = logs / 'sdk-libcxx-control.cpp'
+        control.write_text('#include <unordered_map>\n#include <string>\nint main() { std::unordered_map<std::string, int> values; values["owned"] = 7; return values.at("owned") == 7 ? 0 : 1; }\n')
+        target_flags = ['--target=x86_64-apple-macosx', '-march=nehalem'] if args.arch == 'x64' else []
+        common = [toolbin / 'clang++', *target_flags, '-std=c++20', '-O2', '-mmacosx-version-min=13.0', '-isysroot', sdk]
+        negative = list(map(str, [*common, control, '-o', out / 'default-libcxx-control']))
+        record['commands'].append(dict(label='default-libcxx-abi-control', argv=negative))
+        result = subprocess.run(negative, env=env, capture_output=True, timeout=120)
+        (logs / 'default-libcxx-abi-control.stdout').write_bytes(result.stdout)
+        (logs / 'default-libcxx-abi-control.stderr').write_bytes(result.stderr)
+        record['default_libcxx_control_exit_code'] = result.returncode
+        if result.returncode != 0:
+            assert b'__hash_memory' in result.stderr, 'Unexpected C++ header ABI control failure'
+        cpp_headers = ['-nostdinc', '-isystem', str(Path(sdk) / 'usr/include/c++/v1'),
+            '-isystem', str(resource_dir / 'include'), '-isystem', str(Path(sdk) / 'usr/include'),
+            '-iframework', str(Path(sdk) / 'System/Library/Frameworks')]
+        executable = out / 'sdk-libcxx-control'
+        run('sdk-libcxx-abi-control-build', [*common, *cpp_headers, control, '-o', executable])
+        record['sdk_libcxx_control_sha256'] = sha(executable)
+        if args.arch == 'arm64': run('sdk-libcxx-abi-control-native', [executable])
         extra_flags = []
         if args.arch == 'x64':
             control = out / 'x64-target-control.c'; control.write_text('#include <stdio.h>\nint main(void) { return 0; }\n')
@@ -234,7 +272,8 @@ def main():
         raw = binary.read_bytes()
         assert struct.unpack_from('<II', raw) == (0xfeedfacf, {'arm64': 0x100000c, 'x64': 0x1000007}[args.arch])
         changed = subprocess.check_output(['git', 'status', '--porcelain'], cwd=source, text=True).splitlines()
-        assert changed == ([' M scripts/build/config.ts', ' M scripts/build/tools.ts'] if args.arch == 'x64' else [])
+        expected_changes = [' M scripts/build/config.ts', ' M scripts/build/flags.ts', ' M scripts/build/tools.ts'] if args.arch == 'x64' else [' M scripts/build/flags.ts']
+        assert changed == expected_changes
         if args.arch == 'arm64':
             run('native-runtime-version', [binary, '--version'])
             assert (logs / 'native-runtime-version.log').read_text().strip() == '1.4.3'

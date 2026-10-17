@@ -14,3 +14,10 @@ pass, and 19 mutations of code, binding, descriptors, relocation targets,
 addends, command types and file bounds are rejected. Full component builds
 must retain both object graphs and rerun the comparison with their actual
 toolchain.
+
+`private_symbols.py` applies the private C namespace to fresh program objects
+and dependency archives. Every rewritten object must pass that comparison;
+archive member identities/order and the full external symbol set are also
+checked. An owned graph containing C, C++, TLS and ARM64 explicit addends
+passes through the real archive rewrite path. Injecting a code-byte change
+inside that path is rejected before the graph can be accepted.
