@@ -2,12 +2,11 @@
 set -euo pipefail
 : "${RECOVERY_ARCH?}"
 case "$RECOVERY_ARCH" in
-  x64) triple=x86_64-linux-gnu ;;
-  arm64) triple=aarch64-linux-gnu ;;
+  x64) triple=x86_64-linux-gnu; sysroot=/opt/linux-sysroot-glibc ;;
+  arm64) triple=aarch64-linux-gnu; sysroot=/opt/linux-sysroot-glibc-arm64 ;;
   *) exit 64 ;;
 esac
 compiler=/usr/lib/llvm-23/bin/clang
-sysroot=/opt/linux-sysroot-glibc-$RECOVERY_ARCH
 test -x "$compiler"
 "$compiler" --version
 cmake --version

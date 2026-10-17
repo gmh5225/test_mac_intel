@@ -29,7 +29,8 @@ def main():
         docker_platform={'x64':'linux/amd64','arm64':'linux/arm64'}[a.arch];image=IMAGES[a.arch]
         run('compiler-pull',['docker','pull','--platform',docker_platform,image],900)
         run('compiler-inspect',['docker','image','inspect',image])
-        run('source-build',['docker','run','--rm','--platform',docker_platform,'--network','none','--cap-drop','ALL','--security-opt','no-new-privileges','--user',f'{os.getuid()}:{os.getgid()}','--cpus','2','--memory','4g','--pids-limit','256','--mount',f'type=bind,src={work},dst=/tmpfs/bun','--mount',f'type=bind,src={out/"sysroot"},dst=/opt/linux-sysroot-glibc-{a.arch},readonly','--mount',f'type=bind,src={ROOT},dst=/recipes,readonly','--env','RECOVERY_ARCH='+a.arch,'--entrypoint','/bin/bash',image,'/recipes/build-bfs.sh'])
+        measured_sysroot='/opt/linux-sysroot-glibc'+('-arm64' if a.arch=='arm64' else '')
+        run('source-build',['docker','run','--rm','--platform',docker_platform,'--network','none','--cap-drop','ALL','--security-opt','no-new-privileges','--user',f'{os.getuid()}:{os.getgid()}','--cpus','2','--memory','4g','--pids-limit','256','--mount',f'type=bind,src={work},dst=/tmpfs/bun','--mount',f'type=bind,src={out/"sysroot"},dst={measured_sysroot},readonly','--mount',f'type=bind,src={ROOT},dst=/recipes,readonly','--env','RECOVERY_ARCH='+a.arch,'--entrypoint','/bin/bash',image,'/recipes/build-bfs.sh'])
         binary=work/'embedded/bfs/bin/bfs';assert binary.is_file();raw=binary.read_bytes();assert raw[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',raw,18)[0]=={'x64':62,'arm64':183}[a.arch]
         # Retain the public candidate even when its measured ABI floor refuses it.
         shutil.copyfile(binary,logs/'public-bfs-candidate')
