@@ -45,7 +45,7 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
                  "raw-graph-linux-adapter.cpp", "graph-fidelity-linux-adapter.cpp"]:
         shutil.copyfile(ROOT / name, sources / name)
     if source_bun is not None:
-        for name in ['source_runtime.py', 'source-runtime-pins.json', 'native_search_acceptance.py']:
+        for name in ['source_runtime.py', 'source-runtime-pins.json', 'native_search_acceptance.py', 'native-rg-probe.mjs']:
             shutil.copyfile(ROOT / name, sources / name)
     (logs / "case-matrix.json").write_text(json.dumps(cases(), ensure_ascii=False, indent=2) + "\n")
     profile = PINS["profiles"][arch]
@@ -202,6 +202,18 @@ def accept_bash(arch, original, output, parent_logs, run, bwrap, seccomp_package
         partial["two_independent_builds_equal"] = True
     partial["native_build"] = built
     selected = {name: Path(info["path"]) for name, info in built["clients"].items()}
+    if source_bun is not None:
+        probe = (ROOT / 'native-rg-probe.mjs').read_text()
+        partial['native_rg_count_diagnostics'] = {}
+        for label, target in [('original', original), ('source-bun', source_bun), ('client-preserved', selected['preserved'])]:
+            result, _ = execute('native-rg-count-probe-' + label,
+                ['/runtime/source-bun', '/home/test/native-rg-probe.mjs', '/runtime/' + label], text_spec,
+                client={'source-bun': source_bun, label: target}, work_input='target\nother\ntarget\n',
+                fixture_files={'native-rg-probe.mjs': probe})
+            assert result['exit_code'] == 0 and not result['stderr'], result
+            observation = json.loads(result['stdout'])
+            assert observation['diagnosticOnly'] and len(observation['rows']) == 64
+            partial['native_rg_count_diagnostics'][label] = observation
     config = {"sandbox": {"enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False,
                           "enableWeakerNestedSandbox": False, "excludedCommands": [],
                           "network": {"allowedDomains": [], "allowAllUnixSockets": False},

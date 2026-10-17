@@ -26,7 +26,8 @@ def accept_native_search(execute, original, clients, logs):
                     '--no-chrome','--disable-slash-commands','--permission-mode','manual','--permission-prompts','none',
                     '--system-prompt','Offline fixture. Use only supplied fixture data.','--setting-sources','',
                     '--tools','Grep,Glob','--allowedTools','Grep,Glob','--model',case['model'],
-                    '--session-id','00000000-0000-4000-8000-000000000001','--','fixture prompt']
+                    '--session-id','00000000-0000-4000-8000-000000000001',
+                    '--debug-file','/report/client-debug.txt','--','fixture prompt']
                 extra = {}
                 for key,value in case.get('env',{}).items():
                     assert key=='RIPGREP_CONFIG_PATH' and value.startswith('/fixtures/')
@@ -48,8 +49,11 @@ def accept_native_search(execute, original, clients, logs):
                     assert len(matched)==1 and bool(matched[0].get('is_error',False))==error
                     results.append(matched[0])
                 content=json.dumps(results[-1].get('content'),ensure_ascii=False)
-                assert all(s in content for s in case['last_result_contains'])
-                assert all(s not in content for s in case['last_result_excludes'])
+                # Record the actual result before an oracle can fail. Raw API
+                # requests, streams and the client debug log remain untouched.
+                (logs/name/'tool-results.json').write_text(json.dumps(results,ensure_ascii=False,indent=2)+'\n')
+                assert all(s in content for s in case['last_result_contains']), (case['id'],label,results)
+                assert all(s not in content for s in case['last_result_excludes']), (case['id'],label,results)
                 paths=list((state/'work').rglob('*'));assert len(paths)<=32 and not any(p.is_symlink() for p in paths)
                 files={p.relative_to(state/'work').as_posix():p.read_bytes() for p in paths if p.is_file()}
                 assert files=={'input.txt':case['expected'].encode()}
