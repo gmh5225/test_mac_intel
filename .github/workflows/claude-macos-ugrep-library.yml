@@ -4,7 +4,16 @@ on:
   push:
     branches: [codex/claude-windows-recovery]
     paths:
-      - macos-native-components/**
+      - macos-native-components/build_ugrep.py
+      - macos-native-components/compare_ugrep.py
+      - macos-native-components/expected-ugrep-version-*.txt
+      - macos-native-components/llvm_tools.py
+      - macos-native-components/llvm-tools-pins.json
+      - macos-native-components/role-transport.c
+      - macos-native-components/boundary-control.c
+      - macos-native-components/original-pins.json
+      - macos-native-components/macho_objects.py
+      - macos-native-components/private_symbols.py
       - .github/workflows/claude-macos-ugrep-library.yml
 permissions:
   contents: read

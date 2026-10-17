@@ -1,4 +1,4 @@
-"""Compare native macOS Ugrep roles after bounded, authored Seatbelt controls."""
+"""Compare native macOS source-library roles after authored Seatbelt controls."""
 from pathlib import Path
 import argparse
 import base64
@@ -26,6 +26,7 @@ def sha(path):
 
 def main():
     p = argparse.ArgumentParser(); p.add_argument('--arch', choices=['arm64', 'x64'], required=True)
+    p.add_argument('--role', choices=['ugrep', 'bfs'], default='ugrep')
     p.add_argument('--package', type=Path, required=True); p.add_argument('--output', type=Path, required=True)
     p.add_argument('--original-path', type=Path); a = p.parse_args()
     assert platform.system() == 'Darwin' and platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}[a.arch]
@@ -38,8 +39,10 @@ def main():
         assert file.is_file() and file.stat().st_size == row['bytes'] and sha(file) == row['sha256']
     assert seen | {'MANIFEST.json'} == {p.relative_to(package).as_posix() for p in package.rglob('*') if p.is_file()}
     producer = json.loads((package / 'receipt.json').read_bytes())
-    assert producer['arch'] == a.arch and producer['status'] == 'macos_ugrep_source_library_and_upstream_host_checks_passed'
-    candidate = package / 'native-library/ugrep-library-host'; assert sha(candidate) == producer['host_sha256']
+    expected_status = 'macos_ugrep_source_library_and_upstream_host_checks_passed' if a.role == 'ugrep' else 'public_macos_bfs_cross_source_library_built_native_acceptance_pending'
+    assert producer['arch'] == a.arch and producer['status'] == expected_status
+    component = producer if a.role == 'ugrep' else producer['native_library']
+    candidate = package / 'native-library' / (a.role + '-library-host'); assert sha(candidate) == component['host_sha256']
     candidate.chmod(0o500)
     pin = json.loads((ROOT / 'original-pins.json').read_bytes())[a.arch]
     out = a.output.resolve(); out.mkdir(); logs = out / 'diagnostics'; logs.mkdir()
@@ -48,12 +51,14 @@ def main():
     canary = out / 'outside-canary'; canary.write_bytes(b'owned outside fixture\n')
     text = b'first\nNEEDLE\npreneedle\n'; (fixtures / 'input.txt').write_bytes(text)
     (fixtures / '猫.txt').write_text('first\n🐈\n'); (fixtures / 'line\nbreak.txt').write_bytes(text)
+    (fixtures / 'nested').mkdir(); (fixtures / 'nested/child.txt').write_bytes(b'nested NEEDLE\n')
+    (fixtures / 'link.txt').symlink_to('input.txt')
     for suffix, raw in [('gz', gzip.compress(text, mtime=0)), ('bz2', bz2.compress(text)),
                         ('zst', bytes.fromhex('28b52ffd0458b9000066697273740a4e4545444c450a7072656e6565646c650a2c682895')),
                         ('br', bytes.fromhex('0f0b8066697273740a4e4545444c450a7072656e6565646c650a03'))]:
         (fixtures / ('input.' + suffix)).write_bytes(raw)
     transport = inputs / 'transport'; boundary = inputs / 'boundary'; original = inputs / 'original-copy'
-    receipt = dict(status='started', arch=a.arch, native_host=True, candidate_manifest_sha256=sha(package / 'MANIFEST.json'),
+    receipt = dict(status='started', arch=a.arch, component_role=a.role, native_host=True, candidate_manifest_sha256=sha(package / 'MANIFEST.json'),
         candidate_sha256=sha(candidate), captured_client_executed=False, captured_source_uploaded=False,
         boundary_qualified=False, controls=[], cases=[], normalization='none; exact exit/stdout/stderr bytes',
         whole_engine_integration=False, goal_complete=False)
@@ -171,15 +176,24 @@ def main():
                  ('count', ['--no-config', '-c', '-i', 'needle', fixtures / 'input.txt'], 0, b''),
                  ('stdin-pcre', ['--no-config', '-P', '-o', '(?<=pre)needle'], 0, text)]
         cases += [(suffix, ['--no-config', '-z', '-n', 'NEEDLE', fixtures / ('input.' + suffix)], 0, b'') for suffix in ['gz', 'bz2', 'zst', 'br']]
+        if a.role == 'bfs':
+            cases = [('version', ['--version'], 0, b''),
+                ('name', ['-s', fixtures, '-maxdepth', '1', '-type', 'f', '-name', '*.txt', '-printf', '%f\n'], 0, b''),
+                ('depth', ['-s', fixtures, '-mindepth', '2', '-maxdepth', '2', '-type', 'f', '-printf', '%P\n'], 0, b''),
+                ('regex', ['-s', fixtures, '-maxdepth', '1', '-regex', '.*input[.]txt', '-printf', '%f\n'], 0, b''),
+                ('link', ['-L', '-s', fixtures / 'link.txt', '-type', 'f', '-printf', '%f\n'], 0, b''),
+                ('exec', [fixtures / 'input.txt', '-exec', transport, '--capture', ';'], 0, b''),
+                ('absent', ['-s', fixtures, '-name', 'absent-value', '-print'], 0, b''),
+                ('missing-user', [fixtures, '-maxdepth', '0', '-user', 'neverd_missing_public_fixture_user_21296'], 1, b'')]
         for label, args, expected, stdin in cases:
-            left = execute('original-' + label, original, 'ugrep', args, stdin)
+            left = execute('original-' + label, original, a.role, args, stdin)
             receipt['captured_client_executed'] = True
-            right = execute('candidate-' + label, candidate, 'ugrep', args, stdin)
+            right = execute('candidate-' + label, candidate, a.role, args, stdin)
             matches = left == right and left[0] == expected
             receipt['cases'].append(dict(case=label, expected_exit_code=expected, original_exit_code=left[0], candidate_exit_code=right[0], matches=matches))
-            assert matches, 'Exact Ugrep mismatch: ' + label
-        assert sha(original) == pin['sha256'] and sha(candidate) == producer['host_sha256']
-        receipt.update(status='native_original_and_source_library_ugrep_cases_match_exactly', differential_pairs=len(cases), original=pin,
+            assert matches, 'Exact ' + a.role + ' mismatch: ' + label
+        assert sha(original) == pin['sha256'] and sha(candidate) == component['host_sha256']
+        receipt.update(status='native_original_and_source_library_' + a.role + '_cases_match_exactly', differential_pairs=len(cases), original=pin,
             scope='Bounded standalone native source-library correspondence. Full Bun engine and recovered client integration remain open.')
     except BaseException as error:
         receipt.update(status='failed_not_admitted', error_type=type(error).__name__, error=str(error)); raise

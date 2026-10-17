@@ -90,12 +90,18 @@ def canonical(path, renames=None):
         cursor += size
     require(cursor == 32 + command_bytes and len(segments) == 1, 'Unexpected object layout')
     require(len({s['key'] for s in sections}) == len(sections), 'Ambiguous section identity')
-    require(symtab is not None, 'Missing symbol table')
-    symoff, nsyms, stroff, strsize = symtab
+    if symtab is None:
+        # Apple Clang emits valid empty translation units without LC_SYMTAB.
+        # There must be no metadata that could reference an absent table.
+        require(dysymtab is None and not any(s['relocation_count'] for s in sections),
+                'Missing symbol table with object references')
+        symoff, nsyms, stroff, strsize = len(body), 0, len(body), 0
+    else:
+        symoff, nsyms, stroff, strsize = symtab
     require(nsyms <= 2_000_000, 'Symbol count exceeds bound')
     span(symoff, 16 * nsyms)
     strings = span(stroff, strsize)
-    require(strings and strings[0] == 0, 'Invalid string table')
+    require((strings and strings[0] == 0) or (not nsyms and not strsize), 'Invalid string table')
 
     def symbol_name(offset):
         require(offset < len(strings), 'Symbol name is outside string table')
