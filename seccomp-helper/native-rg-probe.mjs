@@ -9,7 +9,9 @@ for (const mode of ['sync-path', 'sync-fd3', 'async-path', 'async-fd3']) {
   for (let attempt = 0; attempt < 16; attempt++) {
     const inherited = mode.endsWith('fd3');
     const fd = inherited ? openSync('/work/input.txt', 'r') : null;
-    const args = ['--no-config', '--count', '--', 'target', inherited ? '/proc/self/fd/3' : '/work/input.txt'];
+    const path = inherited ? '/proc/self/fd/3' : '/work/input.txt';
+    const args = ['--no-config', '--hidden', '--max-columns', '500', '-c', '-H', '--null', 'target', path];
+    const expected = Buffer.from(path + '\0' + '2\n').toString('hex');
     const options = { argv0: 'rg', stdio: ['pipe', 'pipe', 'pipe', ...(inherited ? [fd] : [])] };
     let result;
     try {
@@ -30,7 +32,7 @@ for (const mode of ['sync-path', 'sync-fd3', 'async-path', 'async-fd3']) {
         });
       }
     } finally { if (fd !== null) closeSync(fd); }
-    rows.push({ mode, attempt, ...result, pass: result.code === 0 && !result.signal && !result.error && result.stdout === '320a' && result.stderr === '' });
+    rows.push({ mode, attempt, ...result, pass: result.code === 0 && !result.signal && !result.error && result.stdout === expected && result.stderr === '' });
   }
 }
 console.log(JSON.stringify({ target, diagnosticOnly: true, rows, failures: rows.filter(r => !r.pass).length }));
