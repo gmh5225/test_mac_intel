@@ -1,0 +1,59 @@
+name: Native controls for exact public macOS baseline candidates
+on:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - platform-runtime/qualify_macos_baseline.py
+      - platform-runtime/macos-baseline-candidates.json
+      - .github/workflows/claude-macos-baseline-controls.yml
+  workflow_dispatch:
+    inputs:
+      arch:
+        type: choice
+        options: [x64, arm64]
+        default: x64
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qualify:
+    runs-on: ${{ inputs.arch == 'arm64' && 'macos-15' || 'macos-15-intel' }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Resolve the recorded public candidate
+        id: candidate
+        env:
+          TARGET_ARCH: ${{ inputs.arch || 'x64' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          p=json.loads(Path('platform-runtime/macos-baseline-candidates.json').read_bytes())['profiles'][os.environ['TARGET_ARCH']]
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              f.write('producer_run='+str(p['producer_run'])+'\nartifact='+p['artifact']+'\n')
+          PY
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ steps.candidate.outputs.artifact }}
+          run-id: ${{ steps.candidate.outputs.producer_run }}
+          github-token: ${{ github.token }}
+          path: public-runtime
+      - name: Exercise native owned runtime and standalone controls
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B platform-runtime/qualify_macos_baseline.py --arch ${{ inputs.arch || 'x64' }} --runtime public-runtime --output native-controls
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: native-darwin-${{ inputs.arch || 'x64' }}-baseline-owned-controls-${{ github.run_attempt }}
+          path: native-controls/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
