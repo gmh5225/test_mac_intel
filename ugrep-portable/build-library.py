@@ -47,7 +47,8 @@ p=source/'pcre2';run('pcre2-configure',[p/'configure','--prefix='+str(prefix),'-
 # A plain -lpthread leaves the corresponding static objects unselected, and
 # lld resolves their tail branches to fall-through instructions. Retain the
 # real pthread implementation before testing the upstream static executable.
-ug=source/'ugrep';ugenv=dict(env,LIBS='-lbrotlicommon -lm '+' '.join(pthread_link))
+ug=source/'ugrep';ugenv=dict(env,LIBS='-lbrotlicommon -lm',
+    PTHREAD_LIBS=' '.join(pthread_link),PTHREAD_CFLAGS='-pthread')
 options=['--enable-static','--without-lzma','--without-lz4',*['--with-'+flag+'='+str(prefix) for flag in ['pcre2','zlib','bzlib','zstd','brotli']]]
 if args.arch=='x64':options.append('--disable-avx2')
 run('ugrep-configure',[ug/'configure',*options],ug,environment=ugenv)
