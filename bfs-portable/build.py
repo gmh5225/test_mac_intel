@@ -52,5 +52,11 @@ def main():
         receipt.update(status='public_bfs_original_compatibility_flags_pass_portability_and_native_controls',binary_sha256=sha(binary),binary_bytes=binary.stat().st_size,controls=controls,original_build_flags_output=version.decode(),scope='Measured compatibility flags with a public replacement sysroot. Original sysroot bytes, exact transitive version identity and Bun integration are not established.')
         (package/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n');rows=[dict(file=p.relative_to(package).as_posix(),bytes=p.stat().st_size,sha256=sha(p)) for p in sorted(package.rglob('*')) if p.is_file()];(package/'MANIFEST.json').write_text(json.dumps(dict(files=rows),indent=2)+'\n')
     except BaseException as error:receipt.update(status='failed',error_type=type(error).__name__,error=str(error));raise
-    finally:(logs/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
+    finally:
+        generated=work/'embedded/bfs/gen'
+        if generated.is_dir():
+            retained=logs/'bfs-config';retained.mkdir()
+            for p in sorted(generated.iterdir()):
+                if p.is_file() and p.suffix in ['.mk','.h']:shutil.copyfile(p,retained/p.name)
+        (logs/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
 if __name__=='__main__':main()

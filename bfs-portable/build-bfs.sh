@@ -23,10 +23,14 @@ cd /tmpfs/bun/embedded/bfs
 export CC="$compiler --target=$triple --sysroot=$sysroot"
 export CPPFLAGS='-Dposix_getdents=__bfs_poison_posix_getdents_musl_1_2_5 -Dgetdents64=__bfs_poison_getdents64_glibc_2_30 -Dposix_spawn_file_actions_addfchdir_np=__bfs_poison_addfchdir_np_glibc_2_29 -I/tmpfs/bun/embedded/oniguruma/src'
 export LDFLAGS='-L/tmpfs/bun/build/release/deps/oniguruma -no-pie'
+# The observed original flags link the privately built Oniguruma and contain
+# no standalone Bfs LTO flag. Its pkg-config file is not installed in this tree.
+export LDLIBS=-lonig
+export LTO=0
 export VERSION=4.1.1
 export PKG_CONFIG_LIBDIR=/tmpfs/bun/no-host-pkgconfig
 unset CFLAGS CXXFLAGS
 ./configure --enable-release --with-oniguruma --without-libselinux --without-libacl
-make -j2
+make -j2 V=1
 make -j2 check
 ./bin/bfs --version
