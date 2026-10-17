@@ -1,7 +1,8 @@
 # Standalone Ugrep and Bfs correspondence
 
-The exact public candidate packages from run 38961650575 are admitted by complete
-manifest and binary hashes. A pinned minimal Ubuntu 24.04 image supplies the
+The exact public candidate packages from run 38986089116 are admitted by complete
+manifest and binary hashes. The x64 Ugrep build uses measured SSE2 rather than
+auto-detected AVX512; both full version outputs match the original bytes. A pinned minimal Ubuntu 24.04 image supplies the
 matching libc for the current Bfs candidate; its GLIBC_2.38 floor is still a
 limitation. This does not establish static linkage into the recovered engine.
 
