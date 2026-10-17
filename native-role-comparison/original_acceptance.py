@@ -13,22 +13,38 @@ def differences(original,candidate,expected):
         if original[field]!=candidate[field]:result.append(field)
     return result
 
-def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--arch',required=True,choices=['x64','arm64']);ap.add_argument('--package',required=True,type=Path);ap.add_argument('--output',required=True,type=Path);a=ap.parse_args()
-    assert platform.system()=='Linux' and {'x86_64':'x64','aarch64':'arm64'}[platform.machine()]==a.arch and os.getuid()!=0
-    pins=json.loads((ROOT/'accepted-candidates.json').read_bytes());pin=pins['profiles'][a.arch];package=a.package.resolve()
-    assert sha(package/'MANIFEST.json')==pin['manifest_sha256'] and not any(p.is_symlink() for p in package.rglob('*'))
+def admit_package(package,expected_manifest):
+    assert not package.is_symlink() and sha(package/'MANIFEST.json')==expected_manifest
+    assert not any(p.is_symlink() for p in package.rglob('*'))
     seen=set()
     for row in json.loads((package/'MANIFEST.json').read_bytes())['files']:
-        rel=Path(row['file']);assert not rel.is_absolute() and '..' not in rel.parts and row['file'] not in seen;seen.add(row['file']);p=package/rel
+        rel=Path(row['file']);assert not rel.is_absolute() and '..' not in rel.parts and rel.as_posix()==row['file'] and row['file'] not in seen
+        seen.add(row['file']);p=package/rel
         assert p.is_file() and p.stat().st_size==row['bytes'] and sha(p)==row['sha256']
     assert seen|{'MANIFEST.json'}=={p.relative_to(package).as_posix() for p in package.rglob('*') if p.is_file()}
+
+def main():
+    ap=argparse.ArgumentParser();ap.add_argument('--arch',required=True,choices=['x64','arm64']);ap.add_argument('--package',required=True,type=Path);ap.add_argument('--bfs-package',type=Path);ap.add_argument('--output',required=True,type=Path);a=ap.parse_args()
+    assert platform.system()=='Linux' and {'x86_64':'x64','aarch64':'arm64'}[platform.machine()]==a.arch and os.getuid()!=0
+    pins=json.loads((ROOT/'accepted-candidates.json').read_bytes());pin=pins['profiles'][a.arch];package=a.package.absolute()
+    admit_package(package,pin['manifest_sha256'])
+    candidate_paths={role:package/role for role in ['ugrep','bfs']};binary_pins=dict(pin['binaries'])
+    bfs_override=pins.get('bfs_override');assert bool(bfs_override)==(a.bfs_package is not None),'Bfs replacement must have an independently admitted artifact'
+    if bfs_override:
+        selected=bfs_override['profiles'][a.arch];bfs_package=a.bfs_package.absolute();admit_package(bfs_package,selected['manifest_sha256'])
+        public=json.loads((bfs_package/'receipt.json').read_bytes())
+        assert public['arch']==a.arch and public['status']=='public_bfs_original_compatibility_flags_pass_portability_and_native_controls'
+        assert public['maximum_glibc_requirement']==selected['maximum_glibc_requirement']=='2.17'
+        assert public['binary_sha256']==selected['binary_sha256'] and public['binary_bytes']==selected['bytes']
+        assert not public['captured_client_executed'] and not public['exact_original_sysroot_proven']
+        candidate_paths['bfs']=bfs_package/'bfs';binary_pins['bfs']=dict(sha256=selected['binary_sha256'],bytes=selected['bytes'])
     out=a.output.resolve();out.mkdir();logs=out/'diagnostics';logs.mkdir();inputs=out/'inputs';inputs.mkdir();empty=out/'empty';empty.mkdir()
     fixtures=out/'fixtures';fixtures.mkdir();(fixtures/'nested').mkdir()
     text=b'first\nNEEDLE\npreneedle\n';(fixtures/'input.txt').write_bytes(text);(fixtures/'猫.txt').write_text('first\n🐈\n');(fixtures/'nested/child.txt').write_text('nested NEEDLE\n');(fixtures/'link.txt').symlink_to('input.txt')
     for suffix,raw in [('gz',gzip.compress(text,mtime=0)),('bz2',bz2.compress(text)),('zst',bytes.fromhex('28b52ffd0458b9000066697273740a4e4545444c450a7072656e6565646c650a2c682895')),('br',bytes.fromhex('0f0b8066697273740a4e4545444c450a7072656e6565646c650a03'))]:
         (fixtures/('input.'+suffix)).write_bytes(raw)
     receipt=dict(status='started',arch=a.arch,boundary_qualified=False,captured_client_executed=False,captured_source_uploaded=False,client_uploaded=False,controls=[],cases=[],runtime_image=pin['runtime_image'],candidate_manifest_sha256=sha(package/'MANIFEST.json'),normalization='none; exact exit status and stdout/stderr bytes')
+    if bfs_override:receipt['bfs_override']=dict(producer_run=bfs_override['producer_run'],producer_head=bfs_override['producer_head'],manifest_sha256=sha(bfs_package/'MANIFEST.json'),binary_sha256=binary_pins['bfs']['sha256'])
     canary=out/'outside-canary';canary.write_bytes(b'owned outside fixture\n')
     def host(label,command):
         r=subprocess.run(list(map(str,command)),capture_output=True,timeout=180)
@@ -68,6 +84,7 @@ def main():
                 except ProcessLookupError:pass
                 process.wait(timeout=10)
             for key,raw in streams.items():(logs/(label+'.'+key)).write_bytes(raw)
+        (logs/(label+'.result.json')).write_text(json.dumps(dict(exit_code=code,failure=failure,streams={key:dict(bytes=len(raw),sha256=hashlib.sha256(raw).hexdigest()) for key,raw in streams.items()}),indent=2)+'\n')
         assert failure==expected_failure,label+': '+str(failure)
         return dict(exit_code=code,stdout=bytes(streams['stdout']),stderr=bytes(streams['stderr']))
     try:
@@ -99,15 +116,16 @@ def main():
             members=[m for m in tar.getmembers() if m.name=='package/claude' and m.isfile()];assert len(members)==1 and members[0].size==original_pin['bytes']
             with tar.extractfile(members[0]) as source,original.open('xb') as dest:shutil.copyfileobj(source,dest)
         assert sha(original)==original_pin['sha256'];original.chmod(0o500)
+        receipt['original']=original_pin
         candidates={}
         for role in ['ugrep','bfs']:
-            assert sha(package/role)==pin['binaries'][role]['sha256']
-            candidate=inputs/role;shutil.copyfile(package/role,candidate);candidate.chmod(0o500);candidates[role]=candidate
+            assert sha(candidate_paths[role])==binary_pins[role]['sha256'] and candidate_paths[role].stat().st_size==binary_pins[role]['bytes']
+            candidate=inputs/role;shutil.copyfile(candidate_paths[role],candidate);candidate.chmod(0o500);candidates[role]=candidate
         cases=[('UG-version','ugrep',['--version'],0),('UG-literal','ugrep',['--no-config','-n','NEEDLE','/fixtures/input.txt'],0),('UG-absent','ugrep',['--no-config','absent-value','/fixtures/input.txt'],1),('UG-invalid','ugrep',['--no-config','[','/fixtures/input.txt'],2),('UG-pcre','ugrep',['--no-config','-P','-o','(?<=pre)needle','/fixtures/input.txt'],0),('UG-unicode','ugrep',['--no-config','-n','🐈','/fixtures/猫.txt'],0)]
         cases += [('UG-'+s,'ugrep',['--no-config','-z','-n','NEEDLE','/fixtures/input.'+s],0) for s in ['gz','bz2','zst','br']]
         cases += [('BF-version','bfs',['--version'],0),('BF-name','bfs',['-s','/fixtures','-maxdepth','1','-type','f','-name','*.txt','-printf','%f\n'],0),('BF-depth','bfs',['-s','/fixtures','-mindepth','2','-maxdepth','2','-type','f','-printf','%P\n'],0),('BF-regex','bfs',['-s','/fixtures','-maxdepth','1','-regex','.*input[.]txt','-printf','%f\n'],0),('BF-link','bfs',['-L','-s','/fixtures/link.txt','-type','f','-printf','%f\n'],0),('BF-exec','bfs',['/fixtures/input.txt','-exec','/runtime/receiver','--env-control',';'],0),('BF-absent','bfs',['-s','/fixtures','-name','absent-value','-print'],0),('BF-missing-user','bfs',['/fixtures','-maxdepth','0','-user','neverd_missing_public_fixture_user_21296'],1)]
         for label,role,args,expected in cases:
-            candidate=candidates[role];assert sha(candidate)==pin['binaries'][role]['sha256']
+            candidate=candidates[role];assert sha(candidate)==binary_pins[role]['sha256']
             left=execute('original-'+label,original,role,args);right=execute('candidate-'+label,candidate,role,args)
             if left['exit_code']!=126:receipt['captured_client_executed']=True
             mismatch=differences(left,right,expected)
