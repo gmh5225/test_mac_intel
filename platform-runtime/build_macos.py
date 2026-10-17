@@ -31,6 +31,7 @@ BOOTSTRAP_BYTES = 25377591
 CMAKE_ASSET = 'cmake-3.30.5-macos-universal.tar.gz'
 CMAKE_SHA256 = '3d603e507c7579b13518ef752b4ffcf3ed479fba80ee171d7d85da8153e869d0'
 CONFIG_SHA256 = '8df541c3f3f3596b5d90f74161d0e946af2097fbe500a00355be3441bb5c046e'
+TOOLS_SHA256 = '19603bce31fd5fd47eab2d70852a48665f9cfa01761df19df0c5cc5b82599e50'
 
 
 def sha(path):
@@ -175,6 +176,16 @@ def main():
             (logs / 'target-architecture.patch').write_text(patch)
             record['target_architecture_fix'] = dict(before_sha256=CONFIG_SHA256, after_sha256=sha(config),
                                                     patch_sha256=sha(logs / 'target-architecture.patch'))
+            tools_file = source / 'scripts/build/tools.ts'; assert sha(tools_file) == TOOLS_SHA256
+            before = tools_file.read_text(); old = '  if (os !== "darwin" && os !== "windows") {\n'
+            new = '  if (os !== "windows") {\n'; assert before.count(old) == 1
+            after = before.replace(old, new); tools_file.write_text(after)
+            patch = ''.join(difflib.unified_diff(before.splitlines(True), after.splitlines(True),
+                                                fromfile='public-bun/scripts/build/tools.ts',
+                                                tofile='qualified-bun/scripts/build/tools.ts'))
+            (logs / 'darwin-linker-discovery.patch').write_text(patch)
+            record['darwin_linker_discovery_fix'] = dict(before_sha256=TOOLS_SHA256, after_sha256=sha(tools_file),
+                                                        patch_sha256=sha(logs / 'darwin-linker-discovery.patch'))
         env['RUSTUP_HOME'] = str(out / 'rustup')
         env['CARGO_HOME'] = str(out / 'cargo')
         env['RUSTUP_TOOLCHAIN'] = CHANNEL
@@ -215,7 +226,7 @@ def main():
         raw = binary.read_bytes()
         assert struct.unpack_from('<II', raw) == (0xfeedfacf, {'arm64': 0x100000c, 'x64': 0x1000007}[args.arch])
         changed = subprocess.check_output(['git', 'status', '--porcelain'], cwd=source, text=True).splitlines()
-        assert changed == ([' M scripts/build/config.ts'] if args.arch == 'x64' else [])
+        assert changed == ([' M scripts/build/config.ts', ' M scripts/build/tools.ts'] if args.arch == 'x64' else [])
         if args.arch == 'arm64':
             run('native-runtime-version', [binary, '--version'])
             assert (logs / 'native-runtime-version.log').read_text().strip() == '1.4.3'
