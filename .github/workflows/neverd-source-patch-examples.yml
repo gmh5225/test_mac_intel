@@ -1,5 +1,5 @@
 name: NeverD runnable source patch examples
-run-name: Native examples at ${{ inputs.source || 'ed30bb08cdccf069e9e82a0e2de0afc274989364' }}
+run-name: Native examples at ${{ inputs.source || 'c8cd6516fe78e274d62765b7bb9a69ddce7cdf6e' }}
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || 'ed30bb08cdccf069e9e82a0e2de0afc274989364' }}
+  SOURCE_COMMIT: ${{ inputs.source || 'c8cd6516fe78e274d62765b7bb9a69ddce7cdf6e' }}
   SCCACHE_GHA_ENABLED: 'true'
 concurrency:
   group: neverd-examples-${{ github.run_id }}
@@ -24,7 +24,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {runner: windows-2025, arch: x64}
+          - {runner: ubuntu-24.04-arm, arch: arm64, python: '3.12'}
+          - {runner: macos-15-intel, arch: x64, python: '3.12'}
+          - {runner: windows-11-arm, arch: arm64, python: '3.13'}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     steps:
@@ -35,10 +37,10 @@ jobs:
           submodules: recursive
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
-        with: {python-version: '3.12'}
+        with: {python-version: "${{ matrix.python }}", architecture: "${{ matrix.arch }}"}
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         if: runner.os == 'Windows'
-        with: {arch: x64}
+        with: {arch: "${{ matrix.arch }}"}
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
         with: {version: v0.16.0}
       - name: Install Linux Clang and linkers
@@ -59,10 +61,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          brew install llvm@22 lld@22 ninja
-          echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix lld@22)/bin" >> "$GITHUB_PATH"
-          echo "SOURCE_CLANG=$(brew --prefix llvm@22)/bin/clang" >> "$GITHUB_ENV"
+          producer="$(brew --prefix llvm@18)/bin"
+          test -x "$producer/clang"
+          test "$(uname -m)" = x86_64
+          echo "$producer" >> "$GITHUB_PATH"
+          echo "SOURCE_CLANG=$producer/clang" >> "$GITHUB_ENV"
+          echo 'ARCHFLAGS=-arch x86_64' >> "$GITHUB_ENV"
       - name: Install Windows Clang
         if: runner.os == 'Windows'
         shell: pwsh
@@ -99,7 +103,7 @@ jobs:
           set -euo pipefail
           options=()
           if [ "$RUNNER_OS" = macOS ]; then
-            options+=("-DCMAKE_OSX_SYSROOT=$(xcrun --show-sdk-path)" '-DCMAKE_OSX_ARCHITECTURES=arm64')
+            options+=("-DCMAKE_OSX_SYSROOT=$(xcrun --show-sdk-path)" "-DCMAKE_OSX_ARCHITECTURES=$(uname -m)")
             options+=("-DCMAKE_AR=$(xcrun --find ar)" "-DCMAKE_RANLIB=$(xcrun --find ranlib)")
             options+=("-DCMAKE_C_COMPILER_AR=$(xcrun --find ar)" "-DCMAKE_CXX_COMPILER_AR=$(xcrun --find ar)")
           fi
@@ -120,6 +124,33 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Configure failed' }
           cmake --build build-examples --target neverd --parallel 4 2>&1 | Tee-Object example-logs/build.log
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - name: Authenticate native host and engine architecture
+        shell: bash
+        env:
+          EXPECTED_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          python - <<'PYHOST'
+          import hashlib,json,os,pathlib,platform,struct,subprocess,sys
+          actual={'x86_64':'x64','amd64':'x64','arm64':'arm64','aarch64':'arm64'}[platform.machine().lower()]
+          assert actual==os.environ['EXPECTED_ARCH'] and struct.calcsize('P')==8
+          system=platform.system();root=pathlib.Path('build-examples/bin')
+          names={'Windows':('neverd.exe','neverd.dll'),'Darwin':('neverd','libneverd.dylib'),'Linux':('neverd','libneverd.so')}[system]
+          files={}
+          for name in names:
+              p=root/name;b=p.read_bytes()
+              if system=='Windows':
+                  pe=struct.unpack_from('<I',b,60)[0];machine=struct.unpack_from('<H',b,pe+4)[0];assert machine==0xaa64
+              elif system=='Darwin':
+                  machine=struct.unpack_from('<I',b,4)[0];assert machine==0x1000007
+              else:
+                  assert b[:4]==b'\x7fELF';machine=struct.unpack_from('<H',b,18)[0];assert machine==183
+              files[name]={'sha256':hashlib.sha256(b).hexdigest(),'bytes':len(b),'machine':machine}
+          producer=subprocess.run([os.environ['SOURCE_CLANG'],'--version'],text=True,capture_output=True,check=True).stdout
+          record={'system':system,'architecture':actual,'python_machine':platform.machine(),'python_version':sys.version,'python_executable':sys.executable,'pointer_bits':64,'engine_files':files,'source_compiler':producer,'source_compiler_host_compatibility':'Windows x64 producer may run under OS compatibility; its emitted images and the NeverD/Python hosts must be ARM64' if system=='Windows' else 'native host producer'}
+          (pathlib.Path('example-logs')/'native-host.json').write_text(json.dumps(record,indent=2)+'\n')
+          print(json.dumps(record,indent=2))
+          PYHOST
       - name: Execute both documented APIs through the native OS loader
         shell: bash
         run: |
