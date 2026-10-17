@@ -63,13 +63,11 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            runner: macos-15
+            runner: macos-26
           - arch: x64
-            runner: macos-15-intel
+            runner: macos-26-intel
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -95,6 +93,44 @@ jobs:
           path: |
             native-bfs-suite/diagnostics/
             native-bfs-correspondence/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14
+  legacy-correspondence:
+    name: Native macOS 15 ${{ matrix.arch }} original Bfs correspondence
+    needs: build
+    if: ${{ always() && !cancelled() }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-darwin-${{ matrix.arch }}-bfs-source-library-${{ github.run_attempt }}
+          path: public-library
+      - name: Compare normal roles and the same original missing-API fault
+        run: python3 -B macos-native-components/compare_ugrep.py --role bfs --arch ${{ matrix.arch }} --package public-library --output native-bfs-correspondence
+      - name: Retain bounded original correspondence records
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-darwin-${{ matrix.arch }}-bfs-macos15-correspondence-${{ github.run_attempt }}
+          path: native-bfs-correspondence/diagnostics/
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14

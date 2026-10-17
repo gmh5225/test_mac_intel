@@ -11,7 +11,7 @@ An empty translation unit may omit the symbol table. Such an object must have
 no relocation or dynamic-symbol references; its section bytes and metadata
 still receive the same comparison. Owned ARM64/x64 controls and an actual
 x64 7zip empty object pass. Data-in-code entries in MH_OBJECT use section VM
-addresses, as emitted by LLVM's MachObjectWriter; their ranges, lengths and
+addresses, as emitted by [LLVM's MachObjectWriter](https://github.com/llvm/llvm-project/blob/llvmorg-23.1.1/llvm/lib/MC/MachObjectWriter.cpp#L966-L980); their ranges, lengths and
 types are verified too. Seven real renames pass and 32 malformed or altered
 inputs are rejected.
 
@@ -59,6 +59,11 @@ diagnostics are uploaded; captured executables and source stay outside the
 artifact paths. Intel version comparisons use the same machine for both
 programs because the upstream SSE2 banner depends on CPUID.
 
+`ugrep-library-pins.json` admits producer 39038017210 after both native jobs
+and independent artifact/raw-output verification: 146 objects per architecture
+and 26 exact original-role pairs in total. It admits only the component
+libraries, not a reconstructed full engine or client.
+
 `build_bfs_cross.py` compiles Bfs 4.1.1 and Oniguruma with the pinned Linux
 LLVM 23 image and the measured Darwin target flags. `prepare_sdk.py` downloads
 the macOS 26.5 SDK from Apple's CDN, checks its pinned whole-package SHA-256
@@ -70,4 +75,13 @@ programs. `qualify_bfs_native.py` runs Oniguruma tests, Bfs unit tests, and the
 eight upstream integration strategies before and after replacing Bfs with a
 fresh library host. The workflow executes these on native ARM64 and Intel
 macOS and then uses the same strict comparison runner for eight original Bfs
-cases. Cross-build success alone does not qualify a native component.
+cases plus an explicit execdir boundary. Cross-build success alone does not
+qualify a native component.
+
+The original Bfs uses `posix_spawn_file_actions_addfchdir`, introduced in macOS
+26.0, despite declaring a macOS 13.0 deployment floor. On macOS 15, both the
+captured original and the fresh source host fault at that missing weak import
+for execdir. The complete upstream suites therefore run on native macOS 26;
+separate native macOS 15 jobs retain exact ordinary-role comparisons and the
+same observed execdir fault. Earlier upstream failures are retained. No version
+output or runtime failure is rewritten to hide this platform boundary.

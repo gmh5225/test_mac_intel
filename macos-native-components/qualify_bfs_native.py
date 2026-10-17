@@ -18,6 +18,8 @@ def main():
     p = argparse.ArgumentParser(); p.add_argument('--arch', choices=['arm64', 'x64'], required=True)
     p.add_argument('--package', type=Path, required=True); p.add_argument('--output', type=Path, required=True); a = p.parse_args()
     assert platform.system() == 'Darwin' and platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}[a.arch] and os.getuid() != 0
+    os_version = platform.mac_ver()[0]
+    assert int(os_version.split('.')[0]) >= 26, 'Original Bfs execdir calls posix_spawn_file_actions_addfchdir, available from macOS 26.0'
     package = a.package.resolve(); names = set(); assert not any(p.is_symlink() for p in package.rglob('*'))
     for row in json.loads((package / 'MANIFEST.json').read_bytes())['files']:
         rel = Path(row['file']); assert not rel.is_absolute() and '..' not in rel.parts and row['file'] not in names
@@ -33,7 +35,8 @@ def main():
     for path in binaries:
         assert struct.unpack('<II', path.read_bytes()[:8]) == (0xfeedfacf, {'arm64': 0x100000c, 'x64': 0x1000007}[a.arch]); path.chmod(0o500)
     for path in tree.rglob('*.sh'): path.chmod(0o500)
-    commands = []; receipt = dict(status='started', arch=a.arch, native_host=True, commands=commands,
+    commands = []; receipt = dict(status='started', arch=a.arch, native_host=True, runtime_os_version=os_version, commands=commands,
+        complete_upstream_runtime_requires_macos='26.0',
         package_manifest_sha256=sha(package / 'MANIFEST.json'), captured_client_executed=False, whole_engine_integration=False, goal_complete=False)
     environment = {k: v for k, v in os.environ.items() if not k.startswith('ACTIONS_') and not any(w in k.upper() for w in ['TOKEN', 'SECRET', 'PASSWORD'])}
     environment.update(HOME=str(out / 'home'), TMPDIR=str(out / 'tmp'), LANG='C', LC_ALL='C')

@@ -30,6 +30,7 @@ def main():
     p.add_argument('--package', type=Path, required=True); p.add_argument('--output', type=Path, required=True)
     p.add_argument('--original-path', type=Path); a = p.parse_args()
     assert platform.system() == 'Darwin' and platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}[a.arch]
+    os_version = platform.mac_ver()[0]
     assert os.getuid() != 0
     package = a.package.resolve(); seen = set()
     assert not any(p.is_symlink() for p in package.rglob('*'))
@@ -58,7 +59,7 @@ def main():
                         ('br', bytes.fromhex('0f0b8066697273740a4e4545444c450a7072656e6565646c650a03'))]:
         (fixtures / ('input.' + suffix)).write_bytes(raw)
     transport = inputs / 'transport'; boundary = inputs / 'boundary'; original = inputs / 'original-copy'
-    receipt = dict(status='started', arch=a.arch, component_role=a.role, native_host=True, candidate_manifest_sha256=sha(package / 'MANIFEST.json'),
+    receipt = dict(status='started', arch=a.arch, component_role=a.role, native_host=True, runtime_os_version=os_version, candidate_manifest_sha256=sha(package / 'MANIFEST.json'),
         candidate_sha256=sha(candidate), captured_client_executed=False, captured_source_uploaded=False,
         boundary_qualified=False, controls=[], cases=[], normalization='none; exact exit/stdout/stderr bytes',
         whole_engine_integration=False, goal_complete=False)
@@ -185,6 +186,11 @@ def main():
                 ('exec', [fixtures / 'input.txt', '-exec', transport, '--capture', ';'], 0, b''),
                 ('absent', ['-s', fixtures, '-name', 'absent-value', '-print'], 0, b''),
                 ('missing-user', [fixtures, '-maxdepth', '0', '-user', 'neverd_missing_public_fixture_user_21296'], 1, b'')]
+            major = int(os_version.split('.')[0]); assert major == 15 or major >= 26
+            expected_execdir = -signal.SIGSEGV if major == 15 else 0
+            cases.append(('execdir', [fixtures / 'input.txt', '-execdir', transport, '--capture', ';'], expected_execdir, b''))
+            receipt['execdir_runtime_boundary'] = dict(required_macos='26.0', expected_exit_code=expected_execdir,
+                original_missing_API_fault_preserved=major == 15)
         for label, args, expected, stdin in cases:
             left = execute('original-' + label, original, a.role, args, stdin)
             receipt['captured_client_executed'] = True
