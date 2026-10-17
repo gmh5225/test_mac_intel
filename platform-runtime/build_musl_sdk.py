@@ -34,13 +34,16 @@ def main():
     out = args.output.resolve(); out.mkdir(); logs = out / 'diagnostics'; logs.mkdir(); inputs = out / 'inputs'; inputs.mkdir()
     root = out / 'sysroot'; root.mkdir()
     cache = root / 'var/cache/apk'; cache.mkdir(parents=True)
+    ca_bundle = Path('/etc/ssl/certs/ca-certificates.crt')
+    assert ca_bundle.is_file(), 'The native runner must provide its HTTPS trust store'
+    apk_env = dict(os.environ, SSL_CERT_FILE=str(ca_bundle))
     receipt = dict(status='started', arch=args.arch, alpine_release='3.23', pin=pin, commands=[],
                    captured_client_executed=False, recovered_engine_qualified=False, goal_complete=False)
 
-    def run(label, argv):
+    def run(label, argv, env=None):
         receipt['commands'].append(dict(label=label, argv=list(map(str, argv)))); print('Starting ' + label, flush=True)
         with (logs / (label + '.log')).open('xb') as stream:
-            result = subprocess.run(list(map(str, argv)), stdout=stream, stderr=subprocess.STDOUT, timeout=600)
+            result = subprocess.run(list(map(str, argv)), stdout=stream, stderr=subprocess.STDOUT, timeout=600, env=env)
         assert result.returncode == 0, label + ' failed; inspect retained diagnostics'
 
     def download(label, url, path):
@@ -60,20 +63,30 @@ def main():
         assert sha(apk) == pin['apk_static_sha256']
         assert body[:4] == b'\x7fELF' and struct.unpack_from('<H', body, 18)[0] == {'x64': 62, 'arm64': 183}[args.arch]
         run('apk-version', [apk, '--version'])
-        run('project-sdk-packages', ['sudo', apk, '--root', root, '--arch', pin['alpine_arch'],
-            '--cache-dir', '/var/cache/apk', '--repository', 'https://dl-cdn.alpinelinux.org/alpine/v3.23/main',
+        run('project-sdk-packages', ['sudo', '--preserve-env=SSL_CERT_FILE', apk, '--root', root, '--arch', pin['alpine_arch'],
+            '--cache-dir', cache, '--repository', 'https://dl-cdn.alpinelinux.org/alpine/v3.23/main',
             '--allow-untrusted', '--initdb', '--no-scripts', 'add',
-            'musl-dev', 'libc-dev', 'linux-headers', 'g++', 'libstdc++-dev'])
+            'musl-dev', 'libc-dev', 'linux-headers', 'g++', 'libstdc++-dev'], env=apk_env)
         # Only the newly created SDK changes ownership; links are never followed.
         run('own-sdk-output', ['sudo', 'chown', '-R', '-h', f'{os.getuid()}:{os.getgid()}', root])
         db = root / 'lib/apk/db/installed'; installed = records(db.read_text())
-        indexed = {(p['P'], p['V'], p.get('A', pin['alpine_arch'])) for p in package_index}
-        assert installed and all((p['P'], p['V'], p.get('A', pin['alpine_arch'])) in indexed for p in installed)
+        identity = lambda p: (p['P'], p['V'], p.get('A', pin['alpine_arch']))
+        indexed = {identity(p): p for p in package_index}
+        assert installed and all(identity(p) in indexed and p['C'] == indexed[identity(p)]['C'] for p in installed)
         package = out / 'public-sdk'; package.mkdir(); source_apks = package / 'source-apks'; source_apks.mkdir()
         cached = sorted(root.rglob('*.apk')); assert len(cached) >= len(installed), 'Retain every installed APK before accepting the snapshot'
+        cached_identities = set()
         for path in cached:
             assert not path.is_symlink() and not (source_apks / path.name).exists()
+            with tarfile.open(path, 'r:gz', ignore_zeros=True) as stream:
+                metadata = [m for m in stream.getmembers() if m.name.lstrip('./') == '.PKGINFO']
+                assert len(metadata) == 1 and metadata[0].isfile()
+                fields = dict(line.split(' = ', 1) for line in stream.extractfile(metadata[0]).read().decode().splitlines() if ' = ' in line)
+            key = (fields['pkgname'], fields['pkgver'], fields['arch'])
+            assert key in indexed and key not in cached_identities
+            cached_identities.add(key)
             shutil.copyfile(path, source_apks / path.name)
+        assert cached_identities == {identity(p) for p in installed}, 'Every installed package needs its exact source archive'
         receipt['installed_packages'] = [dict(name=p['P'], version=p['V'], arch=p.get('A', pin['alpine_arch'])) for p in installed]
         receipt['retained_package_archives'] = [dict(file=p.name, bytes=p.stat().st_size, sha256=sha(p)) for p in sorted(source_apks.iterdir())]
         # Preserve volatile package-manager data as diagnostics, outside the SDK.
