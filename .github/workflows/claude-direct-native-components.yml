@@ -1,0 +1,62 @@
+name: Direct-link native component candidates
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - native-components/**
+      - .github/workflows/claude-direct-native-components.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    name: Native ${{ matrix.arch }} direct-link components
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-glibc-static-search-helper-1
+          path: retained-search
+          run-id: 38955193889
+          github-token: ${{ github.token }}
+      - name: Build the pinned public seccomp inputs
+        run: python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output public-seccomp-build
+      - name: Build library entries and run zero-file-budget controls
+        run: |
+          python3 -m unittest discover -s native-components -p 'test_*.py' -v
+          python3 native-components/build_linux.py --arch ${{ matrix.arch }} --rg-package retained-search --seccomp-package public-seccomp-build/public-seccomp-helper --output native-library-build
+      - name: Retain public libraries and source inputs
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-direct-native-libraries-${{ github.run_attempt }}
+          path: native-library-build/public-native-libraries/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain public component diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-direct-native-diagnostics-${{ github.run_attempt }}
+          path: |
+            native-library-build/diagnostics/
+            public-seccomp-build/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

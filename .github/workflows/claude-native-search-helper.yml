@@ -1,0 +1,68 @@
+name: Native macOS and Windows search helpers
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - runtime-helpers/build.py
+      - runtime-helpers/prepare_pcre2.py
+      - runtime-helpers/test_archive.py
+      - runtime-helpers/build_native.py
+      - runtime-helpers/managed-native-launcher.cpp
+      - runtime-helpers/native-launcher-control.cpp
+      - runtime-helpers/test_native_build.py
+      - .github/workflows/claude-native-search-helper.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Native ${{ matrix.platform }} public search helper
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            platform: darwin-x64
+            runner: macos-15-intel
+          - arch: arm64
+            platform: darwin-arm64
+            runner: macos-15
+          - arch: x64
+            platform: win32-x64
+            runner: windows-2022
+          - arch: arm64
+            platform: win32-arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Check archive and native-link boundary controls
+        run: python -m unittest discover -s runtime-helpers -p 'test_*.py' -v
+      - name: Build and test pinned public PCRE2 and ripgrep
+        run: python runtime-helpers/build_native.py --arch ${{ matrix.arch }} --output native-search-build
+      - name: Retain public helper and exact dependency sources
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-${{ matrix.platform }}-search-helper-${{ github.run_attempt }}
+          path: native-search-build/public-search-helper/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain build and component-test diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-${{ matrix.platform }}-search-helper-diagnostics-${{ github.run_attempt }}
+          path: native-search-build/diagnostics/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,44 @@
+# Independent search runtime component
+
+The recovery's independent Bun executable lacks the original binary's native
+`argv[0]=rg` dispatcher. This job builds upstream ripgrep 14.1.1 with PCRE2
+10.45 in pinned Rust 1.85.1 Linux containers on native x64 and ARM64 runners, for
+both glibc and musl. Archives
+and Cargo dependencies are pinned; compilation runs offline after fetching.
+PCRE2 self-tests and authored search/regex/Unicode controls must pass.
+
+`PCRE2_SYS_STATIC=0` selects the pinned pkg-config library, while
+`PKG_CONFIG_ALL_STATIC=1` links it statically. Setting the former to 1 would
+instead compile the Rust crate's older vendored PCRE2 and is inappropriate here.
+
+The pinned `pcre2` 0.2.9 Rust wrapper reports its generated binding constants
+even when linked to a newer library. A small, recorded overlay queries
+`PCRE2_CONFIG_VERSION` from the linked library instead. It uses a separate
+dependency copy and an offline Cargo path override; original archives and the
+Cargo cache remain unchanged. Both lockfiles, the exact patch and the complete
+overlay source are retained. The native version check still requires 10.45.
+
+The artifact contains only this public helper, exact upstream source archives,
+locked dependency archives with licenses, build scripts and receipts. It does
+not contain a captured or recovered Claude executable. The helper must still
+be qualified and compared in the recovery harness; this job alone does not
+restore embedded multicall dispatch or establish full equivalence.
+
+Use `--arch x64` (the default) or `--arch arm64` on the corresponding native
+Linux host. The driver rejects a mismatched host before creating an output
+directory. The original measured x64 build retains its SSSE3/no-AVX2 compile
+flags; ARM64 uses its normal target baseline. Architecture-specific artifacts
+and diagnostics are uploaded separately, including all public hidden metadata.
+
+Use `--libc glibc` (the default) or `--libc musl`. The musl builds use pinned
+Alpine Rust image manifests, then install exact SHA-256-pinned APKs offline.
+APK signatures are checked against the pinned base image's trusted keys.
+The APK archives, Dockerfile, package pins and resulting image ID are retained.
+Compilation remains offline and non-root. The musl executable must have neither
+an ELF interpreter nor dynamic-library dependencies, and is run directly on the
+native Ubuntu host before upload.
+
+The build profile is defined once in `build.py`. The measured original ARM64
+musl helper has PCRE2 JIT disabled; the other three Linux profiles enable it.
+Each profile checks the linked library version and its JIT availability before
+running the search controls.

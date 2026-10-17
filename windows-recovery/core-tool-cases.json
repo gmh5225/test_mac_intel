@@ -1,0 +1,373 @@
+[
+  {
+    "id": "F01-read-window",
+    "input": "FIRST_UNSELECTED\nβ-line-two\nγ-line-three\nLAST_UNSELECTED\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt",
+          "offset": 2,
+          "limit": 2
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "FIRST_UNSELECTED\nβ-line-two\nγ-line-three\nLAST_UNSELECTED\n",
+    "last_result_contains": [
+      "β-line-two",
+      "γ-line-three"
+    ],
+    "last_result_excludes": [
+      "FIRST_UNSELECTED",
+      "LAST_UNSELECTED"
+    ],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F02-read-missing",
+    "input": "keep\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/absent.txt"
+        }
+      }
+    ],
+    "tool_errors": [
+      true
+    ],
+    "expected": "keep\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F03-read-directory",
+    "input": "keep\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/directory"
+        }
+      }
+    ],
+    "tool_errors": [
+      true
+    ],
+    "expected": "keep\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F04-edit-unread",
+    "input": "old\n",
+    "tools": [
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "old",
+          "new_string": "new"
+        }
+      }
+    ],
+    "tool_errors": [
+      false
+    ],
+    "expected": "new\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F05-edit-one",
+    "input": "first\ntarget\nlast\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "target",
+          "new_string": "replacement"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "first\nreplacement\nlast\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F06-edit-all",
+    "input": "repeat\nother\nrepeat\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "repeat",
+          "new_string": "changed",
+          "replace_all": true
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "changed\nother\nchanged\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F07-edit-ambiguous",
+    "input": "repeat\nother\nrepeat\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "repeat",
+          "new_string": "changed"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      true
+    ],
+    "expected": "repeat\nother\nrepeat\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F08-edit-crlf",
+    "input": "first\r\ntarget\r\nlast\r\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "target",
+          "new_string": "replacement"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "first\r\nreplacement\r\nlast\r\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F09-edit-unicode",
+    "input": "开始\n🐈 café β\n结束\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "🐈 café β",
+          "new_string": "🍂 café γ"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "开始\n🍂 café γ\n结束\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F10-edit-no-match",
+    "input": "keep\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt"
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "absent-value",
+          "new_string": "replacement"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      true
+    ],
+    "expected": "keep\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  },
+  {
+    "id": "F11-edit-unread-legacy-model",
+    "input": "old\n",
+    "tools": [
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "old",
+          "new_string": "new"
+        }
+      }
+    ],
+    "tool_errors": [
+      true
+    ],
+    "expected": "old\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-4-5",
+    "disallowed": null
+  },
+  {
+    "id": "F12-edit-read-denied",
+    "input": "old\n",
+    "tools": [
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "old",
+          "new_string": "new"
+        }
+      }
+    ],
+    "tool_errors": [
+      true
+    ],
+    "expected": "old\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": "Read"
+  },
+  {
+    "id": "F13-edit-partial-legacy-model",
+    "input": "first\ntarget\nlast\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt",
+          "offset": 1,
+          "limit": 1
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "target",
+          "new_string": "new"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "first\nnew\nlast\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-4-5",
+    "disallowed": null
+  },
+  {
+    "id": "F14-edit-partial-current-model",
+    "input": "first\ntarget\nlast\n",
+    "tools": [
+      {
+        "name": "Read",
+        "input": {
+          "file_path": "/work/input.txt",
+          "offset": 1,
+          "limit": 1
+        }
+      },
+      {
+        "name": "Edit",
+        "input": {
+          "file_path": "/work/input.txt",
+          "old_string": "target",
+          "new_string": "new"
+        }
+      }
+    ],
+    "tool_errors": [
+      false,
+      false
+    ],
+    "expected": "first\nnew\nlast\n",
+    "last_result_contains": [],
+    "last_result_excludes": [],
+    "model": "claude-sonnet-5",
+    "disallowed": null
+  }
+]

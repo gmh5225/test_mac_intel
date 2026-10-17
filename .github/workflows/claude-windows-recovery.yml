@@ -1,0 +1,147 @@
+name: Windows recovery environment
+run-name: Native Windows recovery environment / ${{ github.sha }}
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - windows-recovery/**
+      - .github/workflows/claude-windows-recovery.yml
+permissions:
+  contents: read
+jobs:
+  formatter:
+    name: Build and qualify the public source formatter
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+    outputs:
+      manifest_sha256: ${{ steps.package.outputs.manifest_sha256 }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: NeverSight/NeverD
+          ref: 64b77c4e96bb65905818577a954b23311d108ec8
+          path: neverd-source
+          persist-credentials: false
+      - name: Select the pinned source dependency
+        run: git -C neverd-source submodule update --init --depth 1 third_party/capstone
+      - name: Check formatter artifact boundary controls
+        run: python -m unittest discover -s windows-recovery -p test_formatter_bundle.py -v
+      - name: Check authored ordered tool fixtures
+        run: |
+          python -m unittest discover -s windows-recovery -p test_sequence_fixture.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_core_tool_oracles.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_read_truncation.py -v
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Configure the parser-only development target
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $Pins = Get-Content neverd-source/cmake/web-product-dependencies.json -Raw | ConvertFrom-Json
+          if ([version]$env:VCToolsVersion -lt [version]$Pins.toolchain.msvc_toolset_minimum) {
+            throw 'MSVC runtime is older than the pinned LLVM producer'
+          }
+          clang-cl --version
+          cmake -S neverd-source -B formatter-build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DNEVERD_LLVM_PREBUILT=ON -DNEVERD_ENABLE_PYTHON_PLUGINS=OFF -DNEVERD_ENABLE_Z3=OFF -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF -DNEVERD_ENABLE_BINARY_CORPUS_TESTS=OFF -DNEVERD_BUILD_GUI=OFF -DNEVERD_BUILD_WORKER=OFF -DNEVERD_BUILD_WEB_MCP=OFF -DNEVERD_BUILD_SHARED=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=ON -DNEVERD_ENABLE_WEB_ASAR=OFF -DNEVERD_ENABLE_WEB_JAVASCRIPT=ON
+      - name: Build and run the five source recovery owner tests
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          cmake --build formatter-build --parallel 4 --target neverd-web-source-recovery NeverDWebSourceTests
+          formatter-build/bin/NeverDWebSourceTests.exe '--gtest_filter=WebSourceRecovery.*-WebSourceRecovery.ClaudeCode21296AllJavaScriptWhenSupplied' '--gtest_output=xml:formatter-owner-tests.xml'
+      - name: Package the formatter with its exact runtime libraries
+        id: package
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $CRT = Get-ChildItem (Join-Path $env:VCToolsRedistDir 'x64') -Directory -Filter 'Microsoft.VC*.CRT' | Where-Object { Test-Path (Join-Path $_.FullName 'msvcp140.dll') } | Select-Object -First 1
+          if (-not $CRT) { throw 'Selected toolset CRT was not found' }
+          python windows-recovery/formatter_bundle.py --source neverd-source --build formatter-build --crt $CRT.FullName --owner-tests formatter-owner-tests.xml --output public-formatter
+      - name: Retain the public formatter only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-source-formatter-${{ github.run_attempt }}
+          path: public-formatter/
+          if-no-files-found: error
+          retention-days: 14
+  qualify:
+    name: Native ${{ matrix.arch }} recovery acceptance
+    needs: formatter
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Obtain the just-qualified public formatter
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-source-formatter-${{ github.run_attempt }}
+          path: public-formatter
+      - name: Check authored ordered tool fixtures
+        shell: pwsh
+        run: |
+          python -m unittest discover -s windows-recovery -p test_sequence_fixture.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_core_tool_oracles.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_read_truncation.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s windows-recovery -p test_search_tools.py -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m unittest discover -s runtime-helpers -p 'test_*.py' -v
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Build public native search dependencies and managed launchers
+        shell: pwsh
+        run: python runtime-helpers/build_native.py --arch ${{ matrix.arch }} --output native-search-build
+      - name: Qualify environment and compare pinned client
+        shell: pwsh
+        run: python windows-recovery/qualify.py --arch ${{ matrix.arch }} --output windows-evidence --editable-probe --readable-formatter public-formatter --formatter-manifest-sha256 ${{ needs.formatter.outputs.manifest_sha256 }} --search-build native-search-build
+      - name: Retain diagnostic receipts only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-${{ matrix.arch }}-environment-${{ github.run_attempt }}
+          path: windows-evidence/evidence/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain public native search build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: windows-${{ matrix.arch }}-search-build-diagnostics-${{ github.run_attempt }}
+          path: native-search-build/diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Retain the exact public search binaries used by this acceptance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-win32-${{ matrix.arch }}-accepted-search-helper-${{ github.run_attempt }}
+          path: native-search-build/public-search-helper/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

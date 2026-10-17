@@ -1,0 +1,78 @@
+name: Public seccomp helper build
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - seccomp-helper/**
+      - .github/workflows/claude-seccomp-helper.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Native ${{ matrix.arch }} seccomp on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            os: ubuntu24
+            command_check: ''
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            os: ubuntu24
+            command_check: ''
+          - arch: x64
+            runner: ubuntu-22.04
+            os: ubuntu22
+            command_check: --require-helper-command
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+            os: ubuntu22
+            command_check: --require-helper-command
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Build pinned public sources and run native kernel controls
+        id: public_helper
+        run: |
+          python3 -m unittest discover -s seccomp-helper -p 'test_*.py' -v
+          python3 seccomp-helper/build.py --arch ${{ matrix.arch }} --output seccomp-helper-build ${{ matrix.command_check }}
+      - name: Install fixed namespace boundary tool
+        if: matrix.os == 'ubuntu22'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap=0.6.1-1ubuntu0.3
+      - name: Qualify boundary and compare the pinned original native role
+        if: matrix.os == 'ubuntu22'
+        run: |
+          python3 -m unittest discover -s seccomp-helper -p test_original_comparison.py -v
+          python3 seccomp-helper/original_acceptance.py --arch ${{ matrix.arch }} --build seccomp-helper-build --output seccomp-original-acceptance
+      - name: Retain public helper sources and binaries
+        if: always() && steps.public_helper.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-${{ matrix.os }}-seccomp-helper-${{ github.run_attempt }}
+          path: seccomp-helper-build/public-seccomp-helper/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain original-role diagnostics only
+        if: always() && matrix.os == 'ubuntu22'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-${{ matrix.arch }}-seccomp-role-diagnostics-${{ github.run_attempt }}
+          path: seccomp-original-acceptance/diagnostics/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Retain diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-${{ matrix.os }}-seccomp-helper-diagnostics-${{ github.run_attempt }}
+          path: seccomp-helper-build/diagnostics/
+          if-no-files-found: error
+          retention-days: 14
