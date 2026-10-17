@@ -77,6 +77,9 @@ def main():
         shutil.copytree(ROOT/'bun-compat-source',package/'bun-compat-source');shutil.copyfile(ROOT/'bun-compat-inputs.json',package/'bun-compat-inputs.json')
         shutil.copyfile(standalone/'compat.cpp',package/'compat.cpp');shutil.copyfile(ROOT/'compat-probe.c',package/'compat-probe.c')
         shutil.copyfile(expected_version,package/'expected-original-version.txt')
+        shutil.copytree(work/'native-library',package/'native-library')
+        for name in ['export-library.py','bfs-library-host.c']:shutil.copyfile(ROOT/name,package/name)
+        receipt['native_library']=json.loads((work/'native-library/receipt.json').read_bytes())
         for name in ['build.py','build-bfs.sh','README.md']:shutil.copyfile(ROOT/name,package/name)
         for name in ['prepare_sysroot.py','glibc-sysroot-pins.json']:shutil.copyfile(ROOT.parent/'bun-runtime'/name,package/name)
         shutil.copyfile(work/'embedded/bfs/LICENSE',package/'BFS-LICENSE');shutil.copyfile(work/'embedded/oniguruma/COPYING',package/'ONIGURUMA-LICENSE')
@@ -84,6 +87,11 @@ def main():
         (package/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n');rows=[dict(file=p.relative_to(package).as_posix(),bytes=p.stat().st_size,sha256=sha(p)) for p in sorted(package.rglob('*')) if p.is_file()];(package/'MANIFEST.json').write_text(json.dumps(dict(files=rows),indent=2)+'\n')
     except BaseException as error:receipt.update(status='failed',error_type=type(error).__name__,error=str(error));raise
     finally:
+        library=work/'native-library'
+        if library.is_dir():
+            retained_library=logs/'native-library';retained_library.mkdir()
+            for p in sorted(library.iterdir()):
+                if p.is_file() and (p.suffix in ['.json','.stdout','.stderr'] or p.name.startswith('main-text-')):shutil.copyfile(p,retained_library/p.name)
         standalone=work/'standalone'
         if standalone.is_dir():
             retained_outer=logs/'outer-link';retained_outer.mkdir()

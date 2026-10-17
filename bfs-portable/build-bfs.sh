@@ -66,3 +66,6 @@ for variant in native fallback; do
 done
 cp /tmpfs/bun/standalone/bfs ./bin/bfs
 make -j2 check "${build_flags[@]}"
+python3 /recipes/export-library.py
+cp /tmpfs/bun/native-library/bfs-library-host ./bin/bfs
+make -j2 check "${build_flags[@]}"
