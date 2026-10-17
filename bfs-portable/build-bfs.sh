@@ -12,6 +12,9 @@ test -x "$compiler"
 cmake --version
 export HOME=/tmpfs/bun/home
 export GIT_CEILING_DIRECTORIES=/tmpfs/bun
+id
+getent passwd "$(id -u)"
+getent group "$(id -g)"
 cmake -S /tmpfs/bun/embedded/oniguruma -B /tmpfs/bun/build/release/deps/oniguruma \
   -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TEST=ON \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DCMAKE_C_COMPILER="$compiler" \
@@ -31,5 +34,5 @@ export PKG_CONFIG_LIBDIR=/tmpfs/bun/no-host-pkgconfig
 unset CFLAGS CXXFLAGS
 ./configure --enable-release --with-oniguruma --without-libselinux --without-libacl
 make -j2 V=1
-make -j2 check
 ./bin/bfs --version
+make -j2 check

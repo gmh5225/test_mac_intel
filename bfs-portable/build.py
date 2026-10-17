@@ -29,8 +29,22 @@ def main():
         docker_platform={'x64':'linux/amd64','arm64':'linux/arm64'}[a.arch];image=IMAGES[a.arch]
         run('compiler-pull',['docker','pull','--platform',docker_platform,image],900)
         run('compiler-inspect',['docker','image','inspect',image])
+        # The compiler image has no entry for the runner UID/GID. Preserve its
+        # public account database and add only this owned test identity so the
+        # upstream -nouser/-nogroup expectations have a valid current account.
+        identity=work/'test-identity';identity.mkdir()
+        for kind,index,number,entry in [('passwd',2,os.getuid(),f'recovery:x:{os.getuid()}:{os.getgid()}::/tmpfs/bun/home:/bin/bash'),('group',2,os.getgid(),f'recovery:x:{os.getgid()}:')]:
+            run('compiler-'+kind,['docker','run','--rm','--platform',docker_platform,'--network','none','--cap-drop','ALL','--security-opt','no-new-privileges','--user',f'{os.getuid()}:{os.getgid()}','--entrypoint','/bin/cat',image,'/etc/'+kind])
+            raw=(logs/('compiler-'+kind+'.log')).read_text();rows=[line.split(':') for line in raw.splitlines() if line]
+            assert all(len(row)==(7 if kind=='passwd' else 4) and row[index].isdigit() for row in rows)
+            matches=[row for row in rows if int(row[index])==number];assert len(matches)<=1
+            if not matches:
+                assert all(row[0]!='recovery' for row in rows);raw=raw.rstrip('\n')+'\n'+entry+'\n'
+            (identity/kind).write_text(raw)
+        receipt['compiler_test_identity']={name:dict(sha256=sha(identity/name),uid=os.getuid(),gid=os.getgid()) for name in ['passwd','group']}
         measured_sysroot='/opt/linux-sysroot-glibc'+('-arm64' if a.arch=='arm64' else '')
-        run('source-build',['docker','run','--rm','--platform',docker_platform,'--network','none','--cap-drop','ALL','--security-opt','no-new-privileges','--user',f'{os.getuid()}:{os.getgid()}','--cpus','2','--memory','4g','--pids-limit','256','--mount',f'type=bind,src={work},dst=/tmpfs/bun','--mount',f'type=bind,src={out/"sysroot"},dst={measured_sysroot},readonly','--mount',f'type=bind,src={ROOT},dst=/recipes,readonly','--env','RECOVERY_ARCH='+a.arch,'--entrypoint','/bin/bash',image,'/recipes/build-bfs.sh'])
+        identity_mounts=[value for name in ['passwd','group'] for value in ['--mount',f'type=bind,src={identity/name},dst=/etc/{name},readonly']]
+        run('source-build',['docker','run','--rm','--platform',docker_platform,'--network','none','--cap-drop','ALL','--security-opt','no-new-privileges','--user',f'{os.getuid()}:{os.getgid()}','--cpus','2','--memory','4g','--pids-limit','256','--mount',f'type=bind,src={work},dst=/tmpfs/bun','--mount',f'type=bind,src={out/"sysroot"},dst={measured_sysroot},readonly','--mount',f'type=bind,src={ROOT},dst=/recipes,readonly',*identity_mounts,'--env','RECOVERY_ARCH='+a.arch,'--entrypoint','/bin/bash',image,'/recipes/build-bfs.sh'])
         binary=work/'embedded/bfs/bin/bfs';assert binary.is_file();raw=binary.read_bytes();assert raw[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',raw,18)[0]=={'x64':62,'arm64':183}[a.arch]
         # Retain the public candidate even when its measured ABI floor refuses it.
         shutil.copyfile(binary,logs/'public-bfs-candidate')
@@ -47,6 +61,7 @@ def main():
             controls.append(dict(case=label,exit_code=r.returncode))
         package=out/'public-bfs-portable';package.mkdir();shutil.copyfile(binary,package/'bfs');(package/'bfs').chmod(0o555)
         shutil.copytree(inputs,package/'source-inputs')
+        shutil.copytree(identity,package/'compiler-test-identity')
         for name in ['build.py','build-bfs.sh','README.md']:shutil.copyfile(ROOT/name,package/name)
         for name in ['prepare_sysroot.py','glibc-sysroot-pins.json']:shutil.copyfile(ROOT.parent/'bun-runtime'/name,package/name)
         shutil.copyfile(work/'embedded/bfs/LICENSE',package/'BFS-LICENSE');shutil.copyfile(work/'embedded/oniguruma/COPYING',package/'ONIGURUMA-LICENSE')
@@ -54,6 +69,12 @@ def main():
         (package/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n');rows=[dict(file=p.relative_to(package).as_posix(),bytes=p.stat().st_size,sha256=sha(p)) for p in sorted(package.rglob('*')) if p.is_file()];(package/'MANIFEST.json').write_text(json.dumps(dict(files=rows),indent=2)+'\n')
     except BaseException as error:receipt.update(status='failed',error_type=type(error).__name__,error=str(error));raise
     finally:
+        binary=work/'embedded/bfs/bin/bfs'
+        if binary.is_file() and not (logs/'public-bfs-candidate').exists():
+            shutil.copyfile(binary,logs/'public-bfs-candidate')
+            with (logs/'failed-candidate-version-needs.log').open('xb') as stream:
+                result=subprocess.run(['readelf','--version-info',binary],stdout=stream,stderr=subprocess.STDOUT,timeout=30)
+            receipt['failed_candidate_readelf_exit_code']=result.returncode
         generated=work/'embedded/bfs/gen'
         if generated.is_dir():
             retained=logs/'bfs-config';retained.mkdir()
