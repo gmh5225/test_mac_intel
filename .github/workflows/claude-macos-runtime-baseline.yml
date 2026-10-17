@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install build utilities on the disposable runner
-        run: brew install ninja pkgconf automake libtool coreutils gnu-sed go ruby
+        run: brew install nasm ninja pkgconf automake libtool coreutils gnu-sed go ruby
       - name: Rebuild the unmodified public engine with matching LLVM and Rust
         env:
           GH_TOKEN: ${{ github.token }}

@@ -62,6 +62,11 @@ def main():
         env.pop(name, None)
     api_token = env.pop('GH_TOKEN', None)
     env.pop('GITHUB_TOKEN', None)
+    # Upstream command failures may dump their child environment. Runner
+    # service credentials do not belong in compiler diagnostics either.
+    for name in list(env):
+        if name.startswith('ACTIONS_') or any(word in name.upper() for word in ['TOKEN', 'SECRET', 'PASSWORD']):
+            env.pop(name)
     record = dict(status='started', target_arch=args.arch, build_host_arch='arm64',
                   public_bun_commit=COMMIT, commands=[], captured_client_executed=False,
                   recovered_native_roles_integrated=False, original_prefix_reused=False,
