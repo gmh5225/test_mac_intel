@@ -99,8 +99,13 @@ for label,argv,wanted in [('version',['--version'],None),('literal',['--no-confi
     for field in ['stdout','stderr']:(library/(label+'.'+field)).write_bytes(getattr(r,field))
     controls.append(dict(case=label,argv=argv,exit_code=r.returncode,stdout_sha256=hashlib.sha256(r.stdout).hexdigest(),rlimit_fsize=0))
     assert r.returncode==0 and not r.stderr and (wanted is None or r.stdout==wanted)
-shutil.copyfile(host,ug/'bin/ugrep');run('library-host-upstream-check',['make','-j2','check'],ug,environment=ugenv)
-assert sha(ug/'bin/ugrep')==sha(host),'Upstream checks replaced the library host'
+# The top-level all target always copies src/ugrep into bin/ugrep before
+# invoking the test scripts. Install the fresh host at both locations so the
+# upstream suite cannot silently revert to the standalone executable.
+for destination in [ug/'src/ugrep',ug/'bin/ugrep']:
+    shutil.copyfile(host,destination);assert sha(destination)==sha(host)
+run('library-host-upstream-check',['make','-j2','check'],ug,environment=ugenv)
+assert all(sha(p)==sha(host) for p in [ug/'src/ugrep',ug/'bin/ugrep']),'Upstream checks replaced the library host'
 receipt=dict(status='ugrep_source_library_host_and_upstream_checks_passed',entry_symbol='neverd_recovered_ugrep_main',source_objects=len(paths),
     main_text_unchanged=True,main_text_sha256=sha(before),library_sha256=sha(archive),host_sha256=sha(host),controls=controls,commands=commands,
     original_binary_reused=False,dependency_archives={name:sha(library/('lib'+name+'.a')) for name in dependencies},zstd_upstream_suite_run=False,
