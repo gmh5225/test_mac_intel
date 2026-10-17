@@ -26,9 +26,9 @@ def sha(path):
 
 def main():
     p = argparse.ArgumentParser(); p.add_argument('--arch', choices=['arm64', 'x64'], required=True)
-    p.add_argument('--role', choices=['ugrep', 'bfs'], default='ugrep')
+    p.add_argument('--role', choices=['ugrep', 'bfs', 'rg'], default='ugrep')
     p.add_argument('--package', type=Path, required=True); p.add_argument('--output', type=Path, required=True)
-    p.add_argument('--original-path', type=Path); a = p.parse_args()
+    p.add_argument('--original-path', type=Path); p.add_argument('--engine', type=Path); a = p.parse_args()
     assert platform.system() == 'Darwin' and platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}[a.arch]
     os_version = platform.mac_ver()[0]
     assert os.getuid() != 0
@@ -40,10 +40,22 @@ def main():
         assert file.is_file() and file.stat().st_size == row['bytes'] and sha(file) == row['sha256']
     assert seen | {'MANIFEST.json'} == {p.relative_to(package).as_posix() for p in package.rglob('*') if p.is_file()}
     producer = json.loads((package / 'receipt.json').read_bytes())
-    expected_status = 'macos_ugrep_source_library_and_upstream_host_checks_passed' if a.role == 'ugrep' else 'public_macos_bfs_cross_source_library_built_native_acceptance_pending'
-    assert producer['arch'] == a.arch and producer['status'] == expected_status
-    component = producer if a.role == 'ugrep' else producer['native_library']
-    candidate = package / 'native-library' / (a.role + '-library-host'); assert sha(candidate) == component['host_sha256']
+    if a.role == 'rg':
+        assert a.engine is not None and producer['status'] == 'pinned_public_rg_and_PCRE2_sources_prepared'
+        component = None
+    else:
+        expected_status = 'macos_ugrep_source_library_and_upstream_host_checks_passed' if a.role == 'ugrep' else 'public_macos_bfs_cross_source_library_built_native_acceptance_pending'
+        assert producer['arch'] == a.arch and producer['status'] == expected_status
+        component = producer if a.role == 'ugrep' else producer['native_library']
+    engine_provenance = None
+    if a.engine is not None:
+        from source_engine import qualify as qualify_engine
+        candidate = a.engine.resolve(); engine_provenance = qualify_engine(a.arch, candidate)
+        candidate_expected_sha256 = engine_provenance['binary_sha256']
+    else:
+        candidate = package / 'native-library' / (a.role + '-library-host')
+        candidate_expected_sha256 = component['host_sha256']
+    assert sha(candidate) == candidate_expected_sha256
     candidate.chmod(0o500)
     pin = json.loads((ROOT / 'original-pins.json').read_bytes())[a.arch]
     out = a.output.resolve(); out.mkdir(); logs = out / 'diagnostics'; logs.mkdir()
@@ -62,7 +74,8 @@ def main():
     receipt = dict(status='started', arch=a.arch, component_role=a.role, native_host=True, runtime_os_version=os_version, candidate_manifest_sha256=sha(package / 'MANIFEST.json'),
         candidate_sha256=sha(candidate), captured_client_executed=False, captured_source_uploaded=False,
         boundary_qualified=False, controls=[], cases=[], normalization='none; exact exit/stdout/stderr bytes',
-        whole_engine_integration=False, goal_complete=False)
+        whole_engine_integration=a.engine is not None, goal_complete=False)
+    if engine_provenance is not None: receipt['source_engine'] = engine_provenance
 
     def build(name, source, destination):
         result = subprocess.run(['xcrun', 'clang', '-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', str(source), '-o', str(destination)], capture_output=True, timeout=60)
@@ -75,6 +88,7 @@ def main():
     profile += '(allow file-read* (literal "/") (literal "/dev/null") (literal "/dev/urandom") (literal "/dev/random") (subpath "/System/Library") (subpath "/usr/lib") (subpath "/System/Volumes/Preboot/Cryptexes/OS") (subpath "/usr/share/locale") (subpath ' + json.dumps(str(fixtures)) + '))\n'
     profile += '(allow file-map-executable (subpath "/System/Library") (subpath "/usr/lib") (subpath "/System/Volumes/Preboot/Cryptexes/OS"))\n'
     for executable in allowed: profile += '(allow file-read* file-map-executable process-exec ' + literal(executable) + ')\n'
+    if a.role == 'rg': profile += '(allow file-read* ' + literal(work) + ')\n'
     profile += '(allow process-fork)\n(allow signal (target self))\n(deny network*)\n'
     profile_path = logs / 'profile.sb'; profile_path.write_text(profile)
     environment = dict(HOME=str(home), TMPDIR=str(temp), PATH='/unavailable', LANG='C.UTF-8', LC_ALL='C.UTF-8',
@@ -177,6 +191,21 @@ def main():
                  ('count', ['--no-config', '-c', '-i', 'needle', fixtures / 'input.txt'], 0, b''),
                  ('stdin-pcre', ['--no-config', '-P', '-o', '(?<=pre)needle'], 0, text)]
         cases += [(suffix, ['--no-config', '-z', '-n', 'NEEDLE', fixtures / ('input.' + suffix)], 0, b'') for suffix in ['gz', 'bz2', 'zst', 'br']]
+        if a.role == 'rg':
+            cases = [('version', ['--version'], 0, b''),
+                ('literal', ['--no-config', '-n', 'NEEDLE', fixtures / 'input.txt'], 0, b''),
+                ('absent', ['--no-config', 'absent-owned-value', fixtures / 'input.txt'], 1, b''),
+                ('invalid', ['--no-config', '[', fixtures / 'input.txt'], 2, b''),
+                ('pcre', ['--no-config', '-P', '-o', '(?<=pre)needle', fixtures / 'input.txt'], 0, b''),
+                ('unicode', ['--no-config', '-n', '🐈', fixtures / '猫.txt'], 0, b''),
+                ('newline-filename', ['--no-config', '-c', '-H', '--null', 'NEEDLE', fixtures / 'line\nbreak.txt'], 0, b''),
+                ('count', ['--no-config', '-c', 'needle', fixtures / 'input.txt'], 0, b''),
+                ('stdin-pcre', ['--no-config', '-P', '-o', '(?<=pre)needle'], 0, text),
+                ('files', ['--no-config', '--files', '--hidden', '--sort', 'path', '--glob', '*.txt', fixtures], 0, b''),
+                ('glob', ['--no-config', '--sort', 'path', '--glob', '*.txt', '-l', 'NEEDLE', fixtures], 0, b''),
+                ('fixed', ['--no-config', '-F', '-n', 'NEEDLE', fixtures / 'input.txt'], 0, b''),
+                ('multiline-pcre', ['--no-config', '-U', '-P', '-o', 'NEEDLE\npreneedle', fixtures / 'input.txt'], 0, b''),
+                ('case-insensitive', ['--no-config', '-i', '-n', 'needle', fixtures / 'input.txt'], 0, b'')]
         if a.role == 'bfs':
             cases = [('version', ['--version'], 0, b''),
                 ('name', ['-s', fixtures, '-maxdepth', '1', '-type', 'f', '-name', '*.txt', '-printf', '%f\n'], 0, b''),
@@ -198,9 +227,9 @@ def main():
             matches = left == right and left[0] == expected
             receipt['cases'].append(dict(case=label, expected_exit_code=expected, original_exit_code=left[0], candidate_exit_code=right[0], matches=matches))
             assert matches, 'Exact ' + a.role + ' mismatch: ' + label
-        assert sha(original) == pin['sha256'] and sha(candidate) == component['host_sha256']
-        receipt.update(status='native_original_and_source_library_' + a.role + '_cases_match_exactly', differential_pairs=len(cases), original=pin,
-            scope='Bounded standalone native source-library correspondence. Full Bun engine and recovered client integration remain open.')
+        assert sha(original) == pin['sha256'] and sha(candidate) == candidate_expected_sha256
+        receipt.update(status='native_original_and_' + ('source_engine_' if a.engine else 'source_library_') + a.role + '_cases_match_exactly', differential_pairs=len(cases), original=pin,
+            scope=('Bounded original-role correspondence against the admitted complete source engine. Actual recovered-client acceptance remains separate.' if a.engine else 'Bounded standalone native source-library correspondence. Full Bun engine and recovered client integration remain open.'))
     except BaseException as error:
         receipt.update(status='failed_not_admitted', error_type=type(error).__name__, error=str(error)); raise
     finally:

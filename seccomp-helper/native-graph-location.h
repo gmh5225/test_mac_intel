@@ -5,7 +5,7 @@ struct NativeGraph {
 };
 NativeGraph locateNativeGraph(const Bytes &b) {
   if (number(b, 0, 4) == 0xfeedfacf) {
-    require(number(b, 4, 4) == 0x100000c, "MachO arm64 required");
+    require(number(b, 4, 4) == 0x100000c || number(b, 4, 4) == 0x1000007, "MachO arm64 or x64 required");
     uint64_t pos = 32;
     unsigned found = 0;
     NativeGraph graph{};

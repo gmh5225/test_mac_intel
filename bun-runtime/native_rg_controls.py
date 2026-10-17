@@ -46,6 +46,10 @@ def verify(runtime, output, repetitions=32):
                     for label, flags, expected in variants:
                         for attempt in range(repetitions):
                             argv = ["rg", "--no-config", *flags, "target", path]
+                            # Darwin /dev/fd/N duplicates the inherited open-file
+                            # description, including its shared current offset.
+                            # Every repetition measures a fresh complete input.
+                            if transport == "inherited-fd": inherited.seek(0)
                             result = subprocess.run(argv, executable=runtime, env=environment,
                                 pass_fds=(inherited.fileno(),) if transport == "inherited-fd" else (),
                                 capture_output=True, timeout=10, preexec_fn=limits)

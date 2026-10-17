@@ -302,7 +302,7 @@ def main(native_profile=None):
             files = [dict(file=p.name, bytes=p.stat().st_size, sha256=sha(p)) for p in sorted(package.iterdir())]
             (package / 'MANIFEST.json').write_text(json.dumps(dict(schema_version=1, files=files), indent=2) + '\n')
     except BaseException as error:
-        record.update(status='platform_baseline_failed_not_admitted', error_type=type(error).__name__, error=str(error))
+        record.update(status='native_source_engine_failed_not_admitted' if native_profile is not None else 'platform_baseline_failed_not_admitted', error_type=type(error).__name__, error=str(error))
         raise
     finally:
         build = out / 'bun-source/build/recovery'
@@ -310,6 +310,10 @@ def main(native_profile=None):
             path = build / name
             if path.is_file() and path.stat().st_size <= 8 * 1024 * 1024:
                 shutil.copyfile(path, logs / name)
+        binary = build / 'bun'
+        if native_profile is not None and record['status'].endswith('failed_not_admitted') and binary.is_file():
+            shutil.copyfile(binary, logs / 'unqualified-source-bun')
+            record['unqualified_runtime_sha256'] = sha(binary)
         (logs / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
 
 

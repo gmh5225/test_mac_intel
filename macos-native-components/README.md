@@ -111,3 +111,26 @@ including 768 actual rg filename/inherited-FD controls per host. Source build
 and native control success still need independent qualification and actual
 recovered-client comparisons; adding this recipe does not admit a complete
 recovered macOS client.
+
+The original Darwin rg also consumes the inherited open-file offset when it
+opens `/dev/fd/N`. Repeating a read without a rewind reaches EOF. The first full
+ARM64 engine build was refused on the second such repetition; an owned kernel
+control and the actual original reproduce that behavior under the qualified
+profile. The common filename suite now rewinds before every independent FD
+case. All 768 original Darwin cases pass with this preparation; the engine
+rerun still must pass them too. Failed builds retain a public unqualified
+engine for diagnosis and never admit it automatically.
+
+`client_build.py` prepares preserved/readable Mac clients only after
+`source-engine-pins.json` admits the exact source engine. The currently empty
+pin set deliberately refuses client builds. Mac has 2,609 rows per architecture
+(2,364 JavaScript modules and 245 assets). The public formatting recipe contains
+hashes and whitespace insertions only, derived from the previous NeverD parser
+proofs; no captured source body is stored here. Shared graph tooling has read
+back all 5,218 original rows and executed an authored standalone fixture.
+
+The client build uses a qualified Seatbelt profile, no network or shell
+execution, an explicit source engine, disabled macros/config inheritance,
+complete module readback, and source-code/exception-section checks. Captured
+inputs, extracted files and rebuilt clients remain outside uploaded diagnostic
+paths. Actual original-client/tool correspondence remains a later gate.
