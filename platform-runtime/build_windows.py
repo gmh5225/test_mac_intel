@@ -27,6 +27,9 @@ PROFILES = {
                   cmake_sha256='b5fa431bd569b591717a9a0f77c0ab56b072ef8603f924401227c178ac7072d9',
                   target='aarch64-pc-windows-msvc', machine=0xaa64, build_arch='aarch64'),
 }
+NASM_URL = 'https://www.nasm.us/pub/nasm/releasebuilds/2.16.03/win64/nasm-2.16.03-win64.zip'
+NASM_SHA256 = '3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6'
+NASM_BYTES = 513543
 
 
 def unpack(archive, destination):
@@ -89,7 +92,15 @@ def main():
     try:
         for tool in ['git.exe', 'rustup.exe', 'go.exe', 'ruby.exe', 'rc.exe']:
             run('find-' + tool, ['where.exe', tool])
-        if args.arch == 'x64': run('find-nasm', ['where.exe', 'nasm.exe'])
+        if args.arch == 'x64':
+            archive = inputs / 'nasm-2.16.03-win64.zip'; download(NASM_URL, archive)
+            assert archive.stat().st_size == NASM_BYTES and sha(archive) == NASM_SHA256
+            nasm_root = out / 'nasm'; unpack(archive, nasm_root)
+            choices = list(nasm_root.glob('*/nasm.exe')); assert len(choices) == 1
+            env['PATH'] = str(choices[0].parent) + os.pathsep + env['PATH']
+            run('nasm-version', [choices[0], '--version'])
+            assert (logs / 'nasm-version.log').read_text().startswith('NASM version 2.16.03')
+            receipt['nasm_archive_sha256'] = NASM_SHA256
         llvm = release('llvm/llvm-project', 'llvmorg-23.1.1', profile['llvm'], profile['llvm_sha256'], profile['llvm_bytes'])
         tools = out / 'llvm'; tools.mkdir()
         run('extract-llvm-msi', ['msiexec.exe', '/a', llvm, '/qn', 'TARGETDIR=' + str(tools), '/l*v', logs / 'llvm-msi-extraction.log'])
