@@ -30,3 +30,10 @@ The host uses the same unchanged, hash-pinned public Bun fcntl64/statx
 compatibility functions as the qualified Bfs producer. Native forwarding and
 forced old-symbol fallback controls run before building Ugrep. The component
 objects retain their original references for Bun's existing outer wrappers.
+
+The component's defined C symbols receive a private prefix in every referring
+program object and dependency archive. Raw objects/archives and the complete
+rename table are retained. Allocated sections and main machine code must remain
+unchanged. The C++ runtime and main entry keep their names. This makes Ugrep's
+qualified dependency ownership explicit when Bun has its own compression and
+PCRE2 implementations; the full engine must have zero duplicate strong symbols.

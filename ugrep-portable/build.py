@@ -86,7 +86,7 @@ def main():
         shutil.copytree(library,package / 'native-library'); shutil.copytree(inputs,package / 'source-inputs')
         shutil.copyfile(ROOT / ('expected-version-' + args.arch + '.txt'),package / 'expected-original-version.txt')
         shutil.copytree(out/'compat',package/'bun-compatibility')
-        for name in ['build.py','build-library.py','stage_compat.py','README.md']:
+        for name in ['build.py','build-library.py','stage_compat.py','private_symbols.py','README.md']:
             shutil.copyfile(ROOT / name,package / name)
         for name in ['prepare_sysroot.py','glibc-sysroot-pins.json']:
             shutil.copyfile(ROOT.parent / 'bun-runtime' / name,package / name)

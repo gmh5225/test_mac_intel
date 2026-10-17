@@ -1,5 +1,6 @@
 """Compile the pinned public sources, preserve main code, then test its library host."""
 from pathlib import Path
+from private_symbols import isolate
 import argparse, gzip, hashlib, json, os, resource, shutil, subprocess
 
 ap=argparse.ArgumentParser();ap.add_argument('--arch',choices=['x64','arm64'],required=True);args=ap.parse_args()
@@ -88,13 +89,17 @@ renamed_main_hash=sha(main)
 run('main-text-after',[toolbin/'llvm-objcopy','--dump-section','.text.main='+str(after),main,logs/'main-readback-after.o'])
 assert sha(main)==renamed_main_hash,'Section readback modified the renamed compiler object'
 assert before.read_bytes()==after.read_bytes()
-archive=library/'librecovered_ugrep.a';run('export-library',[toolbin/'llvm-ar','rcs',archive,*paths])
 dependencies=['reflex','viiz','pcre2-8','z','bz2','zstd','brotlidec','brotlicommon']
 for name in dependencies:
     if name=='reflex':original=ug/'lib/libreflex.a'
     elif name=='viiz':original=ug/'lzma/C/libviiz.a'
     else:original=prefix/'lib'/('lib'+name+'.a')
     assert original.is_file();shutil.copyfile(original,library/('lib'+name+'.a'))
+private=isolate(library,paths,[library/('lib'+name+'.a') for name in dependencies],toolbin,run,logs)
+private_main=library/'main-text-private.bin'
+run('private-main-text',[toolbin/'llvm-objcopy','--dump-section','.text.main='+str(private_main),main,logs/'main-readback-private.o'])
+assert private_main.read_bytes()==before.read_bytes(),'Private symbol names changed main code bytes'
+archive=library/'librecovered_ugrep.a';run('export-library',[toolbin/'llvm-ar','rcs',archive,*paths])
 host_source=library/'ugrep-library-host.c';host_source.write_text('extern int neverd_recovered_ugrep_main(int, char **);\nint main(int argc, char **argv) { return neverd_recovered_ugrep_main(argc, argv); }\n')
 run('compile-host',[compiler,*ccflags.split(),'-O2','-c',host_source,'-o',library/'host.o'])
 host=library/'ugrep-library-host'
@@ -117,5 +122,5 @@ assert all(sha(p)==sha(host) for p in [ug/'src/ugrep',ug/'bin/ugrep']),'Upstream
 receipt=dict(status='ugrep_source_library_host_and_upstream_checks_passed',entry_symbol='neverd_recovered_ugrep_main',source_objects=len(paths),
     main_text_unchanged=True,main_text_sha256=sha(before),library_sha256=sha(archive),host_sha256=sha(host),controls=controls,commands=commands,
     original_binary_reused=False,dependency_archives={name:sha(library/('lib'+name+'.a')) for name in dependencies},zstd_upstream_suite_run=False,
-    static_pthread_condition_variable_control_passed=True,public_bun_compatibility_controls_passed=True)
+    static_pthread_condition_variable_control_passed=True,public_bun_compatibility_controls_passed=True,private_c_symbols=private)
 (library/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
