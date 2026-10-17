@@ -195,12 +195,15 @@ def canonical(path, renames=None):
                 indirect.append(('symbol', symbol(entry)))
         dynamic = (tuple(groups), tuple(indirect))
 
-    def section_address(file_offset, length):
+    def section_address(address, length):
+        # In MH_OBJECT, LLVM's MachObjectWriter writes getSymbolAddress()
+        # into LC_DATA_IN_CODE: a section VM address, not its file offset.
         matches = [s for s in sections if s['data'] is not None and
-                   s['offset'] <= file_offset and file_offset + length <= s['offset'] + s['size']]
+                   s['addr'] <= address and address + length <= s['addr'] + s['size']]
         require(len(matches) == 1, 'Link-edit address has no unique section')
         s = matches[0]
-        return s['key'], file_offset - s['offset']
+        require(s['attrs'] & 0x80000400, 'Data-in-code range is outside instruction sections')
+        return s['key'], address - s['addr']
 
     metadata = []
     for command, data in commands:
@@ -209,6 +212,7 @@ def canonical(path, renames=None):
             entries = []
             for offset in range(0, len(data), 8):
                 fileoff, length, kind = struct.unpack_from('<IHH', data, offset)
+                require(length > 0 and kind in (1, 2, 3, 4, 5), 'Unsupported data-in-code entry')
                 entries.append((section_address(fileoff, length), length, kind))
             metadata.append((command, tuple(entries)))
         else:

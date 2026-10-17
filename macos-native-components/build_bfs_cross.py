@@ -15,6 +15,7 @@ sys.path.insert(0, str(ROOT.parent / 'runtime-helpers'))
 from build import unpack
 sys.path.insert(0, str(ROOT.parent / 'bun-runtime'))
 from build_linux import PROFILES
+from prepare_sdk import prepare as prepare_sdk
 
 
 def sha(path):
@@ -50,9 +51,11 @@ def main():
             unpack(path, work / 'embedded' / row['name'], row['prefix'])
         run('compiler-pull', ['docker', 'pull', '--platform', 'linux/amd64', profile['image']], 1200)
         run('compiler-inspect', ['docker', 'image', 'inspect', profile['image']])
+        sdk, receipt['sdk'] = prepare_sdk(out, profile['image'], run)
         run('source-build', ['docker', 'run', '--rm', '--platform', 'linux/amd64', '--network', 'none', '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges', '--user', str(os.getuid()) + ':' + str(os.getgid()), '--cpus', '2', '--memory', '4g', '--pids-limit', '256',
             '--mount', 'type=bind,src=' + str(work) + ',dst=/tmpfs/bun', '--mount', 'type=bind,src=' + str(ROOT) + ',dst=/recipes,readonly',
+            '--mount', 'type=bind,src=' + str(sdk) + ',dst=/opt/macos-sdk/MacOSX26.5.sdk,readonly',
             '--env', 'RECOVERY_ARCH=' + a.arch, '--entrypoint', '/bin/bash', profile['image'], '/recipes/build-bfs-cross.sh'])
         r = json.loads((work / 'native-library/receipt.json').read_bytes()); assert r['arch'] == a.arch
         host = work / 'native-library/bfs-library-host'; assert sha(host) == r['host_sha256']
@@ -67,7 +70,7 @@ def main():
             shutil.copyfile(work / 'build/release/deps/oniguruma/test' / name, tests / name)
         shutil.copyfile(work / 'embedded/oniguruma/COPYING', package / 'ONIGURUMA-LICENSE')
         shutil.copyfile(ROOT / ('expected-bfs-version-' + a.arch + '.txt'), package / 'expected-original-version.txt')
-        for name in ['build_bfs_cross.py', 'build-bfs-cross.sh', 'export_bfs_cross.py', 'macho_objects.py', 'private_symbols.py']:
+        for name in ['build_bfs_cross.py', 'build-bfs-cross.sh', 'export_bfs_cross.py', 'prepare_sdk.py', 'macos-sdk-pins.json', 'macho_objects.py', 'private_symbols.py']:
             shutil.copyfile(ROOT / name, package / name)
         receipt.update(status='public_macos_bfs_cross_source_library_built_native_acceptance_pending', native_library=r)
         (package / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')

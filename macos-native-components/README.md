@@ -10,7 +10,10 @@ load commands and malformed ranges fail explicitly.
 An empty translation unit may omit the symbol table. Such an object must have
 no relocation or dynamic-symbol references; its section bytes and metadata
 still receive the same comparison. Owned ARM64/x64 controls and an actual
-x64 7zip empty object pass, while 22 malformed or altered inputs are rejected.
+x64 7zip empty object pass. Data-in-code entries in MH_OBJECT use section VM
+addresses, as emitted by LLVM's MachObjectWriter; their ranges, lengths and
+types are verified too. Seven real renames pass and 32 malformed or altered
+inputs are rejected.
 
 This verifier accepts plain machine-code objects, not LLVM bitcode. It does not
 by itself qualify a Ugrep build or a recovered client. The initial owned
@@ -57,7 +60,11 @@ artifact paths. Intel version comparisons use the same machine for both
 programs because the upstream SSE2 banner depends on CPUID.
 
 `build_bfs_cross.py` compiles Bfs 4.1.1 and Oniguruma with the pinned Linux
-LLVM 23 image, the measured Darwin target flags, and its macOS 26.5 SDK path.
+LLVM 23 image and the measured Darwin target flags. `prepare_sdk.py` downloads
+the macOS 26.5 SDK from Apple's CDN, checks its pinned whole-package SHA-256
+and catalog XAR-TOC digest, and extracts it offline with hash-pinned upstream
+xmac. The SDK is mounted at the measured path and is not uploaded. The input
+package's Apple Software signature was also verified during qualification.
 It exports a fully checked private Mach-O C graph and compiled upstream test
 programs. `qualify_bfs_native.py` runs Oniguruma tests, Bfs unit tests, and the
 eight upstream integration strategies before and after replacing Bfs with a
