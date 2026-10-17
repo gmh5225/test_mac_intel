@@ -116,8 +116,9 @@ def main():
         receipt['llvm_tools'] = {}
         for name in ['llvm-nm.exe', 'lld-link.exe', 'llvm-ar.exe', 'llvm-lib.exe', 'llvm-objcopy.exe']:
             tool = toolbin / name; assert tool.is_file(), 'Incomplete pinned LLVM distribution'
-            run(name + '-version', [tool, '--version'])
-            assert '23.1.1' in (logs / (name + '-version.log')).read_text()
+            if name != 'llvm-lib.exe':  # MSVC lib-compatible driver has no --version query.
+                run(name + '-version', [tool, '--version'])
+                assert '23.1.1' in (logs / (name + '-version.log')).read_text()
             receipt['llvm_tools'][name] = dict(path=str(tool), sha256=sha(tool))
         cmake_archive = release('Kitware/CMake', 'v3.30.5', profile['cmake'], profile['cmake_sha256'])
         cmake_root = out / 'cmake'; unpack(cmake_archive, cmake_root)
@@ -144,6 +145,15 @@ def main():
         assert 'LLVM version: 23.' in (logs / 'rust-version.log').read_text()
         control = out / 'sdk-header-control.c'; control.write_text('#include <stdio.h>\nint main(void) { return 0; }\n')
         run('native-sdk-header-control', [toolbin / 'clang-cl.exe', '/nologo', '/Zs', '/TC', control])
+        obj = out / 'llvm-family-control.obj'; exe = out / 'llvm-family-control.exe'
+        run('llvm-family-compile-control', [toolbin / 'clang-cl.exe', '/nologo', '/c', '/O2',
+            '/clang:-flto=thin', '/Fo' + str(obj), control])
+        run('llvm-family-nm-control', [toolbin / 'llvm-nm.exe', obj])
+        assert 'main' in (logs / 'llvm-family-nm-control.log').read_text()
+        run('llvm-family-link-control', [toolbin / 'lld-link.exe', '/subsystem:console', '/entry:main',
+            '/nodefaultlib', '/out:' + str(exe), obj])
+        run('llvm-family-native-execution-control', [exe])
+        receipt['native_lto_family_control_sha256'] = sha(exe)
         run('public-bun-build', [bun, 'scripts/build.ts', '--profile=release', '--os=windows', '--arch=' + profile['build_arch'],
                                   '--build-dir=' + str(source / 'build/recovery'), '-j2'], source)
         binary = source / 'build/recovery/bun.exe'; raw = binary.read_bytes(); assert raw[:2] == b'MZ'
