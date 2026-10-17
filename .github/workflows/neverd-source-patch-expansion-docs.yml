@@ -1,0 +1,101 @@
+name: NeverD source patch expansion documentation
+run-name: Expansion documentation at ${{ inputs.source || '37989be8e7a7528bb5c9e11e1e22c132dc8d1af6' }}
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Exact NeverD documentation commit, after six native profiles are audited
+        type: string
+        required: true
+  push:
+    branches: [codex/source-patch-expansion]
+    paths: ['.github/workflows/neverd-source-patch-expansion-docs.yml']
+permissions:
+  contents: read
+env:
+  SOURCE_COMMIT: ${{ inputs.source || '37989be8e7a7528bb5c9e11e1e22c132dc8d1af6' }}
+  EXPECTED_PARENT: 8f92bf83e396f6726bcb49002ad83bfd32652991
+  FORMAT_BASE: 327dad40bf364551001b563f7820ae7cbd9b3839
+concurrency:
+  group: neverd-expansion-docs-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  docs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.SOURCE_COMMIT }}
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: '3.12'}
+      - name: Authenticate the exact 33 documentation files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib, json, os, pathlib, re, subprocess
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          source = os.environ['SOURCE_COMMIT']
+          parent = os.environ['EXPECTED_PARENT']
+          base = os.environ['FORMAT_BASE']
+          assert all(re.fullmatch('[0-9a-f]{40}', x) for x in (source, parent, base))
+          assert git('rev-parse', 'HEAD') == source
+          assert git('rev-list', '--parents', '-n', '1', 'HEAD').split() == [source, parent]
+          assert not git('status', '--porcelain', '--untracked-files=no')
+          subprocess.run(['git', 'merge-base', '--is-ancestor', base, source], check=True)
+          locales = ['', 'zh-CN', 'zh-TW', 'ja', 'ko', 'fr', 'de', 'es', 'it', 'ru', 'ar']
+          expected = sorted(str(pathlib.PurePosixPath('docs', locale, document + '.md'))
+                            for locale in locales
+                            for document in ('source-patching', 'architecture', 'testing'))
+          actual = sorted(git('diff', '--name-only', parent, source).splitlines())
+          assert actual == expected, (actual, expected)
+          evidence = pathlib.Path('expansion-doc-evidence')
+          evidence.mkdir()
+          record = {'source_commit': source, 'parent_commit': parent, 'format_base': base,
+                    'harness_repository': os.environ['GITHUB_REPOSITORY'],
+                    'harness_commit': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
+                    'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
+                    'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
+                    'workflow_sha': os.environ['GITHUB_WORKFLOW_SHA'],
+                    'files': {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in expected}}
+          (evidence / 'source.json').write_text(json.dumps(record, indent=2) + '\n')
+          PY
+      - name: Run documentation checker regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest scripts.tests.test_check_docs_i18n -v 2>&1 | tee expansion-doc-evidence/docs-tests.log
+      - name: Check every translated document
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_docs_i18n.py 2>&1 | tee expansion-doc-evidence/docs-check.log
+      - name: Install the pinned LLVM formatter
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-deps clang-format==22.1.2
+          clang-format --version | tee expansion-doc-evidence/formatter.log
+      - name: Run formatter checker regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest scripts.tests.test_check_clang_format -v 2>&1 | tee expansion-doc-evidence/format-tests.log
+      - name: Check the complete feature code diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/check_clang_format.py --base "$FORMAT_BASE" --head "$SOURCE_COMMIT" 2>&1 | tee expansion-doc-evidence/format-check.log
+      - name: Preserve documentation and format evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: expansion-docs-${{ env.SOURCE_COMMIT }}
+          path: expansion-doc-evidence
+          if-no-files-found: error

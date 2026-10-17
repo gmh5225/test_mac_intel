@@ -2,35 +2,8 @@
 #include <stdio.h>
 #include <unicorn/unicorn.h>
 
-#ifdef TRACE_HOST_FAILURE
-#include <windows.h>
-static LONG CALLBACK trace_exception(PEXCEPTION_POINTERS exception) {
-  static unsigned reports;
-  unsigned char bytes[16];
-  SIZE_T count = 0;
-  if (reports++ >= 16) return EXCEPTION_CONTINUE_SEARCH;
-  fprintf(stderr, "EXCEPTION code=%08lx pc=%p fault=%p\n",
-          exception->ExceptionRecord->ExceptionCode,
-          exception->ExceptionRecord->ExceptionAddress,
-          (void *)exception->ExceptionRecord->ExceptionInformation[1]);
-  if (ReadProcessMemory(GetCurrentProcess(),
-                        exception->ExceptionRecord->ExceptionAddress,
-                        bytes, sizeof(bytes), &count)) {
-    SIZE_T i;
-    fputs("PC BYTES", stderr);
-    for (i = 0; i < count; ++i) fprintf(stderr, " %02x", bytes[i]);
-    fputc('\n', stderr);
-  }
-  return EXCEPTION_CONTINUE_SEARCH;
-}
-#define TRACE(expression) fprintf(stderr, "RUN %d %s\n", __LINE__, #expression)
-#else
-#define TRACE(expression) ((void)0)
-#endif
-
 #define CHECK(expression)                                                      \
   do {                                                                         \
-    TRACE(expression);                                                         \
     if (!(expression)) {                                                       \
       fprintf(stderr, "check failed at line %d: %s\n", __LINE__, #expression); \
       return 1;                                                                \
@@ -74,10 +47,6 @@ int main(void) {
   const unsigned char outer[] = {0xb8, 5, 0, 0, 0, 0x90, 0x83, 0xc0, 3};
 
   setvbuf(stdout, NULL, _IONBF, 0);
-#ifdef TRACE_HOST_FAILURE
-  SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
-  AddVectoredExceptionHandler(1, trace_exception);
-#endif
 
   CHECK(open_image(&engine, normal, sizeof(normal)) == 0);
   CHECK(uc_emu_start(engine, base, base + sizeof(normal), 1000000, 1000) ==
