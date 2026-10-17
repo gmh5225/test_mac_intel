@@ -100,6 +100,9 @@ def main():
                    "--entrypoint", "/bin/bash",
                    profile["image"], "/recipes/build-runtime.sh"]
         run("bun-source-build", command)
+        duplicate_checks=re.findall(r"\[check\] bun-profile ([0-9]+) duplicate strong symbols",(logs/"bun-source-build.log").read_text())
+        assert duplicate_checks==["0"], "Native source graph has ambiguous duplicate strong-symbol ownership"
+        receipt["duplicate_strong_symbol_checks"]=dict(status="zero_duplicate_strong_symbols",count=0)
         binary = source / "build/recovery/bun"
         assert binary.is_file()
         data = binary.read_bytes()
@@ -218,6 +221,8 @@ def main():
         receipt.update(status="failed", error_type=type(error).__name__, error=str(error))
         raise
     finally:
+        for report in (source/"build/recovery").glob("*.duplicate-symbols.txt"):
+            if report.is_file():shutil.copyfile(report,logs/report.name)
         binary = source / "build/recovery/bun"
         if receipt["status"] == "failed" and binary.is_file():
             shutil.copyfile(binary, logs / "public-unqualified-bun")

@@ -22,6 +22,10 @@ def load_pins():
         assert selected['allocator_symbol_versions']==allocator_versions(arch)
         assert selected['native_rg_filename_control_cases']==768
         assert re.fullmatch('[0-9a-f]{64}',selected['native_rg_controls_sha256'])
+        if 'ugrep_source_manifest_sha256' in selected:
+            assert selected['duplicate_strong_symbols']==0
+            assert re.fullmatch('[0-9a-f]{64}',selected['ugrep_private_symbol_mapping_sha256'])
+            assert type(selected['ugrep_private_symbol_count']) is int and selected['ugrep_private_symbol_count']>100
     return data
 
 def pin(arch,binary,digest):
@@ -68,6 +72,9 @@ def admit(arch,artifact,output):
         assert sha(library/'MANIFEST.json')==expected['ugrep_source_manifest_sha256']
         assert qualify_ugrep(arch,library,receipt['profile']['image'])==receipt['ugrep_source_provenance']==receipt['source_patch']['ugrep_library_provenance']
         assert receipt['ugrep_exception_metadata_preserved'] and receipt['source_patch']['ugrep_exception_metadata_preserved']
+        assert receipt['duplicate_strong_symbol_checks']==dict(status='zero_duplicate_strong_symbols',count=0)
+        assert receipt['ugrep_source_provenance']['private_symbol_mapping_sha256']==expected['ugrep_private_symbol_mapping_sha256']
+        assert receipt['ugrep_source_provenance']['private_symbol_count']==expected['ugrep_private_symbol_count']
     assert receipt['native_source_provenance']['manifest_sha256']==expected['native_source_manifest_sha256']
     assert sha(artifact/'native-component-input-manifest.json')==expected['native_source_manifest_sha256']
     assert sha(artifact/'Cargo.lock')==receipt['resolved_cargo_lock_sha256']==expected['resolved_cargo_lock_sha256']
