@@ -9,6 +9,7 @@ from prepare_sysroot import prepare
 from build_linux import PROFILES
 sys.path.insert(0, str(ROOT.parent / 'runtime-helpers'))
 from build import unpack
+from stage_compat import prepare as prepare_compat
 
 
 def sha(path):
@@ -59,6 +60,7 @@ def main():
                     if member.isfile():
                         assert 0 <= member.mtime < 4102444800
                         os.utime(sources / row['name'] / member.name[len(row['prefix']):],(member.mtime,member.mtime),follow_symlinks=False)
+        receipt['outer_bun_compatibility_link']=prepare_compat(out/'compat')
         prepare(args.arch,out,logs)
         image = PROFILES[args.arch]['image']; docker_platform = PROFILES[args.arch]['docker_platform']
         run('compiler-pull',['docker','pull','--platform',docker_platform,image],900)
@@ -83,7 +85,8 @@ def main():
         package = out / 'public-ugrep-library'; package.mkdir()
         shutil.copytree(library,package / 'native-library'); shutil.copytree(inputs,package / 'source-inputs')
         shutil.copyfile(ROOT / ('expected-version-' + args.arch + '.txt'),package / 'expected-original-version.txt')
-        for name in ['build.py','build-library.py','README.md']:
+        shutil.copytree(out/'compat',package/'bun-compatibility')
+        for name in ['build.py','build-library.py','stage_compat.py','README.md']:
             shutil.copyfile(ROOT / name,package / name)
         for name in ['prepare_sysroot.py','glibc-sysroot-pins.json']:
             shutil.copyfile(ROOT.parent / 'bun-runtime' / name,package / name)

@@ -38,6 +38,14 @@ run('pthread-link-control',[logs/'pthread-link-control'])
 run('pthread-link-control-symbols',[toolbin/'llvm-nm','--defined-only',logs/'pthread-link-control'])
 thread_symbols={line.split()[-1] for line in (logs/'pthread-link-control-symbols.stdout').read_text().splitlines() if line.split()}
 assert {'pthread_cond_destroy','pthread_cond_wait','pthread_cond_signal','pthread_create','pthread_join'} <= thread_symbols
+compat=out/'compat'
+run('compile-bun-compat',[cxx,*ccflags.split(),'-std=c++20',*env['CXXFLAGS'].split(),'-c',compat/'compat.cpp','-o',compat/'compat.o'])
+outer_flags=['-Wl,--wrap=fcntl64','-Wl,--wrap=statx','-Wl,--gc-sections','-static-libstdc++','-static-libgcc','-Wl,--no-as-needed','-pthread','-ldl','-lm']
+for variant in ['native','fallback']:
+    extra=['-DRECOVERY_FORCE_OLD_FCNTL=1'] if variant=='fallback' else []
+    run('compile-compat-probe-'+variant,[compiler,*ccflags.split(),'-std=c11','-O2',*extra,'-c',compat/'compat-probe.c','-o',compat/('probe-'+variant+'.o')])
+    run('link-compat-probe-'+variant,[cxx,*ccflags.split(),compat/('probe-'+variant+'.o'),compat/'compat.o',*outer_flags,'-Wl,--wrap=dlsym','-o',compat/('probe-'+variant)])
+    run('compat-probe-'+variant,[compat/('probe-'+variant)])
 z=source/'zlib';run('zlib-configure',[z/'configure','--static','--prefix='+str(prefix)],z);make('zlib-build',z);make('zlib-check',z,'check');make('zlib-install',z,'install')
 b=source/'bzip2';make('bzip2-build',b,'libbz2.a','bzip2','bzip2recover','CC='+env['CC'],'AR='+env['AR'],'RANLIB='+env['RANLIB'],'CFLAGS='+env['CFLAGS']);make('bzip2-check',b,'test');make('bzip2-install',b,'install','PREFIX='+str(prefix))
 cmake('zstd',source/'zstd/build/cmake','-DZSTD_BUILD_SHARED=OFF','-DZSTD_BUILD_STATIC=ON','-DZSTD_BUILD_PROGRAMS=ON','-DZSTD_BUILD_TESTS=OFF','-DZSTD_ZLIB_SUPPORT=OFF','-DZSTD_LZMA_SUPPORT=OFF','-DZSTD_LZ4_SUPPORT=OFF')
@@ -90,7 +98,7 @@ for name in dependencies:
 host_source=library/'ugrep-library-host.c';host_source.write_text('extern int neverd_recovered_ugrep_main(int, char **);\nint main(int argc, char **argv) { return neverd_recovered_ugrep_main(argc, argv); }\n')
 run('compile-host',[compiler,*ccflags.split(),'-O2','-c',host_source,'-o',library/'host.o'])
 host=library/'ugrep-library-host'
-run('link-host',[cxx,*ccflags.split(),library/'host.o','-Wl,--start-group',archive,*[library/('lib'+name+'.a') for name in dependencies],'-Wl,--end-group','-static-libstdc++','-static-libgcc','-Wl,--gc-sections','-Wl,--no-as-needed','-pthread','-lm','-o',host])
+run('link-host',[cxx,*ccflags.split(),library/'host.o',compat/'compat.o','-Wl,--start-group',archive,*[library/('lib'+name+'.a') for name in dependencies],'-Wl,--end-group',*outer_flags,'-o',host])
 fixture=library/'input.txt';fixture.write_bytes(b'first\nNEEDLE\npreneedle\n');compressed=library/'input.gz';compressed.write_bytes(gzip.compress(fixture.read_bytes(),mtime=0))
 def limits():resource.setrlimit(resource.RLIMIT_FSIZE,(0,0));resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 controls=[]
@@ -109,5 +117,5 @@ assert all(sha(p)==sha(host) for p in [ug/'src/ugrep',ug/'bin/ugrep']),'Upstream
 receipt=dict(status='ugrep_source_library_host_and_upstream_checks_passed',entry_symbol='neverd_recovered_ugrep_main',source_objects=len(paths),
     main_text_unchanged=True,main_text_sha256=sha(before),library_sha256=sha(archive),host_sha256=sha(host),controls=controls,commands=commands,
     original_binary_reused=False,dependency_archives={name:sha(library/('lib'+name+'.a')) for name in dependencies},zstd_upstream_suite_run=False,
-    static_pthread_condition_variable_control_passed=True)
+    static_pthread_condition_variable_control_passed=True,public_bun_compatibility_controls_passed=True)
 (library/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')

@@ -25,3 +25,8 @@ libstdc++ uses weak condition-variable references, which otherwise do not select
 their implementations from the focal pthread archive. A real threaded
 condition-variable control and defined-symbol checks run before compilation.
 The final library host retains its dynamic pthread dependency explicitly.
+
+The host uses the same unchanged, hash-pinned public Bun fcntl64/statx
+compatibility functions as the qualified Bfs producer. Native forwarding and
+forced old-symbol fallback controls run before building Ugrep. The component
+objects retain their original references for Bun's existing outer wrappers.
