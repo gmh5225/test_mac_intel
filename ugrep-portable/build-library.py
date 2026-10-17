@@ -83,7 +83,9 @@ assert before.read_bytes()==after.read_bytes()
 archive=library/'librecovered_ugrep.a';run('export-library',[toolbin/'llvm-ar','rcs',archive,*paths])
 dependencies=['reflex','viiz','pcre2-8','z','bz2','zstd','brotlidec','brotlicommon']
 for name in dependencies:
-    original=ug/'lib'/('lib'+name+'.a') if name in ['reflex','viiz'] else prefix/'lib'/('lib'+name+'.a')
+    if name=='reflex':original=ug/'lib/libreflex.a'
+    elif name=='viiz':original=ug/'lzma/C/libviiz.a'
+    else:original=prefix/'lib'/('lib'+name+'.a')
     assert original.is_file();shutil.copyfile(original,library/('lib'+name+'.a'))
 host_source=library/'ugrep-library-host.c';host_source.write_text('extern int neverd_recovered_ugrep_main(int, char **);\nint main(int argc, char **argv) { return neverd_recovered_ugrep_main(argc, argv); }\n')
 run('compile-host',[compiler,*ccflags.split(),'-O2','-c',host_source,'-o',library/'host.o'])
