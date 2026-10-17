@@ -21,3 +21,32 @@ archive member identities/order and the full external symbol set are also
 checked. An owned graph containing C, C++, TLS and ARM64 explicit addends
 passes through the real archive rewrite path. Injecting a code-byte change
 inside that path is rejected before the graph can be accepted.
+
+`build_ugrep.py` builds Ugrep 7.8.4 and six pinned source dependencies on native
+macOS ARM64 or Intel. Apple Clang 17 emits plain machine-code objects against
+the macOS 15.5 SDK, with a macOS 13.0 deployment floor. Hash-pinned LLVM 23
+archive, symbol and object-copy tools come from the dated Rust distribution;
+staging them never invokes rustup. The component's C++ headers come from the
+same SDK used by the public Bun source baseline.
+
+The producer checks the complete observed version banner, runs the upstream
+suites, renames every component-defined C symbol into a private namespace,
+and reruns Ugrep's suite using a fresh library host. Its owned runtime controls
+also cover PCRE, gzip and an invalid regular expression under a zero file-size
+budget. C++ names retain their SDK runtime ABI.
+
+The outer engine link must retain compact unwind. Apple ld with
+`-no_compact_unwind` discards the ARM64 exception control's only unwind table,
+causing an otherwise caught exception to terminate the process. The component
+host checks for `__unwind_info` and catches a real exception before proceeding.
+The existing public engine baseline has not yet received that integration
+patch. A source library does not establish recovered client acceptance or
+prove the original transitive dependency versions.
+
+`compare_ugrep.py` first verifies authored Seatbelt, argument transport and
+output-budget controls. It then checks 13 exact native Ugrep comparisons
+against the hash-pinned published original, including Unicode/newline paths,
+stdin, invalid regex, PCRE and four compression formats. Only bounded
+diagnostics are uploaded; captured executables and source stay outside the
+artifact paths. Intel version comparisons use the same machine for both
+programs because the upstream SSE2 banner depends on CPUID.
