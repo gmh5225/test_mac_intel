@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import platform
+import re
 import shutil
 import struct
 import subprocess
@@ -50,25 +51,35 @@ def main():
     # the revision of the public source checkout it actually compiles.
     for name in ['GITHUB_SHA', 'BUILDKITE_COMMIT', 'GIT_SHA']:
         env.pop(name, None)
+    api_token = env.pop('GH_TOKEN', None)
+    env.pop('GITHUB_TOKEN', None)
     record = dict(status='started', target_arch=args.arch, build_host_arch='arm64',
                   public_bun_commit=COMMIT, commands=[], captured_client_executed=False,
                   recovered_native_roles_integrated=False, original_prefix_reused=False,
                   original_private_revision_recovered=False, goal_complete=False)
 
-    def run(label, argv, cwd=None):
+    def run(label, argv, cwd=None, private_input=None):
         argv = list(map(str, argv)); record['commands'].append(dict(label=label, argv=argv))
         print('Starting ' + label, flush=True)
         with (logs / (label + '.log')).open('xb') as stream:
-            process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                       stdin=subprocess.PIPE if private_input is not None else subprocess.DEVNULL)
+            if private_input is not None:
+                process.stdin.write(private_input)
+                process.stdin.close()
             for block in iter(lambda: process.stdout.read(65536), b''):
                 stream.write(block); stream.flush(); sys.stdout.buffer.write(block); sys.stdout.buffer.flush()
             code = process.wait()
         assert code == 0, label + ' failed; inspect retained diagnostics'
 
     def download(url, dest):
+        config = 'url = ' + json.dumps(url) + '\n'
+        if url.startswith('https://api.github.com/repos/'):
+            assert api_token is not None and re.fullmatch('[A-Za-z0-9_]+', api_token)
+            config += 'header = ' + json.dumps('Authorization: Bearer ' + api_token) + '\n'
         argv = ['curl', '--http1.1', '--fail', '--location', '--silent', '--show-error',
-                '--retry', '3', '--max-time', '900', '--output', str(dest), url]
-        run('download-' + dest.name, argv)
+                '--retry', '3', '--max-time', '900', '--output', str(dest), '--config', '-']
+        run('download-' + dest.name, argv, private_input=config.encode())
 
     def release(repo, tag, asset_name, pinned_digest=None, pinned_bytes=None):
         meta_path = inputs / (asset_name + '.release.json')
