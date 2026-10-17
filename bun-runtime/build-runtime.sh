@@ -30,13 +30,17 @@ make -j2
 make check
 make install
 cd /output/bun-source
-export PCRE2_SYS_STATIC=1
+# Permit pkg-config to select the exact external source build. The sys crate's
+# STATIC=1 means "ignore pkg-config and compile bundled PCRE2", not static link.
+export PCRE2_SYS_STATIC=0
 export PKG_CONFIG_ALL_STATIC=1
 export PKG_CONFIG_PATH="$native/pcre2-install/lib/pkgconfig"
+test "$(pkg-config --modversion libpcre2-8)" = 10.45
+pkg-config --static --cflags --libs libpcre2-8
 export GIT_CEILING_DIRECTORIES=/output/bun-source/recovery-native
 # Both native bootstrap plans independently resolved this exact retained lock.
 # Normal preparation and the complete build now remain locked from the start.
 cp Cargo.lock /output/diagnostics/resolved-Cargo.lock
 bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery --target rust-plan -j2
 python3 /recipes/verify_rust_plan.py build/recovery/rust-target/plan.json /output/diagnostics/single-rust-graph.json
-bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery -j2
+bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery -j4

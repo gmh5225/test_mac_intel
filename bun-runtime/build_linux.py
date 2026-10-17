@@ -83,6 +83,7 @@ def main():
         assert versions and max(versions) <= (2, 17), "Source engine exceeds the upstream glibc portability floor"
         receipt["maximum_core_glibc_requirement"] = ".".join(map(str, max(versions)))
         controls = []
+        receipt["authored_controls"] = controls
         fixture = out / "native-search-fixture.txt"; fixture.write_text("first\nNEEDLE\npreneedle\n")
         for label, argv0, role, argv, expected_code, expected_text in [
             ("runtime-version", str(binary), None, ["--version"], 0, "1.4.3"),
@@ -113,7 +114,7 @@ def main():
             controls.append(row)
             assert result.returncode == expected_code and expected_text in stdout + stderr, label
             if label == "rg-environment":
-                assert "(rev " not in stdout and "PCRE2 10.45 is available (JIT is available)" in stdout
+                assert "(rev " not in stdout and "PCRE2 10.45 is available (JIT is available)" in stdout, "rg used a different PCRE2 runtime or leaked a parent revision"
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
         for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "verify_rust_plan.py", "resolved-Cargo.lock"]:
@@ -141,6 +142,10 @@ def main():
         receipt.update(status="failed", error_type=type(error).__name__, error=str(error))
         raise
     finally:
+        binary = source / "build/recovery/bun"
+        if receipt["status"] == "failed" and binary.is_file():
+            shutil.copyfile(binary, logs / "public-unqualified-bun")
+            receipt["unqualified_runtime_sha256"] = sha(binary)
         plan = source / "build/recovery/rust-target/plan.json"
         if plan.is_file(): shutil.copyfile(plan, logs / "rust-plan.json")
         lock = source / "Cargo.lock"
