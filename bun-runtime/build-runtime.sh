@@ -34,8 +34,8 @@ export PCRE2_SYS_STATIC=1
 export PKG_CONFIG_ALL_STATIC=1
 export PKG_CONFIG_PATH="$native/pcre2-install/lib/pkgconfig"
 export GIT_CEILING_DIRECTORIES=/output/bun-source/recovery-native
-# Resolve only the added public crate graph. The final plan/build is locked.
-RECOVERY_BOOTSTRAP_RUST_LOCK=1 bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery --target rust-plan -j2
+# Both native bootstrap plans independently resolved this exact retained lock.
+# Normal preparation and the complete build now remain locked from the start.
 cp Cargo.lock /output/diagnostics/resolved-Cargo.lock
 bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery --target rust-plan -j2
 python3 /recipes/verify_rust_plan.py build/recovery/rust-target/plan.json /output/diagnostics/single-rust-graph.json

@@ -20,12 +20,20 @@ integrated.
 Standalone Rust/C hosts passed seven RLIMIT_FSIZE=0 controls. The first full Bun
 link rejected those separately compiled archives: Bun rebuilds std with its own
 features and flags. The replacement stages the pinned public rg/PCRE2 source
-archives and ABI wrapper into the same Rust graph. A bootstrap `rust-plan` step
-resolves the added dependency lock without compiling the engine; the final plan
-and build use --locked. A pre-build graph verifier requires one target std,
+archives and ABI wrapper into the same Rust graph. Two native bootstrap plans
+resolved the same effective Cargo.lock, preserving every original package and
+checksum while adding 24 packages. That exact lock is now an input, so all
+planning and compilation use --locked with the public Rust planner unchanged.
+A pre-build graph verifier requires one target std,
 the actual rg dependency edge and the pinned PCRE2 overlay source. The effective
 Cargo.lock and complete plan are retained for independent readback and repeat
 build qualification.
+
+The shared graph compiled rg on both architectures before exposing six Bun
+`as _` comparisons whose inference became ambiguous with serde_json's trait
+implementations. Exact source hashes and line identities gate explicit i32
+address-family and u16 SystemError casts. Separate i32 syscall errors are not
+rewritten. The actual engine compile and execution gates still have to pass.
 
 The earlier embedded-ELF strategy failed real Bash when materializing a payload
 exceeded the inherited 256 KiB hard file limit. That strategy is rejected. The

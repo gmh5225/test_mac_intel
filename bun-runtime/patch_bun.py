@@ -14,6 +14,8 @@ CARGO_SHA256 = "495f3ec9e82d180b395d9b9af3cc4a3522c98bac387d3b0c8f2af647712e7c60
 RUNTIME_CARGO_SHA256 = "6dd4d57202c8153c7c1e58057802b46e21f20ba2da5363884de7769ed476086d"
 RUST_BUILD_SHA256 = "60be0343740db96380bca663c4d06875945ef59aeba97e8ea03e4e01b91ddb68"
 GLOBS_SHA256 = "21f9a8a7073b3a780b65ed402ef172766ecfdf5c8ec0ba2274c0b54d41b0eec7"
+BASE_LOCK_SHA256 = "10c44ac0a3662b7ee64b0d925b2d8728e8e3031485066e404b5b31379a342b3e"
+RESOLVED_LOCK_SHA256 = "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723"
 OLD = "    unsafe { bun_core::init_argv(argc, argv) };\n"
 NEW = OLD + '''
     // Recovered Linux multicall boundary, before threads and cached env reads.
@@ -36,9 +38,13 @@ def patch(source, evidence, native_package=None):
     assert native_package is not None, "qualified direct native libraries are required"
     native_package = Path(native_package)
     additional = [("Cargo.toml", CARGO_SHA256), ("src/runtime/Cargo.toml", RUNTIME_CARGO_SHA256),
-                  ("scripts/build/rust.ts", RUST_BUILD_SHA256), ("scripts/glob-sources.ts", GLOBS_SHA256)]
+                  ("scripts/build/rust.ts", RUST_BUILD_SHA256), ("scripts/glob-sources.ts", GLOBS_SHA256),
+                  ("Cargo.lock", BASE_LOCK_SHA256),
+                  ("src/runtime/dns_jsc/options_jsc.rs", "960c957481b0e97a688ed947ccf480dd13b0dd94285fbd45894ace7dae54fc47"),
+                  ("src/runtime/node/node_fs.rs", "09039025d7da37aceec165fd5177caea7e721da3e8c97dc675d4b1035e7bd0dd")]
     for rel, digest in additional:
         assert sha(source / rel) == digest, "unqualified Bun Rust graph input: " + rel
+    assert sha(ROOT / "resolved-Cargo.lock") == RESOLVED_LOCK_SHA256
     native_files = [native_package / name for name in ["apply-seccomp.c", "unix-block-bpf.h", "recovery_lib.rs"]]
     assert all(path.is_file() and not path.is_symlink() for path in native_files)
     native_root = source / "recovery-native"
@@ -64,19 +70,28 @@ def patch(source, evidence, native_package=None):
 [target.'cfg(target_os = "linux")'.dependencies]
 recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep", features = ["pcre2"] }
 '''
-    rust_build = source / "scripts/build/rust.ts"; rust_before = rust_build.read_text()
-    locked = '    "--locked",\n  ];\n'
-    assert rust_before.count(locked) == 1
-    rust_after = rust_before.replace(locked, '''    ...(process.env.RECOVERY_BOOTSTRAP_RUST_LOCK === "1" ? [] : ["--locked"]),
-  ];
-''')
     globs = source / "scripts/glob-sources.ts"; globs_before = globs.read_text()
     anchor = '      "src/**/Cargo.toml",\n'; assert globs_before.count(anchor) == 1
     globs_after = globs_before.replace(anchor, anchor + '      "recovery-native/**/*.rs",\n      "recovery-native/**/Cargo.toml",\n')
+    # The added serde_json trait implementations expose previously ambiguous
+    # `as _` comparisons. Use the actual i32 family/u16 SystemError field types;
+    # hash-gated line identities avoid changing the separate i32 syscall errors.
+    type_patches = []
+    for label, rel, numbers, old, new in [
+        ("dns-type", "src/runtime/dns_jsc/options_jsc.rs", [226, 227], " as _ =>", " as i32 =>"),
+        ("fs-type", "src/runtime/node/node_fs.rs", [1598, 2015, 8236, 8364], "E::EEXIST as _", "E::EEXIST as u16")]:
+        before_type = (source / rel).read_text(); lines = before_type.splitlines(True)
+        for number in numbers:
+            assert lines[number - 1].count(old) == 1
+            lines[number - 1] = lines[number - 1].replace(old, new)
+        type_patches.append((label, rel, before_type, "".join(lines)))
+    lock_before = (source / "Cargo.lock").read_text()
+    lock_after = (ROOT / "resolved-Cargo.lock").read_text()
     stage(native_package, native_root)
     entry.write_text(after); build.write_text(build_after)
     root_cargo.write_text(root_after); runtime_cargo.write_text(runtime_after)
-    rust_build.write_text(rust_after); globs.write_text(globs_after)
+    globs.write_text(globs_after); (source / "Cargo.lock").write_text(lock_after)
+    for _, rel, _, after_type in type_patches: (source / rel).write_text(after_type)
     copied = []
     for name in ["role_contract.rs", "recovered_multicall.rs"]:
         destination = entry.parent / name
@@ -94,8 +109,8 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
     for label, rel, old, new in [
         ("cargo", "Cargo.toml", root_before, root_after),
         ("runtime-cargo", "src/runtime/Cargo.toml", runtime_before, runtime_after),
-        ("rust-plan", "scripts/build/rust.ts", rust_before, rust_after),
-        ("source-globs", "scripts/glob-sources.ts", globs_before, globs_after)]:
+        ("source-globs", "scripts/glob-sources.ts", globs_before, globs_after),
+        ("cargo-lock", "Cargo.lock", lock_before, lock_after), *type_patches]:
         patch_file = evidence / (label + ".patch")
         patch_file.write_text("".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), fromfile="public-bun/" + rel, tofile="recovered-bun/" + rel)))
         graph_patches.append({"file": rel, "before_sha256": hashlib.sha256(old.encode()).hexdigest(), "after_sha256": sha(source / rel), "patch_sha256": sha(patch_file)})
@@ -104,6 +119,8 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
                "original_prefix_reused": False, "original_erased_types_claimed": False,
                "build_sha256_before": BUILD_SHA256, "build_sha256_after": sha(build),
                "build_patch_sha256": sha(evidence / "build.patch"), "rust_graph_patches": graph_patches,
+               "resolved_cargo_lock_sha256": RESOLVED_LOCK_SHA256,
+               "upstream_rust_planner_sha256": sha(source / "scripts/build/rust.ts"),
                "compiled_native_archive_used": False,
                "native_inputs": [{"file": p.relative_to(native_root).as_posix(), "sha256": sha(p)}
                                  for p in sorted(native_root.rglob("*")) if p.is_file()],
