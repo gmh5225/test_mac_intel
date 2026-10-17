@@ -176,6 +176,11 @@ def main():
                 evidence.mkdir(parents=True)
                 for name in ["events.jsonl", "observer-worker.json"]:
                     if (state / name).is_file(): shutil.copyfile(state / name, evidence / name)
+                workspace = {path.relative_to(state).as_posix(): {
+                    "hex": path.read_bytes().hex(), "mode": oct(path.stat().st_mode & 0o777)}
+                    for path in state.rglob("*") if path.is_file()
+                    and path.name not in ["events.jsonl", "observer-worker.json"]}
+                (evidence / "workspace-files.json").write_text(json.dumps(workspace, indent=2) + "\n")
             if role:
                 first, separator, rest = result["stdout"].partition("\n")
                 prefix = "NEVERD_OUTER_NAMESPACE "
