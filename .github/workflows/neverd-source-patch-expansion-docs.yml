@@ -1,5 +1,5 @@
 name: NeverD source patch expansion documentation
-run-name: Expansion documentation at ${{ inputs.source || '37989be8e7a7528bb5c9e11e1e22c132dc8d1af6' }}
+run-name: Expansion documentation at ${{ inputs.source || 'a4219c90b38931d921e03a58589755b872893a1c' }}
 on:
   workflow_dispatch:
     inputs:
@@ -13,9 +13,11 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '37989be8e7a7528bb5c9e11e1e22c132dc8d1af6' }}
-  EXPECTED_PARENT: 8f92bf83e396f6726bcb49002ad83bfd32652991
-  FORMAT_BASE: 327dad40bf364551001b563f7820ae7cbd9b3839
+  SOURCE_COMMIT: ${{ inputs.source || 'a4219c90b38931d921e03a58589755b872893a1c' }}
+  EXPECTED_PARENT: 37989be8e7a7528bb5c9e11e1e22c132dc8d1af6
+  FORMAT_BASE: d9903f283cab5773e467d1882871f5e6778bea46
+  DOCUMENTATION_COMMIT: 37989be8e7a7528bb5c9e11e1e22c132dc8d1af6
+  DOCUMENTATION_PARENT: 8f92bf83e396f6726bcb49002ad83bfd32652991
 concurrency:
   group: neverd-expansion-docs-${{ github.run_id }}
   cancel-in-progress: false
@@ -44,25 +46,37 @@ jobs:
           source = os.environ['SOURCE_COMMIT']
           parent = os.environ['EXPECTED_PARENT']
           base = os.environ['FORMAT_BASE']
-          assert all(re.fullmatch('[0-9a-f]{40}', x) for x in (source, parent, base))
+          documentation = os.environ['DOCUMENTATION_COMMIT']
+          documentation_parent = os.environ['DOCUMENTATION_PARENT']
+          assert all(re.fullmatch('[0-9a-f]{40}', x) for x in (source, parent, base, documentation, documentation_parent))
           assert git('rev-parse', 'HEAD') == source
-          assert git('rev-list', '--parents', '-n', '1', 'HEAD').split() == [source, parent]
+          assert git('rev-list', '--parents', '-n', '1', 'HEAD').split() == [source, parent, base]
+          assert git('rev-list', '--parents', '-n', '1', documentation).split() == [documentation, documentation_parent]
+          assert git('merge-tree', '--write-tree', parent, base).splitlines()[0] == git('rev-parse', 'HEAD^{tree}')
           assert not git('status', '--porcelain', '--untracked-files=no')
           subprocess.run(['git', 'merge-base', '--is-ancestor', base, source], check=True)
           locales = ['', 'zh-CN', 'zh-TW', 'ja', 'ko', 'fr', 'de', 'es', 'it', 'ru', 'ar']
           expected = sorted(str(pathlib.PurePosixPath('docs', locale, document + '.md'))
                             for locale in locales
                             for document in ('source-patching', 'architecture', 'testing'))
-          actual = sorted(git('diff', '--name-only', parent, source).splitlines())
+          actual = sorted(git('diff', '--name-only', documentation_parent, documentation).splitlines())
           assert actual == expected, (actual, expected)
+          current = sorted(p for p in git('diff', '--name-only', base, source, '--', 'docs').splitlines() if p in expected)
+          assert current == expected
+          for p in expected:
+              if p.endswith('source-patching.md'):
+                  assert git('rev-parse', source + ':' + p) == git('rev-parse', documentation + ':' + p)
           evidence = pathlib.Path('expansion-doc-evidence')
           evidence.mkdir()
-          record = {'source_commit': source, 'parent_commit': parent, 'format_base': base,
+          record = {'source_commit': source, 'parent_commit': parent, 'integrated_dev_commit': base,
+                    'documentation_commit': documentation, 'documentation_parent': documentation_parent,
+                    'source_tree': git('rev-parse', 'HEAD^{tree}'), 'format_base': base,
                     'harness_repository': os.environ['GITHUB_REPOSITORY'],
                     'harness_commit': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
                     'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
                     'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
                     'workflow_sha': os.environ['GITHUB_WORKFLOW_SHA'],
+                    'documentation_files': {p: hashlib.sha256(subprocess.check_output(['git', 'show', documentation + ':' + p])).hexdigest() for p in expected},
                     'files': {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in expected}}
           (evidence / 'source.json').write_text(json.dumps(record, indent=2) + '\n')
           PY
