@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--arch', choices=PROFILES, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--source-inputs', type=Path)
     args = parser.parse_args()
     assert platform.system() == 'Linux' and {'x86_64': 'x64', 'aarch64': 'arm64'}[platform.machine()] == args.arch
     out = args.output.resolve(); out.mkdir(); logs = out / 'diagnostics'; logs.mkdir()
@@ -29,6 +30,7 @@ def main():
     assert {row['name'] for row in selected} == names
     receipt = dict(status='started',arch=args.arch,source_inputs=selected,compiler_image=PROFILES[args.arch]['image'],
                    captured_client_executed=False,original_binary_reused=False,exact_original_transitive_versions_proven=False,commands=[])
+    receipt['source_archive_provider']='verified input archives' if args.source_inputs else 'pinned public upstream URLs'
 
     def run(label, command, timeout=1800):
         receipt['commands'].append(dict(label=label,argv=list(map(str,command))))
@@ -40,9 +42,14 @@ def main():
     try:
         for row in selected:
             archive = inputs / (row['name'] + '.tar.gz')
-            with urllib.request.urlopen(row['url'],timeout=90) as response:
-                raw = response.read(16777217)
-            assert len(raw) <= 16777216 and hashlib.sha256(raw).hexdigest() == row['sha256']
+            if args.source_inputs:
+                original=args.source_inputs/(row['name']+'.tar.gz')
+                assert original.is_file() and not original.is_symlink()
+                raw=original.read_bytes()
+            else:
+                with urllib.request.urlopen(row['url'],timeout=90) as response:
+                    raw = response.read(16777217)
+            assert len(raw) <= 16777216 and hashlib.sha256(raw).hexdigest() == row['sha256'], 'Pinned source archive mismatch: '+row['name']
             if 'bytes' in row: assert len(raw) == row['bytes']
             archive.write_bytes(raw); unpack(archive,sources / row['name'],row['prefix'])
             # Preserve autotools release timestamp relationships.

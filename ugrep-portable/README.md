@@ -14,3 +14,8 @@ the library host, raw controls and compiler identities are retained. The Zstd
 upstream test suite is not run. Exact original dependency versions, Bun dispatch
 integration and complete-client acceptance remain separate open requirements.
 No captured client or source is executed or uploaded by this producer.
+
+CI obtains the public source archives from the independently qualified component
+producer 38986089116 and rechecks each original pinned hash before extraction.
+It consumes six source tarballs from that package. All C/C++ objects and libraries
+are freshly rebuilt; the package's candidate executables are not build inputs.

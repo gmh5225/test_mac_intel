@@ -8,6 +8,7 @@ on:
       - .github/workflows/claude-ugrep-portable.yml
 permissions:
   contents: read
+  actions: read
 jobs:
   build:
     name: Native ${{ matrix.arch }} portable Ugrep source library
@@ -28,8 +29,15 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
+      - name: Obtain the already qualified public source archives
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-extra-native-components-1
+          path: retained-public-source-inputs
+          run-id: 38986089116
+          github-token: ${{ github.token }}
       - name: Build and check the portable source library
-        run: python3 -B ugrep-portable/build.py --arch ${{ matrix.arch }} --output ugrep-portable-build
+        run: python3 -B ugrep-portable/build.py --arch ${{ matrix.arch }} --source-inputs retained-public-source-inputs --output ugrep-portable-build
       - name: Retain public source library and host
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
