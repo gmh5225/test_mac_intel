@@ -13,8 +13,9 @@ def verify(runtime, output, repetitions=32):
     output = Path(output)
     output.mkdir()
     rows = []
+    fixtures = []
     receipt = dict(status="started",runtime_sha256=digest,repetitions=repetitions,
-                   rlimit_fsize=0,captured_client_executed=False,results=rows)
+                   rlimit_fsize=0,captured_client_executed=False,results=rows,fixtures=fixtures)
     environment = dict(os.environ, BUN_RUNTIME_TRANSPILER_CACHE_PATH="0")
     environment.pop("ARGV0", None)
 
@@ -23,9 +24,11 @@ def verify(runtime, output, repetitions=32):
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
 
     try:
-        for name in ["input.txt", "space \u96ea\ninput.txt"]:
+        for index, name in enumerate(["input.txt", "space \u96ea\ninput.txt"]):
             fixture = output / name
             fixture.write_bytes(b"target\nother\ntarget\n")
+            fixtures.append(dict(runtime_name=name,retained_file=f"fixture-{index}.bin",
+                                 bytes=fixture.stat().st_size,sha256=hashlib.sha256(fixture.read_bytes()).hexdigest()))
             with fixture.open("rb") as inherited:
                 for transport in ["path", "inherited-fd"]:
                     path = str(fixture) if transport == "path" else "/proc/self/fd/" + str(inherited.fileno())
@@ -64,4 +67,12 @@ def verify(runtime, output, repetitions=32):
         receipt.update(status="failed",error_type=type(error).__name__,error=str(error))
         raise
     finally:
+        # The runtime must see the original newline/Unicode names. Artifact
+        # transports reject those names, so retain exact bytes under ASCII
+        # names and bind the original spelling in the raw receipt.
+        for fixture in fixtures:
+            original=output/fixture['runtime_name'];retained=output/fixture['retained_file']
+            assert original.is_file() and not original.is_symlink() and not retained.exists()
+            assert original.stat().st_size==fixture['bytes'] and hashlib.sha256(original.read_bytes()).hexdigest()==fixture['sha256']
+            original.rename(retained)
         (output / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
