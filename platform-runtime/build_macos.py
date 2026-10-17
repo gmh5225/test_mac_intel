@@ -75,19 +75,26 @@ def main():
                   recovered_native_roles_integrated=False, original_prefix_reused=False,
                   original_private_revision_recovered=False, goal_complete=False)
 
-    def run(label, argv, cwd=None, private_input=None):
+    def run(label, argv, cwd=None, private_input=None, direct_log=False):
         argv = list(map(str, argv)); record['commands'].append(dict(label=label, argv=argv))
         print('Starting ' + label, flush=True)
         with (logs / (label + '.log')).open('xb') as stream:
-            process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            process = subprocess.Popen(argv, cwd=cwd, env=env, stdout=stream if direct_log else subprocess.PIPE, stderr=subprocess.STDOUT,
                                        stdin=subprocess.PIPE if private_input is not None else subprocess.DEVNULL)
             if private_input is not None:
                 process.stdin.write(private_input)
                 process.stdin.close()
-            for block in iter(lambda: process.stdout.read(65536), b''):
-                stream.write(block); stream.flush(); sys.stdout.buffer.write(block); sys.stdout.buffer.flush()
+            if not direct_log:
+                for block in iter(lambda: process.stdout.read(65536), b''):
+                    stream.write(block); stream.flush(); sys.stdout.buffer.write(block); sys.stdout.buffer.flush()
             code = process.wait()
-        assert code == 0, label + ' failed; inspect retained diagnostics'
+        if direct_log:
+            # Bun's CI annotation wrapper exits with queued pipe writes on a
+            # large failed link. A regular log FD retains the complete output.
+            with (logs / (label + '.log')).open('rb') as stream:
+                stream.seek(max(0, (logs / (label + '.log')).stat().st_size - 12000))
+                sys.stdout.buffer.write(stream.read()); sys.stdout.buffer.flush()
+        assert code == 0, label + ' failed with exit ' + str(code) + '; inspect retained diagnostics'
 
     def download(url, dest):
         argv = ['curl', '--http1.1', '--fail', '--location', '--silent', '--show-error',
@@ -128,6 +135,7 @@ def main():
         toolbin = compilers[0].parent
         assert (toolbin / 'llvm-ar').is_file() and (toolbin / 'ld64.lld').is_file()
         env['PATH'] = str(toolbin) + os.pathsep + env['PATH']
+        env['BUN_TOOLCHAIN_LLVM'] = str(toolbin.parent)
         run('clang-version', [toolbin / 'clang++', '--version'])
         assert 'clang version 23.1.1' in (logs / 'clang-version.log').read_text()
         record['compiler'] = dict(version=LLVM_VERSION, clang_sha256=sha(toolbin / 'clang'),
@@ -221,7 +229,7 @@ def main():
         build_arch = 'aarch64' if args.arch == 'arm64' else 'x64'
         run('public-bun-build', [bun, 'scripts/build.ts', '--profile=release', '--arch=' + build_arch,
                                   '--os=darwin', '--osx-deployment-target=13.0',
-                                  '--build-dir=' + str(source / 'build/recovery'), '-j4', *extra_flags], source)
+                                  '--build-dir=' + str(source / 'build/recovery'), '-j4', *extra_flags], source, direct_log=True)
         binary = source / 'build/recovery/bun'; assert binary.is_file()
         raw = binary.read_bytes()
         assert struct.unpack_from('<II', raw) == (0xfeedfacf, {'arm64': 0x100000c, 'x64': 0x1000007}[args.arch])
@@ -245,6 +253,11 @@ def main():
         record.update(status='platform_baseline_failed_not_admitted', error_type=type(error).__name__, error=str(error))
         raise
     finally:
+        build = out / 'bun-source/build/recovery'
+        for name in ['build.ninja', 'bun-profile.rsp', 'bun.rsp', 'configure.json']:
+            path = build / name
+            if path.is_file() and path.stat().st_size <= 8 * 1024 * 1024:
+                shutil.copyfile(path, logs / name)
         (logs / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
 
 

@@ -50,6 +50,7 @@ jobs:
   native-intel:
     name: Native Intel execution of the public source baseline
     needs: build
+    if: ${{ always() && !cancelled() }}
     runs-on: macos-15-intel
     timeout-minutes: 10
     steps:
