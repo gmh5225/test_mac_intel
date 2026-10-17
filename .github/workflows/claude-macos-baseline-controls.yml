@@ -53,7 +53,9 @@ jobs:
         if: always()
         with:
           name: native-darwin-${{ inputs.arch || 'x64' }}-baseline-owned-controls-${{ github.run_attempt }}
-          path: native-controls/
+          path: |
+            native-controls/*.json
+            native-controls/owned-entry.js
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
