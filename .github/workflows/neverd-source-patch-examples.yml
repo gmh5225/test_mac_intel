@@ -1,5 +1,5 @@
 name: NeverD runnable source patch examples
-run-name: Native examples at ${{ inputs.source || '6fcce147777d268496e02ccd5a1e31cc5da2dda9' }}
+run-name: Native examples at ${{ inputs.source || 'ed30bb08cdccf069e9e82a0e2de0afc274989364' }}
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +13,7 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '6fcce147777d268496e02ccd5a1e31cc5da2dda9' }}
+  SOURCE_COMMIT: ${{ inputs.source || 'ed30bb08cdccf069e9e82a0e2de0afc274989364' }}
   SCCACHE_GHA_ENABLED: 'true'
 concurrency:
   group: neverd-examples-${{ github.run_id }}
@@ -24,8 +24,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {runner: ubuntu-24.04, arch: x64}
-          - {runner: macos-15, arch: arm64}
           - {runner: windows-2025, arch: x64}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
