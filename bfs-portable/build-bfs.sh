@@ -32,7 +32,37 @@ export LTO=0
 export VERSION=4.1.1
 export PKG_CONFIG_LIBDIR=/tmpfs/bun/no-host-pkgconfig
 unset CFLAGS CXXFLAGS
-./configure --enable-release --with-oniguruma --without-libselinux --without-libacl
-make -j2 V=1
+# These are real inputs to the compiler/linker and to Bfs's generated metadata.
+# Keep component flags separate from Bun's outer compatibility link below.
+build_flags=(
+  "XCPPFLAGS=-Isrc -Igen -include src/prelude.h -DNDEBUG -MD -MP -Wundef-prefix=BFS_ $CPPFLAGS"
+  "XLDFLAGS=-Wl,-z,now $LDFLAGS"
+  "XLDLIBS=-lonig -lrt"
+)
+./configure --enable-release --with-oniguruma --without-libselinux --without-libacl "${build_flags[@]}"
+make -j2 V=1 "${build_flags[@]}"
 ./bin/bfs --version
-make -j2 check
+./bin/bfs --version > /tmpfs/bun/standalone/component-version.stdout
+cxx=/usr/lib/llvm-23/bin/clang++
+"$cxx" --target="$triple" --sysroot="$sysroot" -std=c++20 -O2 -c \
+  /tmpfs/bun/standalone/compat.cpp -o /tmpfs/bun/standalone/compat.o
+outer_flags=(-Wl,--wrap=fcntl64 -Wl,--wrap=statx -static-libstdc++ -static-libgcc -pthread -ldl)
+objects=(obj/src/*.o)
+"$cxx" --target="$triple" --sysroot="$sysroot" -Wl,-z,now -no-pie \
+  "${objects[@]}" /tmpfs/bun/standalone/compat.o \
+  -L/tmpfs/bun/build/release/deps/oniguruma -lonig -lrt \
+  "${outer_flags[@]}" -o /tmpfs/bun/standalone/bfs
+/tmpfs/bun/standalone/bfs --version > /tmpfs/bun/standalone/outer-version.stdout
+cmp /tmpfs/bun/standalone/component-version.stdout /tmpfs/bun/standalone/outer-version.stdout
+for variant in native fallback; do
+  extra=()
+  if [ "$variant" = fallback ]; then extra=(-DRECOVERY_FORCE_OLD_FCNTL=1); fi
+  "$compiler" --target="$triple" --sysroot="$sysroot" -std=c11 -O2 "${extra[@]}" \
+    -c /recipes/compat-probe.c -o /tmpfs/bun/standalone/probe.o
+  "$cxx" --target="$triple" --sysroot="$sysroot" /tmpfs/bun/standalone/probe.o \
+    /tmpfs/bun/standalone/compat.o "${outer_flags[@]}" -Wl,--wrap=dlsym \
+    -o /tmpfs/bun/standalone/compat-probe
+  /tmpfs/bun/standalone/compat-probe
+done
+cp /tmpfs/bun/standalone/bfs ./bin/bfs
+make -j2 check "${build_flags[@]}"

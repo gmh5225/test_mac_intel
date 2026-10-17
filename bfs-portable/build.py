@@ -25,6 +25,16 @@ def main():
             p=inputs/(pin['name']+'.tar.gz')
             with urllib.request.urlopen(pin['url'],timeout=90) as response:raw=response.read(16777217)
             assert len(raw)<=16777216 and hashlib.sha256(raw).hexdigest()==pin['sha256'] and len(raw)==pin['bytes'];p.write_bytes(raw);unpack(p,work/'embedded'/pin['name'],pin['prefix'])
+        compat_pins=json.loads((ROOT/'bun-compat-inputs.json').read_bytes());assert compat_pins['public_bun_commit']=='c6da4a4d3010e5553438c60f6bd76d981976867c'
+        for row in compat_pins['files']:
+            p=ROOT/'bun-compat-source'/row['file'];assert p.is_file() and not p.is_symlink() and p.stat().st_size==row['bytes'] and sha(p)==row['sha256']
+        public=(ROOT/'bun-compat-source/workaround-missing-symbols.cpp').read_text()
+        first=public.index('typedef int (*fcntl64_func)');last=public.index('\nextern "C" __attribute__((used)) char _libc_single_threaded',first)
+        statx_start=public.index('extern "C" int __wrap_statx(');statx_end=public.index('\nextern "C" int __wrap_memfd_create(',statx_start)
+        standalone=work/'standalone';standalone.mkdir()
+        includes='// Exact functions from public Bun '+compat_pins['public_bun_commit']+'; see BUN-LICENSE.md.\n#define _GNU_SOURCE 1\n#include <fcntl.h>\n#include <stdarg.h>\n#include <errno.h>\n#include <mutex>\n#include <dlfcn.h>\n#include <unistd.h>\n#include <sys/syscall.h>\n#include <sys/stat.h>\n'
+        (standalone/'compat.cpp').write_text(includes+public[first:last]+'\n'+public[statx_start:statx_end]+'\n')
+        receipt['outer_bun_compatibility_link']=dict(public_inputs=compat_pins,generated_source_sha256=sha(standalone/'compat.cpp'),unchanged_source_ranges=[dict(start=first,end=last),dict(start=statx_start,end=statx_end)])
         prepare(a.arch,out,logs)
         docker_platform={'x64':'linux/amd64','arm64':'linux/arm64'}[a.arch];image=IMAGES[a.arch]
         run('compiler-pull',['docker','pull','--platform',docker_platform,image],900)
@@ -62,6 +72,8 @@ def main():
         package=out/'public-bfs-portable';package.mkdir();shutil.copyfile(binary,package/'bfs');(package/'bfs').chmod(0o555)
         shutil.copytree(inputs,package/'source-inputs')
         shutil.copytree(identity,package/'compiler-test-identity')
+        shutil.copytree(ROOT/'bun-compat-source',package/'bun-compat-source');shutil.copyfile(ROOT/'bun-compat-inputs.json',package/'bun-compat-inputs.json')
+        shutil.copyfile(standalone/'compat.cpp',package/'compat.cpp');shutil.copyfile(ROOT/'compat-probe.c',package/'compat-probe.c')
         for name in ['build.py','build-bfs.sh','README.md']:shutil.copyfile(ROOT/name,package/name)
         for name in ['prepare_sysroot.py','glibc-sysroot-pins.json']:shutil.copyfile(ROOT.parent/'bun-runtime'/name,package/name)
         shutil.copyfile(work/'embedded/bfs/LICENSE',package/'BFS-LICENSE');shutil.copyfile(work/'embedded/oniguruma/COPYING',package/'ONIGURUMA-LICENSE')
@@ -69,6 +81,11 @@ def main():
         (package/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n');rows=[dict(file=p.relative_to(package).as_posix(),bytes=p.stat().st_size,sha256=sha(p)) for p in sorted(package.rglob('*')) if p.is_file()];(package/'MANIFEST.json').write_text(json.dumps(dict(files=rows),indent=2)+'\n')
     except BaseException as error:receipt.update(status='failed',error_type=type(error).__name__,error=str(error));raise
     finally:
+        standalone=work/'standalone'
+        if standalone.is_dir():
+            retained_outer=logs/'outer-link';retained_outer.mkdir()
+            for name in ['compat.cpp','component-version.stdout','outer-version.stdout']:
+                if (standalone/name).is_file():shutil.copyfile(standalone/name,retained_outer/name)
         binary=work/'embedded/bfs/bin/bfs'
         if binary.is_file() and not (logs/'public-bfs-candidate').exists():
             shutil.copyfile(binary,logs/'public-bfs-candidate')
