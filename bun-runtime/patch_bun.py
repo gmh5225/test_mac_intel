@@ -32,7 +32,7 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def patch(source, evidence, native_package=None, bfs_package=None):
+def patch(source, evidence, native_package=None, bfs_package=None, ugrep_package=None):
     entry = source / "src/runtime/bin_entry/mod.rs"
     assert sha(entry) == ENTRY_SHA256, "unqualified Bun process entry"
     build = source / "scripts/build/bun.ts"
@@ -58,6 +58,14 @@ def patch(source, evidence, native_package=None, bfs_package=None):
         component = json.loads((bfs_package / "receipt.json").read_bytes())
         bfs_inputs = qualify_bfs(component["arch"], bfs_package, component["compiler_image"])
         assert sha(source / "scripts/build/flags.ts") == FLAGS_SHA256, "unqualified Bun Bfs linker flags"
+    ugrep_inputs = None
+    if ugrep_package is not None:
+        assert bfs_inputs is not None, "The full Ugrep profile requires the qualified Bfs libraries"
+        from ugrep_libraries import qualify as qualify_ugrep
+        ugrep_package = Path(ugrep_package)
+        component = json.loads((ugrep_package / "receipt.json").read_bytes())
+        assert component["arch"] == arch
+        ugrep_inputs = qualify_ugrep(arch, ugrep_package, component["compiler_image"])
     assert sha(ROOT / "resolved-Cargo.lock") == RESOLVED_LOCK_SHA256
     native_files = [native_package / name for name in ["apply-seccomp.c", "unix-block-bpf.h", "recovery_lib.rs"]]
     assert all(path.is_file() and not path.is_symlink() for path in native_files)
@@ -95,13 +103,33 @@ def patch(source, evidence, native_package=None, bfs_package=None):
   {
     flag: c => [`--target=${c.crossTarget!}`, `--sysroot=${c.sysroot!}`],
 ''')
-        extra_patches.append(("bfs-link-flags", "scripts/build/flags.ts", flags_before, flags_after))
+        if ugrep_inputs is not None:
+            from ugrep_libraries import ARCHIVES as ugrep_archives
+            libraries = ''.join('    resolve(cfg.cwd, "recovery-native/ugrep-libraries/'+name+'"),\n' for name in ugrep_archives)
+            build_after = build_after.replace(link_anchor, link_anchor+'  if (cfg.linux) linkObjects.push(\n'+libraries+'  );\n')
+            # Ugrep catches real C++ regex exceptions. Its source objects and
+            # libstdc++ need unwind metadata through the final release strip.
+            eh_anchor = '    flag: "-Wl,--no-eh-frame-hdr",\n'
+            strip_anchor = '    flag: ["-R", ".eh_frame", "-R", ".eh_frame_hdr", "-R", ".gcc_except_table"],\n'
+            assert flags_after.count(eh_anchor) == flags_after.count(strip_anchor) == 1
+            flags_after = flags_after.replace(eh_anchor, '    flag: "-Wl,--eh-frame-hdr", // Required by source-built Ugrep exceptions.\n')
+            flags_after = flags_after.replace(strip_anchor, '    flag: [], // Preserve source-built Ugrep unwind/exception sections.\n')
+        extra_patches.append(("c-native-link-flags" if ugrep_inputs is not None else "bfs-link-flags", "scripts/build/flags.ts", flags_before, flags_after))
         multicall_code = (ROOT / "recovered_multicall.rs").read_text()
         declaration = '    fn neverd_recovered_seccomp_main(argc: c_int, argv: *const *const c_char) -> c_int;\n'
         unsupported = '        role @ (Role::Ugrep | Role::Bfs) => {\n'
         assert multicall_code.count(declaration) == multicall_code.count(unsupported) == 1
         multicall_code = multicall_code.replace(declaration, declaration + '    fn neverd_recovered_bfs_main(argc: c_int, argv: *const *const c_char) -> c_int;\n')
         multicall_code = multicall_code.replace(unsupported, '        Role::Bfs => Some(unsafe { neverd_recovered_bfs_main(argc, argv) }),\n        role @ Role::Ugrep => {\n')
+        if ugrep_inputs is not None:
+            unsupported_ugrep = '''        role @ Role::Ugrep => {
+            eprintln!("recovered native dispatch: {role:?} implementation is not integrated");
+            Some(126)
+        }
+'''
+            assert multicall_code.count(unsupported_ugrep) == 1
+            multicall_code = multicall_code.replace(declaration, declaration+'    fn neverd_recovered_ugrep_main(argc: c_int, argv: *const *const c_char) -> c_int;\n')
+            multicall_code = multicall_code.replace(unsupported_ugrep, '        Role::Ugrep => Some(unsafe { neverd_recovered_ugrep_main(argc, argv) }),\n')
     root_cargo = source / "Cargo.toml"; root_before = root_cargo.read_text()
     assert root_before.count('\nexclude = ["vendor"]\n') == 1 and "[patch.crates-io]" not in root_before
     root_after = root_before.replace('\nexclude = ["vendor"]\n', '\nexclude = ["vendor", "recovery-native"]\n')
@@ -133,6 +161,10 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
         library_root = native_root / "bfs-libraries"; library_root.mkdir()
         for name in ["librecovered_bfs.a", "libonig.a"]:
             shutil.copyfile(bfs_package / "native-library" / name, library_root / name)
+    if ugrep_inputs is not None:
+        library_root = native_root / "ugrep-libraries"; library_root.mkdir()
+        for name in ugrep_archives:
+            shutil.copyfile(ugrep_package / "native-library" / name, library_root / name)
     entry.write_text(after); build.write_text(build_after)
     root_cargo.write_text(root_after); runtime_cargo.write_text(runtime_after)
     globs.write_text(globs_after); (source / "Cargo.lock").write_text(lock_after)
@@ -183,6 +215,9 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
         receipt.update(compiled_native_archive_used=True, compiled_rust_archive_used=False,
             bfs_library_provenance=bfs_inputs, c_library_patches=extra_receipts,
             scope="One source-built Rust graph plus pinned source-built Bfs/Oniguruma C libraries and C seccomp before VM initialization. Ugrep and the private Bun revision remain open.")
+    if ugrep_inputs is not None:
+        receipt.update(ugrep_library_provenance=ugrep_inputs,ugrep_exception_metadata_preserved=True,
+            scope="One source-built Rust graph plus qualified Ugrep/Bfs libraries and unchanged C seccomp before VM initialization. Real Ugrep C++ exception tables are retained. The private Bun revision remains open.")
     (evidence / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
     return receipt
 
@@ -193,6 +228,8 @@ if __name__ == "__main__":
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--native-libraries", type=Path, required=True)
     parser.add_argument("--bfs-libraries", type=Path)
+    parser.add_argument("--ugrep-libraries", type=Path)
     args = parser.parse_args()
     print(json.dumps(patch(args.source.resolve(), args.evidence.resolve(), args.native_libraries.resolve(),
-        args.bfs_libraries.resolve() if args.bfs_libraries else None)))
+        args.bfs_libraries.resolve() if args.bfs_libraries else None,
+        args.ugrep_libraries.resolve() if args.ugrep_libraries else None)))

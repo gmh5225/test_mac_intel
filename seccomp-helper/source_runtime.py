@@ -46,7 +46,10 @@ def admit(arch,artifact,output):
     assert receipt['status']=='public_bun_source_build_and_bounded_native_dispatch_controls_passed'
     assert receipt['public_bun_commit']==data['public_bun_commit'] and receipt['arch']==arch
     bfs=data['integration_strategy']=='single-rust-source-graph-with-c-source-libraries'
-    assert receipt['maximum_core_glibc_requirement']=='2.17' and len(receipt['authored_controls'])==(12 if bfs else 10)
+    ugrep='ugrep_source_manifest_sha256' in expected
+    assert not ugrep or bfs
+    assert ('ugrep_source_provenance' in receipt) is ugrep
+    assert receipt['maximum_core_glibc_requirement']=='2.17' and len(receipt['authored_controls'])==(18 if ugrep else 12 if bfs else 10)
     assert not receipt['original_prefix_reused'] and not receipt['captured_client_executed']
     assert not receipt['original_bun_revision_recovered']
     assert receipt['integration_strategy']==data['integration_strategy'] and receipt['zero_file_budget_controls_passed']
@@ -59,6 +62,12 @@ def admit(arch,artifact,output):
         library=artifact/'bfs-source-library-inputs'
         assert sha(library/'MANIFEST.json')==expected['bfs_source_manifest_sha256']
         assert qualify_bfs(arch,library,receipt['profile']['image'])==receipt['bfs_source_provenance']==receipt['source_patch']['bfs_library_provenance']
+    if ugrep:
+        from ugrep_libraries import qualify as qualify_ugrep
+        library=artifact/'ugrep-source-library-inputs'
+        assert sha(library/'MANIFEST.json')==expected['ugrep_source_manifest_sha256']
+        assert qualify_ugrep(arch,library,receipt['profile']['image'])==receipt['ugrep_source_provenance']==receipt['source_patch']['ugrep_library_provenance']
+        assert receipt['ugrep_exception_metadata_preserved'] and receipt['source_patch']['ugrep_exception_metadata_preserved']
     assert receipt['native_source_provenance']['manifest_sha256']==expected['native_source_manifest_sha256']
     assert sha(artifact/'native-component-input-manifest.json')==expected['native_source_manifest_sha256']
     assert sha(artifact/'Cargo.lock')==receipt['resolved_cargo_lock_sha256']==expected['resolved_cargo_lock_sha256']
