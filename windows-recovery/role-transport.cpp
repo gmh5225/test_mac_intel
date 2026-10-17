@@ -37,10 +37,10 @@ int wmain(int argc, wchar_t **argv) {
         _setmode(_fileno(stderr), _O_BINARY) == -1) return 65;
     FILE *input = _wfopen(argv[1], L"rb");
     if (!input) return 66;
-    std::fputs("{\"kind\":\"owned-rg-preprocessor\",\"env_utf16_hex\":", stderr);
-    hex(stderr, _wgetenv(L"ARGV0"));
-    std::fputs(",\"input_utf16_hex\":", stderr); hex(stderr, argv[1]);
-    std::fputs("}\n", stderr);
+    std::fputs("{\"kind\":\"owned-rg-preprocessor\",\"env_utf16_hex\":", stdout);
+    hex(stdout, _wgetenv(L"ARGV0"));
+    std::fputs(",\"input_utf16_hex\":", stdout); hex(stdout, argv[1]);
+    std::fputs("}\n", stdout);
     char bytes[4096];
     while (auto count = std::fread(bytes, 1, sizeof(bytes), input)) {
       if (std::fwrite(bytes, 1, count, stdout) != count) { std::fclose(input); return 67; }

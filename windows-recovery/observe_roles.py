@@ -27,7 +27,7 @@ def main():
         if receiver or preprocessor:
             shutil.copyfile(transport,root/'bin/receiver.exe');assert sha(root/'bin/receiver.exe')==sha(transport)
             fixture=root/'work/owned-猫.txt';fixture.write_bytes(b'owned NEEDLE\n')
-            args=[str(fixture)] if receiver else ['--no-config','--no-filename','--pre',str(root/'bin/receiver.exe'),'NEEDLE',str(fixture)]
+            args=[str(fixture)] if receiver else ['--no-config','--no-filename','--fixed-strings','--pre',str(root/'bin/receiver.exe'),'-e','"kind":"owned-rg-preprocessor"','-e','owned NEEDLE',str(fixture)]
         env={k:v for k,v in os.environ.items() if k.upper() in {'SYSTEMROOT','WINDIR','COMSPEC','SYSTEMDRIVE'}}
         env.update(HOME=str(root/'home'),USERPROFILE=str(root/'home'),APPDATA=str(root/'home'),LOCALAPPDATA=str(root/'home'),TEMP=str(root/'tmp'),TMP=str(root/'tmp'),CLAUDE_CONFIG_DIR=str(root/'home/.claude'),CLAUDE_CODE_TMPDIR=str(root/'tmp'),BUN_RUNTIME_TRANSPILER_CACHE_PATH='0',NO_COLOR='1',CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1',DISABLE_AUTOUPDATER='1',ENABLE_CLAUDEAI_MCP_SERVERS='false',PATH=str(Path(os.environ['SystemRoot'])/'System32'))
         if role is not None:env['ARGV0']=role
@@ -41,8 +41,9 @@ def main():
         stdout=(p/'process.stdout').read_bytes();stderr=(p/'process.stderr').read_bytes()
         row=dict(case=label,argv0=argv0,role=role,execution=execution,stdout=stdout.decode('utf-8'),stderr=stderr.decode('utf-8'),stdout_sha256=hashlib.sha256(stdout).hexdigest(),stderr_sha256=hashlib.sha256(stderr).hexdigest())
         if receiver or preprocessor:
-            assert execution['exit_code']==0 and stdout==b'owned NEEDLE\n'
-            child=json.loads(stderr);assert child['kind']=='owned-rg-preprocessor' and child['input_utf16_hex']==utf16_hex(str(fixture))
+            lines=stdout.splitlines(keepends=True)
+            assert execution['exit_code']==0 and not stderr and len(lines)==2 and lines[1]==b'owned NEEDLE\n'
+            child=json.loads(lines[0]);assert child['kind']=='owned-rg-preprocessor' and child['input_utf16_hex']==utf16_hex(str(fixture))
             assert set(child)=={'kind','input_utf16_hex','env_utf16_hex'};row['child_environment']=child
         return row
     try:
