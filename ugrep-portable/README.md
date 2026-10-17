@@ -19,3 +19,9 @@ CI obtains the public source archives from the independently qualified component
 producer 38986089116 and rechecks each original pinned hash before extraction.
 It consumes six source tarballs from that package. All C/C++ objects and libraries
 are freshly rebuilt; the package's candidate executables are not build inputs.
+
+The static upstream executable retains all pthread objects: the pinned
+libstdc++ uses weak condition-variable references, which otherwise do not select
+their implementations from the focal pthread archive. A real threaded
+condition-variable control and defined-symbol checks run before compilation.
+The final library host retains its dynamic pthread dependency explicitly.

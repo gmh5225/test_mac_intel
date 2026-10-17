@@ -30,12 +30,24 @@ def cmake(name,path,*options):
     run(name+'-build',['cmake','--build',build,'--parallel','2']);run(name+'-install',['cmake','--install',build]);return build
 
 run('compiler-version',[compiler,'--version']);run('cxx-version',[cxx,'--version'])
+pthread_link=['-Wl,--whole-archive','-lpthread','-Wl,--no-whole-archive']
+thread_control=logs/'pthread-link-control.cc'
+thread_control.write_text('#include <condition_variable>\n#include <thread>\nint main() { std::mutex mutex; std::condition_variable condition; bool ready=false; std::thread worker([&] { { std::lock_guard<std::mutex> lock(mutex); ready=true; } condition.notify_one(); }); { std::unique_lock<std::mutex> lock(mutex); condition.wait(lock,[&] { return ready; }); } worker.join(); }\n')
+run('pthread-link-control-build',[cxx,*ccflags.split(),'-O2','-static',thread_control,*pthread_link,'-o',logs/'pthread-link-control'])
+run('pthread-link-control',[logs/'pthread-link-control'])
+run('pthread-link-control-symbols',[toolbin/'llvm-nm','--defined-only',logs/'pthread-link-control'])
+thread_symbols={line.split()[-1] for line in (logs/'pthread-link-control-symbols.stdout').read_text().splitlines() if line.split()}
+assert {'pthread_cond_destroy','pthread_cond_wait','pthread_cond_signal','pthread_create','pthread_join'} <= thread_symbols
 z=source/'zlib';run('zlib-configure',[z/'configure','--static','--prefix='+str(prefix)],z);make('zlib-build',z);make('zlib-check',z,'check');make('zlib-install',z,'install')
 b=source/'bzip2';make('bzip2-build',b,'libbz2.a','bzip2','bzip2recover','CC='+env['CC'],'AR='+env['AR'],'RANLIB='+env['RANLIB'],'CFLAGS='+env['CFLAGS']);make('bzip2-check',b,'test');make('bzip2-install',b,'install','PREFIX='+str(prefix))
 cmake('zstd',source/'zstd/build/cmake','-DZSTD_BUILD_SHARED=OFF','-DZSTD_BUILD_STATIC=ON','-DZSTD_BUILD_PROGRAMS=ON','-DZSTD_BUILD_TESTS=OFF','-DZSTD_ZLIB_SUPPORT=OFF','-DZSTD_LZMA_SUPPORT=OFF','-DZSTD_LZ4_SUPPORT=OFF')
 brotli=cmake('brotli',source/'brotli');run('brotli-check',['ctest','--test-dir',brotli,'--output-on-failure'])
 p=source/'pcre2';run('pcre2-configure',[p/'configure','--prefix='+str(prefix),'--enable-static','--disable-shared','--enable-jit','--disable-pcre2-16','--disable-pcre2-32'],p);make('pcre2-build',p);make('pcre2-check',p,'check');make('pcre2-install',p,'install')
-ug=source/'ugrep';ugenv=dict(env,LIBS='-lbrotlicommon -lm')
+# libstdc++ condition-variable calls are weak on the pinned focal sysroot.
+# A plain -lpthread leaves the corresponding static objects unselected, and
+# lld resolves their tail branches to fall-through instructions. Retain the
+# real pthread implementation before testing the upstream static executable.
+ug=source/'ugrep';ugenv=dict(env,LIBS='-lbrotlicommon -lm '+' '.join(pthread_link))
 options=['--enable-static','--without-lzma','--without-lz4',*['--with-'+flag+'='+str(prefix) for flag in ['pcre2','zlib','bzlib','zstd','brotli']]]
 if args.arch=='x64':options.append('--disable-avx2')
 run('ugrep-configure',[ug/'configure',*options],ug,environment=ugenv)
@@ -68,14 +80,14 @@ run('main-text-after',[toolbin/'llvm-objcopy','--dump-section','.text.main='+str
 assert sha(main)==renamed_main_hash,'Section readback modified the renamed compiler object'
 assert before.read_bytes()==after.read_bytes()
 archive=library/'librecovered_ugrep.a';run('export-library',[toolbin/'llvm-ar','rcs',archive,*paths])
-dependencies=['reflex','pcre2-8','z','bz2','zstd','brotlidec','brotlicommon']
+dependencies=['reflex','viiz','pcre2-8','z','bz2','zstd','brotlidec','brotlicommon']
 for name in dependencies:
-    original=ug/'lib/libreflex.a' if name=='reflex' else prefix/'lib'/('lib'+name+'.a')
+    original=ug/'lib'/('lib'+name+'.a') if name in ['reflex','viiz'] else prefix/'lib'/('lib'+name+'.a')
     assert original.is_file();shutil.copyfile(original,library/('lib'+name+'.a'))
 host_source=library/'ugrep-library-host.c';host_source.write_text('extern int neverd_recovered_ugrep_main(int, char **);\nint main(int argc, char **argv) { return neverd_recovered_ugrep_main(argc, argv); }\n')
 run('compile-host',[compiler,*ccflags.split(),'-O2','-c',host_source,'-o',library/'host.o'])
 host=library/'ugrep-library-host'
-run('link-host',[cxx,*ccflags.split(),library/'host.o','-Wl,--start-group',archive,*[library/('lib'+name+'.a') for name in dependencies],'-Wl,--end-group','-static-libstdc++','-static-libgcc','-Wl,--gc-sections','-pthread','-lm','-o',host])
+run('link-host',[cxx,*ccflags.split(),library/'host.o','-Wl,--start-group',archive,*[library/('lib'+name+'.a') for name in dependencies],'-Wl,--end-group','-static-libstdc++','-static-libgcc','-Wl,--gc-sections','-Wl,--no-as-needed','-pthread','-lm','-o',host])
 fixture=library/'input.txt';fixture.write_bytes(b'first\nNEEDLE\npreneedle\n');compressed=library/'input.gz';compressed.write_bytes(gzip.compress(fixture.read_bytes(),mtime=0))
 def limits():resource.setrlimit(resource.RLIMIT_FSIZE,(0,0));resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 controls=[]
@@ -88,5 +100,6 @@ shutil.copyfile(host,ug/'bin/ugrep');run('library-host-upstream-check',['make','
 assert sha(ug/'bin/ugrep')==sha(host),'Upstream checks replaced the library host'
 receipt=dict(status='ugrep_source_library_host_and_upstream_checks_passed',entry_symbol='neverd_recovered_ugrep_main',source_objects=len(paths),
     main_text_unchanged=True,main_text_sha256=sha(before),library_sha256=sha(archive),host_sha256=sha(host),controls=controls,commands=commands,
-    original_binary_reused=False,dependency_archives={name:sha(library/('lib'+name+'.a')) for name in dependencies},zstd_upstream_suite_run=False)
+    original_binary_reused=False,dependency_archives={name:sha(library/('lib'+name+'.a')) for name in dependencies},zstd_upstream_suite_run=False,
+    static_pthread_condition_variable_control_passed=True)
 (library/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
