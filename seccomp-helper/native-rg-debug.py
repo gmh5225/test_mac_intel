@@ -11,6 +11,7 @@ def main():
     ap=argparse.ArgumentParser();ap.add_argument('--arch',required=True);ap.add_argument('--runtime',type=Path,required=True);ap.add_argument('--sha256',required=True);ap.add_argument('--output',type=Path,required=True);a=ap.parse_args()
     runtime=a.runtime.resolve();qualified=pin(a.arch,runtime,a.sha256)
     out=a.output.resolve();out.mkdir();shutil.copyfile(Path(__file__),out/'native-rg-debug.py')
+    (out/'gdb-version.txt').write_bytes(subprocess.check_output(['gdb','--version']))
     fixture=out/'input.txt';fixture.write_bytes(b'target\nother\ntarget\n')
     environment={'PATH':'/usr/bin:/bin','LANG':'C','LC_ALL':'C','HOME':str(out),'BUN_RUNTIME_TRANSPILER_CACHE_PATH':'0'}
     variants=[('plain',['--count'],b'2\n'),('filename',['-c','-H'],str(fixture).encode()+b':2\n'),

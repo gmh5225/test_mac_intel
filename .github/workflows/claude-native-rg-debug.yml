@@ -45,6 +45,10 @@ jobs:
           github-token: ${{ github.token }}
       - name: Rehash the entire public source runtime
         run: python3 -B seccomp-helper/source_runtime.py --arch ${{ matrix.arch }} --artifact public-runtime-artifact --output admitted-runtime
+      - name: Install the native crash debugger
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gdb
       - name: Diagnose the owned public count fixture
         run: |
           command -v gdb
