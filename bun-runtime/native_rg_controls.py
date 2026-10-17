@@ -5,6 +5,7 @@ import json
 import os
 import resource
 import subprocess
+import sys
 
 
 def verify(runtime, output, repetitions=32):
@@ -31,7 +32,8 @@ def verify(runtime, output, repetitions=32):
                                  bytes=fixture.stat().st_size,sha256=hashlib.sha256(fixture.read_bytes()).hexdigest()))
             with fixture.open("rb") as inherited:
                 for transport in ["path", "inherited-fd"]:
-                    path = str(fixture) if transport == "path" else "/proc/self/fd/" + str(inherited.fileno())
+                    fd_root = "/dev/fd/" if sys.platform == "darwin" else "/proc/self/fd/"
+                    path = str(fixture) if transport == "path" else fd_root + str(inherited.fileno())
                     encoded = os.fsencode(path)
                     variants = [
                         ("plain", ["--count"], b"2\n"),

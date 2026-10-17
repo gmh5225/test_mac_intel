@@ -5,7 +5,8 @@ sys.dont_write_bytecode=True
 sys.path.insert(0,str(Path(__file__).resolve().parent.parent/'runtime-helpers'))
 from build import unpack
 
-def stage(package,destination):
+def stage(package,destination,target_os="linux"):
+    assert target_os in ["linux", "macos"]
     assert not destination.exists();destination.mkdir()
     inputs=package/'inputs'
     unpack(inputs/'ripgrep.tar.gz',destination/'ripgrep','ripgrep-14.1.1/')
@@ -17,6 +18,7 @@ def stage(package,destination):
     (destination/'ripgrep/crates/core/recovery_lib.rs').write_bytes(wrapper)
     manifest=destination/'ripgrep/Cargo.toml';before=manifest.read_text();assert '[lib]' not in before
     manifest.write_text(before+'\n[lib]\nname = "recovered_ripgrep"\npath = "crates/core/recovery_lib.rs"\ncrate-type = ["rlib"]\n')
-    for name in ['apply-seccomp.c','unix-block-bpf.h']:shutil.copyfile(package/name,destination/name)
-    (destination/'seccomp-entry.c').write_text('#define main neverd_recovered_seccomp_main\n#include "apply-seccomp.c"\n')
+    if target_os == "linux":
+        for name in ['apply-seccomp.c','unix-block-bpf.h']:shutil.copyfile(package/name,destination/name)
+        (destination/'seccomp-entry.c').write_text('#define main neverd_recovered_seccomp_main\n#include "apply-seccomp.c"\n')
     assert not any(p.name.endswith(('.rlib','.a')) for p in destination.rglob('*') if p.is_file())

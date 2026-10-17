@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 from stage_native_sources import stage
+from rust_source_graph import plan as plan_rust_graph
 from allocator_exports import patch_script as patch_allocator_exports, versions as allocator_versions
 
 ROOT = Path(__file__).resolve().parent
@@ -130,32 +131,7 @@ def patch(source, evidence, native_package=None, bfs_package=None, ugrep_package
             assert multicall_code.count(unsupported_ugrep) == 1
             multicall_code = multicall_code.replace(declaration, declaration+'    fn neverd_recovered_ugrep_main(argc: c_int, argv: *const *const c_char) -> c_int;\n')
             multicall_code = multicall_code.replace(unsupported_ugrep, '        Role::Ugrep => Some(unsafe { neverd_recovered_ugrep_main(argc, argv) }),\n')
-    root_cargo = source / "Cargo.toml"; root_before = root_cargo.read_text()
-    assert root_before.count('\nexclude = ["vendor"]\n') == 1 and "[patch.crates-io]" not in root_before
-    root_after = root_before.replace('\nexclude = ["vendor"]\n', '\nexclude = ["vendor", "recovery-native"]\n')
-    root_after += '\n[patch.crates-io]\npcre2 = { path = "recovery-native/pcre2-overlay" }\n'
-    runtime_cargo = source / "src/runtime/Cargo.toml"; runtime_before = runtime_cargo.read_text()
-    runtime_after = runtime_before + '''
-[target.'cfg(target_os = "linux")'.dependencies]
-recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep", features = ["pcre2"] }
-'''
-    globs = source / "scripts/glob-sources.ts"; globs_before = globs.read_text()
-    anchor = '      "src/**/Cargo.toml",\n'; assert globs_before.count(anchor) == 1
-    globs_after = globs_before.replace(anchor, anchor + '      "recovery-native/**/*.rs",\n      "recovery-native/**/Cargo.toml",\n')
-    # The added serde_json trait implementations expose previously ambiguous
-    # `as _` comparisons. Use the actual i32 family/u16 SystemError field types;
-    # hash-gated line identities avoid changing the separate i32 syscall errors.
-    type_patches = []
-    for label, rel, numbers, old, new in [
-        ("dns-type", "src/runtime/dns_jsc/options_jsc.rs", [226, 227], " as _ =>", " as i32 =>"),
-        ("fs-type", "src/runtime/node/node_fs.rs", [1598, 2015, 8236, 8364], "E::EEXIST as _", "E::EEXIST as u16")]:
-        before_type = (source / rel).read_text(); lines = before_type.splitlines(True)
-        for number in numbers:
-            assert lines[number - 1].count(old) == 1
-            lines[number - 1] = lines[number - 1].replace(old, new)
-        type_patches.append((label, rel, before_type, "".join(lines)))
-    lock_before = (source / "Cargo.lock").read_text()
-    lock_after = (ROOT / "resolved-Cargo.lock").read_text()
+    rust_changes = plan_rust_graph(source, "linux")
     stage(native_package, native_root)
     if bfs_inputs is not None:
         library_root = native_root / "bfs-libraries"; library_root.mkdir()
@@ -166,9 +142,7 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
         for name in ugrep_archives:
             shutil.copyfile(ugrep_package / "native-library" / name, library_root / name)
     entry.write_text(after); build.write_text(build_after)
-    root_cargo.write_text(root_after); runtime_cargo.write_text(runtime_after)
-    globs.write_text(globs_after); (source / "Cargo.lock").write_text(lock_after)
-    for _, rel, _, after_type in [*type_patches, allocator_patch]: (source / rel).write_text(after_type)
+    for _, rel, _, body in [*rust_changes, allocator_patch]: (source / rel).write_text(body)
     for _, rel, _, after_extra in extra_patches: (source / rel).write_text(after_extra)
     copied = []
     for name in ["role_contract.rs", "recovered_multicall.rs"]:
@@ -186,11 +160,7 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
         fromfile="public-bun/scripts/build/bun.ts", tofile="recovered-bun/scripts/build/bun.ts"))
     (evidence / "build.patch").write_text(build_diff)
     graph_patches = []
-    for label, rel, old, new in [
-        ("cargo", "Cargo.toml", root_before, root_after),
-        ("runtime-cargo", "src/runtime/Cargo.toml", runtime_before, runtime_after),
-        ("source-globs", "scripts/glob-sources.ts", globs_before, globs_after),
-        ("cargo-lock", "Cargo.lock", lock_before, lock_after), *type_patches, allocator_patch]:
+    for label, rel, old, new in [*rust_changes, allocator_patch]:
         patch_file = evidence / (label + ".patch")
         patch_file.write_text("".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), fromfile="public-bun/" + rel, tofile="recovered-bun/" + rel)))
         graph_patches.append({"file": rel, "before_sha256": hashlib.sha256(old.encode()).hexdigest(), "after_sha256": sha(source / rel), "patch_sha256": sha(patch_file)})

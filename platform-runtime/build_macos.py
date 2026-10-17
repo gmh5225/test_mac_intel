@@ -50,10 +50,11 @@ def curl_config(url, token):
     return config.encode()
 
 
-def main():
+def main(native_profile=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--arch', choices=['arm64', 'x64'], required=True)
     parser.add_argument('--output', type=Path, required=True)
+    if native_profile is not None: native_profile.add_arguments(parser)
     args = parser.parse_args()
     assert platform.system() == 'Darwin' and platform.machine() == 'arm64'
     out = args.output.resolve(); out.mkdir()
@@ -127,6 +128,7 @@ def main():
         return archive
 
     try:
+        if native_profile is not None: native_profile.preflight(args, record)
         archive = release('llvm/llvm-project', 'llvmorg-' + LLVM_VERSION, LLVM_ASSET, LLVM_SHA256, LLVM_BYTES)
         tools = out / 'llvm'; tools.mkdir()
         with tarfile.open(archive, 'r:xz') as stream:
@@ -224,6 +226,8 @@ def main():
         run('sdk-path', ['xcrun', '--sdk', 'macosx', '--show-sdk-path'])
         run('sdk-version', ['xcrun', '--sdk', 'macosx', '--show-sdk-version'])
         sdk = (logs / 'sdk-path.log').read_text().strip()
+        if native_profile is not None:
+            sdk = str(native_profile.prepare_sdk(args, out, bun, run, record))
         assert (Path(sdk) / 'usr/include/stdio.h').is_file()
         # Host tools such as TinyCC's code generator use the discovered clang
         # without target flags. The standalone LLVM driver needs the same SDK
@@ -237,6 +241,7 @@ def main():
         assert (resource_dir / 'include/stddef.h').is_file()
         control = logs / 'sdk-libcxx-control.cpp'
         control.write_text('#include <unordered_map>\n#include <string>\nint main() { std::unordered_map<std::string, int> values; values["owned"] = 7; return values.at("owned") == 7 ? 0 : 1; }\n')
+        if native_profile is not None: control.write_text(native_profile.CPP_CONTROL)
         target_flags = ['--target=x86_64-apple-macosx', '-march=nehalem'] if args.arch == 'x64' else []
         common = [toolbin / 'clang++', *target_flags, '-std=c++20', '-O2', '-mmacosx-version-min=13.0', '-isysroot', sdk]
         negative = list(map(str, [*common, control, '-o', out / 'default-libcxx-control']))
@@ -263,6 +268,9 @@ def main():
             assert struct.unpack_from('<II', obj.read_bytes()) == (0xfeedfacf, 0x1000007)
             record['x64_target_object_control_sha256'] = sha(obj)
             extra_flags = ['--macos-sdk=' + sdk]
+        if native_profile is not None:
+            extra_flags = ['--macos-sdk=' + sdk]
+            native_profile.prepare_build(args, out, source, bun, toolbin, env, run, record, extra_flags)
         run('host-capacity', ['df', '-h', out])
         build_arch = 'aarch64' if args.arch == 'arm64' else 'x64'
         run('public-bun-build', [bun, 'scripts/build.ts', '--profile=release', '--arch=' + build_arch,
@@ -273,21 +281,26 @@ def main():
         assert struct.unpack_from('<II', raw) == (0xfeedfacf, {'arm64': 0x100000c, 'x64': 0x1000007}[args.arch])
         changed = subprocess.check_output(['git', 'status', '--porcelain'], cwd=source, text=True).splitlines()
         expected_changes = [' M scripts/build/config.ts', ' M scripts/build/flags.ts', ' M scripts/build/tools.ts'] if args.arch == 'x64' else [' M scripts/build/flags.ts']
-        assert changed == expected_changes
+        if native_profile is not None:
+            expected_changes = sorted(set(expected_changes + native_profile.expected_changes(record)))
+        assert changed == expected_changes, (changed, expected_changes)
         if args.arch == 'arm64':
             run('native-runtime-version', [binary, '--version'])
             assert (logs / 'native-runtime-version.log').read_text().strip() == '1.4.3'
             run('native-runtime-revision', [binary, '--revision'])
             assert COMMIT[:9] in (logs / 'native-runtime-revision.log').read_text()
-        package = out / 'public-runtime'; package.mkdir()
-        shutil.copyfile(binary, package / 'bun'); (package / 'bun').chmod(0o500)
-        shutil.copyfile(Path(__file__), package / Path(__file__).name)
-        record.update(status='public_macos_source_baseline_built',
-                      binary_sha256=sha(binary), binary_bytes=binary.stat().st_size,
-                      native_arm64_version_controlled=args.arch == 'arm64', captured_source_uploaded=False)
-        (package / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
-        files = [dict(file=p.name, bytes=p.stat().st_size, sha256=sha(p)) for p in sorted(package.iterdir())]
-        (package / 'MANIFEST.json').write_text(json.dumps(dict(schema_version=1, files=files), indent=2) + '\n')
+        if native_profile is not None:
+            native_profile.qualify_and_export(args, out, source, bun, toolbin, env, run, record)
+        else:
+            package = out / 'public-runtime'; package.mkdir()
+            shutil.copyfile(binary, package / 'bun'); (package / 'bun').chmod(0o500)
+            shutil.copyfile(Path(__file__), package / Path(__file__).name)
+            record.update(status='public_macos_source_baseline_built',
+                          binary_sha256=sha(binary), binary_bytes=binary.stat().st_size,
+                          native_arm64_version_controlled=args.arch == 'arm64', captured_source_uploaded=False)
+            (package / 'receipt.json').write_text(json.dumps(record, indent=2) + '\n')
+            files = [dict(file=p.name, bytes=p.stat().st_size, sha256=sha(p)) for p in sorted(package.iterdir())]
+            (package / 'MANIFEST.json').write_text(json.dumps(dict(schema_version=1, files=files), indent=2) + '\n')
     except BaseException as error:
         record.update(status='platform_baseline_failed_not_admitted', error_type=type(error).__name__, error=str(error))
         raise

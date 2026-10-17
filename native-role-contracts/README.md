@@ -7,3 +7,8 @@ Windows has rg/ug/ugrep spellings and case-sensitive `.exe` aliases; its actual
 argv basename accepts both slash characters. macOS additionally has bfs and
 does not use the Linux apply-seccomp role. The Linux implementation remains in
 `bun-runtime/role_contract.rs` and has its own independent evidence.
+
+`darwin.rs` owns the macOS byte classifier and actual-argv precedence rule.
+The staged macOS dispatcher consumes that model and calls the source-built
+libraries before VM initialization. Full engine wiring and acceptance are
+separate from the standalone selector comparison.

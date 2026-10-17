@@ -3,6 +3,7 @@ from pathlib import Path
 import hashlib
 import json
 import os
+import platform
 import struct
 import zlib
 
@@ -13,7 +14,7 @@ def sha(path):
     with path.open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def prepare(out, image, run):
+def prepare(out, image, run, native_bun=None):
     pins = json.loads((ROOT / 'macos-sdk-pins.json').read_bytes()); assert pins['version'] == '26.5'
     work = out / 'sdk-work'; work.mkdir(); (work / 'home').mkdir(); cache = work / 'cache'; cache.mkdir()
     release = pins['release']; package = pins['package']
@@ -31,11 +32,17 @@ def prepare(out, image, run):
     # Apple's catalog Digest identifies the compressed XAR TOC, whose payload
     # checksums xmac verifies during extraction. Pin the whole package too.
     assert hashlib.sha1(toc).hexdigest() == package['digest'] == raw[header + compressed:header + compressed + 20].hex()
-    run('extract-Apple-SDK-offline', ['docker', 'run', '--rm', '--platform', 'linux/amd64', '--network', 'none', '--cap-drop', 'ALL',
-        '--security-opt', 'no-new-privileges', '--user', str(os.getuid()) + ':' + str(os.getgid()), '--cpus', '2', '--memory', '2g', '--pids-limit', '128',
-        '--mount', 'type=bind,src=' + str(work) + ',dst=/sdk-work', '--env', 'HOME=/sdk-work/home', '--entrypoint', 'bun', image,
-        '/sdk-work/xmac.mjs', '--cache-dir', '/sdk-work/cache', '--offline', 'splat', '--sdk', '26.5', '--release', '26.5',
-        '--accept-license', '--sdk-only', '--output', '/sdk-work/output'])
+    if native_bun is None:
+        run('extract-Apple-SDK-offline', ['docker', 'run', '--rm', '--platform', 'linux/amd64', '--network', 'none', '--cap-drop', 'ALL',
+            '--security-opt', 'no-new-privileges', '--user', str(os.getuid()) + ':' + str(os.getgid()), '--cpus', '2', '--memory', '2g', '--pids-limit', '128',
+            '--mount', 'type=bind,src=' + str(work) + ',dst=/sdk-work', '--env', 'HOME=/sdk-work/home', '--entrypoint', 'bun', image,
+            '/sdk-work/xmac.mjs', '--cache-dir', '/sdk-work/cache', '--offline', 'splat', '--sdk', '26.5', '--release', '26.5',
+            '--accept-license', '--sdk-only', '--output', '/sdk-work/output'])
+    else:
+        assert image is None and platform.system() == 'Darwin' and Path(native_bun).is_file()
+        run('extract-Apple-SDK-offline', ['/usr/bin/sandbox-exec', '-p', '(version 1)(allow default)(deny network*)',
+            native_bun, script, '--cache-dir', cache, '--offline', 'splat', '--sdk', '26.5', '--release', '26.5',
+            '--accept-license', '--sdk-only', '--output', work / 'output'])
     sdk = work / 'output/SDKs/MacOSX26.5.sdk'; assert sdk.is_dir() and not sdk.is_symlink()
     assert json.loads((sdk / 'SDKSettings.json').read_bytes())['Version'] == '26.5'
     rows = []
@@ -52,5 +59,7 @@ def prepare(out, image, run):
         sdk_file_manifest_sha256=sha(manifest_path), SDKSettings_sha256=sha(sdk / 'SDKSettings.json'),
         package_source='Apple software-update CDN', compiler_sdk_mount='/opt/macos-sdk/MacOSX26.5.sdk',
         sdk_bytes_redistributed=False, original_sdk_bytes_proven=False)
+    if native_bun is not None:
+        receipt.update(native_offline_extractor=True, compiler_sdk_mount=str(sdk))
     (out / 'diagnostics/SDK-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     return sdk, receipt

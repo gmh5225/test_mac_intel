@@ -183,7 +183,7 @@ def main():
                 assert not result.stdout and b"mismatched [ ]" in result.stderr
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
-        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "verify_rust_plan.py", "resolved-Cargo.lock", "allocator_exports.py", "native_rg_controls.py"]:
+        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "rust_source_graph.py", "verify_rust_plan.py", "resolved-Cargo.lock", "allocator_exports.py", "native_rg_controls.py"]:
             shutil.copyfile(ROOT / name, package / name)
         shutil.copytree(native_package / "inputs", package / "native-component-source-inputs")
         for name in ["apply-seccomp.c", "unix-block-bpf.h", "SECCOMP-LICENSE", "recovery_lib.rs", "effective-library-Cargo.toml"]:

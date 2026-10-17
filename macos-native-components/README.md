@@ -85,3 +85,29 @@ for execdir. The complete upstream suites therefore run on native macOS 26;
 separate native macOS 15 jobs retain exact ordinary-role comparisons and the
 same observed execdir fault. Earlier upstream failures are retained. No version
 output or runtime failure is rewritten to hide this platform boundary.
+
+`bfs-library-pins.json` admits producer 39039756810 after independent checks of
+77 objects per architecture, all 32 upstream integration runs, 14 Oniguruma
+executions and 36 raw original-role pairs across macOS 15/26. The complete
+upstream suite needs macOS 26. The original macOS 15 execdir fault remains an
+explicit compatibility boundary.
+
+`build_runtime.py` adds a native-source profile to the existing public macOS
+builder. It uses the same pinned LLVM 23/Rust toolchain and the qualified
+component archives. The locked Rust/std/rg graph is shared with the Linux
+recipe; six existing Linux source-patch profiles and their receipts remain
+byte-identical after this extraction. New Mac builds prepare public rg/PCRE2
+sources directly and consume no compiled Rust input.
+
+The profile links a separate, accepted pre-namespace PCRE2 C archive for rg,
+uses the pinned SDK 26.5 explicitly on both targets, preserves final exception
+sections, and allows/requires precisely the six observed Ugrep exception
+imports. The six observed Ugrep/RE-flex initializer names are explicit too.
+Other forbidden imports and binary checks stay active. The real component
+host passes this verifier; five altered expectations are rejected.
+
+The new full-engine workflow checks ARM64 and x64 on native macOS 15 and 26,
+including 768 actual rg filename/inherited-FD controls per host. Source build
+and native control success still need independent qualification and actual
+recovered-client comparisons; adding this recipe does not admit a complete
+recovered macOS client.
