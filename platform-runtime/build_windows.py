@@ -107,9 +107,18 @@ def main():
         choices = list(tools.rglob('clang-cl.exe')); assert len(choices) == 1
         toolbin = choices[0].parent
         env['PATH'] = str(toolbin) + os.pathsep + env['PATH']; env['CC'] = str(toolbin / 'clang-cl.exe'); env['CXX'] = env['CC']
+        # Bun's discovery prefers known system install locations over PATH for
+        # tools without a version query. Pin the entire family, not only CC.
+        env['BUN_TOOLCHAIN_LLVM'] = str(toolbin.parent)
         run('clang-version', [toolbin / 'clang-cl.exe', '--version'])
         assert 'clang version 23.1.1' in (logs / 'clang-version.log').read_text()
         receipt['clang_sha256'] = sha(toolbin / 'clang-cl.exe')
+        receipt['llvm_tools'] = {}
+        for name in ['llvm-nm.exe', 'lld-link.exe', 'llvm-ar.exe', 'llvm-lib.exe', 'llvm-objcopy.exe']:
+            tool = toolbin / name; assert tool.is_file(), 'Incomplete pinned LLVM distribution'
+            run(name + '-version', [tool, '--version'])
+            assert '23.1.1' in (logs / (name + '-version.log')).read_text()
+            receipt['llvm_tools'][name] = dict(path=str(tool), sha256=sha(tool))
         cmake_archive = release('Kitware/CMake', 'v3.30.5', profile['cmake'], profile['cmake_sha256'])
         cmake_root = out / 'cmake'; unpack(cmake_archive, cmake_root)
         choices = list(cmake_root.glob('*/bin/cmake.exe')); assert len(choices) == 1

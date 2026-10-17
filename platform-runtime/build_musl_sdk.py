@@ -79,8 +79,8 @@ def main():
         for path in cached:
             assert not path.is_symlink() and not (source_apks / path.name).exists()
             with tarfile.open(path, 'r:gz', ignore_zeros=True) as stream:
-                metadata = [m for m in stream.getmembers() if m.name.lstrip('./') == '.PKGINFO']
-                assert len(metadata) == 1 and metadata[0].isfile()
+                metadata = [m for m in stream.getmembers() if m.name.removeprefix('./') == '.PKGINFO']
+                assert len(metadata) == 1 and metadata[0].isfile(), 'Package archive is missing its .PKGINFO'
                 fields = dict(line.split(' = ', 1) for line in stream.extractfile(metadata[0]).read().decode().splitlines() if ' = ' in line)
             key = (fields['pkgname'], fields['pkgver'], fields['arch'])
             assert key in indexed and key not in cached_identities
