@@ -10,7 +10,6 @@ import hashlib
 import json
 import os
 import platform
-import re
 import shutil
 import struct
 import subprocess
@@ -35,6 +34,16 @@ CMAKE_SHA256 = '3d603e507c7579b13518ef752b4ffcf3ed479fba80ee171d7d85da8153e869d0
 def sha(path):
     with path.open('rb') as stream:
         return hashlib.file_digest(stream, 'sha256').hexdigest()
+
+
+def curl_config(url, token):
+    config = 'url = ' + json.dumps(url) + '\n'
+    if url.startswith('https://api.github.com/repos/'):
+        # GitHub credentials are opaque; job tokens need not have the same
+        # spelling as a local PAT. Only reject header/control injection.
+        assert isinstance(token, str) and token and not any(c in token for c in '\r\n\0')
+        config += 'header = ' + json.dumps('Authorization: Bearer ' + token) + '\n'
+    return config.encode()
 
 
 def main():
@@ -73,13 +82,9 @@ def main():
         assert code == 0, label + ' failed; inspect retained diagnostics'
 
     def download(url, dest):
-        config = 'url = ' + json.dumps(url) + '\n'
-        if url.startswith('https://api.github.com/repos/'):
-            assert api_token is not None and re.fullmatch('[A-Za-z0-9_]+', api_token)
-            config += 'header = ' + json.dumps('Authorization: Bearer ' + api_token) + '\n'
         argv = ['curl', '--http1.1', '--fail', '--location', '--silent', '--show-error',
                 '--retry', '3', '--max-time', '900', '--output', str(dest), '--config', '-']
-        run('download-' + dest.name, argv, private_input=config.encode())
+        run('download-' + dest.name, argv, private_input=curl_config(url, api_token))
 
     def release(repo, tag, asset_name, pinned_digest=None, pinned_bytes=None):
         meta_path = inputs / (asset_name + '.release.json')
