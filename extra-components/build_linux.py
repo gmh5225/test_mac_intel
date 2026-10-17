@@ -135,6 +135,7 @@ def main():
                        "--with-pcre2=" + str(prefix), "--with-zlib=" + str(prefix),
                        "--with-bzlib=" + str(prefix), "--with-zstd=" + str(prefix),
                        "--with-brotli=" + str(prefix)]
+            if args.arch == "x64": options.append("--disable-avx2")
             run("ugrep-configure", [ug / "configure", *options], cwd=ug)
             make("ugrep-build", ug)
             make("ugrep-check", ug, "check")
