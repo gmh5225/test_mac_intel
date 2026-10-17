@@ -40,7 +40,8 @@ def main():
     assert receipt['binary_sha256'] == sha(bun) and not receipt['recovered_native_roles_integrated']
     bun.chmod(0o500)
     env = {k: v for k, v in os.environ.items() if not any(x in k.upper() for x in ['TOKEN', 'SECRET', 'PASSWORD']) and not k.startswith('ACTIONS_')}
-    env.update(BUN_RUNTIME_TRANSPILER_CACHE_PATH='0', BUN_INSTALL_CACHE_DIR=str(out / 'owned-cache'))
+    env.update(BUN_RUNTIME_TRANSPILER_CACHE_PATH='0', BUN_INSTALL_CACHE_DIR=str(out / 'owned-cache'),
+               HTTP_PROXY='http://127.0.0.1:9', HTTPS_PROXY='http://127.0.0.1:9', ALL_PROXY='http://127.0.0.1:9')
     observations = []
 
     def limits():
@@ -60,18 +61,19 @@ def main():
     revision = run('revision', [bun, '--revision'])
     assert COMMIT[:9].encode() in revision.stdout and not revision.stderr
     arch = 'arm64' if args.arch == 'arm64' else 'x64'
-    script = 'const z=require("node:zlib");const s="owned λ 中文";console.log(JSON.stringify({arch:process.arch,unicode:z.gunzipSync(z.gzipSync(Buffer.from(s))).toString(),regexp:/λ/u.test(s),bigint:String(2n**64n)}));'
-    expected = json.dumps(dict(arch=arch, unicode='owned λ 中文', regexp=True, bigint='18446744073709551616'), ensure_ascii=False, separators=(',', ':')).encode() + b'\n'
+    script = 'const z=require("node:zlib");const s="owned λ 中文";console.log(JSON.stringify({arch:process.arch,revision:Bun.revision.slice(0,9),unicode:z.gunzipSync(z.gzipSync(Buffer.from(s))).toString(),regexp:/λ/u.test(s),bigint:String(2n**64n)}));'
+    expected = json.dumps(dict(arch=arch, revision=COMMIT[:9], unicode='owned λ 中文', regexp=True, bigint='18446744073709551616'), ensure_ascii=False, separators=(',', ':')).encode() + b'\n'
     run('javascript-zlib-unicode', [bun, '-e', script], expected)
     fixture = out / 'owned 空格\nfixture.txt'; fixture.write_bytes(b'owned filesystem\n')
     run('filesystem-path', [bun, '-e', 'process.stdout.write(require("node:fs").readFileSync(process.argv.at(-1)));', fixture], b'owned filesystem\n')
     entry = out / 'owned-entry.js'; entry.write_text(script)
     compiled = out / 'owned-standalone'
-    run('compile-owned-standalone', [bun, 'build', '--compile', '--outfile', compiled, entry], restricted=False)
+    run('compile-owned-standalone', [bun, 'build', '--compile', '--compile-executable-path', bun, '--outfile', compiled, entry], restricted=False)
     assert compiled.is_file() and struct.unpack_from('<II', compiled.read_bytes()) == struct.unpack_from('<II', raw)
     run('execute-owned-standalone', [compiled], expected)
     report = dict(status='public_baseline_native_owned_controls_passed', arch=args.arch, host=platform.platform(),
         candidate=pin, binary_sha256=sha(bun), standalone_sha256=sha(compiled), observations=observations,
+        standalone_engine_explicitly_pinned=True, standalone_source_revision_checked=True,
         recovered_native_roles_integrated=False, captured_client_executed=False, goal_complete=False)
     (out / 'receipt.json').write_text(json.dumps(report, indent=2) + '\n')
     compiled.unlink()  # The retained artifact contains bounded authored diagnostics.
