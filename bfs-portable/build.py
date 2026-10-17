@@ -55,7 +55,9 @@ def main():
         measured_sysroot='/opt/linux-sysroot-glibc'+('-arm64' if a.arch=='arm64' else '')
         identity_mounts=[value for name in ['passwd','group'] for value in ['--mount',f'type=bind,src={identity/name},dst=/etc/{name},readonly']]
         run('source-build',['docker','run','--rm','--platform',docker_platform,'--network','none','--cap-drop','ALL','--security-opt','no-new-privileges','--user',f'{os.getuid()}:{os.getgid()}','--cpus','2','--memory','4g','--pids-limit','256','--mount',f'type=bind,src={work},dst=/tmpfs/bun','--mount',f'type=bind,src={out/"sysroot"},dst={measured_sysroot},readonly','--mount',f'type=bind,src={ROOT},dst=/recipes,readonly',*identity_mounts,'--env','RECOVERY_ARCH='+a.arch,'--entrypoint','/bin/bash',image,'/recipes/build-bfs.sh'])
-        binary=work/'embedded/bfs/bin/bfs';assert binary.is_file();raw=binary.read_bytes();assert raw[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',raw,18)[0]=={'x64':62,'arm64':183}[a.arch]
+        binary=work/'embedded/bfs/bin/bfs';assert binary.is_file()
+        library_receipt=json.loads((work/'native-library/receipt.json').read_bytes());assert sha(binary)==library_receipt['host_sha256'], 'Upstream checks replaced the library host'
+        raw=binary.read_bytes();assert raw[:6]==b'\x7fELF\x02\x01' and struct.unpack_from('<H',raw,18)[0]=={'x64':62,'arm64':183}[a.arch]
         # Retain the public candidate even when its measured ABI floor refuses it.
         shutil.copyfile(binary,logs/'public-bfs-candidate')
         run('version-needs',['readelf','--version-info',binary]);run('dynamic-symbols',['readelf','--dyn-syms','--wide',binary])

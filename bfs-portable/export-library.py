@@ -15,9 +15,14 @@ for source in objects:
     target=owned/source.name;shutil.copyfile(source,target)
     if source.name=='main.o':
         before=out/'main-text-before';after=out/'main-text-after'
-        run([llvm/'llvm-objcopy','--dump-section',f'.text={before}',source])
+        original_sha256=sha(source)
+        run([llvm/'llvm-objcopy','--dump-section',f'.text={before}',source,out/'dump-source.o'])
+        assert sha(source)==original_sha256
         run([llvm/'llvm-objcopy','--redefine-sym=main=neverd_recovered_bfs_main',target])
-        run([llvm/'llvm-objcopy','--dump-section',f'.text={after}',target])
+        renamed_sha256=sha(target)
+        run([llvm/'llvm-objcopy','--dump-section',f'.text={after}',target,out/'dump-renamed.o'])
+        assert sha(target)==renamed_sha256
+        (out/'dump-source.o').unlink();(out/'dump-renamed.o').unlink()
         assert before.read_bytes()==after.read_bytes() and before.stat().st_size>0
     rows.append(dict(file=target.name,source_sha256=sha(source),library_object_sha256=sha(target),entry_symbol_renamed=source.name=='main.o'))
 archive=out/'librecovered_bfs.a';run([llvm/'llvm-ar','crsD',archive,*sorted(owned.glob('*.o'))])
