@@ -139,6 +139,11 @@ def main():
         candidate = package / "apply-seccomp"
         for name in ["control", "apply-seccomp"]:
             assert sha(package / name) == public["binaries"][name]["sha256"]
+        if args.source_bun:
+            from source_runtime import pin as source_runtime_pin
+            candidate = args.source_bun.resolve()
+            receipt["source_native_helper_candidate"] = source_runtime_pin(args.arch, candidate, args.source_bun_sha256)
+        candidate_sha256 = sha(candidate)
         state_parent = out / "state"
         state_parent.mkdir()
         def isolated(label, executable, arguments, *, expected=0, role=False, descriptor=False, entrypoint="/runtime/client", seed=None):
@@ -224,6 +229,7 @@ def main():
             with tar.extractfile(members[0]) as source, original.open("xb") as target:
                 shutil.copyfileobj(source, target)
         assert sha(original) == pin["sha256"]
+        assert sha(candidate) == candidate_sha256
         original.chmod(0o500)
         receipt["original"] = pin
         receipt["captured_client_execution_attempted"] = True
@@ -275,6 +281,7 @@ def main():
             receipt["bash"] = accept_bash(args.arch, original, out, logs, run, bwrap, package, args.bash_rg.resolve(), receipt.setdefault("bash", {}),
                 source_bun=args.source_bun.resolve() if args.source_bun else None, source_bun_sha256=args.source_bun_sha256)
         assert sha(original) == pin["sha256"]
+        assert sha(candidate) == candidate_sha256
         receipt.update(status="native_role_candidate_matches_extended_bounded_cases", descriptor_cases=descriptor_cases, extended=extended,
             namespace_normalization="Only three kernel-assigned namespace inode identities; each must be valid and differ from the same invocation's outer namespace recorded by the authored exec driver. Every other process-state field is exact.",
             scope="Seven direct and four descriptor-3 cases plus external signals and optional observer controls inside a qualified empty-root namespace boundary. The optional --bash-rg suite adds seven complete offline Bash tool call chains against both layouts. Whole-helper and universal program equivalence remain open.")

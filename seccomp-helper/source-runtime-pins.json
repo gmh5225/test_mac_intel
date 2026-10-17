@@ -1,19 +1,17 @@
 {
-  "schema_version": 1,
+  "schema_version": 3,
+  "integration_strategy": "single-rust-source-graph-and-c",
   "public_bun_commit": "c6da4a4d3010e5553438c60f6bd76d981976867c",
-  "producer_run": 38956750121,
-  "producer_head": "eb8533774208375903ddc7d298278626e5ac1cce",
-  "profiles": {
-    "arm64": {
-      "binary_sha256": "2ed484921b0688b41c6e99a34f92e4bb6a3262320e40eaa18211d5c1a9db688f",
-      "bytes": 122674984,
-      "manifest_sha256": "629c98b53d492c5152ee2e91f8fba2d03222157013eb41a988067d4eb5e18271",
-      "maximum_core_glibc_requirement": "2.17",
-      "embedded_payloads": {
-        "rg": "e75f359f552c3f0d0594f752f0fd7d8540a20e4739ee9b87c30f99175a6964ac",
-        "apply-seccomp": "6b650422a7287f2e585728667510d75700d6e5c638b0ea5722ad1f9f0d7ec666"
-      },
-      "independent_qualification_sha256": "31d69425ca8fc54c20aa874eadcdb352018f2d6ed9b6876e738df9b1c94b9384"
-    }
+  "producer_run": 0,
+  "producer_head": "",
+  "profiles": {},
+  "status": "no_source_built_engine_admitted_pending_actual_qualification",
+  "revoked_profiles": {
+    "producer_run": 38956750121,
+    "producer_head": "eb8533774208375903ddc7d298278626e5ac1cce",
+    "reason": "Actual Bash exceeded its unchanged hard file limit while materializing a memfd payload; independent prebuilt Rust archives subsequently fail Bun source-std linkage. Neither strategy is admitted.",
+    "binary_sha256": [
+      "2ed484921b0688b41c6e99a34f92e4bb6a3262320e40eaa18211d5c1a9db688f"
+    ]
   }
 }

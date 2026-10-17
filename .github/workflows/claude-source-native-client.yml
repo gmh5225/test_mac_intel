@@ -20,6 +20,7 @@ jobs:
     outputs:
       matrix: ${{ steps.select.outputs.matrix }}
       producer_run: ${{ steps.select.outputs.producer_run }}
+      admitted: ${{ steps.select.outputs.admitted }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -31,16 +32,20 @@ jobs:
           from pathlib import Path
           import json, os
           pins=json.loads(Path('seccomp-helper/source-runtime-pins.json').read_bytes())
-          assert pins['producer_run']==38956750121 and pins['producer_head']=='eb8533774208375903ddc7d298278626e5ac1cce'
-          profiles=pins['profiles'];assert profiles and set(profiles)<={'x64','arm64'}
+          assert pins['schema_version']==3 and pins['integration_strategy']=='single-rust-source-graph-and-c'
+          profiles=pins['profiles'];assert set(profiles)<={'x64','arm64'}
+          if profiles: assert type(pins['producer_run']) is int and pins['producer_run']>0
+          else: print('Full source-engine client acceptance pending: no qualified runtime is admitted.')
           matrix={'include':[{'arch':arch,'runner':{'x64':'ubuntu-22.04','arm64':'ubuntu-22.04-arm'}[arch]} for arch in sorted(profiles)]}
           with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('admitted='+str(bool(profiles)).lower()+'\n')
               out.write('matrix='+json.dumps(matrix,separators=(',',':'))+'\n')
               out.write('producer_run='+str(pins['producer_run'])+'\n')
           PY
   qualify:
     name: Native ${{ matrix.arch }} source-engine real Bash and built-in search
     needs: profiles
+    if: ${{ needs.profiles.outputs.admitted == 'true' }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.profiles.outputs.matrix) }}

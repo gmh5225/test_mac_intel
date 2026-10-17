@@ -18,4 +18,25 @@ python3 --version
 # A fresh build directory cannot reuse the image's Bun core object files.
 # Public WebKit and other dependency artifacts remain subject to Bun's own
 # pinned dependency graph; this is not a JavaScriptCore source-build claim.
+# Compile PCRE2 with the same portable C sysroot before Cargo plans pcre2-sys.
+native=/output/bun-source/recovery-native
+mkdir "$native/pcre2-build"
+cd "$native/pcre2-build"
+CC="/usr/lib/llvm-current/bin/clang --sysroot=$LINUX_GLIBC_SYSROOT" \
+  AR=/usr/lib/llvm-current/bin/llvm-ar RANLIB=/usr/lib/llvm-current/bin/llvm-ranlib \
+  "$native/pcre2-source/configure" --prefix="$native/pcre2-install" \
+  --disable-shared --enable-static --enable-jit --disable-pcre2-16 --disable-pcre2-32
+make -j2
+make check
+make install
+cd /output/bun-source
+export PCRE2_SYS_STATIC=1
+export PKG_CONFIG_ALL_STATIC=1
+export PKG_CONFIG_PATH="$native/pcre2-install/lib/pkgconfig"
+export GIT_CEILING_DIRECTORIES=/output/bun-source/recovery-native
+# Resolve only the added public crate graph. The final plan/build is locked.
+RECOVERY_BOOTSTRAP_RUST_LOCK=1 bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery --target rust-plan -j2
+cp Cargo.lock /output/diagnostics/resolved-Cargo.lock
+bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery --target rust-plan -j2
+python3 /recipes/verify_rust_plan.py build/recovery/rust-target/plan.json /output/diagnostics/single-rust-graph.json
 bun scripts/build.ts --profile=release --build-dir=/output/bun-source/build/recovery -j2

@@ -10,19 +10,28 @@ spelling, unconditional consumption of that variable when present, and
 recognized actual argv[0] basename precedence. The four role values are rg,
 ug/ugrep, bfs and apply-seccomp. Its Rust type names are authored.
 
-`patch_bun.py` requires the exact public process-entry and native-build-graph
-hashes before changing either boundary. `recovered_multicall.rs` runs there
-before VM/thread setup. It directly calls source-built Rust rg and C seccomp
-entries linked into the engine. The Rust library uses Bun's exact compiler
-channel and the host's existing Rust standard library/global allocator. Cargo's
-fresh reported artifacts define the archive inputs. Ugrep and bfs currently
-fail explicitly as unintegrated implementations.
+`patch_bun.py` checks exact public entry, C build, Cargo, Rust planner and
+source-glob hashes. `recovered_multicall.rs` dispatches before VM/thread setup.
+The rg source is a dependency of bun_runtime, using Bun's own source-built std
+and linker-plugin LTO graph. Seccomp remains the unchanged C implementation.
+No prebuilt Rust archive is a link input. Ugrep/bfs still fail explicitly until
+integrated.
 
-The earlier embedded-ELF strategy passed public component controls but failed
-actual Bash: materializing the seccomp payload exceeded the inherited 256 KiB
-file limit. That strategy is rejected for client admission. The replacement
-executes library code without writing a payload file and must pass ten controls
-with RLIMIT_FSIZE=0, the glibc gate and actual captured-client acceptance.
+Standalone Rust/C hosts passed seven RLIMIT_FSIZE=0 controls. The first full Bun
+link rejected those separately compiled archives: Bun rebuilds std with its own
+features and flags. The replacement stages the pinned public rg/PCRE2 source
+archives and ABI wrapper into the same Rust graph. A bootstrap `rust-plan` step
+resolves the added dependency lock without compiling the engine; the final plan
+and build use --locked. A pre-build graph verifier requires one target std,
+the actual rg dependency edge and the pinned PCRE2 overlay source. The effective
+Cargo.lock and complete plan are retained for independent readback and repeat
+build qualification.
+
+The earlier embedded-ELF strategy failed real Bash when materializing a payload
+exceeded the inherited 256 KiB hard file limit. That strategy is rejected. The
+source graph still has to pass ten zero-file-budget engine controls, the glibc
+gate and every actual client case; neither standalone hosts nor a graph patch
+establish that acceptance.
 
 The source workflow uses fresh Bun source/build/cache directories in pinned
 native compiler containers. The containers supply toolchains; the engine's
@@ -58,16 +67,14 @@ musl candidate loses PCRE2 JIT on ARM64, so it is not used for the glibc
 reconstruction. The direct-link library package retains exact public Rust crates,
 PCRE2 10.45/JIT source, upstream locks, the unchanged seccomp C source/filter
 header, the authored ABI wrapper and native probe controls. Every package file
-is hashed before integration. Libraries are built offline in the exact pinned
-Bun compiler image and combined into an archive without a second Rust standard
-library. Native standalone controls do not establish the portability of a
-complete Bun link; the final engine must independently pass its version-needs
+is hashed before integration. The standalone library proof remains source provenance and
+component evidence only. The engine recompiles Rust sources and std together; the final engine must independently pass its version-needs
 gate and actual execution tests.
 
 `claude-source-native-client.yml` consumes only independently admitted runtime
 profiles in `seccomp-helper/source-runtime-pins.json`. Admission binds the exact
-producer, complete artifact manifest, binary, glibc floor and direct library
-input hashes. Its private client builds preserve the original descriptor provider;
+producer, complete artifact manifest, binary, glibc floor, source graph and
+input hashes. Rejected engines have no admitted profile. Its private client builds preserve the original descriptor provider;
 the readable layout applies only the pinned whitespace recipe. Each layout is
 built twice and every module row is read back before actual execution.
 

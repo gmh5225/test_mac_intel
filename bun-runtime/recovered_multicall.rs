@@ -8,7 +8,6 @@ mod role_contract;
 use role_contract::Role;
 
 unsafe extern "C" {
-    fn neverd_recovered_rg_main() -> !;
     fn neverd_recovered_seccomp_main(argc: c_int, argv: *const *const c_char) -> c_int;
 }
 
@@ -34,7 +33,7 @@ pub(super) unsafe fn dispatch(argc: c_int, argv: *const *const c_char) -> Option
     match role_contract::prefer_actual(from_environment, actual) {
         Role::Runtime => None,
         // The public library owns process termination with its real ExitCode.
-        Role::Ripgrep => unsafe { neverd_recovered_rg_main() },
+        Role::Ripgrep => recovered_ripgrep::neverd_recovered_rg_main(),
         // This C entry receives the unchanged process argv and inherited fds.
         Role::ApplySeccomp => Some(unsafe { neverd_recovered_seccomp_main(argc, argv) }),
         role @ (Role::Ugrep | Role::Bfs) => {

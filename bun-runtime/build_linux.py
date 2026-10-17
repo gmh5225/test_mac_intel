@@ -44,8 +44,8 @@ def main():
     native_inputs = qualify_native_libraries(args.arch, native_package)
     receipt = {"status": "started", "arch": args.arch, "public_bun_commit": COMMIT, "profile": profile,
                "original_bun_revision_recovered": False, "original_prefix_reused": False,
-               "captured_client_executed": False, "commands": [], "native_libraries": native_inputs,
-               "integration_strategy": "direct-rust-rlibs-and-c"}
+               "captured_client_executed": False, "commands": [], "native_source_provenance": native_inputs,
+               "integration_strategy": "single-rust-source-graph-and-c", "compiled_native_archive_used": False}
 
     def run(label, argv, *, cwd=None):
         receipt["commands"].append({"label": label, "argv": list(map(str, argv)), "cwd": str(cwd) if cwd else None})
@@ -112,20 +112,26 @@ def main():
                    "expected_code": expected_code, "expected_text": expected_text, "rlimit_fsize": 0}
             controls.append(row)
             assert result.returncode == expected_code and expected_text in stdout + stderr, label
+            if label == "rg-environment":
+                assert "(rev " not in stdout and "PCRE2 10.45 is available (JIT is available)" in stdout
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
-        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json"]:
+        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "verify_rust_plan.py"]:
             shutil.copyfile(ROOT / name, package / name)
         shutil.copytree(native_package / "inputs", package / "native-component-source-inputs")
         for name in ["apply-seccomp.c", "unix-block-bpf.h", "SECCOMP-LICENSE", "recovery_lib.rs", "effective-library-Cargo.toml"]:
             shutil.copyfile(native_package / name, package / name)
         shutil.copyfile(native_package / "MANIFEST.json", package / "native-component-input-manifest.json")
+        shutil.copyfile(logs / "single-rust-graph.json", package / "single-rust-graph.json")
+        shutil.copyfile(source / "build/recovery/rust-target/plan.json", package / "rust-plan.json")
         for name in ["LICENSE.md", "Cargo.lock", "rust-toolchain.toml"]:
             shutil.copyfile(source / name, package / name)
+        receipt["rust_graph"] = json.loads((logs / "single-rust-graph.json").read_bytes())
+        receipt["resolved_cargo_lock_sha256"] = sha(source / "Cargo.lock")
         receipt.update(status="public_bun_source_build_and_bounded_native_dispatch_controls_passed",
                        runtime_sha256=sha(binary), runtime_bytes=binary.stat().st_size, authored_controls=controls,
                        zero_file_budget_controls_passed=True,
-                       scope="Public Bun source with directly linked Rust rg and C seccomp before VM setup. Ten controls pass with a zero file budget. Original revision, Ugrep/Bfs integration and captured-client acceptance remain open.")
+                       scope="Public Bun source with rg/std in one Rust graph and C seccomp before VM setup. Ten controls pass with a zero file budget. Original revision, Ugrep/Bfs integration and captured-client acceptance remain open.")
         (package / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
         files = [{"file": path.relative_to(package).as_posix(), "sha256": sha(path), "bytes": path.stat().st_size}
                  for path in sorted(package.rglob("*")) if path.is_file()]
@@ -135,6 +141,10 @@ def main():
         receipt.update(status="failed", error_type=type(error).__name__, error=str(error))
         raise
     finally:
+        plan = source / "build/recovery/rust-target/plan.json"
+        if plan.is_file(): shutil.copyfile(plan, logs / "rust-plan.json")
+        lock = source / "Cargo.lock"
+        if lock.is_file(): shutil.copyfile(lock, logs / "final-Cargo.lock")
         (logs / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
 
 
