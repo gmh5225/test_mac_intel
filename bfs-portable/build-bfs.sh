@@ -44,14 +44,14 @@ make -j2 V=1 "${build_flags[@]}"
 ./bin/bfs --version
 ./bin/bfs --version > /tmpfs/bun/standalone/component-version.stdout
 cxx=/usr/lib/llvm-23/bin/clang++
-"$cxx" --target="$triple" --sysroot="$sysroot" -std=c++20 -O2 -c \
+"$cxx" --target="$triple" --sysroot="$sysroot" -std=c++20 -O2 -ffunction-sections -fdata-sections -c \
   /tmpfs/bun/standalone/compat.cpp -o /tmpfs/bun/standalone/compat.o
-outer_flags=(-Wl,--wrap=fcntl64 -Wl,--wrap=statx -static-libstdc++ -static-libgcc -pthread -ldl)
+outer_flags=(-Wl,--wrap=fcntl64 -Wl,--wrap=statx -Wl,--gc-sections -static-libstdc++ -static-libgcc -pthread -ldl)
 objects=(obj/src/*.o)
 "$cxx" --target="$triple" --sysroot="$sysroot" -Wl,-z,now -no-pie \
   "${objects[@]}" /tmpfs/bun/standalone/compat.o \
   -L/tmpfs/bun/build/release/deps/oniguruma -lonig -lrt \
-  "${outer_flags[@]}" -o /tmpfs/bun/standalone/bfs
+  "${outer_flags[@]}" -Wl,-Map=/tmpfs/bun/standalone/bfs-link.map -o /tmpfs/bun/standalone/bfs
 /tmpfs/bun/standalone/bfs --version > /tmpfs/bun/standalone/outer-version.stdout
 cmp /tmpfs/bun/standalone/component-version.stdout /tmpfs/bun/standalone/outer-version.stdout
 for variant in native fallback; do

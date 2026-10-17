@@ -62,7 +62,9 @@ def main():
         versions={tuple(map(int,v.split('.'))) for v in re.findall(r'GLIBC_([0-9]+(?:\.[0-9]+)+)',(logs/'version-needs.log').read_text())};assert versions
         receipt['maximum_glibc_requirement']='.'.join(map(str,max(versions)))
         assert max(versions)<=(2,17),'Bfs exceeds the original engine glibc floor'
-        version=subprocess.check_output([binary,'--version'],timeout=10);(logs/'bfs-version.stdout').write_bytes(version);assert version.startswith(b'bfs 4.1.1\n')
+        version=subprocess.check_output([binary,'--version'],timeout=10);(logs/'bfs-version.stdout').write_bytes(version)
+        expected_version=ROOT/('expected-version-'+a.arch+'.txt');assert version==expected_version.read_bytes(), 'Full Bfs version bytes differ from the original measured profile'
+        receipt['original_version_observation_sha256']=sha(expected_version)
         fixture=out/'fixture';fixture.mkdir();(fixture/'input.txt').write_text('owned fixture\n')
         controls=[]
         for label,args,code,text in [('name',[str(fixture),'-name','*.txt','-printf','%f\n'],0,b'input.txt\n'),('missing-user',[str(fixture),'-maxdepth','0','-user','neverd_missing_public_fixture_user_21296'],1,b'')]:
@@ -74,6 +76,7 @@ def main():
         shutil.copytree(identity,package/'compiler-test-identity')
         shutil.copytree(ROOT/'bun-compat-source',package/'bun-compat-source');shutil.copyfile(ROOT/'bun-compat-inputs.json',package/'bun-compat-inputs.json')
         shutil.copyfile(standalone/'compat.cpp',package/'compat.cpp');shutil.copyfile(ROOT/'compat-probe.c',package/'compat-probe.c')
+        shutil.copyfile(expected_version,package/'expected-original-version.txt')
         for name in ['build.py','build-bfs.sh','README.md']:shutil.copyfile(ROOT/name,package/name)
         for name in ['prepare_sysroot.py','glibc-sysroot-pins.json']:shutil.copyfile(ROOT.parent/'bun-runtime'/name,package/name)
         shutil.copyfile(work/'embedded/bfs/LICENSE',package/'BFS-LICENSE');shutil.copyfile(work/'embedded/oniguruma/COPYING',package/'ONIGURUMA-LICENSE')
@@ -84,7 +87,7 @@ def main():
         standalone=work/'standalone'
         if standalone.is_dir():
             retained_outer=logs/'outer-link';retained_outer.mkdir()
-            for name in ['compat.cpp','component-version.stdout','outer-version.stdout']:
+            for name in ['compat.cpp','component-version.stdout','outer-version.stdout','bfs-link.map']:
                 if (standalone/name).is_file():shutil.copyfile(standalone/name,retained_outer/name)
         binary=work/'embedded/bfs/bin/bfs'
         if binary.is_file() and not (logs/'public-bfs-candidate').exists():
