@@ -1,6 +1,8 @@
 // Authored Windows argv[0] transport. Child processes inherit the AppContainer.
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <fcntl.h>
+#include <io.h>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -20,16 +22,36 @@ static std::wstring quote(const wchar_t *value) {
   out.push_back(L'"');
   return out;
 }
-static void hex(const wchar_t *value) {
-  if (!value) { std::fputs("null", stdout); return; }
-  std::putchar('"');
-  for (auto p = value; *p; ++p) std::printf("%04x", static_cast<unsigned>(*p));
-  std::putchar('"');
+static void hex(FILE *stream, const wchar_t *value) {
+  if (!value) { std::fputs("null", stream); return; }
+  std::fputc('"', stream);
+  for (auto p = value; *p; ++p) std::fprintf(stream, "%04x", static_cast<unsigned>(*p));
+  std::fputc('"', stream);
 }
 int wmain(int argc, wchar_t **argv) {
+  std::wstring actual = argc ? argv[0] : L"";
+  auto separator = actual.find_last_of(L"\\/");
+  if (separator != std::wstring::npos) actual.erase(0, separator + 1);
+  if (actual == L"receiver.exe") {
+    if (argc != 2 || _setmode(_fileno(stdout), _O_BINARY) == -1 ||
+        _setmode(_fileno(stderr), _O_BINARY) == -1) return 65;
+    FILE *input = _wfopen(argv[1], L"rb");
+    if (!input) return 66;
+    std::fputs("{\"kind\":\"owned-rg-preprocessor\",\"env_utf16_hex\":", stderr);
+    hex(stderr, _wgetenv(L"ARGV0"));
+    std::fputs(",\"input_utf16_hex\":", stderr); hex(stderr, argv[1]);
+    std::fputs("}\n", stderr);
+    char bytes[4096];
+    while (auto count = std::fread(bytes, 1, sizeof(bytes), input)) {
+      if (std::fwrite(bytes, 1, count, stdout) != count) { std::fclose(input); return 67; }
+    }
+    bool failed = std::ferror(input) != 0;
+    std::fclose(input);
+    return failed ? 68 : 0;
+  }
   if (argc == 2 && std::wstring(argv[1]) == L"--capture") {
-    std::fputs("{\"argv0_utf16_hex\":", stdout); hex(argv[0]);
-    std::fputs(",\"env_utf16_hex\":", stdout); hex(_wgetenv(L"ARGV0"));
+    std::fputs("{\"argv0_utf16_hex\":", stdout); hex(stdout, argv[0]);
+    std::fputs(",\"env_utf16_hex\":", stdout); hex(stdout, _wgetenv(L"ARGV0"));
     std::puts("}"); return 37;
   }
   if (argc < 3) return 64;
