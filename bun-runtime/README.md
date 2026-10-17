@@ -14,8 +14,9 @@ ug/ugrep, bfs and apply-seccomp. Its Rust type names are authored.
 source-glob hashes. `recovered_multicall.rs` dispatches before VM/thread setup.
 The rg source is a dependency of bun_runtime, using Bun's own source-built std
 and linker-plugin LTO graph. Seccomp remains the unchanged C implementation.
-No prebuilt Rust archive is a link input. Ugrep/bfs still fail explicitly until
-integrated.
+No prebuilt Rust archive is a link input. The default profile still rejects
+Ugrep/bfs explicitly. A separately qualified Bfs C library integration profile
+is described below; it has not yet passed full-engine acceptance.
 
 Standalone Rust/C hosts passed seven RLIMIT_FSIZE=0 controls. The first full Bun
 link rejected those separately compiled archives: Bun rebuilds std with its own
@@ -33,7 +34,9 @@ The shared graph compiled rg on both architectures before exposing six Bun
 `as _` comparisons whose inference became ambiguous with serde_json's trait
 implementations. Exact source hashes and line identities gate explicit i32
 address-family and u16 SystemError casts. Separate i32 syscall errors are not
-rewritten. The actual engine compile and execution gates still have to pass.
+rewritten. Run 38989752164 rebuilt both native engines and passed all ten
+zero-file-budget controls with PCRE2 10.45/JIT and GLIBC_2.17. All source,
+artifact, lock and graph records were independently rehashed before admission.
 
 The earlier embedded-ELF strategy failed real Bash when materializing a payload
 exceeded the inherited 256 KiB hard file limit. That strategy is rejected. The
@@ -91,5 +94,22 @@ comparisons, including observer and external signal cases, followed by
 seven complete Bash tool chains and thirteen built-in Grep/Glob cases against
 both layouts. The source-native route calls the rebuilt client directly and
 has no external rg on PATH. Captured clients and source stay on the runner;
-only diagnostics are uploaded. A prepared workflow or admitted public engine
-does not establish that this client acceptance has passed.
+only diagnostics are uploaded. Run 38991982622 rebuilt both layouts twice on
+both architectures and passed all 28 real Bash comparisons and the helper
+controls. It failed built-in search: G03-count returned no matches for one x64
+layout and one ARM64 layout while the originals returned two. Those exact raw
+records remain failed evidence. The current diagnostic run retains client
+debug logs and independently probes count output through synchronous and
+asynchronous children, both with ordinary paths and inherited FD3.
+
+The optional `claude-bun-bfs-runtime-source.yml` profile admits the exact C-only
+archives from run 38991059015. It rehashes the entire package and checks the
+compiler image, portable sysroot, original version bytes, 29 source objects and
+four zero-file-budget host controls. Only the main symbol is renamed; the
+original main text is unchanged. The Bfs and Oniguruma archives are linked
+directly after the Rust objects, using Bun's existing compatibility wrappers
+and the original's POSIX timer library. No separate Rust std archive or payload
+file is used. This profile adds exact Bfs version/name/regex engine controls;
+passing standalone hosts or applying its patch does not establish successful
+Bun integration. Ugrep, the private Bun revision, other native platforms and
+complete client acceptance remain open.

@@ -16,6 +16,7 @@ RUST_BUILD_SHA256 = "60be0343740db96380bca663c4d06875945ef59aeba97e8ea03e4e01b91
 GLOBS_SHA256 = "21f9a8a7073b3a780b65ed402ef172766ecfdf5c8ec0ba2274c0b54d41b0eec7"
 BASE_LOCK_SHA256 = "10c44ac0a3662b7ee64b0d925b2d8728e8e3031485066e404b5b31379a342b3e"
 RESOLVED_LOCK_SHA256 = "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723"
+FLAGS_SHA256 = "131cb0fbe11ae8249bace7d39486c30cd800f1e4e3903093c74c12f2b6e3395c"
 OLD = "    unsafe { bun_core::init_argv(argc, argv) };\n"
 NEW = OLD + '''
     // Recovered Linux multicall boundary, before threads and cached env reads.
@@ -30,7 +31,7 @@ def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def patch(source, evidence, native_package=None):
+def patch(source, evidence, native_package=None, bfs_package=None):
     entry = source / "src/runtime/bin_entry/mod.rs"
     assert sha(entry) == ENTRY_SHA256, "unqualified Bun process entry"
     build = source / "scripts/build/bun.ts"
@@ -44,6 +45,13 @@ def patch(source, evidence, native_package=None):
                   ("src/runtime/node/node_fs.rs", "09039025d7da37aceec165fd5177caea7e721da3e8c97dc675d4b1035e7bd0dd")]
     for rel, digest in additional:
         assert sha(source / rel) == digest, "unqualified Bun Rust graph input: " + rel
+    bfs_inputs = None
+    if bfs_package is not None:
+        from bfs_libraries import qualify as qualify_bfs
+        bfs_package = Path(bfs_package)
+        component = json.loads((bfs_package / "receipt.json").read_bytes())
+        bfs_inputs = qualify_bfs(component["arch"], bfs_package, component["compiler_image"])
+        assert sha(source / "scripts/build/flags.ts") == FLAGS_SHA256, "unqualified Bun Bfs linker flags"
     assert sha(ROOT / "resolved-Cargo.lock") == RESOLVED_LOCK_SHA256
     native_files = [native_package / name for name in ["apply-seccomp.c", "unix-block-bpf.h", "recovery_lib.rs"]]
     assert all(path.is_file() and not path.is_symlink() for path in native_files)
@@ -61,6 +69,33 @@ def patch(source, evidence, native_package=None):
     assert build_before.count(c_anchor) == build_before.count(link_anchor) == 1
     build_after = build_before.replace(c_anchor, c_anchor + '''  if (cfg.linux) cSources.push(resolve(cfg.cwd, "recovery-native/seccomp-entry.c"));
 ''')
+    extra_patches = []
+    multicall_code = None
+    if bfs_inputs is not None:
+        build_after = build_after.replace(link_anchor, link_anchor + '''  if (cfg.linux) linkObjects.push(
+    resolve(cfg.cwd, "recovery-native/bfs-libraries/librecovered_bfs.a"),
+    resolve(cfg.cwd, "recovery-native/bfs-libraries/libonig.a"),
+  );
+''')
+        flags = source / "scripts/build/flags.ts"; flags_before = flags.read_text()
+        flag_anchor = '  // ─── Linux ───\n  {\n    flag: c => [`--target=${c.crossTarget!}`, `--sysroot=${c.sysroot!}`],\n'
+        assert flags_before.count(flag_anchor) == 1
+        flags_after = flags_before.replace(flag_anchor, '''  // ─── Linux ───
+  {
+    flag: "-lrt",
+    when: c => c.linux && c.abi === "gnu",
+    desc: "Source-built Bfs POSIX timers (also required by the measured original)",
+  },
+  {
+    flag: c => [`--target=${c.crossTarget!}`, `--sysroot=${c.sysroot!}`],
+''')
+        extra_patches.append(("bfs-link-flags", "scripts/build/flags.ts", flags_before, flags_after))
+        multicall_code = (ROOT / "recovered_multicall.rs").read_text()
+        declaration = '    fn neverd_recovered_seccomp_main(argc: c_int, argv: *const *const c_char) -> c_int;\n'
+        unsupported = '        role @ (Role::Ugrep | Role::Bfs) => {\n'
+        assert multicall_code.count(declaration) == multicall_code.count(unsupported) == 1
+        multicall_code = multicall_code.replace(declaration, declaration + '    fn neverd_recovered_bfs_main(argc: c_int, argv: *const *const c_char) -> c_int;\n')
+        multicall_code = multicall_code.replace(unsupported, '        Role::Bfs => Some(unsafe { neverd_recovered_bfs_main(argc, argv) }),\n        role @ Role::Ugrep => {\n')
     root_cargo = source / "Cargo.toml"; root_before = root_cargo.read_text()
     assert root_before.count('\nexclude = ["vendor"]\n') == 1 and "[patch.crates-io]" not in root_before
     root_after = root_before.replace('\nexclude = ["vendor"]\n', '\nexclude = ["vendor", "recovery-native"]\n')
@@ -88,15 +123,22 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
     lock_before = (source / "Cargo.lock").read_text()
     lock_after = (ROOT / "resolved-Cargo.lock").read_text()
     stage(native_package, native_root)
+    if bfs_inputs is not None:
+        library_root = native_root / "bfs-libraries"; library_root.mkdir()
+        for name in ["librecovered_bfs.a", "libonig.a"]:
+            shutil.copyfile(bfs_package / "native-library" / name, library_root / name)
     entry.write_text(after); build.write_text(build_after)
     root_cargo.write_text(root_after); runtime_cargo.write_text(runtime_after)
     globs.write_text(globs_after); (source / "Cargo.lock").write_text(lock_after)
     for _, rel, _, after_type in type_patches: (source / rel).write_text(after_type)
+    for _, rel, _, after_extra in extra_patches: (source / rel).write_text(after_extra)
     copied = []
     for name in ["role_contract.rs", "recovered_multicall.rs"]:
         destination = entry.parent / name
         assert not destination.exists()
         shutil.copyfile(ROOT / name, destination)
+        if name == "recovered_multicall.rs" and multicall_code is not None:
+            destination.write_text(multicall_code)
         copied.append({"file": str(destination.relative_to(source)), "sha256": sha(destination)})
     evidence.mkdir()
     diff = "".join(difflib.unified_diff(before.splitlines(True), after.splitlines(True),
@@ -125,6 +167,15 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
                "native_inputs": [{"file": p.relative_to(native_root).as_posix(), "sha256": sha(p)}
                                  for p in sorted(native_root.rglob("*")) if p.is_file()],
                "scope": "One source-built Rust graph including std and rg, plus C seccomp, before VM initialization. No payload file writes or prebuilt Rust archive. Ugrep/Bfs and the private revision remain open."}
+    if bfs_inputs is not None:
+        extra_receipts = []
+        for label, rel, old, new in extra_patches:
+            path = evidence / (label + ".patch")
+            path.write_text("".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), fromfile="public-bun/"+rel, tofile="recovered-bun/"+rel)))
+            extra_receipts.append(dict(file=rel,before_sha256=hashlib.sha256(old.encode()).hexdigest(),after_sha256=sha(source/rel),patch_sha256=sha(path)))
+        receipt.update(compiled_native_archive_used=True, compiled_rust_archive_used=False,
+            bfs_library_provenance=bfs_inputs, c_library_patches=extra_receipts,
+            scope="One source-built Rust graph plus pinned source-built Bfs/Oniguruma C libraries and C seccomp before VM initialization. Ugrep and the private Bun revision remain open.")
     (evidence / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
     return receipt
 
@@ -134,5 +185,7 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--native-libraries", type=Path, required=True)
+    parser.add_argument("--bfs-libraries", type=Path)
     args = parser.parse_args()
-    print(json.dumps(patch(args.source.resolve(), args.evidence.resolve(), args.native_libraries.resolve())))
+    print(json.dumps(patch(args.source.resolve(), args.evidence.resolve(), args.native_libraries.resolve(),
+        args.bfs_libraries.resolve() if args.bfs_libraries else None)))

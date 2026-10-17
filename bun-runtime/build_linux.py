@@ -33,6 +33,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--arch", required=True, choices=PROFILES)
     parser.add_argument("--native-libraries", required=True, type=Path)
+    parser.add_argument("--bfs-libraries", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     assert platform.system() == "Linux" and {"x86_64": "x64", "aarch64": "arm64"}[platform.machine()] == args.arch
@@ -42,16 +43,29 @@ def main():
     source = out / "bun-source"
     native_package = args.native_libraries.resolve()
     native_inputs = qualify_native_libraries(args.arch, native_package)
+    bfs_package = args.bfs_libraries.resolve() if args.bfs_libraries else None
+    bfs_inputs = None
+    if bfs_package is not None:
+        from bfs_libraries import qualify as qualify_bfs_libraries
+        bfs_inputs = qualify_bfs_libraries(args.arch, bfs_package, profile["image"])
     receipt = {"status": "started", "arch": args.arch, "public_bun_commit": COMMIT, "profile": profile,
                "original_bun_revision_recovered": False, "original_prefix_reused": False,
                "captured_client_executed": False, "commands": [], "native_source_provenance": native_inputs,
                "integration_strategy": "single-rust-source-graph-and-c", "compiled_native_archive_used": False}
+    if bfs_inputs is not None:
+        receipt.update(integration_strategy="single-rust-source-graph-with-c-source-libraries",
+            compiled_native_archive_used=True, compiled_rust_archive_used=False, bfs_source_provenance=bfs_inputs)
 
     def run(label, argv, *, cwd=None):
         receipt["commands"].append({"label": label, "argv": list(map(str, argv)), "cwd": str(cwd) if cwd else None})
+        print("Starting " + label, flush=True)
         with (logs / (label + ".log")).open("xb") as stream:
-            result = subprocess.run(list(map(str, argv)), cwd=cwd, stdout=stream, stderr=subprocess.STDOUT)
-        assert result.returncode == 0, label + " failed; inspect retained diagnostics"
+            with subprocess.Popen(list(map(str, argv)), cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0) as process:
+                for chunk in iter(lambda: process.stdout.read(65536), b""):
+                    stream.write(chunk); stream.flush()
+                    sys.stdout.buffer.write(chunk); sys.stdout.buffer.flush()
+                status = process.wait()
+        assert status == 0, label + " failed; inspect retained diagnostics"
 
     try:
         run("git-init", ["git", "init", source])
@@ -60,7 +74,7 @@ def main():
         run("git-checkout", ["git", "checkout", "--detach", COMMIT], cwd=source)
         actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=source, text=True).strip()
         assert actual == COMMIT
-        receipt["source_patch"] = patch(source, logs / "source-patch", native_package)
+        receipt["source_patch"] = patch(source, logs / "source-patch", native_package, bfs_package)
         prepare(args.arch, out, logs)
         receipt["sysroot_receipt_sha256"] = sha(logs / "sysroot-receipt.json")
         run("compiler-image-pull", ["docker", "pull", "--platform", profile["docker_platform"], profile["image"]])
@@ -85,7 +99,7 @@ def main():
         controls = []
         receipt["authored_controls"] = controls
         fixture = out / "native-search-fixture.txt"; fixture.write_text("first\nNEEDLE\npreneedle\n")
-        for label, argv0, role, argv, expected_code, expected_text in [
+        control_cases = [
             ("runtime-version", str(binary), None, ["--version"], 0, "1.4.3"),
             ("rg-environment", str(binary), "rg", ["--version"], 0, "ripgrep 14.1.1"),
             ("rg-actual-basename", "/fixture/rg", "apply-seccomp", ["--version"], 0, "ripgrep 14.1.1"),
@@ -96,7 +110,14 @@ def main():
             ("raw-env-does-not-take-basename", str(binary), "/fixture/rg", ["--version"], 0, "1.4.3"),
             ("rg-zero-file-budget-search", str(binary), "rg", ["--no-config", "-n", "NEEDLE", str(fixture)], 0, "2:NEEDLE\n"),
             ("rg-zero-file-budget-pcre", str(binary), "rg", ["--no-config", "-P", "-o", "(?<=pre)needle", str(fixture)], 0, "needle\n"),
-        ]:
+        ]
+        if bfs_package is not None:
+            control_cases[5] = ("bfs-environment", str(binary), "bfs", ["--version"], 0, "bfs 4.1.1")
+            control_cases.extend([
+                ("bfs-zero-file-budget-name", str(binary), "bfs", [str(out), "-maxdepth", "1", "-name", fixture.name, "-print"], 0, str(fixture) + "\n"),
+                ("bfs-zero-file-budget-regex", str(binary), "bfs", [str(out), "-maxdepth", "1", "-regextype", "posix-extended", "-regex", ".*/native-search-fixture[.]txt", "-print"], 0, str(fixture) + "\n"),
+            ])
+        for label, argv0, role, argv, expected_code, expected_text in control_cases:
             env = dict(os.environ)
             env.pop("ARGV0", None)
             env["BUN_RUNTIME_TRANSPILER_CACHE_PATH"] = "0"
@@ -115,6 +136,8 @@ def main():
             assert result.returncode == expected_code and expected_text in stdout + stderr, label
             if label == "rg-environment":
                 assert "(rev " not in stdout and "PCRE2 10.45 is available (JIT is available)" in stdout, "rg used a different PCRE2 runtime or leaked a parent revision"
+            if label == "bfs-environment":
+                assert result.stdout == (bfs_package / "expected-original-version.txt").read_bytes() and not result.stderr, "Bfs full original version metadata differs"
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
         for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "verify_rust_plan.py", "resolved-Cargo.lock"]:
@@ -123,6 +146,11 @@ def main():
         for name in ["apply-seccomp.c", "unix-block-bpf.h", "SECCOMP-LICENSE", "recovery_lib.rs", "effective-library-Cargo.toml"]:
             shutil.copyfile(native_package / name, package / name)
         shutil.copyfile(native_package / "MANIFEST.json", package / "native-component-input-manifest.json")
+        if bfs_package is not None:
+            shutil.copytree(bfs_package, package / "bfs-source-library-inputs")
+            for name in ["bfs_libraries.py", "bfs-library-pins.json"]:
+                shutil.copyfile(ROOT / name, package / name)
+            shutil.copyfile(source / "src/runtime/bin_entry/recovered_multicall.rs", package / "effective_recovered_multicall.rs")
         shutil.copyfile(logs / "single-rust-graph.json", package / "single-rust-graph.json")
         shutil.copyfile(source / "build/recovery/rust-target/plan.json", package / "rust-plan.json")
         for name in ["LICENSE.md", "Cargo.lock", "rust-toolchain.toml"]:
@@ -133,6 +161,8 @@ def main():
                        runtime_sha256=sha(binary), runtime_bytes=binary.stat().st_size, authored_controls=controls,
                        zero_file_budget_controls_passed=True,
                        scope="Public Bun source with rg/std in one Rust graph and C seccomp before VM setup. Ten controls pass with a zero file budget. Original revision, Ugrep/Bfs integration and captured-client acceptance remain open.")
+        if bfs_package is not None:
+            receipt["scope"] = "Public Bun source with rg/std in one Rust graph, directly linked qualified C Bfs/Oniguruma libraries and C seccomp. Twelve zero-file-budget controls, including exact original Bfs version bytes. Ugrep, original Bun revision and actual-client acceptance remain open."
         (package / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
         files = [{"file": path.relative_to(package).as_posix(), "sha256": sha(path), "bytes": path.stat().st_size}
                  for path in sorted(package.rglob("*")) if path.is_file()]

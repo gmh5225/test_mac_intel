@@ -5,19 +5,20 @@ import hashlib,json,re,struct
 ROOT=Path(__file__).resolve().parent
 def sha(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
+def check_manifest(package,digest):
+    assert not package.is_symlink() and sha(package/'MANIFEST.json')==digest
+    assert not any(p.is_symlink() for p in package.rglob('*'));seen=set()
+    for row in json.loads((package/'MANIFEST.json').read_bytes())['files']:
+        rel=Path(row['file']);assert not rel.is_absolute() and '..' not in rel.parts and rel.as_posix()==row['file'] and row['file'] not in seen
+        seen.add(row['file']);path=package/rel
+        assert path.is_file() and path.stat().st_size==row['bytes'] and sha(path)==row['sha256']
+    assert seen|{'MANIFEST.json'}=={p.relative_to(package).as_posix() for p in package.rglob('*') if p.is_file()}
 def qualify(arch,package):
     pins=json.loads((ROOT/'native-library-pins.json').read_bytes())
     assert pins['schema_version']==1 and type(pins['producer_run']) is int and pins['producer_run']>0
     assert re.fullmatch('[0-9a-f]{40}',pins['producer_head']) and set(pins['profiles'])=={'x64','arm64'}
     expected=pins['profiles'][arch]
-    assert sha(package/'MANIFEST.json')==expected['manifest_sha256']
-    seen=set()
-    assert not package.is_symlink() and not any(p.is_symlink() for p in package.rglob('*'))
-    for row in json.loads((package/'MANIFEST.json').read_bytes())['files']:
-        rel=Path(row['file']);assert not rel.is_absolute() and '..' not in rel.parts and row['file'] not in seen
-        seen.add(row['file']);path=package/rel
-        assert path.is_file() and path.stat().st_size==row['bytes'] and sha(path)==row['sha256']
-    assert seen|{'MANIFEST.json'}=={p.relative_to(package).as_posix() for p in package.rglob('*') if p.is_file()}
+    check_manifest(package,expected['manifest_sha256'])
     receipt=json.loads((package/'receipt.json').read_bytes())
     assert sha(package/'receipt.json')==expected['receipt_sha256']
     assert receipt['status']=='direct_link_rust_and_c_candidates_pass_zero_file_budget_controls'

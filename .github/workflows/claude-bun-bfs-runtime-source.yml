@@ -1,0 +1,80 @@
+name: Source-built Bun with directly linked Bfs C libraries
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - bun-runtime/**
+      - .github/workflows/claude-bun-bfs-runtime-source.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    name: Native ${{ matrix.arch }} public Bun Bfs source rebuild
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Check native entry patch boundary
+        run: python3 -m unittest discover -s bun-runtime -p 'test_*.py' -v
+      - name: Read the admitted native-library producer
+        id: native-pins
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          pins = json.load(open("bun-runtime/native-library-pins.json"))
+          bfs = json.load(open("bun-runtime/bfs-library-pins.json"))
+          assert bfs["schema_version"] == 1 and isinstance(bfs["producer_run"], int) and bfs["producer_run"] > 0
+          assert pins["schema_version"] == 1 and isinstance(pins["producer_run"], int) and pins["producer_run"] > 0
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("producer_run=" + str(pins["producer_run"]) + "\n")
+              output.write("bfs_run=" + str(bfs["producer_run"]) + "\n")
+          PYTHON
+      - name: Download the independently qualified direct libraries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-direct-native-libraries-1
+          path: retained-native-libraries
+          run-id: ${{ steps.native-pins.outputs.producer_run }}
+          github-token: ${{ github.token }}
+      - name: Download the independently qualified Bfs source libraries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-portable-bfs-1
+          path: retained-bfs-libraries
+          run-id: ${{ steps.native-pins.outputs.bfs_run }}
+          github-token: ${{ github.token }}
+      - name: Build the public engine and reconstructed native routing
+        run: python3 bun-runtime/build_linux.py --arch ${{ matrix.arch }} --native-libraries retained-native-libraries --bfs-libraries retained-bfs-libraries --output bun-source-build
+      - name: Retain public runtime and authored integration source
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-source-bun-runtime-${{ github.run_attempt }}
+          path: bun-source-build/public-bun-runtime/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain source build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-source-bun-diagnostics-${{ github.run_attempt }}
+          path: |
+            bun-source-build/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
