@@ -134,3 +134,15 @@ execution, an explicit source engine, disabled macros/config inheritance,
 complete module readback, and source-code/exception-section checks. Captured
 inputs, extracted files and rebuilt clients remain outside uploaded diagnostic
 paths. Actual original-client/tool correspondence remains a later gate.
+
+`claude-macos-source-role-acceptance.yml` remains gated by the empty engine pin
+set until both architectures are independently admitted. It will then run the
+raw Ugrep/Bfs comparisons and 13 exact rg cases on native macOS 15/26, plus
+Ugrep upstream suites and the complete Bfs matrix on macOS 26. The original rg
+banner names the unavailable private revision `eecfd55deb`; the public rg build
+reports its actual upstream version without claiming that revision. This raw
+metadata difference is recorded separately and never counted as an exact pair.
+
+The Ugrep suite runner supplies an explicitly authored optional-feature test
+inventory from the admitted dependencies. It does not label that inventory as
+a recovered producer configuration header.

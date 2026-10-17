@@ -192,8 +192,16 @@ def main():
                  ('stdin-pcre', ['--no-config', '-P', '-o', '(?<=pre)needle'], 0, text)]
         cases += [(suffix, ['--no-config', '-z', '-n', 'NEEDLE', fixtures / ('input.' + suffix)], 0, b'') for suffix in ['gz', 'bz2', 'zst', 'br']]
         if a.role == 'rg':
-            cases = [('version', ['--version'], 0, b''),
-                ('literal', ['--no-config', '-n', 'NEEDLE', fixtures / 'input.txt'], 0, b''),
+            original_version = execute('original-version-provenance', original, 'rg', ['--version'])
+            source_version = execute('candidate-version-provenance', candidate, 'rg', ['--version'])
+            assert original_version[0] == source_version[0] == 0 and not original_version[2] and not source_version[2]
+            original_lines = original_version[1].splitlines(keepends=True); source_lines = source_version[1].splitlines(keepends=True)
+            assert original_lines[0] == b'ripgrep 14.1.1 (rev eecfd55deb)\n' and source_lines[0] == b'ripgrep 14.1.1\n'
+            assert original_lines[1:] == source_lines[1:], 'Non-provenance rg version fields differ'
+            receipt['version_provenance'] = dict(status='observed_private_producer_revision_is_not_claimed_by_public_source_build',
+                original_revision='eecfd55deb', source_revision_restored=False, raw_outputs_retained=True,
+                complete_version_output_equal=False, all_remaining_version_fields_equal=True, counted_as_exact_pair=False)
+            cases = [('literal', ['--no-config', '-n', 'NEEDLE', fixtures / 'input.txt'], 0, b''),
                 ('absent', ['--no-config', 'absent-owned-value', fixtures / 'input.txt'], 1, b''),
                 ('invalid', ['--no-config', '[', fixtures / 'input.txt'], 2, b''),
                 ('pcre', ['--no-config', '-P', '-o', '(?<=pre)needle', fixtures / 'input.txt'], 0, b''),
