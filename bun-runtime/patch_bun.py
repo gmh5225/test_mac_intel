@@ -6,6 +6,7 @@ import hashlib
 import json
 import shutil
 from stage_native_sources import stage
+from allocator_exports import patch_script as patch_allocator_exports, versions as allocator_versions
 
 ROOT = Path(__file__).resolve().parent
 ENTRY_SHA256 = "fe9a6db0e6c4fdc3b960de384a8ce26d3c5892566c6189be9ca5c30bba2b3b43"
@@ -41,10 +42,15 @@ def patch(source, evidence, native_package=None, bfs_package=None):
     additional = [("Cargo.toml", CARGO_SHA256), ("src/runtime/Cargo.toml", RUNTIME_CARGO_SHA256),
                   ("scripts/build/rust.ts", RUST_BUILD_SHA256), ("scripts/glob-sources.ts", GLOBS_SHA256),
                   ("Cargo.lock", BASE_LOCK_SHA256),
+                  ("src/linker.lds", "a365da6e5ee059e4debb1a605bd9433e1cd334ea26f0c142a968757c7d657345"),
                   ("src/runtime/dns_jsc/options_jsc.rs", "960c957481b0e97a688ed947ccf480dd13b0dd94285fbd45894ace7dae54fc47"),
                   ("src/runtime/node/node_fs.rs", "09039025d7da37aceec165fd5177caea7e721da3e8c97dc675d4b1035e7bd0dd")]
     for rel, digest in additional:
         assert sha(source / rel) == digest, "unqualified Bun Rust graph input: " + rel
+    arch = json.loads((native_package / "receipt.json").read_bytes())["arch"]
+    linker_before = (source / "src/linker.lds").read_text()
+    linker_after = patch_allocator_exports(linker_before, arch)
+    allocator_patch = ("allocator-exports", "src/linker.lds", linker_before, linker_after)
     bfs_inputs = None
     if bfs_package is not None:
         from bfs_libraries import qualify as qualify_bfs
@@ -130,7 +136,7 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
     entry.write_text(after); build.write_text(build_after)
     root_cargo.write_text(root_after); runtime_cargo.write_text(runtime_after)
     globs.write_text(globs_after); (source / "Cargo.lock").write_text(lock_after)
-    for _, rel, _, after_type in type_patches: (source / rel).write_text(after_type)
+    for _, rel, _, after_type in [*type_patches, allocator_patch]: (source / rel).write_text(after_type)
     for _, rel, _, after_extra in extra_patches: (source / rel).write_text(after_extra)
     copied = []
     for name in ["role_contract.rs", "recovered_multicall.rs"]:
@@ -152,7 +158,7 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
         ("cargo", "Cargo.toml", root_before, root_after),
         ("runtime-cargo", "src/runtime/Cargo.toml", runtime_before, runtime_after),
         ("source-globs", "scripts/glob-sources.ts", globs_before, globs_after),
-        ("cargo-lock", "Cargo.lock", lock_before, lock_after), *type_patches]:
+        ("cargo-lock", "Cargo.lock", lock_before, lock_after), *type_patches, allocator_patch]:
         patch_file = evidence / (label + ".patch")
         patch_file.write_text("".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), fromfile="public-bun/" + rel, tofile="recovered-bun/" + rel)))
         graph_patches.append({"file": rel, "before_sha256": hashlib.sha256(old.encode()).hexdigest(), "after_sha256": sha(source / rel), "patch_sha256": sha(patch_file)})
@@ -163,6 +169,7 @@ recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep
                "build_patch_sha256": sha(evidence / "build.patch"), "rust_graph_patches": graph_patches,
                "resolved_cargo_lock_sha256": RESOLVED_LOCK_SHA256,
                "upstream_rust_planner_sha256": sha(source / "scripts/build/rust.ts"),
+               "allocator_symbol_versions": allocator_versions(arch),
                "compiled_native_archive_used": False,
                "native_inputs": [{"file": p.relative_to(native_root).as_posix(), "sha256": sha(p)}
                                  for p in sorted(native_root.rglob("*")) if p.is_file()],

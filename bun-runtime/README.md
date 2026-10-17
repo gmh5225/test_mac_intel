@@ -18,6 +18,18 @@ No prebuilt Rust archive is a link input. The default profile still rejects
 Ugrep/bfs explicitly. A separately qualified Bfs C library integration profile
 is described below; it has not yet passed full-engine acceptance.
 
+The filename/count crash has been traced on the public ARM64 engine to
+`std::fs::canonicalize`: libc `realpath(NULL)` allocated on the libc heap,
+while the executable's local `free` was mimalloc. The public linker script
+hid the malloc override from libc. A native source model rejects both hidden
+symbols and symbols versioned as `BUN_1.2`; the matching GLIBC versions pass
+100 realpath/getcwd/getline ownership checks. `allocator_exports.py` now
+exports the ten allocator functions with each architecture's libc ABI versions.
+Fresh engines must pass a dynamic symbol/version check and 768 actual rg
+filename, count, JSON and inherited-file-descriptor comparisons with
+RLIMIT_FSIZE=0. This source fix still requires native full-engine and complete
+client acceptance; the earlier crashing engines are not repaired artifacts.
+
 Standalone Rust/C hosts passed seven RLIMIT_FSIZE=0 controls. The first full Bun
 link rejected those separately compiled archives: Bun rebuilds std with its own
 features and flags. The replacement stages the pinned public rg/PCRE2 source
@@ -111,5 +123,7 @@ directly after the Rust objects, using Bun's existing compatibility wrappers
 and the original's POSIX timer library. No separate Rust std archive or payload
 file is used. This profile adds exact Bfs version/name/regex engine controls;
 passing standalone hosts or applying its patch does not establish successful
-Bun integration. Ugrep, the private Bun revision, other native platforms and
-complete client acceptance remain open.
+Bun integration. Run 38992912659 completed both full-engine builds and all
+24 Bfs-profile controls; independent readback and the allocator repair still
+precede any complete-client admission. Ugrep, the private Bun revision,
+other native platforms and complete client acceptance remain open.

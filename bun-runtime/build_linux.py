@@ -16,6 +16,8 @@ sys.dont_write_bytecode = True
 from patch_bun import patch, sha
 from prepare_sysroot import prepare
 from native_libraries import qualify as qualify_native_libraries
+from allocator_exports import verify_symbols as verify_allocator_symbols
+from native_rg_controls import verify as verify_native_rg
 
 ROOT = Path(__file__).resolve().parent
 COMMIT = "c6da4a4d3010e5553438c60f6bd76d981976867c"
@@ -96,6 +98,9 @@ def main():
         versions = {tuple(map(int, value.split("."))) for value in re.findall(r"GLIBC_([0-9]+(?:\.[0-9]+)+)", (logs / "runtime-version-info.log").read_text())}
         assert versions and max(versions) <= (2, 17), "Source engine exceeds the upstream glibc portability floor"
         receipt["maximum_core_glibc_requirement"] = ".".join(map(str, max(versions)))
+        run("runtime-dynamic-symbols", ["readelf", "--dyn-syms", "--wide", binary])
+        receipt["allocator_symbol_versions"] = verify_allocator_symbols((logs / "runtime-dynamic-symbols.log").read_text(), args.arch)
+        receipt["native_rg_filename_controls"] = verify_native_rg(binary, logs / "native-rg-filename-controls")
         controls = []
         receipt["authored_controls"] = controls
         fixture = out / "native-search-fixture.txt"; fixture.write_text("first\nNEEDLE\npreneedle\n")
@@ -140,7 +145,7 @@ def main():
                 assert result.stdout == (bfs_package / "expected-original-version.txt").read_bytes() and not result.stderr, "Bfs full original version metadata differs"
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
-        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "verify_rust_plan.py", "resolved-Cargo.lock"]:
+        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "verify_rust_plan.py", "resolved-Cargo.lock", "allocator_exports.py", "native_rg_controls.py"]:
             shutil.copyfile(ROOT / name, package / name)
         shutil.copytree(native_package / "inputs", package / "native-component-source-inputs")
         for name in ["apply-seccomp.c", "unix-block-bpf.h", "SECCOMP-LICENSE", "recovery_lib.rs", "effective-library-Cargo.toml"]:
