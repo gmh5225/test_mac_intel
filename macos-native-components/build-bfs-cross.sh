@@ -33,7 +33,9 @@ export LTO=0 VERSION=4.1.1 OS=Darwin
 build_flags=(
   "XCPPFLAGS=-Isrc -Igen -include src/prelude.h -DNDEBUG -MD -MP -Wundef-prefix=BFS_ $CPPFLAGS"
   "XLDFLAGS=$LDFLAGS"
-  "XLDLIBS=-lonig"
+  # This measured flag value also feeds upstream's gen/ldlibs.i. Keep its
+  # trailing space as a real configure/compiler input, without editing output.
+  "XLDLIBS=-lonig "
 )
 ./configure --enable-release --with-oniguruma --without-libselinux --without-libacl --without-liburing --without-libcap "${build_flags[@]}"
 make -j2 V=1 all tests "${build_flags[@]}"
