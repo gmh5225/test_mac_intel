@@ -1,0 +1,155 @@
+name: NeverD runnable source patch examples
+run-name: Native examples at ${{ inputs.source || '6fcce147777d268496e02ccd5a1e31cc5da2dda9' }}
+on:
+  workflow_dispatch:
+    inputs:
+      source:
+        description: Exact NeverD examples commit
+        type: string
+        required: true
+  push:
+    branches: [codex/source-patch-expansion]
+    paths: ['.github/workflows/neverd-source-patch-examples.yml']
+permissions:
+  contents: read
+env:
+  SOURCE_COMMIT: ${{ inputs.source || '6fcce147777d268496e02ccd5a1e31cc5da2dda9' }}
+  SCCACHE_GHA_ENABLED: 'true'
+concurrency:
+  group: neverd-examples-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  examples:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, arch: x64}
+          - {runner: macos-15, arch: arm64}
+          - {runner: windows-2025, arch: x64}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ env.SOURCE_COMMIT }}
+          submodules: recursive
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with: {python-version: '3.12'}
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        if: runner.os == 'Windows'
+        with: {arch: x64}
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with: {version: v0.16.0}
+      - name: Install Linux Clang and linkers
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 https://apt.llvm.org/llvm-snapshot.gpg.key -o "$RUNNER_TEMP/llvm.asc"
+          gpg --show-keys --with-colons "$RUNNER_TEMP/llvm.asc" | grep '^fpr:.*6084F3CF814B57C1CF12EFD515CF4D18AF4F7421:'
+          sudo install -m 0644 "$RUNNER_TEMP/llvm.asc" /usr/share/keyrings/neverd-llvm.asc
+          echo 'deb [signed-by=/usr/share/keyrings/neverd-llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-23 main' | sudo tee /etc/apt/sources.list.d/neverd-llvm.list
+          sudo apt-get update
+          sudo apt-get install --yes clang-23 lld-23 llvm-23 ninja-build g++
+          echo /usr/lib/llvm-23/bin >> "$GITHUB_PATH"
+          echo 'SOURCE_CLANG=/usr/lib/llvm-23/bin/clang' >> "$GITHUB_ENV"
+      - name: Select native macOS Clang and archive tools
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install llvm@22 lld@22 ninja
+          echo "$(brew --prefix llvm@22)/bin" >> "$GITHUB_PATH"
+          echo "$(brew --prefix lld@22)/bin" >> "$GITHUB_PATH"
+          echo "SOURCE_CLANG=$(brew --prefix llvm@22)/bin/clang" >> "$GITHUB_ENV"
+      - name: Install Windows Clang
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'LLVM-22.1.6-win64.exe'
+          Invoke-WebRequest 'https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.6/LLVM-22.1.6-win64.exe' -OutFile $installer
+          if ((Get-FileHash $installer -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'e2d9a6855ff22c0acf3adc87ff1e1ad9705b8b6fc5bab2542aefc3315fc24cf7') { throw 'Clang installer digest mismatch' }
+          $install = Join-Path $env:RUNNER_TEMP 'examples-clang'
+          $process = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$install") -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw 'Clang installation failed' }
+          "$install\bin" >> $env:GITHUB_PATH
+          "SOURCE_CLANG=$install\bin\clang.exe" >> $env:GITHUB_ENV
+          choco install ninja --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Ninja installation failed' }
+      - name: Record exact example and documentation inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir example-logs
+          python - <<'PY'
+          import hashlib,json,os,pathlib,platform,subprocess
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          source=os.environ['SOURCE_COMMIT']
+          assert git('rev-parse','HEAD')==source
+          assert not git('status','--porcelain','--untracked-files=no')
+          paths=sorted([*pathlib.Path('examples/source-patch').rglob('*.c'),*pathlib.Path('examples/source-patch').rglob('*.py'),pathlib.Path('examples/source-patch/README.md'),pathlib.Path('docs/source-patching.md'),*pathlib.Path('docs').glob('*/source-patching.md')])
+          record={'source_commit':source,'harness_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'runner':os.environ['RUNNER_OS'],'architecture':platform.machine(),'files':{p.as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},'gitlinks':[row for row in git('ls-tree','-r','HEAD').splitlines() if row.startswith('160000 ')]}
+          pathlib.Path('example-logs/source.json').write_text(json.dumps(record,indent=2)+'\n')
+          PY
+      - name: Configure and build Unix Python-enabled NeverD
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          options=()
+          if [ "$RUNNER_OS" = macOS ]; then
+            options+=("-DCMAKE_OSX_SYSROOT=$(xcrun --show-sdk-path)" '-DCMAKE_OSX_ARCHITECTURES=arm64')
+            options+=("-DCMAKE_AR=$(xcrun --find ar)" "-DCMAKE_RANLIB=$(xcrun --find ranlib)")
+            options+=("-DCMAKE_C_COMPILER_AR=$(xcrun --find ar)" "-DCMAKE_CXX_COMPILER_AR=$(xcrun --find ar)")
+          fi
+          cmake -S . -B build-examples -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
+            -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON \
+            -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF \
+            -DNEVERD_ENABLE_PYTHON_PLUGINS=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF \
+            -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF \
+            "-DPython3_ROOT_DIR=$(python -c 'import sys;print(sys.base_prefix)')" "${options[@]}" 2>&1 | tee example-logs/configure.log
+          cmake --build build-examples --target neverd --parallel 4 2>&1 | tee example-logs/build.log
+      - name: Configure and build Windows Python-enabled NeverD
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -S . -B build-examples -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=cl -DCMAKE_CXX_COMPILER=cl -DCMAKE_C_COMPILER_LAUNCHER=sccache -DCMAKE_CXX_COMPILER_LAUNCHER=sccache -DBUILD_TESTING=OFF -DNEVERD_LLVM_PREBUILT=OFF -DNEVERD_BUILD_SHARED=ON -DNEVERD_BUILD_GUI=OFF -DNEVERD_ENABLE_WEB_ANALYSIS=OFF -DNEVERD_ENABLE_PYTHON_PLUGINS=ON -DNEVERD_ENABLE_CPU_EMULATION=OFF -DNEVERD_ENABLE_DRIVER_EMULATION=OFF -DNEVERD_ENABLE_SEMANTIC_TESTS=OFF "-DPython3_ROOT_DIR=$env:pythonLocation" 2>&1 | Tee-Object example-logs/configure.log
+          if ($LASTEXITCODE -ne 0) { throw 'Configure failed' }
+          cmake --build build-examples --target neverd --parallel 4 2>&1 | Tee-Object example-logs/build.log
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - name: Execute both documented APIs through the native OS loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          extension=''
+          if [ "$RUNNER_OS" = Windows ]; then extension='.exe'; fi
+          python examples/source-patch/run.py --neverd "build-examples/bin/neverd$extension" --clang "$SOURCE_CLANG" --output example-evidence 2>&1 | tee example-logs/run.log
+          python - <<'PY'
+          import json,pathlib
+          data=json.loads(pathlib.Path('example-evidence/verified.json').read_text())
+          assert len(data['observations'])==9 and data['loader_rejections']==['cli','sdk']
+          assert data['execution']=='native-os-process'
+          PY
+      - name: Verify translated guides and formatting
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest scripts.tests.test_check_docs_i18n scripts.tests.test_check_clang_format -v 2>&1 | tee example-logs/checker-tests.log
+          python scripts/check_docs_i18n.py 2>&1 | tee example-logs/docs.log
+          python -m pip install --disable-pip-version-check --no-deps clang-format==22.1.2
+          clang-format --dry-run --Werror examples/source-patch/*.c 2>&1 | tee example-logs/format.log
+      - name: Retain example outputs and failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: source-patch-examples-${{ matrix.runner }}-${{ env.SOURCE_COMMIT }}
+          path: |
+            example-evidence
+            example-logs
+          if-no-files-found: error
