@@ -173,6 +173,15 @@ def main():
         assert 'LLVM version: 23.' in (logs / 'rust-version.log').read_text()
         run('sdk-path', ['xcrun', '--sdk', 'macosx', '--show-sdk-path'])
         run('sdk-version', ['xcrun', '--sdk', 'macosx', '--show-sdk-version'])
+        sdk = (logs / 'sdk-path.log').read_text().strip()
+        assert (Path(sdk) / 'usr/include/stdio.h').is_file()
+        # Host tools such as TinyCC's code generator use the discovered clang
+        # without target flags. The standalone LLVM driver needs the same SDK
+        # that Bun passes explicitly to its target compilation edges.
+        env['SDKROOT'] = sdk
+        env['MACOSX_DEPLOYMENT_TARGET'] = '13.0'
+        run('native-sdk-header-control', [toolbin / 'clang', '-x', 'c', '-fsyntax-only', '-'],
+            private_input=b'#include <stdio.h>\nint main(void) { return 0; }\n')
         run('host-capacity', ['df', '-h', out])
         build_arch = 'aarch64' if args.arch == 'arm64' else 'x64'
         run('public-bun-build', [bun, 'scripts/build.ts', '--profile=release', '--arch=' + build_arch,
