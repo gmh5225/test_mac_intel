@@ -10,15 +10,20 @@ on:
     inputs:
       arch:
         type: choice
-        options: [arm64, x64]
-        default: arm64
+        options: [both, arm64, x64]
+        default: both
         required: true
 permissions:
   contents: read
   actions: read
 jobs:
   qualify:
-    runs-on: ${{ inputs.arch == 'x64' && 'windows-2022' || 'windows-11-arm' }}
+    name: Native ${{ matrix.arch }} owned baseline controls
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: ${{ fromJSON(inputs.arch == 'x64' && '["x64"]' || inputs.arch == 'arm64' && '["arm64"]' || '["arm64","x64"]') }}
+    runs-on: ${{ matrix.arch == 'x64' && 'windows-2022' || 'windows-11-arm' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -30,7 +35,7 @@ jobs:
       - name: Resolve the recorded public candidate
         id: candidate
         env:
-          TARGET_ARCH: ${{ inputs.arch || 'arm64' }}
+          TARGET_ARCH: ${{ matrix.arch }}
         shell: python
         run: |
           import json, os
@@ -47,11 +52,11 @@ jobs:
       - name: Exercise the native baseline and its exact source-engine standalone
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python -B platform-runtime/qualify_windows_baseline.py --arch ${{ inputs.arch || 'arm64' }} --runtime public-runtime --output native-controls
+        run: python -B platform-runtime/qualify_windows_baseline.py --arch ${{ matrix.arch }} --runtime public-runtime --output native-controls
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: native-win32-${{ inputs.arch || 'arm64' }}-baseline-owned-controls-${{ github.run_attempt }}
+          name: native-win32-${{ matrix.arch }}-baseline-owned-controls-${{ github.run_attempt }}
           path: |
             native-controls/*.json
             native-controls/owned-entry.js
