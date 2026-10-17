@@ -39,7 +39,16 @@ ug=source/'ugrep';ugenv=dict(env,LIBS='-lbrotlicommon -lm')
 options=['--enable-static','--without-lzma','--without-lz4',*['--with-'+flag+'='+str(prefix) for flag in ['pcre2','zlib','bzlib','zstd','brotli']]]
 if args.arch=='x64':options.append('--disable-avx2')
 run('ugrep-configure',[ug/'configure',*options],ug,environment=ugenv)
-run('ugrep-build',['make','-j2'],ug,environment=ugenv);run('ugrep-check',['make','-j2','check'],ug,environment=ugenv)
+run('ugrep-build',['make','-j2'],ug,environment=ugenv)
+shutil.copyfile(ug/'bin/ugrep',logs/'public-ugrep-candidate')
+shutil.copyfile(ug/'config.h',logs/'ugrep-config.h')
+probes=[]
+for label,argv in [('version',['--version']),('config-search',['-Fq','HAVE_PCRE2 1',str(ug/'config.h')]),('no-config-search',['--no-config','-Fq','HAVE_PCRE2 1',str(ug/'config.h')])]:
+    result=subprocess.run([str(ug/'bin/ugrep'),*argv],env=ugenv,capture_output=True,timeout=10)
+    for field in ['stdout','stderr']:(logs/('candidate-'+label+'.'+field)).write_bytes(getattr(result,field))
+    probes.append(dict(case=label,argv=argv,exit_code=result.returncode))
+    (logs/'candidate-probes.json').write_text(json.dumps(probes,indent=2)+'\n')
+run('ugrep-check',['make','-j2','check'],ug,environment=ugenv)
 library=out/'native-library';library.mkdir();objects=library/'objects';objects.mkdir()
 names=['ugrep','cnf','glob','output','query','screen','stats','vkey','zopen']
 paths=[]
