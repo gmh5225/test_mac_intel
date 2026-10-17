@@ -1,10 +1,10 @@
-name: NeverD source patch expansion documentation
-run-name: Expansion documentation at ${{ inputs.source || '30661538b2e01d96848a0176a8edaff5101cc0c5' }}
+name: NeverD source patch examples documentation
+run-name: Example documentation at ${{ inputs.source || '924b6de05f9a1526b00386c6ba07a2dc9e4b8d32' }}
 on:
   workflow_dispatch:
     inputs:
       source:
-        description: Exact NeverD documentation commit, after six native profiles are audited
+        description: Exact examples documentation commit after native artifact audit
         type: string
         required: true
   push:
@@ -13,13 +13,13 @@ on:
 permissions:
   contents: read
 env:
-  SOURCE_COMMIT: ${{ inputs.source || '30661538b2e01d96848a0176a8edaff5101cc0c5' }}
-  EXPECTED_PARENT: a4219c90b38931d921e03a58589755b872893a1c
-  FORMAT_BASE: 3264a443fdbcae22b1641a474e6538f65d3b44ec
-  DOCUMENTATION_COMMIT: 37989be8e7a7528bb5c9e11e1e22c132dc8d1af6
-  DOCUMENTATION_PARENT: 8f92bf83e396f6726bcb49002ad83bfd32652991
+  SOURCE_COMMIT: ${{ inputs.source || '924b6de05f9a1526b00386c6ba07a2dc9e4b8d32' }}
+  EXPECTED_PARENTS: 654f9cee7ad9558c7952baffc0f58b206130a148
+  DOCUMENTATION_COMMIT: 924b6de05f9a1526b00386c6ba07a2dc9e4b8d32
+  DOCUMENTATION_PARENT: 654f9cee7ad9558c7952baffc0f58b206130a148
+  EXAMPLE_BASE: c8cd6516fe78e274d62765b7bb9a69ddce7cdf6e
 concurrency:
-  group: neverd-expansion-docs-${{ github.run_id }}
+  group: neverd-examples-docs-${{ github.run_id }}
   cancel-in-progress: false
 jobs:
   docs:
@@ -35,81 +35,53 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with: {python-version: '3.12'}
-      - name: Authenticate the exact 33 documentation files
+      - name: Authenticate exact example guide changes and native source inputs
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
-          import hashlib, json, os, pathlib, re, subprocess
-          def git(*args):
-              return subprocess.check_output(['git', *args], text=True).strip()
-          source = os.environ['SOURCE_COMMIT']
-          parent = os.environ['EXPECTED_PARENT']
-          base = os.environ['FORMAT_BASE']
-          documentation = os.environ['DOCUMENTATION_COMMIT']
-          documentation_parent = os.environ['DOCUMENTATION_PARENT']
-          assert all(re.fullmatch('[0-9a-f]{40}', x) for x in (source, parent, base, documentation, documentation_parent))
-          assert git('rev-parse', 'HEAD') == source
-          assert git('rev-list', '--parents', '-n', '1', 'HEAD').split() == [source, parent, base]
-          assert git('rev-list', '--parents', '-n', '1', documentation).split() == [documentation, documentation_parent]
-          assert git('merge-tree', '--write-tree', parent, base).splitlines()[0] == git('rev-parse', 'HEAD^{tree}')
-          assert not git('status', '--porcelain', '--untracked-files=no')
-          subprocess.run(['git', 'merge-base', '--is-ancestor', base, source], check=True)
-          locales = ['', 'zh-CN', 'zh-TW', 'ja', 'ko', 'fr', 'de', 'es', 'it', 'ru', 'ar']
-          expected = sorted(str(pathlib.PurePosixPath('docs', locale, document + '.md'))
-                            for locale in locales
-                            for document in ('source-patching', 'architecture', 'testing'))
-          actual = sorted(git('diff', '--name-only', documentation_parent, documentation).splitlines())
-          assert actual == expected, (actual, expected)
-          current = sorted(p for p in git('diff', '--name-only', base, source, '--', 'docs').splitlines() if p in expected)
-          assert current == expected
-          for p in expected:
-              if p.endswith('source-patching.md'):
-                  assert git('rev-parse', source + ':' + p) == git('rev-parse', documentation + ':' + p)
-          evidence = pathlib.Path('expansion-doc-evidence')
-          evidence.mkdir()
-          record = {'source_commit': source, 'parent_commit': parent, 'integrated_dev_commit': base,
-                    'documentation_commit': documentation, 'documentation_parent': documentation_parent,
-                    'source_tree': git('rev-parse', 'HEAD^{tree}'), 'format_base': base,
-                    'harness_repository': os.environ['GITHUB_REPOSITORY'],
-                    'harness_commit': os.environ['GITHUB_SHA'], 'run_id': os.environ['GITHUB_RUN_ID'],
-                    'run_attempt': os.environ['GITHUB_RUN_ATTEMPT'],
-                    'workflow_ref': os.environ['GITHUB_WORKFLOW_REF'],
-                    'workflow_sha': os.environ['GITHUB_WORKFLOW_SHA'],
-                    'documentation_files': {p: hashlib.sha256(subprocess.check_output(['git', 'show', documentation + ':' + p])).hexdigest() for p in expected},
-                    'files': {p: hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in expected}}
-          (evidence / 'source.json').write_text(json.dumps(record, indent=2) + '\n')
+          import hashlib,json,os,pathlib,re,subprocess
+          def git(*args):return subprocess.check_output(['git',*args],text=True).strip()
+          source=os.environ['SOURCE_COMMIT'];parents=os.environ['EXPECTED_PARENTS'].split();base=os.environ['EXAMPLE_BASE']
+          documentation=os.environ['DOCUMENTATION_COMMIT'];parent=os.environ['DOCUMENTATION_PARENT']
+          assert all(re.fullmatch('[0-9a-f]{40}',v) for v in (source,parent,base,documentation,*parents))
+          assert git('rev-list','--parents','-n','1','HEAD').split()==[source,*parents]
+          assert git('rev-list','--parents','-n','1',documentation).split()==[documentation,parent]
+          subprocess.run(['git','merge-base','--is-ancestor',documentation,source],check=True)
+          if source!=documentation:
+              assert len(parents)==2
+              assert git('merge-tree','--write-tree',*parents).splitlines()[0]==git('rev-parse','HEAD^{tree}')
+          assert not git('status','--porcelain','--untracked-files=no')
+          subprocess.run(['git','merge-base','--is-ancestor',base,parent],check=True)
+          paths=sorted(['examples/source-patch/README.md','docs/source-patching.md',*[f'docs/{locale}/source-patching.md' for locale in ('zh-CN','zh-TW','ja','ko','fr','de','es','it','ru','ar')]])
+          assert sorted(git('diff','--name-only',parent,documentation).splitlines())==paths
+          for p in paths:assert git('rev-parse',source+':'+p)==git('rev-parse',documentation+':'+p)
+          code=sorted(['examples/source-patch/'+n for n in ('original.c','extra.c','header_section.c','replacement.c','run.py','plugin/patch.py')])
+          for p in code:assert git('rev-parse',base+':'+p)==git('rev-parse',source+':'+p)
+          links=lambda ref:[s for s in git('ls-tree','-r',ref).splitlines() if s.startswith('160000 ')]
+          assert links(base)==links(source)
+          evidence=pathlib.Path('example-doc-evidence');evidence.mkdir()
+          record={'source_commit':source,'parent_commits':parents,'documentation_commit':documentation,'documentation_parent':parent,'example_base':base,'harness_commit':os.environ['GITHUB_SHA'],'run_id':os.environ['GITHUB_RUN_ID'],'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'files':{p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in paths},'example_sources':{p:hashlib.sha256(pathlib.Path(p).read_bytes()).hexdigest() for p in code},'gitlinks':links(source)}
+          (evidence/'source.json').write_text(json.dumps(record,indent=2)+'\n')
           PY
-      - name: Run documentation checker regression tests
+      - name: Verify documentation and formatter checker regressions
         shell: bash
         run: |
           set -euo pipefail
-          python -m unittest scripts.tests.test_check_docs_i18n -v 2>&1 | tee expansion-doc-evidence/docs-tests.log
-      - name: Check every translated document
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/check_docs_i18n.py 2>&1 | tee expansion-doc-evidence/docs-check.log
-      - name: Install the pinned LLVM formatter
+          python -m unittest scripts.tests.test_check_docs_i18n scripts.tests.test_check_clang_format -v 2>&1 | tee example-doc-evidence/checker-tests.log
+          python scripts/check_docs_i18n.py 2>&1 | tee example-doc-evidence/docs.log
+      - name: Verify example C sources and complete change formatting
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check --no-deps clang-format==22.1.2
-          clang-format --version | tee expansion-doc-evidence/formatter.log
-      - name: Run formatter checker regression tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m unittest scripts.tests.test_check_clang_format -v 2>&1 | tee expansion-doc-evidence/format-tests.log
-      - name: Check the complete feature code diff
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/check_clang_format.py --base "$FORMAT_BASE" --head "$SOURCE_COMMIT" 2>&1 | tee expansion-doc-evidence/format-check.log
-      - name: Preserve documentation and format evidence
+          clang-format --version | tee example-doc-evidence/formatter.log
+          clang-format --dry-run --Werror examples/source-patch/*.c 2>&1 | tee example-doc-evidence/example-format.log
+          python scripts/check_clang_format.py --base "$DOCUMENTATION_PARENT" --head "$DOCUMENTATION_COMMIT" 2>&1 | tee example-doc-evidence/diff-format.log
+      - name: Preserve exact guide and format evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: expansion-docs-${{ env.SOURCE_COMMIT }}
-          path: expansion-doc-evidence
+          name: source-patch-examples-docs-${{ env.SOURCE_COMMIT }}
+          path: example-doc-evidence
           if-no-files-found: error
