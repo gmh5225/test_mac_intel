@@ -1,0 +1,83 @@
+"""Compile the pinned public sources, preserve main code, then test its library host."""
+from pathlib import Path
+import argparse, gzip, hashlib, json, os, resource, shutil, subprocess
+
+ap=argparse.ArgumentParser();ap.add_argument('--arch',choices=['x64','arm64'],required=True);args=ap.parse_args()
+out=Path('/output');source=out/'sources';logs=out/'diagnostics';prefix=out/'dependencies';prefix.mkdir()
+home=out/'home';home.mkdir();empty=out/'no-host-pkgconfig';empty.mkdir()
+sysroot='/opt/linux-sysroot-glibc'+('-arm64' if args.arch=='arm64' else '')
+triple='x86_64-linux-gnu' if args.arch=='x64' else 'aarch64-linux-gnu'
+compiler='/usr/lib/llvm-23/bin/clang';cxx=compiler+'++';toolbin=Path(compiler).parent
+ccflags=f'--target={triple} --sysroot={sysroot}'
+env=dict(PATH=os.environ['PATH'],HOME=str(home),LANG='C.UTF-8',LC_ALL='C.UTF-8',
+    CC=compiler+' '+ccflags,CXX=cxx+' '+ccflags,AR=str(toolbin/'llvm-ar'),RANLIB=str(toolbin/'llvm-ranlib'),
+    CFLAGS='-O2 -fPIC -ffunction-sections -fdata-sections',CXXFLAGS='-O2 -fPIC -ffunction-sections -fdata-sections',
+    CPPFLAGS='-I'+str(prefix/'include'),LDFLAGS='-L'+str(prefix/'lib'),
+    PKG_CONFIG_LIBDIR=str(prefix/'lib/pkgconfig'),GIT_CEILING_DIRECTORIES=str(out))
+commands=[]
+def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def run(label,argv,cwd=None,data=None,environment=None):
+    commands.append(dict(label=label,argv=list(map(str,argv)),cwd=str(cwd) if cwd else None))
+    result=subprocess.run(list(map(str,argv)),cwd=cwd,env=environment or env,input=data,capture_output=True,timeout=1200)
+    (logs/(label+'.stdout')).write_bytes(result.stdout);(logs/(label+'.stderr')).write_bytes(result.stderr)
+    assert result.returncode==0,(label,result.returncode)
+    return result
+def make(label,path,*targets):return run(label,['make','-j2',*targets],path)
+def cmake(name,path,*options):
+    build=out/(name+'-build')
+    run(name+'-configure',['cmake','-S',path,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCMAKE_INSTALL_PREFIX='+str(prefix),
+        '-DCMAKE_INSTALL_LIBDIR=lib','-DBUILD_SHARED_LIBS=OFF','-DCMAKE_POSITION_INDEPENDENT_CODE=ON',*options])
+    run(name+'-build',['cmake','--build',build,'--parallel','2']);run(name+'-install',['cmake','--install',build]);return build
+
+run('compiler-version',[compiler,'--version']);run('cxx-version',[cxx,'--version'])
+z=source/'zlib';run('zlib-configure',[z/'configure','--static','--prefix='+str(prefix)],z);make('zlib-build',z);make('zlib-check',z,'check');make('zlib-install',z,'install')
+b=source/'bzip2';make('bzip2-build',b,'libbz2.a','bzip2','bzip2recover','CC='+env['CC'],'AR='+env['AR'],'RANLIB='+env['RANLIB'],'CFLAGS='+env['CFLAGS']);make('bzip2-check',b,'test');make('bzip2-install',b,'install','PREFIX='+str(prefix))
+cmake('zstd',source/'zstd/build/cmake','-DZSTD_BUILD_SHARED=OFF','-DZSTD_BUILD_STATIC=ON','-DZSTD_BUILD_PROGRAMS=ON','-DZSTD_BUILD_TESTS=OFF','-DZSTD_ZLIB_SUPPORT=OFF','-DZSTD_LZMA_SUPPORT=OFF','-DZSTD_LZ4_SUPPORT=OFF')
+brotli=cmake('brotli',source/'brotli');run('brotli-check',['ctest','--test-dir',brotli,'--output-on-failure'])
+p=source/'pcre2';run('pcre2-configure',[p/'configure','--prefix='+str(prefix),'--enable-static','--disable-shared','--enable-jit','--disable-pcre2-16','--disable-pcre2-32'],p);make('pcre2-build',p);make('pcre2-check',p,'check');make('pcre2-install',p,'install')
+ug=source/'ugrep';ugenv=dict(env,LIBS='-lbrotlicommon -lm')
+options=['--enable-static','--without-lzma','--without-lz4',*['--with-'+flag+'='+str(prefix) for flag in ['pcre2','zlib','bzlib','zstd','brotli']]]
+if args.arch=='x64':options.append('--disable-avx2')
+run('ugrep-configure',[ug/'configure',*options],ug,environment=ugenv)
+run('ugrep-build',['make','-j2'],ug,environment=ugenv);run('ugrep-check',['make','-j2','check'],ug,environment=ugenv)
+library=out/'native-library';library.mkdir();objects=library/'objects';objects.mkdir()
+names=['ugrep','cnf','glob','output','query','screen','stats','vkey','zopen']
+paths=[]
+for name in names:
+    original=ug/'src'/('ugrep-'+name+'.o');assert original.is_file();destination=objects/original.name;shutil.copyfile(original,destination);paths.append(destination)
+main=objects/'ugrep-ugrep.o'
+run('main-symbols',[toolbin/'llvm-nm','--defined-only',main])
+assert sum(line.split()[-1]=='main' for line in (logs/'main-symbols.stdout').read_text().splitlines() if line.split())==1
+before=library/'main-text-before.bin';after=library/'main-text-after.bin'
+original_main_hash=sha(main)
+run('main-text-before',[toolbin/'llvm-objcopy','--dump-section','.text.main='+str(before),main,logs/'main-readback-before.o'])
+assert sha(main)==original_main_hash,'Section readback modified the compiler object'
+assert before.is_file() and before.stat().st_size>0
+run('rename-main',[toolbin/'llvm-objcopy','--redefine-sym','main=neverd_recovered_ugrep_main',main])
+renamed_main_hash=sha(main)
+run('main-text-after',[toolbin/'llvm-objcopy','--dump-section','.text.main='+str(after),main,logs/'main-readback-after.o'])
+assert sha(main)==renamed_main_hash,'Section readback modified the renamed compiler object'
+assert before.read_bytes()==after.read_bytes()
+archive=library/'librecovered_ugrep.a';run('export-library',[toolbin/'llvm-ar','rcs',archive,*paths])
+dependencies=['reflex','pcre2-8','z','bz2','zstd','brotlidec','brotlicommon']
+for name in dependencies:
+    original=ug/'lib/libreflex.a' if name=='reflex' else prefix/'lib'/('lib'+name+'.a')
+    assert original.is_file();shutil.copyfile(original,library/('lib'+name+'.a'))
+host_source=library/'ugrep-library-host.c';host_source.write_text('extern int neverd_recovered_ugrep_main(int, char **);\nint main(int argc, char **argv) { return neverd_recovered_ugrep_main(argc, argv); }\n')
+run('compile-host',[compiler,*ccflags.split(),'-O2','-c',host_source,'-o',library/'host.o'])
+host=library/'ugrep-library-host'
+run('link-host',[cxx,*ccflags.split(),library/'host.o','-Wl,--start-group',archive,*[library/('lib'+name+'.a') for name in dependencies],'-Wl,--end-group','-static-libstdc++','-static-libgcc','-Wl,--gc-sections','-pthread','-lm','-o',host])
+fixture=library/'input.txt';fixture.write_bytes(b'first\nNEEDLE\npreneedle\n');compressed=library/'input.gz';compressed.write_bytes(gzip.compress(fixture.read_bytes(),mtime=0))
+def limits():resource.setrlimit(resource.RLIMIT_FSIZE,(0,0));resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+controls=[]
+for label,argv,wanted in [('version',['--version'],None),('literal',['--no-config','-n','NEEDLE',str(fixture)],b'2:NEEDLE\n'),('pcre',['--no-config','-P','-o','(?<=pre)needle',str(fixture)],b'needle\n'),('gzip',['--no-config','-z','-n','NEEDLE',str(compressed)],b'2:NEEDLE\n')]:
+    r=subprocess.run([str(host),*argv],env=env,capture_output=True,timeout=10,preexec_fn=limits)
+    for field in ['stdout','stderr']:(library/(label+'.'+field)).write_bytes(getattr(r,field))
+    controls.append(dict(case=label,argv=argv,exit_code=r.returncode,stdout_sha256=hashlib.sha256(r.stdout).hexdigest(),rlimit_fsize=0))
+    assert r.returncode==0 and not r.stderr and (wanted is None or r.stdout==wanted)
+shutil.copyfile(host,ug/'bin/ugrep');run('library-host-upstream-check',['make','-j2','check'],ug,environment=ugenv)
+assert sha(ug/'bin/ugrep')==sha(host),'Upstream checks replaced the library host'
+receipt=dict(status='ugrep_source_library_host_and_upstream_checks_passed',entry_symbol='neverd_recovered_ugrep_main',source_objects=len(paths),
+    main_text_unchanged=True,main_text_sha256=sha(before),library_sha256=sha(archive),host_sha256=sha(host),controls=controls,commands=commands,
+    original_binary_reused=False,dependency_archives={name:sha(library/('lib'+name+'.a')) for name in dependencies},zstd_upstream_suite_run=False)
+(library/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
