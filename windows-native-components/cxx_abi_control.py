@@ -10,9 +10,12 @@ COMPARE_SHA256 = '8f185f3771075b2dd0c41c13f4c12ff4995566c1f7240a2881d810ced72679
 
 def qualify(arch, output, toolbin, env, run):
     if arch != 'arm64': return dict(status='ARM64_specific_WebKit_return_ABI_control_not_applicable')
-    version = env['VCToolsVersion'].rstrip('\\/')
+    # build_windows snapshots os.environ as an ordinary case-sensitive dict.
+    # MSVC's exported environment uses upper-case keys on the native runner.
+    windows_env = {key.upper(): value for key, value in env.items()}
+    version = windows_env['VCTOOLSVERSION'].rstrip('\\/')
     assert version == '14.44.35207', 'The pinned WebKit ARM64 Cxx ABI requires MSVC toolset 14.44.35207'
-    header = Path(env['VCToolsInstallDir']) / 'include/compare'
+    header = Path(windows_env['VCTOOLSINSTALLDIR']) / 'include/compare'
     assert sha(header) == COMPARE_SHA256, 'Unqualified ARM64 Cxx comparison-category header'
     source = output / 'authored-Cxx-return-ABI.cpp'
     source.write_text('''#include <compare>
