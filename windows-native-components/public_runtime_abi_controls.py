@@ -1,6 +1,7 @@
 """Authored string-sort probes across official, public baseline and full engines."""
 from pathlib import Path
-import argparse, json, os, shutil
+import argparse, json, os, shutil, sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'windows-recovery'))
 from source_engine import pin as pin_engine
 from coff_admission import sha
 from core_tool_acceptance import fresh_root, environment, write
