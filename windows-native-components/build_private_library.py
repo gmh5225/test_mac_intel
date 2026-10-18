@@ -48,7 +48,7 @@ def main():
             'int wmain(int argc, const wchar_t **argv) { return ' + ENTRY + '(argc, argv); }\n')
         host = library / 'ugrep-library-host.exe'
         run('link-private-library-host', [toolbin / 'clang-cl.exe', '/nologo', '/O2', '/EHsc', '/MT', host_source,
-            '/Fo' + str(out / 'host.obj'), '/Fe' + str(host), '/link', combined, *archives])
+            '/Fo' + str(out / 'host.obj'), '/Fe' + str(host), '/link', combined, *archives, 'advapi32.lib'])
         fixture = out / 'owned-fixtures'; fixture.mkdir()
         text = fixture / 'owned 空格 猫.txt'; text.write_bytes('first\nNEEDLE\npreneedle\nλ猫\n'.encode())
         payload = b'owned COMPRESSED_NEEDLE\n'
