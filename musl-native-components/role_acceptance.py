@@ -17,6 +17,7 @@ from component_libraries import qualify
 from runtime_sdk import prepare as prepare_runtime
 from role_cases import prepare as prepare_fixtures, cases
 from role_process import RoleProcess
+from runtime_image import select as select_image
 
 
 def original_input(arch, output, supplied=None):
@@ -42,7 +43,7 @@ def original_input(arch, output, supplied=None):
 def main():
     p = argparse.ArgumentParser(); p.add_argument('--arch', choices=['arm64', 'x64'], required=True)
     for name in ['components', 'sdk', 'baseline', 'private', 'output']: p.add_argument('--' + name, type=Path, required=True)
-    p.add_argument('--original-path', type=Path); p.add_argument('--runtime-image'); a = p.parse_args()
+    p.add_argument('--original-path', type=Path); p.add_argument('--runtime-image'); p.add_argument('--engine', type=Path); a = p.parse_args()
     assert platform.system() in ['Linux', 'Darwin'] and {'arm64': 'arm64', 'aarch64': 'arm64', 'x86_64': 'x64'}[platform.machine()] == a.arch
     assert os.getuid() != 0
     architecture = json.loads(subprocess.check_output(['docker', 'info', '--format', '{{json .Architecture}}']))
@@ -50,16 +51,16 @@ def main():
     components = a.components.resolve(); provenance = qualify(a.arch, components)
     private = a.private.resolve(); private.mkdir(); records = private / 'records'; records.mkdir()
     out = a.output.resolve(); out.mkdir(); assert not private.is_relative_to(out) and not out.is_relative_to(private)
-    public_recipe_image = json.loads((ROOT.parent / 'seccomp-helper/pins.json').read_bytes())['profiles'][a.arch]['image']
-    image = a.runtime_image or public_recipe_image
-    if not image.startswith('sha256:'):
-        subprocess.run(['docker', 'pull', '--platform', 'linux/' + ('arm64' if a.arch == 'arm64' else 'amd64'), image], check=True, stdout=subprocess.DEVNULL)
-    inspected = json.loads(subprocess.check_output(['docker', 'image', 'inspect', image])); assert len(inspected) == 1
-    assert inspected[0]['Architecture'] == {'arm64': 'arm64', 'x64': 'amd64'}[a.arch]
-    if a.runtime_image is None: assert image in inspected[0]['RepoDigests']
+    image = select_image(a.arch, a.runtime_image)
     sdk = private / 'sdk'; sdk_proof = prepare_runtime(a.arch, a.sdk.resolve(), sdk)
     loader_path = private / 'musl-loader.path'; loader_path.write_text('/recovery-sdk/usr/lib:/recovery-sdk/lib\n')
     fixtures = private / 'fixtures'; prepare_fixtures(fixtures); (fixtures / 'owned.txt').write_bytes(b'owned role profile\n')
+    selected_cases = cases()
+    if a.engine is not None:
+        from engine_role_cases import prepare as prepare_engine, cases as engine_cases
+        prepare_engine(fixtures); selected_cases += engine_cases()
+    required_pairs = 35 if a.engine is not None else 22
+    assert len(selected_cases) == required_pairs
     sentinel = private / 'outside-sentinel'; sentinel.write_bytes(b'owned host file invisible to the role profile\n')
     source = private / 'guard.c'; shutil.copyfile(ROOT / 'native-role-guard.c', source)
     compiled = private / 'compiled'; compiled.mkdir(); guard = compiled / 'guard'
@@ -85,6 +86,7 @@ def main():
         host_compiler=cc.stdout.decode(errors='replace'), host_sentinel_existed_before_probe=True, host_sentinel_sha256=sha(sentinel),
         original_executed=False, original_execution_attempted=False, captured_source_uploaded=False, original_binary_uploaded=False, client_binary_uploaded=False,
         normalization='none; exact native exit/stdout/stderr bytes', controls=controls, cases=comparisons, goal_complete=False)
+    receipt['complete_engine_role_comparison'] = a.engine is not None
     def owned(label):
         boundary = process.execute(label + '-boundary', None, ['--probe', str(sentinel)])
         assert boundary['exit_code'] == 0 and not boundary['stderr']
@@ -108,19 +110,38 @@ def main():
         retired = process.execute('owned-descendant', None, ['--descendant-probe'], expected_failure='wall timeout', wall=3)
         assert retired['stdout'].startswith(b'owned child ') and retired['row']['fresh_owned_container_retired']
         receipt['transport_and_supervision_controls'] = dict(receiver=receiver['row'], argv=transported['row'], flood=flood['row'], descendant=retired['row'])
+        if a.engine is not None:
+            from source_engine import qualify as qualify_engine
+            receipt['source_engine'] = qualify_engine(a.arch, a.engine.resolve())
         (out / 'qualified-before-original.json').write_text(json.dumps(receipt, indent=2) + '\n')
         original, original_pin = original_input(a.arch, private, a.original_path)
         receipt['original_pin'] = original_pin
         candidates = {}
-        for role in ['ugrep', 'bfs']:
-            src = components / 'native-libraries' / role / (role + '-library-host')
-            target = private / role; shutil.copyfile(src, target); target.chmod(0o555)
-            assert sha(target) == sha(src); candidates[role] = target
-        for label, role, args, code in cases():
+        if a.engine is not None:
+            target = private / 'complete-source-engine'; shutil.copyfile(a.engine.resolve() / 'bun', target); target.chmod(0o555)
+            assert sha(target) == receipt['source_engine']['binary_sha256']
+            candidates = {role: target for role in ['ugrep', 'bfs', 'rg']}
+            owned('RG-version-before-original'); receipt['original_execution_attempted'] = True
+            left = process.execute('RG-version-original-metadata', original, ['--version'], argv0='rg'); receipt['original_executed'] = True
+            right = process.execute('RG-version-candidate-metadata', target, ['--version'], argv0='rg')
+            assert left['exit_code'] == right['exit_code'] == 0 and not left['stderr'] and not right['stderr']
+            assert left['stdout'].splitlines()[0] == b'ripgrep 14.1.1 (rev eecfd55deb)'
+            assert right['stdout'].splitlines()[0] == b'ripgrep 14.1.1' and b'(rev ' not in right['stdout']
+            pcre = b'PCRE2 10.45 is available (JIT is ' + (b'available' if a.arch == 'x64' else b'unavailable') + b')'
+            assert pcre in left['stdout'] and pcre in right['stdout']
+            receipt['rg_version_metadata'] = dict(original=left['row'], candidate=right['row'], same_measured_version_and_PCRE2_JIT=True,
+                producer_revision_equal=False, included_in_exact_raw_pairs=False)
+        else:
+            for role in ['ugrep', 'bfs']:
+                src = components / 'native-libraries' / role / (role + '-library-host')
+                target = private / role; shutil.copyfile(src, target); target.chmod(0o555)
+                assert sha(target) == sha(src); candidates[role] = target
+        for label, role, args, code in selected_cases:
             owned(label + '-before-original')
             receipt['original_execution_attempted'] = True
-            left = process.execute(label + '-original', original, args, argv0=role); receipt['original_executed'] = True
-            right = process.execute(label + '-candidate', candidates[role], args, argv0=role)
+            config = '/input/rg-config.txt' if label == 'RG-config-reparse' else None
+            left = process.execute(label + '-original', original, args, argv0=role, ripgrep_config=config); receipt['original_executed'] = True
+            right = process.execute(label + '-candidate', candidates[role], args, argv0=role, ripgrep_config=config)
             mismatch = [name for name in ['exit_code', 'stdout', 'stderr'] if left[name] != right[name]]
             if left['exit_code'] != code or right['exit_code'] != code: mismatch.append('expected exit code')
             receivers = {'BF-exec': b'owned receiver cwd=/input\nmarker=owned-exec\npath=/input/nested/child.txt\n',
@@ -128,20 +149,20 @@ def main():
             if label in receivers and left['stdout'] != receivers[label]: mismatch.append('owned receiver cwd/path contract')
             comparisons.append(dict(case=label, role=role, argv=args, expected_exit_code=code, original=left['row'], candidate=right['row'], matches=not mismatch, differences=mismatch))
             assert not mismatch, label + ': native component correspondence failed'
-        assert len(comparisons) == 22 and sha(original) == original_pin['sha256']
-        # Every original stream has now matched a qualified public native tool
-        # on authored fixture inputs. Failures remain only in private storage.
+        assert len(comparisons) == required_pairs and sha(original) == original_pin['sha256']
+        # Raw pairs match public source tools on authored fixtures. Any separate
+        # rg version metadata has its explicit measured-version/JIT proof above.
         exported = out / 'validated-native-records'; exported.mkdir()
         for path in records.iterdir():
             assert path.is_file() and not path.is_symlink(); shutil.copyfile(path, exported / path.name)
-        receipt.update(status='native_musl_Ugrep_Bfs_22_original_pairs_passed_after_each_owned_profile_control', differential_pairs=22,
-            original_or_source_files_in_public_output=False, full_Bun_engine_accepted=False, recovered_client_accepted=False,
+        receipt.update(status='native_musl_source_engine_35_original_pairs_passed_after_each_owned_profile_control' if a.engine is not None else 'native_musl_Ugrep_Bfs_22_original_pairs_passed_after_each_owned_profile_control', differential_pairs=required_pairs,
+            original_or_source_files_in_public_output=False, full_Bun_engine_accepted=a.engine is not None, recovered_client_accepted=False,
             exact_original_transitive_versions_proven=False, local_image_override_is_diagnostic_only=a.runtime_image is not None)
     except BaseException as error:
         receipt.update(status='musl_role_correspondence_failed_not_admitted', error_type=type(error).__name__, error=str(error)); raise
     finally:
         (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
-        if receipt['status'] == 'native_musl_Ugrep_Bfs_22_original_pairs_passed_after_each_owned_profile_control':
+        if receipt['status'] in ['native_musl_Ugrep_Bfs_22_original_pairs_passed_after_each_owned_profile_control', 'native_musl_source_engine_35_original_pairs_passed_after_each_owned_profile_control']:
             files = [dict(file=p.relative_to(out).as_posix(), bytes=p.stat().st_size, sha256=sha(p)) for p in sorted(out.rglob('*')) if p.is_file()]
             (out / 'MANIFEST.json').write_text(json.dumps(dict(schema_version=1, files=files), indent=2) + '\n')
 

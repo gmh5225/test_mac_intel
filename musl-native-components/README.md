@@ -100,3 +100,18 @@ after all 22 exit/stdout/stderr pairs match are bounded fixture records copied
 to the public output directory. Any mismatch retains raw streams privately
 and publishes only receipt metadata. These component pairs do not admit the
 complete Bun engine, rg integration, or a reconstructed client.
+
+`client_build.py` uses the existing shared Linux typed graph adapters to build
+two private source layouts and read all 2,589 records back. It accepts a source
+workspace without an original executable. Complete-engine mode requires exact
+independent admission pins. The separate `--baseline-compiler-control` mode
+uses the already admitted public musl baseline and makes only build/control
+claims. `baseline_client_controls.py` requires two byte-identical builds,
+a source-only rebuild, one isolated module-6 edit with 2,588 unchanged records,
+and bounded version executions after public compiler controls. Only metadata
+and fixed-oracle version records enter public output; all input archives,
+captured bodies, clients and failed build logs remain private.
+
+Complete-engine role mode adds 13 exact rg cases, including config reparse,
+to the 22 Ugrep/Bfs pairs. Its rg version observations preserve the measured
+private/public revision difference explicitly and are excluded from raw pairs.

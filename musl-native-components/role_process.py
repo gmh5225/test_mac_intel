@@ -17,15 +17,20 @@ class RoleProcess:
         self.loader_path, self.fixtures, self.logs = loader_path, fixtures, private_logs
         self.target_profile = target_profile
 
-    def execute(self, label, target, arguments, *, argv0=None, wall=60, expected_failure=None):
+    def execute(self, label, target, arguments, *, argv0=None, wall=60, expected_failure=None,
+                writable_work=None, project=None, user='65534:65534', file_bytes=0,
+                cpu=20, stream_bytes=262144, tmp_size='64m', ripgrep_config=None):
         assert re.fullmatch('[A-Za-z0-9-]+', label)
+        assert 0 <= file_bytes <= 512 * 1024 * 1024 and 0 < cpu <= 180 and 0 < wall <= 300
+        assert 262144 <= stream_bytes <= 2 * 1024 * 1024 and tmp_size in ['64m', '512m']
+        assert re.fullmatch('[0-9]+:[0-9]+', user) and user.split(':')[0] != '0'
         name = 'neverd-musl-' + self.arch + '-' + label + '-' + uuid.uuid4().hex[:12]
         loader = self.target_profile['loader']
         command = ['docker', 'run', '--rm', '--name', name, '--log-driver', 'none', '--label', 'neverd-recovery-owned=musl-native-roles-v1',
             '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
-            '--user', '65534:65534', '--cpus', '2', '--memory', '2g', '--pids-limit', '128',
-            '--ulimit', 'fsize=0:0', '--ulimit', 'core=0:0', '--ulimit', 'cpu=20:20', '--ulimit', 'nofile=256:256',
-            '--tmpfs', '/tmp:rw,nosuid,nodev,size=64m', '--workdir', '/input',
+            '--user', user, '--cpus', '2', '--memory', '2g', '--pids-limit', '128',
+            '--ulimit', f'fsize={file_bytes}:{file_bytes}', '--ulimit', 'core=0:0', '--ulimit', f'cpu={cpu}:{cpu}', '--ulimit', 'nofile=256:256',
+            '--tmpfs', '/tmp:rw,nosuid,nodev,size=' + tmp_size, '--workdir', '/input',
             '--mount', f'type=bind,src={self.guard},dst=/runtime/guard,readonly',
             '--mount', f'type=bind,src={self.sdk},dst=/recovery-sdk,readonly',
             '--mount', f'type=bind,src={self.sdk / "lib" / loader},dst=/lib/{loader},readonly',
@@ -35,6 +40,13 @@ class RoleProcess:
             '-e', 'NO_COLOR=1', '-e', 'BUN_RUNTIME_TRANSPILER_CACHE_PATH=0']
         for directory in ['/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/local/bin', '/usr/local/sbin']:
             command += ['--tmpfs', directory + ':ro,nosuid,nodev,noexec,size=1m']
+        if writable_work is not None:
+            command += ['--mount', f'type=bind,src={writable_work},dst=/work']
+        if project is not None:
+            command += ['--mount', f'type=bind,src={project},dst=/project,readonly']
+        if ripgrep_config is not None:
+            assert ripgrep_config == '/input/rg-config.txt'
+            command += ['-e', 'RIPGREP_CONFIG_PATH=' + ripgrep_config]
         if target is not None:
             command += ['--mount', f'type=bind,src={target},dst=/runtime/program,readonly']
             actual = ['/runtime/program', argv0, *map(str, arguments)]
@@ -52,7 +64,7 @@ class RoleProcess:
                 for event, _ in selector.select(.1):
                     raw = os.read(event.fd, 65536)
                     if not raw: selector.unregister(event.fileobj); continue
-                    buffer = streams[event.data]; keep = min(len(raw), 262144 - len(buffer)); buffer.extend(raw[:keep])
+                    buffer = streams[event.data]; keep = min(len(raw), stream_bytes - len(buffer)); buffer.extend(raw[:keep])
                     if keep < len(raw): failure = 'output limit'; break
                 if failure: break
             if not failure:
@@ -80,7 +92,8 @@ class RoleProcess:
                     except subprocess.TimeoutExpired:
                         cleanup.append(dict(argv=action, timeout=True))
                 if retired: break
-        row = dict(label=label, command=command, container_name=name, exit_code=code, failure=failure, fsize_zero=True, cpu_limit_seconds=20,
+        row = dict(label=label, command=command, container_name=name, exit_code=code, failure=failure, fsize_zero=file_bytes == 0,
+            regular_file_byte_limit=file_bytes, stream_byte_limit=stream_bytes, cpu_limit_seconds=cpu,
             fresh_owned_container_retired=retired, retirement=cleanup, additive_socket_and_io_uring_refusal=True,
             streams={key: dict(bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()) for key, raw in streams.items()})
         for key, raw in streams.items(): (self.logs / (label + '.' + key)).write_bytes(raw)
