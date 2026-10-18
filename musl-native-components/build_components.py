@@ -96,7 +96,8 @@ def main():
         for archive in archives:
             path = library / archive.name; shutil.copyfile(archive, path); deps.append(path)
         def scoped_run(label, argv, cwd=None): return run(role + '-' + label, argv, cwd)
-        private = isolate(library, paths, deps, toolbin, scoped_run, logs, entry='neverd_recovered_' + role + '_main', prefix='neverd_' + role + '_native_')
+        private_logs = logs / (role + '-private-objects'); private_logs.mkdir()
+        private = isolate(library, paths, deps, toolbin, scoped_run, private_logs, entry='neverd_recovered_' + role + '_main', prefix='neverd_' + role + '_native_')
         archive = library / ('librecovered_' + role + '.a'); run(role + '-export', [toolbin / 'llvm-ar', 'rcs', archive, *paths])
         host_source = library / (role + '-library-host.c')
         host_source.write_text('extern int neverd_recovered_' + role + '_main(int,char **);\nint main(int argc,char **argv){return neverd_recovered_' + role + '_main(argc,argv);}\n')
