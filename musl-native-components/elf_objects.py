@@ -1,5 +1,4 @@
 """Strict ELF64 little-endian relocatable-object readback for symbol renames."""
-from collections import Counter
 from pathlib import Path
 import hashlib
 import struct
@@ -73,8 +72,10 @@ def compare_objects(before, after, mapping):
     require(old['identity'] == new['identity'] and old['names'] == new['names'], 'ELF header or section identity changed')
     require(old['ordinary'] == new['ordinary'], 'ELF allocated/debug/group section bytes changed')
     def symbol(row): return (mapping.get(row[0], row[0]), *row[1:])
-    require({i: Counter(map(symbol, rows)) for i, rows in old['symbols'].items()} ==
-        {i: Counter(rows) for i, rows in new['symbols'].items()}, 'ELF typed symbol changed')
+    # COMDAT sh_info and LLVM addrsig bytes contain symbol ordinals. Require
+    # order as well as typed identity so those references cannot be retargeted.
+    require({i: list(map(symbol, rows)) for i, rows in old['symbols'].items()} ==
+        new['symbols'], 'ELF typed symbol or ordinal changed')
     renamed = {}
     for name, row in old['relocations'].items():
         renamed[name] = (*row[:-1], [(offset, typ, addend, symbol(sym)) for offset, typ, addend, sym in row[-1]])

@@ -40,5 +40,23 @@ class RenameProof(unittest.TestCase):
                     compare_objects(work / 'before.o', path, mapping)
             with self.assertRaises(ObjectError): compare_objects(work / 'before.o', work / 'after.o', {'main': 'recovery_main'})
 
+    def test_comdat_signatures_keep_symbol_ordinals(self):
+        with tempfile.TemporaryDirectory() as name:
+            work = Path(name); source = work / 'owned.cc'
+            source.write_text('template<int N> int value(){return N;}\ntemplate int value<1>();\ntemplate int value<2>();\nint main(){return 0;}\n')
+            subprocess.run(['c++', '-fno-lto', '-c', source, '-o', work / 'before.o'], check=True)
+            raw = (work / 'before.o').read_bytes(); shoff = struct.unpack_from('<Q', raw, 40)[0]
+            count = struct.unpack_from('<H', raw, 60)[0]
+            sections = [struct.unpack_from('<IIQQQQIIQQ', raw, shoff + i * 64) for i in range(count)]
+            self.assertTrue(any(s[1] == 17 for s in sections))
+            sym = next(s for s in sections if s[1] == 2)
+            weak_functions = [sym[4] + i for i in range(0, sym[5], 24) if raw[sym[4] + i + 4] == 0x22]
+            self.assertEqual(len(weak_functions), 2)
+            mutated = bytearray(raw); a, b = weak_functions
+            mutated[a:a+24], mutated[b:b+24] = raw[b:b+24], raw[a:a+24]
+            (work / 'after.o').write_bytes(mutated)
+            compare_objects(work / 'before.o', work / 'before.o', {})
+            with self.assertRaises(ObjectError): compare_objects(work / 'before.o', work / 'after.o', {})
+
 
 if __name__ == '__main__': unittest.main()
