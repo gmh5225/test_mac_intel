@@ -40,6 +40,17 @@ def main():
         print('Starting ' + label, flush=True)
         r = subprocess.run(argv, cwd=cwd, env=environment or env, input=data, capture_output=True, timeout=timeout)
         (logs / (label + '.stdout')).write_bytes(r.stdout); (logs / (label + '.stderr')).write_bytes(r.stderr)
+        if r.returncode != 0 and cwd is not None:
+            retained = logs / (label + '-source-logs'); retained.mkdir()
+            total = 0
+            for path in sorted(Path(cwd).rglob('*')):
+                if not path.is_file() or path.is_symlink(): continue
+                if not (path.suffix in ['.log', '.trs'] or path.name.startswith('testtry')): continue
+                assert path.stat().st_size <= 8 * 1024 * 1024, 'Oversized public source-test diagnostic'
+                total += path.stat().st_size
+                assert total <= 32 * 1024 * 1024, 'Public source-test diagnostics exceed budget'
+                destination = retained / path.relative_to(cwd); destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, destination)
         assert r.returncode == 0, (label, r.returncode)
         return r
     def make(label, cwd, *argv, environment=None): return run(label, ['make', '-j2', *argv], cwd, environment)

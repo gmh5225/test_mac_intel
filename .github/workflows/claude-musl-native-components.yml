@@ -4,7 +4,13 @@ on:
   push:
     branches: [codex/claude-windows-recovery]
     paths:
-      - musl-native-components/**
+      - musl-native-components/build.py
+      - musl-native-components/build_components.py
+      - musl-native-components/sdk.py
+      - musl-native-components/elf_objects.py
+      - musl-native-components/private_symbols.py
+      - musl-native-components/test_elf_objects.py
+      - musl-native-components/expected-*-version-*.txt
       - .github/workflows/claude-musl-native-components.yml
 permissions:
   contents: read
