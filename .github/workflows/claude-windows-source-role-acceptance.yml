@@ -1,6 +1,12 @@
 name: Native original and complete Windows source roles
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - windows-native-components/source-engine-pins.json
+      - windows-native-components/compare_roles.py
+      - .github/workflows/claude-windows-source-role-acceptance.yml
 permissions:
   contents: read
   actions: read

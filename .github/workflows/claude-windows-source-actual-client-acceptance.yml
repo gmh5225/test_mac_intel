@@ -1,6 +1,15 @@
 name: Native Windows complete source actual client acceptance
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - windows-native-components/source-engine-pins.json
+      - windows-native-components/client_build.py
+      - windows-native-components/client_workspace.py
+      - windows-native-components/actual_client_acceptance.py
+      - windows-native-components/client_search.py
+      - .github/workflows/claude-windows-source-actual-client-acceptance.yml
 permissions:
   contents: read
   actions: read

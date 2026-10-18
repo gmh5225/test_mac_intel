@@ -1,6 +1,14 @@
 name: Native Windows complete source client rebuild controls
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - windows-native-components/source-engine-pins.json
+      - windows-native-components/client_build.py
+      - windows-native-components/client_workspace.py
+      - windows-native-components/client_build_controls.py
+      - .github/workflows/claude-windows-source-client-build-controls.yml
 permissions:
   contents: read
   actions: read
