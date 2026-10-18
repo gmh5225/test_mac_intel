@@ -19,9 +19,13 @@ def qualify(path, arch):
     for i in range(count):
         name, virtual, rva, size, offset, reloc, line, nr, nl, attrs = at('<8sIIIIIIHHI', opt + optional + 40 * i)
         name = name.rstrip(b'\0').decode('ascii'); data = span(offset, size)
-        sections.append(dict(name=name, rva=rva, virtual=virtual, raw_bytes=size, offset=offset, attrs=attrs,
+        sections.append(dict(index=i + 1, name=name, rva=rva, virtual=virtual, raw_bytes=size, offset=offset, attrs=attrs,
             sha256=hashlib.sha256(data).hexdigest()))
-    assert len({s['name'] for s in sections}) == len(sections)
+    # PE section labels are eight bytes. The admitted Bun baseline already
+    # contains two distinct __DATA,_ labels; section ordinal/RVA own identity.
+    for i, left in enumerate(sections):
+        for right in sections[i + 1:]:
+            assert left['rva'] + max(left['virtual'], left['raw_bytes']) <= right['rva'] or right['rva'] + max(right['virtual'], right['raw_bytes']) <= left['rva']
     def section(rva, length):
         found = [s for s in sections if s['rva'] <= rva and rva + length <= s['rva'] + s['raw_bytes']]
         assert len(found) == 1, 'PE RVA does not resolve to one file-backed section'
