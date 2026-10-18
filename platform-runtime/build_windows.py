@@ -43,9 +43,11 @@ def unpack(archive, destination):
         stream.extractall(destination)
 
 
-def main():
+def main(native_profile=None):
     parser = argparse.ArgumentParser(); parser.add_argument('--arch', required=True, choices=PROFILES)
-    parser.add_argument('--output', required=True, type=Path); args = parser.parse_args()
+    parser.add_argument('--output', required=True, type=Path)
+    if native_profile is not None: native_profile.add_arguments(parser)
+    args = parser.parse_args()
     assert platform.system() == 'Windows'
     assert os.environ['RUNNER_ARCH'].lower() == args.arch
     profile = PROFILES[args.arch]
@@ -90,6 +92,7 @@ def main():
         return archive
 
     try:
+        if native_profile is not None: native_profile.preflight(args, receipt)
         for tool in ['git.exe', 'rustup.exe', 'go.exe', 'ruby.exe', 'rc.exe']:
             run('find-' + tool, ['where.exe', tool])
         if args.arch == 'x64':
@@ -154,6 +157,10 @@ def main():
             '/nodefaultlib', '/out:' + str(exe), obj])
         run('llvm-family-native-execution-control', [exe])
         receipt['native_lto_family_control_sha256'] = sha(exe)
+        if native_profile is not None:
+            native_profile.prepare_build(args, out, source, bun, toolbin, env, run, receipt)
+            actual = sorted(subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=normal'], cwd=source, text=True).splitlines())
+            assert actual == sorted(native_profile.expected_changes(receipt)), 'Unexpected public source modification'
         run('public-bun-build', [bun, 'scripts/build.ts', '--profile=release', '--os=windows', '--arch=' + profile['build_arch'],
                                   '--build-dir=' + str(source / 'build/recovery'), '-j2'], source)
         binary = source / 'build/recovery/bun.exe'; raw = binary.read_bytes(); assert raw[:2] == b'MZ'
@@ -161,6 +168,9 @@ def main():
         assert raw[pe:pe+4] == b'PE\0\0' and struct.unpack_from('<H', raw, pe+4)[0] == profile['machine']
         run('native-runtime-version', [binary, '--version']); assert (logs / 'native-runtime-version.log').read_text().strip() == '1.4.3'
         run('native-runtime-revision', [binary, '--revision']); assert COMMIT[:9] in (logs / 'native-runtime-revision.log').read_text()
+        if native_profile is not None:
+            native_profile.qualify_and_export(args, out, source, bun, toolbin, env, run, receipt)
+            return
         receipt.update(status='unmodified_public_windows_source_baseline_built_and_version_controlled',
                        binary_sha256=sha(binary), binary_bytes=binary.stat().st_size, native_version_executed=True,
                        source_tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], cwd=source, text=True).strip())
@@ -170,7 +180,7 @@ def main():
         files = [dict(file=p.name, bytes=p.stat().st_size, sha256=sha(p)) for p in sorted(package.iterdir())]
         (package / 'MANIFEST.json').write_text(json.dumps(dict(schema_version=1, files=files), indent=2) + '\n')
     except BaseException as error:
-        receipt.update(status='platform_baseline_failed_not_admitted', error_type=type(error).__name__, error=str(error)); raise
+        receipt.update(status='Windows_native_source_engine_failed_not_admitted' if native_profile is not None else 'platform_baseline_failed_not_admitted', error_type=type(error).__name__, error=str(error)); raise
     finally:
         (logs / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 
