@@ -117,7 +117,7 @@ class Harness:
         return text
 
     def execute(self, name, label, argv, *, spec=None, steps=None, work_input='fixture input\n', fixture_files=None, setup=None, extra_env=None):
-        assert name.replace('-','').isalnum() and label in [*self.clients,'authored']
+        assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*',name) and label in [*self.clients,'authored']
         stage = self.output/name; stage.mkdir()
         for part in ['work','home','tmp','fixtures','report']: (stage/part).mkdir()
         (stage/'work/input.txt').write_text(work_input)
