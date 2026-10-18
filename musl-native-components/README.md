@@ -41,3 +41,21 @@ musl behavior before a hash-gated correction changes this single expected
 result to no match (`RC=1`). The original test script, all other expected cases,
 and the PCRE2 runtime implementation remain byte-identical; test 150 still
 executes. The fixture patch and both controls are retained explicitly.
+
+`build_runtime.py --arch arm64|x64 --sdk /abs/admitted-sdk --components
+/abs/admitted-components --output /abs/new-directory` compiles public Bun
+`c6da4a4d3010e5553438c60f6bd76d981976867c` with the independently admitted C
+graphs, a fresh single Rust/std/rg graph, and the unchanged public Linux seccomp
+source/filter. It restores the measured 29-name musl allocator export surface
+through the existing public mimalloc implementations and retains static C++
+exception support. The final engine must import only target musl libc and pass
+19 authored role/JavaScript controls plus 768 filename/inherited-FD controls.
+This is a producer gate; complete-engine admission and captured-client
+correspondence remain separate requirements.
+
+The allocator implementation remains the public Bun-pinned
+[mimalloc override source](https://github.com/oven-sh/mimalloc/blob/92ef6587c57b262f6e6abf513f7776a2f8d12aeb/src/alloc-override.c).
+The seccomp source is hash-pinned to sandbox-runtime
+`9520430507ce3c354a71b1518e29e76121407ed1`; its Apache-2.0 license is downloaded
+with the source. The generated filter header is byte-identical to the earlier
+independently verified public libseccomp filter graph.
