@@ -13,7 +13,9 @@ ROOT=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT.parent/'bun-runtime'))
 from native_libraries import check_manifest
 from client_build import build
-from client_acceptance import Harness, sha, write
+from client_acceptance import Harness, sha, write, arguments
+from client_workspace import edit_control
+from client_bash import accept as accept_bash
 
 
 def published_input(arch, folder):
@@ -45,7 +47,8 @@ def main():
     try:
         for number in [1,2]:
             work=output/('private-build-'+str(number));diagnostics=output/('private-build-logs-'+str(number))
-            result=build(a.arch,original,engine,work,diagnostics)
+            result=build(a.arch,original if number==1 else None,engine,work,diagnostics,
+                workspace=output/'private-build-1' if number==2 else None)
             receipt['builds'].append(result);write(logs/('build-'+str(number)+'.json'),result)
             for layout in ['preserved','readable']:
                 public=logs/('build-'+str(number)+'-'+layout);public.mkdir()
@@ -56,11 +59,17 @@ def main():
         first,second=receipt['builds']
         assert {k:r['sha256'] for k,r in first['clients'].items()}=={k:r['sha256'] for k,r in second['clients'].items()}
         receipt['two_independent_builds_identical']=True
+        edited=edit_control(a.arch,engine,output/'private-build-1',output/'private-edit-control',output/'private-edit-build-logs')
+        receipt['source_workspace_edit_control']=edited
+        write(logs/'workspace-edit-control.json',edited)
+        for layout in ['preserved','readable']:
+            folder=logs/('edit-'+layout);folder.mkdir()
+            shutil.copyfile(output/'private-edit-control/edited-build'/layout/'readback/mapping.tsv',folder/'readback-module-hashes.tsv')
         harness=Harness(a.arch,original,engine,output/'private-build-logs-1/native-client-build.json',output/'private-client-runs',logs/'client')
         try:
-            harness.qualify_fixture();harness.version();harness.tool_matrix('search');harness.tool_matrix('core');harness.configuration()
+            harness.qualify_fixture();harness.version();harness.tool_matrix('search');harness.tool_matrix('core');harness.configuration();accept_bash(harness,arguments)
             assert all(sha(path)==harness.receipt['client_sha256'][label] for label,path in harness.clients.items())
-            harness.receipt.update(status='selected_native_Mac_client_differential_cases_passed',inputs_preserved=True,groups=['version','search','core','config'])
+            harness.receipt.update(status='selected_native_Mac_client_differential_cases_passed',inputs_preserved=True,groups=['version','search','core','config','bash'])
         except Exception as error:
             harness.receipt.update(status='failed_private_records_retained',error_type=type(error).__name__);raise
         finally:write(harness.logs/'client-acceptance.json',harness.receipt)

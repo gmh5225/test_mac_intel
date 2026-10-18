@@ -93,11 +93,12 @@ class Harness:
         self.receipt['public_system_ICU_data'] = [dict(path=str(p),bytes=p.stat().st_size,sha256=sha(p)) for p in self.icu]
         self.receipt['public_system_timezone_data'] = [dict(path=str(p),resolved=str(p.resolve()),bytes=p.stat().st_size,sha256=sha(p)) for p in self.timezone]
         source = logs/'source'; source.mkdir()
-        for name in ['client_acceptance.py','client_protocol.py','client-fixture-probe.mjs','client-runner-control.c','boundary-control.c','role-transport.c','source_engine.py','source-engine-pins.json','original-pins.json']:
+        for name in ['client_acceptance.py','client_protocol.py','client_bash.py','client-fixture-probe.mjs','client-runner-control.c','boundary-control.c','role-transport.c','source_engine.py','source-engine-pins.json','original-pins.json']:
             shutil.copyfile(ROOT/name,source/name)
         shutil.copyfile(ROOT.parent/'seccomp-helper/compare_bash.py',source/'compare_bash.py')
 
-    def profile(self, stage, target, port):
+    def profile(self, stage, target, port, capability=None):
+        assert capability in [None,'bash']
         literal = lambda p:'(literal ' + json.dumps(str(p)) + ')'
         text = '(version 1)\n(deny default)\n(allow sysctl-read)\n(allow file-read-metadata)\n'
         system = '(subpath "/System/Library") (subpath "/usr/lib") (subpath "/System/Volumes/Preboot/Cryptexes/OS")'
@@ -112,11 +113,15 @@ class Harness:
             text += '(allow file-write* (subpath ' + json.dumps(str(stage/part)) + '))\n'
         for path in {target, self.engine, self.boundary, self.transport}:
             text += '(allow file-read* file-map-executable process-exec ' + literal(path) + ')\n'
+        if capability == 'bash':
+            text += '(allow file-write* (literal "/dev/null"))\n'
+            for path in ['/bin/bash','/bin/cat']:
+                text += '(allow file-read* file-map-executable process-exec ' + literal(path) + ')\n'
         text += '(allow process-fork)\n(allow signal (target self))\n'
         if port is not None: text += '(allow network-outbound (remote tcp "localhost:' + str(port) + '"))\n'
         return text
 
-    def execute(self, name, label, argv, *, spec=None, steps=None, work_input='fixture input\n', fixture_files=None, setup=None, extra_env=None):
+    def execute(self, name, label, argv, *, spec=None, steps=None, work_input='fixture input\n', fixture_files=None, setup=None, extra_env=None, capability=None):
         assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*',name) and label in [*self.clients,'authored']
         stage = self.output/name; stage.mkdir()
         for part in ['work','home','tmp','fixtures','report']: (stage/part).mkdir()
@@ -141,7 +146,7 @@ class Harness:
         if '@FIXTURE_PORT@' in argv:
             assert server is not None and label == 'authored'
             argv = [str(server.port) if value == '@FIXTURE_PORT@' else value for value in argv]
-        profile = private/'profile.sb'; profile.write_text(self.profile(stage,target,server.port if server else None))
+        profile = private/'profile.sb'; profile.write_text(self.profile(stage,target,server.port if server else None,capability))
         environment = dict(HOME=str(stage/'home'), TMPDIR=str(stage/'tmp'), XDG_CONFIG_HOME=str(stage/'home/config'),
             XDG_CACHE_HOME=str(stage/'home/cache'), BUN_INSTALL_CACHE_DIR=str(stage/'home/bun-cache'),
             BUN_RUNTIME_TRANSPILER_CACHE_PATH='0', PATH='/unavailable', LANG='C', LC_ALL='C', TZ='UTC', NO_COLOR='1',
@@ -149,6 +154,7 @@ class Harness:
             ANTHROPIC_API_KEY='sk-ant-api03-offline-fixture-not-a-real-credential',
             ANTHROPIC_BASE_URL='http://127.0.0.1:' + str(server.port if server else 9),
             CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1',DISABLE_AUTOUPDATER='1',ENABLE_CLAUDEAI_MCP_SERVERS='false', USE_BUILTIN_RIPGREP='true')
+        if capability == 'bash': environment.update(SHELL='/bin/bash',CLAUDE_CODE_SHELL='/bin/bash')
         for key,value in (extra_env or {}).items():
             assert key == 'RIPGREP_CONFIG_PATH' and value.startswith('/fixtures/'); environment[key] = replace(value)
         canary = stage/'outside-canary'; canary.write_text('owned outside canary\n')
@@ -161,6 +167,10 @@ class Harness:
             assert all(v in [1,13] for v in [boundary['outside_errno'],boundary['write_errno'],*boundary['network_errno']]) and len(boundary['network_errno']) == 4
             assert canary.read_text() == 'owned outside canary\n' and not (stage/'forbidden-write').exists()
             write(private/'qualified-before-client.json',dict(profile_sha256=sha(profile),boundary=boundary))
+            if capability == 'bash':
+                row,raw,errors = protocol(['/usr/bin/sandbox-exec','-f',profile,'/bin/bash','--noprofile','--norc','-c','printf ignored > /dev/null; printf "owned bash capability\\n"'],
+                    stage/'work',environment,private/'owned-bash')
+                assert row['exit_code'] == 0 and row['failure'] is None and not errors and raw == b'owned bash capability\n'
             execution,stdout,stderr = protocol(['/usr/bin/sandbox-exec','-f',profile,target,*argv],stage/'work',environment,private/'client',steps)
         finally:
             if server: server.close()
@@ -188,6 +198,8 @@ class Harness:
         # and captured-source diagnostics always remain in private-records.
         write(folder/'observation.json',value); write(folder/'normalized.json',normalized)
         write(folder/'normalization.json',dict(fields=normalizer.audit,ids=normalizer.ids,devices=normalizer.devices))
+        (folder/'client.stdout').write_bytes(result['stdout']); (folder/'client.stderr').write_bytes(b'')
+        if result['requests']: shutil.copyfile(result['private']/'requests.json',folder/'requests.json')
         return normalized
 
     def compare(self, name, observations):
@@ -303,6 +315,9 @@ def main():
             if group in MATRICES:h.tool_matrix(group)
             elif group=='version':h.version()
             elif group=='config':h.configuration()
+            elif group=='bash':
+                from client_bash import accept
+                accept(h,arguments)
             else:raise ValueError('unknown group')
         assert all(sha(path)==h.receipt['client_sha256'][label] for label,path in h.clients.items())
         h.receipt.update(status='selected_native_Mac_client_differential_cases_passed',inputs_preserved=True,groups=a.groups.split(','))

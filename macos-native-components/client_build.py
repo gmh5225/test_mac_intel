@@ -51,12 +51,17 @@ def critical_sections(path):
     return result
 
 
-def build(arch, original, engine, output, logs, workspace=None):
-    assert platform.system() == 'Darwin' and platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}[arch] and os.getuid() != 0
+def build(arch, original, engine, output, logs, workspace=None, *, translated_compiler=False):
+    native = platform.machine() == {'arm64': 'arm64', 'x64': 'x86_64'}[arch]
+    assert platform.system() == 'Darwin' and os.getuid() != 0
+    assert native or translated_compiler and arch == 'x64' and platform.machine() == 'arm64'
+    assert not translated_compiler or not native, 'The diagnostic flag is only for an ARM host running the public x64 compiler'
     assert subprocess.run(['/usr/sbin/sysctl', '-n', 'sysctl.proc_translated'], capture_output=True).stdout != b'1\n'
     engine_receipt = qualify_engine(arch, engine)
     pin = json.loads((ROOT / 'original-pins.json').read_bytes())[arch]
-    assert original.is_file() and not original.is_symlink() and original.stat().st_size == pin['bytes'] and sha(original) == pin['sha256']
+    if original is not None:
+        assert original.is_file() and not original.is_symlink() and original.stat().st_size == pin['bytes'] and sha(original) == pin['sha256']
+    else: assert workspace is not None, 'A private source workspace is required without a published original input'
     recipe = ROOT / 'macos-readable-recipes-v1.json.gz'; assert sha(recipe) == RECIPE_SHA256
     recipes = json.loads(gzip.decompress(recipe.read_bytes())); assert recipes['kind'] == 'hash_pinned_whitespace_insertion_only' and not recipes['contains_captured_source']
     expected = recipes['profiles'][arch]; assert expected['module_count'] == 2609 and expected['source_count'] == 2364 and expected['entry_index'] == 6 and expected['startup_count'] == 7
@@ -68,13 +73,18 @@ def build(arch, original, engine, output, logs, workspace=None):
     for name in ['extract-native-graph', 'raw-graph-adapter', 'graph-fidelity-adapter']:
         command('compile-' + name, ['xcrun', 'clang++', '-std=c++20', '-O2', '-Wall', '-Wextra', '-Werror', '-Wno-deprecated-declarations', ROOT / (name + '.cpp'), '-o', tools / name])
     extracted = output / 'extracted'
-    command('extract-published-graph', [tools / 'extract-native-graph', original, pin['sha256'], extracted])
-    actual = rows(extracted / 'mapping.tsv')
+    if original is not None:
+        command('extract-published-graph', [tools / 'extract-native-graph', original, pin['sha256'], extracted])
+        actual = rows(extracted / 'mapping.tsv')
+    else:
+        actual = [dict({k:v for k,v in row.items() if k != 'readable_sha256'},file='m'+str(row['module_index'])) for row in expected['rows']]
     assert [{k:v for k,v in row.items() if k != 'file'} for row in actual] == [{k:v for k,v in row.items() if k != 'readable_sha256'} for row in expected['rows']]
     receipt = dict(status='started', arch=arch, source_engine=engine_receipt, original_sha256=pin['sha256'],
         original_executed_during_build=False, clients_uploaded=False, captured_source_uploaded=False,
         formatting_recipe_sha256=RECIPE_SHA256, all_2609_original_rows_match_prior_NeverD=True,
-        original_descriptor_provider_preserved=True, clients={}, goal_complete=False)
+        original_descriptor_provider_preserved=True, clients={}, goal_complete=False,
+        original_input_supplied=original is not None, rebuild_input_mode='published_input_and_optional_workspace' if original is not None else 'private_source_workspace_and_pinned_module_identity_map',
+        build_host_cpu=platform.machine(),native_target_CPU=native,translated_public_compiler_used=translated_compiler)
     try:
         for layout in ['preserved', 'readable']:
             work = output / layout; work.mkdir(); source = work / 'sources'; source.mkdir(); selected = []; edits = []
@@ -82,13 +92,16 @@ def build(arch, original, engine, output, logs, workspace=None):
                 supplied = workspace / layout / 'sources'; assert not any(p.is_symlink() for p in supplied.rglob('*'))
                 assert {p.name for p in supplied.iterdir()} == {'m' + str(r['module_index']) for r in actual}
             for row in actual:
-                raw = (extracted / 'input' / row['file']).read_bytes(); assert hashlib.sha256(raw).hexdigest() == row['storage_sha256']
-                if layout == 'readable' and row['loader_id'] == 1: raw = formatted(raw, recipes['recipes'][row['storage_sha256']])
                 name = 'm' + str(row['module_index'])
+                if original is not None:
+                    raw = (extracted / 'input' / row['file']).read_bytes(); assert hashlib.sha256(raw).hexdigest() == row['storage_sha256']
+                    if layout == 'readable' and row['loader_id'] == 1: raw = formatted(raw, recipes['recipes'][row['storage_sha256']])
                 if workspace is not None:
                     file = supplied / name; assert file.is_file() and file.stat().st_size <= 512 * 1024 * 1024
                     edited = file.read_bytes()
-                    if edited != raw: edits.append(row['module_index'])
+                    expected_sha = hashlib.sha256(raw).hexdigest() if original is not None else expected['rows'][row['module_index']].get('readable_sha256' if layout == 'readable' and row['loader_id'] == 1 else 'storage_sha256')
+                    assert expected_sha is not None
+                    if hashlib.sha256(edited).hexdigest() != expected_sha: edits.append(row['module_index'])
                     raw = edited
                 (source / name).write_bytes(raw)
                 selected.append([row['virtual_name'],row['loader_id'],row['encoding_id'],row['format_id'],row['side_id'],name,len(raw),hashlib.sha256(raw).hexdigest()])
@@ -111,6 +124,10 @@ def build(arch, original, engine, output, logs, workspace=None):
             for folder in ['work','home','tmp']: profile += '(allow file-write* (subpath ' + json.dumps(str(stage / folder)) + '))\n'
             for binary in [runtime,control]: profile += '(allow file-map-executable process-exec ' + literal(binary) + ')\n'
             profile += '(allow process-fork)\n(allow signal (target self))\n(deny network*)\n'
+            if translated_compiler:
+                library=Path('/Library/Apple/usr/libexec/oah/libRosettaRuntime');assert library.is_file()
+                profile += '(allow file-read* file-map-executable ' + literal(library) + ')\n'
+                receipt['translated_compiler_library']=dict(path=str(library),sha256=sha(library))
             profile_path = logs / (layout + '-build-profile.sb'); profile_path.write_text(profile)
             environment = dict(HOME=str(stage / 'home'), TMPDIR=str(stage / 'tmp'), PATH='/unavailable', LANG='C', LC_ALL='C', BUN_RUNTIME_TRANSPILER_CACHE_PATH='0')
             row, stdout, stderr = bounded(layout + '-boundary', ['/usr/bin/sandbox-exec','-f',profile_path,control,canary,work/'forbidden-write',readable],stage/'work',environment,logs,wall=30,cpu=20)
@@ -118,6 +135,10 @@ def build(arch, original, engine, output, logs, workspace=None):
             assert boundary['readable'] == boundary['shell_exec_denied'] == 1 and len(boundary['network_errno']) == 4
             assert all(v in [1,13] for v in [boundary['outside_errno'],boundary['write_errno'],*boundary['network_errno']])
             assert not (work / 'forbidden-write').exists() and canary.read_bytes() == b'owned outside build fixture\n'
+            row,stdout,stderr = bounded(layout+'-owned-compiler', ['/usr/bin/sandbox-exec','-f',profile_path,runtime,'-e','console.log(JSON.stringify({arch:process.arch,message:"owned source compiler"}))'],
+                stage/'work',environment,logs,wall=60,cpu=30)
+            assert row['exit_code']==0 and row['failure'] is None and not stderr
+            assert json.loads(stdout)==dict(arch=arch,message='owned source compiler')
             names = sorted(p.name for p in graph.iterdir())
             startup = [r['virtual_name'] for r in actual[:expected['startup_count']]]
             (graph / 'bootstrap.mjs').write_text(''.join('await import(JSON.parse(' + json.dumps(json.dumps(name)) + '));\n' for name in startup))
@@ -147,6 +168,8 @@ def build(arch, original, engine, output, logs, workspace=None):
 
 if __name__ == '__main__':
     p=argparse.ArgumentParser();p.add_argument('--arch',choices=['arm64','x64'],required=True)
-    for name in ['original','engine','output','logs']:p.add_argument('--'+name,type=Path,required=True)
+    for name in ['engine','output','logs']:p.add_argument('--'+name,type=Path,required=True)
+    p.add_argument('--original',type=Path)
+    p.add_argument('--translated-compiler',action='store_true',help='ARM host diagnostic: translate only the public x64 compiler; captured client execution is not accepted')
     p.add_argument('--workspace',type=Path);a=p.parse_args()
-    print(json.dumps(build(a.arch,a.original.resolve(),a.engine.resolve(),a.output.resolve(),a.logs.resolve(),a.workspace.resolve() if a.workspace else None)))
+    print(json.dumps(build(a.arch,a.original.resolve() if a.original else None,a.engine.resolve(),a.output.resolve(),a.logs.resolve(),a.workspace.resolve() if a.workspace else None,translated_compiler=a.translated_compiler)))
