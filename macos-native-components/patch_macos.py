@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT.parent / 'bun-runtime'))
 from rust_source_graph import plan as plan_rust_graph
 from stage_native_sources import stage
 from component_libraries import ARCHIVES, qualify
+from macho_contracts import EXCEPTION_IMPORTS
 
 HASHES = {
     'src/runtime/bin_entry/mod.rs': 'fe9a6db0e6c4fdc3b960de384a8ce26d3c5892566c6189be9ca5c30bba2b3b43',
@@ -24,7 +25,6 @@ HASHES = {
     'src/runtime/node/node_fs.rs': '09039025d7da37aceec165fd5177caea7e721da3e8c97dc675d4b1035e7bd0dd',
     'scripts/build/flags.ts': '471840ec9df1838a4237805ac456b8a9e4ae069c0d09cf2470b9b5366ea28bbc',
 }
-EXCEPTION_IMPORTS = ['__cxa_allocate_exception', '__cxa_begin_catch', '__cxa_rethrow', '__cxa_throw', '__gxx_personality_v0', '_Unwind_Resume']
 UGREP_INITIALIZERS = ['_GLOBAL__sub_I_' + name + '.cpp' for name in ['ugrep', 'output', 'query', 'stats', 'posix', 'unicode']]
 
 

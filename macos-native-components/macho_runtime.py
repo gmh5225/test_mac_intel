@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib
 import struct
-from patch_macos import EXCEPTION_IMPORTS
+from macho_contracts import EXCEPTION_IMPORTS
 
 
 def qualify(path, arch):

@@ -20,7 +20,7 @@ sys.path.insert(0, str(ROOT.parent / 'seccomp-helper'))
 from format_recipe import formatted
 from bounded_process import run as bounded
 from source_engine import qualify as qualify_engine
-from patch_macos import sha
+from component_libraries import sha
 from macho_client_layout import inspect as signed_layout
 
 RECIPE_SHA256 = 'c5acb4ce821b00bd7d99f1d08c723c46128319a8f162dced66bcbf71dcf6f61e'
@@ -138,6 +138,15 @@ def build(arch, original, engine, output, logs, workspace=None, *, translated_co
             assert not (work / 'forbidden-write').exists() and canary.read_bytes() == b'owned outside build fixture\n'
             row,stdout,stderr = bounded(layout+'-owned-compiler', ['/usr/bin/sandbox-exec','-f',profile_path,runtime,'-e','console.log(JSON.stringify({arch:process.arch,message:"owned source compiler"}))'],
                 stage/'work',environment,logs,wall=60,cpu=30)
+            attempts=[row]
+            # Translation can stall before the public compiler produces its
+            # first byte. One identical authored-probe retry remains bounded;
+            # captured-source compilation is never retried or accepted here.
+            if translated_compiler and row['failure']=='wall timeout' and not stdout and not stderr:
+                row,stdout,stderr = bounded(layout+'-owned-compiler-retry', ['/usr/bin/sandbox-exec','-f',profile_path,runtime,'-e','console.log(JSON.stringify({arch:process.arch,message:"owned source compiler"}))'],
+                    stage/'work',environment,logs,wall=60,cpu=30)
+                attempts.append(row)
+            receipt.setdefault('owned_compiler_startup',{})[layout]=attempts
             assert row['exit_code']==0 and row['failure'] is None and not stderr
             assert json.loads(stdout)==dict(arch=arch,message='owned source compiler')
             names = sorted(p.name for p in graph.iterdir())
