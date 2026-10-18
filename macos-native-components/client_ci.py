@@ -54,7 +54,7 @@ def main():
                 public=logs/('build-'+str(number)+'-'+layout);public.mkdir()
                 shutil.copyfile(work/layout/'mapping.tsv',public/'selected-module-hashes.tsv')
                 shutil.copyfile(work/layout/'readback/mapping.tsv',public/'readback-module-hashes.tsv')
-                for name in ['boundary.result.json','boundary.stdout','compile-source.result.json','readback.stdout','build-profile.sb']:
+                for name in ['boundary.result.json','boundary.stdout','compile-source.result.json','readback.stdout','build-profile.sb','signed-layout.json']:
                     shutil.copyfile(diagnostics/(layout+'-'+name),public/name)
         first,second=receipt['builds']
         assert {k:r['sha256'] for k,r in first['clients'].items()}=={k:r['sha256'] for k,r in second['clients'].items()}

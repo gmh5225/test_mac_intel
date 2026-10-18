@@ -21,6 +21,7 @@ from format_recipe import formatted
 from bounded_process import run as bounded
 from source_engine import qualify as qualify_engine
 from patch_macos import sha
+from macho_client_layout import inspect as signed_layout
 
 RECIPE_SHA256 = 'c5acb4ce821b00bd7d99f1d08c723c46128319a8f162dced66bcbf71dcf6f61e'
 
@@ -150,14 +151,17 @@ def build(arch, original, engine, output, logs, workspace=None, *, translated_co
             assert row['exit_code'] == 0 and row['failure'] is None, layout + ' source compile'
             client = work / 'client-final'
             command(layout + '-restore-graph', [tools/'graph-fidelity-adapter',mapping,stage/'work/client',client,actual[expected['entry_index']]['virtual_name'],expected['startup_count'],expected['flags'] & 15,8])
-            command(layout + '-codesign', ['/usr/bin/codesign','--force','--sign','-','--preserve-metadata=entitlements,requirements,flags',client])
+            command(layout + '-codesign', ['/usr/bin/codesign','--force','--sign','-','--pagesize','4096','--preserve-metadata=entitlements,requirements,flags',client])
             command(layout + '-signature-verify', ['/usr/bin/codesign','--verify','--strict',client]); client.chmod(0o500)
+            signature=signed_layout(client);assert signature['signature']['code_directories'][0]['page_size']==4096
+            (logs/(layout+'-signed-layout.json')).write_text(json.dumps(signature,indent=2)+'\n')
             readback = work / 'readback'; command(layout + '-readback', [tools/'extract-native-graph',client,sha(client),readback])
             rebuilt = rows(readback / 'mapping.tsv')
             assert [[r['virtual_name'],r['loader_id'],r['encoding_id'],r['format_id'],r['side_id'],r['bytes'],r['storage_sha256']] for r in rebuilt] == [r[:5]+r[6:] for r in selected]
             core = critical_sections(engine); assert critical_sections(client) == core
             receipt['clients'][layout] = dict(path=str(client),sha256=sha(client),bytes=client.stat().st_size,
-                all_module_rows_match_selected_source=True,source_engine_code_and_exception_sections_preserved=core,intentionally_edited_modules=edits)
+                all_module_rows_match_selected_source=True,source_engine_code_and_exception_sections_preserved=core,intentionally_edited_modules=edits,
+                code_signing_page_size=4096,signed_layout_sha256=sha(logs/(layout+'-signed-layout.json')))
             if edits: receipt['original_descriptor_provider_preserved'] = False
         receipt.update(status='both_Mac_source_engine_clients_rebuilt_and_2609_rows_readback_exactly',
             compiled_client_flags=4479, original_graph_flags=expected['flags'], original_caches_reused=False, actual_client_execution_acceptance=False)
