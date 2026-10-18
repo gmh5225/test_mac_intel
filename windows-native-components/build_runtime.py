@@ -18,6 +18,8 @@ from component_libraries import qualify_library
 from patch_windows import patch
 from pe_runtime import qualify as qualify_pe
 from coff_admission import sha
+from cxx_abi_control import qualify as qualify_Cxx_ABI
+from string_sort_controls import qualify as qualify_string_sort
 
 
 class NativeProfile:
@@ -36,6 +38,7 @@ class NativeProfile:
             compiled_Rust_archive_used=False, native_role_boundary_qualification=pins['independent_qualification_sha256'])
 
     def prepare_build(self, args, out, source, bun, toolbin, env, run, receipt):
+        receipt['Cxx_return_ABI_control'] = qualify_Cxx_ABI(args.arch, out / 'diagnostics', toolbin, env, run)
         inputs = out / 'native-source-inputs'; receipt['native_source_preparation'] = prepare_sources(inputs, run, target_os='windows')
         receipt['native_source_patch'] = patch(source, out / 'diagnostics/native-source-patch', inputs, self.ugrep, args.arch)
         install = source / 'recovery-native/pcre2-install'; install.mkdir()
@@ -71,13 +74,14 @@ class NativeProfile:
         assert checks == ['0'], 'Ambiguous strong symbol ownership in Windows source graph'
         receipt['duplicate_strong_symbols'] = 0
         receipt['owned_native_controls'] = owned_controls(binary, args.arch, logs / 'native-role-controls', self.ugrep)
+        receipt['authored_string_sort_controls'] = qualify_string_sort(binary, args.arch, logs / 'string-sort-controls')
         run('final-PE-imports-exports', [toolbin / 'llvm-readobj.exe', '--file-headers', '--sections', '--coff-imports', '--coff-exports', binary])
         package = out / 'public-runtime'; package.mkdir(); shutil.copyfile(binary, package / 'bun.exe')
         shutil.copytree(inputs := out / 'native-source-inputs', package / inputs.name)
         shutil.copytree(self.ugrep, package / 'ugrep-source-library-inputs')
         shutil.copytree(logs / 'native-source-patch', package / 'native-source-patch')
         recipes = package / 'recipes'; recipes.mkdir()
-        names = ['build_runtime.py', 'patch_windows.py', 'pcre2_sys_overlay.py', 'pe_runtime.py', 'component_libraries.py',
+        names = ['build_runtime.py', 'cxx_abi_control.py', 'string_sort_controls.py', 'patch_windows.py', 'pcre2_sys_overlay.py', 'pe_runtime.py', 'component_libraries.py',
             'coff_admission.py', 'ugrep-library-pins.json', 'source-component-pins.json', 'role-boundary-pins.json',
             'role_boundary.rs', 'recovered_multicall.rs', 'resolved-Cargo.lock']
         folder = recipes / 'windows-native-components'; folder.mkdir()
@@ -89,6 +93,8 @@ class NativeProfile:
             for name in names: shutil.copyfile(ROOT.parent / directory / name, folder / name)
         for name in ['Cargo.lock', 'Cargo.toml']: shutil.copyfile(source / name, package / name)
         for name in ['rust-plan.json', 'single-rust-graph.json', 'final-PE.json']: shutil.copyfile(logs / name, package / name)
+        if args.arch == 'arm64': shutil.copyfile(logs / 'Cxx-return-ABI.json', package / 'Cxx-return-ABI.json')
+        shutil.copytree(logs / 'string-sort-controls', package / 'string-sort-controls')
         receipt.update(status='public_Windows_complete_native_source_engine_and_owned_controls_passed',
             binary_sha256=sha(binary), binary_bytes=binary.stat().st_size, recovered_native_roles_integrated=True,
             source_tree=subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], cwd=source, text=True).strip(),

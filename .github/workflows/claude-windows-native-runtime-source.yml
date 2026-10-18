@@ -5,6 +5,8 @@ on:
     branches: [codex/claude-windows-recovery]
     paths:
       - windows-native-components/build_runtime.py
+      - windows-native-components/cxx_abi_control.py
+      - windows-native-components/string_sort_controls.py
       - windows-native-components/patch_windows.py
       - windows-native-components/pcre2_sys_overlay.py
       - windows-native-components/pe_runtime.py
@@ -33,8 +35,10 @@ jobs:
         include:
           - arch: x64
             runner: windows-2022
+            toolset: ''
           - arch: arm64
             runner: windows-11-arm
+            toolset: '14.44.35207'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 120
     defaults:
@@ -52,6 +56,7 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
         with:
           arch: ${{ matrix.arch }}
+          toolset: ${{ matrix.toolset }}
       - name: Read independently admitted C source graph producer
         id: input
         run: |
