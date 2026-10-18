@@ -25,9 +25,12 @@ def plan(source, target_os):
     # `as _` comparisons. Use the actual i32 family/u16 SystemError field types;
     # hash-gated line identities avoid changing the separate i32 syscall errors.
     type_patches = []
-    for label, rel, numbers, old, new in [
+    rules = [
         ("dns-type", "src/runtime/dns_jsc/options_jsc.rs", [226, 227], " as _ =>", " as i32 =>"),
-        ("fs-type", "src/runtime/node/node_fs.rs", [1598, 2015, 8236, 8364], "E::EEXIST as _", "E::EEXIST as u16")]:
+        ("fs-type", "src/runtime/node/node_fs.rs", [1598, 2015, 8236, 8364] + ([1976, 8207] if target_os == "windows" else []), "E::EEXIST as _", "E::EEXIST as u16")]
+    if target_os == "windows":
+        rules.append(("windows-watcher-type", "src/runtime/node/win_watcher.rs", [348], "sys::E::NOENT as _", "sys::E::NOENT as u16"))
+    for label, rel, numbers, old, new in rules:
         before_type = (source / rel).read_text(encoding='utf-8'); lines = before_type.splitlines(True)
         for number in numbers:
             assert lines[number - 1].count(old) == 1

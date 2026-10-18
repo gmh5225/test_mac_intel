@@ -23,6 +23,7 @@ HASHES = {
     'Cargo.lock': '10c44ac0a3662b7ee64b0d925b2d8728e8e3031485066e404b5b31379a342b3e',
     'src/runtime/dns_jsc/options_jsc.rs': '960c957481b0e97a688ed947ccf480dd13b0dd94285fbd45894ace7dae54fc47',
     'src/runtime/node/node_fs.rs': '09039025d7da37aceec165fd5177caea7e721da3e8c97dc675d4b1035e7bd0dd',
+    'src/runtime/node/win_watcher.rs': 'fb2ed4de0bac5c9d1b3e2d62311020aab035ab808bca30f327413f8703c2fe32',
 }
 
 
