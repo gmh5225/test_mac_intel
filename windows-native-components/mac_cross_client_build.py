@@ -57,7 +57,7 @@ def build(arch, workspace, engine, compiler, output, logs, *, baseline_control=F
             for name in ['runtime', 'input', 'work', 'home', 'tmp']: (stage / name).mkdir()
             runtime = stage / 'runtime/bun'; shutil.copyfile(compiler, runtime); runtime.chmod(0o500)
             target = stage / 'runtime/target-PE'; shutil.copyfile(engine, target); target.chmod(0o400)
-            graph = stage / 'project'
+            graph = stage / 'input/project'
             trusted(layout + '-stage', [tools / 'raw-graph-windows-adapter', 'stage', mapping, sources, graph])
             assets = sorted(p.name for p in graph.iterdir())
             control = stage / 'runtime/boundary'
@@ -66,7 +66,7 @@ def build(arch, workspace, engine, compiler, output, logs, *, baseline_control=F
             readable = graph / 'owned.txt'; readable.write_bytes(b'owned readable fixture\n')
             profile = '(version 1)\n(deny default)\n(allow sysctl-read)\n(allow file-read-metadata)\n'
             profile += '(allow file-read* file-map-executable (literal "/") (literal "/dev/null") (literal "/dev/urandom") (literal "/dev/random") (subpath "/System/Library") (subpath "/usr/lib") (subpath "/System/Volumes/Preboot/Cryptexes/OS"))\n'
-            for name in ['runtime', 'input', 'project', 'work', 'home', 'tmp']: profile += '(allow file-read* (subpath ' + json.dumps(str(stage / name)) + '))\n'
+            for name in ['runtime', 'input', 'work', 'home', 'tmp']: profile += '(allow file-read* (subpath ' + json.dumps(str(stage / name)) + '))\n'
             for name in ['work', 'home', 'tmp']: profile += '(allow file-write* (subpath ' + json.dumps(str(stage / name)) + '))\n'
             for binary in [runtime, control]: profile += '(allow file-map-executable process-exec (literal ' + json.dumps(str(binary)) + '))\n'
             profile += '(allow process-fork)\n(allow signal (target self))\n(deny network*)\n'
@@ -85,7 +85,8 @@ def build(arch, workspace, engine, compiler, output, logs, *, baseline_control=F
             assert owned == dict(arch=host, revision='c6da4a4d3', message='owned Mac Windows source compiler')
             startup = [row['virtual_name'] for row in expected['rows'][:7]]
             (graph / 'bootstrap.mjs').write_text(''.join('await import(JSON.parse(' + json.dumps(json.dumps(name)) + '));\n' for name in startup))
-            # Keep a fixed authored bootstrap label across hosts. Windows
+            # CWD input + nested project yields project/bootstrap.mjs, also
+            # used by the native Windows AppContainer compiler. Windows
             # also uses the compile output basename as its internal module name;
             # client.exe must produce the already-qualified root/client entry.
             script = "import{fileURLToPath}from'node:url';const path=s=>fileURLToPath(new URL(s,import.meta.url));await Bun.build({entrypoints:[path('./bootstrap.mjs')],target:'bun',env:'disable',macros:false,minify:false,compile:{target:" + json.dumps('bun-windows-' + arch) + ",outfile:" + json.dumps(str(stage / 'work/client.exe')) + ",executablePath:" + json.dumps(str(target)) + ",assets:" + json.dumps(assets, separators=(',', ':')) + ".map(s=>path('./'+s))}});\n"
