@@ -35,7 +35,7 @@ def main():
         run('install-native-Rust', [rustup, 'toolchain', 'install', CHANNEL, '--profile', 'minimal'])
         run('Rust-version', [rustup, 'run', CHANNEL, 'rustc', '-vV'])
         control = out / 'role-boundary-control.exe'
-        run('build-native-control', [rustup, 'run', CHANNEL, 'rustc', '--edition=2024', '-O', '-Ctarget-feature=+crt-static',
+        run('build-native-control', [rustup, 'run', CHANNEL, 'rustc', '--edition=2024', '-O', '-Dwarnings', '-Dunreachable-pub', '-Ctarget-feature=+crt-static',
             source / 'role-boundary-control.rs', '-o', control])
         # Popen's executable selects the image while argv[0] remains independently
         # controlled, matching the qualified native CreateProcess transport.
