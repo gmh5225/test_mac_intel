@@ -24,5 +24,5 @@ test "$(pkg-config --modversion libpcre2-8)" = 10.45
 pkg-config --static --cflags --libs libpcre2-8
 args=(--profile=release --os=linux --arch="$BUN_TARGET_ARCH" --abi=musl --build-dir=/output/bun-source/build/recovery)
 bun scripts/build.ts "${args[@]}" --target=rust-plan -j2
-python3 /repo/bun-runtime/verify_rust_plan.py build/recovery/rust-target/plan.json /output/diagnostics/single-rust-graph.json
+python3 /repo/musl-native-components/verify_musl_graph.py build/recovery/rust-target/plan.json /output/diagnostics/single-rust-graph.json
 bun scripts/build.ts "${args[@]}" -j4

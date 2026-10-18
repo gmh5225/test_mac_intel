@@ -18,7 +18,7 @@ from patch_musl import patch
 from musl_allocator import verify_symbols
 sys.path.insert(0, str(ROOT.parent / 'bun-runtime'))
 from build_linux import PROFILES, COMMIT
-from verify_rust_plan import verify as verify_plan
+from verify_musl_graph import verify as verify_plan
 
 
 def main():
@@ -103,8 +103,14 @@ def main():
             path = source / 'build/recovery' / name
             if path.is_file() and path.stat().st_size <= 16 * 1024 * 1024: shutil.copyfile(path, logs / name.replace('/', '-'))
         binary = source / 'build/recovery/bun'
-        if receipt['status'] == 'musl_source_engine_failed_not_admitted' and binary.is_file():
-            shutil.copyfile(binary, logs / 'public-unqualified-bun')
+        if receipt['status'] == 'musl_source_engine_failed_not_admitted':
+            if binary.is_file(): shutil.copyfile(binary, logs / 'public-unqualified-bun')
+            total = 0
+            for config in sorted((source / 'build/recovery/rust-target').rglob('config.log')):
+                assert config.is_file() and not config.is_symlink() and config.stat().st_size <= 8 * 1024 * 1024
+                total += config.stat().st_size; assert total <= 32 * 1024 * 1024
+                target = logs / 'public-build-script-configs' / config.relative_to(source / 'build/recovery/rust-target')
+                target.parent.mkdir(parents=True, exist_ok=True); shutil.copyfile(config, target)
         (logs / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 
 

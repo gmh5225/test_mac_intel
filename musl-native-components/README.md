@@ -59,3 +59,12 @@ The seccomp source is hash-pinned to sandbox-runtime
 `9520430507ce3c354a71b1518e29e76121407ed1`; its Apache-2.0 license is downloaded
 with the source. The generated filter header is byte-identical to the earlier
 independently verified public libseccomp filter graph.
+
+The upstream standalone musl rg binary declares its own Rust global jemalloc
+allocator. The embedding Bun process already owns a mimalloc-backed Rust
+global allocator. The musl adapter changes only the generated library wrapper
+and its integration manifest: the standalone `main.rs` remains unchanged,
+normal standalone defaults still enable jemalloc, and Bun imports the library
+with default features disabled and PCRE2 enabled. The musl unit graph must
+contain no `jemallocator` or `jemalloc_sys` units. Original allocator performance
+and arbitrary memory-limit behavior are not inferred from this integration.
