@@ -23,6 +23,13 @@ from core_tool_acceptance import fresh_root, environment, write
 from contained_protocol import ContainedProtocol
 
 
+def write_manifest(public):
+    rows = [dict(file=p.relative_to(public).as_posix(), bytes=p.stat().st_size, sha256=sha(p))
+        for p in sorted(public.rglob('*')) if p.is_file()]
+    assert not (public / 'MANIFEST.json').exists()
+    write(public / 'MANIFEST.json', dict(schema_version=1, files=rows))
+
+
 def seal_failure(private, public):
     module_path = ROOT.parent / 'musl-native-components/private_diagnostics.py'
     spec = importlib.util.spec_from_file_location('Windows_private_diagnostic_envelope', module_path)
@@ -102,6 +109,7 @@ def main():
             readback_rows=15516, version_executions=6, actual_protocol_client_acceptance=False)
         write(private / 'private-harness-receipt.json', receipt)
         shutil.copytree(logs, public / 'client-build-logs'); shutil.copytree(records, public / 'execution-records'); write(public / 'receipt.json', receipt)
+        write_manifest(public)
         print(json.dumps(dict(status=receipt['status'], arch=a.arch, readback_rows=15516, versions=6)))
     except BaseException as error:
         receipt['status'] = 'failed_not_admitted'; receipt['error_type'] = type(error).__name__

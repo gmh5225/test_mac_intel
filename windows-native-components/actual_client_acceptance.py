@@ -13,7 +13,7 @@ import tarfile
 import traceback
 import urllib.request
 from client_build import build
-from client_build_controls import seal_failure
+from client_build_controls import seal_failure, write_manifest
 from client_search import accept_source_search
 from source_engine import pin as pin_engine
 from coff_admission import sha
@@ -170,6 +170,7 @@ def main():
         for folder in records.iterdir():
             if folder.is_dir(): shutil.copytree(folder, public / folder.name)
         shutil.copytree(build_logs, public / 'client-build-logs'); write(public / 'receipt.json', receipt)
+        write_manifest(public)
         print(json.dumps(dict(status=receipt['status'], arch=args.arch, differential_pairs=134, typed_readback_rows=5172)))
     except BaseException as error:
         receipt.update(status='failed_not_admitted', error_type=type(error).__name__, private_error=str(error)[:4096],

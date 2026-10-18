@@ -100,6 +100,10 @@ def build(arch, original, engine, output, logs, qualified_environment, workspace
                 final, expected['rows'][6]['virtual_name'], '7', '15', '8'])
             trusted(layout + '-readback', [tools / 'extract-pinned-graph.exe', final, sha(final), work / 'readback'])
             readback = check_readback(work / 'readback/mapping.tsv', chosen)
+            # Hash-only typed inventories permit independent CI readback joins
+            # without publishing source, assets or the rebuilt executable.
+            for suffix, mapping in [('selected', work / 'mapping.tsv'), ('readback', work / 'readback/mapping.tsv')]:
+                (logs / (layout + '-' + suffix + '-mapping.tsv')).write_text(mapping.read_text(encoding='utf-8'), encoding='utf-8', newline='\n')
             assert critical_sections(final, arch) == core
             record['clients'][layout] = dict(path=str(final), bytes=final.stat().st_size, sha256=sha(final),
                 intentionally_edited_modules=edits, readback=readback, source_engine_code_and_exception_sections_preserved=core,
