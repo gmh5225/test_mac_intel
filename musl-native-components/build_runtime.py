@@ -16,6 +16,7 @@ from component_libraries import qualify
 from prepare_sources import prepare as prepare_sources
 from patch_musl import patch
 from musl_allocator import verify_symbols
+from musl_rust_lock import LOCK_SHA256
 sys.path.insert(0, str(ROOT.parent / 'bun-runtime'))
 from build_linux import PROFILES, COMMIT
 from verify_musl_graph import verify as verify_plan
@@ -62,6 +63,8 @@ def main():
         assert checks == ['0'], 'Ambiguous strong symbol ownership in the complete musl source graph'
         binary = source / 'build/recovery/bun'
         receipt['single_rust_graph'] = verify_plan(source / 'build/recovery/rust-target/plan.json')
+        assert sha(source / 'Cargo.lock') == LOCK_SHA256
+        receipt['locked_musl_graph_sha256'] = LOCK_SHA256
         assert receipt['single_rust_graph']['triple'] == ('aarch64' if args.arch == 'arm64' else 'x86_64') + '-unknown-linux-musl'
         run('engine-dynamic', ['readelf', '-d', binary]); needed = re.findall(r'\(NEEDED\).*?\[([^\]]+)\]', (logs / 'engine-dynamic.log').read_text())
         assert needed == [target['libc']], 'Complete musl engine imported an extra runtime library'

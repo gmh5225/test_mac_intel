@@ -13,6 +13,7 @@ from stage_native_sources import stage
 from native_libraries import sha
 from musl_allocator import patch_script
 from embedded_rg_allocator import plan as plan_rg_allocator
+from musl_rust_lock import qualified_text as musl_lock, LOCK_SHA256
 
 HASHES = {
     'src/runtime/bin_entry/mod.rs': 'fe9a6db0e6c4fdc3b960de384a8ce26d3c5892566c6189be9ca5c30bba2b3b43',
@@ -43,6 +44,7 @@ def patch(source, evidence, native_sources, components):
     assert not evidence.exists() and not (source / 'recovery-native').exists()
     for name, digest in HASHES.items(): assert sha(source / name) == digest, 'Unqualified musl source boundary: ' + name
     changes = plan(source, 'linux')
+    changes = [(label, name, before, musl_lock() if label == 'cargo-lock' else after) for label, name, before, after in changes]
     old_dependency = 'recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep", features = ["pcre2"] }'
     changes = [(label, name, before, replace(after, old_dependency, old_dependency.replace('features =', 'default-features = false, features =')) if label == 'runtime-cargo' else after) for label, name, before, after in changes]
     entry = source / 'src/runtime/bin_entry/mod.rs'; before = entry.read_text()
@@ -124,6 +126,7 @@ def patch(source, evidence, native_sources, components):
         native_source_manifest_sha256=sha(native_sources / 'MANIFEST.json'), component_manifest_sha256=sha(components / 'MANIFEST.json'),
         GNU_allocator_symbol_versions_used=False, original_prefix_reused=False, erased_types_restored=False,
         embedded_rg_allocator_owner='Bun process mimalloc', upstream_rg_standalone_main_unchanged=True,
+        locked_musl_graph_sha256=LOCK_SHA256, shared_GNU_and_macos_lock_unchanged=True,
         upstream_rg_standalone_default_jemalloc_feature_preserved=True, original_allocator_performance_reproduced=False, goal_complete=False)
     (evidence / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     return receipt

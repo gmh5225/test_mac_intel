@@ -68,3 +68,27 @@ normal standalone defaults still enable jemalloc, and Bun imports the library
 with default features disabled and PCRE2 enabled. The musl unit graph must
 contain no `jemallocator` or `jemalloc_sys` units. Original allocator performance
 and arbitrary memory-limit behavior are not inferred from this integration.
+
+The musl-specific Cargo lock removes only `jemallocator`, `jemalloc-sys`, and
+rg's now-disabled allocator dependency edge. Every other package, version,
+checksum and dependency remains identical to the admitted shared GNU/macOS
+lock. Both lock hashes and this exact structural delta are checked before
+patching; builds still require `--locked`.
+
+`role_acceptance.py` compares 13 Ugrep and nine Bfs authored cases on each
+native architecture. Before any reference execution, a fresh read-only,
+unprivileged, networkless container must pass an actual host-file absence
+probe, write refusal, IPv4/IPv6/Unix socket refusals, shell execution refusal,
+exact argument transport, bounded output flood retirement, descendant
+retirement, and an admitted public musl Bun loader control. File/network and
+loader controls repeat before every reference case. Bfs `-exec`/`-execdir`
+use only an authored static receiver with explicit cwd/path expectations.
+Each process has a zero regular-file budget, CPU/memory/process limits and
+bounded streams. Output floods detach the Docker client before container
+removal; the owned containers have no persistent log driver.
+
+Reference binaries and archives stay in a separate private directory. Only
+after all 22 exit/stdout/stderr pairs match are bounded fixture records copied
+to the public output directory. Any mismatch retains raw streams privately
+and publishes only receipt metadata. These component pairs do not admit the
+complete Bun engine, rg integration, or a reconstructed client.

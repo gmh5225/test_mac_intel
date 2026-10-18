@@ -1,0 +1,82 @@
+name: Native musl original Ugrep and Bfs correspondence
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - musl-native-components/role_acceptance.py
+      - musl-native-components/role_cases.py
+      - musl-native-components/role_process.py
+      - musl-native-components/native-role-guard.c
+      - musl-native-components/original-pins.json
+      - musl-native-components/runtime_sdk.py
+      - .github/workflows/claude-musl-native-role-acceptance.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  correspondence:
+    name: Native musl ${{ matrix.arch }} Ugrep and Bfs original pairs
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Read independently admitted public producers
+        id: inputs
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          python3 -B - <<'PY'
+          import json,os
+          rows={name:json.load(open(path)) for name,path in [('sdk','platform-runtime/musl-sdk-runtime-pins.json'),('components','musl-native-components/component-library-pins.json'),('baseline','platform-runtime/musl-baseline-candidates.json')]}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              for name,pins in rows.items():
+                  run=pins['profiles'][os.environ['ARCH']]['producer_run'] if name=='baseline' else pins['producer_run']
+                  assert type(run) is int and run>0
+                  out.write(name+'_run='+str(run)+'\n')
+          PY
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-sdk-1
+          path: retained-sdk
+          run-id: ${{ steps.inputs.outputs.sdk_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-source-components-1
+          path: retained-components
+          run-id: ${{ steps.inputs.outputs.components_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-bun-baseline-1
+          path: retained-baseline
+          run-id: ${{ steps.inputs.outputs.baseline_run }}
+          github-token: ${{ github.token }}
+      - name: Require owned boundaries then compare native original roles
+        run: >-
+          python3 -B musl-native-components/role_acceptance.py --arch ${{ matrix.arch }}
+          --components retained-components --sdk retained-sdk --baseline retained-baseline/bun
+          --private "${{ runner.temp }}/musl-private-native-role-inputs"
+          --output musl-native-roles
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-native-role-acceptance-${{ github.run_attempt }}
+          path: musl-native-roles/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
