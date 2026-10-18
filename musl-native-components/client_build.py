@@ -4,7 +4,7 @@ import argparse,gzip,hashlib,json,os,platform,shutil,struct,subprocess,sys
 from sdk import ROOT,profile,sha
 from runtime_sdk import prepare as prepare_runtime
 from role_process import RoleProcess
-from elf_client_layout import core_sections
+from elf_client_layout import core_sections, observe as observe_layout
 from runtime_image import select as select_image
 sys.path.insert(0,str(ROOT.parent/'seccomp-helper'))
 from format_recipe import formatted
@@ -106,7 +106,7 @@ def build(arch,original,engine,sdk_package,output,logs,workspace=None,*,baseline
    execute(layout+'-readback',tools/'extract-linux-graph',['/work/client-final',sha(client),'/work/readback'],work=work,file_bytes=512*1024*1024)
    rebuilt=rows(work/'readback/mapping.tsv');assert [[r['virtual_name'],r['loader_id'],r['encoding_id'],r['format_id'],r['side_id'],r['bytes'],r['storage_sha256']] for r in rebuilt]==[r[:5]+r[6:] for r in chosen]
    core=core_sections(engine,require_cxx=not baseline_control);assert core_sections(client,require_cxx=not baseline_control)==core
-   receipt['clients'][layout]=dict(path=str(client),bytes=client.stat().st_size,sha256=sha(client),all_2589_rows_match_selected_source=True,source_engine_code_and_exception_sections_preserved=core,intentionally_edited_modules=edits)
+   receipt['clients'][layout]=dict(path=str(client),bytes=client.stat().st_size,sha256=sha(client),all_2589_rows_match_selected_source=True,source_engine_code_and_exception_sections_preserved=core,intentionally_edited_modules=edits,ELF_layout_observation=observe_layout(client))
    if 236 in edits:receipt['original_descriptor_provider_preserved']=False
   receipt['status']='both_musl_private_clients_rebuilt_and_2589_typed_rows_readback_exactly'
   return receipt
