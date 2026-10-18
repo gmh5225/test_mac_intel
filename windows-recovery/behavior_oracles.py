@@ -34,6 +34,12 @@ def check_case(case,variant,run,frames,api,stage,report,before,out,malformed):
     if case['id'] in ['H01','H02','H03']:
         hook_records=lines(stage/'helper-log/hooks.jsonl');(report/'hook-records.json').write_text(json.dumps(hook_records,indent=2)+'\n')
         events=[r.get('hook_event_name') for r in hook_records]
+        # H03 tests malformed output from a completed authored helper.
+        # A deadline failure is a different fail-closed condition.
+        if case['id']=='H03':
+            messages=json.dumps([r['body'].get('messages',[]) for r in api])
+            if 'PreToolUse:Write hook error:' in messages and 'timed out' in messages:
+                errors.append('invalid-output hook fixture exceeded its execution deadline')
         if case['id']=='H01':
             required=['SessionStart','UserPromptSubmit','PreToolUse','PostToolUse','Stop']
             if any(e not in events for e in required):errors.append('missing lifecycle hook event')
