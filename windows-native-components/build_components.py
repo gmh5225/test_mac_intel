@@ -87,9 +87,9 @@ def main():
         config.write_text('#pragma once\n#define _CRT_SECURE_NO_WARNINGS\n#define _CRT_NONSTDC_NO_WARNINGS\n#define PCRE2_STATIC\n')
         build = out / 'build'
         run('configure-source-components', [cmake, '-S', ROOT, '-B', build, '-G', 'NMake Makefiles',
-            '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER=' + str(toolbin / 'clang-cl.exe'), '-DCMAKE_CXX_COMPILER=' + str(toolbin / 'clang-cl.exe'),
-            '-DCMAKE_LINKER=' + str(toolbin / 'lld-link.exe'), '-DCMAKE_AR=' + str(toolbin / 'llvm-lib.exe'),
-            '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DSOURCE_ROOT=' + str(sources), '-DUG_CONFIG=' + str(config), '-DRECOVERY_ARCH=' + args.arch])
+            '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER:FILEPATH=' + (toolbin / 'clang-cl.exe').as_posix(), '-DCMAKE_CXX_COMPILER:FILEPATH=' + (toolbin / 'clang-cl.exe').as_posix(),
+            '-DCMAKE_LINKER:FILEPATH=' + (toolbin / 'lld-link.exe').as_posix(), '-DCMAKE_AR:FILEPATH=' + (toolbin / 'llvm-lib.exe').as_posix(),
+            '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded', '-DSOURCE_ROOT:PATH=' + sources.as_posix(), '-DUG_CONFIG:FILEPATH=' + config.as_posix(), '-DRECOVERY_ARCH=' + args.arch])
         run('build-source-components', [cmake, '--build', build, '--parallel', '2'], timeout=2400)
         upstream = {}
         for name in ['pcre2', 'brotli', 'zlib']:
