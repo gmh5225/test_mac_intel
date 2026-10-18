@@ -7,6 +7,7 @@ import os
 import platform
 import re
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -159,9 +160,18 @@ class Harness:
             return result, state
         finally:
             retained = self.logs / label; retained.mkdir()
-            for path in (state / 'report').iterdir():
-                assert path.is_file() and not path.is_symlink() and path.stat().st_size <= 262144
-                shutil.copyfile(path, retained / path.name)
+            entries = list((state / 'report').iterdir()); assert len(entries) <= 128
+            kinds = []
+            for path in entries:
+                info = path.lstat()
+                kinds.append(dict(name=path.name, kind=stat.S_IFMT(info.st_mode), bytes=info.st_size))
+                # Like the established GNU harness, retain ordinary report
+                # files. Runtime socket/directory entries are metadata; never
+                # follow a symlink while collecting host-side evidence.
+                if stat.S_ISREG(info.st_mode):
+                    assert info.st_size <= 262144
+                    shutil.copyfile(path, retained / path.name)
+            (retained / 'report-entry-kinds.json').write_text(json.dumps(kinds, indent=2) + '\n')
             if result: (retained / 'process.json').write_text(json.dumps(result, indent=2) + '\n')
 
     def qualify(self, label):
