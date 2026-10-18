@@ -50,7 +50,7 @@ list(TRANSFORM UGCPP PREPEND "${UG}/src/")
 list(TRANSFORM UGCPP APPEND ".cpp")
 add_library(owned_ugrep_source OBJECT ${REFLEX} ${UGCPP} "${UG}/src/zopen.c")
 target_include_directories(owned_ugrep_source PRIVATE
-  "${UG}/include" "${SOURCE_ROOT}/pcre2/src" "${CMAKE_CURRENT_BINARY_DIR}/pcre2"
+  "${UG}/include" "${UG}/lzma/C" "${SOURCE_ROOT}/pcre2/src" "${CMAKE_CURRENT_BINARY_DIR}/pcre2"
   "${SOURCE_ROOT}/zlib" "${CMAKE_CURRENT_BINARY_DIR}/zlib" "${SOURCE_ROOT}/bzip2"
   "${SOURCE_ROOT}/zstd/lib" "${SOURCE_ROOT}/brotli/c/include")
 target_compile_options(owned_ugrep_source PRIVATE "/FI${UG_CONFIG}")

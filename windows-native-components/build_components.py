@@ -84,7 +84,7 @@ def main():
             projections += unpack(archive, sources / row['name'], row['prefix'], row['name'])
         receipt['declared_archive_alias_projections'] = projections
         config = out / 'owned-ugrep-config.h'
-        config.write_text('#pragma once\n#define _CRT_SECURE_NO_WARNINGS\n#define _CRT_NONSTDC_NO_WARNINGS\n#define PCRE2_STATIC\n')
+        config.write_text('#pragma once\n// Feature definitions are owned by the CMake source target.\n')
         build = out / 'build'
         run('configure-source-components', [cmake, '-S', ROOT, '-B', build, '-G', 'NMake Makefiles',
             '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER:FILEPATH=' + (toolbin / 'clang-cl.exe').as_posix(), '-DCMAKE_CXX_COMPILER:FILEPATH=' + (toolbin / 'clang-cl.exe').as_posix(),
