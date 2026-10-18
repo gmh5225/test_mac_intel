@@ -16,9 +16,9 @@ from core_tool_acceptance import fresh_root, environment, write
 from contained_protocol import ContainedProtocol
 
 
-def build(arch, original, engine, output, logs, qualified_environment, workspace=None):
+def build(arch, original, engine, output, logs, qualified_environment, workspace=None, *, baseline_control=False):
     assert os.name == 'nt' and os.environ['RUNNER_ARCH'].lower() == arch
-    provenance = pin_engine(arch, engine)
+    provenance = pin_engine(arch, engine, baseline_control=baseline_control)
     qualified = json.loads((qualified_environment / 'evidence/receipt.json').read_bytes())
     assert qualified['status'] == 'authored_windows_environment_qualified' and qualified['architecture'] == arch
     assert qualified['isolation']['status'] == 'qualified' and qualified['authored_inputs_only']
@@ -34,6 +34,7 @@ def build(arch, original, engine, output, logs, qualified_environment, workspace
     env.pop('ARGV0', None)
     clean = {k: v for k, v in env.items() if k.upper() in {'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'SYSTEMDRIVE'}}
     record = dict(status='started', arch=arch, source_engine=provenance, clients={},
+        baseline_compiler_control_only=baseline_control,
         original_input_supplied=original is not None, original_executed=False, original_native_prefix_reused=False,
         compiled_client_flags=4479, original_graph_flags=expected['flags'], captured_source_uploaded=False, goal_complete=False)
     def trusted(label, args):
@@ -108,7 +109,7 @@ def build(arch, original, engine, output, logs, qualified_environment, workspace
             record['clients'][layout] = dict(path=str(final), bytes=final.stat().st_size, sha256=sha(final),
                 intentionally_edited_modules=edits, readback=readback, source_engine_code_and_exception_sections_preserved=core,
                 native_compiler_execution=execution, owned_compiler_execution=control)
-        record.update(status='both_native_Windows_private_clients_rebuilt_and_2586_typed_rows_readback_exactly',
+        record.update(status='both_native_Windows_baseline_diagnostic_clients_rebuilt_and_2586_typed_rows_readback_exactly' if baseline_control else 'both_native_Windows_private_clients_rebuilt_and_2586_typed_rows_readback_exactly',
             original_provider_source_adapted=False, source_only_workspace=original is None)
         return record
     finally: write(logs / 'native-client-build.json', record)
