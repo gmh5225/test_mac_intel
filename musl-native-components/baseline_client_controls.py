@@ -1,4 +1,4 @@
-"""Native source-only client build controls; all captured inputs stay private."""
+"""Native source-only build controls for an admitted musl compiler profile."""
 from pathlib import Path
 import argparse,hashlib,json,shutil
 from sdk import sha,profile
@@ -9,14 +9,19 @@ from role_process import RoleProcess
 
 def main():
  p=argparse.ArgumentParser();p.add_argument('--arch',required=True,choices=['arm64','x64'])
- for name in ['baseline','sdk','private','output']:p.add_argument('--'+name,required=True,type=Path)
+ for name in ['sdk','private','output']:p.add_argument('--'+name,required=True,type=Path)
+ compiler=p.add_mutually_exclusive_group(required=True);compiler.add_argument('--baseline',type=Path);compiler.add_argument('--engine',type=Path)
  a=p.parse_args();private=a.private.resolve();private.mkdir();out=a.output.resolve();out.mkdir();assert not private.is_relative_to(out) and not out.is_relative_to(private)
- receipt=dict(status='started',arch=a.arch,baseline_compiler_control_only=True,complete_source_engine_admitted=False,original_executed=False,
+ receipt=dict(status='started',arch=a.arch,baseline_compiler_control_only=a.engine is None,complete_source_engine_admitted=False,original_executed=False,
   original_or_source_or_client_files_uploaded=False,actual_original_client_correspondence=False,goal_complete=False)
  try:
+  if a.engine is not None:
+   from source_engine import qualify
+   receipt['source_engine']=qualify(a.arch,a.engine.resolve());receipt['complete_source_engine_admitted']=True;compiler=a.engine.resolve()/'bun'
+  else:compiler=a.baseline.resolve()
   original,pin=original_input(a.arch,private);receipt['original_pin']=pin
   def rebuild(label,workspace=None):
-   return build(a.arch,original if workspace is None else None,a.baseline.resolve(),a.sdk.resolve(),private/label,private/(label+'-logs'),workspace,baseline_control=True)
+   return build(a.arch,original if workspace is None else None,compiler,a.sdk.resolve(),private/label,private/(label+'-logs'),workspace,baseline_control=a.engine is None)
   first=rebuild('published-build');workspace=private/'source-only-workspace';workspace.mkdir()
   for layout in ['preserved','readable']:shutil.copytree(private/'published-build'/layout/'sources',workspace/layout/'sources')
   repeat=rebuild('source-only-rebuild',workspace);assert not repeat['original_input_supplied']
@@ -49,7 +54,7 @@ def main():
   for kind,record in [('published-build',first),('source-only-rebuild',repeat),('edited-source-only-rebuild',changed)]:
    (out/(kind+'.json')).write_text(json.dumps(record,indent=2)+'\n')
    for layout in ['preserved','readable']:shutil.copyfile(private/kind/layout/'readback/mapping.tsv',out/(kind+'-'+layout+'-mapping.tsv'))
-  receipt.update(status='both_native_musl_baseline_source_layouts_rebuilt_without_original_and_single_entry_edit_controlled',
+  receipt.update(status='both_native_musl_baseline_source_layouts_rebuilt_without_original_and_single_entry_edit_controlled' if a.engine is None else 'both_native_musl_complete_source_layouts_rebuilt_without_original_and_single_entry_edit_controlled',
    native_target_CPU=True,independent_builds_byte_equal=True,all_2589_rows_readback_each_layout=True,edited_only_module=6,
    all_other_2588_rows_unchanged=True,source_only_rebuilds_have_no_original_input=True,version_controls=versions,
    baseline_source_builds=[first['clients'],repeat['clients'],changed['clients']])
@@ -57,7 +62,7 @@ def main():
   receipt.update(status='baseline_musl_source_client_control_failed_not_admitted',error_type=type(error).__name__,error=str(error));raise
  finally:
   (out/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
-  if receipt['status']=='both_native_musl_baseline_source_layouts_rebuilt_without_original_and_single_entry_edit_controlled':
+  if receipt['status'] in ['both_native_musl_baseline_source_layouts_rebuilt_without_original_and_single_entry_edit_controlled','both_native_musl_complete_source_layouts_rebuilt_without_original_and_single_entry_edit_controlled']:
    files=[dict(file=f.relative_to(out).as_posix(),bytes=f.stat().st_size,sha256=sha(f)) for f in sorted(out.rglob('*')) if f.is_file()]
    (out/'MANIFEST.json').write_text(json.dumps(dict(schema_version=1,files=files),indent=2)+'\n')
 

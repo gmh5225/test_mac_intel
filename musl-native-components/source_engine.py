@@ -23,7 +23,7 @@ def pins():
     assert data['public_bun_commit'] == 'c6da4a4d3010e5553438c60f6bd76d981976867c'
     assert type(data['producer_run']) is int and data['producer_run'] > 0 and re.fullmatch('[0-9a-f]{40}', data['producer_head'])
     assert re.fullmatch('[0-9a-f]{64}', data['independent_qualification_sha256'])
-    assert set(data['profiles']) == {'arm64', 'x64'}
+    assert data['profiles'] and set(data['profiles']) <= {'arm64', 'x64'}
     for arch, row in data['profiles'].items():
         assert row['needed_libraries'] == [profile(arch)['libc']]
         assert row['musl_allocator_exports'] == 29 and row['duplicate_strong_symbols'] == 0
@@ -33,7 +33,8 @@ def pins():
 
 
 def pin(arch, binary):
-    data = pins(); expected = data['profiles'][arch]
+    data = pins(); assert arch in data['profiles'], 'This architecture has no independently admitted complete source engine'
+    expected = data['profiles'][arch]
     assert binary.is_file() and not binary.is_symlink() and sha(binary) == expected['binary_sha256'] and binary.stat().st_size == expected['bytes']
     with binary.open('rb') as stream: header = stream.read(64)
     assert header[:7] == b'\x7fELF\x02\x01\x01' and struct.unpack_from('<H', header, 18)[0] == {'arm64': 183, 'x64': 62}[arch]
