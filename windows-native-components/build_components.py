@@ -109,18 +109,19 @@ def main():
             'Written by Robert van Engelen and others: <https://github.com/Genivia/ugrep>\r\n'
             'Ugrep utilizes the RE/flex regex library: <https://github.com/Genivia/RE-flex>\r\n').encode()
         assert version == expected, 'Windows Ugrep metadata does not match the measured original features'
-        # Ugrep's version returns during init in CRT text mode. Its actual
-        # Windows search path then switches stdout to _O_BINARY, preserving LF.
+        # Windows init switches stdout to binary mode. Full-line output copies
+        # the input LF; -o uses Output::nl(), which explicitly emits CRLF.
+        # Keep these two upstream byte contracts separate.
         cases = [('literal', ['--no-config', '-F', '-n', 'NEEDLE', source], 0, b'2:NEEDLE\n'),
-            ('PCRE-lookbehind', ['--no-config', '-P', '-o', '(?<=pre)needle', source], 0, b'needle\n'),
-            ('Unicode', ['--no-config', '-F', '-o', 'λ猫', source], 0, 'λ猫\n'.encode()),
+            ('PCRE-lookbehind', ['--no-config', '-P', '-o', '(?<=pre)needle', source], 0, b'needle\r\n'),
+            ('Unicode', ['--no-config', '-F', '-o', 'λ猫', source], 0, 'λ猫\r\n'.encode()),
             ('absent', ['--no-config', 'owned-absent', source], 1, b''),
             ('invalid-regex', ['--no-config', '-P', '(', source], 2, None)]
         payload = b'owned COMPRESSED_NEEDLE\n'
         (fixture / 'owned.gz').write_bytes(gzip.compress(payload, mtime=0)); (fixture / 'owned.bz2').write_bytes(bz2.compress(payload))
         with zipfile.ZipFile(fixture / 'owned.zip', 'w', compression=zipfile.ZIP_DEFLATED) as archive: archive.writestr('owned.txt', payload)
         for suffix in ['gz', 'bz2', 'zip']:
-            cases.append(('compressed-' + suffix, ['--no-config', '-z', '-h', '-o', 'COMPRESSED_NEEDLE', fixture / ('owned.' + suffix)], 0, b'COMPRESSED_NEEDLE\n'))
+            cases.append(('compressed-' + suffix, ['--no-config', '-z', '-h', '-o', 'COMPRESSED_NEEDLE', fixture / ('owned.' + suffix)], 0, b'COMPRESSED_NEEDLE\r\n'))
         controls = []
         for label, arguments, code, wanted in cases:
             observed = run('owned-UG-' + label, [binary, *arguments], expected=code, timeout=30)
