@@ -31,3 +31,13 @@ checks do not admit a complete Bun engine or a captured client.
 No captured executable, prefix, JavaScript, or reconstructed client enters a
 public artifact. Successful packages contain only public sources, authored
 recipes, source libraries, and bounded authored diagnostic output.
+
+PCRE2 `RunGrepTest` test 150 assumes that a `locale` command in `PATH` means
+that its C runtime rejects `LC_CTYPE=locale.bad`. The GNU compiler image has
+that command while the musl-linked CLI accepts the name. Both initial native
+runs retained exactly this one output difference. A separately compiled target
+C `setlocale` control and the unchanged PCRE2 CLI must demonstrate the actual
+musl behavior before a hash-gated correction changes this single expected
+result to no match (`RC=1`). The original test script, all other expected cases,
+and the PCRE2 runtime implementation remain byte-identical; test 150 still
+executes. The fixture patch and both controls are retained explicitly.

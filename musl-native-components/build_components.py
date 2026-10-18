@@ -16,6 +16,7 @@ sys.dont_write_bytecode = True
 from sdk import profile
 from elf_objects import compare_objects
 from private_symbols import isolate
+from pcre2_test_fixture import adapt as adapt_pcre2_test
 
 
 def sha(path):
@@ -121,7 +122,27 @@ def main():
     pc = source / 'pcre2'
     run('pcre2-configure', [pc / 'configure', '--host=' + target['triple'], '--prefix=' + str(prefix), '--enable-static', '--disable-shared',
         '--enable-jit' if target['pcre2_jit'] else '--disable-jit', '--disable-pcre2-16', '--disable-pcre2-32'], pc)
-    make('pcre2-build', pc); make('pcre2-check', pc, 'check'); make('pcre2-install', pc, 'install')
+    make('pcre2-build', pc)
+    # RunGrepTest detects locale support using the GNU user's `which locale`,
+    # although pcre2grep uses musl. Test 150 therefore has a GNU-only expected
+    # error. First measure the real target C API and unchanged CLI; only this
+    # one expected result is adapted, and the original full test still runs.
+    locale_source = logs / 'owned-musl-locale.c'
+    locale_source.write_text('#include <locale.h>\n#include <stdio.h>\nint main(void){printf("%d\\n",setlocale(LC_CTYPE,"locale.bad")!=NULL);return 0;}\n')
+    run('owned-musl-locale-build', [cc, *ccflags, locale_source, '-o', out / 'owned-musl-locale'])
+    assert run('owned-musl-locale', [out / 'owned-musl-locale']).stdout == b'1\n'
+    locale_env = dict(env, LC_CTYPE='locale.bad'); locale_env.pop('LC_ALL', None)
+    locale_cli = subprocess.run([str(pc / 'pcre2grep'), 'abc', '/dev/null'], env=locale_env, capture_output=True, timeout=30)
+    (logs / 'pcre2-musl-invalid-locale-control.stdout').write_bytes(locale_cli.stdout)
+    (logs / 'pcre2-musl-invalid-locale-control.stderr').write_bytes(locale_cli.stderr)
+    assert locale_cli.returncode == 1 and not locale_cli.stdout and not locale_cli.stderr
+    locale_control = dict(native_setlocale_accepts_name=True, CLI_exit_code=locale_cli.returncode,
+        CLI_stdout_hex=locale_cli.stdout.hex(), CLI_stderr_hex=locale_cli.stderr.hex(),
+        target_SDK_used=True, public_pcre2grep_runtime_unmodified=True)
+    locale_fixture = adapt_pcre2_test(pc / 'testdata/grepoutput', logs / 'pcre2-musl-test-150.patch',
+        native_setlocale_accepts_name=True, actual_cli_no_match=True)
+    (logs / 'pcre2-musl-locale-fixture.json').write_text(json.dumps(dict(control=locale_control, expected_fixture=locale_fixture), indent=2) + '\n')
+    make('pcre2-check', pc, 'check'); make('pcre2-install', pc, 'install')
     ug = source / 'ugrep'; ug_env = dict(env, LIBS='-lbrotlicommon -lm', PTHREAD_LIBS='-pthread', PTHREAD_CFLAGS='-pthread')
     options = ['--host=' + target['triple'], '--without-lzma', '--without-lz4', *['--with-' + name + '=' + str(prefix) for name in ['pcre2', 'zlib', 'bzlib', 'zstd', 'brotli']]]
     if args.arch == 'x64': options += ['--disable-avx2']
@@ -167,7 +188,8 @@ def main():
     receipt = dict(status='musl_source_component_graphs_hosts_and_upstream_checks_passed', arch=args.arch, target_profile=target,
         components=dict(ugrep=ug_receipt, bfs=bf_receipt), commands=commands, owned_static_cxx_thread_control=thread_dynamic,
         captured_client_executed=False, compiled_rust_archive_used=False, original_prefix_reused=False,
-        rg_pcre2_archive_sha256=sha(pc_rg / 'libpcre2-8.a'), zstd_upstream_suite_run=False, goal_complete=False)
+        rg_pcre2_archive_sha256=sha(pc_rg / 'libpcre2-8.a'), zstd_upstream_suite_run=False,
+        pcre2_test_150_native_locale_control=locale_control, pcre2_test_150_expected_fixture=locale_fixture, goal_complete=False)
     (libraries / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 
 
