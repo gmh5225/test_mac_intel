@@ -33,9 +33,12 @@ def elf_abi(arch, executable):
     interpreter = re.findall(r'Requesting program interpreter: ([^\]]+)', headers)
     expected = profile(arch)
     assert needed == [expected['libc']] and interpreter == ['/lib/' + expected['loader']]
-    versions = subprocess.check_output(['readelf', '-VW', executable], text=True)
-    assert 'GLIBC_' not in versions
-    return dict(needed=needed, interpreter=interpreter[0], GLIBC_versions=False)
+    sections = subprocess.check_output(['readelf', '-SW', executable], text=True)
+    # The captured producer exports GLIBC-named allocator aliases even on
+    # musl. Definitions do not impose a versioned runtime dependency. Every
+    # admitted musl input here has no version-requirement section at all.
+    assert re.search(r'\]\s+\.gnu\.version_r\s+', sections) is None
+    return dict(needed=needed, interpreter=interpreter[0], versioned_import_requirements=[])
 
 
 def check_static_elf(path, machine):

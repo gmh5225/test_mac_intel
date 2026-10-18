@@ -10,6 +10,7 @@ from source_engine import qualify as qualify_engine
 from role_acceptance import original_input
 from client_build import build
 from client_tools import accept as accept_tools
+from helper_acceptance import accept as accept_helper
 
 
 def main():
@@ -47,6 +48,8 @@ def main():
             receipt['original_executed'] |= name == 'original'
             versions.append(dict(label=name, **result))
         receipt['versions'] = versions
+        receipt['helper'] = accept_helper(harness, original, args.engine.resolve() / 'bun')
+        assert receipt['helper']['differential_pairs'] == 28
         def execute(label, command, spec, **kwargs):
             if (kwargs.get('client') or {}).get('original') is not None:
                 harness.qualify('before-' + label)
@@ -61,13 +64,14 @@ def main():
         assert all(sha(clients[name]) == row['sha256'] for name, row in compiled['clients'].items())
         receipt.update(status='native_musl_actual_Bash_Grep_Glob_pass_both_source_layouts', actual_client_correspondence=True,
             Bash_sandbox_enabled=True, Bash_pairs=14, native_search_pairs=26, bounded_acceptance_only=True,
-            full_helper_observer_acceptance=False, universal_equivalence_proven=False)
+            full_helper_observer_acceptance=True, helper_pairs=28, universal_equivalence_proven=False)
         # Failures and unclassified bytes stay private. These logs only become
         # exportable after all declared oracles, exact comparisons and budgets.
         source = harness.logs / 'source'; source.mkdir(exist_ok=True)
-        for file in ['client_acceptance.py', 'client_root.py', 'client_tools.py', 'client-boundary.c']:
+        for file in ['client_acceptance.py', 'client_root.py', 'client_tools.py', 'client-boundary.c', 'helper_acceptance.py']:
             shutil.copyfile(ROOT / file, source / file)
-        for file in ['bash_tool_cases.py', 'native_search_acceptance.py', 'bash-driver.cpp', 'bash-payload.c', 'offline-fixture.cpp', 'compare_bash.py']:
+        for file in ['bash_tool_cases.py', 'native_search_acceptance.py', 'bash-driver.cpp', 'bash-payload.c', 'offline-fixture.cpp', 'compare_bash.py',
+                     'process_state_comparison.py', 'extended_comparison.py', 'namespace-driver.c', 'descriptor-control.c', 'supervision-control.c', 'boundary-control.c', 'control.c']:
             shutil.copyfile(SHARED / file, source / file)
         shutil.copytree(harness.logs, out / 'validated-client-records')
         (out / 'native-client-build.json').write_text(json.dumps(compiled, indent=2) + '\n')
@@ -85,6 +89,10 @@ def main():
                 # before the first original entry. Its separate logs never hold
                 # source-client build diagnostics.
                 shutil.copytree(harness.logs, out / 'owned-preflight-records')
+            elif not receipt['actual_client_correspondence']:
+                from private_diagnostics import seal
+                try: receipt['encrypted_private_failure_diagnostics'] = seal(private, out)
+                except Exception as error: receipt['private_diagnostic_retention_error_type'] = type(error).__name__
         (out / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
         if receipt['actual_client_correspondence']:
             files = [dict(file=file.relative_to(out).as_posix(), bytes=file.stat().st_size, sha256=sha(file)) for file in sorted(out.rglob('*')) if file.is_file()]
