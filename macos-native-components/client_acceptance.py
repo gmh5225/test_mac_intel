@@ -121,7 +121,7 @@ class Harness:
         if port is not None: text += '(allow network-outbound (remote tcp "localhost:' + str(port) + '"))\n'
         return text
 
-    def execute(self, name, label, argv, *, spec=None, steps=None, work_input='fixture input\n', fixture_files=None, setup=None, extra_env=None, capability=None):
+    def execute(self, name, label, argv, *, spec=None, steps=None, work_input='fixture input\n', fixture_files=None, setup=None, extra_env=None, capability=None, expected_exit_code=0):
         assert re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_-]*',name) and label in [*self.clients,'authored']
         stage = self.output/name; stage.mkdir()
         for part in ['work','home','tmp','fixtures','report']: (stage/part).mkdir()
@@ -176,7 +176,7 @@ class Harness:
             if server: server.close()
             if execution is not None:
                 self.receipt['cases'].append(dict(name=name,label=label,execution=execution,profile_sha256=sha(profile),qualified_boundary=True))
-        assert execution['failure'] is None and execution['exit_code'] == 0 and not stderr, name + ' bounded client failed; private records retained'
+        assert execution['failure'] is None and execution['exit_code'] == expected_exit_code and not stderr, name + ' bounded client failed; private records retained'
         frames = [json.loads(line) for line in stdout.splitlines()] if label == 'authored' or '--output-format' in argv else []
         if server: assert not server.errors
         requests = server.requests if server else []
@@ -190,7 +190,7 @@ class Harness:
     def observe(self, result, *, json_output=True):
         normalizer = Normalize(str(result['stage']))
         value = dict(protocol=result['frames'] if json_output else result['stdout'].decode(),
-            requests=[dict(path=r['path'],body=r['body']) for r in result['requests']], stderr='',exit=0,
+            requests=[dict(path=r['path'],body=r['body']) for r in result['requests']], stderr='',exit=result['execution']['exit_code'],
             files={name:body.hex() for name,body in result['files'].items()})
         normalized = normalizer.value(value)
         folder = self.logs/result['private'].name; folder.mkdir()
