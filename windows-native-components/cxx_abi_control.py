@@ -46,7 +46,7 @@ bool caller(View a, View b) { return externalCompare(a, b) < 0; }
     host_source = output / 'authored-selected-SDK-UG-host.cpp'; host = output / 'authored-selected-SDK-UG-host.exe'
     host_source.write_text('extern "C" int neverd_recovered_ugrep_wmain(int, const wchar_t **);\nint wmain(int argc, const wchar_t **argv) { return neverd_recovered_ugrep_wmain(argc, argv); }\n', encoding='utf-8', newline='\n')
     run('native-selected-SDK-UG-host-link', [toolbin / 'clang-cl.exe', '/nologo', '/O2', '/EHsc', '/MT', host_source,
-        '/Fo' + str(output / 'authored-selected-SDK-UG-host.obj'), '/Fe' + str(host), '/link',
+        '/clang:-fuse-ld=lld', '/Fo' + str(output / 'authored-selected-SDK-UG-host.obj'), '/Fe' + str(host), '/link',
         *[ugrep / 'native-library' / name for name in ARCHIVES], 'advapi32.lib'])
     run('native-selected-SDK-UG-host-version', [host, '--version'])
     expected = bytes.fromhex(json.loads((ugrep / 'receipt.json').read_bytes())['expected_native_version_hex'])
