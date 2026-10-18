@@ -47,6 +47,7 @@ def patch(source, evidence, native_sources, components):
     changes = [(label, name, before, musl_lock() if label == 'cargo-lock' else after) for label, name, before, after in changes]
     old_dependency = 'recovered_ripgrep = { package = "ripgrep", path = "../../recovery-native/ripgrep", features = ["pcre2"] }'
     changes = [(label, name, before, replace(after, old_dependency, old_dependency.replace('features =', 'default-features = false, features =')) if label == 'runtime-cargo' else after) for label, name, before, after in changes]
+    changes = [(label, name, before, replace(after, 'features = ["pcre2"]', 'features = ["pcre2", "recovery-bun-args"]') if label == 'runtime-cargo' else after) for label, name, before, after in changes]
     entry = source / 'src/runtime/bin_entry/mod.rs'; before = entry.read_text()
     anchor = '    unsafe { bun_core::init_argv(argc, argv) };\n'
     after = replace(before, anchor, anchor + '''
@@ -107,6 +108,7 @@ def patch(source, evidence, native_sources, components):
     prefix = '/output/bun-source/recovery-native/pcre2-install'
     (install / 'lib/pkgconfig/libpcre2-8.pc').write_text('prefix=' + prefix + '\nlibdir=${prefix}/lib\nincludedir=${prefix}/include\n\nName: libpcre2-8\nDescription: Admitted native musl PCRE2 source graph\nVersion: 10.45\nLibs: -L${libdir} -lpcre2-8\nCflags: -I${includedir}\n')
     multicall = (ROOT.parent / 'bun-runtime/recovered_multicall.rs').read_text()
+    multicall = replace(multicall, 'Role::Ripgrep => recovered_ripgrep::neverd_recovered_rg_main(),', 'Role::Ripgrep => unsafe { recovered_ripgrep::neverd_recovered_rg_main(argc, argv) },')
     anchor = '    fn neverd_recovered_seccomp_main(argc: c_int, argv: *const *const c_char) -> c_int;\n'
     multicall = replace(multicall, anchor, anchor + ''.join('    fn neverd_recovered_' + role + '_main(argc: c_int, argv: *const *const c_char) -> c_int;\n' for role in ['ugrep', 'bfs']))
     unsupported = '''        role @ (Role::Ugrep | Role::Bfs) => {
@@ -127,6 +129,8 @@ def patch(source, evidence, native_sources, components):
         GNU_allocator_symbol_versions_used=False, original_prefix_reused=False, erased_types_restored=False,
         embedded_rg_allocator_owner='Bun process mimalloc', upstream_rg_standalone_main_unchanged=True,
         locked_musl_graph_sha256=LOCK_SHA256, shared_GNU_and_macos_lock_unchanged=True,
+        embedded_rg_arguments='one owned Unix-byte vector from unchanged C-runtime argc/argv; shared by initial and config reparse',
+        Rust_standard_library_source_unchanged=True,
         upstream_rg_standalone_default_jemalloc_feature_preserved=True, original_allocator_performance_reproduced=False, goal_complete=False)
     (evidence / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
     return receipt

@@ -62,12 +62,20 @@ independently verified public libseccomp filter graph.
 
 The upstream standalone musl rg binary declares its own Rust global jemalloc
 allocator. The embedding Bun process already owns a mimalloc-backed Rust
-global allocator. The musl adapter changes only the generated library wrapper
-and its integration manifest: the standalone `main.rs` remains unchanged,
+global allocator. The musl adapter changes the generated library wrapper,
+its integration manifest and two feature-gated parser argument reads: the standalone `main.rs` remains unchanged,
 normal standalone defaults still enable jemalloc, and Bun imports the library
 with default features disabled and PCRE2 enabled. The musl unit graph must
 contain no `jemallocator` or `jemalloc_sys` units. Original allocator performance
 and arbitrary memory-limit behavior are not inferred from this integration.
+
+The public Bun C entry captures its own `argc`/`argv` because Rust std's glibc
+argument constructor does not run on musl. The embedded rg entry receives this
+same unchanged pair and owns one Unix-byte argument vector. Both the initial
+parser and config reparse use this vector under the private integration feature
+`recovery-bun-args`; normal standalone defaults continue to use
+`std::env::args_os()`. Empty, Unicode and non-UTF8 arguments are preserved,
+without decoding or rewriting. Rust's standard-library source is unchanged.
 
 The musl-specific Cargo lock removes only `jemallocator`, `jemalloc-sys`, and
 rg's now-disabled allocator dependency edge. Every other package, version,

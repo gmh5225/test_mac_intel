@@ -14,9 +14,10 @@ def verify(path):
     data = json.loads(path.read_bytes()); units = data['unitGraph']['units']
     assert not any(u['target']['name'] in ['jemallocator', 'jemalloc_sys'] for u in units), 'Standalone allocator entered the embedded Bun graph'
     rg = [u for u in units if u['target']['name'] == 'recovered_ripgrep']; assert len(rg) == 1
-    assert 'pcre2' in rg[0]['features'] and 'standalone-jemalloc' not in rg[0]['features']
+    assert {'pcre2', 'recovery-bun-args'} <= set(rg[0]['features']) and 'standalone-jemalloc' not in rg[0]['features']
     result.update(standalone_jemalloc_units=0, embedded_Rust_allocator_owner='Bun process mimalloc',
         upstream_standalone_main_preserved=True, original_allocator_performance_reproduced=False)
+    result['embedded_rg_C_runtime_argument_vector_required'] = True
     return result
 
 
