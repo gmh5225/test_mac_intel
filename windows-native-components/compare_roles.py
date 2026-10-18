@@ -14,10 +14,12 @@ import os
 import shutil
 import sys
 import tarfile
+import traceback
 import urllib.request
 import zipfile
 from source_engine import pin as pin_engine
 from coff_admission import sha
+from client_build_controls import seal_failure
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent / 'windows-recovery'))
@@ -65,12 +67,13 @@ def main():
     engine = a.engine.resolve(); provenance = pin_engine(a.arch, engine)
     transport = out / 'role-transport.exe'; launcher = out / 'appcontainer-run.exe'; assert transport.is_file() and launcher.is_file()
     private = out / 'private-complete-source-role-records'; private.mkdir()
+    records = private / 'execution-records'; records.mkdir()
     receipt = dict(status='started', arch=a.arch, source_engine=provenance, controls=[], pairs=[], child_environment=[],
         environment_receipt_sha256=sha(out / 'evidence/receipt.json'), transport_sha256=sha(transport),
         captured_source_uploaded=False, normalization='none for search exit/stdout/stderr pairs', goal_complete=False)
     clean = {k: v for k, v in os.environ.items() if k.upper() in {'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'SYSTEMDRIVE'}}
     def execute(label, target, argv0, args, role, *, child=False):
-        root = fresh_root(); fixtures(root); log = private / label; log.mkdir()
+        root = fresh_root(); fixtures(root); log = records / label; log.mkdir()
         shutil.copyfile(transport, root / 'bin/transport.exe'); shutil.copyfile(target, root / 'bin/target.exe')
         if child:
             shutil.copyfile(transport, root / 'bin/receiver.exe')
@@ -101,7 +104,7 @@ def main():
             code, raw, error, root = execute('authored-receiver-' + str(i), transport, 'receiver.exe', ['input.txt'], role)
             lines = raw.splitlines(keepends=True); assert code == 0 and not error
             assert b''.join(lines[1:]) == b'first\nNEEDLE\npreneedle\n'
-            child = json.loads(lines[0]); assert child['kind'] == 'owned-rg-preprocessor'
+            child = json.loads(lines[0]); assert set(child) == {'kind', 'env_utf16_hex', 'input_utf16_hex'} and child['kind'] == 'owned-rg-preprocessor'
             if role == '': assert child['env_utf16_hex'] in [None, '']
             else: assert child['env_utf16_hex'] == (None if role is None else hex16(role.encode('utf-16-le')))
             receipt['controls'].append(dict(case='receiver-' + str(i), exit_code=code, inherited_environment_verified=True))
@@ -135,7 +138,7 @@ def main():
             for label, target in [('original', original), ('source', engine)]:
                 code, raw, error, root = execute('rg-child-' + str(i) + '-' + label, target, 'rg.exe', [], role, child=True)
                 lines = raw.splitlines(keepends=True); assert code == 0 and not error and len(lines) == 2 and lines[1] == b'NEEDLE\n'
-                child = json.loads(lines[0]); assert child['kind'] == 'owned-rg-preprocessor' and child['env_utf16_hex'] is None
+                child = json.loads(lines[0]); assert set(child) == {'kind', 'env_utf16_hex', 'input_utf16_hex'} and child['kind'] == 'owned-rg-preprocessor' and child['env_utf16_hex'] is None
                 expected = str(root / 'work/input.txt').encode('utf-16-le')
                 assert child['input_utf16_hex'] == ''.join(f'{int.from_bytes(expected[j:j+2], "little"):04x}' for j in range(0, len(expected), 2))
                 receipt['child_environment'].append(dict(case=i, label=label, ARGV0_consumed=True, exact_owned_input_bytes=True))
@@ -147,8 +150,14 @@ def main():
         public = out / 'evidence/complete-source-roles'; assert not public.exists(); shutil.copytree(private, public)
         print(json.dumps(dict(status=receipt['status'], pairs=receipt['exact_pairs'], child_environment_processes=12)))
     except BaseException as error:
+        receipt.update(private_error=str(error)[:4096], private_traceback=traceback.format_exc(limit=12)[:16384])
+        write(private / 'private-harness-receipt.json', receipt)
+        encrypted = out / 'evidence/complete-source-role-failure-envelope'; encrypted.mkdir()
+        try: envelope = seal_failure(private, encrypted)
+        except BaseException as sealing_error: envelope = dict(status='not_exported', error_type=type(sealing_error).__name__, plaintext_exported=False)
         write(out / 'evidence/complete-source-role-failure-summary.json', dict(status='failed_not_admitted',
-            error_type=type(error).__name__, validated_pairs=len(receipt['pairs']), private_raw_records_exported=False)); raise
+            error_type=type(error).__name__, validated_pairs=len(receipt['pairs']), private_raw_records_exported=False, encrypted_export=envelope))
+        raise RuntimeError('Native original/source roles failed; inspect the private authenticated diagnostic envelope') from None
 
 
 if __name__ == '__main__': main()
