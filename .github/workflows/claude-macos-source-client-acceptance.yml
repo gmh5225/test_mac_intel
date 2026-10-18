@@ -9,6 +9,7 @@ on:
       - macos-native-components/client-*.mjs
       - macos-native-components/source-engine-pins.json
       - macos-native-components/macos-readable-recipes-v1.json.gz
+      - macos-client-regression/**
       - .github/workflows/claude-macos-source-client-acceptance.yml
 permissions:
   contents: read
@@ -57,7 +58,7 @@ jobs:
           github-token: ${{ github.token }}
           path: public-runtime
       - name: Build both private layouts twice, read all modules, and compare actual clients
-        run: python3 -B macos-native-components/client_ci.py --arch ${{ matrix.arch }} --package public-runtime --output private-macos-client-work --logs macos-client-public
+        run: python3 -B macos-client-regression/run.py --arch ${{ matrix.arch }} --package public-runtime --output private-macos-client-work --logs macos-client-public
       - name: Retain authored recipes, hashes and successful bounded fixture observations
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

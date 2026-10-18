@@ -21,9 +21,12 @@ from client_bash import accept as accept_bash
 def published_input(arch, folder):
     folder.mkdir(); pin=json.loads((ROOT/'original-pins.json').read_bytes())[arch]
     archive=folder/'published-input.tgz'
-    result=subprocess.run(['curl','--http1.1','--fail','--silent','--show-error','--location','--retry','3','--max-time','300',
+    result=subprocess.run(['curl','--http1.1','--fail','--silent','--show-error','--location','--retry','3','--retry-all-errors','--max-time','300',
         '--max-filesize','134217728','--output',str(archive),pin['url']],capture_output=True,timeout=360)
-    assert result.returncode==0,'published input download failed'
+    if result.returncode:
+        (folder/'transport-diagnostic.json').write_text(json.dumps(dict(curl_exit_code=result.returncode,
+            stderr=result.stderr[:8192].decode('utf-8',errors='replace'),url=pin['url']),indent=2)+'\n')
+    assert result.returncode==0,'published input download failed: curl exit '+str(result.returncode)
     with archive.open('rb') as file: assert 'sha512-'+base64.b64encode(hashlib.file_digest(file,'sha512').digest()).decode()==pin['integrity']
     original=folder/'original'
     with tarfile.open(archive,'r:gz') as source:

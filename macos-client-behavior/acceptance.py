@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import sys
 import traceback
-import urllib.request
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -236,10 +235,11 @@ def main():
         subprocess.run(['/bin/cp', '-c', args.engine.resolve(), engine], check=True); engine.chmod(0o500)
         source_engine = qualify_engine(args.arch, engine)
         include = output / 'owned-include/nlohmann'; include.mkdir(parents=True)
-        with urllib.request.urlopen(HEADER_URL, timeout=45) as stream:
-            header = stream.read(1024 * 1024)
-        assert hashlib.sha256(header).hexdigest() == HEADER_SHA256
-        (include / 'json.hpp').write_bytes(header)
+        fetched = subprocess.run(['curl', '--http1.1', '--fail', '--silent', '--show-error', '--location',
+            '--retry', '3', '--retry-all-errors', '--max-time', '45', '--max-filesize', '1048576',
+            '--output', str(include / 'json.hpp'), HEADER_URL], capture_output=True, timeout=210)
+        assert fetched.returncode == 0, 'authored header download failed: curl exit ' + str(fetched.returncode)
+        assert sha(include / 'json.hpp') == HEADER_SHA256
         helper = output / 'owned-stdio-helper'
         compiler = ['xcrun', 'clang++', '-std=c++20', '-O2', '-Wall', '-Wextra', '-Werror', '-I', include.parent, ROOT / 'offline-stdio-helper.cpp', '-o', helper]
         result = subprocess.run(list(map(str, compiler)), capture_output=True, timeout=120)
@@ -279,7 +279,9 @@ def main():
             actual_nested_product_Bash_sandbox_accepted=False, retained_native_addon_functions_invoked=False)
     except Exception as error:
         receipt.update(status='failed_private_diagnostics_only', error_type=type(error).__name__)
-        write(output / 'private-harness-receipt.json', dict(error_type=type(error).__name__, error=str(error), traceback=traceback.format_exc(), harness=harness.receipt if harness else None))
+        transport_file = output / 'published-input/transport-diagnostic.json'
+        write(output / 'private-harness-receipt.json', dict(error_type=type(error).__name__, error=str(error), traceback=traceback.format_exc(),
+            input_transport=json.loads(transport_file.read_bytes()) if transport_file.is_file() else None, harness=harness.receipt if harness else None))
         if harness is not None:
             shutil.copytree(harness.private, output / 'execution-records', dirs_exist_ok=True)
         try:
