@@ -5,6 +5,32 @@ SYMBOLS = ("malloc", "calloc", "realloc", "free", "aligned_alloc",
            "posix_memalign", "memalign", "valloc", "pvalloc", "malloc_usable_size")
 
 
+def patch_export_parser(before):
+    """Keep every version node in Bun's linker and binary-check export list."""
+    anchor = r'  const globals = text.split(/\blocal\s*:/)[0]!.split(/\bglobal\s*:/)[1] ?? "";'
+    assert before.count(anchor) == 1, "unqualified Bun version-script parser"
+    replacement = r'  const globals = text.split(/\blocal\s*:/)[0]!.split(/\bglobal\s*:/).slice(1).join("\n");'
+    return before.replace(anchor, replacement)
+
+
+def verify_napi_symbols(output):
+    required = {"napi_define_properties", "napi_get_cb_info", "napi_get_boolean",
+                "napi_create_threadsafe_function", "napi_call_threadsafe_function",
+                "napi_release_threadsafe_function", "napi_create_buffer_copy"}
+    seen = set()
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) < 8 or not fields[0].endswith(":"):
+            continue
+        name = fields[7].split("@", 1)[0]
+        if name not in required or fields[6] == "UND":
+            continue
+        assert fields[3:6] == ["FUNC", "GLOBAL", "DEFAULT"], "hidden N-API export: " + name
+        seen.add(name)
+    assert seen == required, "missing N-API exports: " + repr(sorted(required - seen))
+    return sorted(seen)
+
+
 def versions(arch):
     assert arch in {"x64", "arm64"}, "unqualified allocator ABI"
     base = "GLIBC_2.2.5" if arch == "x64" else "GLIBC_2.17"

@@ -1,5 +1,5 @@
 import unittest
-from allocator_exports import patch_script, verify_symbols, versions
+from allocator_exports import patch_script, verify_symbols, versions, patch_export_parser, verify_napi_symbols
 
 
 class AllocatorAbiTests(unittest.TestCase):
@@ -28,6 +28,17 @@ class AllocatorAbiTests(unittest.TestCase):
                         correct.replace("DEFAULT 14 malloc", "DEFAULT UND malloc")]:
             with self.assertRaises(AssertionError):
                 verify_symbols(invalid, "arm64")
+
+    def test_version_parser_patch_refuses_an_unknown_boundary(self):
+        for invalid in ["", "const globals = changed;", "global: napi*;"]:
+            with self.assertRaisesRegex(AssertionError, "unqualified Bun version-script parser"):
+                patch_export_parser(invalid)
+
+    def test_napi_gate_rejects_allocator_only_symbol_table(self):
+        observed = "\n".join(f"{i}: 1234 24 FUNC GLOBAL DEFAULT 14 {name}@@{version}"
+                             for i, (name, version) in enumerate(versions("arm64").items()))
+        with self.assertRaisesRegex(AssertionError, "missing N-API exports"):
+            verify_napi_symbols(observed)
 
 
 if __name__ == "__main__":

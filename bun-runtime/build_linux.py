@@ -18,6 +18,7 @@ from patch_bun import patch, sha
 from prepare_sysroot import prepare
 from native_libraries import qualify as qualify_native_libraries
 from allocator_exports import verify_symbols as verify_allocator_symbols
+from allocator_exports import verify_napi_symbols
 from native_rg_controls import verify as verify_native_rg
 
 ROOT = Path(__file__).resolve().parent
@@ -113,6 +114,12 @@ def main():
         receipt["maximum_core_glibc_requirement"] = ".".join(map(str, max(versions)))
         run("runtime-dynamic-symbols", ["readelf", "--dyn-syms", "--wide", binary])
         receipt["allocator_symbol_versions"] = verify_allocator_symbols((logs / "runtime-dynamic-symbols.log").read_text(), args.arch)
+        receipt["native_NAPI_exports"] = verify_napi_symbols((logs / "runtime-dynamic-symbols.log").read_text())
+        napi_probe = out / "owned-napi-probe.node"
+        run("owned-napi-probe-build", ["cc", "-shared", "-fPIC", "-pthread", "-I", source / "src/runtime/napi",
+                                       ROOT / "owned-napi-probe.c", "-o", napi_probe])
+        run("owned-napi-probe", [binary, ROOT / "owned-napi-probe.mjs", napi_probe])
+        receipt["native_NAPI_loading_and_threadsafe_callback_probe"] = json.loads((logs / "owned-napi-probe.log").read_text())
         if ugrep_package is not None:
             run("runtime-exception-sections", ["readelf", "--sections", "--wide", binary])
             sections = (logs / "runtime-exception-sections.log").read_text()
@@ -183,7 +190,7 @@ def main():
                 assert not result.stdout and b"mismatched [ ]" in result.stderr
         package = out / "public-bun-runtime"; package.mkdir()
         shutil.copyfile(binary, package / "bun"); (package / "bun").chmod(0o555)
-        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "rust_source_graph.py", "verify_rust_plan.py", "resolved-Cargo.lock", "allocator_exports.py", "native_rg_controls.py"]:
+        for name in ["role_contract.rs", "recovered_multicall.rs", "patch_bun.py", "build_linux.py", "build-runtime.sh", "prepare_sysroot.py", "glibc-sysroot-pins.json", "native_libraries.py", "native-library-pins.json", "stage_native_sources.py", "rust_source_graph.py", "verify_rust_plan.py", "resolved-Cargo.lock", "allocator_exports.py", "native_rg_controls.py", "owned-napi-probe.c", "owned-napi-probe.mjs"]:
             shutil.copyfile(ROOT / name, package / name)
         shutil.copytree(native_package / "inputs", package / "native-component-source-inputs")
         for name in ["apply-seccomp.c", "unix-block-bpf.h", "SECCOMP-LICENSE", "recovery_lib.rs", "effective-library-Cargo.toml"]:
