@@ -234,8 +234,11 @@ def main():
         image = info['Id']; receipt['runtime_image'] = image
         common = ['docker', 'run', '--rm', '--init', '--platform', 'linux/amd64', '--network', 'none', '--read-only',
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--security-opt', 'seccomp=unconfined',
-            '--security-opt', 'systempaths=unconfined', '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', '2',
+            '--security-opt', 'apparmor=unconfined', '--security-opt', 'systempaths=unconfined', '--user', f'{os.getuid()}:{os.getgid()}', '--cpus', '2',
             '--memory', '3g', '--pids-limit', '128', '--ulimit', 'core=0', '--tmpfs', '/tmp:rw,nosuid,nodev,size=512m']
+        receipt['outer_namespace_adaptation'] = dict(Docker_AppArmor='unconfined',
+            reason='docker-default denied mount propagation in the owned nested user namespace',
+            product_Bash_sandbox_enabled=True, capabilities_dropped=True, non_root=True, network='none', read_only_root=True)
         owned = private / 'owned'; owned.mkdir()
         run('owned-kernel-gate', [*common, '--mount', f'type=bind,src={ROOT},dst=/gate,readonly',
             '--mount', f'type=bind,src={owned},dst=/evidence', image, 'python3', '-B', '/gate/owned_preflight.py',
