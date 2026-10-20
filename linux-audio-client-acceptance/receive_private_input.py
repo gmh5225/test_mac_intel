@@ -11,7 +11,7 @@ def receive(root, first, count, environment):
     for index in range(first, first + count):
         raw = environment['NDC_AUDIO_X64_V10_' + format(index, '03')]
         assert 0 < len(raw) <= 46000 and re.fullmatch('[A-Za-z0-9+/=]+', raw)
-        with (root / format(index, '03')).open('x', opener=lambda p, f: os.open(p, f, 0o600)) as stream:
+        with open(root / format(index, '03'), 'x', opener=lambda p, f: os.open(p, f, 0o600)) as stream:
             stream.write(raw)
 
 
