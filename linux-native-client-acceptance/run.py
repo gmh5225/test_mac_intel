@@ -272,6 +272,7 @@ def main():
         spec = importlib.util.spec_from_file_location('retained_whitespace_recipe', recipes / 'seccomp-helper/format_recipe.py')
         formatter = importlib.util.module_from_spec(spec); spec.loader.exec_module(formatter)
         receipt['client_builds'] = {}
+        receipt['embedded_clipboard'] = {}
         for abi in ['gnu', 'musl']:
             profile = inputs['profiles'][abi]
             target = private / ('target-' + abi); target.mkdir()
@@ -338,7 +339,12 @@ def main():
             value = json.loads((runtime / 'independent-readback.json').read_bytes())
             assert value['pairs'] == 40
             receipt['accepted_pairs'] += 40
+            from embedded_fixture import accept as accept_embedded
+            receipt['embedded_clipboard'][abi] = accept_embedded(ROOT,private,abi,inbox,clients,extracted,mapping,expected,
+                engine,args.sdk.resolve(),image,run)
         assert receipt['accepted_pairs'] == 80
+        assert sum(r['function_pairs'] for r in receipt['embedded_clipboard'].values()) == 168
+        receipt['embedded_clipboard_function_pairs'] = 168
         receipt['status'] = 'native_x64_audio_clipboard_four_clients_80_pairs_independently_recomputed'
         failed = False
     except BaseException as error:
