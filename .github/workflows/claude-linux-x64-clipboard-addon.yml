@@ -1,0 +1,89 @@
+name: Native x64 clipboard addon comparison
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - linux-clipboard-addon-acceptance/**
+      - .github/workflows/claude-linux-x64-clipboard-addon.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-source-bun-runtime-1
+          path: retained-gnu-engine
+          run-id: 39255954611
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-musl-native-source-runtime-1
+          path: retained-musl-engine
+          run-id: 39114748399
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-musl-sdk-1
+          path: retained-sdk
+          run-id: 39030122940
+          github-token: ${{ github.token }}
+      - name: Check owned transport boundary
+        run: python3 -B -m unittest discover -s linux-clipboard-addon-acceptance -p test_private_transport.py -v
+      - name: Stage private module and fixture input batch 1
+        env:
+          NDC_CLIP_X64_V11_000: ${{ secrets.NDC_CLIP_X64_V11_000 }}
+          NDC_CLIP_X64_V11_001: ${{ secrets.NDC_CLIP_X64_V11_001 }}
+          NDC_CLIP_X64_V11_002: ${{ secrets.NDC_CLIP_X64_V11_002 }}
+          NDC_CLIP_X64_V11_003: ${{ secrets.NDC_CLIP_X64_V11_003 }}
+          NDC_CLIP_X64_V11_004: ${{ secrets.NDC_CLIP_X64_V11_004 }}
+          NDC_CLIP_X64_V11_005: ${{ secrets.NDC_CLIP_X64_V11_005 }}
+          NDC_CLIP_X64_V11_006: ${{ secrets.NDC_CLIP_X64_V11_006 }}
+          NDC_CLIP_X64_V11_007: ${{ secrets.NDC_CLIP_X64_V11_007 }}
+        run: python3 -B linux-clipboard-addon-acceptance/receive_private_input.py --first 0 --count 8
+      - name: Stage private module and fixture input batch 2
+        env:
+          NDC_CLIP_X64_V11_008: ${{ secrets.NDC_CLIP_X64_V11_008 }}
+          NDC_CLIP_X64_V11_009: ${{ secrets.NDC_CLIP_X64_V11_009 }}
+          NDC_CLIP_X64_V11_010: ${{ secrets.NDC_CLIP_X64_V11_010 }}
+          NDC_CLIP_X64_V11_011: ${{ secrets.NDC_CLIP_X64_V11_011 }}
+          NDC_CLIP_X64_V11_012: ${{ secrets.NDC_CLIP_X64_V11_012 }}
+          NDC_CLIP_X64_V11_013: ${{ secrets.NDC_CLIP_X64_V11_013 }}
+          NDC_CLIP_X64_V11_014: ${{ secrets.NDC_CLIP_X64_V11_014 }}
+          NDC_CLIP_X64_V11_015: ${{ secrets.NDC_CLIP_X64_V11_015 }}
+        run: python3 -B linux-clipboard-addon-acceptance/receive_private_input.py --first 8 --count 8
+      - name: Stage private module and fixture input batch 3
+        env:
+          NDC_CLIP_X64_V11_016: ${{ secrets.NDC_CLIP_X64_V11_016 }}
+          NDC_CLIP_X64_V11_017: ${{ secrets.NDC_CLIP_X64_V11_017 }}
+          NDC_CLIP_X64_V11_018: ${{ secrets.NDC_CLIP_X64_V11_018 }}
+          NDC_CLIP_X64_V11_019: ${{ secrets.NDC_CLIP_X64_V11_019 }}
+          NDC_CLIP_X64_V11_020: ${{ secrets.NDC_CLIP_X64_V11_020 }}
+          NDC_CLIP_X64_V11_021: ${{ secrets.NDC_CLIP_X64_V11_021 }}
+        run: python3 -B linux-clipboard-addon-acceptance/receive_private_input.py --first 16 --count 6
+      - name: Compare original and reconstructed modules inside owned displays
+        run: >-
+          python3 -B linux-clipboard-addon-acceptance/run.py
+          --gnu-engine retained-gnu-engine --musl-engine retained-musl-engine --sdk retained-sdk
+          --input "${{ runner.temp }}/private-clipboard-x64-input"
+          --private "${{ runner.temp }}/private-native-clipboard-x64-v11"
+          --output native-clipboard-x64-encrypted-records
+      - name: Export encrypted bounded records only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-x64-clipboard-encrypted-records-${{ github.run_attempt }}
+          path: native-clipboard-x64-encrypted-records/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
