@@ -36,25 +36,25 @@ jobs:
           python3 -m pip install capstone==5.0.6 unicorn==2.1.4
       - name: Stage private input batch 1
         env:
-          NDC_SWIFT_V23_000: ${{ secrets.NDC_SWIFT_V23_000 }}
-          NDC_SWIFT_V23_001: ${{ secrets.NDC_SWIFT_V23_001 }}
-          NDC_SWIFT_V23_002: ${{ secrets.NDC_SWIFT_V23_002 }}
-          NDC_SWIFT_V23_003: ${{ secrets.NDC_SWIFT_V23_003 }}
-          NDC_SWIFT_V23_004: ${{ secrets.NDC_SWIFT_V23_004 }}
-          NDC_SWIFT_V23_005: ${{ secrets.NDC_SWIFT_V23_005 }}
-          NDC_SWIFT_V23_006: ${{ secrets.NDC_SWIFT_V23_006 }}
-          NDC_SWIFT_V23_007: ${{ secrets.NDC_SWIFT_V23_007 }}
+          NDC_SWIFT_V23R2_000: ${{ secrets.NDC_SWIFT_V23R2_000 }}
+          NDC_SWIFT_V23R2_001: ${{ secrets.NDC_SWIFT_V23R2_001 }}
+          NDC_SWIFT_V23R2_002: ${{ secrets.NDC_SWIFT_V23R2_002 }}
+          NDC_SWIFT_V23R2_003: ${{ secrets.NDC_SWIFT_V23R2_003 }}
+          NDC_SWIFT_V23R2_004: ${{ secrets.NDC_SWIFT_V23R2_004 }}
+          NDC_SWIFT_V23R2_005: ${{ secrets.NDC_SWIFT_V23R2_005 }}
+          NDC_SWIFT_V23R2_006: ${{ secrets.NDC_SWIFT_V23R2_006 }}
+          NDC_SWIFT_V23R2_007: ${{ secrets.NDC_SWIFT_V23R2_007 }}
         run: python3 -B macos-swift-substitutions-acceptance/run.py receive 0 8
       - name: Stage private input batch 2
         env:
-          NDC_SWIFT_V23_008: ${{ secrets.NDC_SWIFT_V23_008 }}
-          NDC_SWIFT_V23_009: ${{ secrets.NDC_SWIFT_V23_009 }}
-          NDC_SWIFT_V23_010: ${{ secrets.NDC_SWIFT_V23_010 }}
-          NDC_SWIFT_V23_011: ${{ secrets.NDC_SWIFT_V23_011 }}
-          NDC_SWIFT_V23_012: ${{ secrets.NDC_SWIFT_V23_012 }}
-          NDC_SWIFT_V23_013: ${{ secrets.NDC_SWIFT_V23_013 }}
-          NDC_SWIFT_V23_014: ${{ secrets.NDC_SWIFT_V23_014 }}
-          NDC_SWIFT_V23_015: ${{ secrets.NDC_SWIFT_V23_015 }}
+          NDC_SWIFT_V23R2_008: ${{ secrets.NDC_SWIFT_V23R2_008 }}
+          NDC_SWIFT_V23R2_009: ${{ secrets.NDC_SWIFT_V23R2_009 }}
+          NDC_SWIFT_V23R2_010: ${{ secrets.NDC_SWIFT_V23R2_010 }}
+          NDC_SWIFT_V23R2_011: ${{ secrets.NDC_SWIFT_V23R2_011 }}
+          NDC_SWIFT_V23R2_012: ${{ secrets.NDC_SWIFT_V23R2_012 }}
+          NDC_SWIFT_V23R2_013: ${{ secrets.NDC_SWIFT_V23R2_013 }}
+          NDC_SWIFT_V23R2_014: ${{ secrets.NDC_SWIFT_V23R2_014 }}
+          NDC_SWIFT_V23R2_015: ${{ secrets.NDC_SWIFT_V23R2_015 }}
         run: python3 -B macos-swift-substitutions-acceptance/run.py receive 8 8
       - name: Rebuild private Swift substitutions and Promise callbacks twice and compare actual N-API outputs
         run: python3 -B macos-swift-substitutions-acceptance/run.py ${{ matrix.arch }}
