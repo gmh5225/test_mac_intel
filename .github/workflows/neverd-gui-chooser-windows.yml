@@ -24,7 +24,7 @@ jobs:
           git -C NeverD fetch -q --depth 1 https://github.com/NeverSight/NeverD.git "$ref"
           git -C NeverD checkout -q FETCH_HEAD
           git -C NeverD log -1 --oneline
-          git -C NeverD apply --verbose ../probe/instrument.patch
+          git -C NeverD apply --ignore-whitespace --verbose ../probe/instrument.patch
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: '3.12'
