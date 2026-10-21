@@ -1,0 +1,92 @@
+name: NeverD functions chooser on Windows
+on:
+  push:
+    branches: [claude/neverd-gui-chooser-flake]
+permissions:
+  contents: read
+jobs:
+  probe:
+    name: functionsActivationKeepsCodeWindow (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          path: probe
+      - name: Check out NeverD at the revision under test
+        run: |
+          ref=$(cat probe/neverd-ref)
+          git init -q NeverD
+          git -C NeverD fetch -q --depth 1 https://github.com/NeverSight/NeverD.git "$ref"
+          git -C NeverD checkout -q FETCH_HEAD
+          git -C NeverD log -1 --oneline
+          git -C NeverD apply --verbose ../probe/instrument.patch
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: x64
+      - name: Install Qt and build tools
+        run: |
+          python -m pip install aqtinstall==3.3.0 ninja==1.11.1.3
+          python -m aqt install-qt windows desktop 6.8.3 win64_msvc2022_64 -O "$RUNNER_TEMP/Qt"
+          echo "$RUNNER_TEMP/Qt/6.8.3/msvc2022_64/bin" >> "$GITHUB_PATH"
+      - name: Configure Windows offscreen fonts
+        shell: pwsh
+        run: |
+          "QT_QPA_FONTDIR=$(Join-Path $env:WINDIR 'Fonts')" >> $env:GITHUB_ENV
+      - name: Build the workbench as the desktop job does
+        working-directory: NeverD
+        run: |
+          cmake -S tools/neverd-gui/tests/mock-sdk -B build-fixture -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-fixture --parallel 4
+          cmake -S tools/neverd-gui -B build-gui -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/Qt/6.8.3/msvc2022_64" \
+            -DNEVERD_ENGINE_LIBRARY="$GITHUB_WORKSPACE/NeverD/build-fixture/bin/neverd_fixture.dll" \
+            -DNEVERD_ENGINE_IMPLIB="$GITHUB_WORKSPACE/NeverD/build-fixture/bin/neverd_fixture.lib" \
+            -DNEVERD_GUI_CI_DIAGNOSTICS=ON \
+            -DNEVERD_WORKER_REAL_ENGINE_TESTS=OFF
+          cmake --build build-gui --parallel 4
+          cp build-fixture/bin/neverd_fixture.dll build-gui/bin/
+      - name: Repeat the chooser test, then the whole controller suite
+        working-directory: NeverD
+        env:
+          QT_QPA_PLATFORM: offscreen
+          QT_LOGGING_RULES: neverd.queries.debug=true
+        run: |
+          mkdir -p probe-out
+          set +e
+          for i in $(seq 1 10); do
+            build-gui/bin/neverd-gui-tests.exe functionsActivationKeepsCodeWindow -o "probe-out/function-$i.txt,txt"
+            echo "function run $i: exit $?"
+          done
+          for i in 1 2; do
+            build-gui/bin/neverd-gui-tests.exe -o "probe-out/suite-$i.txt,txt"
+            echo "suite run $i: exit $?"
+          done
+          set -e
+          echo "== failures"
+          grep -h -A2 "^FAIL!" probe-out/*.txt || true
+          echo "== probe lines of failing rows"
+          for f in probe-out/*.txt; do
+            grep -q "^FAIL!  : WorkbenchTests::functionsActivationKeepsCodeWindow" "$f" || continue
+            echo "-- $f"
+            tag=$(grep "^FAIL!  : WorkbenchTests::functionsActivationKeepsCodeWindow" "$f" | head -1 | sed -E 's/.*\(([^)]*)\).*/\1/')
+            grep -E "functionsActivationKeepsCodeWindow\($tag\)" "$f" | grep -vE "propagateSizeHints" | sed -E 's/^Q[A-Z]+ +: WorkbenchTests::functionsActivationKeepsCodeWindow\([^)]*\) //'
+          done
+          echo "== probe summary of every row"
+          grep -h "PROBE" probe-out/*.txt | grep -vE "syncProject|project_sync" | sed -E 's/ background .*//' | awk '{print $4, $6, $8, $12, $14, $16, $18, $20, $22}' | sort | uniq -c | sort -rn | head -60
+          echo "== project sync lines"
+          grep -h "PROBE syncProject\|PROBE project_sync" probe-out/*.txt | sed -E 's/^Q[A-Z]+ +: [^ ]+ //' | sort | uniq -c | head -30
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: chooser-probe
+          path: NeverD/probe-out
+          retention-days: 3

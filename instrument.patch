@@ -1,0 +1,56 @@
+diff --git a/tools/neverd-gui/app/Session.cpp b/tools/neverd-gui/app/Session.cpp
+index 7aaefdcc7..1bce8dd99 100644
+--- a/tools/neverd-gui/app/Session.cpp
++++ b/tools/neverd-gui/app/Session.cpp
+@@ -1059,9 +1059,13 @@ void Session::syncProject() {
+   }
+   if (!capabilities_.contains(QStringLiteral("project_sync")))
+     return;
++  qWarning().noquote() << "PROBE syncProject files changed";
+   command(
+       QStringLiteral("project_sync"), {},
+       [this](const QJsonObject &result) {
++        qWarning().noquote()
++            << "PROBE project_sync"
++            << QJsonDocument(result).toJson(QJsonDocument::Compact);
+         if (!result.value("changed").toBool())
+           return;
+         refreshHistory();
+diff --git a/tools/neverd-gui/tests/WorkbenchTests.cpp b/tools/neverd-gui/tests/WorkbenchTests.cpp
+index 75fad25d5..75ed59872 100644
+--- a/tools/neverd-gui/tests/WorkbenchTests.cpp
++++ b/tools/neverd-gui/tests/WorkbenchTests.cpp
+@@ -3556,6 +3556,14 @@ private slots:
+     QVERIFY(functions);
+     QTRY_VERIFY_WITH_TIMEOUT(!functions->model().rowObject(2).isEmpty(),
+                              OpenTimeoutMs);
++    QSignalSpy probeResets(&functions->model(), &QAbstractItemModel::modelReset);
++    QSignalSpy probeRevisions(&bench.session, &Session::revisionChanged);
++    QSignalSpy probeFunctions(&bench.session, &Session::functionsChanged);
++    QSignalSpy probeUnloads(&bench.session, &Session::unloaded);
++    QSignalSpy probeContexts(&bench.session.queries(),
++                             &QueryService::contextChanged);
++    QElapsedTimer probeClock;
++    probeClock.start();
+     const Address caller =
+         native ? *functions->model().addressAt(0) : Base + 0x140;
+     auto *disassembly = bench.window->disassembly();
+@@ -3586,6 +3594,18 @@ private slots:
+     for (const bool keyboard : {false, true}) {
+       const int row = native ? (keyboard ? 2 : 1) : (keyboard ? 23 : 22);
+       const auto target = functions->model().addressAt(row);
++      qWarning().noquote()
++          << "PROBE" << QTest::currentDataTag() << "row" << row
++          << "target" << bool(target) << "ms" << probeClock.elapsed()
++          << "resets" << probeResets.count() << "revisions"
++          << probeRevisions.count() << "functionsChanged"
++          << probeFunctions.count() << "unloaded" << probeUnloads.count()
++          << "contexts" << probeContexts.count() << "total"
++          << functions->model().total() << "loading"
++          << functions->model().loading() << "loaded" << bench.session.loaded()
++          << "revision" << bench.session.revision() << "background"
++          << QJsonDocument(bench.session.background()).toJson(
++                 QJsonDocument::Compact);
+       QVERIFY(target);
+       code->setFocus();
+       QTRY_VERIFY(code->hasFocus());
