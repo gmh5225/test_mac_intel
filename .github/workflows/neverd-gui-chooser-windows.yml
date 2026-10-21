@@ -44,7 +44,7 @@ jobs:
         working-directory: NeverD
         run: |
           cmake -S tools/neverd-gui/tests/mock-sdk -B build-fixture -G Ninja -DCMAKE_BUILD_TYPE=Release
-          cmake --build build-fixture --parallel 4
+          cmake --build build-fixture --parallel 4 -- -k 0
           cmake -S tools/neverd-gui -B build-gui -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/Qt/6.8.3/msvc2022_64" \
@@ -52,7 +52,7 @@ jobs:
             -DNEVERD_ENGINE_IMPLIB="$GITHUB_WORKSPACE/NeverD/build-fixture/bin/neverd_fixture.lib" \
             -DNEVERD_GUI_CI_DIAGNOSTICS=ON \
             -DNEVERD_WORKER_REAL_ENGINE_TESTS=OFF
-          cmake --build build-gui --parallel 4
+          cmake --build build-gui --parallel 4 -- -k 0
           cp build-fixture/bin/neverd_fixture.dll build-gui/bin/
       - name: Repeat the chooser test, then the whole controller suite
         working-directory: NeverD
