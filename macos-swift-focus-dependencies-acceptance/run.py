@@ -11,7 +11,7 @@ def receive(first,count):
  assert 0<=first and 0<count<=8 and first+count<=CONFIG['chunks']
  root=Path(os.environ['RUNNER_TEMP'])/'private-swift-focus-dependencies/chunks';root.mkdir(parents=True,exist_ok=True,mode=0o700)
  for i in range(first,first+count):
-  value=os.environ['NDC_SWIFT_V33_'+format(i,'03')]
+  value=os.environ['NDC_SWIFT_V33R2_'+format(i,'03')]
   assert 0<len(value)<=46000
   data=base64.b64decode(value,validate=True);assert data
   f=root/format(i,'03');f.write_text(value);f.chmod(0o600)
@@ -62,7 +62,7 @@ def main(arch):
  status='failed';report={}
  try:
   extract(folder);(folder/'results').mkdir()
-  env={k:v for k,v in os.environ.items() if not k.startswith('NDC_SWIFT_V33_')}
+  env={k:v for k,v in os.environ.items() if not k.startswith('NDC_SWIFT_V33R2_')}
   with (folder/'results/driver.stdout').open('wb') as o,(folder/'results/driver.stderr').open('wb') as e:
    p=subprocess.run([sys.executable,'-B',str(folder/'actions_accept.py'),arch],cwd=folder,env=env,stdout=o,stderr=e,timeout=1500)
   if p.returncode==0:
