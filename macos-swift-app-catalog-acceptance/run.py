@@ -68,7 +68,10 @@ def main(arch):
   if p.returncode==0:
    result=json.loads((folder/'results/acceptance.json').read_bytes())
    assert result['status']=='all_native_app_catalog_checks_passed' and result['arch']==arch
-   status='passed';report={k:result[k] for k in ('arch','machine','callback_contract_pairs','native_napi_pairs','source_rebuild_pairs','original_host_loads','original_OS_services_called')}
+   fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called')
+   fields+=('module_registration_pairs','registration_contract_cases','registered_callback_declarations','shared_source_callback_bodies','callbacks_recovered') if 'module_registration_pairs' in result else ('callback_contract_pairs','native_napi_pairs')
+   report={k:result[k] for k in fields}
+   status='passed'
  except Exception:
   (folder/'results').mkdir(exist_ok=True)
   (folder/'results/harness-error.txt').write_text(traceback.format_exc())
