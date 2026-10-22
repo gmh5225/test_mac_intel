@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root=='results' or root.startswith(('poll-comparison-',)) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-','poll-owned-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
+  if root=='results' or root.startswith(('open-comparison-','open-node-comparison-','open-trap-comparison-')) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-','poll-owned-','open-probe-','open-node-','public-calibration-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<128*1024*1024
  assert all(f.stat().st_size<16*1024*1024 for f in selected)
@@ -71,6 +71,7 @@ def main(arch):
    fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called')
    fields+=('module_registration_pairs','registration_contract_cases','registered_callback_declarations','shared_source_callback_bodies','callbacks_recovered','shared_promise_node_pairs','joint_hotkey_pairs') if 'module_registration_pairs' in result else ('callback_contract_pairs','native_napi_pairs')
    if 'poll_helper_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','poll_helper_pairs','shared_source_callback_bodies','callbacks_recovered')
+   if 'open_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','open_callback_pairs','open_node_pairs','open_node_profiles','open_trap_pairs','shared_source_callback_bodies','callbacks_recovered')
    report={k:result[k] for k in fields}
    status='passed'
  except Exception:
