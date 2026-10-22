@@ -25,7 +25,7 @@ def extract(folder):
  d=lzma.LZMADecompressor(memlimit=256*1024*1024);plain=d.decompress(data,max_length=16*1024*1024)
  assert d.eof and not d.unused_data
  with tarfile.open(fileobj=io.BytesIO(plain),mode='r:') as archive:
-  members=archive.getmembers();assert len(members)<=128
+  members=archive.getmembers();assert len(members)<=256
   for member in members:
    p=PurePosixPath(member.name);assert member.isreg() and not p.is_absolute() and '..' not in p.parts and 0<member.size<3*1024*1024
    target=folder.joinpath(*p.parts);target.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root=='results' or root.startswith(('registration-comparison-',)) or (root in ('build-1','build-2') and f.name.startswith(('darwin-shared-','registration-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
+  if root=='results' or root.startswith(('registration-comparison-','manual-node-comparison-','substitutions-node-comparison-','hotkey-joint-comparison-')) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<128*1024*1024
  assert all(f.stat().st_size<16*1024*1024 for f in selected)
@@ -69,7 +69,7 @@ def main(arch):
    result=json.loads((folder/'results/acceptance.json').read_bytes())
    assert result['status']=='all_native_app_catalog_checks_passed' and result['arch']==arch
    fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called')
-   fields+=('module_registration_pairs','registration_contract_cases','registered_callback_declarations','shared_source_callback_bodies','callbacks_recovered') if 'module_registration_pairs' in result else ('callback_contract_pairs','native_napi_pairs')
+   fields+=('module_registration_pairs','registration_contract_cases','registered_callback_declarations','shared_source_callback_bodies','callbacks_recovered','shared_promise_node_pairs','joint_hotkey_pairs') if 'module_registration_pairs' in result else ('callback_contract_pairs','native_napi_pairs')
    report={k:result[k] for k in fields}
    status='passed'
  except Exception:
