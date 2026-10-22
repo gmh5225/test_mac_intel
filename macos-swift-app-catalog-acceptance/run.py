@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root=='results' or root.startswith(('apps-comparison-','apps-node-comparison-','resolver-comparison-','resolver-node-comparison-')) or (root in ('build-1','build-2') and f.name.startswith(('apps-','resolver-','production-','public-calibration-')) and f.suffix!='.o'):
+  if root=='results' or root.startswith(('unhide-comparison-','unhide-node-comparison-')) or (root in ('build-1','build-2') and f.name.startswith(('unhide-','production-','public-calibration-')) and f.suffix!='.o'):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<128*1024*1024
  assert all(f.stat().st_size<16*1024*1024 for f in selected)
