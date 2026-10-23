@@ -77,6 +77,7 @@ def main(arch):
    if 'preview_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','preview_callback_pairs','preview_node_pairs','preview_node_profiles','preview_trap_pairs','hide_helper_pairs','retained_point_pairs','retained_display_pairs','shared_source_callback_bodies','callbacks_recovered')
    if 'window_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','window_callback_pairs','window_node_pairs','window_node_calls','window_node_profiles','window_trap_pairs','pid_resolver_pairs','retained_preview_pairs','hide_helper_pairs','retained_point_pairs','retained_display_pairs','shared_source_callback_bodies','callbacks_recovered')
    if 'catalog_helper_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','catalog_helper_pairs','catalog_parallel_calls','catalog_native_owners_reclaimed','shared_source_callback_bodies','callbacks_recovered','callback_lifetime_pending')
+   if 'native_package_rebuild_pairs' in result:fields+=('native_package_rebuild_pairs','native_package_probe_pairs','native_package_parallel_calls','cold_creator_pending')
    report={k:result[k] for k in fields}
    status='passed'
  except Exception:
