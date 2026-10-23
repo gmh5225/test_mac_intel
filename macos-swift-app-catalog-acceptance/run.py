@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root=='results' or root.startswith(('point-comparison-','point-node-comparison-','point-trap-comparison-')) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-','poll-owned-','open-probe-','open-node-','public-calibration-','show-probe-','show-node-','hide-regression-','reorder-regression-','point-probe-','point-node-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
+  if root=='results' or root.startswith(('preview-comparison-','preview-node-comparison-','preview-trap-comparison-','hide-comparison-','point-regression-','display-regression-')) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-','poll-owned-','open-probe-','open-node-','public-calibration-','show-probe-','show-node-','hide-regression-','reorder-regression-','point-probe-','point-node-','preview-probe-','preview-node-','hide-probe-','point-regression-','display-owned-probe-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<128*1024*1024
  assert all(f.stat().st_size<16*1024*1024 for f in selected)
@@ -74,7 +74,7 @@ def main(arch):
    if 'open_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','open_callback_pairs','open_node_pairs','open_node_profiles','open_trap_pairs','shared_source_callback_bodies','callbacks_recovered')
    if 'show_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','show_callback_pairs','show_node_pairs','show_node_profiles','shared_source_callback_bodies','callbacks_recovered')
    if 'point_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','point_callback_pairs','point_node_pairs','point_node_profiles','point_trap_pairs','shared_source_callback_bodies','callbacks_recovered')
-   if 'point_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','point_callback_pairs','point_node_pairs','point_node_profiles','point_trap_pairs','shared_source_callback_bodies','callbacks_recovered')
+   if 'preview_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','preview_callback_pairs','preview_node_pairs','preview_node_profiles','preview_trap_pairs','hide_helper_pairs','retained_point_pairs','retained_display_pairs','shared_source_callback_bodies','callbacks_recovered')
    report={k:result[k] for k in fields}
    status='passed'
  except Exception:
