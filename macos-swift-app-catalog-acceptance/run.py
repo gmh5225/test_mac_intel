@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root=='results' or root.startswith(('preview-comparison-','preview-node-comparison-','preview-trap-comparison-','hide-comparison-','point-regression-','display-regression-')) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-','poll-owned-','open-probe-','open-node-','public-calibration-','show-probe-','show-node-','hide-regression-','reorder-regression-','point-probe-','point-node-','preview-probe-','preview-node-','hide-probe-','point-regression-','display-owned-probe-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
+  if root=='results' or root.startswith(('window-comparison-','window-node-comparison-','window-trap-comparison-','pid-comparison-','preview-comparison-','preview-node-comparison-','preview-trap-comparison-','hide-comparison-','point-regression-','display-regression-')) or (root in ('build-1','build-2') and f.name.startswith(('darwin-accepted-','registration-','manual-fixture-','substitutions-fixture-','hotkey-joint-','poll-owned-','open-probe-','open-node-','public-calibration-','show-probe-','show-node-','hide-regression-','reorder-regression-','point-probe-','point-node-','window-probe-','window-node-','pid-probe-','preview-probe-','preview-node-','hide-probe-','point-regression-','display-owned-probe-')) and (f.name.startswith('registration-production-') or f.suffix!='.o')):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<128*1024*1024
  assert all(f.stat().st_size<16*1024*1024 for f in selected)
@@ -64,7 +64,7 @@ def main(arch):
   extract(folder);(folder/'results').mkdir()
   env={k:v for k,v in os.environ.items() if not k.startswith('NDC_')}
   with (folder/'results/driver.stdout').open('wb') as o,(folder/'results/driver.stderr').open('wb') as e:
-   p=subprocess.run([sys.executable,'-B',str(folder/'actions_accept.py'),arch],cwd=folder,env=env,stdout=o,stderr=e,timeout=1500)
+   p=subprocess.run([sys.executable,'-B',str(folder/'actions_accept.py'),arch],cwd=folder,env=env,stdout=o,stderr=e,timeout=2400)
   if p.returncode==0:
    result=json.loads((folder/'results/acceptance.json').read_bytes())
    assert result['status']=='all_native_app_catalog_checks_passed' and result['arch']==arch
@@ -75,6 +75,7 @@ def main(arch):
    if 'show_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','show_callback_pairs','show_node_pairs','show_node_profiles','shared_source_callback_bodies','callbacks_recovered')
    if 'point_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','point_callback_pairs','point_node_pairs','point_node_profiles','point_trap_pairs','shared_source_callback_bodies','callbacks_recovered')
    if 'preview_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','preview_callback_pairs','preview_node_pairs','preview_node_profiles','preview_trap_pairs','hide_helper_pairs','retained_point_pairs','retained_display_pairs','shared_source_callback_bodies','callbacks_recovered')
+   if 'window_callback_pairs' in result:fields=('arch','machine','source_rebuild_pairs','original_host_loads','original_OS_services_called','window_callback_pairs','window_node_pairs','window_node_calls','window_node_profiles','window_trap_pairs','pid_resolver_pairs','retained_preview_pairs','hide_helper_pairs','retained_point_pairs','retained_display_pairs','shared_source_callback_bodies','callbacks_recovered')
    report={k:result[k] for k in fields}
    status='passed'
  except Exception:
