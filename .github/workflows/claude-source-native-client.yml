@@ -8,7 +8,9 @@ on:
       - seccomp-helper/source_runtime.py
       - seccomp-helper/native_client_build.py
       - seccomp-helper/bash_acceptance.py
+      - seccomp-helper/bash_tool_cases.py
       - seccomp-helper/original_acceptance.py
+      - seccomp-helper/process_state_comparison.py
       - seccomp-helper/native_search_acceptance.py
       - .github/workflows/claude-source-native-client.yml
 permissions:
@@ -32,7 +34,8 @@ jobs:
           from pathlib import Path
           import json, os
           pins=json.loads(Path('seccomp-helper/source-runtime-pins.json').read_bytes())
-          assert pins['schema_version']==3 and pins['integration_strategy']=='single-rust-source-graph-and-c'
+          assert pins['schema_version']==4 and pins['integration_strategy'] in {'single-rust-source-graph-and-c','single-rust-source-graph-with-c-source-libraries'}
+          assert pins['allocator_abi_required'] is True and pins['native_rg_filename_controls_required'] is True
           profiles=pins['profiles'];assert set(profiles)<={'x64','arm64'}
           if profiles: assert type(pins['producer_run']) is int and pins['producer_run']>0
           else: print('Full source-engine client acceptance pending: no qualified runtime is admitted.')

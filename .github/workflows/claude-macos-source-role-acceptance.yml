@@ -1,0 +1,112 @@
+name: Admitted macOS source engine native role acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - macos-native-components/source-engine-pins.json
+      - macos-native-components/source_engine.py
+      - macos-native-components/compare_ugrep.py
+      - macos-native-components/qualify_bfs_native.py
+      - macos-native-components/qualify_ugrep_engine.py
+      - .github/workflows/claude-macos-source-role-acceptance.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  profiles:
+    runs-on: ubuntu-24.04
+    outputs:
+      admitted: ${{ steps.pins.outputs.admitted }}
+      producer: ${{ steps.pins.outputs.producer }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - id: pins
+        run: |
+          python3 -B - <<'PY'
+          import json,os
+          pins=json.load(open('macos-native-components/source-engine-pins.json'))
+          assert pins['schema_version']==1 and pins['target_os']=='darwin'
+          admitted=set(pins['profiles'])=={'arm64','x64'}
+          assert admitted or not pins['profiles']
+          if admitted: assert type(pins['producer_run']) is int and pins['producer_run']>0
+          else: print('Exact source engine admission remains pending; no captured input will execute.')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('admitted='+str(admitted).lower()+'\nproducer='+str(pins['producer_run'])+'\n')
+          PY
+  accept:
+    needs: profiles
+    if: ${{ needs.profiles.outputs.admitted == 'true' }}
+    name: Native macOS ${{ matrix.os }} ${{ matrix.arch }} exact source-role comparisons
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: 15
+            runner: macos-15
+          - arch: x64
+            os: 15
+            runner: macos-15-intel
+          - arch: arm64
+            os: 26
+            runner: macos-26
+          - arch: x64
+            os: 26
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-darwin-${{ matrix.arch }}-native-source-runtime-1
+          run-id: ${{ needs.profiles.outputs.producer }}
+          github-token: ${{ github.token }}
+          path: public-runtime
+      - name: Rehash the whole artifact before using its admitted engine
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import sys
+          sys.path.insert(0,'bun-runtime')
+          from native_libraries import check_manifest,sha
+          root=Path('public-runtime')
+          check_manifest(root,sha(root/'MANIFEST.json'))
+          (root/'bun').chmod(0o500)
+          PY
+      - name: Strict raw Ugrep and Bfs original-role correspondence
+        run: |
+          python3 -B macos-native-components/compare_ugrep.py --arch ${{ matrix.arch }} --role ugrep --package public-runtime/ugrep-source-library-inputs --engine public-runtime/bun --output source-ugrep
+          python3 -B macos-native-components/compare_ugrep.py --arch ${{ matrix.arch }} --role bfs --package public-runtime/bfs-source-library-inputs --engine public-runtime/bun --output source-bfs
+      - name: Exact rg cases and separate unresolved private revision observation
+        run: python3 -B macos-native-components/compare_ugrep.py --arch ${{ matrix.arch }} --role rg --package public-runtime/native-source-inputs --engine public-runtime/bun --output source-rg
+      - name: Ugrep single and multi-thread upstream suites through the complete engine
+        run: python3 -B macos-native-components/qualify_ugrep_engine.py --arch ${{ matrix.arch }} --package public-runtime/ugrep-source-library-inputs --engine public-runtime/bun --output source-ugrep-upstream
+      - name: Install upstream Bash on macOS 26
+        if: matrix.os == 26
+        run: brew install bash
+      - name: Bfs and Oniguruma suites before and after the complete engine replacement
+        if: matrix.os == 26
+        run: python3 -B macos-native-components/qualify_bfs_native.py --arch ${{ matrix.arch }} --package public-runtime/bfs-source-library-inputs --engine public-runtime/bun --output source-bfs-upstream
+      - name: Retain bounded or authored diagnostics only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-darwin-${{ matrix.arch }}-macos${{ matrix.os }}-source-role-acceptance-${{ github.run_attempt }}
+          path: |
+            source-ugrep/diagnostics/
+            source-bfs/diagnostics/
+            source-rg/diagnostics/
+            source-ugrep-upstream/diagnostics/
+            source-bfs-upstream/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

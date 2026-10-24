@@ -1,0 +1,89 @@
+name: Native musl complete native-role Bun source engines
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - musl-native-components/build_runtime.py
+      - musl-native-components/build-runtime.sh
+      - musl-native-components/patch_musl.py
+      - musl-native-components/musl_allocator.py
+      - musl-native-components/embedded_rg_allocator.py
+      - musl-native-components/verify_musl_graph.py
+      - musl-native-components/musl_rust_lock.py
+      - musl-native-components/resolved-Cargo.lock
+      - musl-native-components/test_musl_rust_lock.py
+      - musl-native-components/test_embedded_rg_allocator.py
+      - musl-native-components/test_musl_allocator.py
+      - musl-native-components/component_libraries.py
+      - musl-native-components/component-library-pins.json
+      - musl-native-components/prepare_sources.py
+      - musl-native-components/qualify_runtime.py
+      - musl-native-components/unix-block-bpf.h
+      - .github/workflows/claude-musl-native-runtime-source.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    name: Native musl ${{ matrix.arch }} complete source engine
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Verify shared source-graph and musl allocator boundaries
+        run: |
+          python3 -B -m unittest discover -s bun-runtime -p 'test_*.py' -v
+          python3 -B -m unittest discover -s musl-native-components -p 'test_*.py' -v
+      - name: Read independently qualified musl producers
+        id: inputs
+        run: |
+          python3 -B - <<'PY'
+          import json,os
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:
+              for name,path in [('sdk','platform-runtime/musl-sdk-runtime-pins.json'),('components','musl-native-components/component-library-pins.json')]:
+                  pins=json.load(open(path));assert type(pins['producer_run']) is int and pins['producer_run']>0
+                  f.write(name+'_run='+str(pins['producer_run'])+'\n')
+          PY
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-sdk-1
+          path: retained-sdk
+          run-id: ${{ steps.inputs.outputs.sdk_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-source-components-1
+          path: retained-components
+          run-id: ${{ steps.inputs.outputs.components_run }}
+          github-token: ${{ github.token }}
+      - name: Build one Rust std and rg graph with admitted musl C libraries
+        run: python3 -B musl-native-components/build_runtime.py --arch ${{ matrix.arch }} --sdk retained-sdk --components retained-components --output musl-native-engine
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-native-source-runtime-${{ github.run_attempt }}
+          path: musl-native-engine/public-runtime/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-native-source-diagnostics-${{ github.run_attempt }}
+          path: musl-native-engine/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

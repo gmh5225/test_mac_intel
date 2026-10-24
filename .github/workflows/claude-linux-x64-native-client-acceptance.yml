@@ -1,0 +1,149 @@
+name: Native x64 audio and clipboard client acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - linux-native-client-acceptance/**
+      - .github/workflows/claude-linux-x64-native-client-acceptance.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Retain exact public GNU source engine
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-source-bun-runtime-1
+          path: retained-gnu-engine
+          run-id: 39255954611
+          github-token: ${{ github.token }}
+      - name: Retain exact public musl source engine
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-musl-native-source-runtime-1
+          path: retained-musl-engine
+          run-id: 39114748399
+          github-token: ${{ github.token }}
+      - name: Retain admitted public musl SDK
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-musl-sdk-1
+          path: retained-sdk
+          run-id: 39030122940
+          github-token: ${{ github.token }}
+      - name: Check owned private transport
+        run: python3 -B linux-native-client-acceptance/test_private_transport.py
+      - name: Stage private input batch 1
+        env:
+          NDC_NATIVE_X64_V12_000: ${{ secrets.NDC_NATIVE_X64_V12_000 }}
+          NDC_NATIVE_X64_V12_001: ${{ secrets.NDC_NATIVE_X64_V12_001 }}
+          NDC_NATIVE_X64_V12_002: ${{ secrets.NDC_NATIVE_X64_V12_002 }}
+          NDC_NATIVE_X64_V12_003: ${{ secrets.NDC_NATIVE_X64_V12_003 }}
+          NDC_NATIVE_X64_V12_004: ${{ secrets.NDC_NATIVE_X64_V12_004 }}
+          NDC_NATIVE_X64_V12_005: ${{ secrets.NDC_NATIVE_X64_V12_005 }}
+          NDC_NATIVE_X64_V12_006: ${{ secrets.NDC_NATIVE_X64_V12_006 }}
+          NDC_NATIVE_X64_V12_007: ${{ secrets.NDC_NATIVE_X64_V12_007 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 0 --count 8
+      - name: Stage private input batch 2
+        env:
+          NDC_NATIVE_X64_V12_008: ${{ secrets.NDC_NATIVE_X64_V12_008 }}
+          NDC_NATIVE_X64_V12_009: ${{ secrets.NDC_NATIVE_X64_V12_009 }}
+          NDC_NATIVE_X64_V12_010: ${{ secrets.NDC_NATIVE_X64_V12_010 }}
+          NDC_NATIVE_X64_V12_011: ${{ secrets.NDC_NATIVE_X64_V12_011 }}
+          NDC_NATIVE_X64_V12_012: ${{ secrets.NDC_NATIVE_X64_V12_012 }}
+          NDC_NATIVE_X64_V12_013: ${{ secrets.NDC_NATIVE_X64_V12_013 }}
+          NDC_NATIVE_X64_V12_014: ${{ secrets.NDC_NATIVE_X64_V12_014 }}
+          NDC_NATIVE_X64_V12_015: ${{ secrets.NDC_NATIVE_X64_V12_015 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 8 --count 8
+      - name: Stage private input batch 3
+        env:
+          NDC_NATIVE_X64_V12_016: ${{ secrets.NDC_NATIVE_X64_V12_016 }}
+          NDC_NATIVE_X64_V12_017: ${{ secrets.NDC_NATIVE_X64_V12_017 }}
+          NDC_NATIVE_X64_V12_018: ${{ secrets.NDC_NATIVE_X64_V12_018 }}
+          NDC_NATIVE_X64_V12_019: ${{ secrets.NDC_NATIVE_X64_V12_019 }}
+          NDC_NATIVE_X64_V12_020: ${{ secrets.NDC_NATIVE_X64_V12_020 }}
+          NDC_NATIVE_X64_V12_021: ${{ secrets.NDC_NATIVE_X64_V12_021 }}
+          NDC_NATIVE_X64_V12_022: ${{ secrets.NDC_NATIVE_X64_V12_022 }}
+          NDC_NATIVE_X64_V12_023: ${{ secrets.NDC_NATIVE_X64_V12_023 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 16 --count 8
+      - name: Stage private input batch 4
+        env:
+          NDC_NATIVE_X64_V12_024: ${{ secrets.NDC_NATIVE_X64_V12_024 }}
+          NDC_NATIVE_X64_V12_025: ${{ secrets.NDC_NATIVE_X64_V12_025 }}
+          NDC_NATIVE_X64_V12_026: ${{ secrets.NDC_NATIVE_X64_V12_026 }}
+          NDC_NATIVE_X64_V12_027: ${{ secrets.NDC_NATIVE_X64_V12_027 }}
+          NDC_NATIVE_X64_V12_028: ${{ secrets.NDC_NATIVE_X64_V12_028 }}
+          NDC_NATIVE_X64_V12_029: ${{ secrets.NDC_NATIVE_X64_V12_029 }}
+          NDC_NATIVE_X64_V12_030: ${{ secrets.NDC_NATIVE_X64_V12_030 }}
+          NDC_NATIVE_X64_V12_031: ${{ secrets.NDC_NATIVE_X64_V12_031 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 24 --count 8
+      - name: Stage private input batch 5
+        env:
+          NDC_NATIVE_X64_V12_032: ${{ secrets.NDC_NATIVE_X64_V12_032 }}
+          NDC_NATIVE_X64_V12_033: ${{ secrets.NDC_NATIVE_X64_V12_033 }}
+          NDC_NATIVE_X64_V12_034: ${{ secrets.NDC_NATIVE_X64_V12_034 }}
+          NDC_NATIVE_X64_V12_035: ${{ secrets.NDC_NATIVE_X64_V12_035 }}
+          NDC_NATIVE_X64_V12_036: ${{ secrets.NDC_NATIVE_X64_V12_036 }}
+          NDC_NATIVE_X64_V12_037: ${{ secrets.NDC_NATIVE_X64_V12_037 }}
+          NDC_NATIVE_X64_V12_038: ${{ secrets.NDC_NATIVE_X64_V12_038 }}
+          NDC_NATIVE_X64_V12_039: ${{ secrets.NDC_NATIVE_X64_V12_039 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 32 --count 8
+      - name: Stage private input batch 6
+        env:
+          NDC_NATIVE_X64_V12_040: ${{ secrets.NDC_NATIVE_X64_V12_040 }}
+          NDC_NATIVE_X64_V12_041: ${{ secrets.NDC_NATIVE_X64_V12_041 }}
+          NDC_NATIVE_X64_V12_042: ${{ secrets.NDC_NATIVE_X64_V12_042 }}
+          NDC_NATIVE_X64_V12_043: ${{ secrets.NDC_NATIVE_X64_V12_043 }}
+          NDC_NATIVE_X64_V12_044: ${{ secrets.NDC_NATIVE_X64_V12_044 }}
+          NDC_NATIVE_X64_V12_045: ${{ secrets.NDC_NATIVE_X64_V12_045 }}
+          NDC_NATIVE_X64_V12_046: ${{ secrets.NDC_NATIVE_X64_V12_046 }}
+          NDC_NATIVE_X64_V12_047: ${{ secrets.NDC_NATIVE_X64_V12_047 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 40 --count 8
+      - name: Stage private input batch 7
+        env:
+          NDC_NATIVE_X64_V12_048: ${{ secrets.NDC_NATIVE_X64_V12_048 }}
+          NDC_NATIVE_X64_V12_049: ${{ secrets.NDC_NATIVE_X64_V12_049 }}
+          NDC_NATIVE_X64_V12_050: ${{ secrets.NDC_NATIVE_X64_V12_050 }}
+          NDC_NATIVE_X64_V12_051: ${{ secrets.NDC_NATIVE_X64_V12_051 }}
+          NDC_NATIVE_X64_V12_052: ${{ secrets.NDC_NATIVE_X64_V12_052 }}
+          NDC_NATIVE_X64_V12_053: ${{ secrets.NDC_NATIVE_X64_V12_053 }}
+          NDC_NATIVE_X64_V12_054: ${{ secrets.NDC_NATIVE_X64_V12_054 }}
+          NDC_NATIVE_X64_V12_055: ${{ secrets.NDC_NATIVE_X64_V12_055 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 48 --count 8
+      - name: Stage private input batch 8
+        env:
+          NDC_NATIVE_X64_V12_056: ${{ secrets.NDC_NATIVE_X64_V12_056 }}
+          NDC_NATIVE_X64_V12_057: ${{ secrets.NDC_NATIVE_X64_V12_057 }}
+          NDC_NATIVE_X64_V12_058: ${{ secrets.NDC_NATIVE_X64_V12_058 }}
+          NDC_NATIVE_X64_V12_059: ${{ secrets.NDC_NATIVE_X64_V12_059 }}
+          NDC_NATIVE_X64_V12_060: ${{ secrets.NDC_NATIVE_X64_V12_060 }}
+          NDC_NATIVE_X64_V12_061: ${{ secrets.NDC_NATIVE_X64_V12_061 }}
+          NDC_NATIVE_X64_V12_062: ${{ secrets.NDC_NATIVE_X64_V12_062 }}
+          NDC_NATIVE_X64_V12_063: ${{ secrets.NDC_NATIVE_X64_V12_063 }}
+        run: python3 -B linux-native-client-acceptance/receive_private_input.py --first 56 --count 8
+      - name: Rebuild exact clients and run unchanged full acceptance
+        run: >-
+          python3 -B linux-native-client-acceptance/run.py
+          --gnu-engine retained-gnu-engine --musl-engine retained-musl-engine --sdk retained-sdk
+          --input "${{ runner.temp }}/private-native-x64-input"
+          --private "${{ runner.temp }}/private-native-clients-x64-v12"
+          --output native-clients-x64-encrypted-records
+      - name: Export only encrypted bounded records and aggregate status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-x64-two-addon-clients-encrypted-records-${{ github.run_attempt }}
+          path: native-clients-x64-encrypted-records/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

@@ -15,8 +15,21 @@ source-glob hashes. `recovered_multicall.rs` dispatches before VM/thread setup.
 The rg source is a dependency of bun_runtime, using Bun's own source-built std
 and linker-plugin LTO graph. Seccomp remains the unchanged C implementation.
 No prebuilt Rust archive is a link input. The default profile still rejects
-Ugrep/bfs explicitly. A separately qualified Bfs C library integration profile
-is described below; it has not yet passed full-engine acceptance.
+Ugrep/bfs explicitly. The separately qualified Bfs C library profile described
+below passes full-engine controls and the declared Linux client suite.
+
+The filename/count crash has been traced on the public ARM64 engine to
+`std::fs::canonicalize`: libc `realpath(NULL)` allocated on the libc heap,
+while the executable's local `free` was mimalloc. The public linker script
+hid the malloc override from libc. A native source model rejects both hidden
+symbols and symbols versioned as `BUN_1.2`; the matching GLIBC versions pass
+100 realpath/getcwd/getline ownership checks. `allocator_exports.py` now
+exports the ten allocator functions with each architecture's libc ABI versions.
+Fresh engines must pass a dynamic symbol/version check and 768 actual rg
+filename, count, JSON and inherited-file-descriptor comparisons with
+RLIMIT_FSIZE=0. Corrected default and Bfs engines pass on native x64 and ARM64
+in runs 39008321363 and 39008321371. All 3,072 raw rg cases were independently
+rederived before admission. The earlier crashing engines remain revoked.
 
 Standalone Rust/C hosts passed seven RLIMIT_FSIZE=0 controls. The first full Bun
 link rejected those separately compiled archives: Bun rebuilds std with its own
@@ -36,7 +49,8 @@ implementations. Exact source hashes and line identities gate explicit i32
 address-family and u16 SystemError casts. Separate i32 syscall errors are not
 rewritten. Run 38989752164 rebuilt both native engines and passed all ten
 zero-file-budget controls with PCRE2 10.45/JIT and GLIBC_2.17. All source,
-artifact, lock and graph records were independently rehashed before admission.
+artifact, lock and graph records were independently rehashed. Later filename
+controls exposed the allocator mismatch above, so those engines were revoked.
 
 The earlier embedded-ELF strategy failed real Bash when materializing a payload
 exceeded the inherited 256 KiB hard file limit. That strategy is rejected. The
@@ -98,9 +112,14 @@ only diagnostics are uploaded. Run 38991982622 rebuilt both layouts twice on
 both architectures and passed all 28 real Bash comparisons and the helper
 controls. It failed built-in search: G03-count returned no matches for one x64
 layout and one ARM64 layout while the originals returned two. Those exact raw
-records remain failed evidence. The current diagnostic run retains client
-debug logs and independently probes count output through synchronous and
-asynchronous children, both with ordinary paths and inherited FD3.
+records remain failed evidence. Corrected Bfs engines pass the declared suite
+on both native architectures in runs 39019415232 and 39019748515. The latter
+retains raw observer workspace snapshots as well as telemetry and owned-worker
+identities. Independent readback rederives all 80 client pairs and 56 helper
+pairs from raw protocol/API bodies, tool results, exits, stderr and workspace
+bytes. Each client layout is rebuilt twice and all 2,589 module rows are read
+back exactly. This establishes the declared offline Linux cases, with the
+original descriptor provider preserved and native rg dispatch.
 
 The optional `claude-bun-bfs-runtime-source.yml` profile admits the exact C-only
 archives from run 38991059015. It rehashes the entire package and checks the
@@ -110,6 +129,9 @@ original main text is unchanged. The Bfs and Oniguruma archives are linked
 directly after the Rust objects, using Bun's existing compatibility wrappers
 and the original's POSIX timer library. No separate Rust std archive or payload
 file is used. This profile adds exact Bfs version/name/regex engine controls;
-passing standalone hosts or applying its patch does not establish successful
-Bun integration. Ugrep, the private Bun revision, other native platforms and
-complete client acceptance remain open.
+passing standalone hosts or applying its patch alone does not establish
+successful Bun integration. Corrected run 39008321371 passes both full-engine
+builds, all 24 Bfs-profile controls and 1,536 rg regression cases, followed by
+the actual client acceptance above. Ugrep integration, the private Bun
+revision, other native platforms and universal behavioral equivalence remain
+open.

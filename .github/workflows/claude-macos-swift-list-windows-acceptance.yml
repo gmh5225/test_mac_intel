@@ -1,0 +1,68 @@
+name: Native macOS Swift listWindows and shared AX cache acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - macos-swift-list-windows-acceptance/**
+      - .github/workflows/claude-macos-swift-list-windows-acceptance.yml
+permissions:
+  contents: read
+jobs:
+  accept:
+    name: Native macOS ${{ matrix.arch }} Swift listWindows and shared AX cache
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20.19.2'
+      - name: Pin instruction fixture toolchains
+        run: python3 -m pip install capstone==5.0.6 unicorn==2.1.4
+      - name: Stage private input batch 1
+        env:
+          NDC_SWIFT_V41R3_000: ${{ secrets.NDC_SWIFT_V41R3_000 }}
+          NDC_SWIFT_V41R3_001: ${{ secrets.NDC_SWIFT_V41R3_001 }}
+          NDC_SWIFT_V41R3_002: ${{ secrets.NDC_SWIFT_V41R3_002 }}
+          NDC_SWIFT_V41R3_003: ${{ secrets.NDC_SWIFT_V41R3_003 }}
+          NDC_SWIFT_V41R3_004: ${{ secrets.NDC_SWIFT_V41R3_004 }}
+          NDC_SWIFT_V41R3_005: ${{ secrets.NDC_SWIFT_V41R3_005 }}
+          NDC_SWIFT_V41R3_006: ${{ secrets.NDC_SWIFT_V41R3_006 }}
+          NDC_SWIFT_V41R3_007: ${{ secrets.NDC_SWIFT_V41R3_007 }}
+        run: python3 -B macos-swift-list-windows-acceptance/run.py receive 0 8
+      - name: Stage private input batch 2
+        env:
+          NDC_SWIFT_V41R3_008: ${{ secrets.NDC_SWIFT_V41R3_008 }}
+          NDC_SWIFT_V41R3_009: ${{ secrets.NDC_SWIFT_V41R3_009 }}
+          NDC_SWIFT_V41R3_010: ${{ secrets.NDC_SWIFT_V41R3_010 }}
+          NDC_SWIFT_V41R3_011: ${{ secrets.NDC_SWIFT_V41R3_011 }}
+          NDC_SWIFT_V41R3_012: ${{ secrets.NDC_SWIFT_V41R3_012 }}
+          NDC_SWIFT_V41R3_013: ${{ secrets.NDC_SWIFT_V41R3_013 }}
+          NDC_SWIFT_V41R3_014: ${{ secrets.NDC_SWIFT_V41R3_014 }}
+          NDC_SWIFT_V41R3_015: ${{ secrets.NDC_SWIFT_V41R3_015 }}
+        run: python3 -B macos-swift-list-windows-acceptance/run.py receive 8 8
+      - name: Rebuild source twice and compare listWindows, nonempty CG, shared AX cache and Node worker lifetime
+        run: python3 -B macos-swift-list-windows-acceptance/run.py ${{ matrix.arch }}
+      - name: Export encrypted evidence and bounded aggregate only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-macos-${{ matrix.arch }}-swift-list-windows-encrypted-${{ github.run_attempt }}
+          path: swift-list-windows-encrypted-records/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

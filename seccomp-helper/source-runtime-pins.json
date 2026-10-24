@@ -1,32 +1,94 @@
 {
-  "schema_version": 3,
-  "integration_strategy": "single-rust-source-graph-and-c",
+  "schema_version": 4,
+  "integration_strategy": "single-rust-source-graph-with-c-source-libraries",
   "public_bun_commit": "c6da4a4d3010e5553438c60f6bd76d981976867c",
-  "producer_run": 38989752164,
-  "producer_head": "4636fe32e458946113e7e3a8fa84488b72a52433",
+  "producer_run": 39023780777,
+  "producer_head": "74cc7b0532b7441ef979ee9109464686f315b98e",
   "profiles": {
     "x64": {
-      "binary_sha256": "e524210d3a979262dcb5ed016fb5bd929cf0effb980095b5421d6741e0aaa353",
-      "bytes": 92682992,
-      "manifest_sha256": "bc3790664803875eb2a301bca3ef195d54ff111cdcac03a3fe5be4a4b6306b0d",
+      "binary_sha256": "7931f3628253eaa032cc09b5c2981057d3ad5e56eec1a95bd602046c3d65fc0c",
+      "bytes": 96206736,
+      "manifest_sha256": "5580a91bbb6268beedef03ce2366078d41819ac53ca7283afb4d7821d5f2b681",
+      "files_rehashed": 256,
       "maximum_core_glibc_requirement": "2.17",
       "native_source_manifest_sha256": "f77dd8d3b92c3989bf5ff833fd001190daf5d12a164f90e5d2008b1cf4141f84",
       "resolved_cargo_lock_sha256": "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723",
       "rust_plan_sha256": "12f4b13cd592416c2bd915954635def4c110b374c6370e341355177a82c36f2a",
-      "independent_qualification_sha256": "f2ecde80f1900c54f2be63f5ccd970b304af34fd4b2ebd56b1c15cd22d348e9e"
+      "allocator_symbol_versions": {
+        "calloc": "GLIBC_2.2.5",
+        "malloc_usable_size": "GLIBC_2.2.5",
+        "valloc": "GLIBC_2.2.5",
+        "pvalloc": "GLIBC_2.2.5",
+        "realloc": "GLIBC_2.2.5",
+        "aligned_alloc": "GLIBC_2.16",
+        "malloc": "GLIBC_2.2.5",
+        "free": "GLIBC_2.2.5",
+        "posix_memalign": "GLIBC_2.2.5",
+        "memalign": "GLIBC_2.2.5"
+      },
+      "native_rg_controls_sha256": "d15e27b53b7cacf1dab059b02d84c3578f2cac939e6a7c30c66bab823cffbaf6",
+      "native_rg_filename_control_cases": 768,
+      "needed": [
+        "librt.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libpthread.so.0",
+        "libdl.so.2",
+        "libm.so.6"
+      ],
+      "whole_client_acceptance": false,
+      "bfs_source_manifest_sha256": "a05fa22b017dcc0fa11d187ccbde45c3a37c15bc2b07fa89997ce959de6e820b",
+      "ugrep_source_manifest_sha256": "3b30476ab91f3e3a0694f6d9a9e342f40f6b086fd1d9984ece6160456a3ae697",
+      "ugrep_exception_metadata_preserved": true,
+      "duplicate_strong_symbols": 0,
+      "ugrep_private_symbol_mapping_sha256": "64baddf90a780f998d66fbf8a71737f5f5664bda84a3158f2b5838961d0a6b00",
+      "ugrep_private_symbol_count": 1189,
+      "independent_qualification_sha256": "309d0661ccb6c764fe4ad354023e4005de2e0ad8be8a7b8ad7cc4f84a8c81349"
     },
     "arm64": {
-      "binary_sha256": "fd2bc4bbb708b205a826a2690f7043997df3e32fe8a4f83df90182cad0b4c808",
-      "bytes": 92267664,
-      "manifest_sha256": "11c6cfc501ec5b0a25447cec770072e443ebae5813023be649c9953d199edfc8",
+      "binary_sha256": "348790270a7e5faa6f189cbc986be2f7ec63725734f298b7a24fed0ee0ec63ac",
+      "bytes": 95486072,
+      "manifest_sha256": "07a2b934d4f4a94d79a6d3ed8cee3ca0d635c0f509bfb4dd37b33d7a5eb06bc8",
+      "files_rehashed": 256,
       "maximum_core_glibc_requirement": "2.17",
       "native_source_manifest_sha256": "5836b29722e065d99495495d4236ee46285fe533f06370a7ac18df2c9c38574f",
       "resolved_cargo_lock_sha256": "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723",
       "rust_plan_sha256": "2d28cb9ca7859fccbdc64b94fedc1eca9b4e18613632dba21eba29b4d7d1f354",
-      "independent_qualification_sha256": "f2ecde80f1900c54f2be63f5ccd970b304af34fd4b2ebd56b1c15cd22d348e9e"
+      "allocator_symbol_versions": {
+        "calloc": "GLIBC_2.17",
+        "malloc_usable_size": "GLIBC_2.17",
+        "valloc": "GLIBC_2.17",
+        "pvalloc": "GLIBC_2.17",
+        "realloc": "GLIBC_2.17",
+        "aligned_alloc": "GLIBC_2.17",
+        "malloc": "GLIBC_2.17",
+        "free": "GLIBC_2.17",
+        "posix_memalign": "GLIBC_2.17",
+        "memalign": "GLIBC_2.17"
+      },
+      "native_rg_controls_sha256": "ca3f2bdb8cec88ce5a52ec600a368052e79fb8fd6bf5044e73cc3a38588125da",
+      "native_rg_filename_control_cases": 768,
+      "needed": [
+        "librt.so.1",
+        "libc.so.6",
+        "ld-linux-aarch64.so.1",
+        "libpthread.so.0",
+        "libdl.so.2",
+        "libm.so.6"
+      ],
+      "whole_client_acceptance": false,
+      "bfs_source_manifest_sha256": "3614f76928b61f9faed9cabe667313697d85f4eac117b33cfef4187b87ef178d",
+      "ugrep_source_manifest_sha256": "f31c53db4395209134f26f84854953c37ea94287f8e0d777e65889a2e1469b1e",
+      "ugrep_exception_metadata_preserved": true,
+      "duplicate_strong_symbols": 0,
+      "ugrep_private_symbol_mapping_sha256": "0df2503d44231916c7e38e7fef7d81be47cba05e6ffc817ade2ec3aa6e55b4f3",
+      "ugrep_private_symbol_count": 1180,
+      "independent_qualification_sha256": "309d0661ccb6c764fe4ad354023e4005de2e0ad8be8a7b8ad7cc4f84a8c81349"
     }
   },
-  "status": "both_source_engines_component_qualified_actual_client_acceptance_pending",
+  "allocator_abi_required": true,
+  "native_rg_filename_controls_required": true,
+  "status": "allocator_abi_and_filename_controls_independently_qualified_client_acceptance_pending",
   "revoked_profiles": {
     "producer_run": 38956750121,
     "producer_head": "eb8533774208375903ddc7d298278626e5ac1cce",
@@ -34,5 +96,111 @@
     "binary_sha256": [
       "2ed484921b0688b41c6e99a34f92e4bb6a3262320e40eaa18211d5c1a9db688f"
     ]
-  }
+  },
+  "revoked_source_graph_profiles": {
+    "producer_run": 38989752164,
+    "producer_head": "4636fe32e458946113e7e3a8fa84488b72a52433",
+    "profiles": {
+      "x64": {
+        "binary_sha256": "e524210d3a979262dcb5ed016fb5bd929cf0effb980095b5421d6741e0aaa353",
+        "bytes": 92682992,
+        "manifest_sha256": "bc3790664803875eb2a301bca3ef195d54ff111cdcac03a3fe5be4a4b6306b0d",
+        "maximum_core_glibc_requirement": "2.17",
+        "native_source_manifest_sha256": "f77dd8d3b92c3989bf5ff833fd001190daf5d12a164f90e5d2008b1cf4141f84",
+        "resolved_cargo_lock_sha256": "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723",
+        "rust_plan_sha256": "12f4b13cd592416c2bd915954635def4c110b374c6370e341355177a82c36f2a",
+        "independent_qualification_sha256": "f2ecde80f1900c54f2be63f5ccd970b304af34fd4b2ebd56b1c15cd22d348e9e"
+      },
+      "arm64": {
+        "binary_sha256": "fd2bc4bbb708b205a826a2690f7043997df3e32fe8a4f83df90182cad0b4c808",
+        "bytes": 92267664,
+        "manifest_sha256": "11c6cfc501ec5b0a25447cec770072e443ebae5813023be649c9953d199edfc8",
+        "maximum_core_glibc_requirement": "2.17",
+        "native_source_manifest_sha256": "5836b29722e065d99495495d4236ee46285fe533f06370a7ac18df2c9c38574f",
+        "resolved_cargo_lock_sha256": "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723",
+        "rust_plan_sha256": "2d28cb9ca7859fccbdc64b94fedc1eca9b4e18613632dba21eba29b4d7d1f354",
+        "independent_qualification_sha256": "f2ecde80f1900c54f2be63f5ccd970b304af34fd4b2ebd56b1c15cd22d348e9e"
+      }
+    },
+    "reason": "Filename/canonicalization calls pass a GLIBC realpath allocation to a hidden local mimalloc free, causing native SIGSEGV. A replacement must have independently checked GLIBC allocator exports and 768 raw filename/FD controls before client admission."
+  },
+  "superseded_qualified_profiles": [
+    {
+      "producer_run": 39008321371,
+      "producer_head": "b2c479a460253fd16b0c55e86d3fab39c497da93",
+      "profiles": {
+        "x64": {
+          "binary_sha256": "349d801f0f986fd75c79689af2d3bfa6f26d03cdc801c09856e91a331db6d1bb",
+          "bytes": 93345384,
+          "manifest_sha256": "dc8297661b6f1a9b8ccd9900c992e65bcd64e5f7a385027fa619ea2062622f16",
+          "files_rehashed": 173,
+          "maximum_core_glibc_requirement": "2.17",
+          "native_source_manifest_sha256": "f77dd8d3b92c3989bf5ff833fd001190daf5d12a164f90e5d2008b1cf4141f84",
+          "resolved_cargo_lock_sha256": "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723",
+          "rust_plan_sha256": "12f4b13cd592416c2bd915954635def4c110b374c6370e341355177a82c36f2a",
+          "allocator_symbol_versions": {
+            "calloc": "GLIBC_2.2.5",
+            "malloc_usable_size": "GLIBC_2.2.5",
+            "valloc": "GLIBC_2.2.5",
+            "pvalloc": "GLIBC_2.2.5",
+            "realloc": "GLIBC_2.2.5",
+            "aligned_alloc": "GLIBC_2.16",
+            "malloc": "GLIBC_2.2.5",
+            "free": "GLIBC_2.2.5",
+            "posix_memalign": "GLIBC_2.2.5",
+            "memalign": "GLIBC_2.2.5"
+          },
+          "native_rg_controls_sha256": "b8c8f181d792514eb4c48ac2605de51bcc1b4f84522f6b47a0a5fdc69d07ec9a",
+          "native_rg_filename_control_cases": 768,
+          "needed": [
+            "librt.so.1",
+            "libc.so.6",
+            "ld-linux-x86-64.so.2",
+            "libpthread.so.0",
+            "libdl.so.2",
+            "libm.so.6"
+          ],
+          "whole_client_acceptance": false,
+          "bfs_source_manifest_sha256": "a05fa22b017dcc0fa11d187ccbde45c3a37c15bc2b07fa89997ce959de6e820b",
+          "independent_qualification_sha256": "77c9b15c67b3f19259c5474891cc06e3413caf8fd4df63a6935d3b659747d3d4"
+        },
+        "arm64": {
+          "binary_sha256": "d3eccc50862aab6e54387a81c302bca357a0a74f2f99c80bb6084de3c2b26564",
+          "bytes": 92856768,
+          "manifest_sha256": "f83553f7eedbe978cbb5d2b87cd5190bbc64d64bcf97f43ae9959f4afaa95755",
+          "files_rehashed": 173,
+          "maximum_core_glibc_requirement": "2.17",
+          "native_source_manifest_sha256": "5836b29722e065d99495495d4236ee46285fe533f06370a7ac18df2c9c38574f",
+          "resolved_cargo_lock_sha256": "1bc3c6d8c1975d2693c16ca22cf84f9ea12d66ca2565916c292d27030919c723",
+          "rust_plan_sha256": "2d28cb9ca7859fccbdc64b94fedc1eca9b4e18613632dba21eba29b4d7d1f354",
+          "allocator_symbol_versions": {
+            "calloc": "GLIBC_2.17",
+            "malloc_usable_size": "GLIBC_2.17",
+            "valloc": "GLIBC_2.17",
+            "pvalloc": "GLIBC_2.17",
+            "realloc": "GLIBC_2.17",
+            "aligned_alloc": "GLIBC_2.17",
+            "malloc": "GLIBC_2.17",
+            "free": "GLIBC_2.17",
+            "posix_memalign": "GLIBC_2.17",
+            "memalign": "GLIBC_2.17"
+          },
+          "native_rg_controls_sha256": "1ba726ed58d93a39b87d80034335c4465f7ab682313ad10ed849f0574f48ba6c",
+          "native_rg_filename_control_cases": 768,
+          "needed": [
+            "librt.so.1",
+            "libc.so.6",
+            "ld-linux-aarch64.so.1",
+            "libpthread.so.0",
+            "libdl.so.2",
+            "libm.so.6"
+          ],
+          "whole_client_acceptance": false,
+          "bfs_source_manifest_sha256": "3614f76928b61f9faed9cabe667313697d85f4eac117b33cfef4187b87ef178d",
+          "independent_qualification_sha256": "77c9b15c67b3f19259c5474891cc06e3413caf8fd4df63a6935d3b659747d3d4"
+        }
+      },
+      "scope": "Previously qualified engines; preserved as regression baselines, not revoked."
+    }
+  ]
 }

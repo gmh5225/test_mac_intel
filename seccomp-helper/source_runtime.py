@@ -3,22 +3,41 @@ from pathlib import Path
 import argparse,hashlib,json,shutil,struct,re,sys
 ROOT=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT.parent/'bun-runtime'))
+from allocator_exports import versions as allocator_versions
+
+STRATEGIES = {'single-rust-source-graph-and-c', 'single-rust-source-graph-with-c-source-libraries'}
 def sha(path):
     with path.open('rb') as stream:return hashlib.file_digest(stream,'sha256').hexdigest()
-def pin(arch,binary,digest):
+def load_pins():
     path=ROOT/'source-runtime-pins.json'
     data=json.loads(path.read_bytes())
-    assert data['schema_version']==3 and data['integration_strategy']=='single-rust-source-graph-and-c'
+    assert data['schema_version']==4 and data['integration_strategy'] in STRATEGIES, 'Pre-repair source runtime profiles are revoked'
+    assert data['allocator_abi_required'] is True and data['native_rg_filename_controls_required'] is True
     assert data['profiles'], 'No qualified source-built runtime is admitted'
+    assert data['status']=='allocator_abi_and_filename_controls_independently_qualified_client_acceptance_pending', 'Independent allocator qualification is missing'
+    assert set(data['profiles']) <= {'x64','arm64'}
     assert type(data['producer_run']) is int and data['producer_run']>0 and re.fullmatch('[0-9a-f]{40}',data['producer_head'])
     assert data['public_bun_commit']=='c6da4a4d3010e5553438c60f6bd76d981976867c'
+    for arch, selected in data['profiles'].items():
+        assert selected['allocator_symbol_versions']==allocator_versions(arch)
+        assert selected['native_rg_filename_control_cases']==768
+        assert re.fullmatch('[0-9a-f]{64}',selected['native_rg_controls_sha256'])
+        if 'ugrep_source_manifest_sha256' in selected:
+            assert selected['duplicate_strong_symbols']==0
+            assert re.fullmatch('[0-9a-f]{64}',selected['ugrep_private_symbol_mapping_sha256'])
+            assert type(selected['ugrep_private_symbol_count']) is int and selected['ugrep_private_symbol_count']>100
+    return data
+
+def pin(arch,binary,digest):
+    path=ROOT/'source-runtime-pins.json'
+    data=load_pins()
     selected=data['profiles'][arch]
     assert selected['maximum_core_glibc_requirement']=='2.17'
     assert binary.is_file() and not binary.is_symlink() and sha(binary)==digest==selected['binary_sha256']
     assert binary.stat().st_size==selected['bytes']
     return dict(selected,public_bun_commit=data['public_bun_commit'],pin_file_sha256=sha(path),source_built_native_dispatch=True)
 def admit(arch,artifact,output):
-    data=json.loads((ROOT/'source-runtime-pins.json').read_bytes());expected=data['profiles'][arch]
+    data=load_pins();expected=data['profiles'][arch]
     manifest=artifact/'MANIFEST.json';assert sha(manifest)==expected['manifest_sha256']
     records=json.loads(manifest.read_bytes())['files'];seen=set()
     assert not artifact.is_symlink() and not any(p.is_symlink() for p in artifact.rglob('*'))
@@ -30,11 +49,32 @@ def admit(arch,artifact,output):
     receipt=json.loads((artifact/'receipt.json').read_bytes())
     assert receipt['status']=='public_bun_source_build_and_bounded_native_dispatch_controls_passed'
     assert receipt['public_bun_commit']==data['public_bun_commit'] and receipt['arch']==arch
-    assert receipt['maximum_core_glibc_requirement']=='2.17' and len(receipt['authored_controls'])==10
+    bfs=data['integration_strategy']=='single-rust-source-graph-with-c-source-libraries'
+    ugrep='ugrep_source_manifest_sha256' in expected
+    assert not ugrep or bfs
+    assert ('ugrep_source_provenance' in receipt) is ugrep
+    assert receipt['maximum_core_glibc_requirement']=='2.17' and len(receipt['authored_controls'])==(18 if ugrep else 12 if bfs else 10)
     assert not receipt['original_prefix_reused'] and not receipt['captured_client_executed']
     assert not receipt['original_bun_revision_recovered']
-    assert receipt['integration_strategy']=='single-rust-source-graph-and-c' and receipt['zero_file_budget_controls_passed']
-    assert receipt['compiled_native_archive_used'] is False
+    assert receipt['integration_strategy']==data['integration_strategy'] and receipt['zero_file_budget_controls_passed']
+    assert receipt['compiled_native_archive_used'] is bfs and receipt.get('compiled_rust_archive_used',False) is False
+    assert receipt['allocator_symbol_versions']==expected['allocator_symbol_versions']==receipt['source_patch']['allocator_symbol_versions']
+    assert receipt['native_rg_filename_controls']==dict(status='native_rg_filename_and_inherited_fd_controls_passed',
+        runtime_sha256=expected['binary_sha256'],cases=768,repetitions=32,rlimit_fsize=0)
+    if bfs:
+        from bfs_libraries import qualify as qualify_bfs
+        library=artifact/'bfs-source-library-inputs'
+        assert sha(library/'MANIFEST.json')==expected['bfs_source_manifest_sha256']
+        assert qualify_bfs(arch,library,receipt['profile']['image'])==receipt['bfs_source_provenance']==receipt['source_patch']['bfs_library_provenance']
+    if ugrep:
+        from ugrep_libraries import qualify as qualify_ugrep
+        library=artifact/'ugrep-source-library-inputs'
+        assert sha(library/'MANIFEST.json')==expected['ugrep_source_manifest_sha256']
+        assert qualify_ugrep(arch,library,receipt['profile']['image'])==receipt['ugrep_source_provenance']==receipt['source_patch']['ugrep_library_provenance']
+        assert receipt['ugrep_exception_metadata_preserved'] and receipt['source_patch']['ugrep_exception_metadata_preserved']
+        assert receipt['duplicate_strong_symbol_checks']==dict(status='zero_duplicate_strong_symbols',count=0)
+        assert receipt['ugrep_source_provenance']['private_symbol_mapping_sha256']==expected['ugrep_private_symbol_mapping_sha256']
+        assert receipt['ugrep_source_provenance']['private_symbol_count']==expected['ugrep_private_symbol_count']
     assert receipt['native_source_provenance']['manifest_sha256']==expected['native_source_manifest_sha256']
     assert sha(artifact/'native-component-input-manifest.json')==expected['native_source_manifest_sha256']
     assert sha(artifact/'Cargo.lock')==receipt['resolved_cargo_lock_sha256']==expected['resolved_cargo_lock_sha256']

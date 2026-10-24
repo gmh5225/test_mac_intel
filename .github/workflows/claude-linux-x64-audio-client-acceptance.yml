@@ -1,0 +1,123 @@
+name: Native x64 audio-integrated client acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - linux-audio-client-acceptance/**
+      - .github/workflows/claude-linux-x64-audio-client-acceptance.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  native:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Retain exact public GNU source engine
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-source-bun-runtime-1
+          path: retained-gnu-engine
+          run-id: 39255954611
+          github-token: ${{ github.token }}
+      - name: Retain exact public musl source engine
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-musl-native-source-runtime-1
+          path: retained-musl-engine
+          run-id: 39114748399
+          github-token: ${{ github.token }}
+      - name: Retain admitted public musl SDK
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-x64-musl-sdk-1
+          path: retained-sdk
+          run-id: 39030122940
+          github-token: ${{ github.token }}
+      - name: Stage private repository secret batch 1
+        env:
+          NDC_AUDIO_X64_V10_000: ${{ secrets.NDC_AUDIO_X64_V10_000 }}
+          NDC_AUDIO_X64_V10_001: ${{ secrets.NDC_AUDIO_X64_V10_001 }}
+          NDC_AUDIO_X64_V10_002: ${{ secrets.NDC_AUDIO_X64_V10_002 }}
+          NDC_AUDIO_X64_V10_003: ${{ secrets.NDC_AUDIO_X64_V10_003 }}
+          NDC_AUDIO_X64_V10_004: ${{ secrets.NDC_AUDIO_X64_V10_004 }}
+          NDC_AUDIO_X64_V10_005: ${{ secrets.NDC_AUDIO_X64_V10_005 }}
+          NDC_AUDIO_X64_V10_006: ${{ secrets.NDC_AUDIO_X64_V10_006 }}
+          NDC_AUDIO_X64_V10_007: ${{ secrets.NDC_AUDIO_X64_V10_007 }}
+          NDC_AUDIO_X64_V10_008: ${{ secrets.NDC_AUDIO_X64_V10_008 }}
+          NDC_AUDIO_X64_V10_009: ${{ secrets.NDC_AUDIO_X64_V10_009 }}
+          NDC_AUDIO_X64_V10_010: ${{ secrets.NDC_AUDIO_X64_V10_010 }}
+          NDC_AUDIO_X64_V10_011: ${{ secrets.NDC_AUDIO_X64_V10_011 }}
+          NDC_AUDIO_X64_V10_012: ${{ secrets.NDC_AUDIO_X64_V10_012 }}
+        run: python3 -B linux-audio-client-acceptance/receive_private_input.py --first 0
+      - name: Stage private repository secret batch 2
+        env:
+          NDC_AUDIO_X64_V10_013: ${{ secrets.NDC_AUDIO_X64_V10_013 }}
+          NDC_AUDIO_X64_V10_014: ${{ secrets.NDC_AUDIO_X64_V10_014 }}
+          NDC_AUDIO_X64_V10_015: ${{ secrets.NDC_AUDIO_X64_V10_015 }}
+          NDC_AUDIO_X64_V10_016: ${{ secrets.NDC_AUDIO_X64_V10_016 }}
+          NDC_AUDIO_X64_V10_017: ${{ secrets.NDC_AUDIO_X64_V10_017 }}
+          NDC_AUDIO_X64_V10_018: ${{ secrets.NDC_AUDIO_X64_V10_018 }}
+          NDC_AUDIO_X64_V10_019: ${{ secrets.NDC_AUDIO_X64_V10_019 }}
+          NDC_AUDIO_X64_V10_020: ${{ secrets.NDC_AUDIO_X64_V10_020 }}
+          NDC_AUDIO_X64_V10_021: ${{ secrets.NDC_AUDIO_X64_V10_021 }}
+          NDC_AUDIO_X64_V10_022: ${{ secrets.NDC_AUDIO_X64_V10_022 }}
+          NDC_AUDIO_X64_V10_023: ${{ secrets.NDC_AUDIO_X64_V10_023 }}
+          NDC_AUDIO_X64_V10_024: ${{ secrets.NDC_AUDIO_X64_V10_024 }}
+          NDC_AUDIO_X64_V10_025: ${{ secrets.NDC_AUDIO_X64_V10_025 }}
+        run: python3 -B linux-audio-client-acceptance/receive_private_input.py --first 13
+      - name: Stage private repository secret batch 3
+        env:
+          NDC_AUDIO_X64_V10_026: ${{ secrets.NDC_AUDIO_X64_V10_026 }}
+          NDC_AUDIO_X64_V10_027: ${{ secrets.NDC_AUDIO_X64_V10_027 }}
+          NDC_AUDIO_X64_V10_028: ${{ secrets.NDC_AUDIO_X64_V10_028 }}
+          NDC_AUDIO_X64_V10_029: ${{ secrets.NDC_AUDIO_X64_V10_029 }}
+          NDC_AUDIO_X64_V10_030: ${{ secrets.NDC_AUDIO_X64_V10_030 }}
+          NDC_AUDIO_X64_V10_031: ${{ secrets.NDC_AUDIO_X64_V10_031 }}
+          NDC_AUDIO_X64_V10_032: ${{ secrets.NDC_AUDIO_X64_V10_032 }}
+          NDC_AUDIO_X64_V10_033: ${{ secrets.NDC_AUDIO_X64_V10_033 }}
+          NDC_AUDIO_X64_V10_034: ${{ secrets.NDC_AUDIO_X64_V10_034 }}
+          NDC_AUDIO_X64_V10_035: ${{ secrets.NDC_AUDIO_X64_V10_035 }}
+          NDC_AUDIO_X64_V10_036: ${{ secrets.NDC_AUDIO_X64_V10_036 }}
+          NDC_AUDIO_X64_V10_037: ${{ secrets.NDC_AUDIO_X64_V10_037 }}
+          NDC_AUDIO_X64_V10_038: ${{ secrets.NDC_AUDIO_X64_V10_038 }}
+        run: python3 -B linux-audio-client-acceptance/receive_private_input.py --first 26
+      - name: Stage private repository secret batch 4
+        env:
+          NDC_AUDIO_X64_V10_039: ${{ secrets.NDC_AUDIO_X64_V10_039 }}
+          NDC_AUDIO_X64_V10_040: ${{ secrets.NDC_AUDIO_X64_V10_040 }}
+          NDC_AUDIO_X64_V10_041: ${{ secrets.NDC_AUDIO_X64_V10_041 }}
+          NDC_AUDIO_X64_V10_042: ${{ secrets.NDC_AUDIO_X64_V10_042 }}
+          NDC_AUDIO_X64_V10_043: ${{ secrets.NDC_AUDIO_X64_V10_043 }}
+          NDC_AUDIO_X64_V10_044: ${{ secrets.NDC_AUDIO_X64_V10_044 }}
+          NDC_AUDIO_X64_V10_045: ${{ secrets.NDC_AUDIO_X64_V10_045 }}
+          NDC_AUDIO_X64_V10_046: ${{ secrets.NDC_AUDIO_X64_V10_046 }}
+          NDC_AUDIO_X64_V10_047: ${{ secrets.NDC_AUDIO_X64_V10_047 }}
+          NDC_AUDIO_X64_V10_048: ${{ secrets.NDC_AUDIO_X64_V10_048 }}
+          NDC_AUDIO_X64_V10_049: ${{ secrets.NDC_AUDIO_X64_V10_049 }}
+          NDC_AUDIO_X64_V10_050: ${{ secrets.NDC_AUDIO_X64_V10_050 }}
+          NDC_AUDIO_X64_V10_051: ${{ secrets.NDC_AUDIO_X64_V10_051 }}
+        run: python3 -B linux-audio-client-acceptance/receive_private_input.py --first 39
+      - name: Rebuild exact clients and run unchanged full acceptance
+        run: >-
+          python3 -B linux-audio-client-acceptance/run.py
+          --gnu-engine retained-gnu-engine --musl-engine retained-musl-engine --sdk retained-sdk
+          --input "${{ runner.temp }}/private-audio-x64-input"
+          --private "${{ runner.temp }}/private-native-audio-x64-v10"
+          --output native-audio-x64-encrypted-records
+      - name: Export only encrypted bounded records and aggregate status
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-linux-x64-audio-clients-encrypted-records-${{ github.run_attempt }}
+          path: native-audio-x64-encrypted-records/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

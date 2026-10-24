@@ -1,0 +1,75 @@
+name: Native macOS Swift capture excluding acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - macos-swift-capture-excluding-acceptance/**
+      - .github/workflows/claude-macos-swift-capture-excluding-acceptance.yml
+permissions:
+  contents: read
+jobs:
+  accept:
+    name: Native macOS ${{ matrix.arch }} Swift capture excluding
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x86_64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '20.19.2'
+      - name: Pin instruction fixture toolchains
+        run: python3 -m pip install capstone==5.0.6 unicorn==2.1.4
+      - name: Stage private input batch 1
+        env:
+          NDC_SWIFT_V63R1_000: ${{ secrets.NDC_SWIFT_V63R1_000 }}
+          NDC_SWIFT_V63R1_001: ${{ secrets.NDC_SWIFT_V63R1_001 }}
+          NDC_SWIFT_V63R1_002: ${{ secrets.NDC_SWIFT_V63R1_002 }}
+          NDC_SWIFT_V63R1_003: ${{ secrets.NDC_SWIFT_V63R1_003 }}
+          NDC_SWIFT_V63R1_004: ${{ secrets.NDC_SWIFT_V63R1_004 }}
+          NDC_SWIFT_V63R1_005: ${{ secrets.NDC_SWIFT_V63R1_005 }}
+          NDC_SWIFT_V63R1_006: ${{ secrets.NDC_SWIFT_V63R1_006 }}
+          NDC_SWIFT_V63R1_007: ${{ secrets.NDC_SWIFT_V63R1_007 }}
+        run: python3 -B macos-swift-capture-excluding-acceptance/run.py receive 0 8
+      - name: Stage private input batch 2
+        env:
+          NDC_SWIFT_V63R1_008: ${{ secrets.NDC_SWIFT_V63R1_008 }}
+          NDC_SWIFT_V63R1_009: ${{ secrets.NDC_SWIFT_V63R1_009 }}
+          NDC_SWIFT_V63R1_010: ${{ secrets.NDC_SWIFT_V63R1_010 }}
+          NDC_SWIFT_V63R1_011: ${{ secrets.NDC_SWIFT_V63R1_011 }}
+          NDC_SWIFT_V63R1_012: ${{ secrets.NDC_SWIFT_V63R1_012 }}
+          NDC_SWIFT_V63R1_013: ${{ secrets.NDC_SWIFT_V63R1_013 }}
+          NDC_SWIFT_V63R1_014: ${{ secrets.NDC_SWIFT_V63R1_014 }}
+          NDC_SWIFT_V63R1_015: ${{ secrets.NDC_SWIFT_V63R1_015 }}
+        run: python3 -B macos-swift-capture-excluding-acceptance/run.py receive 8 8
+      - name: Stage private input batch 3
+        env:
+          NDC_SWIFT_V63R1_016: ${{ secrets.NDC_SWIFT_V63R1_016 }}
+          NDC_SWIFT_V63R1_017: ${{ secrets.NDC_SWIFT_V63R1_017 }}
+          NDC_SWIFT_V63R1_018: ${{ secrets.NDC_SWIFT_V63R1_018 }}
+          NDC_SWIFT_V63R1_019: ${{ secrets.NDC_SWIFT_V63R1_019 }}
+        run: python3 -B macos-swift-capture-excluding-acceptance/run.py receive 16 4
+      - name: Rebuild source twice and compare complete callbacks, Node lifetime and source package
+        run: python3 -B macos-swift-capture-excluding-acceptance/run.py ${{ matrix.arch }}
+      - name: Export encrypted evidence and bounded aggregate only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-macos-${{ matrix.arch }}-swift-capture-excluding-encrypted-${{ github.run_attempt }}
+          path: swift-capture-excluding-encrypted-records/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
