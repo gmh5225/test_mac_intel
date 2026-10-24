@@ -35,32 +35,32 @@ jobs:
         run: python3 -m pip install capstone==5.0.6 unicorn==2.1.4
       - name: Stage private input batch 1
         env:
-          NDC_SWIFT_V60R2_000: ${{ secrets.NDC_SWIFT_V60R2_000 }}
-          NDC_SWIFT_V60R2_001: ${{ secrets.NDC_SWIFT_V60R2_001 }}
-          NDC_SWIFT_V60R2_002: ${{ secrets.NDC_SWIFT_V60R2_002 }}
-          NDC_SWIFT_V60R2_003: ${{ secrets.NDC_SWIFT_V60R2_003 }}
-          NDC_SWIFT_V60R2_004: ${{ secrets.NDC_SWIFT_V60R2_004 }}
-          NDC_SWIFT_V60R2_005: ${{ secrets.NDC_SWIFT_V60R2_005 }}
-          NDC_SWIFT_V60R2_006: ${{ secrets.NDC_SWIFT_V60R2_006 }}
-          NDC_SWIFT_V60R2_007: ${{ secrets.NDC_SWIFT_V60R2_007 }}
+          NDC_SWIFT_V60R3_000: ${{ secrets.NDC_SWIFT_V60R3_000 }}
+          NDC_SWIFT_V60R3_001: ${{ secrets.NDC_SWIFT_V60R3_001 }}
+          NDC_SWIFT_V60R3_002: ${{ secrets.NDC_SWIFT_V60R3_002 }}
+          NDC_SWIFT_V60R3_003: ${{ secrets.NDC_SWIFT_V60R3_003 }}
+          NDC_SWIFT_V60R3_004: ${{ secrets.NDC_SWIFT_V60R3_004 }}
+          NDC_SWIFT_V60R3_005: ${{ secrets.NDC_SWIFT_V60R3_005 }}
+          NDC_SWIFT_V60R3_006: ${{ secrets.NDC_SWIFT_V60R3_006 }}
+          NDC_SWIFT_V60R3_007: ${{ secrets.NDC_SWIFT_V60R3_007 }}
         run: python3 -B macos-swift-prepare-display-acceptance/run.py receive 0 8
       - name: Stage private input batch 2
         env:
-          NDC_SWIFT_V60R2_008: ${{ secrets.NDC_SWIFT_V60R2_008 }}
-          NDC_SWIFT_V60R2_009: ${{ secrets.NDC_SWIFT_V60R2_009 }}
-          NDC_SWIFT_V60R2_010: ${{ secrets.NDC_SWIFT_V60R2_010 }}
-          NDC_SWIFT_V60R2_011: ${{ secrets.NDC_SWIFT_V60R2_011 }}
-          NDC_SWIFT_V60R2_012: ${{ secrets.NDC_SWIFT_V60R2_012 }}
-          NDC_SWIFT_V60R2_013: ${{ secrets.NDC_SWIFT_V60R2_013 }}
-          NDC_SWIFT_V60R2_014: ${{ secrets.NDC_SWIFT_V60R2_014 }}
-          NDC_SWIFT_V60R2_015: ${{ secrets.NDC_SWIFT_V60R2_015 }}
+          NDC_SWIFT_V60R3_008: ${{ secrets.NDC_SWIFT_V60R3_008 }}
+          NDC_SWIFT_V60R3_009: ${{ secrets.NDC_SWIFT_V60R3_009 }}
+          NDC_SWIFT_V60R3_010: ${{ secrets.NDC_SWIFT_V60R3_010 }}
+          NDC_SWIFT_V60R3_011: ${{ secrets.NDC_SWIFT_V60R3_011 }}
+          NDC_SWIFT_V60R3_012: ${{ secrets.NDC_SWIFT_V60R3_012 }}
+          NDC_SWIFT_V60R3_013: ${{ secrets.NDC_SWIFT_V60R3_013 }}
+          NDC_SWIFT_V60R3_014: ${{ secrets.NDC_SWIFT_V60R3_014 }}
+          NDC_SWIFT_V60R3_015: ${{ secrets.NDC_SWIFT_V60R3_015 }}
         run: python3 -B macos-swift-prepare-display-acceptance/run.py receive 8 8
       - name: Stage private input batch 3
         env:
-          NDC_SWIFT_V60R2_016: ${{ secrets.NDC_SWIFT_V60R2_016 }}
-          NDC_SWIFT_V60R2_017: ${{ secrets.NDC_SWIFT_V60R2_017 }}
-          NDC_SWIFT_V60R2_018: ${{ secrets.NDC_SWIFT_V60R2_018 }}
-          NDC_SWIFT_V60R2_019: ${{ secrets.NDC_SWIFT_V60R2_019 }}
+          NDC_SWIFT_V60R3_016: ${{ secrets.NDC_SWIFT_V60R3_016 }}
+          NDC_SWIFT_V60R3_017: ${{ secrets.NDC_SWIFT_V60R3_017 }}
+          NDC_SWIFT_V60R3_018: ${{ secrets.NDC_SWIFT_V60R3_018 }}
+          NDC_SWIFT_V60R3_019: ${{ secrets.NDC_SWIFT_V60R3_019 }}
         run: python3 -B macos-swift-prepare-display-acceptance/run.py receive 16 4
       - name: Rebuild source twice and compare complete callbacks, Node lifetime and source package
         run: python3 -B macos-swift-prepare-display-acceptance/run.py ${{ matrix.arch }}
