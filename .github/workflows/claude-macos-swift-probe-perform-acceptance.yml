@@ -1,6 +1,11 @@
 name: Native macOS Swift probe perform leaf acceptance
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - macos-swift-probe-perform-acceptance/**
+      - .github/workflows/claude-macos-swift-probe-perform-acceptance.yml
 permissions:
   contents: read
 jobs:
