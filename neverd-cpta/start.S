@@ -68,6 +68,18 @@ GuestException:
   msr ELR_EL1, x11
   eret
 UnexpectedException:
+  mrs x0, ESR_EL1
+  mrs x1, ELR_EL1
+  mrs x2, FAR_EL1
+  mov x3, sp
+  mrs x14, SCTLR_EL1
+  mov x15, #CPA_MEMORY_SCTLR_SET
+  bic x14, x14, x15
+  msr SCTLR_EL1, x14
+  isb
+  ldr x13, =GuestStackEnd
+  mov sp, x13
+  bl reportUnexpected
   mov x0, #CPA_SEMIHOST_WRITE0
   adr x1, UnexpectedText
   hlt #CPA_SEMIHOST_IMMEDIATE

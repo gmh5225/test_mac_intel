@@ -1,0 +1,81 @@
+{
+  "scope": "Actual NeverD explicit-IR immediate-memory output: 177 independent samples per route and control, HighC and LLVMC at O0/O2 and LLVM ELF, all four CPTA/CPTA0 combinations, identity-mapped Normal WB data, PAN=UAO=0. Model-only nonoverflow qualification. No automatic lifting, image relocation, original SP, writeback/pairs, native half/vector ABI, Apple silicon, EL0 instruction execution, other translation/tagging, overflowing memory or every CPACHECK choice.",
+  "output_directory": "cpta-memory",
+  "tools_directory": "tools",
+  "evidence_directory": "evidence",
+  "input_directory": "input",
+  "summary_file": "summary.json",
+  "provenance_file": "provenance.json",
+  "test_report_file": "input-tests.json",
+  "harness_file": "harness.c",
+  "harness_object": "harness.o",
+  "projection_object": "projection.o",
+  "main_token": "int main(void)",
+  "main_replacement": "int neverdMemoryMain(void)",
+  "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(immediate_cases) / sizeof(immediate_cases[0]); }\n",
+  "generated_flags": [
+    "-Wno-unused-parameter"
+  ],
+  "guest_flags": [
+    "-DCPA_GENERATED_MEMORY=1"
+  ],
+  "compiler": "clang-18",
+  "linker": "ld.lld-18",
+  "revision_hex_length": 40,
+  "revision_hex_digits": "0123456789abcdef",
+  "expected_passed_cases": 79,
+  "generated_gate_values": {
+    "neverd-memory-samples": 177,
+    "neverd-memory-off": 0,
+    "neverd-memory-on": 0,
+    "neverd-memory-cpta0-only": 0,
+    "neverd-memory-both": 0
+  },
+  "routes": [
+    {
+      "name": "high-O0",
+      "file": "high.c",
+      "compile_c": true,
+      "optimization": "-O0"
+    },
+    {
+      "name": "high-O2",
+      "file": "high.c",
+      "compile_c": true,
+      "optimization": "-O2"
+    },
+    {
+      "name": "llvm-c-O0",
+      "file": "llvm.c",
+      "compile_c": true,
+      "optimization": "-O0"
+    },
+    {
+      "name": "llvm-c-O2",
+      "file": "llvm.c",
+      "compile_c": true,
+      "optimization": "-O2"
+    },
+    {
+      "name": "llvm-object",
+      "file": "llvm.o",
+      "compile_c": false
+    }
+  ],
+  "test_report_cases": [
+    "AArch64ImmediateMemory.ImmediateFieldsAndUnprivilegedVariantsStayEncoded",
+    "AArch64ImmediateMemory.ByteSpansIncludeNegativeOffsetsAndTheMaximumQAccess",
+    "AArch64ImmediateMemory.EveryImmediateValueAgreesWithIndependentOperandDetail",
+    "AArch64ImmediateMemory.BothCProjectionsAndLLVMExecuteEveryImmediateFamily",
+    "AArch64ImmediateMemory.TracingUsesTheEncodedOffsetAndExactDataSlice",
+    "AArch64ImmediateMemory.StackAndImageRequirementsCannotBeHiddenByFiltering",
+    "AArch64ImmediateMemory.AssemblyCannotConsumeAPhantomRegisterIndex"
+  ],
+  "artifact_property": "cpta_memory_artifacts",
+  "errors": {
+    "revision": "A full lowercase NeverD source commit is required",
+    "input_tests": "All seven named immediate-memory tests and one artifact export must complete successfully",
+    "harness": "The exported harness must contain exactly one complete main entry",
+    "matrix": "The generated-memory matrix did not complete every route"
+  }
+}

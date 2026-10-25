@@ -3,15 +3,17 @@
 import json
 import unittest
 
+import generated_memory
 import run
 
 
 class EvidenceTests(unittest.TestCase):
-    def transcript(self, changes=None, omit=None):
-        values = dict(run.CONFIG["gate_values"])
-        values[run.CONFIG["pfr_record"]] = 0x11
-        values[run.CONFIG["isar_record"]] = run.CONFIG["cpa2_level"]
-        values[run.CONFIG["passed_record"]] = run.CONFIG["expected_passed_cases"]
+    def transcript(self, changes=None, omit=None, config=None):
+        config = run.CONFIG if config is None else config
+        values = dict(config["gate_values"])
+        values[config["pfr_record"]] = 0x11
+        values[config["isar_record"]] = config["cpa2_level"]
+        values[config["passed_record"]] = config["expected_passed_cases"]
         values.update(changes or {})
         return "\n".join(
             json.dumps({"name": name, "value": f"0x{value:016x}"}, separators=(",", ":"))
@@ -42,11 +44,12 @@ class EvidenceTests(unittest.TestCase):
                 self.assertFalse(run.assess(self.transcript({run.CONFIG["pfr_record"]: value}), 0)["passed"])
 
     def test_ineffective_cpta_or_failed_guest_fails(self):
-        for name, value in (("sctlr2-el1-on", 0), ("sctlr2-el1-off", 512),
-                            ("failed-cases", 1), ("guest-complete", 0),
-                            ("passed-cases", run.CONFIG["expected_passed_cases"] - 1)):
+        for name, expected in run.CONFIG["gate_values"].items():
             with self.subTest(name=name):
-                self.assertFalse(run.assess(self.transcript({name: value}), 0)["passed"])
+                self.assertFalse(run.assess(self.transcript({name: expected ^ 1}), 0)["passed"])
+        self.assertFalse(run.assess(self.transcript({
+            run.CONFIG["passed_record"]: run.CONFIG["expected_passed_cases"] - 1
+        }), 0)["passed"])
         self.assertFalse(run.assess(self.transcript(), 1)["passed"])
 
     def test_empty_truncated_duplicate_and_unexpected_exception_fail(self):
@@ -56,6 +59,47 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             run.assess(self.transcript() + "\n" + self.transcript(), 0)
         self.assertFalse(run.assess(self.transcript() + "\n" + run.CONFIG["unexpected_marker"], 0)["passed"])
+
+    def test_generated_output_retains_its_narrow_qualification(self):
+        config = generated_memory.configuration()
+        result = generated_memory.assess(self.transcript(config=config), 0)
+        self.assertTrue(result["passed"])
+        self.assertTrue(result["explicit_immediate_memory_output_qualified"])
+        self.assertFalse(result["neverd_output_qualified"])
+        self.assertFalse(result["native_apple_cpta_qualified"])
+
+    def test_every_missing_or_wrong_generated_observation_fails(self):
+        config = generated_memory.configuration()
+        for name, expected in generated_memory.CONFIG["generated_gate_values"].items():
+            with self.subTest(name=name):
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(omit=name, config=config), 0)["passed"])
+                self.assertFalse(generated_memory.assess(
+                    self.transcript({name: expected ^ 1}, config=config), 0)["passed"])
+
+    def test_input_report_requires_every_named_test_and_one_export(self):
+        cases = []
+        suite = None
+        for identity in generated_memory.CONFIG["test_report_cases"]:
+            suite, name = identity.rsplit(".", 1)
+            cases.append({"name": name, "status": "RUN", "result": "COMPLETED"})
+        cases[0][generated_memory.CONFIG["artifact_property"]] = self.id()
+        report = {"tests": len(cases), "failures": 0, "errors": 0,
+                  "testsuites": [{"name": suite, "testsuite": cases}]}
+        self.assertEqual(generated_memory.validate_test_report(report), self.id())
+        invalid = json.loads(json.dumps(report))
+        invalid["testsuites"][0]["testsuite"].pop()
+        with self.assertRaises(ValueError):
+            generated_memory.validate_test_report(invalid)
+        for key, value in (("status", "NOTRUN"), ("result", "SKIPPED"),
+                           ("name", cases[0]["name"])):
+            invalid = json.loads(json.dumps(report))
+            invalid["testsuites"][0]["testsuite"][-1][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                generated_memory.validate_test_report(invalid)
+        del cases[0][generated_memory.CONFIG["artifact_property"]]
+        with self.assertRaises(ValueError):
+            generated_memory.validate_test_report(report)
 
 
 if __name__ == "__main__":

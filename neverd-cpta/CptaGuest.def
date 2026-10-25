@@ -18,6 +18,7 @@
 #define CPA_EL3_SHIFT 12
 #define CPA_FEATURE_LEVEL 2
 #define CPA_CPTA (1UL << 9)
+#define CPA_CPTA0 (1UL << 10)
 #define CPA_SA (1UL << 3)
 #define CPA_FP_ENABLE (3UL << 20)
 #define CPA_SP_ALIGNMENT 16
@@ -30,6 +31,10 @@
 #define CPA_SEMIHOST_TRAP "hlt #0xf000"
 #define CPA_OPERATION_REGISTER "x0"
 #define CPA_PARAMETER_REGISTER "x1"
+#define CPA_REGISTER_INPUT "r"
+#define CPA_REGISTER_OUTPUT "=r"
+#define CPA_REGISTER_INOUT "+r"
+#define CPA_MEMORY_CLOBBER "memory"
 #define CPA_WAIT "wfi"
 #define CPA_SEMIHOST_IMMEDIATE 0xf000
 #define CPA_INSTRUCTION_BYTES 4
@@ -63,6 +68,53 @@
 #define CPA_OFFSET_REGISTER "x2"
 #define CPA_LOAD_GPR "ldr %0, [%1, %2]"
 #define CPA_MEMORY_PATTERN 0xa5
+
+// Four-KiB stage-1 pages cover the guest's first two MiB. EL0-writable
+// pages cannot execute at EL1, so code and data use separate descriptors.
+#define CPA_PAGE_BYTES 4096
+#define CPA_TABLE_ENTRIES 512
+#define CPA_ROOT_INDEX 2
+#define CPA_L2_INDEX 0
+#define CPA_TABLE_DESCRIPTOR 3
+#define CPA_CODE_PAGE 0x40000000000703ULL
+#define CPA_DATA_PAGE 0x60000000000743ULL
+#define CPA_GUEST_MAP_BYTES 0x200000
+#define CPA_NORMAL_MAIR 0xff
+#define CPA_NORMAL_TCR 0x80a03520
+#define CPA_MEMORY_SCTLR_SET 0x1005
+#define CPA_MEMORY_SCTLR_CLEAR 0x80002ULL
+#define CPA_MEMORY_SCTLR_MASK (CPA_MEMORY_SCTLR_SET | CPA_MEMORY_SCTLR_CLEAR)
+#define CPA_MAP_LIMIT_MESSAGE "CPA guest exceeds mapped Normal memory"
+#define CPA_READ_MAIR "mrs %0, MAIR_EL1"
+#define CPA_READ_TCR "mrs %0, TCR_EL1"
+#define CPA_READ_TTBR "mrs %0, TTBR0_EL1"
+#define CPA_READ_PAN "mrs %0, S3_0_C4_C2_3"
+#define CPA_READ_UAO "mrs %0, S3_0_C4_C2_4"
+#define CPA_CONFIGURE_TRANSLATION                                              \
+  "dsb sy\n\tmsr MAIR_EL1, %0\n\tmsr TCR_EL1, %1\n\t"                          \
+  "msr TTBR0_EL1, %2\n\tisb\n\ttlbi vmalle1\n\tdsb sy\n\tisb"
+#define CPA_NORMAL_MAIR_NAME "normal-mair"
+#define CPA_NORMAL_TCR_NAME "normal-tcr"
+#define CPA_NORMAL_TTBR_NAME "normal-ttbr-matches"
+#define CPA_NORMAL_SCTLR_NAME "normal-sctlr-masked"
+#define CPA_NORMAL_PAN_NAME "normal-pan"
+#define CPA_NORMAL_UAO_NAME "normal-uao"
+#define CPA_UNEXPECTED_ESR_NAME "unexpected-esr"
+#define CPA_UNEXPECTED_ELR_NAME "unexpected-elr"
+#define CPA_UNEXPECTED_FAR_NAME "unexpected-far"
+#define CPA_UNEXPECTED_SP_NAME "unexpected-sp"
+#define CPA_GENERATED_ENTRY neverdMemoryMain
+#define CPA_GENERATED_SAMPLES neverdMemorySampleCount
+#define CPA_GENERATED_SAMPLES_NAME "neverd-memory-samples"
+#define CPA_GENERATED_SAMPLE_COUNT 177
+
+#ifdef CPA_CONTROL_CASE
+CPA_CONTROL_CASE(0, "sctlr2-el1-off", "neverd-memory-off")
+CPA_CONTROL_CASE(CPA_CPTA, "sctlr2-el1-on", "neverd-memory-on")
+CPA_CONTROL_CASE(CPA_CPTA0, "sctlr2-el1-cpta0-only", "neverd-memory-cpta0-only")
+CPA_CONTROL_CASE(CPA_CPTA | CPA_CPTA0, "sctlr2-el1-both", "neverd-memory-both")
+#undef CPA_CONTROL_CASE
+#endif
 
 // Base, offset, unchecked result, checked result. These are concrete oracle
 // inputs, not an implementation of PointerCheckAtEL in the guest.

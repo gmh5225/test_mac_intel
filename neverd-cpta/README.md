@@ -15,19 +15,27 @@ or claim to validate that controller.
 
 The bare-metal guest requires EL1 as the highest implemented exception level,
 reads `ID_AA64ISAR3_EL1.CPA`, and requires the actual value 2. With no EL2/EL3
-there are no higher-level SCTLR2 enable gates. It writes and reads back
-`SCTLR2_EL1.CPTA` and requires concrete ADDPT overflow/underflow results to
-change as expected between off and on. No ID register or result is fabricated.
+there are no higher-level SCTLR2 enable gates. It writes and reads back all
+four `SCTLR2_EL1.CPTA/CPTA0` combinations (values 0, 512, 1024 and 1536).
+Concrete EL1 ADDPT overflow/underflow results must follow CPTA independently
+of CPTA0. No ID register or result is fabricated.
 It also executes GPR/SIMD register-offset memory controls and the same aligned
 or eight-byte-misaligned address through SP and X0 with `SCTLR_EL1.SA` off/on.
 
-All 36 checks, both modes, explicit guest completion and a successful process
+The MMU maps the first two MiB of guest DRAM with 4-KiB Normal WB pages.
+Code is privileged; data is writable at EL0/EL1 and non-executable. A common
+EL0-writable mapping cannot execute at EL1, and disabling the MMU would make
+unaligned Device-memory accesses fault. MAIR, TCR, TTBR and SCTLR readbacks,
+PAN=0 and UAO=0 are required. The linker rejects guests exceeding the mapping.
+
+All 74 checks, four modes, explicit guest completion and a successful process
 exit are required. Missing features, exceptions, timeouts, malformed or
 incomplete records fail the job. Artifacts preserve the exact commands,
 source/guest hashes, model version/parameter listing and raw transcript.
 
 This is **model validation of the environment**. It does not qualify Apple
-silicon, EL0/CPTA0, memory overflow/translation faults, CPACHECK choices or
+silicon, EL0 instruction execution, memory overflow/other translation faults,
+CPACHECK choices or
 NeverD's emitted code. Those require further fixtures in this environment.
 The JSON report explicitly retains these limits even when all controls pass.
 
@@ -40,8 +48,40 @@ python3 neverd-cpta/run.py --build-only --compiler clang --linker ld.lld
 Definitions, encodings, configuration values and pinned downloads belong in
 `CptaGuest.def` and `CptaEnvironment.def`.
 
+`generated_memory.py` consumes actual exports from NeverD's
+`AArch64ImmediateMemory` suite. Require all seven named tests to complete with
+an artifact export, then pass its four files, the test JSON and the exact
+NeverD commit. Inputs and hashes are preserved before compilation:
+
+```sh
+python3 neverd-cpta/generated_memory.py \
+  --artifacts /path/to/immediate-memory-export \
+  --test-report /path/to/immediate-tests.json \
+  --neverd-revision FULL_40_CHARACTER_COMMIT
+```
+
+Each of five routes (HighC and LLVMC at O0/O2, plus the actual LLVM ELF object)
+executes 177 samples under every control combination and requires 79 checks.
+The original generated functions/object stay unchanged; the independent
+harness entry is renamed and exposes its actual array size. Only unused
+formal-parameter warnings are suppressed for the fixed-ABI generated C.
+The model archive, capability/completion gates and 45-second process limit
+remain the same. The default workflow qualifies the environment; running
+this separate matrix qualifies only its declared explicit-IR inputs.
+
+This is no-image, nonoverflow, normal-memory model coverage. Automatic
+lifting, image rebasing/relocation, original SP, writeback/pairs, native
+half/whole-vector ABI, EL0 instruction execution and Apple hardware remain
+outside its scope. Even a passing matrix keeps the broad
+`neverd_output_qualified` and `native_apple_cpta_qualified` fields false; only
+`explicit_immediate_memory_output_qualified` is granted per passing route.
+`CptaGeneratedMemory.def` owns the matrix inventory, required test identities,
+source bridge, flags and expected observations.
+
 References:
 
 - [Arm Architecture FVP downloads](https://support.arm.com/tools-and-software/fixed-virtual-platforms/arm-architecture-fvps)
 - [Arm A-profile feature definitions, 2025-09](https://documentation-service.arm.com/static/68da532186b96e39e38c318c)
 - [Linux system register metadata](https://github.com/torvalds/linux/blob/master/arch/arm64/tools/sysreg)
+- [Arm memory management](https://developer.arm.com/documentation/101811/latest)
+- [Arm execution permissions](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Providing%20protection%20for%20complex%20software.pdf)
