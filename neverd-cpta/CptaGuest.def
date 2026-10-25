@@ -1,0 +1,79 @@
+//===- CptaGuest.def - CPA2 guest definitions --------------------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+// Architectural encodings and fields follow Arm A-profile 2025-09 and
+// Linux arch/arm64/tools/sysreg. No model feature register is overridden.
+//===----------------------------------------------------------------------===//
+
+#define CPA_GUEST_BASE 0x80000000
+#define CPA_GUEST_STACK_BYTES 0x10000
+#define CPA_GUEST_VECTOR_ALIGNMENT 11
+#define CPA_GUEST_VECTOR_SLOT_BYTES 128
+#define CPA_GUEST_VECTOR_COUNT 16
+#define CPA_EL1 4
+#define CPA_EL_FIELD_MASK 15
+#define CPA_EL2_SHIFT 8
+#define CPA_EL3_SHIFT 12
+#define CPA_FEATURE_LEVEL 2
+#define CPA_CPTA (1UL << 9)
+#define CPA_SA (1UL << 3)
+#define CPA_FP_ENABLE (3UL << 20)
+#define CPA_SP_ALIGNMENT 16
+#define CPA_SP_ALIGNMENT_EC 0x26
+#define CPA_ESR_EC_SHIFT 26
+#define CPA_MEMORY_BYTES 32
+#define CPA_SEMIHOST_WRITE0 4
+#define CPA_SEMIHOST_EXIT_EXTENDED 0x20
+#define CPA_SEMIHOST_APPLICATION_EXIT 0x20026
+#define CPA_SEMIHOST_TRAP "hlt #0xf000"
+#define CPA_OPERATION_REGISTER "x0"
+#define CPA_PARAMETER_REGISTER "x1"
+#define CPA_WAIT "wfi"
+#define CPA_SEMIHOST_IMMEDIATE 0xf000
+#define CPA_INSTRUCTION_BYTES 4
+#define CPA_MACHINE_WORD_BYTES 8
+#define CPA_UNEXPECTED_TEXT "CPA2_UNEXPECTED_EXCEPTION\n"
+#define CPA_ROW_PREFIX "{\"name\":\""
+#define CPA_ROW_VALUE "\",\"value\":\"0x"
+#define CPA_ROW_END "\"}\n"
+#define CPA_HEX_DIGITS "0123456789abcdef"
+#define CPA_EL_NAME "current-el"
+#define CPA_PFR_NAME "id-aa64pfr0-el1"
+#define CPA_ISAR_NAME "id-aa64isar3-el1"
+#define CPA_SCTLR_OFF_NAME "sctlr2-el1-off"
+#define CPA_SCTLR_ON_NAME "sctlr2-el1-on"
+#define CPA_TESTS_NAME "passed-cases"
+#define CPA_FAILURES_NAME "failed-cases"
+#define CPA_FAILURE_INDEX_NAME "failed-case-index"
+#define CPA_COMPLETE_NAME "guest-complete"
+#define CPA_READ_EL "mrs %0, CurrentEL"
+#define CPA_READ_PFR "mrs %0, ID_AA64PFR0_EL1"
+#define CPA_READ_ISAR3 "mrs %0, S3_0_C0_C6_3"
+#define CPA_READ_SCTLR2 "mrs %0, S3_0_C1_C0_3"
+#define CPA_WRITE_SCTLR2 "msr S3_0_C1_C0_3, %0\n\tisb"
+#define CPA_READ_SCTLR "mrs %0, SCTLR_EL1"
+#define CPA_WRITE_SCTLR "msr SCTLR_EL1, %0\n\tisb"
+#define CPA_WRITE_CPACR "msr CPACR_EL1, %0\n\tisb"
+// llvm-mc 22.1.6 independently encodes: addpt x0, x1, x2.
+#define CPA_ADDPT ".inst 0x9a022020"
+#define CPA_RESULT_REGISTER "x0"
+#define CPA_BASE_REGISTER "x1"
+#define CPA_OFFSET_REGISTER "x2"
+#define CPA_LOAD_GPR "ldr %0, [%1, %2]"
+#define CPA_MEMORY_PATTERN 0xa5
+
+// Base, offset, unchecked result, checked result. These are concrete oracle
+// inputs, not an implementation of PointerCheckAtEL in the guest.
+#ifdef CPA_ARITHMETIC_CASE
+CPA_ARITHMETIC_CASE(0x1200000000000100ULL, 8, 0x1200000000000108ULL,
+                    0x1200000000000108ULL)
+CPA_ARITHMETIC_CASE(0x00ffffffffffffffULL, 1, 0x0100000000000000ULL,
+                    0x0080000000000000ULL)
+CPA_ARITHMETIC_CASE(0x1200000000000000ULL, -1, 0x11ffffffffffffffULL,
+                    0x127fffffffffffffULL)
+CPA_ARITHMETIC_CASE(0x1240000000000000ULL, -0x0040000000000000LL,
+                    0x1200000000000000ULL, 0x1240000000000000ULL)
+#undef CPA_ARITHMETIC_CASE
+#endif

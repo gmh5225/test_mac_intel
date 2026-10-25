@@ -1,0 +1,35 @@
+name: NeverD controlled CPA2 EL1 environment
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/neverd-cpta-environment]
+    paths:
+      - neverd-cpta/**
+      - .github/workflows/neverd-cpta-environment.yml
+permissions:
+  contents: read
+jobs:
+  cpa2:
+    name: Arm official FVP CPA2 and effective CPTA controls
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install the guest compiler and linker
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends clang-18 lld-18
+      - name: Verify evidence gates reject missing and contradictory capabilities
+        run: python3 -m unittest discover -s neverd-cpta -p 'test_*.py' -v
+      - name: Build and execute the pinned official model with CPA2 enabled
+        run: python3 neverd-cpta/run.py
+      - name: Preserve provenance and complete or incomplete guest evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neverd-cpta-fvp-${{ github.run_attempt }}
+          path: cpta-evidence/
+          if-no-files-found: error
+          retention-days: 14
