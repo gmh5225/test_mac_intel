@@ -87,7 +87,7 @@ def main(arch):
   if p.returncode!=0:diagnose_failed_worker(folder,arch,env)
   if p.returncode==0:
    result=json.loads((folder/'results/acceptance.json').read_bytes())
-   assert result['status']=='all_native_window_normal_Task_records_collected_independent_comparison_pending' and result['arch']==arch
+   assert result['status']=='all_native_window_normal_Task_lifecycle_records_collected_independent_comparison_pending' and result['arch']==arch
    fields=('recording','arch','machine','source_rebuild_pairs','native_package_rebuild_pairs','accepted_callback_bodies','callbacks_recovered','original_host_loads','full_client_integrated','active_task_termination_covered','full_capture_window_callback_qualified','independent_acceptance_pending','full_worker_qualified','modified_composition_qualified','asynchronous_callbacks_exercised')
    report={k:result[k] for k in fields}
    status='passed'
