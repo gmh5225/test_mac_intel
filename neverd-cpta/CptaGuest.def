@@ -106,7 +106,11 @@
 #define CPA_GENERATED_ENTRY neverdMemoryMain
 #define CPA_GENERATED_SAMPLES neverdMemorySampleCount
 #define CPA_GENERATED_SAMPLES_NAME "neverd-memory-samples"
+#if defined(CPA_GENERATED_REGISTER_MEMORY)
+#define CPA_GENERATED_SAMPLE_COUNT 184
+#else
 #define CPA_GENERATED_SAMPLE_COUNT 177
+#endif
 
 #ifdef CPA_CONTROL_CASE
 CPA_CONTROL_CASE(0, "sctlr2-el1-off", "neverd-memory-off",

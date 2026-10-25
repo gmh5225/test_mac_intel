@@ -87,6 +87,16 @@ It grants only `explicit_raw_sp_memory_output_qualified`. All original
 functions and the LLVM ELF object remain unchanged. Native SP exception and
 GPR-control checks use NeverD's `scripts/verify_arm64e_sp_memory.py` with its
 actual C and Mach-O exports; they do not establish Apple CPA2 execution.
+Use `--profile stack-register` with the same complete seven-test SP report
+and its `cpta_stack_register_memory_artifacts` export to require all 184
+register-offset GPR/SIMD samples, including every extension and scale. It
+requires the same 83 checks and grants only
+`explicit_raw_sp_register_memory_output_qualified`. The matching GPR export
+`cpta_register_memory_artifacts` uses `--profile register`, requiring 79
+checks and granting only `explicit_register_memory_output_qualified`.
+NeverD's native verifier uses `--profile register` with those two exports
+and the SP report for both report arguments; all 184 SP faults and every
+matching GPR result must pass independently.
 Reconstructed frames, image-backed SP, stack ABI, tagging and asynchronous
 unwind remain outside this profile's scope. The default workflow still runs
 the environment profile; it does not claim the separate output matrix ran.

@@ -111,6 +111,63 @@
       ],
       "artifact_property": "cpta_stack_memory_artifacts",
       "qualification_key": "explicit_raw_sp_memory_output_qualified"
+    },
+    "stack-register": {
+      "scope": "Actual NeverD explicit raw-SP memory output: 184 independent register-offset samples (GPR and B/H/S/D/Q, all extensions and scales) per route and CPTA/CPTA0 setting, HighC and LLVMC at O0/O2 plus actual LLVM ELF, identity-mapped Normal WB data, PAN=UAO=0, actual SCTLR_EL1.SA=1 readback in all four modes. Model-only nonoverflow single-access qualification. No synthetic frame, automatic immediate lifting, image relocation, stack ABI, asynchronous unwind, MTE/other tagging, writeback/pairs, native half/vector ABI, EL0 execution, Apple CPA2 hardware, overflowing memory or every CPACHECK choice.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_REGISTER_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "generated_gate_values": {
+        "neverd-memory-samples": 184,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8
+      },
+      "test_report_cases": [
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryImmediateFamily",
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryRegisterFamily",
+        "AArch64StackAddressMemory.NominalFootprintsKeepTheExactEntrySPBasis",
+        "AArch64StackAddressMemory.UnknownOrExpiredInputsDoNotInventFrameAccesses",
+        "AArch64StackAddressMemory.JoinsAndIndependentRootsKeepTheirOwnSPBasis",
+        "AArch64StackAddressMemory.SourceBoundariesRequireAnExternalRawSPParameter",
+        "AArch64StackAddressMemory.StackAssemblyRequiresTheLiteralSPAndClobber"
+      ],
+      "artifact_property": "cpta_stack_register_memory_artifacts",
+      "qualification_key": "explicit_raw_sp_register_memory_output_qualified"
+    },
+    "register": {
+      "scope": "Actual NeverD explicit-IR register-offset memory output: 184 independent GPR and B/H/S/D/Q samples per route and control, every extension and scale, HighC and LLVMC at O0/O2 and actual LLVM ELF, all four CPTA/CPTA0 combinations, identity-mapped Normal WB data, PAN=UAO=0. Model-only nonoverflow qualification. No image relocation, original SP, writeback/pairs, native half/vector ABI, Apple silicon, EL0 instruction execution, other translation/tagging, overflowing memory or every CPACHECK choice.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_REGISTER_MEMORY=1"
+      ],
+      "expected_passed_cases": 79,
+      "generated_gate_values": {
+        "neverd-memory-samples": 184,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "test_report_cases": [
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryImmediateFamily",
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryRegisterFamily",
+        "AArch64StackAddressMemory.NominalFootprintsKeepTheExactEntrySPBasis",
+        "AArch64StackAddressMemory.UnknownOrExpiredInputsDoNotInventFrameAccesses",
+        "AArch64StackAddressMemory.JoinsAndIndependentRootsKeepTheirOwnSPBasis",
+        "AArch64StackAddressMemory.SourceBoundariesRequireAnExternalRawSPParameter",
+        "AArch64StackAddressMemory.StackAssemblyRequiresTheLiteralSPAndClobber"
+      ],
+      "artifact_property": "cpta_register_memory_artifacts",
+      "qualification_key": "explicit_register_memory_output_qualified"
     }
   }
 }

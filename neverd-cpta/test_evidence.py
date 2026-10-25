@@ -140,6 +140,62 @@ class EvidenceTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             generated_memory.validate_test_report(report, profile)
 
+    def test_register_stack_profile_keeps_its_own_inventory_and_alignment(self):
+        profile = generated_memory.select_profile("stack-register")
+        config = generated_memory.configuration(profile)
+        text = self.transcript(config=config)
+        result = generated_memory.assess(text, 0, profile)
+        self.assertTrue(result[profile["qualification_key"]])
+        self.assertFalse(result["neverd_output_qualified"])
+        self.assertFalse(result["native_apple_cpta_qualified"])
+        for other in ("immediate", "stack"):
+            self.assertFalse(generated_memory.assess(
+                text, 0, generated_memory.select_profile(other))["passed"])
+        for name, expected in profile["generated_gate_values"].items():
+            with self.subTest(name=name):
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(omit=name, config=config), 0, profile)["passed"])
+                self.assertFalse(generated_memory.assess(
+                    self.transcript({name: expected ^ 1}, config=config),
+                    0, profile)["passed"])
+        self.assertFalse(generated_memory.assess(text, 1, profile)["passed"])
+
+    def test_register_stack_profile_rejects_an_immediate_export(self):
+        profile = generated_memory.select_profile("stack-register")
+        immediate = generated_memory.select_profile("stack")
+        cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
+                  "result": "COMPLETED"}
+                 for identity in profile["test_report_cases"]]
+        suite = profile["test_report_cases"][0].rsplit(".", 1)[0]
+        cases[0][immediate["artifact_property"]] = self.id()
+        report = {"tests": len(cases), "failures": 0, "errors": 0,
+                  "testsuites": [{"name": suite, "testsuite": cases}]}
+        with self.assertRaises(ValueError):
+            generated_memory.validate_test_report(report, profile)
+        cases[0][profile["artifact_property"]] = self.id()
+        self.assertEqual(generated_memory.validate_test_report(report, profile),
+                         self.id())
+        cases[-1][profile["artifact_property"]] = self.id()
+        with self.assertRaises(ValueError):
+            generated_memory.validate_test_report(report, profile)
+
+    def test_register_profile_rejects_immediate_counts_and_stack_scope(self):
+        profile = generated_memory.select_profile("register")
+        config = generated_memory.configuration(profile)
+        text = self.transcript(config=config)
+        result = generated_memory.assess(text, 0, profile)
+        self.assertTrue(result[profile["qualification_key"]])
+        self.assertFalse(result["neverd_output_qualified"])
+        self.assertFalse(result["native_apple_cpta_qualified"])
+        for other in ("immediate", "stack", "stack-register"):
+            self.assertFalse(generated_memory.assess(
+                text, 0, generated_memory.select_profile(other))["passed"])
+        for name, expected in profile["generated_gate_values"].items():
+            with self.subTest(name=name):
+                self.assertFalse(generated_memory.assess(
+                    self.transcript({name: expected ^ 1}, config=config),
+                    0, profile)["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()
