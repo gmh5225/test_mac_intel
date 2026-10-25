@@ -78,6 +78,19 @@ outside its scope. Even a passing matrix keeps the broad
 `CptaGeneratedMemory.def` owns the matrix inventory, required test identities,
 source bridge, flags and expected observations.
 
+Use `--profile stack` with the separate seven-test
+`AArch64StackAddressMemory` report and its `cpta_stack_memory_artifacts`
+export to check actual explicit raw-SP output. This profile requires 177
+immediate samples, all four effective CPTA/CPTA0 values and a separate
+`SCTLR_EL1.SA=1` readback in every mode: 83 mandatory guest checks per route.
+It grants only `explicit_raw_sp_memory_output_qualified`. All original
+functions and the LLVM ELF object remain unchanged. Native SP exception and
+GPR-control checks use NeverD's `scripts/verify_arm64e_sp_memory.py` with its
+actual C and Mach-O exports; they do not establish Apple CPA2 execution.
+Reconstructed frames, image-backed SP, stack ABI, tagging and asynchronous
+unwind remain outside this profile's scope. The default workflow still runs
+the environment profile; it does not claim the separate output matrix ran.
+
 References:
 
 - [Arm Architecture FVP downloads](https://support.arm.com/tools-and-software/fixed-virtual-platforms/arm-architecture-fvps)

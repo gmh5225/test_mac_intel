@@ -15,23 +15,35 @@ import run
 CONFIG = json.loads((run.ROOT / "CptaGeneratedMemory.def").read_text())
 
 
-def configuration():
+def select_profile(name):
+    profile = copy.deepcopy(CONFIG)
+    if name != CONFIG["default_profile"]:
+        if name not in CONFIG["profiles"]:
+            raise ValueError(CONFIG["errors"]["profile"])
+        profile.update(CONFIG["profiles"][name])
+    return profile
+
+
+def configuration(profile=None):
+    profile = CONFIG if profile is None else profile
     config = copy.deepcopy(run.CONFIG)
-    config["scope"] = CONFIG["scope"]
-    config["expected_passed_cases"] = CONFIG["expected_passed_cases"]
-    config["required_records"] += list(CONFIG["generated_gate_values"])
-    config["gate_values"].update(CONFIG["generated_gate_values"])
+    config["scope"] = profile["scope"]
+    config["expected_passed_cases"] = profile["expected_passed_cases"]
+    config["required_records"] += list(profile["generated_gate_values"])
+    config["gate_values"].update(profile["generated_gate_values"])
     return config
 
 
-def assess(transcript, returncode):
-    report = run.assess(transcript, returncode, configuration())
-    report["explicit_immediate_memory_output_qualified"] = report["passed"]
+def assess(transcript, returncode, profile=None):
+    profile = CONFIG if profile is None else profile
+    report = run.assess(transcript, returncode, configuration(profile))
+    report[profile["qualification_key"]] = report["passed"]
     return report
 
 
-def validate_test_report(report):
-    expected = CONFIG["test_report_cases"]
+def validate_test_report(report, profile=None):
+    profile = CONFIG if profile is None else profile
+    expected = profile["test_report_cases"]
     actual = []
     exports = []
     valid = (report.get("tests") == len(expected)
@@ -42,8 +54,8 @@ def validate_test_report(report):
             valid = (valid and case.get("status") == "RUN"
                      and case.get("result") == "COMPLETED"
                      and not case.get("failures"))
-            if CONFIG["artifact_property"] in case:
-                exports.append(case[CONFIG["artifact_property"]])
+            if profile["artifact_property"] in case:
+                exports.append(case[profile["artifact_property"]])
     if (not valid or sorted(actual) != sorted(expected) or len(exports) != 1
             or not isinstance(exports[0], str) or not exports[0]):
         raise ValueError(CONFIG["errors"]["input_tests"])
@@ -62,12 +74,15 @@ def main():
     parser.add_argument("--compiler", default=CONFIG["compiler"])
     parser.add_argument("--linker", default=CONFIG["linker"])
     parser.add_argument("--output", type=Path, default=Path(CONFIG["output_directory"]))
+    parser.add_argument("--profile", default=CONFIG["default_profile"],
+                        choices=[CONFIG["default_profile"], *CONFIG["profiles"]])
     args = parser.parse_args()
+    profile = select_profile(args.profile)
     if (len(args.neverd_revision) != CONFIG["revision_hex_length"]
             or any(c not in CONFIG["revision_hex_digits"] for c in args.neverd_revision)):
         parser.error(CONFIG["errors"]["revision"])
     test_report = json.loads(args.test_report.read_text())
-    export_origin = validate_test_report(test_report)
+    export_origin = validate_test_report(test_report, profile)
     root = args.output.resolve()
     root.mkdir()
     tools = root / CONFIG["tools_directory"]
@@ -92,10 +107,12 @@ def main():
         "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
         "model_archive_sha256": run.CONFIG["model_sha256"],
         "model_parameters": run.CONFIG["model_parameters"],
-        "scope": CONFIG["scope"],
+        "scope": profile["scope"],
+        "profile": args.profile,
     }
     (evidence / CONFIG["provenance_file"]).write_text(json.dumps(provenance, indent=2) + "\n")
-    summary = {"passed": False, "neverd_revision": args.neverd_revision, "results": []}
+    summary = {"passed": False, "neverd_revision": args.neverd_revision,
+               "profile": args.profile, "results": []}
 
     def save():
         (evidence / CONFIG["summary_file"]).write_text(json.dumps(summary, indent=2) + "\n")
@@ -132,11 +149,11 @@ def main():
         else:
             shutil.copy2(inputs / route["file"], projection)
         guest = run.build(args.compiler, args.linker, work, observations,
-                          CONFIG["guest_flags"], [harness_object, projection])
+                          profile["guest_flags"], [harness_object, projection])
         start = time.monotonic()
         result = run.execute(run.model_command(model, guest), observations, "guest",
                              run.CONFIG["timeout_seconds"])
-        report = assess(result.stdout, result.returncode)
+        report = assess(result.stdout, result.returncode, profile)
         report.update(route=route["name"], model_returncode=result.returncode,
                       seconds=round(time.monotonic() - start, 3), guest_sha256=digest(guest))
         (observations / run.CONFIG["report"]).write_text(json.dumps(report, indent=2) + "\n")

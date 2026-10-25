@@ -74,8 +74,43 @@
   "artifact_property": "cpta_memory_artifacts",
   "errors": {
     "revision": "A full lowercase NeverD source commit is required",
-    "input_tests": "All seven named immediate-memory tests and one artifact export must complete successfully",
+    "input_tests": "Every named memory test and exactly one artifact export must complete successfully",
     "harness": "The exported harness must contain exactly one complete main entry",
-    "matrix": "The generated-memory matrix did not complete every route"
+    "matrix": "The generated-memory matrix did not complete every route",
+    "profile": "Unknown generated-memory qualification profile"
+  },
+  "default_profile": "immediate",
+  "qualification_key": "explicit_immediate_memory_output_qualified",
+  "profiles": {
+    "stack": {
+      "scope": "Actual NeverD explicit raw-SP memory output: 177 independent immediate samples per route and CPTA/CPTA0 setting, HighC and LLVMC at O0/O2 plus actual LLVM ELF, identity-mapped Normal WB data, PAN=UAO=0, actual SCTLR_EL1.SA=1 readback in all four modes. Model-only nonoverflow single-access qualification. No synthetic frame, automatic immediate lifting, image relocation, stack ABI, asynchronous unwind, MTE/other tagging, writeback/pairs, native half/vector ABI, EL0 execution, Apple CPA2 hardware, overflowing memory or every CPACHECK choice.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "generated_gate_values": {
+        "neverd-memory-samples": 177,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8
+      },
+      "test_report_cases": [
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryImmediateFamily",
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryRegisterFamily",
+        "AArch64StackAddressMemory.NominalFootprintsKeepTheExactEntrySPBasis",
+        "AArch64StackAddressMemory.UnknownOrExpiredInputsDoNotInventFrameAccesses",
+        "AArch64StackAddressMemory.JoinsAndIndependentRootsKeepTheirOwnSPBasis",
+        "AArch64StackAddressMemory.SourceBoundariesRequireAnExternalRawSPParameter",
+        "AArch64StackAddressMemory.StackAssemblyRequiresTheLiteralSPAndClobber"
+      ],
+      "artifact_property": "cpta_stack_memory_artifacts",
+      "qualification_key": "explicit_raw_sp_memory_output_qualified"
+    }
   }
 }

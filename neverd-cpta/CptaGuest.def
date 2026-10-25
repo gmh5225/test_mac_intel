@@ -109,10 +109,14 @@
 #define CPA_GENERATED_SAMPLE_COUNT 177
 
 #ifdef CPA_CONTROL_CASE
-CPA_CONTROL_CASE(0, "sctlr2-el1-off", "neverd-memory-off")
-CPA_CONTROL_CASE(CPA_CPTA, "sctlr2-el1-on", "neverd-memory-on")
-CPA_CONTROL_CASE(CPA_CPTA0, "sctlr2-el1-cpta0-only", "neverd-memory-cpta0-only")
-CPA_CONTROL_CASE(CPA_CPTA | CPA_CPTA0, "sctlr2-el1-both", "neverd-memory-both")
+CPA_CONTROL_CASE(0, "sctlr2-el1-off", "neverd-memory-off",
+                 "neverd-memory-off-sa")
+CPA_CONTROL_CASE(CPA_CPTA, "sctlr2-el1-on", "neverd-memory-on",
+                 "neverd-memory-on-sa")
+CPA_CONTROL_CASE(CPA_CPTA0, "sctlr2-el1-cpta0-only", "neverd-memory-cpta0-only",
+                 "neverd-memory-cpta0-only-sa")
+CPA_CONTROL_CASE(CPA_CPTA | CPA_CPTA0, "sctlr2-el1-both", "neverd-memory-both",
+                 "neverd-memory-both-sa")
 #undef CPA_CONTROL_CASE
 #endif
 

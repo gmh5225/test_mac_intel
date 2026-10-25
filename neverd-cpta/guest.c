@@ -126,9 +126,10 @@ static const struct {
   uint64_t Bits;
   const char *ControlName;
   const char *MemoryName;
+  const char *StackAlignmentName;
 } Controls[] = {
-#define CPA_CONTROL_CASE(Bits, ControlName, MemoryName)                        \
-  {Bits, ControlName, MemoryName},
+#define CPA_CONTROL_CASE(Bits, ControlName, MemoryName, AlignmentName)         \
+  {Bits, ControlName, MemoryName, AlignmentName},
 #include "CptaGuest.def"
 };
 
@@ -231,9 +232,25 @@ void guestMain(void) {
                      : CPA_REGISTER_INPUT(SavedSCTLR)
                      : CPA_MEMORY_CLOBBER);
 #if defined(CPA_GENERATED_MEMORY)
+#if defined(CPA_GENERATED_STACK_MEMORY)
+    const uint64_t StackSCTLR = SavedSCTLR | CPA_SA;
+    __asm__ volatile(CPA_WRITE_SCTLR
+                     :
+                     : CPA_REGISTER_INPUT(StackSCTLR)
+                     : CPA_MEMORY_CLOBBER);
+    __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Observed));
+    record(Controls[Mode].StackAlignmentName, Observed & CPA_SA);
+    expect((Observed & CPA_SA) == CPA_SA);
+#endif
     const unsigned MemoryResult = CPA_GENERATED_ENTRY();
     record(Controls[Mode].MemoryName, MemoryResult);
     expect(MemoryResult == 0);
+#if defined(CPA_GENERATED_STACK_MEMORY)
+    __asm__ volatile(CPA_WRITE_SCTLR
+                     :
+                     : CPA_REGISTER_INPUT(SavedSCTLR)
+                     : CPA_MEMORY_CLOBBER);
+#endif
 #endif
   }
   finish();
