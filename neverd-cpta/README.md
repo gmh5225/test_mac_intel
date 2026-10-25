@@ -9,6 +9,9 @@ The archive is downloaded directly from Arm and checked against a pinned
 SHA-256. Its published MD5 was independently checked when pinning the package.
 The workflow installs the unmodified package under its included Arm terms;
 the model and its libraries are not redistributed in the artifacts.
+Semihosting is enabled at the model root. The bare EL1 guest disables the
+board TZC gate with `bp.secure_memory=0`; it does not install secure firmware
+or claim to validate that controller.
 
 The bare-metal guest requires EL1 as the highest implemented exception level,
 reads `ID_AA64ISAR3_EL1.CPA`, and requires the actual value 2. With no EL2/EL3
