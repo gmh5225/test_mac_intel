@@ -30,10 +30,10 @@ jobs:
           python-version: '3.12'
       - name: Stage private input batch 1
         env:
-          NDC_SWIFT_V64W10_000: ${{ secrets.NDC_SWIFT_V64W10_000 }}
-          NDC_SWIFT_V64W10_001: ${{ secrets.NDC_SWIFT_V64W10_001 }}
-          NDC_SWIFT_V64W10_002: ${{ secrets.NDC_SWIFT_V64W10_002 }}
-          NDC_SWIFT_V64W10_003: ${{ secrets.NDC_SWIFT_V64W10_003 }}
+          NDC_SWIFT_V64W11_000: ${{ secrets.NDC_SWIFT_V64W11_000 }}
+          NDC_SWIFT_V64W11_001: ${{ secrets.NDC_SWIFT_V64W11_001 }}
+          NDC_SWIFT_V64W11_002: ${{ secrets.NDC_SWIFT_V64W11_002 }}
+          NDC_SWIFT_V64W11_003: ${{ secrets.NDC_SWIFT_V64W11_003 }}
         run: python3 -B macos-swift-window-worker/run.py receive 0 4
       - name: Record capture worker modes and source package rebuild
         run: python3 -B macos-swift-window-worker/run.py ${{ matrix.arch }}
