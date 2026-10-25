@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root in ('results','worker-source-package-v64w13r2','worker-package-build','geometry-build','build-1','build-2','complete-build-1','complete-build-2','complete-package-build'):
+  if root in ('results','worker-source-package-v64d6','worker-package-build','geometry-build','build-1','build-2','complete-build-1','complete-build-2','complete-package-build'):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<256*1024*1024
  assert all(f.stat().st_size<32*1024*1024 for f in selected)
@@ -87,7 +87,7 @@ def main(arch):
   if p.returncode!=0:diagnose_failed_worker(folder,arch,env)
   if p.returncode==0:
    result=json.loads((folder/'results/acceptance.json').read_bytes())
-   assert result['status']=='all_native_window_normal_Task_lifecycle_records_collected_independent_comparison_pending' and result['arch']==arch
+   assert result['status']=='all_public_Swift_summary_SDK_records_collected_independent_comparison_pending' and result['arch']==arch
    fields=('recording','arch','machine','source_rebuild_pairs','native_package_rebuild_pairs','accepted_callback_bodies','callbacks_recovered','original_host_loads','full_client_integrated','active_task_termination_covered','full_capture_window_callback_qualified','independent_acceptance_pending','full_worker_qualified','modified_composition_qualified','asynchronous_callbacks_exercised')
    report={k:result[k] for k in fields}
    status='passed'
