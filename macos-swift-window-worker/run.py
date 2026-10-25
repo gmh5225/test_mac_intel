@@ -56,6 +56,25 @@ def seal(folder,output):
  assert r.returncode==0,'Private result encryption failed; plaintext not exported'
  return {'sha256':sha(dest),'bytes':dest.stat().st_size,'files':len(selected),'algorithm':'CMS AES-256-GCM / RSA-4096 OAEP'}
 
+def diagnose_failed_worker(folder,arch,env):
+ executable=folder/'build-1'/('worker-'+arch)
+ if not executable.is_file():return
+ results=folder/'results'
+ command=['xcrun','lldb','--no-lldbinit','--no-use-colors','--batch',
+  '-o','settings set target.disable-aslr false','-o','run',
+  '-k','thread backtrace all','-k','register read',
+  '-k','disassemble --frame --count 64','-k','image list -o -f',
+  '--',str(executable),str(folder/'cases.json'),'sequential',str(results/'debugger-lifetime.json')]
+ (results/'native-debugger.command.json').write_text(json.dumps(command,indent=2)+'\n')
+ diagnostic_env=dict(env,SWIFT_DETERMINISTIC_HASHING='1')
+ try:
+  with (results/'native-debugger.stdout').open('wb') as o,(results/'native-debugger.stderr').open('wb') as e:
+   result=subprocess.run(command,cwd=folder,env=diagnostic_env,stdout=o,stderr=e,timeout=90)
+  record={'returncode':result.returncode,'same_source_and_executable':True,'original_host_loads':0}
+ except subprocess.TimeoutExpired:
+  record={'timeout':True,'same_source_and_executable':True,'original_host_loads':0}
+ (results/'native-debugger.exit.json').write_text(json.dumps(record,indent=2)+'\n')
+
 def main(arch):
  folder=Path(os.environ['RUNNER_TEMP'])/'private-swift-window-worker/work';folder.mkdir(parents=True,exist_ok=False,mode=0o700)
  output=Path.cwd()/'swift-window-worker-encrypted-records';output.mkdir(exist_ok=False)
@@ -65,6 +84,7 @@ def main(arch):
   env={k:v for k,v in os.environ.items() if not k.startswith('NDC_')}
   with (folder/'results/driver.stdout').open('wb') as o,(folder/'results/driver.stderr').open('wb') as e:
    p=subprocess.run([sys.executable,'-B',str(folder/'actions.py'),arch],cwd=folder,env=env,stdout=o,stderr=e,timeout=5400)
+  if p.returncode!=0:diagnose_failed_worker(folder,arch,env)
   if p.returncode==0:
    result=json.loads((folder/'results/acceptance.json').read_bytes())
    assert result['status']=='all_native_window_worker_records_collected_independent_comparison_pending' and result['arch']==arch
