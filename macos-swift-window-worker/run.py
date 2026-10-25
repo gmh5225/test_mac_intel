@@ -41,7 +41,7 @@ def seal(folder,output):
  for f in folder.rglob('*'):
   if not f.is_file() or f.is_symlink():continue
   rel=f.relative_to(folder);root=rel.parts[0]
-  if root in ('results','worker-source-package-v64l1','worker-package-build','build-1','build-2','complete-build-1','complete-build-2','complete-package-build'):
+  if root in ('results','worker-source-package-v64l2','worker-package-build','build-1','build-2','complete-build-1','complete-build-2','complete-package-build'):
    selected.append(f)
  assert selected and len(selected)<8192 and sum(f.stat().st_size for f in selected)<256*1024*1024
  assert all(f.stat().st_size<32*1024*1024 for f in selected)
