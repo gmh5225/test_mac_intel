@@ -186,7 +186,10 @@ ABI, foreign exception identity and Apple CPA2 hardware remain unqualified.
 The `ordered`, `ordered-image` and `ordered-image-relocated` profiles, with
 their corresponding `el0-` variants, require the distinct nine-test
 `AArch64OrderedMemory` report. Each exports 115 independently assembled GPR
-and B/H/S/D/Q LDAPUR/STLUR samples. The profiles distinguish explicit runtime
+and B/H/S/D/Q LDAPUR/STLUR samples. Effective access addresses are naturally
+aligned while every encoded displacement boundary remains present. Unaligned
+accesses and their faults are not qualified by this success matrix. The
+profiles distinguish explicit runtime
 bases, image-context runtime bases and relocated complete image storage.
 Hardware LRCPC3 readback, sample count, all four effective checking controls
 and every EL0 origin are mandatory. Only these profiles enable the model's
