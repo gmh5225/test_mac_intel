@@ -243,6 +243,7 @@ class EvidenceTests(unittest.TestCase):
     def test_writeback_profiles_require_their_own_count_and_controls(self):
         for name in ("writeback", "el0-writeback"):
             profile = generated_memory.select_profile(name)
+            self.assertIn("-DCPA_GENERATED_WRITEBACK_MEMORY=1", profile["guest_flags"])
             config = generated_memory.configuration(profile)
             text = self.transcript(config=config)
             result = generated_memory.assess(text, 0, profile)

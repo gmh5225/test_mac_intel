@@ -293,7 +293,11 @@
         "neverd-memory-on": 0,
         "neverd-memory-cpta0-only": 0,
         "neverd-memory-both": 0
-      }
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_WRITEBACK_MEMORY=1"
+      ]
     },
     "el0-writeback": {
       "scope": "Actual NeverD explicit-IR GPR single pre/post-index writeback output: 130 independent LLVM MC samples covering 13 load/store classes, both modes and five signed imm9 boundaries; HighC and LLVMC at O0/O2 and LLVM ELF, all four effective CPTA/CPTA0 settings at EL0 with hardware SPSR and exact SVC-origin checks. Each result, returned base and every buffer byte is compared with an independent original-register native instruction. Model-only nonoverflow Normal WB memory qualification. No automatic whole-image, image relocation, SP/stack ABI, SIMD/pairs, overflowing memory, tagging, foreign exception identity or Apple CPA2 hardware qualification.",
@@ -322,7 +326,8 @@
       },
       "guest_flags": [
         "-DCPA_GENERATED_MEMORY=1",
-        "-DCPA_GENERATED_EL0_MEMORY=1"
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_WRITEBACK_MEMORY=1"
       ],
       "expected_passed_cases": 83
     }
