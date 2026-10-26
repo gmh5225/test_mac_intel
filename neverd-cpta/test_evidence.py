@@ -292,6 +292,59 @@ class EvidenceTests(unittest.TestCase):
                     self.transcript(config=generated_memory.configuration(
                         generated_memory.select_profile(other))), 0, profile)["passed"])
 
+    def test_structure_batches_require_their_count_context_and_all_controls(self):
+        names = [name for name in generated_memory.CONFIG["profiles"]
+                 if "structure" in name]
+        self.assertEqual(len(names), 8)
+        for name in names:
+            profile = generated_memory.select_profile(name)
+            self.assertIn("-DCPA_GENERATED_STRUCTURE_MEMORY=1", profile["guest_flags"])
+            self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"],
+                             78 if name.endswith("tail") else 96)
+            self.assertIn("sizeof(structure_cases)", profile["count_function"])
+            self.assertEqual(len(profile["test_report_cases"]), 12)
+            config = generated_memory.configuration(profile)
+            result = generated_memory.assess(self.transcript(config=config), 0, profile)
+            self.assertTrue(result[profile["qualification_key"]])
+            self.assertFalse(result["neverd_output_qualified"])
+            self.assertFalse(result["native_apple_cpta_qualified"])
+            for key, value in profile["generated_gate_values"].items():
+                with self.subTest(profile=name, gate=key):
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript(omit=key, config=config), 0, profile)["passed"])
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript({key: value ^ 1}, config=config), 0, profile)["passed"])
+            other = generated_memory.select_profile(
+                name.removesuffix("-tail") if name.endswith("tail") else name + "-tail")
+            self.assertFalse(generated_memory.assess(
+                self.transcript(config=generated_memory.configuration(other)), 0,
+                profile)["passed"])
+
+    def test_structure_reports_keep_context_identity_and_all_named_tests(self):
+        for name in generated_memory.CONFIG["profiles"]:
+            if "structure" not in name:
+                continue
+            profile = generated_memory.select_profile(name)
+            cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
+                      "result": "COMPLETED"}
+                     for identity in profile["test_report_cases"]]
+            cases[0][profile["artifact_property"]] = self.id()
+            report = {"tests": len(cases), "failures": 0, "errors": 0,
+                      "testsuites": [{"name": "AArch64StructureMemory",
+                                      "testsuite": cases}]}
+            self.assertEqual(generated_memory.validate_test_report(report, profile),
+                             self.id())
+            cases[-1]["result"] = "SKIPPED"
+            with self.assertRaises(ValueError):
+                generated_memory.validate_test_report(report, profile)
+            cases[-1]["result"] = "COMPLETED"
+            opposite = generated_memory.select_profile(
+                name.replace("structure-image", "structure")
+                if "structure-image" in name
+                else name.replace("structure", "structure-image"))
+            with self.assertRaises(ValueError):
+                generated_memory.validate_test_report(report, opposite)
+
     def test_pair_profiles_require_both_results_and_their_own_counts(self):
         for name in ("pair", "el0-pair"):
             profile = generated_memory.select_profile(name)

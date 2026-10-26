@@ -665,6 +665,282 @@
       "model_parameters": {
         "cluster0.has_lrcpc3": "1"
       }
+    },
+    "structure": {
+      "scope": "Actual NeverD explicit-IR baseline AdvSIMD structure memory, 96-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL1, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_artifact_dir",
+      "qualification_key": "explicit_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 96,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "el0-structure": {
+      "scope": "Actual NeverD explicit-IR baseline AdvSIMD structure memory, 96-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL0, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_artifact_dir",
+      "qualification_key": "explicit_el0_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 96,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "structure-tail": {
+      "scope": "Actual NeverD explicit-IR baseline AdvSIMD structure memory, 78-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL1, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_artifact_dir",
+      "qualification_key": "explicit_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 78,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY_TAIL=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "el0-structure-tail": {
+      "scope": "Actual NeverD explicit-IR baseline AdvSIMD structure memory, 78-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL0, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_artifact_dir",
+      "qualification_key": "explicit_el0_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 78,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY_TAIL=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "structure-image": {
+      "scope": "Actual NeverD image-context runtime-base baseline AdvSIMD structure memory, 96-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL1, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_image_artifact_dir",
+      "qualification_key": "image_runtime_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 96,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "el0-structure-image": {
+      "scope": "Actual NeverD image-context runtime-base baseline AdvSIMD structure memory, 96-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL0, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_image_artifact_dir",
+      "qualification_key": "image_runtime_el0_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 96,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "structure-image-tail": {
+      "scope": "Actual NeverD image-context runtime-base baseline AdvSIMD structure memory, 78-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL1, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_image_artifact_dir",
+      "qualification_key": "image_runtime_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 78,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY_TAIL=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
+    },
+    "el0-structure-image-tail": {
+      "scope": "Actual NeverD image-context runtime-base baseline AdvSIMD structure memory, 78-case batch of 1134 independent LLVM MC words covering all LD1..LD4/ST1..ST4 multiple/lane and LD1R..LD4R arrangements and indices. Five unchanged source/object routes, four effective CPTA/CPTA0 modes at EL0, three post-index deltas per case. Full 128-bit vectors, completed base and every byte of 256-byte ordinary Normal WB buffers compare with independent original-register instructions. Model-only nonoverflow integer-ABI bridges; no native Apple CPA2, original SP/frame/call/unwind ABI, tagged/overflowing/foreign fault or reconstructed image qualification.",
+      "test_report_cases": [
+        "AArch64StructureMemory.IndependentWordsCoverEveryArrangementLaneAndIndex",
+        "AArch64StructureMemory.BothCProjectionsAndLLVMExecuteCompleteResults",
+        "AArch64StructureMemory.ImageContextRetainsRuntimePostIndexAndVectorResults",
+        "AArch64StructureMemory.TracerKeepsCompleteValuesMemoryAndCompletedBase",
+        "AArch64StructureMemory.MalformedLastVectorsAndResultsFailBeforeFiltering",
+        "AArch64StructureMemory.AllEightInputsAreKeptAndOverflowFailsClearly",
+        "AArch64StructureMemory.SourceFilteringCannotHideMalformedCompleteVectors",
+        "AArch64StructureMemory.RawSPAndWrappingVectorRolesRemainExplicit",
+        "AArch64StructureMemory.LLVMAdmissionValidatesEveryVectorBeforeSelection",
+        "AArch64StructureMemory.OwnedSpansIncludeAllElementsAndReturnedBases",
+        "AArch64StructureMemory.ReservedWordsCannotReachLegacyOrPermissiveHandlers",
+        "AArch64StructureMemory.DiscardedCompleteResultsRetainOriginalEffects"
+      ],
+      "artifact_property": "structure_memory_image_artifact_dir",
+      "qualification_key": "image_runtime_el0_structure_memory_batch_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 78,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY=1",
+        "-DCPA_GENERATED_STRUCTURE_MEMORY_TAIL=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(structure_cases) / sizeof(structure_cases[0]); }\n"
     }
   },
   "headers_directory": "include",

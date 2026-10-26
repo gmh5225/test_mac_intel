@@ -204,3 +204,20 @@ Generated output is compiled unchanged. The environment supplies freestanding
 Clang target has no system C library headers. The generated header hash is
 recorded alongside source provenance. These declarations supply no library
 implementation and do not replace any instruction or output operation.
+
+The `structure`, `structure-image`, and corresponding `el0-` profiles consume
+NeverD's baseline AdvSIMD structure-memory exports. They require all twelve
+named source tests, complete C/object artifacts and the actual exported
+`structure_cases` array count. The first eleven batches contain 96 cases each;
+`structure-tail`/`structure-image-tail` and their `el0-` variants require the
+last 78 cases, for 1,134 independent LLVM MC samples overall. Each case compares
+three post-index deltas, all 128-bit vector results, the completed base and
+every byte of the memory/output buffers against the original register encoding.
+The explicit and image-context exports have distinct report properties. A
+missing/skipped test, wrong context, wrong batch count, missing control or
+nonzero comparison fails qualification. All five routes, four effective
+CPTA/CPTA0 combinations, EL0 origin checks and the existing 45-second model
+deadline remain mandatory. These are bounded, nonoverflow Normal WB integer
+bridges. They do not qualify original SP/frame/call/unwind execution, dynamic
+post-index relocation of a fixed image base, arbitrary native vector ABI,
+tagging/foreign faults or Apple CPA2 hardware.
