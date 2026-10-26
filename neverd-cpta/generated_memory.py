@@ -67,6 +67,18 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def compile_freestanding_runtime(args, tools, evidence, flags, definitions):
+    runtime = definitions["freestanding_runtime"]
+    source = tools / runtime["source_file"]
+    source.write_text(runtime["source"])
+    output = tools / runtime["object_file"]
+    run.execute([args.compiler, *run.CONFIG["compiler_flags"], *flags,
+                 *runtime["flags"], "-c", str(source), "-o", str(output)],
+                evidence, runtime["compile_label"],
+                run.CONFIG["build_timeout_seconds"]).check_returncode()
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts", required=True, type=Path)
@@ -88,7 +100,8 @@ def main():
     if profile.get("artifact_batches"):
         import grouped_memory
         return grouped_memory.execute(args, profile, config, export_origin,
-                                      CONFIG, assess)
+                                      CONFIG, assess,
+                                      compile_freestanding_runtime)
     root = args.output.resolve()
     root.mkdir()
     tools = root / CONFIG["tools_directory"]
@@ -147,6 +160,8 @@ def main():
          "-c", str(tools / CONFIG["harness_file"]), "-o", str(harness_object)],
         evidence, "harness-compile", run.CONFIG["build_timeout_seconds"],
     ).check_returncode()
+    runtime_object = compile_freestanding_runtime(args, tools, evidence,
+                                                  generated_flags, CONFIG)
     for route in CONFIG["routes"]:
         work = tools / route["name"]
         observations = evidence / route["name"]
@@ -162,7 +177,7 @@ def main():
         else:
             shutil.copy2(inputs / route["file"], projection)
         guest = run.build(args.compiler, args.linker, work, observations,
-                          profile["guest_flags"], [harness_object, projection])
+                          profile["guest_flags"], [harness_object, projection, runtime_object])
         start = time.monotonic()
         result = run.execute(run.model_command(model, guest, config), observations, "guest",
                              run.CONFIG["timeout_seconds"])

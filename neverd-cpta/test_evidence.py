@@ -408,6 +408,27 @@ class EvidenceTests(unittest.TestCase):
                                    timeout=run.CONFIG["timeout_seconds"],
                                    capture_output=True)
 
+    def test_freestanding_byte_runtime_preserves_bounds_and_return_values(self):
+        import shutil
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        runtime = generated_memory.CONFIG["freestanding_runtime"]
+        compiler = shutil.which("cc")
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            source = directory / runtime["source_file"]
+            source.write_text(runtime["source"] + runtime["probe"])
+            binary = directory / "runtime-probe"
+            subprocess.run([compiler, "-std=c11", *runtime["flags"], str(source),
+                            "-o", str(binary)], check=True,
+                           timeout=run.CONFIG["build_timeout_seconds"],
+                           capture_output=True)
+            subprocess.run([str(binary)], check=True,
+                           timeout=run.CONFIG["timeout_seconds"],
+                           capture_output=True)
+
     def test_pair_profiles_require_both_results_and_their_own_counts(self):
         for name in ("pair", "el0-pair"):
             profile = generated_memory.select_profile(name)

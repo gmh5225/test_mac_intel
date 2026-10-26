@@ -27,7 +27,7 @@ def render_entry(grouped, batch_count):
         counts=grouped["count_separator"].join(counts))
 
 
-def execute(args, profile, config, report_origin, definitions, assess):
+def execute(args, profile, config, report_origin, definitions, assess, compile_runtime):
     root = args.output.resolve()
     root.mkdir()
     tools = root / definitions["tools_directory"]
@@ -85,7 +85,8 @@ def execute(args, profile, config, report_origin, definitions, assess):
                               ("linker-version", args.linker)):
         run.execute([executable, "--version"], evidence, label,
                     run.CONFIG["build_timeout_seconds"]).check_returncode()
-    harness_objects = []
+    runtime_object = compile_runtime(args, tools, evidence, flags, definitions)
+    harness_objects = [runtime_object]
     grouped = definitions["grouped"]
     for index, batch in enumerate(batches):
         entry = grouped["entry_name"].format(index=index)

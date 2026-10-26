@@ -231,3 +231,9 @@ LLVM objects remain unchanged. Input hashes name every original batch file.
 This avoids repeating environment startup for each small compiler batch; it
 keeps the original mapping, link-size checks and per-process timeouts. A failed
 batch, wrong sum or incomplete control matrix still fails the whole group.
+
+Generated integer bridges link a shared freestanding `memcpy`/`memset` byte
+runtime, compiled without builtin substitution. Its independent native gate
+checks all bytes, unaligned offsets, zero lengths and exact returned pointers.
+The same runtime is used by single-batch and grouped profiles; it contains no
+fixture values or comparison results. Generated projections remain unchanged.
