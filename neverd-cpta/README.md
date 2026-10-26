@@ -150,3 +150,13 @@ References:
 - [Arm memory management](https://developer.arm.com/documentation/101811/latest)
 - [Arm exception model](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Exception%20model.pdf)
 - [Arm execution permissions](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Providing%20protection%20for%20complex%20software.pdf)
+
+The `writeback` and `el0-writeback` profiles require the separate eight-test
+`AArch64WritebackMemory` report and its
+`arm64e_writeback_memory_artifact_directory` export. They execute 130 independently
+assembled GPR single pre/post-index samples through the same five output routes,
+comparing load values, completed bases and every buffer byte against original
+register encodings. All four CPTA/CPTA0 combinations remain mandatory; EL0 also
+requires every hardware-origin check. This bounds nonoverflow Normal WB memory
+only. It does not qualify automatic whole images, image relocation, SP/stack
+ABI, SIMD/pairs, overflow/tagging environments or native Apple CPA2 hardware.

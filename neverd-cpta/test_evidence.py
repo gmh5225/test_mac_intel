@@ -217,7 +217,8 @@ class EvidenceTests(unittest.TestCase):
         for profile_name, el1_name in (("el0-immediate", "immediate"),
                                        ("el0-register", "register"),
                                        ("el0-image", "image"),
-                                       ("el0-image-relocated", "image-relocated")):
+                                       ("el0-image-relocated", "image-relocated"),
+                                       ("el0-writeback", "writeback")):
             profile = generated_memory.select_profile(profile_name)
             config = generated_memory.configuration(profile)
             text = self.transcript(config=config)
@@ -238,6 +239,27 @@ class EvidenceTests(unittest.TestCase):
                     self.assertFalse(generated_memory.assess(
                         self.transcript({name: expected ^ 1}, config=config),
                         0, profile)["passed"])
+
+    def test_writeback_profiles_require_their_own_count_and_controls(self):
+        for name in ("writeback", "el0-writeback"):
+            profile = generated_memory.select_profile(name)
+            config = generated_memory.configuration(profile)
+            text = self.transcript(config=config)
+            result = generated_memory.assess(text, 0, profile)
+            self.assertTrue(result[profile["qualification_key"]])
+            self.assertFalse(result["neverd_output_qualified"])
+            self.assertFalse(result["native_apple_cpta_qualified"])
+            for key, value in profile["generated_gate_values"].items():
+                with self.subTest(profile=name, gate=key):
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript(omit=key, config=config), 0, profile)["passed"])
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript({key: value ^ 1}, config=config),
+                        0, profile)["passed"])
+            for other in ("immediate", "register", "image", "image-relocated"):
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(config=generated_memory.configuration(
+                        generated_memory.select_profile(other))), 0, profile)["passed"])
 
     def test_distinct_output_profiles_require_their_own_export(self):
         for name in generated_memory.CONFIG["profiles"]:
