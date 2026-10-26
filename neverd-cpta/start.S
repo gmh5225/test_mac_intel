@@ -50,6 +50,28 @@ copyVector:
   str q17, [x1, x2]
   ret
 
+#if defined(CPA_GENERATED_EL0_MEMORY)
+.global runGeneratedAtEL0
+runGeneratedAtEL0:
+  stp x29, x30, [sp, #-CPA_SP_ALIGNMENT]!
+  ldr x9, =GuestEL0StackEnd
+  msr SP_EL0, x9
+  mov x9, #CPA_SPSR_EL0T_MASKED
+  msr SPSR_EL1, x9
+  adr x9, GeneratedEL0Entry
+  msr ELR_EL1, x9
+  eret
+GeneratedEL0Entry:
+  bl CPA_GENERATED_ENTRY
+GeneratedEL0Return:
+  svc #CPA_SVC_IMMEDIATE
+GeneratedEL0AfterSVC:
+  b UnexpectedException
+GeneratedEL1Resume:
+  ldp x29, x30, [sp], #CPA_SP_ALIGNMENT
+  ret
+#endif
+
 .balign (1 << CPA_GUEST_VECTOR_ALIGNMENT)
 GuestVectors:
   .rept CPA_GUEST_VECTOR_COUNT
@@ -57,6 +79,12 @@ GuestVectors:
   .space CPA_GUEST_VECTOR_SLOT_BYTES - CPA_INSTRUCTION_BYTES
   .endr
 GuestException:
+#if defined(CPA_GENERATED_EL0_MEMORY)
+  mrs x12, ESR_EL1
+  lsr x13, x12, #CPA_ESR_EC_SHIFT
+  cmp x13, #CPA_SVC64_EC
+  b.eq GeneratedEL0Exception
+#endif
   cbz x11, UnexpectedException
   adr x12, ProbeResume
   cmp x11, x12
@@ -67,6 +95,25 @@ GuestException:
   b.ne UnexpectedException
   msr ELR_EL1, x11
   eret
+#if defined(CPA_GENERATED_EL0_MEMORY)
+GeneratedEL0Exception:
+  and x12, x12, #CPA_SVC_ISS_MASK
+  cmp x12, #CPA_SVC_IMMEDIATE
+  b.ne UnexpectedException
+  mrs x12, ELR_EL1
+  adr x13, GeneratedEL0AfterSVC
+  cmp x12, x13
+  b.ne UnexpectedException
+  mrs x1, SPSR_EL1
+  and x1, x1, #CPA_SPSR_MODE_MASK
+  cmp x1, #CPA_EL0_ORIGIN
+  b.ne UnexpectedException
+  mov x12, #CPA_SPSR_EL1H_MASKED
+  msr SPSR_EL1, x12
+  adr x12, GeneratedEL1Resume
+  msr ELR_EL1, x12
+  eret
+#endif
 UnexpectedException:
   mrs x0, ESR_EL1
   mrs x1, ELR_EL1
@@ -98,3 +145,10 @@ UnexpectedExit:
 GuestStack:
   .space CPA_GUEST_STACK_BYTES
 GuestStackEnd:
+
+#if defined(CPA_GENERATED_EL0_MEMORY)
+.balign CPA_SP_ALIGNMENT
+GuestEL0Stack:
+  .space CPA_GUEST_STACK_BYTES
+GuestEL0StackEnd:
+#endif

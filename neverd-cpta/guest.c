@@ -51,9 +51,14 @@ static void configureNormalMemory(void) {
   NormalL2[CPA_L2_INDEX] = (uint64_t)NormalL3 | CPA_TABLE_DESCRIPTOR;
   for (unsigned I = 0; I != CPA_TABLE_ENTRIES; ++I) {
     const uint64_t Address = CPA_GUEST_BASE + (uint64_t)I * CPA_PAGE_BYTES;
+#if defined(CPA_GENERATED_EL0_MEMORY)
+    const uint64_t CodePage = CPA_SHARED_CODE_PAGE;
+#else
+    const uint64_t CodePage = CPA_CODE_PAGE;
+#endif
     NormalL3[I] =
         Address |
-        (Address < (uint64_t)GuestDataStart ? CPA_CODE_PAGE : CPA_DATA_PAGE);
+        (Address < (uint64_t)GuestDataStart ? CodePage : CPA_DATA_PAGE);
   }
   const uint64_t MAIR = CPA_NORMAL_MAIR;
   const uint64_t TCR = CPA_NORMAL_TCR;
@@ -117,6 +122,29 @@ __attribute__((noreturn)) static void finish(void) {
 extern uint64_t probeStack(uint64_t Address, uint64_t UseSP);
 extern void copyVector(const void *Source, void *Destination, uint64_t Offset);
 
+#if defined(CPA_GENERATED_EL0_MEMORY) && !defined(CPA_GENERATED_MEMORY)
+int CPA_GENERATED_ENTRY(void) {
+  _Alignas(CPA_SP_ALIGNMENT)
+      uint64_t Source[CPA_MEMORY_BYTES / sizeof(uint64_t)];
+  _Alignas(CPA_SP_ALIGNMENT)
+      uint64_t Destination[CPA_MEMORY_BYTES / sizeof(uint64_t)];
+  for (size_t I = 0; I != sizeof(Source) / sizeof(*Source); ++I) {
+    Source[I] = CPA_MEMORY_PATTERN + I;
+    Destination[I] = 0;
+  }
+  uint64_t Loaded;
+  const uint64_t Offset = sizeof(uint64_t);
+  __asm__ volatile(CPA_LOAD_GPR
+                   : CPA_REGISTER_OUTPUT(Loaded)
+                   : CPA_REGISTER_INPUT(Source), CPA_REGISTER_INPUT(Offset)
+                   : CPA_MEMORY_CLOBBER);
+  copyVector(Source, Destination, 0);
+  return Loaded != Source[1] || Destination[0] != Source[0] ||
+         Destination[1] != Source[1] || Destination[2] != 0 ||
+         Destination[3] != 0;
+}
+#endif
+
 #if defined(CPA_GENERATED_MEMORY)
 extern int CPA_GENERATED_ENTRY(void);
 extern unsigned CPA_GENERATED_SAMPLES(void);
@@ -132,6 +160,21 @@ static const struct {
   {Bits, ControlName, MemoryName, AlignmentName},
 #include "CptaGuest.def"
 };
+
+#if defined(CPA_GENERATED_EL0_MEMORY)
+struct GeneratedEL0Result {
+  uint64_t Value;
+  uint64_t Origin;
+};
+extern struct GeneratedEL0Result runGeneratedAtEL0(void);
+static const char *const EL0Origins[] = {
+#define CPA_EL0_ORIGIN_CASE(Name) Name,
+#include "CptaGuest.def"
+};
+_Static_assert(sizeof(EL0Origins) / sizeof(*EL0Origins) ==
+                   sizeof(Controls) / sizeof(*Controls),
+               CPA_EL0_CONTROL_COUNT_MESSAGE);
+#endif
 
 void guestMain(void) {
   uint64_t EL, PFR, ISAR;
@@ -231,7 +274,7 @@ void guestMain(void) {
                      :
                      : CPA_REGISTER_INPUT(SavedSCTLR)
                      : CPA_MEMORY_CLOBBER);
-#if defined(CPA_GENERATED_MEMORY)
+#if defined(CPA_GENERATED_MEMORY) || defined(CPA_GENERATED_EL0_MEMORY)
 #if defined(CPA_GENERATED_STACK_MEMORY)
     const uint64_t StackSCTLR = SavedSCTLR | CPA_SA;
     __asm__ volatile(CPA_WRITE_SCTLR
@@ -242,7 +285,14 @@ void guestMain(void) {
     record(Controls[Mode].StackAlignmentName, Observed & CPA_SA);
     expect((Observed & CPA_SA) == CPA_SA);
 #endif
+#if defined(CPA_GENERATED_EL0_MEMORY)
+    const struct GeneratedEL0Result EL0Result = runGeneratedAtEL0();
+    record(EL0Origins[Mode], EL0Result.Origin);
+    expect(EL0Result.Origin == CPA_EL0_ORIGIN);
+    const unsigned MemoryResult = (unsigned)EL0Result.Value;
+#else
     const unsigned MemoryResult = CPA_GENERATED_ENTRY();
+#endif
     record(Controls[Mode].MemoryName, MemoryResult);
     expect(MemoryResult == 0);
 #if defined(CPA_GENERATED_STACK_MEMORY)

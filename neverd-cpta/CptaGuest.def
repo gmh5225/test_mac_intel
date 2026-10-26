@@ -77,6 +77,7 @@
 #define CPA_L2_INDEX 0
 #define CPA_TABLE_DESCRIPTOR 3
 #define CPA_CODE_PAGE 0x40000000000703ULL
+#define CPA_SHARED_CODE_PAGE 0x7c3ULL
 #define CPA_DATA_PAGE 0x60000000000743ULL
 #define CPA_GUEST_MAP_BYTES 0x200000
 #define CPA_NORMAL_MAIR 0xff
@@ -106,10 +107,32 @@
 #define CPA_GENERATED_ENTRY neverdMemoryMain
 #define CPA_GENERATED_SAMPLES neverdMemorySampleCount
 #define CPA_GENERATED_SAMPLES_NAME "neverd-memory-samples"
+// The controlled EL0 profile shares read-only code with EL1. Returning from
+// EL0 requires this exact SVC site and the hardware-saved EL0t mode.
+#define CPA_SPSR_EL0T_MASKED 0x3c0
+#define CPA_SPSR_EL1H_MASKED 0x3c5
+#define CPA_SPSR_MODE_MASK 0x1f
+#define CPA_SVC64_EC 0x15
+#define CPA_SVC_IMMEDIATE 0
+#define CPA_SVC_ISS_MASK 0xffff
+#define CPA_EL0_ORIGIN 0
+#define CPA_EL0_CONTROL_COUNT_MESSAGE "EL0 origins must cover every CPTA mode"
+#define CPA_MEMORY_EL0_OFF_NAME "neverd-memory-off-el0-origin"
+#define CPA_MEMORY_EL0_ON_NAME "neverd-memory-on-el0-origin"
+#define CPA_MEMORY_EL0_CPTA0_NAME "neverd-memory-cpta0-only-el0-origin"
+#define CPA_MEMORY_EL0_BOTH_NAME "neverd-memory-both-el0-origin"
 #if defined(CPA_GENERATED_REGISTER_MEMORY)
 #define CPA_GENERATED_SAMPLE_COUNT 184
 #else
 #define CPA_GENERATED_SAMPLE_COUNT 177
+#endif
+
+#ifdef CPA_EL0_ORIGIN_CASE
+CPA_EL0_ORIGIN_CASE(CPA_MEMORY_EL0_OFF_NAME)
+CPA_EL0_ORIGIN_CASE(CPA_MEMORY_EL0_ON_NAME)
+CPA_EL0_ORIGIN_CASE(CPA_MEMORY_EL0_CPTA0_NAME)
+CPA_EL0_ORIGIN_CASE(CPA_MEMORY_EL0_BOTH_NAME)
+#undef CPA_EL0_ORIGIN_CASE
 #endif
 
 #ifdef CPA_CONTROL_CASE

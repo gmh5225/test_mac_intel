@@ -1,4 +1,4 @@
-name: NeverD controlled CPA2 EL1 environment
+name: NeverD controlled CPA2 EL1 and EL0 environment
 on:
   workflow_dispatch:
   push:
@@ -10,9 +10,16 @@ permissions:
   contents: read
 jobs:
   cpa2:
-    name: Arm official FVP CPA2 and effective CPTA controls
+    name: Arm official FVP CPA2 at ${{ matrix.mode }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      matrix:
+        include:
+          - mode: EL1
+            arguments: ''
+          - mode: EL0
+            arguments: --el0-control
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -24,12 +31,12 @@ jobs:
       - name: Verify evidence gates reject missing and contradictory capabilities
         run: python3 -m unittest discover -s neverd-cpta -p 'test_*.py' -v
       - name: Build and execute the pinned official model with CPA2 enabled
-        run: python3 neverd-cpta/run.py
+        run: python3 neverd-cpta/run.py ${{ matrix.arguments }}
       - name: Preserve provenance and complete or incomplete guest evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: neverd-cpta-fvp-${{ github.run_attempt }}
+          name: neverd-cpta-fvp-${{ matrix.mode }}-${{ github.run_attempt }}
           path: cpta-evidence/
           if-no-files-found: error
           retention-days: 14

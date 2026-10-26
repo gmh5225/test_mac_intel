@@ -69,7 +69,8 @@
     "AArch64ImmediateMemory.BothCProjectionsAndLLVMExecuteEveryImmediateFamily",
     "AArch64ImmediateMemory.TracingUsesTheEncodedOffsetAndExactDataSlice",
     "AArch64ImmediateMemory.StackAndImageRequirementsCannotBeHiddenByFiltering",
-    "AArch64ImmediateMemory.AssemblyCannotConsumeAPhantomRegisterIndex"
+    "AArch64ImmediateMemory.AssemblyCannotConsumeAPhantomRegisterIndex",
+    "AArch64ImmediateMemory.ImageContextPreservesEveryRuntimeParameterAccess"
   ],
   "artifact_property": "cpta_memory_artifacts",
   "errors": {
@@ -168,6 +169,62 @@
       ],
       "artifact_property": "cpta_register_memory_artifacts",
       "qualification_key": "explicit_register_memory_output_qualified"
+    },
+    "image": {
+      "scope": "Actual NeverD explicit-IR immediate-memory output emitted with a Mach-O image context and explicit runtime GPR parameters: 177 samples, five unchanged source/object routes, all four effective CPTA/CPTA0 settings at EL1. Model-only nonoverflow qualification. This does not qualify image-derived addresses, automatic lifting, SP or stack ABI, EL0, writeback/pairs, tagging, overflowing memory or Apple CPA2 hardware.",
+      "artifact_property": "cpta_image_memory_artifacts",
+      "qualification_key": "explicit_image_context_runtime_memory_output_qualified"
+    },
+    "el0-immediate": {
+      "scope": "Actual NeverD explicit-IR GPR/SIMD immediate output executing at EL0: 177 samples per five unchanged source/object routes and all four effective CPTA/CPTA0 settings. ERET enters EL0t; the exact SVC return site and hardware SPSR_EL1.M are checked for every mode. Shared read-only EL0/EL1 code and writable non-executable EL0/EL1 Normal WB data. Model-only nonoverflow qualification. No automatic lifting, image relocation, literal SP or stack ABI, writeback/pairs, tagging, overflowing memory, every CPACHECK choice or Apple CPA2 hardware.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "generated_gate_values": {
+        "neverd-memory-samples": 177,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "qualification_key": "explicit_el0_immediate_memory_output_qualified"
+    },
+    "el0-register": {
+      "scope": "Actual NeverD explicit-IR GPR/SIMD register-offset output executing at EL0: 184 samples per five unchanged source/object routes and all four effective CPTA/CPTA0 settings. ERET enters EL0t; the exact SVC return site and hardware SPSR_EL1.M are checked for every mode. Shared read-only EL0/EL1 code and writable non-executable EL0/EL1 Normal WB data. Model-only nonoverflow qualification. No automatic lifting, image relocation, literal SP or stack ABI, writeback/pairs, tagging, overflowing memory, every CPACHECK choice or Apple CPA2 hardware.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_REGISTER_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "generated_gate_values": {
+        "neverd-memory-samples": 184,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "test_report_cases": [
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryImmediateFamily",
+        "AArch64StackAddressMemory.BothCProjectionsAndLLVMExecuteEveryRegisterFamily",
+        "AArch64StackAddressMemory.NominalFootprintsKeepTheExactEntrySPBasis",
+        "AArch64StackAddressMemory.UnknownOrExpiredInputsDoNotInventFrameAccesses",
+        "AArch64StackAddressMemory.JoinsAndIndependentRootsKeepTheirOwnSPBasis",
+        "AArch64StackAddressMemory.SourceBoundariesRequireAnExternalRawSPParameter",
+        "AArch64StackAddressMemory.StackAssemblyRequiresTheLiteralSPAndClobber"
+      ],
+      "artifact_property": "cpta_register_memory_artifacts",
+      "qualification_key": "explicit_el0_register_memory_output_qualified"
     }
   }
 }

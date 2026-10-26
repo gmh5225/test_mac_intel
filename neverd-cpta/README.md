@@ -28,13 +28,22 @@ EL0-writable mapping cannot execute at EL1, and disabling the MMU would make
 unaligned Device-memory accesses fault. MAIR, TCR, TTBR and SCTLR readbacks,
 PAN=0 and UAO=0 are required. The linker rejects guests exceeding the mapping.
 
+`run.py --el0-control` additionally enters EL0t with ERET and executes real
+GPR/SIMD memory controls under every CPTA/CPTA0 combination. This profile
+shares read-only executable code with EL1 while retaining writable,
+non-executable data. Its returning SVC must have the exact site and immediate;
+the hardware-saved `SPSR_EL1.M` must identify EL0t. Every mode reports that
+origin and its memory result. All 82 checks are mandatory. Actions runs this
+profile separately from the original 74-check EL1 environment, preserving
+independent artifacts. The EL0 control does not execute NeverD output.
+
 All 74 checks, four modes, explicit guest completion and a successful process
 exit are required. Missing features, exceptions, timeouts, malformed or
 incomplete records fail the job. Artifacts preserve the exact commands,
 source/guest hashes, model version/parameter listing and raw transcript.
 
-This is **model validation of the environment**. It does not qualify Apple
-silicon, EL0 instruction execution, memory overflow/other translation faults,
+The original EL1 profile is **model validation of the environment**. It does
+not qualify Apple silicon, EL0 instruction execution, memory overflow/other translation faults,
 CPACHECK choices or
 NeverD's emitted code. Those require further fixtures in this environment.
 The JSON report explicitly retains these limits even when all controls pass.
@@ -49,7 +58,7 @@ Definitions, encodings, configuration values and pinned downloads belong in
 `CptaGuest.def` and `CptaEnvironment.def`.
 
 `generated_memory.py` consumes actual exports from NeverD's
-`AArch64ImmediateMemory` suite. Require all seven named tests to complete with
+`AArch64ImmediateMemory` suite. Require all eight named tests to complete with
 an artifact export, then pass its four files, the test JSON and the exact
 NeverD commit. Inputs and hashes are preserved before compilation:
 
@@ -66,7 +75,7 @@ The original generated functions/object stay unchanged; the independent
 harness entry is renamed and exposes its actual array size. Only unused
 formal-parameter warnings are suppressed for the fixed-ABI generated C.
 The model archive, capability/completion gates and 45-second process limit
-remain the same. The default workflow qualifies the environment; running
+remain the same. The default workflow qualifies the two environments; running
 this separate matrix qualifies only its declared explicit-IR inputs.
 
 This is no-image, nonoverflow, normal-memory model coverage. Automatic
@@ -77,6 +86,25 @@ outside its scope. Even a passing matrix keeps the broad
 `explicit_immediate_memory_output_qualified` is granted per passing route.
 `CptaGeneratedMemory.def` owns the matrix inventory, required test identities,
 source bridge, flags and expected observations.
+
+`--profile image` instead requires the distinct
+`cpta_image_memory_artifacts` export from that same eight-test report. These
+177 functions were emitted with a Mach-O image context but use explicit runtime
+GPR parameters. It grants only
+`explicit_image_context_runtime_memory_output_qualified`; it does not qualify
+image-derived addresses or relocation.
+
+`--profile el0-immediate` executes the original 177-sample export at EL0;
+`--profile el0-register` uses the seven-test SP report and its matching
+`cpta_register_memory_artifacts` export for all 184 GPR/SIMD register-offset
+samples. Each profile requires 83 checks on every source/object route,
+including the actual EL0t origin under all four control combinations. Their
+qualification keys are `explicit_el0_immediate_memory_output_qualified` and
+`explicit_el0_register_memory_output_qualified`. They do not qualify literal
+SP access at EL0, overflowing memory, tagging, image rebasing, automatic
+immediate lifting, every internal CPACHECK choice or Apple hardware. The
+default Actions matrix validates the two environments; these separate
+generated-output matrices still require actual NeverD exports.
 
 Use `--profile stack` with the separate seven-test
 `AArch64StackAddressMemory` report and its `cpta_stack_memory_artifacts`
@@ -107,4 +135,5 @@ References:
 - [Arm A-profile feature definitions, 2025-09](https://documentation-service.arm.com/static/68da532186b96e39e38c318c)
 - [Linux system register metadata](https://github.com/torvalds/linux/blob/master/arch/arm64/tools/sysreg)
 - [Arm memory management](https://developer.arm.com/documentation/101811/latest)
+- [Arm exception model](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Exception%20model.pdf)
 - [Arm execution permissions](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Providing%20protection%20for%20complex%20software.pdf)

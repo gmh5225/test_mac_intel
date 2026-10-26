@@ -16,6 +16,16 @@ ROOT = Path(__file__).resolve().parent
 CONFIG = json.loads((ROOT / "CptaEnvironment.def").read_text())
 
 
+def el0_configuration():
+    profile = CONFIG["el0_control"]
+    return {
+        **CONFIG, "scope": profile["scope"],
+        "expected_passed_cases": profile["expected_passed_cases"],
+        "required_records": CONFIG["required_records"] + list(profile["gate_values"]),
+        "gate_values": {**CONFIG["gate_values"], **profile["gate_values"]},
+    }
+
+
 def assess(transcript, returncode, config=None):
     config = CONFIG if config is None else config
     records = {}
@@ -160,7 +170,10 @@ def main():
     parser.add_argument("--compiler", default="clang-18")
     parser.add_argument("--linker", default="ld.lld-18")
     parser.add_argument("--build-only", action="store_true")
+    parser.add_argument(CONFIG["el0_option"], action="store_true")
     args = parser.parse_args()
+    config = el0_configuration() if args.el0_control else CONFIG
+    flags = CONFIG["el0_control"]["flags"] if args.el0_control else []
     workspace = Path(CONFIG["workspace_directory"]).resolve()
     evidence = Path(CONFIG["evidence_directory"]).resolve()
     workspace.mkdir(exist_ok=True)
@@ -172,7 +185,8 @@ def main():
         "runner_arch": platform.machine(),
         "model_sha256": CONFIG["model_sha256"],
         "model_parameters": CONFIG["model_parameters"],
-        "scope": CONFIG["scope"],
+        "scope": config["scope"],
+        "guest_flags": flags,
         "source_sha256": {
             path.name: hashlib.sha256(path.read_bytes()).hexdigest()
             for path in ROOT.iterdir() if path.is_file()
@@ -181,14 +195,14 @@ def main():
     (evidence / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     report_path = evidence / CONFIG["report"]
     report_path.write_text(json.dumps({"passed": False, "status": "not-executed"}) + "\n")
-    guest = build(args.compiler, args.linker, workspace, evidence)
+    guest = build(args.compiler, args.linker, workspace, evidence, flags)
     if args.build_only:
         print("Guest compiled; execution and CPA2 capability remain unverified")
         return
     model = prepare(workspace, evidence)
     inspect_model(model, evidence)
     result = execute(model_command(model, guest), evidence, "guest", CONFIG["timeout_seconds"])
-    report = assess(result.stdout, result.returncode)
+    report = assess(result.stdout, result.returncode, config)
     report["model_returncode"] = result.returncode
     report["guest_sha256"] = hashlib.sha256(guest.read_bytes()).hexdigest()
     report_path.write_text(json.dumps(report, indent=2) + "\n")

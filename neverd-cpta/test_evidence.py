@@ -196,6 +196,65 @@ class EvidenceTests(unittest.TestCase):
                     self.transcript({name: expected ^ 1}, config=config),
                     0, profile)["passed"])
 
+    def test_el0_environment_requires_each_hardware_origin_and_result(self):
+        config = run.el0_configuration()
+        text = self.transcript(config=config)
+        result = run.assess(text, 0, config)
+        self.assertTrue(result["passed"])
+        self.assertFalse(result["neverd_output_qualified"])
+        self.assertFalse(result["native_apple_cpta_qualified"])
+        self.assertFalse(run.assess(self.transcript(), 0, config)["passed"])
+        self.assertFalse(run.assess(text, 1, config)["passed"])
+        for name, expected in run.CONFIG["el0_control"]["gate_values"].items():
+            with self.subTest(name=name):
+                self.assertFalse(run.assess(
+                    self.transcript(omit=name, config=config), 0, config)["passed"])
+                self.assertFalse(run.assess(
+                    self.transcript({name: expected ^ 1}, config=config),
+                    0, config)["passed"])
+
+    def test_el0_output_profiles_cannot_borrow_el1_or_other_sample_counts(self):
+        for profile_name, el1_name in (("el0-immediate", "immediate"),
+                                       ("el0-register", "register")):
+            profile = generated_memory.select_profile(profile_name)
+            config = generated_memory.configuration(profile)
+            text = self.transcript(config=config)
+            result = generated_memory.assess(text, 0, profile)
+            self.assertTrue(result[profile["qualification_key"]])
+            self.assertFalse(result["neverd_output_qualified"])
+            self.assertFalse(result["native_apple_cpta_qualified"])
+            self.assertFalse(generated_memory.assess(text, 1, profile)["passed"])
+            el1 = generated_memory.select_profile(el1_name)
+            self.assertFalse(generated_memory.assess(
+                self.transcript(config=generated_memory.configuration(el1)),
+                0, profile)["passed"])
+            for name, expected in profile["generated_gate_values"].items():
+                with self.subTest(profile=profile_name, name=name):
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript(omit=name, config=config),
+                        0, profile)["passed"])
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript({name: expected ^ 1}, config=config),
+                        0, profile)["passed"])
+
+    def test_image_context_profile_requires_its_distinct_export(self):
+        profile = generated_memory.select_profile("image")
+        cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
+                  "result": "COMPLETED"}
+                 for identity in profile["test_report_cases"]]
+        suite = profile["test_report_cases"][0].rsplit(".", 1)[0]
+        cases[0][generated_memory.CONFIG["artifact_property"]] = self.id()
+        report = {"tests": len(cases), "failures": 0, "errors": 0,
+                  "testsuites": [{"name": suite, "testsuite": cases}]}
+        with self.assertRaises(ValueError):
+            generated_memory.validate_test_report(report, profile)
+        cases[-1][profile["artifact_property"]] = self.id()
+        self.assertEqual(generated_memory.validate_test_report(report, profile),
+                         self.id())
+        cases[0][profile["artifact_property"]] = self.id()
+        with self.assertRaises(ValueError):
+            generated_memory.validate_test_report(report, profile)
+
 
 if __name__ == "__main__":
     unittest.main()

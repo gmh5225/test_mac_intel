@@ -97,5 +97,23 @@
   "failed_index_record": "failed-case-index",
   "unexpected_marker": "CPA2_UNEXPECTED_EXCEPTION",
   "scope": "Arm official AEM model: EL1 CPA2 capability, all four effective CPTA/CPTA0 control combinations and EL1 ADDPT overflow controls, nonoverflow GPR/SIMD register-offset access, SP versus general-register SA controls. Normal WB memory uses separate privileged-code and EL0/EL1 RW non-executable data pages, PAN=UAO=0. No Apple silicon, EL0 instruction execution, overflowing memory/other translation/tagging/CPACHECK-choice, or NeverD output qualification.",
-  "model_version_error": "Unexpected official model version"
+  "model_version_error": "Unexpected official model version",
+  "el0_option": "--el0-control",
+  "el0_control": {
+    "scope": "Arm official AEM model: original EL1 CPA2, CPTA/CPTA0 and memory controls plus GPR/SIMD register-offset memory executed at EL0 in all four modes. ERET enters EL0t and the exact returning SVC site, syndrome and hardware SPSR_EL1.M are checked. Shared read-only executable code, EL0/EL1 writable non-executable Normal WB data, PAN=UAO=0. Model-only environment validation. No NeverD output, overflowing memory, every CPACHECK choice, other translation/tagging or Apple hardware qualification.",
+    "expected_passed_cases": 82,
+    "flags": [
+      "-DCPA_GENERATED_EL0_MEMORY=1"
+    ],
+    "gate_values": {
+      "neverd-memory-off": 0,
+      "neverd-memory-on": 0,
+      "neverd-memory-cpta0-only": 0,
+      "neverd-memory-both": 0,
+      "neverd-memory-off-el0-origin": 0,
+      "neverd-memory-on-el0-origin": 0,
+      "neverd-memory-cpta0-only-el0-origin": 0,
+      "neverd-memory-both-el0-origin": 0
+    }
+  }
 }
