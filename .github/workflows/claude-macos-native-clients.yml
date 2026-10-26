@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
       - name: Authenticate private source, rebuild and collect native client evidence
         env:
-          NDC_DARWIN_V82C1_KEY: ${{ secrets.NDC_DARWIN_V82C1_KEY }}
+          NDC_DARWIN_V82C3_KEY: ${{ secrets.NDC_DARWIN_V82C3_KEY }}
         run: python3 -B macos-native-client-recovery/run.py ${{ matrix.arch }}
       - name: Export authenticated encrypted evidence only
         if: always()
