@@ -218,7 +218,8 @@ class EvidenceTests(unittest.TestCase):
                                        ("el0-register", "register"),
                                        ("el0-image", "image"),
                                        ("el0-image-relocated", "image-relocated"),
-                                       ("el0-writeback", "writeback")):
+                                       ("el0-writeback", "writeback"),
+                                       ("el0-vector-writeback", "vector-writeback")):
             profile = generated_memory.select_profile(profile_name)
             config = generated_memory.configuration(profile)
             text = self.transcript(config=config)
@@ -258,6 +259,31 @@ class EvidenceTests(unittest.TestCase):
                         self.transcript({key: value ^ 1}, config=config),
                         0, profile)["passed"])
             for other in ("immediate", "register", "image", "image-relocated"):
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(config=generated_memory.configuration(
+                        generated_memory.select_profile(other))), 0, profile)["passed"])
+
+    def test_vector_writeback_profiles_require_their_own_count_and_controls(self):
+        for name in ("vector-writeback", "el0-vector-writeback"):
+            profile = generated_memory.select_profile(name)
+            self.assertIn("-DCPA_GENERATED_VECTOR_WRITEBACK_MEMORY=1", profile["guest_flags"])
+            self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"], 100)
+            self.assertIn("sizeof(vwb_cases)", profile["count_function"])
+            config = generated_memory.configuration(profile)
+            text = self.transcript(config=config)
+            result = generated_memory.assess(text, 0, profile)
+            self.assertTrue(result[profile["qualification_key"]])
+            self.assertFalse(result["neverd_output_qualified"])
+            self.assertFalse(result["native_apple_cpta_qualified"])
+            for key, value in profile["generated_gate_values"].items():
+                with self.subTest(profile=name, gate=key):
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript(omit=key, config=config), 0, profile)["passed"])
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript({key: value ^ 1}, config=config),
+                        0, profile)["passed"])
+            for other in ("immediate", "register", "image", "image-relocated",
+                          "writeback", "el0-writeback"):
                 self.assertFalse(generated_memory.assess(
                     self.transcript(config=generated_memory.configuration(
                         generated_memory.select_profile(other))), 0, profile)["passed"])

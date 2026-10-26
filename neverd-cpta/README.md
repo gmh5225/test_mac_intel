@@ -160,3 +160,13 @@ register encodings. All four CPTA/CPTA0 combinations remain mandatory; EL0 also
 requires every hardware-origin check. This bounds nonoverflow Normal WB memory
 only. It does not qualify automatic whole images, image relocation, SP/stack
 ABI, SIMD/pairs, overflow/tagging environments or native Apple CPA2 hardware.
+
+The `vector-writeback` and `el0-vector-writeback` profiles require the distinct
+ten-test `AArch64VectorWritebackMemory` report and exactly one
+`arm64e_vector_writeback_memory_artifact_directory` export. The 100 independent
+B/H/S/D/Q single pre/post-index samples compare the complete V value, completed
+base and every buffer byte against original-register native instructions. The
+same five output routes, four CPTA/CPTA0 settings and EL0 origin checks apply.
+These profiles retain the bounded Normal WB, nonoverflow scope; automatic whole
+images, image relocation, original SP/stack ABI, pairs, tagging, foreign exception
+identity and native Apple CPA2 hardware remain unqualified.

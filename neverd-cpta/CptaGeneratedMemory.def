@@ -330,6 +330,70 @@
         "-DCPA_GENERATED_WRITEBACK_MEMORY=1"
       ],
       "expected_passed_cases": 83
+    },
+    "vector-writeback": {
+      "scope": "Actual NeverD explicit-IR SIMD single pre/post-index output: 100 independent LLVM MC B/H/S/D/Q load/store samples, both modes and five signed imm9 boundaries; HighC and LLVMC at O0/O2 plus actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL1. Complete V values, completed bases and every buffer byte are compared with independent original-register native instructions. Model-only nonoverflow Normal WB memory qualification. No automatic whole-image, image relocation, SP/stack ABI, pairs, overflowing memory, tagging, foreign exception identity or Apple CPA2 hardware qualification.",
+      "test_report_cases": [
+        "AArch64VectorWritebackMemory.IndependentWordsRetainSingleInstructions",
+        "AArch64VectorWritebackMemory.BothCProjectionsAndLLVMExecuteEveryFamily",
+        "AArch64VectorWritebackMemory.EveryImmediateKeepsTheIndependentOperandDetail",
+        "AArch64VectorWritebackMemory.ImageContextKeepsTheCompleteRuntimeResults",
+        "AArch64VectorWritebackMemory.MalformedTuplesFailBeforeBodyFiltering",
+        "AArch64VectorWritebackMemory.TracerCommitsCompleteResultsAndRefusesMissingBindings",
+        "AArch64VectorWritebackMemory.LLVMCallAdmissionPrecedesFunctionSelection",
+        "AArch64VectorWritebackMemory.OwnedImagesKeepBothValuesAndReturnedRuntimeBases",
+        "AArch64VectorWritebackMemory.DecodedImagesKeepVectorAndCompletedBaseOccurrences",
+        "AArch64VectorWritebackMemory.DiscardedResultsRetainOriginalMemoryEffects"
+      ],
+      "artifact_property": "arm64e_vector_writeback_memory_artifact_directory",
+      "qualification_key": "explicit_simd_writeback_memory_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 100,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_VECTOR_WRITEBACK_MEMORY=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(vwb_cases) / sizeof(vwb_cases[0]); }\n"
+    },
+    "el0-vector-writeback": {
+      "scope": "Actual NeverD explicit-IR SIMD single pre/post-index output: 100 independent LLVM MC B/H/S/D/Q load/store samples, both modes and five signed imm9 boundaries; HighC and LLVMC at O0/O2 plus actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL0 with hardware SPSR and exact SVC-origin checks. Complete V values, completed bases and every buffer byte are compared with independent original-register native instructions. Model-only nonoverflow Normal WB memory qualification. No automatic whole-image, image relocation, SP/stack ABI, pairs, overflowing memory, tagging, foreign exception identity or Apple CPA2 hardware qualification.",
+      "test_report_cases": [
+        "AArch64VectorWritebackMemory.IndependentWordsRetainSingleInstructions",
+        "AArch64VectorWritebackMemory.BothCProjectionsAndLLVMExecuteEveryFamily",
+        "AArch64VectorWritebackMemory.EveryImmediateKeepsTheIndependentOperandDetail",
+        "AArch64VectorWritebackMemory.ImageContextKeepsTheCompleteRuntimeResults",
+        "AArch64VectorWritebackMemory.MalformedTuplesFailBeforeBodyFiltering",
+        "AArch64VectorWritebackMemory.TracerCommitsCompleteResultsAndRefusesMissingBindings",
+        "AArch64VectorWritebackMemory.LLVMCallAdmissionPrecedesFunctionSelection",
+        "AArch64VectorWritebackMemory.OwnedImagesKeepBothValuesAndReturnedRuntimeBases",
+        "AArch64VectorWritebackMemory.DecodedImagesKeepVectorAndCompletedBaseOccurrences",
+        "AArch64VectorWritebackMemory.DiscardedResultsRetainOriginalMemoryEffects"
+      ],
+      "artifact_property": "arm64e_vector_writeback_memory_artifact_directory",
+      "qualification_key": "explicit_el0_simd_writeback_memory_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 100,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_VECTOR_WRITEBACK_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(vwb_cases) / sizeof(vwb_cases[0]); }\n"
     }
   }
 }

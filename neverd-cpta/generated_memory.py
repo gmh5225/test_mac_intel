@@ -127,7 +127,7 @@ def main():
     if harness.count(CONFIG["main_token"]) != 1:
         raise ValueError(CONFIG["errors"]["harness"])
     harness = harness.replace(CONFIG["main_token"], CONFIG["main_replacement"])
-    (tools / CONFIG["harness_file"]).write_text(harness + CONFIG["count_function"])
+    (tools / CONFIG["harness_file"]).write_text(harness + profile["count_function"])
     harness_object = tools / CONFIG["harness_object"]
     run.execute(
         [args.compiler, *run.CONFIG["compiler_flags"], *CONFIG["generated_flags"],
