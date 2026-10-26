@@ -96,6 +96,12 @@ def main():
     filenames.add(CONFIG["harness_file"])
     for name in sorted(filenames):
         shutil.copy2(args.artifacts / name, inputs / name)
+    headers = tools / CONFIG["headers_directory"]
+    headers.mkdir()
+    for name, contents in CONFIG["headers"].items():
+        (headers / name).write_text(contents)
+    generated_flags = [*CONFIG["generated_flags"], CONFIG["headers_include_flag"],
+                       str(headers)]
     provenance = {
         "neverd_revision": args.neverd_revision,
         "input_export_origin": export_origin,
@@ -105,6 +111,7 @@ def main():
         },
         "workflow_commit": os.environ.get("GITHUB_SHA"),
         "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+        "generated_header_sha256": {p.name: digest(p) for p in headers.iterdir()},
         "model_archive_sha256": run.CONFIG["model_sha256"],
         "model_parameters": run.CONFIG["model_parameters"],
         "scope": profile["scope"],
@@ -130,7 +137,7 @@ def main():
     (tools / CONFIG["harness_file"]).write_text(harness + profile["count_function"])
     harness_object = tools / CONFIG["harness_object"]
     run.execute(
-        [args.compiler, *run.CONFIG["compiler_flags"], *CONFIG["generated_flags"],
+        [args.compiler, *run.CONFIG["compiler_flags"], *generated_flags,
          "-c", str(tools / CONFIG["harness_file"]), "-o", str(harness_object)],
         evidence, "harness-compile", run.CONFIG["build_timeout_seconds"],
     ).check_returncode()
@@ -142,7 +149,7 @@ def main():
         projection = work / CONFIG["projection_object"]
         if route["compile_c"]:
             run.execute(
-                [args.compiler, *run.CONFIG["compiler_flags"], *CONFIG["generated_flags"],
+                [args.compiler, *run.CONFIG["compiler_flags"], *generated_flags,
                  route["optimization"], "-c", str(inputs / route["file"]), "-o", str(projection)],
                 observations, "projection-compile", run.CONFIG["build_timeout_seconds"],
             ).check_returncode()

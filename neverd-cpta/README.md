@@ -170,3 +170,9 @@ same five output routes, four CPTA/CPTA0 settings and EL0 origin checks apply.
 These profiles retain the bounded Normal WB, nonoverflow scope; automatic whole
 images, image relocation, original SP/stack ABI, pairs, tagging, foreign exception
 identity and native Apple CPA2 hardware remain unqualified.
+
+Generated output is compiled unchanged. The environment supplies freestanding
+`string.h` declarations from `CptaGeneratedMemory.def`, since the bare-metal
+Clang target has no system C library headers. The generated header hash is
+recorded alongside source provenance. These declarations supply no library
+implementation and do not replace any instruction or output operation.
