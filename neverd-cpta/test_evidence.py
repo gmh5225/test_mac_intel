@@ -334,6 +334,19 @@ class EvidenceTests(unittest.TestCase):
                         self.assertFalse(generated_memory.assess(
                             self.transcript({key: value ^ 1}, config=config), 0, profile)["passed"])
 
+    def test_ordered_profiles_configure_the_real_optional_model_feature(self):
+        default_parameters = dict(run.CONFIG["model_parameters"])
+        for context in ("ordered", "ordered-image", "ordered-image-relocated"):
+            for prefix in ("", "el0-"):
+                profile = generated_memory.select_profile(prefix + context)
+                config = generated_memory.configuration(profile)
+                self.assertEqual(config["model_parameters"]["cluster0.has_lrcpc3"], "1")
+                self.assertIn("cluster0.has_lrcpc3=1", run.model_command("model", "guest", config))
+                for key, value in default_parameters.items():
+                    self.assertEqual(config["model_parameters"][key], value)
+        self.assertEqual(run.CONFIG["model_parameters"], default_parameters)
+        self.assertNotIn("cluster0.has_lrcpc3=1", run.model_command("model", "guest"))
+
     def test_distinct_output_profiles_require_their_own_export(self):
         for name in generated_memory.CONFIG["profiles"]:
             profile = generated_memory.select_profile(name)

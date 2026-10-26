@@ -189,7 +189,9 @@ their corresponding `el0-` variants, require the distinct nine-test
 and B/H/S/D/Q LDAPUR/STLUR samples. The profiles distinguish explicit runtime
 bases, image-context runtime bases and relocated complete image storage.
 Hardware LRCPC3 readback, sample count, all four effective checking controls
-and every EL0 origin are mandatory. Actual original opcodes retain RCpc and
+and every EL0 origin are mandatory. Only these profiles enable the model's
+documented `cluster0.has_lrcpc3=1` implementation parameter; feature registers
+are read from the model. Actual original opcodes retain RCpc and
 release ordering; sequential model execution does not qualify concurrency
 litmus behavior or native Apple CPA2 hardware. Original SP/stack/call/unwind,
 overflow/tagging and foreign exception identity remain separate work.

@@ -158,9 +158,10 @@ def inspect_model(model, evidence):
             CONFIG["timeout_seconds"]).check_returncode()
 
 
-def model_command(model, guest):
+def model_command(model, guest, config=None):
+    config = CONFIG if config is None else config
     command = [str(model), "--application", str(guest)]
-    for name, value in CONFIG["model_parameters"].items():
+    for name, value in config["model_parameters"].items():
         command += ["-C", f"{name}={value}"]
     return command
 

@@ -31,6 +31,7 @@ def configuration(profile=None):
     config["expected_passed_cases"] = profile["expected_passed_cases"]
     config["required_records"] += list(profile["generated_gate_values"])
     config["gate_values"].update(profile["generated_gate_values"])
+    config["model_parameters"].update(profile.get("model_parameters", {}))
     return config
 
 
@@ -78,6 +79,7 @@ def main():
                         choices=[CONFIG["default_profile"], *CONFIG["profiles"]])
     args = parser.parse_args()
     profile = select_profile(args.profile)
+    config = configuration(profile)
     if (len(args.neverd_revision) != CONFIG["revision_hex_length"]
             or any(c not in CONFIG["revision_hex_digits"] for c in args.neverd_revision)):
         parser.error(CONFIG["errors"]["revision"])
@@ -113,7 +115,7 @@ def main():
         "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
         "generated_header_sha256": {p.name: digest(p) for p in headers.iterdir()},
         "model_archive_sha256": run.CONFIG["model_sha256"],
-        "model_parameters": run.CONFIG["model_parameters"],
+        "model_parameters": config["model_parameters"],
         "scope": profile["scope"],
         "profile": args.profile,
     }
@@ -158,7 +160,7 @@ def main():
         guest = run.build(args.compiler, args.linker, work, observations,
                           profile["guest_flags"], [harness_object, projection])
         start = time.monotonic()
-        result = run.execute(run.model_command(model, guest), observations, "guest",
+        result = run.execute(run.model_command(model, guest, config), observations, "guest",
                              run.CONFIG["timeout_seconds"])
         report = assess(result.stdout, result.returncode, profile)
         report.update(route=route["name"], model_returncode=result.returncode,
