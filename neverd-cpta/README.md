@@ -171,6 +171,18 @@ These profiles retain the bounded Normal WB, nonoverflow scope; automatic whole
 images, image relocation, original SP/stack ABI, pairs, tagging, foreign exception
 identity and native Apple CPA2 hardware remain unqualified.
 
+The `pair` and `el0-pair` profiles require the distinct ten-test
+`AArch64PairMemory` report and exactly one
+`arm64e_pair_memory_artifact_directory` export. They execute 215 independent
+GPR W/X, LDPSW and SIMD S/D/Q pairs, covering non-temporal, offset, pre-index
+and post-index forms with signed imm7 boundary samples. Both complete values,
+the completed base and all 4096 buffer bytes are compared with independent
+original-register instructions. Five output routes, all four CPTA/CPTA0
+settings and every EL0 origin gate remain mandatory. These profiles qualify
+only the declared Normal WB nonoverflow integer bridges; automatic whole
+images, image relocation, original SP/stack ABI, overflow/tagging, native vector
+ABI, foreign exception identity and Apple CPA2 hardware remain unqualified.
+
 Generated output is compiled unchanged. The environment supplies freestanding
 `string.h` declarations from `CptaGeneratedMemory.def`, since the bare-metal
 Clang target has no system C library headers. The generated header hash is

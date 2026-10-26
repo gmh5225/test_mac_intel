@@ -394,6 +394,70 @@
       ],
       "expected_passed_cases": 83,
       "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(vwb_cases) / sizeof(vwb_cases[0]); }\n"
+    },
+    "pair": {
+      "scope": "Actual NeverD explicit-IR GPR W/X, LDPSW and SIMD S/D/Q pair output: 215 independent LLVM MC samples, non-temporal/offset/pre-index/post-index forms and five signed imm7 boundaries; HighC and LLVMC at O0/O2 plus actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL1. Both complete values, completed bases and every 4096-byte buffer are compared with independent original-register native instructions. Model-only nonoverflow Normal WB memory qualification. No automatic whole-image, image relocation, original SP/stack ABI, overflowing memory, tagging, foreign exception identity, native half/vector ABI or Apple CPA2 hardware qualification.",
+      "test_report_cases": [
+        "AArch64PairMemory.BothCProjectionsAndLLVMExecuteEveryFamily",
+        "AArch64PairMemory.ImageContextKeepsCompleteRuntimeResults",
+        "AArch64PairMemory.IndependentWordsAndAllImmediatesKeepOneInstruction",
+        "AArch64PairMemory.MalformedResultsAndSecondOperandsFailBeforeFiltering",
+        "AArch64PairMemory.TracerKeepsBothValuesBaseAndCompleteMemory",
+        "AArch64PairMemory.RegisterRolesRejectAmbiguityAndKeepLegalAliases",
+        "AArch64PairMemory.LLVMAdmissionChecksBothValuesBeforeFunctionSelection",
+        "AArch64PairMemory.OwnedImagesValidateBothAccessesAndReturnedBases",
+        "AArch64PairMemory.DiscardedResultsRetainPairEffects",
+        "AArch64PairMemory.NominalFrameFootprintsCoverBothTransfers"
+      ],
+      "artifact_property": "arm64e_pair_memory_artifact_directory",
+      "qualification_key": "explicit_pair_memory_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 215,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_PAIR_MEMORY=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pair_cases) / sizeof(pair_cases[0]); }\n"
+    },
+    "el0-pair": {
+      "scope": "Actual NeverD explicit-IR GPR W/X, LDPSW and SIMD S/D/Q pair output: 215 independent LLVM MC samples, non-temporal/offset/pre-index/post-index forms and five signed imm7 boundaries; HighC and LLVMC at O0/O2 plus actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL0 with hardware SPSR and exact SVC-origin checks. Both complete values, completed bases and every 4096-byte buffer are compared with independent original-register native instructions. Model-only nonoverflow Normal WB memory qualification. No automatic whole-image, image relocation, original SP/stack ABI, overflowing memory, tagging, foreign exception identity, native half/vector ABI or Apple CPA2 hardware qualification.",
+      "test_report_cases": [
+        "AArch64PairMemory.BothCProjectionsAndLLVMExecuteEveryFamily",
+        "AArch64PairMemory.ImageContextKeepsCompleteRuntimeResults",
+        "AArch64PairMemory.IndependentWordsAndAllImmediatesKeepOneInstruction",
+        "AArch64PairMemory.MalformedResultsAndSecondOperandsFailBeforeFiltering",
+        "AArch64PairMemory.TracerKeepsBothValuesBaseAndCompleteMemory",
+        "AArch64PairMemory.RegisterRolesRejectAmbiguityAndKeepLegalAliases",
+        "AArch64PairMemory.LLVMAdmissionChecksBothValuesBeforeFunctionSelection",
+        "AArch64PairMemory.OwnedImagesValidateBothAccessesAndReturnedBases",
+        "AArch64PairMemory.DiscardedResultsRetainPairEffects",
+        "AArch64PairMemory.NominalFrameFootprintsCoverBothTransfers"
+      ],
+      "artifact_property": "arm64e_pair_memory_artifact_directory",
+      "qualification_key": "explicit_el0_pair_memory_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 215,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_PAIR_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pair_cases) / sizeof(pair_cases[0]); }\n"
     }
   },
   "headers_directory": "include",
