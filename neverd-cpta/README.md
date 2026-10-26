@@ -74,6 +74,10 @@ executes 177 samples under every control combination and requires 79 checks.
 The original generated functions/object stay unchanged; the independent
 harness entry is renamed and exposes its actual array size. Only unused
 formal-parameter warnings are suppressed for the fixed-ABI generated C.
+The generated C's declared plain-pointer memory contract also requires
+`-fno-strict-aliasing`; the shared generated flags apply it to both C
+projections, the independent harness and the freestanding byte runtime.
+Compiler warnings, process deadlines and the memory mapping stay unchanged.
 The model archive, capability/completion gates and 45-second process limit
 remain the same. The default workflow qualifies the two environments; running
 this separate matrix qualifies only its declared explicit-IR inputs.
