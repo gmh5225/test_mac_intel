@@ -216,6 +216,7 @@ class EvidenceTests(unittest.TestCase):
     def test_el0_output_profiles_cannot_borrow_el1_or_other_sample_counts(self):
         for profile_name, el1_name in (("el0-immediate", "immediate"),
                                        ("el0-register", "register"),
+                                       ("el0-image", "image"),
                                        ("el0-image-relocated", "image-relocated")):
             profile = generated_memory.select_profile(profile_name)
             config = generated_memory.configuration(profile)

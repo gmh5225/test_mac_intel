@@ -90,9 +90,12 @@ source bridge, flags and expected observations.
 `--profile image` instead requires the distinct
 `cpta_image_memory_artifacts` export from that same eight-test report. These
 177 functions were emitted with a Mach-O image context but use explicit runtime
-GPR parameters. It grants only
+GPR parameters, including scalar SSA arithmetic. It grants only
 `explicit_image_context_runtime_memory_output_qualified`; it does not qualify
-image-derived addresses or relocation.
+image-derived addresses or relocation. `--profile el0-image` uses the same
+export at EL0 and additionally checks hardware exception origin under every
+control combination. Its separate key is
+`explicit_el0_image_context_runtime_memory_output_qualified`.
 
 `--profile image-relocated` requires the separate
 `cpta_relocated_memory_artifacts` export. Its 177 cases use image-owned base
