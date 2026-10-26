@@ -458,6 +458,195 @@
       ],
       "expected_passed_cases": 83,
       "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pair_cases) / sizeof(pair_cases[0]); }\n"
+    },
+    "ordered": {
+      "scope": "Actual NeverD original GPR/SIMD LDAPUR/STLUR output: 115 independent LLVM MC samples covering all23 ordered unscaled families and five signed imm9 boundaries, complete scalar/vector results and every66064 buffer byte, HighC/LLVMC O0/O2 and actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL1. Explicit IR with runtime GPR parameters. LRCPC3 hardware feature readback is mandatory; original instructions retain RCpc acquire/release ordering. This is sequential Normal WB/nonoverflow model qualification, not a concurrency litmus, original SP/stack/call/unwind ABI, overflow/tag/foreign exception identity or native Apple CPA2 hardware qualification.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_ORDERED_MEMORY=1"
+      ],
+      "expected_passed_cases": 80,
+      "generated_gate_values": {
+        "neverd-memory-samples": 115,
+        "ordered-lrcpc-level": 3,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "test_report_cases": [
+        "AArch64OrderedMemory.IndependentWordsAndEveryImmediateKeepOneOperation",
+        "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+        "AArch64OrderedMemory.ImageContextPreservesRuntimeBases",
+        "AArch64OrderedMemory.ImageRelocationRetainsCompleteOrderedAccesses",
+        "AArch64OrderedMemory.TracerUsesExactOriginalMemoryShapes",
+        "AArch64OrderedMemory.MalformedOperationsFailBeforeSourceFiltering",
+        "AArch64OrderedMemory.UnallocatedFormsCannotReachLegacyHandlers",
+        "AArch64OrderedMemory.RegisterRolesKeepSPAndZeroDistinct",
+        "AArch64OrderedMemory.DiscardedReadsRetainOrderedEffects"
+      ],
+      "artifact_property": "arm64e_ordered_memory_artifact_directory",
+      "qualification_key": "explicit_ordered_memory_output_qualified"
+    },
+    "el0-ordered": {
+      "scope": "Actual NeverD original GPR/SIMD LDAPUR/STLUR output: 115 independent LLVM MC samples covering all23 ordered unscaled families and five signed imm9 boundaries, complete scalar/vector results and every66064 buffer byte, HighC/LLVMC O0/O2 and actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL0 with exact hardware SPSR/SVC origin checks. Explicit IR with runtime GPR parameters. LRCPC3 hardware feature readback is mandatory; original instructions retain RCpc acquire/release ordering. This is sequential Normal WB/nonoverflow model qualification, not a concurrency litmus, original SP/stack/call/unwind ABI, overflow/tag/foreign exception identity or native Apple CPA2 hardware qualification.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_ORDERED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 84,
+      "generated_gate_values": {
+        "neverd-memory-samples": 115,
+        "ordered-lrcpc-level": 3,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "test_report_cases": [
+        "AArch64OrderedMemory.IndependentWordsAndEveryImmediateKeepOneOperation",
+        "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+        "AArch64OrderedMemory.ImageContextPreservesRuntimeBases",
+        "AArch64OrderedMemory.ImageRelocationRetainsCompleteOrderedAccesses",
+        "AArch64OrderedMemory.TracerUsesExactOriginalMemoryShapes",
+        "AArch64OrderedMemory.MalformedOperationsFailBeforeSourceFiltering",
+        "AArch64OrderedMemory.UnallocatedFormsCannotReachLegacyHandlers",
+        "AArch64OrderedMemory.RegisterRolesKeepSPAndZeroDistinct",
+        "AArch64OrderedMemory.DiscardedReadsRetainOrderedEffects"
+      ],
+      "artifact_property": "arm64e_ordered_memory_artifact_directory",
+      "qualification_key": "explicit_el0_ordered_memory_output_qualified"
+    },
+    "ordered-image": {
+      "scope": "Actual NeverD original GPR/SIMD LDAPUR/STLUR output: 115 independent LLVM MC samples covering all23 ordered unscaled families and five signed imm9 boundaries, complete scalar/vector results and every66064 buffer byte, HighC/LLVMC O0/O2 and actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL1. Mach-O image context with runtime GPR parameters and alternating scalar SSA arithmetic. LRCPC3 hardware feature readback is mandatory; original instructions retain RCpc acquire/release ordering. This is sequential Normal WB/nonoverflow model qualification, not a concurrency litmus, original SP/stack/call/unwind ABI, overflow/tag/foreign exception identity or native Apple CPA2 hardware qualification.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_ORDERED_MEMORY=1"
+      ],
+      "expected_passed_cases": 80,
+      "generated_gate_values": {
+        "neverd-memory-samples": 115,
+        "ordered-lrcpc-level": 3,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "test_report_cases": [
+        "AArch64OrderedMemory.IndependentWordsAndEveryImmediateKeepOneOperation",
+        "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+        "AArch64OrderedMemory.ImageContextPreservesRuntimeBases",
+        "AArch64OrderedMemory.ImageRelocationRetainsCompleteOrderedAccesses",
+        "AArch64OrderedMemory.TracerUsesExactOriginalMemoryShapes",
+        "AArch64OrderedMemory.MalformedOperationsFailBeforeSourceFiltering",
+        "AArch64OrderedMemory.UnallocatedFormsCannotReachLegacyHandlers",
+        "AArch64OrderedMemory.RegisterRolesKeepSPAndZeroDistinct",
+        "AArch64OrderedMemory.DiscardedReadsRetainOrderedEffects"
+      ],
+      "artifact_property": "arm64e_ordered_memory_image_artifact_directory",
+      "qualification_key": "explicit_ordered_image_memory_output_qualified"
+    },
+    "el0-ordered-image": {
+      "scope": "Actual NeverD original GPR/SIMD LDAPUR/STLUR output: 115 independent LLVM MC samples covering all23 ordered unscaled families and five signed imm9 boundaries, complete scalar/vector results and every66064 buffer byte, HighC/LLVMC O0/O2 and actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL0 with exact hardware SPSR/SVC origin checks. Mach-O image context with runtime GPR parameters and alternating scalar SSA arithmetic. LRCPC3 hardware feature readback is mandatory; original instructions retain RCpc acquire/release ordering. This is sequential Normal WB/nonoverflow model qualification, not a concurrency litmus, original SP/stack/call/unwind ABI, overflow/tag/foreign exception identity or native Apple CPA2 hardware qualification.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_ORDERED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 84,
+      "generated_gate_values": {
+        "neverd-memory-samples": 115,
+        "ordered-lrcpc-level": 3,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "test_report_cases": [
+        "AArch64OrderedMemory.IndependentWordsAndEveryImmediateKeepOneOperation",
+        "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+        "AArch64OrderedMemory.ImageContextPreservesRuntimeBases",
+        "AArch64OrderedMemory.ImageRelocationRetainsCompleteOrderedAccesses",
+        "AArch64OrderedMemory.TracerUsesExactOriginalMemoryShapes",
+        "AArch64OrderedMemory.MalformedOperationsFailBeforeSourceFiltering",
+        "AArch64OrderedMemory.UnallocatedFormsCannotReachLegacyHandlers",
+        "AArch64OrderedMemory.RegisterRolesKeepSPAndZeroDistinct",
+        "AArch64OrderedMemory.DiscardedReadsRetainOrderedEffects"
+      ],
+      "artifact_property": "arm64e_ordered_memory_image_artifact_directory",
+      "qualification_key": "explicit_el0_ordered_image_memory_output_qualified"
+    },
+    "ordered-image-relocated": {
+      "scope": "Actual NeverD original GPR/SIMD LDAPUR/STLUR output: 115 independent LLVM MC samples covering all23 ordered unscaled families and five signed imm9 boundaries, complete scalar/vector results and every66064 buffer byte, HighC/LLVMC O0/O2 and actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL1. Relocated complete initialized image storage with alternating direct/SSA COPY bases and independent storage-alias getter. LRCPC3 hardware feature readback is mandatory; original instructions retain RCpc acquire/release ordering. This is sequential Normal WB/nonoverflow model qualification, not a concurrency litmus, original SP/stack/call/unwind ABI, overflow/tag/foreign exception identity or native Apple CPA2 hardware qualification.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_ORDERED_MEMORY=1"
+      ],
+      "expected_passed_cases": 80,
+      "generated_gate_values": {
+        "neverd-memory-samples": 115,
+        "ordered-lrcpc-level": 3,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0
+      },
+      "test_report_cases": [
+        "AArch64OrderedMemory.IndependentWordsAndEveryImmediateKeepOneOperation",
+        "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+        "AArch64OrderedMemory.ImageContextPreservesRuntimeBases",
+        "AArch64OrderedMemory.ImageRelocationRetainsCompleteOrderedAccesses",
+        "AArch64OrderedMemory.TracerUsesExactOriginalMemoryShapes",
+        "AArch64OrderedMemory.MalformedOperationsFailBeforeSourceFiltering",
+        "AArch64OrderedMemory.UnallocatedFormsCannotReachLegacyHandlers",
+        "AArch64OrderedMemory.RegisterRolesKeepSPAndZeroDistinct",
+        "AArch64OrderedMemory.DiscardedReadsRetainOrderedEffects"
+      ],
+      "artifact_property": "arm64e_ordered_memory_relocated_artifact_directory",
+      "qualification_key": "explicit_ordered_image_relocated_memory_output_qualified"
+    },
+    "el0-ordered-image-relocated": {
+      "scope": "Actual NeverD original GPR/SIMD LDAPUR/STLUR output: 115 independent LLVM MC samples covering all23 ordered unscaled families and five signed imm9 boundaries, complete scalar/vector results and every66064 buffer byte, HighC/LLVMC O0/O2 and actual LLVM ELF, all four effective CPTA/CPTA0 settings at EL0 with exact hardware SPSR/SVC origin checks. Relocated complete initialized image storage with alternating direct/SSA COPY bases and independent storage-alias getter. LRCPC3 hardware feature readback is mandatory; original instructions retain RCpc acquire/release ordering. This is sequential Normal WB/nonoverflow model qualification, not a concurrency litmus, original SP/stack/call/unwind ABI, overflow/tag/foreign exception identity or native Apple CPA2 hardware qualification.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_ORDERED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 84,
+      "generated_gate_values": {
+        "neverd-memory-samples": 115,
+        "ordered-lrcpc-level": 3,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "test_report_cases": [
+        "AArch64OrderedMemory.IndependentWordsAndEveryImmediateKeepOneOperation",
+        "AArch64OrderedMemory.BothCProjectionsAndLLVMRetainOrderedInstructions",
+        "AArch64OrderedMemory.ImageContextPreservesRuntimeBases",
+        "AArch64OrderedMemory.ImageRelocationRetainsCompleteOrderedAccesses",
+        "AArch64OrderedMemory.TracerUsesExactOriginalMemoryShapes",
+        "AArch64OrderedMemory.MalformedOperationsFailBeforeSourceFiltering",
+        "AArch64OrderedMemory.UnallocatedFormsCannotReachLegacyHandlers",
+        "AArch64OrderedMemory.RegisterRolesKeepSPAndZeroDistinct",
+        "AArch64OrderedMemory.DiscardedReadsRetainOrderedEffects"
+      ],
+      "artifact_property": "arm64e_ordered_memory_relocated_artifact_directory",
+      "qualification_key": "explicit_el0_ordered_image_relocated_memory_output_qualified"
     }
   },
   "headers_directory": "include",

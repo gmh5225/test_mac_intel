@@ -188,6 +188,14 @@ void guestMain(void) {
   expect(((PFR >> CPA_EL2_SHIFT) & CPA_EL_FIELD_MASK) == 0);
   expect(((PFR >> CPA_EL3_SHIFT) & CPA_EL_FIELD_MASK) == 0);
   expect((ISAR & CPA_EL_FIELD_MASK) == CPA_FEATURE_LEVEL);
+#if defined(CPA_GENERATED_ORDERED_MEMORY)
+  uint64_t ISAR1;
+  __asm__ volatile(CPA_READ_ISAR1 : CPA_REGISTER_OUTPUT(ISAR1));
+  const uint64_t OrderedLevel =
+      (ISAR1 >> CPA_ORDERED_FEATURE_SHIFT) & CPA_EL_FIELD_MASK;
+  record(CPA_ORDERED_FEATURE_NAME, OrderedLevel);
+  expect(OrderedLevel == CPA_ORDERED_FEATURE_LEVEL);
+#endif
   if (Failed)
     finish();
 

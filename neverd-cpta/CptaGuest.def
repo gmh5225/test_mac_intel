@@ -56,6 +56,10 @@
 #define CPA_READ_EL "mrs %0, CurrentEL"
 #define CPA_READ_PFR "mrs %0, ID_AA64PFR0_EL1"
 #define CPA_READ_ISAR3 "mrs %0, S3_0_C0_C6_3"
+#define CPA_READ_ISAR1 "mrs %0, ID_AA64ISAR1_EL1"
+#define CPA_ORDERED_FEATURE_SHIFT 20
+#define CPA_ORDERED_FEATURE_LEVEL 3
+#define CPA_ORDERED_FEATURE_NAME "ordered-lrcpc-level"
 #define CPA_READ_SCTLR2 "mrs %0, S3_0_C1_C0_3"
 #define CPA_WRITE_SCTLR2 "msr S3_0_C1_C0_3, %0\n\tisb"
 #define CPA_READ_SCTLR "mrs %0, SCTLR_EL1"
@@ -121,7 +125,9 @@
 #define CPA_MEMORY_EL0_ON_NAME "neverd-memory-on-el0-origin"
 #define CPA_MEMORY_EL0_CPTA0_NAME "neverd-memory-cpta0-only-el0-origin"
 #define CPA_MEMORY_EL0_BOTH_NAME "neverd-memory-both-el0-origin"
-#if defined(CPA_GENERATED_PAIR_MEMORY)
+#if defined(CPA_GENERATED_ORDERED_MEMORY)
+#define CPA_GENERATED_SAMPLE_COUNT 115
+#elif defined(CPA_GENERATED_PAIR_MEMORY)
 #define CPA_GENERATED_SAMPLE_COUNT 215
 #elif defined(CPA_GENERATED_VECTOR_WRITEBACK_MEMORY)
 #define CPA_GENERATED_SAMPLE_COUNT 100

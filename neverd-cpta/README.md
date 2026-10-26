@@ -183,6 +183,17 @@ only the declared Normal WB nonoverflow integer bridges; automatic whole
 images, image relocation, original SP/stack ABI, overflow/tagging, native vector
 ABI, foreign exception identity and Apple CPA2 hardware remain unqualified.
 
+The `ordered`, `ordered-image` and `ordered-image-relocated` profiles, with
+their corresponding `el0-` variants, require the distinct nine-test
+`AArch64OrderedMemory` report. Each exports 115 independently assembled GPR
+and B/H/S/D/Q LDAPUR/STLUR samples. The profiles distinguish explicit runtime
+bases, image-context runtime bases and relocated complete image storage.
+Hardware LRCPC3 readback, sample count, all four effective checking controls
+and every EL0 origin are mandatory. Actual original opcodes retain RCpc and
+release ordering; sequential model execution does not qualify concurrency
+litmus behavior or native Apple CPA2 hardware. Original SP/stack/call/unwind,
+overflow/tagging and foreign exception identity remain separate work.
+
 Generated output is compiled unchanged. The environment supplies freestanding
 `string.h` declarations from `CptaGeneratedMemory.def`, since the bare-metal
 Clang target has no system C library headers. The generated header hash is

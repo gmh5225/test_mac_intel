@@ -220,7 +220,10 @@ class EvidenceTests(unittest.TestCase):
                                        ("el0-image-relocated", "image-relocated"),
                                        ("el0-writeback", "writeback"),
                                        ("el0-vector-writeback", "vector-writeback"),
-                                       ("el0-pair", "pair")):
+                                       ("el0-pair", "pair"),
+                                       ("el0-ordered", "ordered"),
+                                       ("el0-ordered-image", "ordered-image"),
+                                       ("el0-ordered-image-relocated", "ordered-image-relocated")):
             profile = generated_memory.select_profile(profile_name)
             config = generated_memory.configuration(profile)
             text = self.transcript(config=config)
@@ -310,6 +313,26 @@ class EvidenceTests(unittest.TestCase):
                 self.assertFalse(generated_memory.assess(
                     self.transcript(config=generated_memory.configuration(
                         generated_memory.select_profile(other))), 0, profile)["passed"])
+
+    def test_ordered_profiles_require_their_own_report_and_feature(self):
+        for context in ("ordered", "ordered-image", "ordered-image-relocated"):
+            for prefix in ("", "el0-"):
+                profile = generated_memory.select_profile(prefix + context)
+                self.assertIn("-DCPA_GENERATED_ORDERED_MEMORY=1", profile["guest_flags"])
+                self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"], 115)
+                self.assertEqual(profile["generated_gate_values"]["ordered-lrcpc-level"], 3)
+                self.assertEqual(len(profile["test_report_cases"]), 9)
+                config = generated_memory.configuration(profile)
+                result = generated_memory.assess(self.transcript(config=config), 0, profile)
+                self.assertTrue(result[profile["qualification_key"]])
+                self.assertFalse(result["neverd_output_qualified"])
+                self.assertFalse(result["native_apple_cpta_qualified"])
+                for key, value in profile["generated_gate_values"].items():
+                    with self.subTest(profile=prefix + context, gate=key):
+                        self.assertFalse(generated_memory.assess(
+                            self.transcript(omit=key, config=config), 0, profile)["passed"])
+                        self.assertFalse(generated_memory.assess(
+                            self.transcript({key: value ^ 1}, config=config), 0, profile)["passed"])
 
     def test_distinct_output_profiles_require_their_own_export(self):
         for name in generated_memory.CONFIG["profiles"]:
