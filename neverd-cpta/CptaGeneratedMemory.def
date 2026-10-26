@@ -225,6 +225,32 @@
       ],
       "artifact_property": "cpta_register_memory_artifacts",
       "qualification_key": "explicit_el0_register_memory_output_qualified"
+    },
+    "image-relocated": {
+      "scope": "Actual NeverD explicit-IR immediate-memory output using relocated image-owned GPR bases: 177 samples, alternating direct address occurrences and SSA COPY, five unchanged C/object routes, all four effective CPTA/CPTA0 settings at EL1. Each access must alias an independent getter for the same complete initialized image storage; all bytes are compared with native oracles. Model-only nonoverflow qualification. No automatic whole-pipeline qualification, original SP or stack ABI, EL0, writeback/pairs, tagging, overflowing memory, native half/whole-vector ABI or Apple CPA2 hardware.",
+      "artifact_property": "cpta_relocated_memory_artifacts",
+      "qualification_key": "explicit_relocated_image_memory_output_qualified"
+    },
+    "el0-image-relocated": {
+      "scope": "Actual NeverD explicit-IR immediate-memory output using relocated image-owned GPR bases: 177 samples, alternating direct address occurrences and SSA COPY, five unchanged C/object routes, all four effective CPTA/CPTA0 settings at EL0, with hardware SPSR_EL1.M and exact SVC origin checks. Each access must alias an independent getter for the same complete initialized image storage; all bytes are compared with native oracles. Model-only nonoverflow qualification. No automatic whole-pipeline qualification, original SP or stack ABI, writeback/pairs, tagging, overflowing memory, native half/whole-vector ABI or Apple CPA2 hardware.",
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "generated_gate_values": {
+        "neverd-memory-samples": 177,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0
+      },
+      "qualification_key": "explicit_el0_relocated_image_memory_output_qualified",
+      "artifact_property": "cpta_relocated_memory_artifacts"
     }
   }
 }

@@ -94,6 +94,16 @@ GPR parameters. It grants only
 `explicit_image_context_runtime_memory_output_qualified`; it does not qualify
 image-derived addresses or relocation.
 
+`--profile image-relocated` requires the separate
+`cpta_relocated_memory_artifacts` export. Its 177 cases use image-owned base
+addresses, alternating direct occurrences and SSA COPY. An independent getter
+must alias the same complete storage as every original access. This proves
+nonoverflow rebasing for these explicit fixtures, including negative and maximum
+Q displacements, without qualifying an entire automatically lifted program.
+`--profile el0-image-relocated` executes that same export through the EL0 entry
+and origin checks. Both profiles retain the five unchanged C/object routes,
+all four effective controls and the complete eight-test input gate.
+
 `--profile el0-immediate` executes the original 177-sample export at EL0;
 `--profile el0-register` uses the seven-test SP report and its matching
 `cpta_register_memory_artifacts` export for all 184 GPR/SIMD register-offset

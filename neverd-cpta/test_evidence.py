@@ -215,7 +215,8 @@ class EvidenceTests(unittest.TestCase):
 
     def test_el0_output_profiles_cannot_borrow_el1_or_other_sample_counts(self):
         for profile_name, el1_name in (("el0-immediate", "immediate"),
-                                       ("el0-register", "register")):
+                                       ("el0-register", "register"),
+                                       ("el0-image-relocated", "image-relocated")):
             profile = generated_memory.select_profile(profile_name)
             config = generated_memory.configuration(profile)
             text = self.transcript(config=config)
@@ -237,23 +238,26 @@ class EvidenceTests(unittest.TestCase):
                         self.transcript({name: expected ^ 1}, config=config),
                         0, profile)["passed"])
 
-    def test_image_context_profile_requires_its_distinct_export(self):
-        profile = generated_memory.select_profile("image")
-        cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
-                  "result": "COMPLETED"}
-                 for identity in profile["test_report_cases"]]
-        suite = profile["test_report_cases"][0].rsplit(".", 1)[0]
-        cases[0][generated_memory.CONFIG["artifact_property"]] = self.id()
-        report = {"tests": len(cases), "failures": 0, "errors": 0,
-                  "testsuites": [{"name": suite, "testsuite": cases}]}
-        with self.assertRaises(ValueError):
-            generated_memory.validate_test_report(report, profile)
-        cases[-1][profile["artifact_property"]] = self.id()
-        self.assertEqual(generated_memory.validate_test_report(report, profile),
-                         self.id())
-        cases[0][profile["artifact_property"]] = self.id()
-        with self.assertRaises(ValueError):
-            generated_memory.validate_test_report(report, profile)
+    def test_distinct_output_profiles_require_their_own_export(self):
+        for name in generated_memory.CONFIG["profiles"]:
+            profile = generated_memory.select_profile(name)
+            if profile["artifact_property"] == generated_memory.CONFIG["artifact_property"]:
+                continue
+            cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
+                      "result": "COMPLETED"}
+                     for identity in profile["test_report_cases"]]
+            suite = profile["test_report_cases"][0].rsplit(".", 1)[0]
+            cases[0][generated_memory.CONFIG["artifact_property"]] = self.id()
+            report = {"tests": len(cases), "failures": 0, "errors": 0,
+                      "testsuites": [{"name": suite, "testsuite": cases}]}
+            with self.assertRaises(ValueError):
+                generated_memory.validate_test_report(report, profile)
+            cases[-1][profile["artifact_property"]] = self.id()
+            self.assertEqual(generated_memory.validate_test_report(report, profile),
+                             self.id())
+            cases[0][profile["artifact_property"]] = self.id()
+            with self.assertRaises(ValueError):
+                generated_memory.validate_test_report(report, profile)
 
 
 if __name__ == "__main__":
