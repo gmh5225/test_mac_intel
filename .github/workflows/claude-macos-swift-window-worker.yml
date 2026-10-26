@@ -30,9 +30,11 @@ jobs:
           python-version: '3.12'
       - name: Stage private input batch 1
         env:
-          NDC_SWIFT_V74D2_000: ${{ secrets.NDC_SWIFT_V74D2_000 }}
-          NDC_SWIFT_V74D2_001: ${{ secrets.NDC_SWIFT_V74D2_001 }}
-        run: python3 -B macos-swift-window-worker/run.py receive 0 2
+          NDC_SWIFT_V75N1_000: ${{ secrets.NDC_SWIFT_V75N1_000 }}
+          NDC_SWIFT_V75N1_001: ${{ secrets.NDC_SWIFT_V75N1_001 }}
+          NDC_SWIFT_V75N1_002: ${{ secrets.NDC_SWIFT_V75N1_002 }}
+          NDC_SWIFT_V75N1_003: ${{ secrets.NDC_SWIFT_V75N1_003 }}
+        run: python3 -B macos-swift-window-worker/run.py receive 0 4
       - name: Record capture worker modes and source package rebuild
         run: python3 -B macos-swift-window-worker/run.py ${{ matrix.arch }}
       - name: Export encrypted evidence only
