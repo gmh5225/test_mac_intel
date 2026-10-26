@@ -85,6 +85,10 @@ def main():
         parser.error(CONFIG["errors"]["revision"])
     test_report = json.loads(args.test_report.read_text())
     export_origin = validate_test_report(test_report, profile)
+    if profile.get("artifact_batches"):
+        import grouped_memory
+        return grouped_memory.execute(args, profile, config, export_origin,
+                                      CONFIG, assess)
     root = args.output.resolve()
     root.mkdir()
     tools = root / CONFIG["tools_directory"]

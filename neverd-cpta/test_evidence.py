@@ -294,15 +294,15 @@ class EvidenceTests(unittest.TestCase):
 
     def test_structure_batches_require_their_count_context_and_all_controls(self):
         names = [name for name in generated_memory.CONFIG["profiles"]
-                 if "structure" in name]
+                 if "structure" in name and "-group-" not in name]
         self.assertEqual(len(names), 8)
         for name in names:
             profile = generated_memory.select_profile(name)
             self.assertIn("-DCPA_GENERATED_STRUCTURE_MEMORY=1", profile["guest_flags"])
             self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"],
-                             78 if name.endswith("tail") else 96)
+                             30 if name.endswith("tail") else 48)
             self.assertIn("sizeof(structure_cases)", profile["count_function"])
-            self.assertEqual(len(profile["test_report_cases"]), 12)
+            self.assertEqual(len(profile["test_report_cases"]), 58)
             config = generated_memory.configuration(profile)
             result = generated_memory.assess(self.transcript(config=config), 0, profile)
             self.assertTrue(result[profile["qualification_key"]])
@@ -325,13 +325,16 @@ class EvidenceTests(unittest.TestCase):
             if "structure" not in name:
                 continue
             profile = generated_memory.select_profile(name)
-            cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
-                      "result": "COMPLETED"}
-                     for identity in profile["test_report_cases"]]
+            suites = {}
+            for identity in profile["test_report_cases"]:
+                suite, case = identity.rsplit(".", 1)
+                suites.setdefault(suite, []).append(
+                    {"name": case, "status": "RUN", "result": "COMPLETED"})
+            cases = [case for values in suites.values() for case in values]
             cases[0][profile["artifact_property"]] = self.id()
             report = {"tests": len(cases), "failures": 0, "errors": 0,
-                      "testsuites": [{"name": "AArch64StructureMemory",
-                                      "testsuite": cases}]}
+                      "testsuites": [{"name": name, "testsuite": values}
+                                     for name, values in suites.items()]}
             self.assertEqual(generated_memory.validate_test_report(report, profile),
                              self.id())
             cases[-1]["result"] = "SKIPPED"
@@ -344,6 +347,66 @@ class EvidenceTests(unittest.TestCase):
                 else name.replace("structure", "structure-image"))
             with self.assertRaises(ValueError):
                 generated_memory.validate_test_report(report, opposite)
+
+    def test_structure_groups_preserve_all_batches_and_actual_counts(self):
+        names = [name for name in generated_memory.CONFIG["profiles"]
+                 if "structure" in name and "-group-" in name]
+        self.assertEqual(len(names), 12)
+        for name in names:
+            profile = generated_memory.select_profile(name)
+            group = int(name.rsplit("-", 1)[1])
+            self.assertEqual(profile["artifact_batches"],
+                             [f"batch-{index * 48}"
+                              for index in range(group * 8, (group + 1) * 8)])
+            self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"],
+                             366 if group == 2 else 384)
+            self.assertIn("-DCPA_GENERATED_STRUCTURE_GROUP_MEMORY=1", profile["guest_flags"])
+            config = generated_memory.configuration(profile)
+            result = generated_memory.assess(self.transcript(config=config), 0, profile)
+            self.assertTrue(result[profile["qualification_key"]])
+            for key, value in profile["generated_gate_values"].items():
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(omit=key, config=config), 0, profile)["passed"])
+                self.assertFalse(generated_memory.assess(
+                    self.transcript({key: value ^ 1}, config=config), 0, profile)["passed"])
+            batch = generated_memory.select_profile(name.rsplit("-group-", 1)[0])
+            self.assertFalse(generated_memory.assess(
+                self.transcript(config=generated_memory.configuration(batch)), 0,
+                profile)["passed"])
+
+    def test_group_entry_executes_every_batch_and_propagates_each_failure(self):
+        import grouped_memory
+        import shutil
+        import subprocess
+        import tempfile
+        from pathlib import Path
+        grouped = generated_memory.CONFIG["grouped"]
+        batch_count = len(generated_memory.select_profile(
+            "structure-group-0")["artifact_batches"])
+        source = grouped["probe_globals"]
+        source += grouped_memory.render_entry(grouped, batch_count)
+        for index in range(batch_count):
+            source += grouped["probe_batch"].format(
+                entry=grouped["entry_name"].format(index=index),
+                count=grouped["count_name"].format(index=index),
+                index=index, length=index + 1)
+        source += grouped["probe_main"].format(
+            samples=sum(range(1, batch_count + 1)), batches=batch_count)
+        compiler = shutil.which("cc")
+        self.assertIsNotNone(compiler)
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            path = directory / "probe.c"
+            path.write_text(source)
+            binary = directory / "probe"
+            subprocess.run([compiler, "-std=c11", "-O2", str(path), "-o", str(binary)],
+                           check=True, timeout=run.CONFIG["build_timeout_seconds"],
+                           capture_output=True)
+            for failure in range(-1, batch_count):
+                with self.subTest(failure=failure):
+                    subprocess.run([str(binary), str(failure + 1)], check=True,
+                                   timeout=run.CONFIG["timeout_seconds"],
+                                   capture_output=True)
 
     def test_pair_profiles_require_both_results_and_their_own_counts(self):
         for name in ("pair", "el0-pair"):
@@ -405,13 +468,16 @@ class EvidenceTests(unittest.TestCase):
             profile = generated_memory.select_profile(name)
             if profile["artifact_property"] == generated_memory.CONFIG["artifact_property"]:
                 continue
-            cases = [{"name": identity.rsplit(".", 1)[1], "status": "RUN",
-                      "result": "COMPLETED"}
-                     for identity in profile["test_report_cases"]]
-            suite = profile["test_report_cases"][0].rsplit(".", 1)[0]
+            suites = {}
+            for identity in profile["test_report_cases"]:
+                suite, case = identity.rsplit(".", 1)
+                suites.setdefault(suite, []).append(
+                    {"name": case, "status": "RUN", "result": "COMPLETED"})
+            cases = [case for values in suites.values() for case in values]
             cases[0][generated_memory.CONFIG["artifact_property"]] = self.id()
             report = {"tests": len(cases), "failures": 0, "errors": 0,
-                      "testsuites": [{"name": suite, "testsuite": cases}]}
+                      "testsuites": [{"name": name, "testsuite": values}
+                                     for name, values in suites.items()]}
             with self.assertRaises(ValueError):
                 generated_memory.validate_test_report(report, profile)
             cases[-1][profile["artifact_property"]] = self.id()

@@ -206,11 +206,11 @@ recorded alongside source provenance. These declarations supply no library
 implementation and do not replace any instruction or output operation.
 
 The `structure`, `structure-image`, and corresponding `el0-` profiles consume
-NeverD's baseline AdvSIMD structure-memory exports. They require all twelve
-named source tests, complete C/object artifacts and the actual exported
-`structure_cases` array count. The first eleven batches contain 96 cases each;
+NeverD's baseline AdvSIMD structure-memory exports. They require all 58
+named core/projection tests, complete C/object artifacts and the actual exported
+`structure_cases` array count. The first twenty-three batches contain 48 cases each;
 `structure-tail`/`structure-image-tail` and their `el0-` variants require the
-last 78 cases, for 1,134 independent LLVM MC samples overall. Each case compares
+last 30 cases, for 1,134 independent LLVM MC samples overall. Each case compares
 three post-index deltas, all 128-bit vector results, the completed base and
 every byte of the memory/output buffers against the original register encoding.
 The explicit and image-context exports have distinct report properties. A
@@ -221,3 +221,13 @@ deadline remain mandatory. These are bounded, nonoverflow Normal WB integer
 bridges. They do not qualify original SP/frame/call/unwind execution, dynamic
 post-index relocation of a fixed image base, arbitrary native vector ABI,
 tagging/foreign faults or Apple CPA2 hardware.
+
+The twelve `structure[-image]-group-0/1/2` profiles, including their `el0-`
+variants, compile eight unchanged batch exports into each bounded guest. The
+three groups contain 384, 384 and 366 cases. Each harness remains a separate
+translation unit; only its entry is renamed, and its actual array length is
+exposed. A thin guest entry calls every batch and sums those lengths. C and
+LLVM objects remain unchanged. Input hashes name every original batch file.
+This avoids repeating environment startup for each small compiler batch; it
+keeps the original mapping, link-size checks and per-process timeouts. A failed
+batch, wrong sum or incomplete control matrix still fails the whole group.
