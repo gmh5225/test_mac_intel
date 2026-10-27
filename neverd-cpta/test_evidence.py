@@ -450,7 +450,7 @@ class EvidenceTests(unittest.TestCase):
         for name in ("sp-flow", "el0-sp-flow"):
             profile = generated_memory.select_profile(name)
             self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"], 20)
-            self.assertEqual(len(profile["test_report_cases"]), 8)
+            self.assertEqual(len(profile["test_report_cases"]), 9)
             self.assertIn("-DCPA_GENERATED_SP_FLOW=1", profile["guest_flags"])
             self.assertIn("sizeof(flow_cases)", profile["count_function"])
             config = generated_memory.configuration(profile)
