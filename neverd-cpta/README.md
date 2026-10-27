@@ -253,3 +253,12 @@ case. NEON reports require that same admission case and all 24 SP batches.
 Each profile grants only its specific raw-SP primitive qualification. Normal
 completion does not qualify a reconstructed frame/call/unwind ABI, asynchronous
 unwind, tagged or overflowing addresses, fault identity or Apple CPA2 hardware.
+
+`sp-flow` and `el0-sp-flow` consume twenty original-SP sequences, one for each
+scalar, vector, pair and NEON writeback identity. The completed base passes
+through copies into a second literal-SP load. The exact source-flow tests must
+also pass, including all incoming PHI arms, anchored loops and mutable source
+uses before and after reassignment. Each route compares the second value,
+completed SP and every buffer byte. These profiles require the same four
+controls, alignment readbacks and EL0 origin as the other SP profiles; they do
+not grant a reconstructed stack or unwind ABI.

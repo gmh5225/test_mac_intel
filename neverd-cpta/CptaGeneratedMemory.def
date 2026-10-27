@@ -2964,6 +2964,73 @@
         "batch-1056",
         "batch-1104"
       ]
+    },
+    "sp-flow": {
+      "scope": "Actual NeverD raw-SP sequences across all 20 scalar, vector, pair and NEON memory identities. The completed original SP flows through copies into a second original SP load. HighC/LLVMC O0/O2 and LLVM ELF compare the second loaded value, completed SP and every buffer byte against independent original-word sequences, at EL1 with SA=1, under all four effective CPTA/CPTA0 settings. Model-only nonoverflow normal-return primitive qualification; no reconstructed call/frame/unwind ABI, asynchronous unwind, MTE, authenticated load, native Apple CPA2 or fault qualification.",
+      "test_report_cases": [
+        "AArch64RawSPFlow.CompletedBasesExecuteThroughEveryMemoryFamily",
+        "AArch64RawSPProvenance.SSAJoinsRequireEveryArmToReachAParameter",
+        "AArch64RawSPProvenance.CompletedBaseIsDistinctFromTheLoadedValue",
+        "AArch64RawSPProvenance.MutableJoinsUseAllReachingDefinitions",
+        "AArch64RawSPProvenance.MutableLoopsRetainEntryAndBackedgeValues",
+        "AArch64RawSPProvenance.MutableValuesAreProvedAtTheirExactUse"
+      ],
+      "artifact_property": "sp_flow_artifact_dir",
+      "qualification_key": "raw_sp_sequence_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 20,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_SP_FLOW=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1"
+      ],
+      "expected_passed_cases": 83,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(flow_cases) / sizeof(flow_cases[0]); }\n"
+    },
+    "el0-sp-flow": {
+      "scope": "Actual NeverD raw-SP sequences across all 20 scalar, vector, pair and NEON memory identities. The completed original SP flows through copies into a second original SP load. HighC/LLVMC O0/O2 and LLVM ELF compare the second loaded value, completed SP and every buffer byte against independent original-word sequences, at EL0 with hardware-saved EL0t origin and SA0=1, under all four effective CPTA/CPTA0 settings. Model-only nonoverflow normal-return primitive qualification; no reconstructed call/frame/unwind ABI, asynchronous unwind, MTE, authenticated load, native Apple CPA2 or fault qualification.",
+      "test_report_cases": [
+        "AArch64RawSPFlow.CompletedBasesExecuteThroughEveryMemoryFamily",
+        "AArch64RawSPProvenance.SSAJoinsRequireEveryArmToReachAParameter",
+        "AArch64RawSPProvenance.CompletedBaseIsDistinctFromTheLoadedValue",
+        "AArch64RawSPProvenance.MutableJoinsUseAllReachingDefinitions",
+        "AArch64RawSPProvenance.MutableLoopsRetainEntryAndBackedgeValues",
+        "AArch64RawSPProvenance.MutableValuesAreProvedAtTheirExactUse"
+      ],
+      "artifact_property": "sp_flow_artifact_dir",
+      "qualification_key": "el0_raw_sp_sequence_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 20,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0,
+        "neverd-memory-off-sa": 16,
+        "neverd-memory-on-sa": 16,
+        "neverd-memory-cpta0-only-sa": 16,
+        "neverd-memory-both-sa": 16
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_SP_FLOW=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1"
+      ],
+      "expected_passed_cases": 87,
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(flow_cases) / sizeof(flow_cases[0]); }\n"
     }
   },
   "headers_directory": "include",

@@ -429,6 +429,28 @@ class EvidenceTests(unittest.TestCase):
                            timeout=run.CONFIG["timeout_seconds"],
                            capture_output=True)
 
+    def test_sp_flow_requires_every_definition_and_effective_control(self):
+        for name in ("sp-flow", "el0-sp-flow"):
+            profile = generated_memory.select_profile(name)
+            self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"], 20)
+            self.assertEqual(len(profile["test_report_cases"]), 6)
+            self.assertIn("-DCPA_GENERATED_SP_FLOW=1", profile["guest_flags"])
+            self.assertIn("sizeof(flow_cases)", profile["count_function"])
+            config = generated_memory.configuration(profile)
+            result = generated_memory.assess(self.transcript(config=config), 0, profile)
+            self.assertTrue(result[profile["qualification_key"]])
+            self.assertFalse(result["neverd_output_qualified"])
+            self.assertFalse(result["native_apple_cpta_qualified"])
+            for key, value in profile["generated_gate_values"].items():
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(omit=key, config=config), 0, profile)["passed"])
+                self.assertFalse(generated_memory.assess(
+                    self.transcript({key: value ^ 1}, config=config), 0, profile)["passed"])
+            for other in ("sp-writeback", "el0-sp-writeback", "stack"):
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(config=generated_memory.configuration(
+                        generated_memory.select_profile(other))), 0, profile)["passed"])
+
     def test_pair_profiles_require_both_results_and_their_own_counts(self):
         for name in ("pair", "el0-pair"):
             profile = generated_memory.select_profile(name)
@@ -487,7 +509,7 @@ class EvidenceTests(unittest.TestCase):
     def test_raw_sp_profiles_require_alignment_origin_and_complete_results(self):
         names = [name for name in generated_memory.CONFIG["profiles"]
                  if name.startswith(("sp-", "el0-sp-"))]
-        self.assertEqual(len(names), 12)
+        self.assertEqual(len(names), 14)
         for name in names:
             with self.subTest(profile=name):
                 profile = generated_memory.select_profile(name)
