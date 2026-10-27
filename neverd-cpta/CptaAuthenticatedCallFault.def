@@ -1,0 +1,20 @@
+//===- CptaAuthenticatedCallFault.def ---------------------------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+  mrs x14, ELR_EL1
+  str x14, [x13, #CPA_FAULT_HIGH_OFFSET]
+  mov x15, #CPA_GUEST_BASE
+  cmp x14, x15
+  b.lo CallProbeUnknownWord
+  mov x15, #(CPA_GUEST_BASE + CPA_GUEST_MAP_BYTES)
+  cmp x14, x15
+  b.hs CallProbeUnknownWord
+  ldr w15, [x14]
+  b CallProbeStoreWord
+CallProbeUnknownWord:
+  mov x15, #0
+CallProbeStoreWord:
+  str x15, [x13, #CPA_FAULT_WORD_OFFSET]

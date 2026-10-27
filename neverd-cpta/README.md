@@ -291,3 +291,55 @@ the original PSTATE through ERET. `CptaFaultProbe.def` owns the layout and
 instruction constants; `CptaPAuthFaultHarness.def` owns the fault oracle.
 These profiles qualify synchronous primitive faults in the official model.
 They do not qualify an Apple call/frame/unwind ABI or asynchronous unwind.
+
+`authenticated_calls.py` consumes the complete five-test
+`AArch64AuthenticatedCall` report and its two matching
+`authenticated_call_artifact_dir` properties. Each of nine batches supplies
+both generated C files, their O0/O2 LLVM IR, and five actual ELF objects emitted
+with NeverD's configured LLVM. These objects are linked unchanged except for
+renaming the exported entry symbol. The environment compiler builds only the
+independent assembly oracle, integer callback harness and guest.
+
+```sh
+python3 neverd-cpta/authenticated_calls.py \
+  --artifacts /path/to/authenticated-call-export \
+  --test-report /path/to/authenticated-call-tests.json \
+  --neverd-revision FULL_40_CHARACTER_COMMIT
+```
+
+The matrix runs five output routes, three actual instruction-PAC feature levels
+(PAuth, FPAC and FPACCOMBINE), and EL1/EL0: 30 guests. Every guest reads the actual
+APIA/APIB feature level, installs and reads back independent nonzero keys, and
+requires SCTLR.EnIA/EnIB. All four CPTA/CPTA0 settings remain mandatory. Eight
+IA/IB calls cover zero/dynamic modifiers and one/ten integer arguments, including
+stack arguments; a ninth raw BLR control must execute without authentication.
+Every valid original/projected pair must return the independently calculated
+result and execute its callback once. Wrong key, wrong discriminator and PAC-bit
+corruption each must fault synchronously before either callback executes.
+The fault probe saves the actual exception PC and reads an instruction only
+inside the mapped guest range, since baseline invalid branches can fault at an
+unmapped poisoned destination.
+
+The C O0 routes can retain an auth-and-resign sequence. Their known invalid
+signature diagnostics differ from the original combined branch: LLVM's key
+specific BRK under baseline PAuth, and a noncombined authentication fault under
+FPAC. Each such difference must be observed and counted exactly; the native and
+C O2 routes require the original exception class. FPACCOMBINE requires matching
+classes on all routes. Passing grants only
+`integer_authenticated_call_abi_qualified`, and
+`exact_original_fault_syndrome` stays false on the affected C O0 routes.
+Authenticated FP/HFA/aggregate/variadic ABI, exact exception PC, whole-image
+relocations and authenticated storage, Darwin signed unwind and native Apple
+CPA2 remain unqualified. The default Actions workflow still validates the base
+environments and evidence gates; it does not claim to have consumed these
+separately supplied NeverD exports.
+
+`CptaAuthenticatedCalls.def` owns the input inventory, model settings and gates;
+the `CptaAuthenticatedCall*.def` fixtures own the independent call instructions,
+keys, exception observations and expected integer results. A preinstalled model
+can be selected with `--model /path/to/FVP_Base_RevC-2xAEMvA`; the model version
+and full parameter listing are still recorded. Provenance preserves the exact
+source commit, all input hashes, environment source hashes and pinned archive
+hash. Use the model's library path only for its own process if the installation
+requires it; exporting its bundled C++ runtime for the guest compiler can prevent
+Clang from starting.

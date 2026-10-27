@@ -68,6 +68,7 @@
 // PAuth data-key controls follow Arm's SCTLR_EL1 and APDA/APDB register
 // definitions. These fixed keys are public test inputs, never host keys.
 #define CPA_PAUTH_ENABLE ((1UL << 27) | (1UL << 13))
+#define CPA_CALL_PAUTH_ENABLE ((1UL << 31) | (1UL << 30))
 #define CPA_PAUTH_APA_SHIFT 4
 #define CPA_PAUTH_API_SHIFT 8
 #define CPA_PAUTH_KEY_A_LO 0x123456789abcdef0ULL
@@ -147,7 +148,9 @@
 #define CPA_MEMORY_EL0_ON_NAME "neverd-memory-on-el0-origin"
 #define CPA_MEMORY_EL0_CPTA0_NAME "neverd-memory-cpta0-only-el0-origin"
 #define CPA_MEMORY_EL0_BOTH_NAME "neverd-memory-both-el0-origin"
-#if defined(CPA_GENERATED_SP_PAUTH)
+#if defined(CPA_GENERATED_AUTHENTICATED_CALLS)
+#define CPA_GENERATED_SAMPLE_COUNT 9
+#elif defined(CPA_GENERATED_SP_PAUTH)
 #define CPA_GENERATED_SAMPLE_COUNT 7
 #elif defined(CPA_GENERATED_SP_FLOW)
 #define CPA_GENERATED_SAMPLE_COUNT 20

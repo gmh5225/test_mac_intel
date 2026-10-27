@@ -231,6 +231,10 @@ _Static_assert(sizeof(EL0Origins) / sizeof(*EL0Origins) ==
                CPA_EL0_CONTROL_COUNT_MESSAGE);
 #endif
 
+#if defined(CPA_GENERATED_AUTHENTICATED_CALLS)
+#include "CptaAuthenticatedCallSetup.def"
+#endif
+
 void guestMain(void) {
   uint64_t EL, PFR, ISAR;
   __asm__ volatile(CPA_READ_EL : CPA_REGISTER_OUTPUT(EL));
@@ -255,6 +259,9 @@ void guestMain(void) {
     finish();
 
   configureNormalMemory();
+#if defined(CPA_GENERATED_AUTHENTICATED_CALLS)
+  configureCallKeys();
+#endif
   if (Failed)
     finish();
 #if defined(CPA_GENERATED_SP_PAUTH)

@@ -168,9 +168,13 @@ GeneratedPAuthFaultEL0:
   ldr x15, [x12, #CPA_FAULT_HOST_SP_OFFSET]
   msr SP_EL0, x15
 GeneratedPAuthFaultReturn:
+#if defined(CPA_GENERATED_AUTHENTICATED_CALLS)
+#include "CptaAuthenticatedCallFault.def"
+#else
   mrs x14, ELR_EL1
   ldr w15, [x14]
   str x15, [x13, #CPA_FAULT_WORD_OFFSET]
+#endif
   mov x15, #CPA_FAULT_COMPLETED
   str x15, [x13, #CPA_FAULT_FAULTED_OFFSET]
   ldr x14, [x12, #CPA_FAULT_RESUME_OFFSET]
