@@ -327,7 +327,7 @@ FPAC. Each such difference must be observed and counted exactly; the native and
 C O2 routes require the original exception class. FPACCOMBINE requires matching
 classes on all routes. Passing grants only
 `integer_authenticated_call_abi_qualified`, and
-`exact_original_fault_syndrome` stays false on the affected C O0 routes.
+`original_exception_class_qualified` stays false on the affected C O0 routes.
 Authenticated FP/HFA/aggregate/variadic ABI, exact exception PC, whole-image
 relocations and authenticated storage, Darwin signed unwind and native Apple
 CPA2 remain unqualified. The default Actions workflow still validates the base

@@ -59,7 +59,7 @@ class AuthenticatedCallTests(unittest.TestCase):
                     self.assertTrue(result[calls.CONFIG["qualification_key"]])
                     self.assertFalse(result["neverd_output_qualified"])
                     self.assertFalse(result["native_apple_cpta_qualified"])
-                    exact += result["exact_original_fault_syndrome"]
+                    exact += result["original_exception_class_qualified"]
         self.assertEqual(exact, 22)
         self.assertEqual(run.CONFIG, snapshots)
 

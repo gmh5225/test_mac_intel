@@ -64,7 +64,7 @@ def configuration(route, feature, el0):
 def assess(transcript, returncode, route, feature, el0):
     report = run.assess(transcript, returncode, configuration(route, feature, el0))
     report[CONFIG["qualification_key"]] = report["passed"]
-    report["exact_original_fault_syndrome"] = (
+    report["original_exception_class_qualified"] = (
         report["passed"] and not allows_alternate_syndrome(route, feature["level"]))
     return report
 
