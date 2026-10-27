@@ -1,7 +1,10 @@
 name: NeverD JavaScript integration
-run-name: NeverD JavaScript integration / ${{ inputs.source-ref }}
+run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '4deddbd3dc60740413ecdf8baabff692f1384486' }}
 
 on:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths: [.github/workflows/neverd-javascript-integration.yml]
   workflow_dispatch:
     inputs:
       source-ref:
@@ -25,12 +28,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ${{ inputs.source-ref }}
+          ref: ${{ inputs.source-ref || '4deddbd3dc60740413ecdf8baabff692f1384486' }}
           path: source
           persist-credentials: false
       - name: Require the exact native source revision
         env:
-          EXPECTED_SOURCE: ${{ inputs.source-ref }}
+          EXPECTED_SOURCE: ${{ inputs.source-ref || '4deddbd3dc60740413ecdf8baabff692f1384486' }}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
@@ -101,6 +104,46 @@ jobs:
             -R '^NeverDWebMCP|^NeverDWorkerWeb$' \
             --output-on-failure --no-tests=error --parallel 3 \
             --output-junit "$PWD/integration-evidence/parser-omission-transports.xml"
+      - name: Validate explicit ICU backend omission
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-web-integration \
+            -DNEVERD_ENABLE_WEB_JAVASCRIPT=ON -DNEVERD_ENABLE_WEB_ASAR=OFF
+          python3 scripts/build.py build-web-integration --parallel 3 --target \
+            NeverDWebArtifactTests NeverDWebSourceTests NeverDWebSourceMapTests \
+            NeverDWebSDKTests NeverDWebNativeTests \
+            NeverDWebZipWithoutDeflateTests NeverDWebGzipWithoutDecoderTests \
+            NeverDWebBrotliWithoutDecoderTests neverd neverd-worker-web-tests \
+            neverd-web-mcp-protocol-tests neverd-web-mcp-catalog-tests \
+            neverd-web-mcp-web-tests neverd-web-mcp-process-tests
+          ctest --test-dir build-web-integration/unittests/web \
+            --output-on-failure --no-tests=error --parallel 3 \
+            --output-junit "$PWD/integration-evidence/backend-omission-web.xml"
+          ctest --test-dir build-web-integration \
+            -R '^NeverDWebMCP|^NeverDWorkerWeb$' \
+            --output-on-failure --no-tests=error --parallel 3 \
+            --output-junit "$PWD/integration-evidence/backend-omission-transports.xml"
+      - name: Restore the enabled profile and rerun affected consumers
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-web-integration -DNEVERD_ENABLE_WEB_ASAR=ON
+          python3 scripts/build.py build-web-integration --parallel 3 --target \
+            NeverDWebArtifactTests NeverDWebSourceTests NeverDWebSourceMapTests \
+            NeverDWebSDKTests NeverDWebNativeTests \
+            NeverDWebZipWithoutDeflateTests NeverDWebGzipWithoutDecoderTests \
+            NeverDWebBrotliWithoutDecoderTests neverd neverd-worker-web-tests \
+            neverd-web-mcp-protocol-tests neverd-web-mcp-catalog-tests \
+            neverd-web-mcp-web-tests neverd-web-mcp-process-tests \
+            neverd-web-bun-project neverd-web-bun-semantic-index \
+            neverd-web-bun-inventory neverd-web-source-recovery \
+            neverd-web-source-model neverd-web-source-map-model
+          ctest --test-dir build-web-integration/unittests/web \
+            --output-on-failure --no-tests=error --parallel 3 \
+            --output-junit "$PWD/integration-evidence/restored-web.xml"
+          ctest --test-dir build-web-integration \
+            -R '^NeverDWebMCP|^NeverDWorkerWeb$' \
+            --output-on-failure --no-tests=error --parallel 3 \
+            --output-junit "$PWD/integration-evidence/restored-transports.xml"
       - name: Retain logs and receipts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
