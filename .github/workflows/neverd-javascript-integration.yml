@@ -1,5 +1,5 @@
 name: NeverD JavaScript integration
-run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '4deddbd3dc60740413ecdf8baabff692f1384486' }}
+run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '92a59328500af74eeb4016c7138573cfbf847345' }}
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
         description: Exact NeverSight/NeverD commit to validate
         required: true
         type: string
-        default: 4deddbd3dc60740413ecdf8baabff692f1384486
+        default: 92a59328500af74eeb4016c7138573cfbf847345
 
 permissions:
   contents: read
@@ -28,12 +28,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ${{ inputs.source-ref || '4deddbd3dc60740413ecdf8baabff692f1384486' }}
+          ref: ${{ inputs.source-ref || '92a59328500af74eeb4016c7138573cfbf847345' }}
           path: source
           persist-credentials: false
       - name: Require the exact native source revision
         env:
-          EXPECTED_SOURCE: ${{ inputs.source-ref || '4deddbd3dc60740413ecdf8baabff692f1384486' }}
+          EXPECTED_SOURCE: ${{ inputs.source-ref || '92a59328500af74eeb4016c7138573cfbf847345' }}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
