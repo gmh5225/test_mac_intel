@@ -1,5 +1,5 @@
 name: NeverD JavaScript integration
-run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '533c3ca0e6104c429610088788c08b1548b3af69' }}
+run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '0338896d904c42bda10a5ff408c26682577e2f02' }}
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
         description: Exact NeverSight/NeverD commit to validate
         required: true
         type: string
-        default: 533c3ca0e6104c429610088788c08b1548b3af69
+        default: 0338896d904c42bda10a5ff408c26682577e2f02
 
 permissions:
   contents: read
@@ -30,12 +30,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ${{ inputs.source-ref || '533c3ca0e6104c429610088788c08b1548b3af69' }}
+          ref: ${{ inputs.source-ref || '0338896d904c42bda10a5ff408c26682577e2f02' }}
           path: source
           persist-credentials: false
       - name: Require the exact native source revision
         env:
-          EXPECTED_SOURCE: ${{ inputs.source-ref || '533c3ca0e6104c429610088788c08b1548b3af69' }}
+          EXPECTED_SOURCE: ${{ inputs.source-ref || '0338896d904c42bda10a5ff408c26682577e2f02' }}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
@@ -47,7 +47,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
         with:
           version: v0.16.0
-      - name: Configure the Release Web and transport profile
+      - name: Configure a fresh Release ICU omission profile
         run: |
           set -euo pipefail
           cmake -S . -B build-web-integration -G Ninja \
