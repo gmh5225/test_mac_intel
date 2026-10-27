@@ -1,0 +1,36 @@
+name: Authored Windows ARM64 Cxx return ABI and installed toolsets
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - windows-native-components/cxx_abi_diagnostic.py
+      - .github/workflows/claude-windows-cxx-abi-diagnostic.yml
+permissions:
+  contents: read
+jobs:
+  diagnostic:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: arm64
+      - name: Collect authored assembly for each installed Cxx toolset
+        run: python -B windows-native-components/cxx_abi_diagnostic.py --output authored-cxx-ABI
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-win32-arm64-authored-Cxx-ABI-${{ github.run_attempt }}
+          path: authored-cxx-ABI/
+          if-no-files-found: error
+          retention-days: 14

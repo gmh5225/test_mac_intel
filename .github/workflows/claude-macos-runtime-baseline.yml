@@ -1,0 +1,86 @@
+name: Public macOS Bun source baseline
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - platform-runtime/build_macos.py
+      - .github/workflows/claude-macos-runtime-baseline.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }} public source baseline on ARM64
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install build utilities on the disposable runner
+        run: brew install nasm ninja pkgconf automake libtool coreutils gnu-sed go ruby
+      - name: Build the qualified public engine with matching LLVM and Rust
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -B platform-runtime/build_macos.py --arch ${{ matrix.arch }} --output macos-baseline
+      - name: Retain public runtime
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-darwin-${{ matrix.arch }}-bun-baseline-${{ github.run_attempt }}
+          path: macos-baseline/public-runtime/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain platform build diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-darwin-${{ matrix.arch }}-bun-baseline-diagnostics-${{ github.run_attempt }}
+          path: macos-baseline/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+  native-intel:
+    name: Native Intel execution of the public source baseline
+    needs: build
+    if: ${{ always() && !cancelled() }}
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-darwin-x64-bun-baseline-${{ github.run_attempt }}
+          path: public-runtime
+      - name: Rehash the x64 baseline before native execution
+        run: |
+          python3 -B - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os, platform, subprocess
+          root=Path('public-runtime'); p=root/'bun'
+          assert platform.machine()=='x86_64'
+          manifest=json.loads((root/'MANIFEST.json').read_bytes())
+          for row in manifest['files']:
+              rel=Path(row['file']); assert not rel.is_absolute() and '..' not in rel.parts
+              path=root/rel; assert path.stat().st_size==row['bytes'] and hashlib.sha256(path.read_bytes()).hexdigest()==row['sha256']
+          r=json.loads((root/'receipt.json').read_bytes()); assert r['target_arch']=='x64' and not r['recovered_native_roles_integrated']
+          assert r['public_bun_commit']=='c6da4a4d3010e5553438c60f6bd76d981976867c' and r['binary_sha256']==hashlib.sha256(p.read_bytes()).hexdigest()
+          p.chmod(0o500)
+          result=subprocess.run([str(p.resolve()),'--version'],capture_output=True,timeout=30)
+          assert result.returncode==0 and result.stdout==b'1.4.3\n' and not result.stderr
+          Path('native-intel-control.json').write_text(json.dumps(dict(status='public_source_baseline_version_passed_on_native_intel',
+              binary_sha256=r['binary_sha256'],stdout_hex=result.stdout.hex(),stderr_hex=result.stderr.hex(),exit_code=0,
+              recovered_native_roles_integrated=False,goal_complete=False),indent=2)+'\n')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-darwin-x64-baseline-control-${{ github.run_attempt }}
+          path: native-intel-control.json
+          if-no-files-found: error
+          retention-days: 14

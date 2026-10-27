@@ -1,0 +1,66 @@
+name: Native original and complete Windows source roles
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - windows-native-components/source-engine-pins.json
+      - windows-native-components/compare_roles.py
+      - .github/workflows/claude-windows-source-role-acceptance.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    name: Native Windows ${{ matrix.arch }} original and source role pairs
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      PYTHONUTF8: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756
+        with:
+          arch: ${{ matrix.arch }}
+      - name: Read independently admitted source producer
+        id: input
+        run: |
+          python -B -c "import json,os; p=json.load(open('windows-native-components/source-engine-pins.json')); open(os.environ['GITHUB_OUTPUT'],'a').write('run='+str(p['producer_run'])+'\n')"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-win32-${{ matrix.arch }}-native-source-runtime-1
+          path: source-engine
+          run-id: ${{ steps.input.outputs.run }}
+          github-token: ${{ github.token }}
+      - name: Qualify authored native graph and OS boundary first
+        run: python -B windows-recovery/qualify.py --arch ${{ matrix.arch }} --output windows-source-roles --authored-only
+      - name: Compile the previously qualified wide argv transport
+        run: |
+          cl /nologo /std:c++20 /EHsc /O2 /MT /D_CRT_SECURE_NO_WARNINGS windows-recovery/role-transport.cpp /Fe:windows-source-roles/role-transport.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compare declared raw search outputs and child environment consumption
+        run: python -B windows-native-components/compare_roles.py --arch ${{ matrix.arch }} --engine source-engine/bun.exe --environment windows-source-roles
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-win32-${{ matrix.arch }}-complete-source-role-controls-${{ github.run_attempt }}
+          path: windows-source-roles/evidence/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,1 @@
+Private source inputs for completed Actions run 40395776235 have been retired. This transport workflow is disabled until a new authorized private input is configured. Only authenticated encrypted diagnostics were uploaded; source and complete clients remain in the private local delivery. Historical ciphertext remains in Git history; its ephemeral input key file has been removed.

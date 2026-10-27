@@ -1,0 +1,13 @@
+bfs 4.1.1
+
+Copyright © Tavian Barnes and the bfs contributors
+No rights reserved (https://opensource.org/license/0BSD)
+
+CONFFLAGS := --enable-release --with-oniguruma --without-libselinux --without-libacl
+CC        := /usr/lib/llvm-23/bin/clang --target=x86_64-alpine-linux-musl --sysroot=/opt/linux-sysroot-musl --ld-path=/usr/lib/llvm-23/bin/ld.lld
+CPPFLAGS  := -Isrc -Igen -include src/prelude.h -DNDEBUG -MD -MP -Wundef-prefix=BFS_ -Dposix_getdents=__bfs_poison_posix_getdents_musl_1_2_5 -Dgetdents64=__bfs_poison_getdents64_glibc_2_30 -Dposix_spawn_file_actions_addfchdir_np=__bfs_poison_addfchdir_np_glibc_2_29 -I/tmpfs/bun/embedded/oniguruma/src
+CFLAGS    := -O3 -std=c23 -pthread -Wformat=2 -Wimplicit-fallthrough -Werror=implicit -Wmissing-declarations -Wmissing-variable-declarations -Wshadow -Wsign-compare -Wstrict-prototypes -g -Wall 
+LDFLAGS   := -Wl,-z,now -L/tmpfs/bun/build/release/deps/oniguruma -no-pie
+LDLIBS    := -lonig -lrt
+
+https://tavianator.com/projects/bfs.html

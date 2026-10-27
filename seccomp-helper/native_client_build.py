@@ -46,8 +46,16 @@ def map_rows(path):
     return rows
 
 
-def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun_sha256=None):
-    assert platform.system() == "Linux" and {"x86_64": "x64", "aarch64": "arm64"}[platform.machine()] == arch
+def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun_sha256=None,
+                  containerized_tools=False, source_workspace=None):
+    if not containerized_tools:
+        assert platform.system() == "Linux" and {"x86_64": "x64", "aarch64": "arm64"}[platform.machine()] == arch
+    else:
+        assert platform.system() in {"Linux", "Darwin"}, "Containerized graph tools require POSIX file ownership"
+    if source_workspace is not None:
+        assert source_bun is not None and source_bun_sha256 is not None
+        source_workspace = Path(source_workspace).resolve()
+        assert source_workspace.is_dir() and not any(p.is_symlink() for p in source_workspace.rglob('*'))
     out.mkdir()
     profile = PINS["profiles"][arch]; compiler_pin = COMPILERS[arch]
     native_dispatch = source_bun is not None
@@ -84,34 +92,72 @@ def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun
             "--user", f"{os.getuid()}:{os.getgid()}", "--cpus", "2", "--memory", "3g", "--pids-limit", "64",
             "--tmpfs", "/tmp:rw,nosuid,nodev,size=512m", "--mount", f"type=bind,src={out},dst=/out",
             "--mount", f"type=bind,src={ROOT},dst=/recipes,readonly"]
+    if containerized_tools:
+        # Local packaging may run on macOS. Execute every Linux graph tool in
+        # the same pinned target image instead of pretending the host is Linux.
+        # This mode establishes byte identity with native CI, not native CPU
+        # execution on an emulated target.
+        machine = {"x64": "x86_64", "arm64": "aarch64"}[arch]
+        run("containerized-tool-platform", [*base, profile["image"], "python3", "-c",
+            "import platform; assert platform.system() == 'Linux'; "
+            + "assert platform.machine() == " + repr(machine) + "; print(platform.machine())"], timeout=60)
+
+    def graph_run(label, argv, *, timeout=60):
+        if not containerized_tools:
+            return run(label, argv, timeout=timeout)
+        mapped = []
+        for value in map(str, argv):
+            path = Path(value)
+            if path.is_absolute() and path.is_relative_to(out):
+                value = "/out/" + path.relative_to(out).as_posix()
+            elif value == str(original):
+                value = "/captured/original"
+            mapped.append(value)
+        assert mapped[0].startswith("/out/")
+        return run(label, [*base, "--mount", f"type=bind,src={original},dst=/captured/original,readonly",
+                           profile["image"], *mapped], timeout=timeout)
     for name in ["extract-linux-graph", "raw-graph-linux-adapter", "graph-fidelity-linux-adapter"]:
         run("compile-" + name, [*base, profile["image"], "g++", "-std=c++20", "-static", "-O2", "-Wall", "-Wextra",
                                "/recipes/" + name + ".cpp", "-lcrypto", "-pthread", "-ldl", "-o", "/out/" + name], timeout=180)
     extracted = out / "extracted"
-    run("extract-published-graph", [out / "extract-linux-graph", original, sha(original), extracted], timeout=60)
+    graph_run("extract-published-graph", [out / "extract-linux-graph", original, sha(original), extracted], timeout=60)
     rows = map_rows(extracted / "mapping.tsv")
     assert [{k: v for k, v in row.items() if k != "file"} for row in rows] == [
         {k: v for k, v in row.items() if k != "readable_sha256"} for row in expected["rows"]]
     result = {"status": "started", "recipe_sha256": RECIPE_SHA, "compiler": compiler_pin,
               "original_sha256": sha(original), "all_2589_original_rows_match_neverd": True,
               "original_executed_during_build": False, "clients_uploaded": False, "clients": {},
-              "native_dispatch": native_dispatch, "original_descriptor_provider_preserved": native_dispatch}
+              "native_dispatch": native_dispatch, "original_descriptor_provider_preserved": native_dispatch,
+              "containerized_graph_tools": containerized_tools,
+              "orchestrator_system": platform.system(), "orchestrator_machine": platform.machine(),
+              "intentional_edit_modules": {}}
     (logs / "client-build-start.json").write_text(json.dumps(result, indent=2) + "\n")
     try:
         for layout in ["preserved", "readable"]:
             work = out / layout; work.mkdir(); sources = work / "sources"; sources.mkdir()
+            edits = []
+            if source_workspace is not None:
+                supplied = source_workspace / layout / "sources"
+                assert {p.name for p in supplied.iterdir()} == {f"m{row['module_index']}" for row in rows}
+                assert all(p.is_file() and not p.is_symlink() for p in supplied.iterdir())
             selected = []
             for row in rows:
                 raw = (extracted / "input" / row["file"]).read_bytes(); assert hashlib.sha256(raw).hexdigest() == row["storage_sha256"]
                 if row["loader_id"] == 1 and (layout == "readable" or (row["module_index"] == 236 and not native_dispatch)):
                     raw = formatted(raw, recipes["recipes"][row["storage_sha256"]])
                     if row["module_index"] == 236 and not native_dispatch: raw = patch(raw, arch)
+                if source_workspace is not None:
+                    supplied_file = supplied / f"m{row['module_index']}"
+                    assert supplied_file.stat().st_size <= 512 * 1024 * 1024, "Workspace body exceeds graph adapter budget"
+                    supplied_raw = supplied_file.read_bytes()
+                    if supplied_raw != raw: edits.append(row["module_index"])
+                    raw = supplied_raw
                 name = f"m{row['module_index']}"; (sources / name).write_bytes(raw)
                 selected.append([row["virtual_name"], row["loader_id"], row["encoding_id"], row["format_id"], row["side_id"], name,
                                  len(raw), hashlib.sha256(raw).hexdigest()])
             mapping = work / "mapping.tsv"; mapping.write_text("".join("\t".join(map(str, row)) + "\n" for row in selected))
             graph = work / "graph-input"
-            run(layout + "-stage", [out / "raw-graph-linux-adapter", "stage", mapping, sources, graph], timeout=60)
+            graph_run(layout + "-stage", [out / "raw-graph-linux-adapter", "stage", mapping, sources, graph], timeout=60)
             names = sorted(path.name for path in graph.iterdir())
             startup = [r["virtual_name"] for r in rows[:expected["startup_count"]]]
             (graph / "bootstrap.mjs").write_text("".join("await import(JSON.parse(" + json.dumps(json.dumps(name)) + "));\n" for name in startup))
@@ -125,11 +171,11 @@ def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun
                 command += ["--mount", f"type=bind,src={empty},dst={destination},readonly"]
             run(layout + "-compile-source", [*command, profile["image"], "/runtime/bun", "/project/graph/build.isolated.mjs"], timeout=180)
             raw_client = work / "client"; client = work / "client-final"
-            run(layout + "-restore-graph", [out / "graph-fidelity-linux-adapter", mapping, raw_client, client,
+            graph_run(layout + "-restore-graph", [out / "graph-fidelity-linux-adapter", mapping, raw_client, client,
                 rows[expected["entry_index"]]["virtual_name"], str(expected["startup_count"]), str(expected["flags"] & 15), "8"], timeout=60)
             client.chmod(0o500)
             readback = work / "readback"
-            run(layout + "-readback", [out / "extract-linux-graph", client, sha(client), readback], timeout=60)
+            graph_run(layout + "-readback", [out / "extract-linux-graph", client, sha(client), readback], timeout=60)
             actual = map_rows(readback / "mapping.tsv")
             assert [[r["virtual_name"], r["loader_id"], r["encoding_id"], r["format_id"], r["side_id"], r["bytes"], r["storage_sha256"]] for r in actual] == [r[:5] + r[6:] for r in selected]
             # Hash identity connects this native build directly to the four
@@ -138,6 +184,9 @@ def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun
                     "all_module_rows_match_selected_sources": True,
                     "matches_sealed_candidate": None if native_dispatch else sha(client) == compiler_pin["clients"][layout]}
             result["clients"][layout] = info
+            result["intentional_edit_modules"][layout] = edits
+            if 236 in edits:
+                result["original_descriptor_provider_preserved"] = False
             if not native_dispatch:
                 assert info["matches_sealed_candidate"], "native build differs from the sealed local candidate; retain for investigation"
         result["status"] = "both_source_bun_clients_readback_exactly" if native_dispatch else "both_native_clients_match_sealed_candidates"
@@ -148,10 +197,16 @@ def build_clients(arch, original, out, logs, run, *, source_bun=None, source_bun
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(); parser.add_argument("--arch", required=True); parser.add_argument("--original", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True); parser.add_argument("--logs", type=Path, required=True); args = parser.parse_args()
+    parser.add_argument("--output", type=Path, required=True); parser.add_argument("--logs", type=Path, required=True)
+    parser.add_argument("--source-bun", type=Path); parser.add_argument("--source-bun-sha256")
+    parser.add_argument("--source-workspace", type=Path)
+    parser.add_argument("--containerized-tools", action="store_true"); args = parser.parse_args()
     args.logs.mkdir(exist_ok=True)
     def run(label, command, *, timeout=60):
         with (args.logs / (label + ".log")).open("xb") as stream:
             p = subprocess.run(list(map(str, command)), stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
         assert p.returncode == 0, label
-    print(json.dumps(build_clients(args.arch, args.original.resolve(), args.output.resolve(), args.logs.resolve(), run)))
+    print(json.dumps(build_clients(args.arch, args.original.resolve(), args.output.resolve(), args.logs.resolve(), run,
+        source_bun=args.source_bun.resolve() if args.source_bun else None,
+        source_bun_sha256=args.source_bun_sha256, containerized_tools=args.containerized_tools,
+        source_workspace=args.source_workspace)))

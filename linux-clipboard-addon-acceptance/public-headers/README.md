@@ -1,0 +1,1 @@
+Four public N-API headers copied verbatim from Bun commit c6da4a4d3010e5553438c60f6bd76d981976867c, src/runtime/napi. Original private producer source is not included or implied. SHA-256 pins are in ../public-header-pins.json; upstream license is retained here.

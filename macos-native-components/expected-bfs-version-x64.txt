@@ -1,0 +1,13 @@
+bfs 4.1.1
+
+Copyright © Tavian Barnes and the bfs contributors
+No rights reserved (https://opensource.org/license/0BSD)
+
+CONFFLAGS := --enable-release --with-oniguruma --without-libselinux --without-libacl --without-liburing --without-libcap
+CC        := /usr/lib/llvm-23/bin/clang --target=x86_64-apple-macosx -isysroot /opt/macos-sdk/MacOSX26.5.sdk -mmacosx-version-min=13.0 -mlinker-version=705 --ld-path=/usr/lib/llvm-23/bin/ld64.lld
+CPPFLAGS  := -Isrc -Igen -include src/prelude.h -DNDEBUG -MD -MP -Wundef-prefix=BFS_ -Dfdclosedir=__bfs_poison_fdclosedir_macos_26_4 -I/tmpfs/bun/embedded/oniguruma/src
+CFLAGS    := -O3 -std=c23 -pthread -Wformat=2 -Wimplicit-fallthrough -Werror=implicit -Wmissing-declarations -Wmissing-variable-declarations -Wshadow -Wsign-compare -Wstrict-prototypes -g -Wall 
+LDFLAGS   := -L/tmpfs/bun/build/release/deps/oniguruma
+LDLIBS    := -lonig 
+
+https://tavianator.com/projects/bfs.html

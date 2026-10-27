@@ -1,0 +1,86 @@
+name: Native admitted musl source-only client build controls
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - musl-native-components/source-engine-pins.json
+      - musl-native-components/source_engine.py
+      - musl-native-components/client_build.py
+      - musl-native-components/baseline_client_controls.py
+      - musl-native-components/elf_client_layout.py
+      - musl-native-components/runtime_image.py
+      - .github/workflows/claude-musl-complete-source-client-build-controls.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      profiles: ${{ steps.pins.outputs.profiles }}
+      engine_run: ${{ steps.pins.outputs.engine_run }}
+      sdk_run: ${{ steps.pins.outputs.sdk_run }}
+      components_run: ${{ steps.pins.outputs.components_run }}
+      baseline_run: ${{ steps.pins.outputs.baseline_run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - id: pins
+        run: |
+          python3 -B - <<'PY'
+          import json,os
+          p=json.load(open('musl-native-components/source-engine-pins.json'))
+          assert p['profiles'] and set(p['profiles'])<={'arm64','x64'}
+          matrix={'include':[{'arch':a,'runner':'ubuntu-24.04-arm' if a=='arm64' else 'ubuntu-24.04'} for a in sorted(p['profiles'])]}
+          baseline_runs={json.load(open('platform-runtime/musl-baseline-candidates.json'))['profiles'][a]['producer_run'] for a in p['profiles']}
+          assert len(baseline_runs)==1
+          values={'engine_run':p['producer_run'],'sdk_run':json.load(open('platform-runtime/musl-sdk-runtime-pins.json'))['producer_run'],'components_run':json.load(open('musl-native-components/component-library-pins.json'))['producer_run'],'baseline_run':baseline_runs.pop()}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('profiles='+json.dumps(matrix,separators=(',',':'))+'\n')
+              for k,v in values.items():
+                  assert type(v) is int and v>0
+                  out.write(k+'='+str(v)+'\n')
+          PY
+  correspondence:
+    needs: matrix
+    name: Native musl ${{ matrix.arch }} complete source client controls
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.matrix.outputs.profiles) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-sdk-1
+          path: retained-sdk
+          run-id: ${{ needs.matrix.outputs.sdk_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-native-source-runtime-1
+          path: retained-engine
+          run-id: ${{ needs.matrix.outputs.engine_run }}
+          github-token: ${{ github.token }}
+      - name: Build source-only clients twice and require one real entry edit
+        run: >-
+          python3 -B musl-native-components/baseline_client_controls.py --arch ${{ matrix.arch }}
+          --engine retained-engine --sdk retained-sdk
+          --private "${{ runner.temp }}/private-musl-complete-source-client-controls"
+          --output musl-complete-source-client-controls
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-complete-source-client-controls-${{ github.run_attempt }}
+          path: musl-complete-source-client-controls/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

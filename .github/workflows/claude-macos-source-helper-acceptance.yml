@@ -1,0 +1,84 @@
+name: Native macOS source-client helper and interrupt acceptance
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - macos-client-behavior/**
+      - macos-native-components/client_*.py
+      - macos-native-components/client-*.c
+      - macos-native-components/client-*.mjs
+      - macos-native-components/boundary-control.c
+      - macos-native-components/role-transport.c
+      - macos-native-components/bounded_process.py
+      - macos-native-components/macho_client_layout.py
+      - macos-native-components/source_engine.py
+      - macos-native-components/source-engine-pins.json
+      - macos-native-components/source-client-pins.json
+      - macos-native-components/macos-readable-recipes-v1.json.gz
+      - windows-recovery/behavior-fixtures.json
+      - windows-recovery/behavior_oracles.py
+      - windows-recovery/contained_protocol.py
+      - windows-recovery/offline_server.py
+      - windows-recovery/sequence_fixture_controls.py
+      - seccomp-helper/compare_bash.py
+      - musl-native-components/private_diagnostics.py
+      - musl-native-components/private-diagnostics-recipient.pem
+      - .github/workflows/claude-macos-source-helper-acceptance.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  accept:
+    name: Native macOS ${{ matrix.os }} ${{ matrix.arch }} source helper and interrupt
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            os: 15
+            runner: macos-15
+          - arch: x64
+            os: 15
+            runner: macos-15-intel
+          - arch: arm64
+            os: 26
+            runner: macos-26
+          - arch: x64
+            os: 26
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - id: pins
+        name: Require independently admitted complete source engines
+        run: |
+          python3 -B - <<'PY'
+          import json,os
+          p=json.load(open('macos-native-components/source-engine-pins.json'))
+          assert set(p['profiles'])=={'arm64','x64'} and type(p['producer_run']) is int
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f:f.write('producer='+str(p['producer_run'])+'\n')
+          PY
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-darwin-${{ matrix.arch }}-native-source-runtime-1
+          run-id: ${{ steps.pins.outputs.producer }}
+          github-token: ${{ github.token }}
+          path: public-runtime
+      - name: Rebuild both layouts, qualify inherited helper isolation, and compare seven cases
+        run: python3 -B macos-client-behavior/acceptance.py --arch ${{ matrix.arch }} --engine public-runtime/bun --output private-Mac-helper-work --public-output Mac-helper-public
+      - name: Retain complete success records or authenticated encrypted failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-darwin-${{ matrix.arch }}-macos${{ matrix.os }}-helper-interrupt-${{ github.run_attempt }}
+          path: Mac-helper-public/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

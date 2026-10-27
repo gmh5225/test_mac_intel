@@ -1,0 +1,75 @@
+name: Public macOS Ugrep source libraries
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - macos-native-components/build_ugrep.py
+      - macos-native-components/compare_ugrep.py
+      - macos-native-components/expected-ugrep-version-*.txt
+      - macos-native-components/llvm_tools.py
+      - macos-native-components/llvm-tools-pins.json
+      - macos-native-components/role-transport.c
+      - macos-native-components/boundary-control.c
+      - macos-native-components/original-pins.json
+      - macos-native-components/macho_objects.py
+      - macos-native-components/private_symbols.py
+      - .github/workflows/claude-macos-ugrep-library.yml
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Native macOS ${{ matrix.arch }} Ugrep source library
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-15
+          - arch: x64
+            runner: macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Install configure utilities on the disposable runner
+        run: brew install autoconf automake libtool pkgconf
+      - name: Build and verify every renamed source object
+        id: library
+        run: python3 -B macos-native-components/build_ugrep.py --arch ${{ matrix.arch }} --output macos-ugrep
+      - name: Compare original and source-library Ugrep on the same native host
+        run: python3 -B macos-native-components/compare_ugrep.py --arch ${{ matrix.arch }} --package macos-ugrep/public-library --output macos-ugrep-correspondence
+      - name: Retain public source library and controls
+        if: ${{ always() && steps.library.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-darwin-${{ matrix.arch }}-ugrep-source-library-${{ github.run_attempt }}
+          path: macos-ugrep/public-library/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain build and upstream diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: public-darwin-${{ matrix.arch }}-ugrep-library-diagnostics-${{ github.run_attempt }}
+          path: macos-ugrep/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain bounded original-role comparison diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-darwin-${{ matrix.arch }}-ugrep-library-correspondence-${{ github.run_attempt }}
+          path: macos-ugrep-correspondence/diagnostics/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 14

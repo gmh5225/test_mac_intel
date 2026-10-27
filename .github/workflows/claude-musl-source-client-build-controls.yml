@@ -1,0 +1,75 @@
+name: Native musl source-only client build controls
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/claude-windows-recovery]
+    paths:
+      - musl-native-components/client_build.py
+      - musl-native-components/baseline_client_controls.py
+      - musl-native-components/elf_client_layout.py
+      - musl-native-components/musl-readable-recipes-v1.json.gz
+      - musl-native-components/runtime_image.py
+      - .github/workflows/claude-musl-source-client-build-controls.yml
+permissions:
+  contents: read
+  actions: read
+jobs:
+  controls:
+    name: Native musl ${{ matrix.arch }} source-only build controls
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - name: Read independently admitted baseline and SDK producers
+        id: inputs
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          python3 -B - <<'PY'
+          import json,os
+          sdk=json.load(open('platform-runtime/musl-sdk-runtime-pins.json'))
+          baseline=json.load(open('platform-runtime/musl-baseline-candidates.json'))['profiles'][os.environ['ARCH']]
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              for key,value in [('sdk_run',sdk['producer_run']),('baseline_run',baseline['producer_run'])]:
+                  assert type(value) is int and value>0
+                  out.write(key+'='+str(value)+'\n')
+          PY
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-sdk-1
+          path: retained-sdk
+          run-id: ${{ steps.inputs.outputs.sdk_run }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-bun-baseline-1
+          path: retained-baseline
+          run-id: ${{ steps.inputs.outputs.baseline_run }}
+          github-token: ${{ github.token }}
+      - name: Rebuild private source-only clients and verify one entry edit
+        run: >-
+          python3 -B musl-native-components/baseline_client_controls.py --arch ${{ matrix.arch }}
+          --baseline retained-baseline/bun --sdk retained-sdk
+          --private "${{ runner.temp }}/private-musl-baseline-client-controls"
+          --output musl-baseline-client-controls
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: public-linux-${{ matrix.arch }}-musl-source-client-build-controls-${{ github.run_attempt }}
+          path: musl-baseline-client-controls/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14

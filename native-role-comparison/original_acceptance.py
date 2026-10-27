@@ -1,4 +1,4 @@
-"""Compare standalone public Ugrep/Bfs only after authored Docker controls."""
+"""Compare public Ugrep/Bfs roles only after authored Docker controls."""
 from pathlib import Path
 import argparse,base64,bz2,gzip,hashlib,json,os,platform,selectors,shutil,signal,subprocess,tarfile,time,urllib.request
 ROOT=Path(__file__).resolve().parent
@@ -24,12 +24,24 @@ def admit_package(package,expected_manifest):
     assert seen|{'MANIFEST.json'}=={p.relative_to(package).as_posix() for p in package.rglob('*') if p.is_file()}
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--arch',required=True,choices=['x64','arm64']);ap.add_argument('--package',required=True,type=Path);ap.add_argument('--bfs-package',type=Path);ap.add_argument('--output',required=True,type=Path);a=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--arch',required=True,choices=['x64','arm64']);ap.add_argument('--package',type=Path);ap.add_argument('--bfs-package',type=Path);ap.add_argument('--source-bun',type=Path);ap.add_argument('--roles',nargs='+',choices=['ugrep','bfs'],default=['ugrep','bfs']);ap.add_argument('--output',required=True,type=Path);a=ap.parse_args()
     assert platform.system()=='Linux' and {'x86_64':'x64','aarch64':'arm64'}[platform.machine()]==a.arch and os.getuid()!=0
-    pins=json.loads((ROOT/'accepted-candidates.json').read_bytes());pin=pins['profiles'][a.arch];package=a.package.absolute()
-    admit_package(package,pin['manifest_sha256'])
-    candidate_paths={role:package/role for role in ['ugrep','bfs']};binary_pins=dict(pin['binaries'])
-    bfs_override=pins.get('bfs_override');assert bool(bfs_override)==(a.bfs_package is not None),'Bfs replacement must have an independently admitted artifact'
+    assert len(a.roles)==len(set(a.roles))
+    pins=json.loads((ROOT/'accepted-candidates.json').read_bytes());pin=pins['profiles'][a.arch]
+    native=None;package=None;bfs_override=None
+    if a.source_bun:
+        assert a.package is None and a.bfs_package is None
+        import sys
+        sys.path.insert(0,str(ROOT.parent/'seccomp-helper'))
+        from source_runtime import pin as source_runtime_pin
+        binary=a.source_bun.resolve();native=source_runtime_pin(a.arch,binary,sha(binary))
+        candidate_paths={role:binary for role in a.roles}
+        binary_pins={role:dict(sha256=native['binary_sha256'],bytes=native['bytes']) for role in a.roles}
+    else:
+        assert a.package is not None
+        package=a.package.absolute();admit_package(package,pin['manifest_sha256'])
+        candidate_paths={role:package/role for role in a.roles};binary_pins=dict(pin['binaries'])
+        bfs_override=pins.get('bfs_override');assert bool(bfs_override)==(a.bfs_package is not None),'Bfs replacement must have an independently admitted artifact'
     if bfs_override:
         selected=bfs_override['profiles'][a.arch];bfs_package=a.bfs_package.absolute();admit_package(bfs_package,selected['manifest_sha256'])
         public=json.loads((bfs_package/'receipt.json').read_bytes())
@@ -43,7 +55,7 @@ def main():
     text=b'first\nNEEDLE\npreneedle\n';(fixtures/'input.txt').write_bytes(text);(fixtures/'猫.txt').write_text('first\n🐈\n');(fixtures/'nested/child.txt').write_text('nested NEEDLE\n');(fixtures/'link.txt').symlink_to('input.txt')
     for suffix,raw in [('gz',gzip.compress(text,mtime=0)),('bz2',bz2.compress(text)),('zst',bytes.fromhex('28b52ffd0458b9000066697273740a4e4545444c450a7072656e6565646c650a2c682895')),('br',bytes.fromhex('0f0b8066697273740a4e4545444c450a7072656e6565646c650a03'))]:
         (fixtures/('input.'+suffix)).write_bytes(raw)
-    receipt=dict(status='started',arch=a.arch,boundary_qualified=False,captured_client_executed=False,captured_source_uploaded=False,client_uploaded=False,controls=[],cases=[],runtime_image=pin['runtime_image'],candidate_manifest_sha256=sha(package/'MANIFEST.json'),normalization='none; exact exit status and stdout/stderr bytes')
+    receipt=dict(status='started',arch=a.arch,boundary_qualified=False,captured_client_executed=False,captured_source_uploaded=False,client_uploaded=False,controls=[],cases=[],runtime_image=pin['runtime_image'],candidate_manifest_sha256=sha(package/'MANIFEST.json') if package else native['manifest_sha256'],normalization='none; exact exit status and stdout/stderr bytes',selected_roles=a.roles,source_native_runtime=native)
     if bfs_override:receipt['bfs_override']=dict(producer_run=bfs_override['producer_run'],producer_head=bfs_override['producer_head'],manifest_sha256=sha(bfs_package/'MANIFEST.json'),binary_sha256=binary_pins['bfs']['sha256'])
     canary=out/'outside-canary';canary.write_bytes(b'owned outside fixture\n')
     def host(label,command):
@@ -89,6 +101,9 @@ def main():
         return dict(exit_code=code,stdout=bytes(streams['stdout']),stderr=bytes(streams['stderr']))
     try:
         for name in ['original_acceptance.py','role-transport.c','accepted-candidates.json']:shutil.copyfile(ROOT/name,logs/name)
+        if native:
+            for name in ['source_runtime.py','source-runtime-pins.json']:
+                shutil.copyfile(ROOT.parent/'seccomp-helper'/name,logs/name)
         shutil.copyfile(ROOT.parent/'seccomp-helper/boundary-control.c',logs/'boundary-control.c')
         host('runtime-pull',['docker','pull',pin['runtime_image']]);host('runtime-inspect',['docker','image','inspect',pin['runtime_image']])
         for name,source,static in [('transport',ROOT/'role-transport.c',True),('boundary-static',ROOT.parent/'seccomp-helper/boundary-control.c',True),('boundary-dynamic',ROOT.parent/'seccomp-helper/boundary-control.c',False)]:
@@ -118,12 +133,13 @@ def main():
         assert sha(original)==original_pin['sha256'];original.chmod(0o500)
         receipt['original']=original_pin
         candidates={}
-        for role in ['ugrep','bfs']:
+        for role in a.roles:
             assert sha(candidate_paths[role])==binary_pins[role]['sha256'] and candidate_paths[role].stat().st_size==binary_pins[role]['bytes']
             candidate=inputs/role;shutil.copyfile(candidate_paths[role],candidate);candidate.chmod(0o500);candidates[role]=candidate
         cases=[('UG-version','ugrep',['--version'],0),('UG-literal','ugrep',['--no-config','-n','NEEDLE','/fixtures/input.txt'],0),('UG-absent','ugrep',['--no-config','absent-value','/fixtures/input.txt'],1),('UG-invalid','ugrep',['--no-config','[','/fixtures/input.txt'],2),('UG-pcre','ugrep',['--no-config','-P','-o','(?<=pre)needle','/fixtures/input.txt'],0),('UG-unicode','ugrep',['--no-config','-n','🐈','/fixtures/猫.txt'],0)]
         cases += [('UG-'+s,'ugrep',['--no-config','-z','-n','NEEDLE','/fixtures/input.'+s],0) for s in ['gz','bz2','zst','br']]
         cases += [('BF-version','bfs',['--version'],0),('BF-name','bfs',['-s','/fixtures','-maxdepth','1','-type','f','-name','*.txt','-printf','%f\n'],0),('BF-depth','bfs',['-s','/fixtures','-mindepth','2','-maxdepth','2','-type','f','-printf','%P\n'],0),('BF-regex','bfs',['-s','/fixtures','-maxdepth','1','-regex','.*input[.]txt','-printf','%f\n'],0),('BF-link','bfs',['-L','-s','/fixtures/link.txt','-type','f','-printf','%f\n'],0),('BF-exec','bfs',['/fixtures/input.txt','-exec','/runtime/receiver','--env-control',';'],0),('BF-absent','bfs',['-s','/fixtures','-name','absent-value','-print'],0),('BF-missing-user','bfs',['/fixtures','-maxdepth','0','-user','neverd_missing_public_fixture_user_21296'],1)]
+        cases=[row for row in cases if row[1] in a.roles]
         for label,role,args,expected in cases:
             candidate=candidates[role];assert sha(candidate)==binary_pins[role]['sha256']
             left=execute('original-'+label,original,role,args);right=execute('candidate-'+label,candidate,role,args)
@@ -134,6 +150,9 @@ def main():
         receipt['mismatches']=[row['case'] for row in receipt['cases'] if not row['matches']]
         assert not receipt['mismatches'],'Exact mismatches: '+', '.join(receipt['mismatches'])
         receipt.update(status='original_and_source_component_cases_match_exactly',differential_pairs=len(cases),original=original_pin,scope='Bounded standalone Ugrep/Bfs correspondence, with actual argv[0] role selection in the original. No static engine integration, portability-floor or exact transitive-version claim.')
+        if native:
+            receipt.update(status='original_and_source_engine_role_cases_match_exactly',
+                scope='Bounded actual argv[0] role comparisons through the admitted public source-built engine. Exact exits/stdout/stderr with no normalization. Original private revision and universal behavior remain open.')
     except BaseException as error:receipt.update(status='failed',error_type=type(error).__name__,error=str(error));raise
     finally:(logs/'receipt.json').write_text(json.dumps(receipt,indent=2)+'\n')
 if __name__=='__main__':main()
