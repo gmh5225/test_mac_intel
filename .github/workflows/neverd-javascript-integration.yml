@@ -1,5 +1,5 @@
 name: NeverD JavaScript integration
-run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '305119eb3c7c631c10c663696c41f5b7803b706b' }}
+run-name: NeverD JavaScript integration / ${{ inputs.source-ref || '533c3ca0e6104c429610088788c08b1548b3af69' }}
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
         description: Exact NeverSight/NeverD commit to validate
         required: true
         type: string
-        default: 305119eb3c7c631c10c663696c41f5b7803b706b
+        default: 533c3ca0e6104c429610088788c08b1548b3af69
 
 permissions:
   contents: read
@@ -20,6 +20,8 @@ jobs:
   web:
     runs-on: macos-15
     timeout-minutes: 90
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
     defaults:
       run:
         shell: bash
@@ -28,12 +30,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: ${{ inputs.source-ref || '305119eb3c7c631c10c663696c41f5b7803b706b' }}
+          ref: ${{ inputs.source-ref || '533c3ca0e6104c429610088788c08b1548b3af69' }}
           path: source
           persist-credentials: false
       - name: Require the exact native source revision
         env:
-          EXPECTED_SOURCE: ${{ inputs.source-ref || '305119eb3c7c631c10c663696c41f5b7803b706b' }}
+          EXPECTED_SOURCE: ${{ inputs.source-ref || '533c3ca0e6104c429610088788c08b1548b3af69' }}
         run: |
           set -euo pipefail
           [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
@@ -42,14 +44,19 @@ jobs:
           git submodule update --init --depth 1 third_party/capstone
       - name: Install the existing Web build dependencies
         run: brew install cmake ninja icu4c@77
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba
+        with:
+          version: v0.16.0
       - name: Configure the Release Web and transport profile
         run: |
           set -euo pipefail
           cmake -S . -B build-web-integration -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache \
             -DNEVERD_LLVM_PREBUILT=ON \
             -DNEVERD_ENABLE_WEB_ANALYSIS=ON \
-            -DNEVERD_ENABLE_WEB_ASAR=ON \
+            -DNEVERD_ENABLE_WEB_ASAR=OFF \
             -DNEVERD_ENABLE_WEB_JAVASCRIPT=ON \
             -DNEVERD_BUILD_SHARED=ON -DNEVERD_BUILD_WORKER=ON \
             -DNEVERD_BUILD_WEB_MCP=ON -DNEVERD_BUILD_GUI=OFF \
@@ -68,6 +75,28 @@ jobs:
             NeverDWebZipWithoutDeflateTests NeverDWebGzipWithoutDecoderTests \
             NeverDWebBrotliWithoutDecoderTests \
             neverd neverd-worker-web-tests \
+            neverd-web-mcp-protocol-tests neverd-web-mcp-catalog-tests \
+            neverd-web-mcp-web-tests neverd-web-mcp-process-tests \
+            neverd-web-bun-project neverd-web-bun-semantic-index \
+            neverd-web-bun-inventory neverd-web-source-recovery \
+            neverd-web-source-model neverd-web-source-map-model
+      - name: Check the failing CLI boundary in a fresh ICU omission build
+        run: |
+          set -euo pipefail
+          mkdir -p integration-evidence
+          ctest --test-dir build-web-integration/unittests/web \
+            -R '^WebDataPackSDK.CLIUsesSharedConsumersWithAnUnusableExternalPATH$' \
+            --output-on-failure --no-tests=error \
+            --output-junit "$PWD/integration-evidence/cold-omission-cli.xml"
+      - name: Enable ICU before the complete profile sequence
+        run: |
+          set -euo pipefail
+          cmake -S . -B build-web-integration -DNEVERD_ENABLE_WEB_ASAR=ON
+          python3 scripts/build.py build-web-integration --parallel 3 --target \
+            NeverDWebArtifactTests NeverDWebSourceTests NeverDWebSourceMapTests \
+            NeverDWebSDKTests NeverDWebNativeTests \
+            NeverDWebZipWithoutDeflateTests NeverDWebGzipWithoutDecoderTests \
+            NeverDWebBrotliWithoutDecoderTests neverd neverd-worker-web-tests \
             neverd-web-mcp-protocol-tests neverd-web-mcp-catalog-tests \
             neverd-web-mcp-web-tests neverd-web-mcp-process-tests \
             neverd-web-bun-project neverd-web-bun-semantic-index \
@@ -155,5 +184,11 @@ jobs:
             source/build-web-integration/Testing/Temporary/
             source/build-web-integration/unittests/web/Testing/Temporary/
             source/build-web-integration/CMakeCache.txt
+            source/build-web-integration/bin/neverd
+            source/build-web-integration/bin/NeverDWebSDKTests
+            source/build-web-integration/bin/*.dylib
+            source/build-web-integration/lib/*.dylib
+            source/LICENSE
+            source/THIRD_PARTY_NOTICES.md
           if-no-files-found: warn
           retention-days: 14
