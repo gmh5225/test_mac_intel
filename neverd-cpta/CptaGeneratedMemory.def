@@ -2973,7 +2973,9 @@
         "AArch64RawSPProvenance.CompletedBaseIsDistinctFromTheLoadedValue",
         "AArch64RawSPProvenance.MutableJoinsUseAllReachingDefinitions",
         "AArch64RawSPProvenance.MutableLoopsRetainEntryAndBackedgeValues",
-        "AArch64RawSPProvenance.MutableValuesAreProvedAtTheirExactUse"
+        "AArch64RawSPProvenance.MutableValuesAreProvedAtTheirExactUse",
+        "AArch64RawSPLifting.AutomaticCheckedMemoryRetainsEveryOriginalSPWord",
+        "AArch64RawSPLifting.OrderedSPAccessesNeverBecomeOrdinaryFrameMemory"
       ],
       "artifact_property": "sp_flow_artifact_dir",
       "qualification_key": "raw_sp_sequence_output_qualified",
@@ -3004,7 +3006,9 @@
         "AArch64RawSPProvenance.CompletedBaseIsDistinctFromTheLoadedValue",
         "AArch64RawSPProvenance.MutableJoinsUseAllReachingDefinitions",
         "AArch64RawSPProvenance.MutableLoopsRetainEntryAndBackedgeValues",
-        "AArch64RawSPProvenance.MutableValuesAreProvedAtTheirExactUse"
+        "AArch64RawSPProvenance.MutableValuesAreProvedAtTheirExactUse",
+        "AArch64RawSPLifting.AutomaticCheckedMemoryRetainsEveryOriginalSPWord",
+        "AArch64RawSPLifting.OrderedSPAccessesNeverBecomeOrdinaryFrameMemory"
       ],
       "artifact_property": "sp_flow_artifact_dir",
       "qualification_key": "el0_raw_sp_sequence_output_qualified",
@@ -3031,6 +3035,87 @@
       ],
       "expected_passed_cases": 87,
       "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(flow_cases) / sizeof(flow_cases[0]); }\n"
+    },
+    "sp-pauth": {
+      "scope": "Actual NeverD combined authenticated SP loads for seven independent A/B, offset/writeback, zero-destination and boundary displacement words. HighC/LLVMC O0/O2 and LLVM ELF run at EL1 with SA=1 under all four effective CPTA/CPTA0 settings. The model reports real PAuth capability, enables EnDA/EnDB with readback, installs distinct controlled 128-bit data keys with readback, and requires both A and B signatures to change pointer bits. Independent native words compare loaded values, unchanged signed base versus authenticated completed writeback base, and all guarded bytes. Model-only successful-access qualification; no invalid-PAC/fault ordering, reconstructed call/frame/unwind ABI, asynchronous unwind, MTE, overflowing addresses or native Apple CPA2 qualification.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_load_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1"
+      ],
+      "expected_passed_cases": 86,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n"
+    },
+    "el0-sp-pauth": {
+      "scope": "Actual NeverD combined authenticated SP loads for seven independent A/B, offset/writeback, zero-destination and boundary displacement words. HighC/LLVMC O0/O2 and LLVM ELF run at EL0 with hardware-saved EL0t origin and SA0=1 under all four effective CPTA/CPTA0 settings. The model reports real PAuth capability, enables EnDA/EnDB with readback, installs distinct controlled 128-bit data keys with readback, and requires both A and B signatures to change pointer bits. Independent native words compare loaded values, unchanged signed base versus authenticated completed writeback base, and all guarded bytes. Model-only successful-access qualification; no invalid-PAC/fault ordering, reconstructed call/frame/unwind ABI, asynchronous unwind, MTE, overflowing addresses or native Apple CPA2 qualification.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "el0_raw_sp_pauth_load_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0,
+        "neverd-memory-off-sa": 16,
+        "neverd-memory-on-sa": 16,
+        "neverd-memory-cpta0-only-sa": 16,
+        "neverd-memory-both-sa": 16,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1"
+      ],
+      "expected_passed_cases": 90,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n"
     }
   },
   "headers_directory": "include",

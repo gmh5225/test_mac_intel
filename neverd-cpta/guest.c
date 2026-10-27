@@ -95,6 +95,46 @@ static void configureNormalMemory(void) {
   expect(Observed == 0);
 }
 
+#if defined(CPA_GENERATED_SP_PAUTH)
+static void configurePAuthData(void) {
+  uint64_t Feature;
+  __asm__ volatile(CPA_READ_ISAR1 : CPA_REGISTER_OUTPUT(Feature));
+  const unsigned Supported =
+      ((Feature >> CPA_PAUTH_APA_SHIFT) & CPA_EL_FIELD_MASK) != 0 ||
+      ((Feature >> CPA_PAUTH_API_SHIFT) & CPA_EL_FIELD_MASK) != 0;
+  record(CPA_PAUTH_FEATURE_NAME, Supported);
+  expect(Supported);
+  if (!Supported)
+    return;
+  const uint64_t ALo = CPA_PAUTH_KEY_A_LO, AHi = CPA_PAUTH_KEY_A_HI;
+  const uint64_t BLo = CPA_PAUTH_KEY_B_LO, BHi = CPA_PAUTH_KEY_B_HI;
+  __asm__ volatile(CPA_WRITE_PAUTH_KEYS
+                   :
+                   : CPA_REGISTER_INPUT(ALo), CPA_REGISTER_INPUT(AHi),
+                     CPA_REGISTER_INPUT(BLo), CPA_REGISTER_INPUT(BHi)
+                   : CPA_MEMORY_CLOBBER);
+  uint64_t ReadALo, ReadAHi, ReadBLo, ReadBHi;
+  __asm__ volatile(CPA_READ_PAUTH_KEYS
+                   : CPA_REGISTER_OUTPUT(ReadALo), CPA_REGISTER_OUTPUT(ReadAHi),
+                     CPA_REGISTER_OUTPUT(ReadBLo),
+                     CPA_REGISTER_OUTPUT(ReadBHi));
+  const unsigned KeysMatch =
+      ReadALo == ALo && ReadAHi == AHi && ReadBLo == BLo && ReadBHi == BHi;
+  record(CPA_PAUTH_KEYS_NAME, KeysMatch);
+  expect(KeysMatch);
+  uint64_t Control;
+  __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Control));
+  Control |= CPA_PAUTH_ENABLE;
+  __asm__ volatile(CPA_WRITE_SCTLR
+                   :
+                   : CPA_REGISTER_INPUT(Control)
+                   : CPA_MEMORY_CLOBBER);
+  __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Control));
+  record(CPA_PAUTH_CONTROLS_NAME, Control & CPA_PAUTH_ENABLE);
+  expect((Control & CPA_PAUTH_ENABLE) == CPA_PAUTH_ENABLE);
+}
+#endif
+
 void reportUnexpected(uint64_t ESR, uint64_t ELR, uint64_t FAR,
                       uint64_t Stack) {
   record(CPA_UNEXPECTED_ESR_NAME, ESR);
@@ -202,6 +242,11 @@ void guestMain(void) {
   configureNormalMemory();
   if (Failed)
     finish();
+#if defined(CPA_GENERATED_SP_PAUTH)
+  configurePAuthData();
+  if (Failed)
+    finish();
+#endif
 #if defined(CPA_GENERATED_MEMORY)
   const unsigned Samples = CPA_GENERATED_SAMPLES();
   record(CPA_GENERATED_SAMPLES_NAME, Samples);

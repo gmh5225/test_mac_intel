@@ -66,6 +66,24 @@
 #define CPA_READ_SCTLR "mrs %0, SCTLR_EL1"
 #define CPA_WRITE_SCTLR "msr SCTLR_EL1, %0\n\tisb"
 #define CPA_WRITE_CPACR "msr CPACR_EL1, %0\n\tisb"
+// PAuth data-key controls follow Arm's SCTLR_EL1 and APDA/APDB register
+// definitions. These fixed keys are public test inputs, never host keys.
+#define CPA_PAUTH_ENABLE ((1UL << 27) | (1UL << 13))
+#define CPA_PAUTH_APA_SHIFT 4
+#define CPA_PAUTH_API_SHIFT 8
+#define CPA_PAUTH_KEY_A_LO 0x123456789abcdef0ULL
+#define CPA_PAUTH_KEY_A_HI 0x0fedcba987654321ULL
+#define CPA_PAUTH_KEY_B_LO 0xa5963c5af0e1872dULL
+#define CPA_PAUTH_KEY_B_HI 0x1928374655aabbccULL
+#define CPA_PAUTH_FEATURE_NAME "pauth-data-feature"
+#define CPA_PAUTH_CONTROLS_NAME "pauth-data-controls"
+#define CPA_PAUTH_KEYS_NAME "pauth-data-key-readback"
+#define CPA_WRITE_PAUTH_KEYS                                                   \
+  "msr S3_0_C2_C2_0, %0\n\tmsr S3_0_C2_C2_1, %1\n\t"                           \
+  "msr S3_0_C2_C2_2, %2\n\tmsr S3_0_C2_C2_3, %3\n\tisb"
+#define CPA_READ_PAUTH_KEYS                                                    \
+  "mrs %0, S3_0_C2_C2_0\n\tmrs %1, S3_0_C2_C2_1\n\t"                           \
+  "mrs %2, S3_0_C2_C2_2\n\tmrs %3, S3_0_C2_C2_3"
 // llvm-mc 22.1.6 independently encodes: addpt x0, x1, x2.
 #define CPA_ADDPT ".inst 0x9a022020"
 #define CPA_RESULT_REGISTER "x0"
@@ -126,7 +144,9 @@
 #define CPA_MEMORY_EL0_ON_NAME "neverd-memory-on-el0-origin"
 #define CPA_MEMORY_EL0_CPTA0_NAME "neverd-memory-cpta0-only-el0-origin"
 #define CPA_MEMORY_EL0_BOTH_NAME "neverd-memory-both-el0-origin"
-#if defined(CPA_GENERATED_SP_FLOW)
+#if defined(CPA_GENERATED_SP_PAUTH)
+#define CPA_GENERATED_SAMPLE_COUNT 7
+#elif defined(CPA_GENERATED_SP_FLOW)
 #define CPA_GENERATED_SAMPLE_COUNT 20
 #elif defined(CPA_GENERATED_STRUCTURE_GROUP_TAIL)
 #define CPA_GENERATED_SAMPLE_COUNT 366

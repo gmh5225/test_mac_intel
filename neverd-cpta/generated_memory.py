@@ -119,7 +119,7 @@ def main():
     headers.mkdir()
     for name, contents in CONFIG["headers"].items():
         (headers / name).write_text(contents)
-    generated_flags = [*CONFIG["generated_flags"], CONFIG["headers_include_flag"],
+    generated_flags = [*profile["generated_flags"], CONFIG["headers_include_flag"],
                        str(headers)]
     provenance = {
         "neverd_revision": args.neverd_revision,

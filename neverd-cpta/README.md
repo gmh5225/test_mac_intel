@@ -262,3 +262,11 @@ uses before and after reassignment. Each route compares the second value,
 completed SP and every buffer byte. These profiles require the same four
 controls, alignment readbacks and EL0 origin as the other SP profiles; they do
 not grant a reconstructed stack or unwind ABI.
+
+`sp-pauth` and `el0-sp-pauth` require actual PAuth capability, EnDA/EnDB
+readback and distinct APDA/APDB key readback. The generated harness must also
+observe changed signature bits for both keys. Seven independent LDRAA/B words
+cover offset and writeback addressing, both displacement limits and discarded
+architectural destinations. All five generated routes compare the combined
+load, outgoing signed or authenticated base and complete guarded memory.
+Successful accesses do not qualify invalid-PAC fault ordering or Apple unwind.

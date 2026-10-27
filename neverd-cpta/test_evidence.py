@@ -429,11 +429,28 @@ class EvidenceTests(unittest.TestCase):
                            timeout=run.CONFIG["timeout_seconds"],
                            capture_output=True)
 
+    def test_sp_pauth_requires_active_distinct_data_keys(self):
+        for name in ("sp-pauth", "el0-sp-pauth"):
+            profile = generated_memory.select_profile(name)
+            self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"], 7)
+            self.assertEqual(len(profile["test_report_cases"]), 5)
+            self.assertIn("-DCPA_GENERATED_SP_PAUTH=1", profile["guest_flags"])
+            self.assertIn("-DSP_PAUTH_REQUIRE_ACTIVE=1", profile["generated_flags"])
+            self.assertIn("sizeof(pauth_cases)", profile["count_function"])
+            config = generated_memory.configuration(profile)
+            self.assertTrue(generated_memory.assess(
+                self.transcript(config=config), 0, profile)[profile["qualification_key"]])
+            for key, value in profile["generated_gate_values"].items():
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(omit=key, config=config), 0, profile)["passed"])
+                self.assertFalse(generated_memory.assess(
+                    self.transcript({key: value ^ 1}, config=config), 0, profile)["passed"])
+
     def test_sp_flow_requires_every_definition_and_effective_control(self):
         for name in ("sp-flow", "el0-sp-flow"):
             profile = generated_memory.select_profile(name)
             self.assertEqual(profile["generated_gate_values"]["neverd-memory-samples"], 20)
-            self.assertEqual(len(profile["test_report_cases"]), 6)
+            self.assertEqual(len(profile["test_report_cases"]), 8)
             self.assertIn("-DCPA_GENERATED_SP_FLOW=1", profile["guest_flags"])
             self.assertIn("sizeof(flow_cases)", profile["count_function"])
             config = generated_memory.configuration(profile)
@@ -509,7 +526,7 @@ class EvidenceTests(unittest.TestCase):
     def test_raw_sp_profiles_require_alignment_origin_and_complete_results(self):
         names = [name for name in generated_memory.CONFIG["profiles"]
                  if name.startswith(("sp-", "el0-sp-"))]
-        self.assertEqual(len(names), 14)
+        self.assertEqual(len(names), 16)
         for name in names:
             with self.subTest(profile=name):
                 profile = generated_memory.select_profile(name)
