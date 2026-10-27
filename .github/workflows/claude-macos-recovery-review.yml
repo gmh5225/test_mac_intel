@@ -30,8 +30,17 @@ jobs:
           python-version: '3.12'
       - name: Authenticate private source, rebuild and collect native client evidence
         env:
-          NDC_DARWIN_V84R2_KEY: ${{ secrets.NDC_DARWIN_V84R2_KEY }}
+          NDC_DARWIN_V84R3_KEY: ${{ secrets.NDC_DARWIN_V84R3_KEY }}
         run: python3 -B macos-recovery-review/run.py ${{ matrix.arch }}
+      - name: Export small authenticated failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-darwin-${{ matrix.arch }}-quick-encrypted-${{ github.run_attempt }}
+          path: darwin-native-client-quick-records/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Export authenticated encrypted evidence only
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

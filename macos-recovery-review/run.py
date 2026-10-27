@@ -92,7 +92,7 @@ def collect(folder):
  for p in folder.rglob('*'):
   if not p.is_file() or p.is_symlink():continue
   rel=p.relative_to(folder);parts=rel.parts
-  include=parts[0] in ('results','products','fresh-source-package')
+  include=parts[0] in ('results','products','fresh-source-package','early-audio')
   if parts[0]=='offline-client-runs' and len(parts)>1 and parts[1]=='private-records':include=True
   if parts[0] in ('build-1','package-build'):
    include=(parts[1]=='rebuild.json' or parts[1]=='client-logs' or parts[1]=='native' and (parts[-1]=='build.json' or len(parts)>2 and parts[2]=='logs') or parts[1]=='clients' and parts[-1]=='mapping.tsv')
@@ -112,6 +112,43 @@ def seal(folder,output):
  assert r.returncode==0,'Diagnostic encryption failed; plaintext not exported'
  return dict(algorithm='CMS AES-256-GCM / RSA-4096 OAEP',bytes=target.stat().st_size,sha256=sha(target),files=len(selected))
 
+def seal_quick(folder):
+ # A separate authenticated small packet accelerates failure diagnosis.
+ # Full evidence is still sealed unchanged by seal().
+ output=Path.cwd()/'darwin-native-client-quick-records';output.mkdir()
+ selected={}
+ for name in ('private-failure.txt','harness-error.txt','driver.stderr'):
+  p=folder/'results'/name
+  if p.is_file():selected[p.relative_to(folder).as_posix()]=p
+ for status in (folder/'results').rglob('*.exit.json'):
+  try:value=json.loads(status.read_bytes())
+  except (ValueError,OSError):continue
+  if value.get('returncode') in (None,0) and 'timeout' not in value:continue
+  stem=status.name.removesuffix('.exit.json')
+  for suffix in ('.exit.json','.command.json','.stderr','.stdout'):
+   p=status.with_name(stem+suffix)
+   if p.is_file():selected[p.relative_to(folder).as_posix()]=p
+ for p in sorted((folder/'results/review').rglob('*'),key=lambda p:p.stat().st_mtime,reverse=True) if (folder/'results/review').exists() else ():
+  if len(selected)>=96:break
+  if p.is_file() and not p.is_symlink() and p.suffix in ('.json','.stdout','.stderr') and p.stat().st_size:
+   selected.setdefault(p.relative_to(folder).as_posix(),p)
+ assert len(selected)<=128
+ staging=folder.parent/'quick-records';staging.mkdir();rows=[]
+ for name,p in sorted(selected.items()):
+  data=p.read_bytes();whole=hashlib.sha256(data).hexdigest();data=data[-2*1024*1024:]
+  q=staging/name;q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(data)
+  rows.append(dict(file=name,bytes=len(data),sha256=sha(q),whole_file_sha256=whole,truncated=len(data)!=p.stat().st_size))
+ write(staging/'record-index.json',dict(files=rows,diagnostic_only=True,full_evidence_retained_separately=True))
+ archive=folder.parent/'quick-records.tar.gz'
+ with tarfile.open(archive,'x:gz') as tar:
+  for p in sorted(staging.rglob('*')):
+   if p.is_file():tar.add(p,arcname=p.relative_to(staging).as_posix(),recursive=False)
+ cert=ROOT.parent/'musl-native-components/private-diagnostics-recipient.pem';assert sha(cert)=='dc19589992ec91dbb66f34435d302a4b14e47d9ccd789c60c75f1894a9a943de'
+ target=output/'private-records.cms'
+ result=subprocess.run([openssl(),'cms','-encrypt','-aes-256-gcm','-binary','-in',str(archive),'-outform','DER','-out',str(target),'-recip',str(cert),'-keyopt','rsa_padding_mode:oaep'],capture_output=True,timeout=60)
+ assert result.returncode==0
+ write(output/'receipt.json',dict(status='diagnostic_only',plaintext_uploaded=False,source_uploaded_publicly=False,encrypted_evidence=dict(algorithm='CMS AES-256-GCM / RSA-4096 OAEP',bytes=target.stat().st_size,sha256=sha(target),files=len(rows)+1)))
+
 def main(arch):
  assert arch in ('arm64','x64')
  folder=Path(os.environ['RUNNER_TEMP'])/'private-darwin-native-clients/work';folder.mkdir(parents=True,exist_ok=False,mode=0o700)
@@ -128,6 +165,9 @@ def main(arch):
    aggregate={k:value[k] for k in ('arch','native_host','full_client_layouts','native_addons_built','source_rebuilds','fresh_package_rebuild','original_native_host_loads','independent_acceptance_pending','goal_complete')};status='passed'
  except Exception:
   results.mkdir(exist_ok=True);(results/'harness-error.txt').write_text(traceback.format_exc())
+ if status=='failed':
+  try:seal_quick(folder)
+  except Exception:(results/'quick-diagnostic-error.txt').write_text(traceback.format_exc())
  envelope=seal(folder,output)
  write(output/'receipt.json',dict(status=status,aggregate=aggregate,encrypted_evidence=envelope,plaintext_uploaded=False,source_uploaded_publicly=False))
  print('Darwin source client collection: '+status)
