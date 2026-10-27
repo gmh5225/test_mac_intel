@@ -7,6 +7,8 @@
 // Linux arch/arm64/tools/sysreg. No model feature register is overridden.
 //===----------------------------------------------------------------------===//
 
+#include "CptaFaultProbe.def"
+
 #define CPA_GUEST_BASE 0x80000000
 #define CPA_GUEST_STACK_BYTES 0x10000
 #define CPA_GUEST_VECTOR_ALIGNMENT 11
@@ -22,9 +24,6 @@
 #define CPA_SA (1UL << 3)
 #define CPA_SA0 (1UL << 4)
 #define CPA_FP_ENABLE (3UL << 20)
-#define CPA_SP_ALIGNMENT 16
-#define CPA_SP_ALIGNMENT_EC 0x26
-#define CPA_ESR_EC_SHIFT 26
 #define CPA_MEMORY_BYTES 32
 #define CPA_SEMIHOST_WRITE0 4
 #define CPA_SEMIHOST_EXIT_EXTENDED 0x20
@@ -127,7 +126,11 @@
 #define CPA_UNEXPECTED_ELR_NAME "unexpected-elr"
 #define CPA_UNEXPECTED_FAR_NAME "unexpected-far"
 #define CPA_UNEXPECTED_SP_NAME "unexpected-sp"
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+#define CPA_GENERATED_ENTRY neverdPAuthFaultMain
+#else
 #define CPA_GENERATED_ENTRY neverdMemoryMain
+#endif
 #define CPA_GENERATED_SAMPLES neverdMemorySampleCount
 #define CPA_GENERATED_SAMPLES_NAME "neverd-memory-samples"
 // The controlled EL0 profile shares read-only code with EL1. Returning from

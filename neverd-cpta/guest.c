@@ -104,6 +104,15 @@ static void configurePAuthData(void) {
       ((Feature >> CPA_PAUTH_API_SHIFT) & CPA_EL_FIELD_MASK) != 0;
   record(CPA_PAUTH_FEATURE_NAME, Supported);
   expect(Supported);
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+  const unsigned APALevel =
+      (Feature >> CPA_PAUTH_APA_SHIFT) & CPA_EL_FIELD_MASK;
+  const unsigned APILevel =
+      (Feature >> CPA_PAUTH_API_SHIFT) & CPA_EL_FIELD_MASK;
+  const unsigned PAuthLevel = APALevel > APILevel ? APALevel : APILevel;
+  record(CPA_FAULT_PAUTH_FEATURE_NAME, PAuthLevel);
+  expect(PAuthLevel == CPA_PAUTH_FAULT_FEATURE_LEVEL);
+#endif
   if (!Supported)
     return;
   const uint64_t ALo = CPA_PAUTH_KEY_A_LO, AHi = CPA_PAUTH_KEY_A_HI;
@@ -188,6 +197,12 @@ int CPA_GENERATED_ENTRY(void) {
 #if defined(CPA_GENERATED_MEMORY)
 extern int CPA_GENERATED_ENTRY(void);
 extern unsigned CPA_GENERATED_SAMPLES(void);
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+extern unsigned neverdPAuthFaultCount(void);
+static const char *const PAuthFaultCounts[] = {
+    CPA_FAULT_MODE_OFF_NAME, CPA_FAULT_MODE_ON_NAME, CPA_FAULT_MODE_CPTA0_NAME,
+    CPA_FAULT_MODE_BOTH_NAME};
+#endif
 #endif
 
 static const struct {
@@ -353,6 +368,11 @@ void guestMain(void) {
 #endif
     record(Controls[Mode].MemoryName, MemoryResult);
     expect(MemoryResult == 0);
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+    const unsigned Faults = neverdPAuthFaultCount();
+    record(PAuthFaultCounts[Mode], Faults);
+    expect(Faults == CPA_PAUTH_FAULT_COUNT);
+#endif
 #if defined(CPA_GENERATED_STACK_MEMORY)
     __asm__ volatile(CPA_WRITE_SCTLR
                      :

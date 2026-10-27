@@ -270,3 +270,24 @@ cover offset and writeback addressing, both displacement limits and discarded
 architectural destinations. All five generated routes compare the combined
 load, outgoing signed or authenticated base and complete guarded memory.
 Successful accesses do not qualify invalid-PAC fault ordering or Apple unwind.
+
+`sp-pauth-faults`, `fpac-sp-pauth-faults` and
+`fpac-combine-sp-pauth-faults`, with matching `el0-` variants, consume those
+same unchanged exports. They configure the model's real enhanced PAC level
+and require architecture-level readback of 1, 4 or 5 respectively. Every word
+has an aligned valid completion control plus valid-PAC/misaligned-SP,
+invalid-PAC/aligned-SP and invalid-PAC/misaligned-SP stimuli. All four CPTA
+modes require 21 successful fault comparisons per generated route. The
+independent native words and generated functions must agree on complete ESR,
+raw signed SP, hardware exception origin and exact fault instruction; every
+guarded memory byte remains unchanged. FPAC without FPACCOMBINE must retain
+the combined load's fault order instead of substituting standalone AUTDA/B.
+
+The assembly recovery probe saves the AAPCS64 callee-saved GPR and low SIMD
+bank, recovers the controlled wrapper's SP after a synchronous fault, and
+checks a separate normal-completion path. Exception entry may enable PAN;
+the handler clears it before reading the shared recovery state and restores
+the original PSTATE through ERET. `CptaFaultProbe.def` owns the layout and
+instruction constants; `CptaPAuthFaultHarness.def` owns the fault oracle.
+These profiles qualify synchronous primitive faults in the official model.
+They do not qualify an Apple call/frame/unwind ABI or asynchronous unwind.

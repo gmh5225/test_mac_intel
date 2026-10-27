@@ -3118,6 +3118,344 @@
         "-DSP_PAUTH_REQUIRE_ACTIVE=1"
       ],
       "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n"
+    },
+    "sp-pauth-faults": {
+      "scope": "Actual unchanged NeverD combined authenticated SP-load exports in the official Arm model, with enhanced_pac2_level=0. Seven A/B, offset/writeback, discarded-destination and boundary-displacement words run through valid aligned completion and three fault stimuli: valid signed misaligned SP, invalid PAC aligned SP and invalid PAC misaligned SP. Original native words and all five generated routes must agree on complete ESR, raw signed SP, hardware execution origin and exact fault word; every guarded byte remains unchanged. EL1 with SA=1, all four effective CPTA/CPTA0 controls, active controlled data keys and actual ID_AA64ISAR1_EL1 architecture-level readback. This qualifies model synchronous primitive fault ordering only, not an Apple call/frame/unwind ABI, asynchronous unwind, MTE, overflow or native Apple CPA2.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_fault_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1,
+        "pauth-data-architecture-level": 1,
+        "neverd-pauth-faults-off": 21,
+        "neverd-pauth-faults-on": 21,
+        "neverd-pauth-faults-cpta0-only": 21,
+        "neverd-pauth-faults-both": 21
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_PAUTH_FAULTS=1",
+        "-DCPA_PAUTH_FAULT_FEATURE_LEVEL=1",
+        "-DCPA_PAUTH_FAULT_COUNT=21"
+      ],
+      "expected_passed_cases": 91,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n\n#include \"CptaPAuthFaultHarness.def\"\n",
+      "support_headers": [
+        "CptaFaultProbe.def",
+        "CptaPAuthFaultHarness.def"
+      ],
+      "model_parameters": {
+        "cluster0.enhanced_pac2_level": "0"
+      }
+    },
+    "el0-sp-pauth-faults": {
+      "scope": "Actual unchanged NeverD combined authenticated SP-load exports in the official Arm model, with enhanced_pac2_level=0. Seven A/B, offset/writeback, discarded-destination and boundary-displacement words run through valid aligned completion and three fault stimuli: valid signed misaligned SP, invalid PAC aligned SP and invalid PAC misaligned SP. Original native words and all five generated routes must agree on complete ESR, raw signed SP, hardware execution origin and exact fault word; every guarded byte remains unchanged. EL0 with SA0=1, all four effective CPTA/CPTA0 controls, active controlled data keys and actual ID_AA64ISAR1_EL1 architecture-level readback. This qualifies model synchronous primitive fault ordering only, not an Apple call/frame/unwind ABI, asynchronous unwind, MTE, overflow or native Apple CPA2.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_fault_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0,
+        "neverd-memory-off-sa": 16,
+        "neverd-memory-on-sa": 16,
+        "neverd-memory-cpta0-only-sa": 16,
+        "neverd-memory-both-sa": 16,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1,
+        "pauth-data-architecture-level": 1,
+        "neverd-pauth-faults-off": 21,
+        "neverd-pauth-faults-on": 21,
+        "neverd-pauth-faults-cpta0-only": 21,
+        "neverd-pauth-faults-both": 21
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_PAUTH_FAULTS=1",
+        "-DCPA_PAUTH_FAULT_FEATURE_LEVEL=1",
+        "-DCPA_PAUTH_FAULT_COUNT=21"
+      ],
+      "expected_passed_cases": 95,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1",
+        "-DSP_PAUTH_FAULT_EL0=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n\n#include \"CptaPAuthFaultHarness.def\"\n",
+      "support_headers": [
+        "CptaFaultProbe.def",
+        "CptaPAuthFaultHarness.def"
+      ],
+      "model_parameters": {
+        "cluster0.enhanced_pac2_level": "0"
+      }
+    },
+    "fpac-sp-pauth-faults": {
+      "scope": "Actual unchanged NeverD combined authenticated SP-load exports in the official Arm model, with enhanced_pac2_level=2. Seven A/B, offset/writeback, discarded-destination and boundary-displacement words run through valid aligned completion and three fault stimuli: valid signed misaligned SP, invalid PAC aligned SP and invalid PAC misaligned SP. Original native words and all five generated routes must agree on complete ESR, raw signed SP, hardware execution origin and exact fault word; every guarded byte remains unchanged. EL1 with SA=1, all four effective CPTA/CPTA0 controls, active controlled data keys and actual ID_AA64ISAR1_EL1 architecture-level readback. This qualifies model synchronous primitive fault ordering only, not an Apple call/frame/unwind ABI, asynchronous unwind, MTE, overflow or native Apple CPA2.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_fault_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1,
+        "pauth-data-architecture-level": 4,
+        "neverd-pauth-faults-off": 21,
+        "neverd-pauth-faults-on": 21,
+        "neverd-pauth-faults-cpta0-only": 21,
+        "neverd-pauth-faults-both": 21
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_PAUTH_FAULTS=1",
+        "-DCPA_PAUTH_FAULT_FEATURE_LEVEL=4",
+        "-DCPA_PAUTH_FAULT_COUNT=21"
+      ],
+      "expected_passed_cases": 91,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n\n#include \"CptaPAuthFaultHarness.def\"\n",
+      "support_headers": [
+        "CptaFaultProbe.def",
+        "CptaPAuthFaultHarness.def"
+      ],
+      "model_parameters": {
+        "cluster0.enhanced_pac2_level": "2"
+      }
+    },
+    "el0-fpac-sp-pauth-faults": {
+      "scope": "Actual unchanged NeverD combined authenticated SP-load exports in the official Arm model, with enhanced_pac2_level=2. Seven A/B, offset/writeback, discarded-destination and boundary-displacement words run through valid aligned completion and three fault stimuli: valid signed misaligned SP, invalid PAC aligned SP and invalid PAC misaligned SP. Original native words and all five generated routes must agree on complete ESR, raw signed SP, hardware execution origin and exact fault word; every guarded byte remains unchanged. EL0 with SA0=1, all four effective CPTA/CPTA0 controls, active controlled data keys and actual ID_AA64ISAR1_EL1 architecture-level readback. This qualifies model synchronous primitive fault ordering only, not an Apple call/frame/unwind ABI, asynchronous unwind, MTE, overflow or native Apple CPA2.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_fault_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0,
+        "neverd-memory-off-sa": 16,
+        "neverd-memory-on-sa": 16,
+        "neverd-memory-cpta0-only-sa": 16,
+        "neverd-memory-both-sa": 16,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1,
+        "pauth-data-architecture-level": 4,
+        "neverd-pauth-faults-off": 21,
+        "neverd-pauth-faults-on": 21,
+        "neverd-pauth-faults-cpta0-only": 21,
+        "neverd-pauth-faults-both": 21
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_PAUTH_FAULTS=1",
+        "-DCPA_PAUTH_FAULT_FEATURE_LEVEL=4",
+        "-DCPA_PAUTH_FAULT_COUNT=21"
+      ],
+      "expected_passed_cases": 95,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1",
+        "-DSP_PAUTH_FAULT_EL0=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n\n#include \"CptaPAuthFaultHarness.def\"\n",
+      "support_headers": [
+        "CptaFaultProbe.def",
+        "CptaPAuthFaultHarness.def"
+      ],
+      "model_parameters": {
+        "cluster0.enhanced_pac2_level": "2"
+      }
+    },
+    "fpac-combine-sp-pauth-faults": {
+      "scope": "Actual unchanged NeverD combined authenticated SP-load exports in the official Arm model, with enhanced_pac2_level=3. Seven A/B, offset/writeback, discarded-destination and boundary-displacement words run through valid aligned completion and three fault stimuli: valid signed misaligned SP, invalid PAC aligned SP and invalid PAC misaligned SP. Original native words and all five generated routes must agree on complete ESR, raw signed SP, hardware execution origin and exact fault word; every guarded byte remains unchanged. EL1 with SA=1, all four effective CPTA/CPTA0 controls, active controlled data keys and actual ID_AA64ISAR1_EL1 architecture-level readback. This qualifies model synchronous primitive fault ordering only, not an Apple call/frame/unwind ABI, asynchronous unwind, MTE, overflow or native Apple CPA2.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_fault_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-sa": 8,
+        "neverd-memory-on-sa": 8,
+        "neverd-memory-cpta0-only-sa": 8,
+        "neverd-memory-both-sa": 8,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1,
+        "pauth-data-architecture-level": 5,
+        "neverd-pauth-faults-off": 21,
+        "neverd-pauth-faults-on": 21,
+        "neverd-pauth-faults-cpta0-only": 21,
+        "neverd-pauth-faults-both": 21
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_PAUTH_FAULTS=1",
+        "-DCPA_PAUTH_FAULT_FEATURE_LEVEL=5",
+        "-DCPA_PAUTH_FAULT_COUNT=21"
+      ],
+      "expected_passed_cases": 91,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1",
+        "-DSP_PAUTH_FAULT_COMBINE=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n\n#include \"CptaPAuthFaultHarness.def\"\n",
+      "support_headers": [
+        "CptaFaultProbe.def",
+        "CptaPAuthFaultHarness.def"
+      ],
+      "model_parameters": {
+        "cluster0.enhanced_pac2_level": "3"
+      }
+    },
+    "el0-fpac-combine-sp-pauth-faults": {
+      "scope": "Actual unchanged NeverD combined authenticated SP-load exports in the official Arm model, with enhanced_pac2_level=3. Seven A/B, offset/writeback, discarded-destination and boundary-displacement words run through valid aligned completion and three fault stimuli: valid signed misaligned SP, invalid PAC aligned SP and invalid PAC misaligned SP. Original native words and all five generated routes must agree on complete ESR, raw signed SP, hardware execution origin and exact fault word; every guarded byte remains unchanged. EL0 with SA0=1, all four effective CPTA/CPTA0 controls, active controlled data keys and actual ID_AA64ISAR1_EL1 architecture-level readback. This qualifies model synchronous primitive fault ordering only, not an Apple call/frame/unwind ABI, asynchronous unwind, MTE, overflow or native Apple CPA2.",
+      "test_report_cases": [
+        "AArch64PAuthLoadSemantics.RawWordsRetainCombinedLoadAndCompletedWriteback",
+        "AArch64PAuthLoadSemantics.LLVMAndCEmitOneCombinedInstruction",
+        "AArch64PAuthLoadSemantics.SPAdmissionRequiresAnExternalMachineValue",
+        "AArch64PAuthLoadSemantics.SPAdaptersRequireTheCompleteMachineEnvelope",
+        "AArch64StackPAuthLoad.BothCProjectionsAndLLVMExecuteCombinedSPAccesses"
+      ],
+      "artifact_property": "sp_pauth_artifact_dir",
+      "qualification_key": "raw_sp_pauth_fault_output_qualified",
+      "generated_gate_values": {
+        "neverd-memory-samples": 7,
+        "neverd-memory-off": 0,
+        "neverd-memory-on": 0,
+        "neverd-memory-cpta0-only": 0,
+        "neverd-memory-both": 0,
+        "neverd-memory-off-el0-origin": 0,
+        "neverd-memory-on-el0-origin": 0,
+        "neverd-memory-cpta0-only-el0-origin": 0,
+        "neverd-memory-both-el0-origin": 0,
+        "neverd-memory-off-sa": 16,
+        "neverd-memory-on-sa": 16,
+        "neverd-memory-cpta0-only-sa": 16,
+        "neverd-memory-both-sa": 16,
+        "pauth-data-feature": 1,
+        "pauth-data-controls": 134225920,
+        "pauth-data-key-readback": 1,
+        "pauth-data-architecture-level": 5,
+        "neverd-pauth-faults-off": 21,
+        "neverd-pauth-faults-on": 21,
+        "neverd-pauth-faults-cpta0-only": 21,
+        "neverd-pauth-faults-both": 21
+      },
+      "guest_flags": [
+        "-DCPA_GENERATED_MEMORY=1",
+        "-DCPA_GENERATED_EL0_MEMORY=1",
+        "-DCPA_GENERATED_SP_PAUTH=1",
+        "-DCPA_GENERATED_STACK_MEMORY=1",
+        "-DCPA_GENERATED_PAUTH_FAULTS=1",
+        "-DCPA_PAUTH_FAULT_FEATURE_LEVEL=5",
+        "-DCPA_PAUTH_FAULT_COUNT=21"
+      ],
+      "expected_passed_cases": 95,
+      "generated_flags": [
+        "-Wno-unused-parameter",
+        "-fno-strict-aliasing",
+        "-DSP_PAUTH_REQUIRE_ACTIVE=1",
+        "-DSP_PAUTH_FAULT_EL0=1",
+        "-DSP_PAUTH_FAULT_COMBINE=1"
+      ],
+      "count_function": "\nunsigned neverdMemorySampleCount(void) { return sizeof(pauth_cases) / sizeof(pauth_cases[0]); }\n\n#include \"CptaPAuthFaultHarness.def\"\n",
+      "support_headers": [
+        "CptaFaultProbe.def",
+        "CptaPAuthFaultHarness.def"
+      ],
+      "model_parameters": {
+        "cluster0.enhanced_pac2_level": "3"
+      }
     }
   },
   "headers_directory": "include",

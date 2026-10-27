@@ -525,7 +525,8 @@ class EvidenceTests(unittest.TestCase):
 
     def test_raw_sp_profiles_require_alignment_origin_and_complete_results(self):
         names = [name for name in generated_memory.CONFIG["profiles"]
-                 if name.startswith(("sp-", "el0-sp-"))]
+                 if name.startswith(("sp-", "el0-sp-"))
+                 and not name.endswith("-faults")]
         self.assertEqual(len(names), 16)
         for name in names:
             with self.subTest(profile=name):
@@ -555,6 +556,41 @@ class EvidenceTests(unittest.TestCase):
                         range(group * 8, (group + 1) * 8)])
                     self.assertEqual(profile["generated_gate_values"][
                         "neverd-memory-samples"], 366 if group == 2 else 384)
+
+    def test_pauth_fault_profiles_require_architecture_and_every_fault(self):
+        names = [name for name in generated_memory.CONFIG["profiles"]
+                 if name.endswith("sp-pauth-faults")]
+        self.assertEqual(len(names), 6)
+        for name in names:
+            with self.subTest(profile=name):
+                profile = generated_memory.select_profile(name)
+                self.assertIn("-DCPA_GENERATED_PAUTH_FAULTS=1", profile["guest_flags"])
+                self.assertEqual(profile["support_headers"],
+                                 ["CptaFaultProbe.def", "CptaPAuthFaultHarness.def"])
+                level = 5 if "combine" in name else 4 if "fpac" in name else 1
+                self.assertEqual(profile["generated_gate_values"][
+                    "pauth-data-architecture-level"], level)
+                self.assertIn("-DCPA_PAUTH_FAULT_FEATURE_LEVEL=" + str(level),
+                              profile["guest_flags"])
+                model_level = "3" if level == 5 else "2" if level == 4 else "0"
+                config = generated_memory.configuration(profile)
+                self.assertEqual(config["model_parameters"][
+                    "cluster0.enhanced_pac2_level"], model_level)
+                report = generated_memory.assess(self.transcript(config=config), 0, profile)
+                self.assertTrue(report[profile["qualification_key"]])
+                self.assertFalse(report["neverd_output_qualified"])
+                self.assertFalse(report["native_apple_cpta_qualified"])
+                for mode in ("off", "on", "cpta0-only", "both"):
+                    self.assertEqual(profile["generated_gate_values"][
+                        "neverd-pauth-faults-" + mode], 21)
+                for key, value in profile["generated_gate_values"].items():
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript(omit=key, config=config), 0, profile)["passed"])
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript({key: value ^ 1}, config=config), 0,
+                        profile)["passed"])
+                self.assertFalse(generated_memory.assess(
+                    self.transcript(config=config), 1, profile)["passed"])
 
     def test_distinct_output_profiles_require_their_own_export(self):
         for name in generated_memory.CONFIG["profiles"]:

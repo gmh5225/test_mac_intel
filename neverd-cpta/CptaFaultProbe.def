@@ -1,0 +1,77 @@
+//===- CptaFaultProbe.def - Controlled authenticated SP faults --*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+// Shared assembly/C layout, architectural observations and test inputs.
+//===----------------------------------------------------------------------===//
+
+#ifndef CPA_FAULT_FRAME_BYTES
+#define CPA_SP_ALIGNMENT 16
+#define CPA_SP_ALIGNMENT_EC 0x26
+#define CPA_ESR_EC_SHIFT 26
+#define CPA_FAULT_FRAME_BYTES 160
+// Independently assembled with LLVM MC 22.1.6: msr PAN, #0. Exception entry
+// can set PAN even though the interrupted controlled access had PAN=0.
+#define CPA_FAULT_CLEAR_PAN .inst 0xd500409f
+#define CPA_FAULT_X19_OFFSET 16
+#define CPA_FAULT_X21_OFFSET 32
+#define CPA_FAULT_X23_OFFSET 48
+#define CPA_FAULT_X25_OFFSET 64
+#define CPA_FAULT_X27_OFFSET 80
+#define CPA_FAULT_D8_OFFSET 96
+#define CPA_FAULT_D10_OFFSET 112
+#define CPA_FAULT_D12_OFFSET 128
+#define CPA_FAULT_D14_OFFSET 144
+#define CPA_FAULT_STATE_BYTES 24
+#define CPA_FAULT_RESUME_OFFSET 0
+#define CPA_FAULT_HOST_SP_OFFSET 8
+#define CPA_FAULT_REPORT_OFFSET 16
+#define CPA_FAULT_LOW_OFFSET 0
+#define CPA_FAULT_COMPLETED_OFFSET 16
+#define CPA_FAULT_ESR_OFFSET 24
+#define CPA_FAULT_SP_OFFSET 32
+#define CPA_FAULT_ORIGIN_OFFSET 40
+#define CPA_FAULT_WORD_OFFSET 48
+#define CPA_FAULT_FAULTED_OFFSET 56
+#define CPA_FAULT_OBSERVATION_BYTES 64
+#define CPA_FAULT_COMPLETED 1
+#define CPA_FAULT_EL1H 5
+#define CPA_FAULT_EL0_DATA_ABORT 0x24
+#define CPA_FAULT_EL1_DATA_ABORT 0x25
+#define CPA_FAULT_PAUTH_EC 0x1c
+#define CPA_FAULT_CORRUPT_BIT (1ULL << 48)
+#define CPA_FAULT_BUFFER_BYTES 8320
+#define CPA_FAULT_BUFFER_MIDDLE 4112
+#define CPA_FAULT_MISALIGNMENT 8
+#define CPA_FAULT_PATTERN_FACTOR 37
+#define CPA_FAULT_CASE_FACTOR 19
+#define CPA_FAULT_PATTERN_BIAS 11
+#define CPA_FAULT_MODE_COUNT 4
+#define CPA_FAULT_VALID_MISALIGNED 0
+#define CPA_FAULT_INVALID_ALIGNED 1
+#define CPA_FAULT_INVALID_MISALIGNED 2
+#define CPA_FAULT_VALID_ALIGNED 3
+#define CPA_FAULT_PAUTH_FEATURE_NAME "pauth-data-architecture-level"
+#define CPA_FAULT_MODE_OFF_NAME "neverd-pauth-faults-off"
+#define CPA_FAULT_MODE_ON_NAME "neverd-pauth-faults-on"
+#define CPA_FAULT_MODE_CPTA0_NAME "neverd-pauth-faults-cpta0-only"
+#define CPA_FAULT_MODE_BOTH_NAME "neverd-pauth-faults-both"
+#define CPA_FAULT_NORMAL_FAILURE 10
+#define CPA_FAULT_COMPLETION_FAILURE 11
+#define CPA_FAULT_OBSERVATION_FAILURE 12
+#define CPA_FAULT_MEMORY_FAILURE 13
+#define CPA_FAULT_LAYOUT_MESSAGE "Authenticated SP probe layout changed"
+#define CPA_FAULT_WORDS_MESSAGE "Authenticated SP oracle word inventory changed"
+#endif
+
+#if defined(CPA_PAUTH_FAULT_WORD)
+CPA_PAUTH_FAULT_WORD(0xf82007f1U)
+CPA_PAUTH_FAULT_WORD(0xf8a02ff1U)
+CPA_PAUTH_FAULT_WORD(0xf8201ff1U)
+CPA_PAUTH_FAULT_WORD(0xf86007f1U)
+CPA_PAUTH_FAULT_WORD(0xf8bff7f1U)
+CPA_PAUTH_FAULT_WORD(0xf87feff1U)
+CPA_PAUTH_FAULT_WORD(0xf8a007f1U)
+#undef CPA_PAUTH_FAULT_WORD
+#endif

@@ -119,6 +119,8 @@ def main():
     headers.mkdir()
     for name, contents in CONFIG["headers"].items():
         (headers / name).write_text(contents)
+    for name in profile.get("support_headers", []):
+        shutil.copy2(run.ROOT / name, headers / name)
     generated_flags = [*profile["generated_flags"], CONFIG["headers_include_flag"],
                        str(headers)]
     provenance = {
