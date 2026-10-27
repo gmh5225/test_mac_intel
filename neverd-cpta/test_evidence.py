@@ -484,6 +484,39 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(run.CONFIG["model_parameters"], default_parameters)
         self.assertNotIn("cluster0.has_lrcpc3=1", run.model_command("model", "guest"))
 
+    def test_raw_sp_profiles_require_alignment_origin_and_complete_results(self):
+        names = [name for name in generated_memory.CONFIG["profiles"]
+                 if name.startswith(("sp-", "el0-sp-"))]
+        self.assertEqual(len(names), 12)
+        for name in names:
+            with self.subTest(profile=name):
+                profile = generated_memory.select_profile(name)
+                self.assertIn("-DCPA_GENERATED_STACK_MEMORY=1", profile["guest_flags"])
+                self.assertTrue(profile["artifact_property"].startswith("sp_"))
+                config = generated_memory.configuration(profile)
+                report = generated_memory.assess(self.transcript(config=config), 0, profile)
+                self.assertTrue(report[profile["qualification_key"]])
+                self.assertFalse(report["neverd_output_qualified"])
+                self.assertFalse(report["native_apple_cpta_qualified"])
+                for mode in ("off", "on", "cpta0-only", "both"):
+                    self.assertEqual(profile["generated_gate_values"][
+                        "neverd-memory-" + mode + "-sa"],
+                        16 if name.startswith("el0-") else 8)
+                for key, value in profile["generated_gate_values"].items():
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript(omit=key, config=config), 0, profile)["passed"])
+                    self.assertFalse(generated_memory.assess(
+                        self.transcript({key: value ^ 1}, config=config), 0,
+                        profile)["passed"])
+                if "-neon-group-" in name:
+                    group = int(name.rsplit("-", 1)[1])
+                    self.assertEqual(len(profile["test_report_cases"]), 25)
+                    self.assertEqual(profile["artifact_batches"], [
+                        f"batch-{index * 48}" for index in
+                        range(group * 8, (group + 1) * 8)])
+                    self.assertEqual(profile["generated_gate_values"][
+                        "neverd-memory-samples"], 366 if group == 2 else 384)
+
     def test_distinct_output_profiles_require_their_own_export(self):
         for name in generated_memory.CONFIG["profiles"]:
             profile = generated_memory.select_profile(name)

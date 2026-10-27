@@ -241,3 +241,15 @@ runtime, compiled without builtin substitution. Its independent native gate
 checks all bytes, unaligned offsets, zero lengths and exact returned pointers.
 The same runtime is used by single-batch and grouped profiles; it contains no
 fixture values or comparison results. Generated projections remain unchanged.
+
+The `sp-writeback`, `sp-vector-writeback`, `sp-pair` and `sp-neon-group-0/1/2`
+profiles, with matching `el0-` variants, consume the separate raw-SP exports.
+They retain literal Rn=31 and compare complete values, completed SP and all
+neighboring bytes through all five routes and four effective CPTA/CPTA0 modes.
+Every mode requires actual SCTLR_EL1.SA readback at EL1 or SA0 readback at EL0;
+the EL0 profiles also require the hardware-saved execution origin. Scalar,
+SIMD and pair reports contain their execution case and the shared SP admission
+case. NEON reports require that same admission case and all 24 SP batches.
+Each profile grants only its specific raw-SP primitive qualification. Normal
+completion does not qualify a reconstructed frame/call/unwind ABI, asynchronous
+unwind, tagged or overflowing addresses, fault identity or Apple CPA2 hardware.

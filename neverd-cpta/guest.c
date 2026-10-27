@@ -284,14 +284,19 @@ void guestMain(void) {
                      : CPA_MEMORY_CLOBBER);
 #if defined(CPA_GENERATED_MEMORY) || defined(CPA_GENERATED_EL0_MEMORY)
 #if defined(CPA_GENERATED_STACK_MEMORY)
-    const uint64_t StackSCTLR = SavedSCTLR | CPA_SA;
+#if defined(CPA_GENERATED_EL0_MEMORY)
+    const uint64_t StackAlignmentMask = CPA_SA0;
+#else
+    const uint64_t StackAlignmentMask = CPA_SA;
+#endif
+    const uint64_t StackSCTLR = SavedSCTLR | StackAlignmentMask;
     __asm__ volatile(CPA_WRITE_SCTLR
                      :
                      : CPA_REGISTER_INPUT(StackSCTLR)
                      : CPA_MEMORY_CLOBBER);
     __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Observed));
-    record(Controls[Mode].StackAlignmentName, Observed & CPA_SA);
-    expect((Observed & CPA_SA) == CPA_SA);
+    record(Controls[Mode].StackAlignmentName, Observed & StackAlignmentMask);
+    expect((Observed & StackAlignmentMask) == StackAlignmentMask);
 #endif
 #if defined(CPA_GENERATED_EL0_MEMORY)
     const struct GeneratedEL0Result EL0Result = runGeneratedAtEL0();
