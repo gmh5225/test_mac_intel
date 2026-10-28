@@ -45,6 +45,16 @@ class TypedCallTests(unittest.TestCase):
                 self.assertEqual(typed.integer_bits(case["value"], scalar), case["register"])
                 self.assertEqual(typed.integer_bits(case["value"], scalar, True), case["stack"])
 
+    def test_composite_placement_preserves_whole_values(self):
+        shapes = {shape["name"]: shape for shape in typed.POLICY["shapes"]}
+        for case in EXPECTED["composite_layouts"]:
+            with self.subTest(case=case):
+                locations, stack = typed.placements(shapes[case["name"]])
+                self.assertEqual(stack, case["stack"])
+                self.assertEqual([location["bank"] for location in locations], case["banks"])
+                self.assertEqual([location["reg"] for location in locations if location["bank"] != "stack"], case["registers"])
+                self.assertEqual([location["offset"] for location in locations if location["bank"] == "stack"], case["offsets"])
+
     def test_typed_profile_does_not_weaken_the_integer_contract(self):
         integer = copy.deepcopy(calls.CONFIG)
         helper = integer_tests.AuthenticatedCallTests()

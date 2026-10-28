@@ -36,23 +36,55 @@ def aligned(value, alignment):
     return (value + alignment - 1) // alignment * alignment
 
 
+def value_members(kind, offset=0):
+    value = POLICY["kinds"][kind]
+    if "fields" not in value:
+        return [{"kind": kind, "source_offset": offset, **value}]
+    members, position = [], 0
+    for field in value["fields"]:
+        child = POLICY["kinds"][field]
+        position = aligned(position, child.get("alignment", child["bytes"]))
+        members.extend(value_members(field, offset + position))
+        position += child["bytes"]
+    return members
+
+
 def placements(shape):
-    """Independent Darwin scalar PCS: narrow fixed spills, 8-byte vararg slots."""
+    """Independent Darwin PCS, keeping each composite wholly in one bank or stack."""
     registers = {"gp": 0, "fp": 0}
     stack, result = 0, []
     for index, kind in enumerate(shape["parameters"]):
-        scalar = {"memory": "", **POLICY["kinds"][kind]}
-        bank = "fp" if "fp" in scalar else "gp"
+        value = POLICY["kinds"][kind]
+        members = value_members(kind)
+        composite = "fields" in value
+        floating = all("fp" in member for member in members)
+        bank = "fp" if floating else "gp"
+        count = len(members) if floating else aligned(value["bytes"], POLICY["word_bytes"]) // POLICY["word_bytes"]
         variadic = shape["fixed"] >= 0 and index >= shape["fixed"]
-        if not variadic and registers[bank] < POLICY["register_arguments"]:
-            result.append({"bank": bank, "reg": registers[bank], **scalar})
-            registers[bank] += 1
+        fits = not variadic and registers[bank] + count <= POLICY["register_arguments"]
+        if not fits:
+            if composite:
+                registers[bank] = POLICY["register_arguments"]
+            size = POLICY["word_bytes"] if variadic else value["bytes"]
+            alignment = POLICY["word_bytes"] if variadic else value.get("alignment", size)
+            stack = aligned(stack, alignment)
+        for part, member in enumerate(members):
+            location = {"memory": "", **member, "argument": index, "part": part}
+            if fits:
+                location.update(bank=bank, reg=registers[bank] + (part if floating else member["source_offset"] // POLICY["word_bytes"]))
+            else:
+                location.update(bank="stack", offset=stack + member["source_offset"])
+            result.append(location)
+        if fits:
+            registers[bank] += count
         else:
-            size = POLICY["word_bytes"] if variadic else scalar["bytes"]
-            stack = aligned(stack, size)
-            result.append({"bank": "stack", "offset": stack, **scalar})
             stack += size
     return result, stack
+
+
+def carrier_value(location):
+    values = POLICY["values"][location["kind"]]
+    return values[(location["argument"] + location["part"]) % len(values)]
 
 
 def integer_bits(value, scalar, stack=False):
@@ -96,19 +128,37 @@ def prepare_fixtures(work, config):
         locations, stack = placements(shape)
         result = POLICY["kinds"][shape["return_kind"]]
         floating = "fp" in result
-        expected = (POLICY["results"][str(result["bytes"])] if floating else
-                    POLICY["integer_results"][shape["return_kind"]])
+        composite = "fields" in result
+        result_members = value_members(shape["return_kind"])
+        if composite:
+            expected_bits = 0
+            for member, value in zip(result_members, POLICY["composite_results"][shape["return_kind"]]):
+                expected_bits ^= int(value, 0) & ((1 << (member["bytes"] * POLICY["bits_per_byte"])) - 1)
+            expected = hex(expected_bits)
+            assert expected_bits
+        else:
+            expected = (POLICY["results"][str(result["bytes"])] if floating else
+                        POLICY["integer_results"][shape["return_kind"]])
         functions.append(render("symbol", name=name))
         functions.append(render("callback_start", alignment_mask=POLICY["frame_alignment"] - 1))
-        for index, (kind, location) in enumerate(zip(shape["parameters"], locations)):
+        for location in locations:
             functions.append(render("read_" + location["bank"], **location))
-            value = POLICY["values"][kind][index]
+            value = carrier_value(location)
             if "fp" not in location:
                 value = integer_bits(value, location, location["bank"] == "stack")
             functions.append(render("check", **location, value=value))
-        functions.append(render("callback_end" if floating else "callback_end_integer",
-                                **result, expected=expected if floating else
-                                integer_bits(expected, result)))
+        if composite:
+            for index, (member, value) in enumerate(zip(result_members, POLICY["composite_results"][shape["return_kind"]])):
+                returned = dict(member)
+                if "fp" not in returned:
+                    returned["gp"] = POLICY["kinds"]["i"]["gp"]
+                functions.append(render("callback_member_fp" if "fp" in member else "callback_member_gp",
+                                        **returned, reg=index, expected=value))
+            functions.append(templates["callback_members_end"])
+        else:
+            functions.append(render("callback_end" if floating else "callback_end_integer",
+                                    **result, expected=expected if floating else
+                                    integer_bits(expected, result)))
         outgoing = aligned(stack, POLICY["frame_alignment"])
         saved = outgoing + aligned(len(locations) * POLICY["word_bytes"], POLICY["frame_alignment"])
         frame = saved + POLICY["frame_alignment"]
@@ -120,8 +170,8 @@ def prepare_fixtures(work, config):
                     "declaration", name=target,
                     parameters=", ".join([templates["argument"]] * (
                         len(locations) + POLICY["outer_header_arguments"])),
-                    values=", ".join(render("argument_value", value=POLICY["values"][kind][index])
-                                     for index, kind in enumerate(shape["parameters"]))))
+                    values=", ".join(render("argument_value", value=carrier_value(location))
+                                     for location in locations)))
             cases.append(render("case", projected=projected, original=original,
                                 callback=name, key=case["key"], zero=int(case["zero"]),
                                 raw=int(case["raw"]), expected=expected))
@@ -148,6 +198,12 @@ def prepare_fixtures(work, config):
                              templates["zero_calls" if case["zero"] else "calls"][case["key"]])
             narrow = (render("narrow_return", bits=result["bytes"] * POLICY["bits_per_byte"])
                       if not floating and result["bytes"] < POLICY["promoted_integer_bytes"] else "")
+            if composite:
+                narrow = templates["result_start"]
+                for index, member in enumerate(result_members):
+                    narrow += render("read_fp" if "fp" in member else "read_gp", **member, reg=index)
+                    narrow += templates["result_mix"]
+                narrow += templates["result_finish"]
             functions.append(render("frame_close" if floating else "frame_close_integer",
                                     **result, frame=frame, saved=saved, narrow=narrow))
     (work / config["fixtures"][0]["file"]).write_text(

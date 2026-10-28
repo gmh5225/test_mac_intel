@@ -1,6 +1,6 @@
 {
-  "samples": 75,
-  "faults_per_mode": 180,
+  "samples": 200,
+  "faults_per_mode": 480,
   "layouts": [
     {
       "name": "signed-byte-ten",
@@ -74,6 +74,147 @@
       "value": "0x00123456789abcde",
       "register": "0x123456789abcde",
       "stack": "0x123456789abcde"
+    }
+  ],
+  "composite_layouts": [
+    {
+      "name": "wide-odd",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "offsets": [],
+      "stack": 0
+    },
+    {
+      "name": "wide-whole-spill",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
+    },
+    {
+      "name": "word-pair-packed",
+      "banks": [
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "gp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
+    },
+    {
+      "name": "hfa-f32-exhausted",
+      "banks": [
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "stack",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      "offsets": [
+        0,
+        4,
+        8,
+        12
+      ],
+      "stack": 16
+    },
+    {
+      "name": "hfa-f64-exhausted",
+      "banks": [
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "fp",
+        "stack",
+        "stack",
+        "stack"
+      ],
+      "registers": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "offsets": [
+        0,
+        8,
+        16
+      ],
+      "stack": 24
     }
   ]
 }
