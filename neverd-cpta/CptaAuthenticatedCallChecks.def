@@ -1,0 +1,86 @@
+//===- CptaAuthenticatedCallChecks.def -------------------------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+extern void callRecord(const char *, uint64_t);
+static unsigned Faults, AlternateFaults, Invocation;
+static const char *const DifferenceNames[] = {
+    "call-differences-off", "call-differences-on",
+    "call-differences-cpta0-only", "call-differences-both"};
+unsigned neverdMemorySampleCount(void) {
+  return sizeof(Cases) / sizeof(*Cases);
+}
+unsigned neverdPAuthFaultCount(void) { return Faults; }
+
+int neverdPAuthFaultMain(void) {
+  Faults = 0;
+  AlternateFaults = 0;
+  for (unsigned C = 0; C < sizeof(Cases) / sizeof(*Cases); ++C) {
+    const uint64_t Expected = expectedCall(C);
+    Modifier = Cases[C].Zero ? 0 : 0xfedcba9876543210ULL;
+    for (unsigned Mode = 0; Mode < (Cases[C].Raw ? 1 : 4); ++Mode) {
+      Pointer = Cases[C].Raw
+                    ? Cases[C].Target
+                    : signPointer(Cases[C].Target, Modifier ^ (Mode == 2),
+                                  Cases[C].Key ^ (Mode == 1));
+      if (Mode == 3)
+        Pointer ^= (1ULL << 48);
+      struct Observation Actual = {0}, Original = {0};
+      Called = 0;
+      probeGeneratedPAuth(Cases[C].Original, 0, &Original);
+      uint64_t NativeCalls = Called;
+      Called = 0;
+      probeGeneratedPAuth(Cases[C].Projected, 0, &Actual);
+      if (Mode == 0) {
+        if (!Actual.Completed || !Original.Completed || Actual.Faulted ||
+            Original.Faulted || Actual.Low != Expected ||
+            Original.Low != Expected || Actual.High || Original.High ||
+            NativeCalls != 1 || Called != 1)
+          return 100 + C;
+      } else {
+        unsigned EC = Original.ESR >> 26;
+#if defined(CPA_GENERATED_EL0_MEMORY)
+        unsigned Origin = 0;
+#else
+        unsigned Origin = 5;
+#endif
+        unsigned ActualEC = Actual.ESR >> 26;
+        unsigned Permitted = (ActualEC == EC);
+#if defined(CALL_C_PROJECTION)
+        // LLVM's auth-and-resign has its own invalid-signature diagnostic. This
+        // gate qualifies ABI rejection, never equality of the original
+        // syndrome.
+        if (!Permitted && ((CALL_PAUTH_LEVEL == 1 && ActualEC == 0x3c &&
+                            (Actual.ESR & 0xffff) == 0xc470 + Cases[C].Key) ||
+                           (CALL_PAUTH_LEVEL == 4 && ActualEC == 0x1c &&
+                            (EC == 0x20 || EC == 0x21)))) {
+          Permitted = 1;
+          ++AlternateFaults;
+        }
+#endif
+        if (Actual.Completed || Original.Completed || !Actual.Faulted ||
+            !Original.Faulted || !Permitted ||
+            (EC != 0x20 && EC != 0x21 && EC != 0x1c) ||
+            Actual.Origin != Origin || Original.Origin != Origin ||
+            NativeCalls || Called) {
+          callRecord("failed-call-case", C);
+          callRecord("failed-call-stimulus", Mode);
+          callRecord("native-esr", Original.ESR);
+          callRecord("projected-esr", Actual.ESR);
+          callRecord("native-elr", Original.High);
+          callRecord("projected-elr", Actual.High);
+          callRecord("native-word", Original.Word);
+          callRecord("projected-word", Actual.Word);
+          callRecord("native-callback-count", NativeCalls);
+          callRecord("projected-callback-count", Called);
+          return 200 + C * 4 + Mode;
+        }
+        ++Faults;
+      }
+    }
+  }
+  callRecord(DifferenceNames[Invocation++ % 4], AlternateFaults);
+  return 0;
+}

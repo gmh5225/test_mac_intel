@@ -1,0 +1,188 @@
+{
+  "scope": "Controlled PAC execution of self-contained Darwin scalar authenticated calls: fixed f32/f64, exhausted FP registers, mixed integer/FP and Darwin stack variadics, IA/IB, zero/dynamic discriminator and raw controls. Actual Mach-O text is copied without code generation or instruction changes. Does not qualify aggregates/HFAs, authenticated storage, whole images, native Apple execution, signed exception unwinding or exact fault PC/ESR.",
+  "output_directory": "cpta-typed-calls",
+  "test_report_cases": [
+    "AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall"
+  ],
+  "export_count": 1,
+  "qualification_key": "darwin_scalar_authenticated_call_abi_qualified",
+  "object_symbol": "_authenticated_dispatch",
+  "directory": "typed-{shape}-{key}-{zero}-{raw}",
+  "shapes": [
+    {
+      "name": "f64-one",
+      "parameters": "d",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "f64-ten",
+      "parameters": "dddddddddd",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "f32-ten",
+      "parameters": "ffffffffff",
+      "return_bytes": 4,
+      "fixed": -1
+    },
+    {
+      "name": "mixed-ten",
+      "parameters": "ididididid",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "variadic-double",
+      "parameters": "iddddddddd",
+      "return_bytes": 8,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-mixed",
+      "parameters": "dididididi",
+      "return_bytes": 4,
+      "fixed": 1
+    }
+  ],
+  "variants": [
+    {
+      "key": 0,
+      "zero": false,
+      "raw": false
+    },
+    {
+      "key": 0,
+      "zero": true,
+      "raw": false
+    },
+    {
+      "key": 1,
+      "zero": false,
+      "raw": false
+    },
+    {
+      "key": 1,
+      "zero": true,
+      "raw": false
+    },
+    {
+      "key": 0,
+      "zero": false,
+      "raw": true
+    }
+  ],
+  "kinds": {
+    "i": {
+      "bytes": 8,
+      "gp": "x"
+    },
+    "d": {
+      "bytes": 8,
+      "gp": "x",
+      "fp": "d"
+    },
+    "f": {
+      "bytes": 4,
+      "gp": "w",
+      "fp": "s"
+    }
+  },
+  "word_bytes": 8,
+  "frame_alignment": 16,
+  "register_arguments": 8,
+  "outer_header_arguments": 2,
+  "fault_stimuli": 3,
+  "values": {
+    "i": [
+      "0x8123456789abcdef",
+      "0xfeedbabe12345678",
+      "0x7fffffffffffffff",
+      "0x1000000000000001",
+      "0xfedcba9876543210",
+      "0",
+      "1",
+      "0xffffffffffffffff",
+      "0x0011223344556677",
+      "0xdeadbeefcafef00d"
+    ],
+    "d": [
+      "0x8000000000000000",
+      "0x3ff0000000000000",
+      "0xbff4000000000000",
+      "0x4004000000000000",
+      "0xc008000000000000",
+      "0x4016000000000000",
+      "0x4027800000000000",
+      "0xc031000000000000",
+      "0x3fd0000000000000",
+      "0x4031800000000000"
+    ],
+    "f": [
+      "0x80000000",
+      "0x3f800000",
+      "0xbfa00000",
+      "0x40200000",
+      "0xc0400000",
+      "0x40b00000",
+      "0x413c0000",
+      "0xc1880000",
+      "0x3e800000",
+      "0x418c0000"
+    ]
+  },
+  "results": {
+    "4": "0xc0b00000",
+    "8": "0xc016000000000000"
+  },
+  "callback": "typed_target_{shape_index}",
+  "original": "original_{index}",
+  "text_file": "projected-{index}.bin",
+  "assembly_file": "projected-{index}.S",
+  "fixtures": [
+    {
+      "file": "typed-harness.c",
+      "language": "c",
+      "generated": true
+    },
+    {
+      "file": "typed-original.S",
+      "language": "assembler-with-cpp",
+      "generated": true
+    }
+  ],
+  "harness_template": "CptaTypedCallHarness.def",
+  "original_template": "CptaTypedCallOriginal.def",
+  "templates": {
+    "argument": "uint64_t",
+    "argument_value": "{value}ULL",
+    "declaration": "extern uint64_t {name}({parameters});\nstatic unsigned __int128 {name}_outer(uint64_t Unused) {{\n  (void)Unused;\n  return {name}(Pointer, Modifier, {values});\n}}\n",
+    "callback_declaration": "extern void {name}(void);\n",
+    "case": "  {{{projected}_outer, {original}_outer, (uint64_t){callback}, {key}, {zero}, {raw}, {expected}ULL}},\n",
+    "symbol": ".global {name}\n.type {name},%function\n{name}:\n",
+    "frame_open": "  sub sp,sp,#{frame}\n  stp x29,x30,[sp,#{saved}]\n  mov x16,x0\n  mov x17,x1\n",
+    "stage_register": "  str x{reg},[sp,#{offset}]\n",
+    "stage_stack": "  ldr x9,[sp,#{incoming}]\n  str x9,[sp,#{offset}]\n",
+    "load_gp": "  ldr {gp}{reg},[sp,#{offset}]\n",
+    "load_fp": "  ldr {fp}{reg},[sp,#{offset}]\n",
+    "load_stack": "  ldr {gp}9,[sp,#{stage}]\n  str {gp}9,[sp,#{offset}]\n",
+    "calls": [
+      "  blraa x16,x17\n",
+      "  blrab x16,x17\n"
+    ],
+    "zero_calls": [
+      "  blraaz x16\n",
+      "  blrabz x16\n"
+    ],
+    "raw_call": "  blr x16\n",
+    "frame_close": "  fmov {gp}0,{fp}0\n  ldp x29,x30,[sp,#{saved}]\n  add sp,sp,#{frame}\n  ret\n",
+    "callback_start": "  adrp x14,Called\n  add x14,x14,:lo12:Called\n  ldr x15,[x14]\n  add x15,x15,#1\n  str x15,[x14]\n  mov x14,sp\n  and x14,x14,#{alignment_mask}\n",
+    "read_gp": "  mov {gp}10,{gp}{reg}\n",
+    "read_fp": "  fmov {gp}10,{fp}{reg}\n",
+    "read_stack": "  ldr {gp}10,[sp,#{offset}]\n",
+    "check": "  ldr {gp}11,={value}\n  cmp {gp}10,{gp}11\n  cset x12,ne\n  orr x14,x14,x12\n",
+    "callback_end": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}10,{gp}10,{gp}zr,eq\n  fmov {fp}0,{gp}10\n  ret\n"
+  },
+  "input_error": "The complete typed-call test and its single artifact export must complete"
+}

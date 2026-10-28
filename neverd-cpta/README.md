@@ -343,3 +343,31 @@ source commit, all input hashes, environment source hashes and pinned archive
 hash. Use the model's library path only for its own process if the installation
 requires it; exporting its bundled C++ runtime for the guest compiler can prevent
 Clang from starting.
+
+`typed_calls.py` separately consumes only
+`AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall` and its
+single matching artifact export. Its 30 groups cover fixed f32/f64 calls,
+exhausted FP registers, mixed integer/FP operands and Darwin stack variadics,
+with IA/IB, zero/dynamic discriminators and raw BLR controls. All five routes
+are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
+one self-contained text section with no code relocations. It copies the text
+bytes into an ELF guest section; it neither retargets LLVM IR nor patches any
+instruction. The outer entry uses full-width integer carriers on both ABIs.
+
+```sh
+python3 neverd-cpta/typed_calls.py \
+  --artifacts /path/to/typed-call-export \
+  --test-report /path/to/typed-call-test.json \
+  --neverd-revision FULL_40_CHARACTER_COMMIT
+```
+
+The independent assembly callbacks check every argument's bits, position and
+stack alignment, then return an exact floating bit pattern. In particular,
+fixed f32 stack spills are four bytes apart while variadic tails use eight-byte
+slots. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
+with 72 invalid-signature pairs per mode. Integer and typed profiles share their
+key installation, fault probe and exception-class policy. Typed success grants
+only `darwin_scalar_authenticated_call_abi_qualified`; HFA/aggregate calls,
+dyld binding, whole images, native Apple execution, signed exception unwinding
+and exact exception PC/ESR remain unqualified. Use a separately filtered report
+for the original five integer tests when running `authenticated_calls.py`.
