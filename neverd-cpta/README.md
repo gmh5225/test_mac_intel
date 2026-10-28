@@ -1,0 +1,383 @@
+# Controlled CPA2 execution environment
+
+This separate manual/branch workflow develops NeverD's arm64e.x1 validation
+environment. It runs the **official Arm AEM FVP 11.32.19 on x86-64 Linux**;
+the repository name does not imply an Intel Mac can execute arm64e natively.
+Existing suspended Intel HVF workflows remain suspended.
+
+The archive is downloaded directly from Arm and checked against a pinned
+SHA-256. Its published MD5 was independently checked when pinning the package.
+The workflow installs the unmodified package under its included Arm terms;
+the model and its libraries are not redistributed in the artifacts.
+Semihosting is enabled at the model root. The bare EL1 guest disables the
+board TZC gate with `bp.secure_memory=0`; it does not install secure firmware
+or claim to validate that controller.
+
+The bare-metal guest requires EL1 as the highest implemented exception level,
+reads `ID_AA64ISAR3_EL1.CPA`, and requires the actual value 2. With no EL2/EL3
+there are no higher-level SCTLR2 enable gates. It writes and reads back all
+four `SCTLR2_EL1.CPTA/CPTA0` combinations (values 0, 512, 1024 and 1536).
+Concrete EL1 ADDPT overflow/underflow results must follow CPTA independently
+of CPTA0. No ID register or result is fabricated.
+It also executes GPR/SIMD register-offset memory controls and the same aligned
+or eight-byte-misaligned address through SP and X0 with `SCTLR_EL1.SA` off/on.
+
+The MMU maps the first two MiB of guest DRAM with 4-KiB Normal WB pages.
+Code is privileged; data is writable at EL0/EL1 and non-executable. A common
+EL0-writable mapping cannot execute at EL1, and disabling the MMU would make
+unaligned Device-memory accesses fault. MAIR, TCR, TTBR and SCTLR readbacks,
+PAN=0 and UAO=0 are required. The linker rejects guests exceeding the mapping.
+
+`run.py --el0-control` additionally enters EL0t with ERET and executes real
+GPR/SIMD memory controls under every CPTA/CPTA0 combination. This profile
+shares read-only executable code with EL1 while retaining writable,
+non-executable data. Its returning SVC must have the exact site and immediate;
+the hardware-saved `SPSR_EL1.M` must identify EL0t. Every mode reports that
+origin and its memory result. All 82 checks are mandatory. Actions runs this
+profile separately from the original 74-check EL1 environment, preserving
+independent artifacts. The EL0 control does not execute NeverD output.
+
+All 74 checks, four modes, explicit guest completion and a successful process
+exit are required. Missing features, exceptions, timeouts, malformed or
+incomplete records fail the job. Artifacts preserve the exact commands,
+source/guest hashes, model version/parameter listing and raw transcript.
+
+The original EL1 profile is **model validation of the environment**. It does
+not qualify Apple silicon, EL0 instruction execution, memory overflow/other translation faults,
+CPACHECK choices or
+NeverD's emitted code. Those require further fixtures in this environment.
+The JSON report explicitly retains these limits even when all controls pass.
+
+Local cross-compilation without a model:
+
+```sh
+python3 neverd-cpta/run.py --build-only --compiler clang --linker ld.lld
+```
+
+Definitions, encodings, configuration values and pinned downloads belong in
+`CptaGuest.def` and `CptaEnvironment.def`.
+
+`generated_memory.py` consumes actual exports from NeverD's
+`AArch64ImmediateMemory` suite. Require all eight named tests to complete with
+an artifact export, then pass its four files, the test JSON and the exact
+NeverD commit. Inputs and hashes are preserved before compilation:
+
+```sh
+python3 neverd-cpta/generated_memory.py \
+  --artifacts /path/to/immediate-memory-export \
+  --test-report /path/to/immediate-tests.json \
+  --neverd-revision FULL_40_CHARACTER_COMMIT
+```
+
+Each of five routes (HighC and LLVMC at O0/O2, plus the actual LLVM ELF object)
+executes 177 samples under every control combination and requires 79 checks.
+The original generated functions/object stay unchanged; the independent
+harness entry is renamed and exposes its actual array size. Only unused
+formal-parameter warnings are suppressed for the fixed-ABI generated C.
+The generated C's declared plain-pointer memory contract also requires
+`-fno-strict-aliasing`; the shared generated flags apply it to both C
+projections, the independent harness and the freestanding byte runtime.
+Compiler warnings, process deadlines and the memory mapping stay unchanged.
+The model archive, capability/completion gates and 45-second process limit
+remain the same. The default workflow qualifies the two environments; running
+this separate matrix qualifies only its declared explicit-IR inputs.
+
+This is no-image, nonoverflow, normal-memory model coverage. Automatic
+lifting, image rebasing/relocation, original SP, writeback/pairs, native
+half/whole-vector ABI, EL0 instruction execution and Apple hardware remain
+outside its scope. Even a passing matrix keeps the broad
+`neverd_output_qualified` and `native_apple_cpta_qualified` fields false; only
+`explicit_immediate_memory_output_qualified` is granted per passing route.
+`CptaGeneratedMemory.def` owns the matrix inventory, required test identities,
+source bridge, flags and expected observations.
+
+`--profile image` instead requires the distinct
+`cpta_image_memory_artifacts` export from that same eight-test report. These
+177 functions were emitted with a Mach-O image context but use explicit runtime
+GPR parameters, including scalar SSA arithmetic. It grants only
+`explicit_image_context_runtime_memory_output_qualified`; it does not qualify
+image-derived addresses or relocation. `--profile el0-image` uses the same
+export at EL0 and additionally checks hardware exception origin under every
+control combination. Its separate key is
+`explicit_el0_image_context_runtime_memory_output_qualified`.
+
+`--profile image-relocated` requires the separate
+`cpta_relocated_memory_artifacts` export. Its 177 cases use image-owned base
+addresses, alternating direct occurrences and SSA COPY. An independent getter
+must alias the same complete storage as every original access. This proves
+nonoverflow rebasing for these explicit fixtures, including negative and maximum
+Q displacements, without qualifying an entire automatically lifted program.
+`--profile el0-image-relocated` executes that same export through the EL0 entry
+and origin checks. Both profiles retain the five unchanged C/object routes,
+all four effective controls and the complete eight-test input gate.
+
+`--profile el0-immediate` executes the original 177-sample export at EL0;
+`--profile el0-register` uses the seven-test SP report and its matching
+`cpta_register_memory_artifacts` export for all 184 GPR/SIMD register-offset
+samples. Each profile requires 83 checks on every source/object route,
+including the actual EL0t origin under all four control combinations. Their
+qualification keys are `explicit_el0_immediate_memory_output_qualified` and
+`explicit_el0_register_memory_output_qualified`. They do not qualify literal
+SP access at EL0, overflowing memory, tagging, image rebasing, automatic
+immediate lifting, every internal CPACHECK choice or Apple hardware. The
+default Actions matrix validates the two environments; these separate
+generated-output matrices still require actual NeverD exports.
+
+Use `--profile stack` with the separate seven-test
+`AArch64StackAddressMemory` report and its `cpta_stack_memory_artifacts`
+export to check actual explicit raw-SP output. This profile requires 177
+immediate samples, all four effective CPTA/CPTA0 values and a separate
+`SCTLR_EL1.SA=1` readback in every mode: 83 mandatory guest checks per route.
+It grants only `explicit_raw_sp_memory_output_qualified`. All original
+functions and the LLVM ELF object remain unchanged. Native SP exception and
+GPR-control checks use NeverD's `scripts/verify_arm64e_sp_memory.py` with its
+actual C and Mach-O exports; they do not establish Apple CPA2 execution.
+Use `--profile stack-register` with the same complete seven-test SP report
+and its `cpta_stack_register_memory_artifacts` export to require all 184
+register-offset GPR/SIMD samples, including every extension and scale. It
+requires the same 83 checks and grants only
+`explicit_raw_sp_register_memory_output_qualified`. The matching GPR export
+`cpta_register_memory_artifacts` uses `--profile register`, requiring 79
+checks and granting only `explicit_register_memory_output_qualified`.
+NeverD's native verifier uses `--profile register` with those two exports
+and the SP report for both report arguments; all 184 SP faults and every
+matching GPR result must pass independently.
+Reconstructed frames, image-backed SP, stack ABI, tagging and asynchronous
+unwind remain outside this profile's scope. The default workflow still runs
+the environment profile; it does not claim the separate output matrix ran.
+
+References:
+
+- [Arm Architecture FVP downloads](https://support.arm.com/tools-and-software/fixed-virtual-platforms/arm-architecture-fvps)
+- [Arm A-profile feature definitions, 2025-09](https://documentation-service.arm.com/static/68da532186b96e39e38c318c)
+- [Linux system register metadata](https://github.com/torvalds/linux/blob/master/arch/arm64/tools/sysreg)
+- [Arm memory management](https://developer.arm.com/documentation/101811/latest)
+- [Arm exception model](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Exception%20model.pdf)
+- [Arm execution permissions](https://developer.arm.com/-/media/Arm%20Developer%20Community/PDF/Learn%20the%20Architecture/Providing%20protection%20for%20complex%20software.pdf)
+
+The `writeback` and `el0-writeback` profiles require the separate eight-test
+`AArch64WritebackMemory` report and its
+`arm64e_writeback_memory_artifact_directory` export. They execute 130 independently
+assembled GPR single pre/post-index samples through the same five output routes,
+comparing load values, completed bases and every buffer byte against original
+register encodings. All four CPTA/CPTA0 combinations remain mandatory; EL0 also
+requires every hardware-origin check. This bounds nonoverflow Normal WB memory
+only. It does not qualify automatic whole images, image relocation, SP/stack
+ABI, SIMD/pairs, overflow/tagging environments or native Apple CPA2 hardware.
+
+The `vector-writeback` and `el0-vector-writeback` profiles require the distinct
+ten-test `AArch64VectorWritebackMemory` report and exactly one
+`arm64e_vector_writeback_memory_artifact_directory` export. The 100 independent
+B/H/S/D/Q single pre/post-index samples compare the complete V value, completed
+base and every buffer byte against original-register native instructions. The
+same five output routes, four CPTA/CPTA0 settings and EL0 origin checks apply.
+These profiles retain the bounded Normal WB, nonoverflow scope; automatic whole
+images, image relocation, original SP/stack ABI, pairs, tagging, foreign exception
+identity and native Apple CPA2 hardware remain unqualified.
+
+The `pair` and `el0-pair` profiles require the distinct ten-test
+`AArch64PairMemory` report and exactly one
+`arm64e_pair_memory_artifact_directory` export. They execute 215 independent
+GPR W/X, LDPSW and SIMD S/D/Q pairs, covering non-temporal, offset, pre-index
+and post-index forms with signed imm7 boundary samples. Both complete values,
+the completed base and all 4096 buffer bytes are compared with independent
+original-register instructions. Five output routes, all four CPTA/CPTA0
+settings and every EL0 origin gate remain mandatory. These profiles qualify
+only the declared Normal WB nonoverflow integer bridges; automatic whole
+images, image relocation, original SP/stack ABI, overflow/tagging, native vector
+ABI, foreign exception identity and Apple CPA2 hardware remain unqualified.
+
+The `ordered`, `ordered-image` and `ordered-image-relocated` profiles, with
+their corresponding `el0-` variants, require the distinct nine-test
+`AArch64OrderedMemory` report. Each exports 115 independently assembled GPR
+and B/H/S/D/Q LDAPUR/STLUR samples. Effective access addresses are naturally
+aligned while every encoded displacement boundary remains present. Unaligned
+accesses and their faults are not qualified by this success matrix. The
+profiles distinguish explicit runtime
+bases, image-context runtime bases and relocated complete image storage.
+Hardware LRCPC3 readback, sample count, all four effective checking controls
+and every EL0 origin are mandatory. Only these profiles enable the model's
+documented `cluster0.has_lrcpc3=1` implementation parameter; feature registers
+are read from the model. Actual original opcodes retain RCpc and
+release ordering; sequential model execution does not qualify concurrency
+litmus behavior or native Apple CPA2 hardware. Original SP/stack/call/unwind,
+overflow/tagging and foreign exception identity remain separate work.
+
+Generated output is compiled unchanged. The environment supplies freestanding
+`string.h` declarations from `CptaGeneratedMemory.def`, since the bare-metal
+Clang target has no system C library headers. The generated header hash is
+recorded alongside source provenance. These declarations supply no library
+implementation and do not replace any instruction or output operation.
+
+The `structure`, `structure-image`, and corresponding `el0-` profiles consume
+NeverD's baseline AdvSIMD structure-memory exports. They require all 58
+named core/projection tests, complete C/object artifacts and the actual exported
+`structure_cases` array count. The first twenty-three batches contain 48 cases each;
+`structure-tail`/`structure-image-tail` and their `el0-` variants require the
+last 30 cases, for 1,134 independent LLVM MC samples overall. Each case compares
+three post-index deltas, all 128-bit vector results, the completed base and
+every byte of the memory/output buffers against the original register encoding.
+The explicit and image-context exports have distinct report properties. A
+missing/skipped test, wrong context, wrong batch count, missing control or
+nonzero comparison fails qualification. All five routes, four effective
+CPTA/CPTA0 combinations, EL0 origin checks and the existing 45-second model
+deadline remain mandatory. These are bounded, nonoverflow Normal WB integer
+bridges. They do not qualify original SP/frame/call/unwind execution, dynamic
+post-index relocation of a fixed image base, arbitrary native vector ABI,
+tagging/foreign faults or Apple CPA2 hardware.
+
+The twelve `structure[-image]-group-0/1/2` profiles, including their `el0-`
+variants, compile eight unchanged batch exports into each bounded guest. The
+three groups contain 384, 384 and 366 cases. Each harness remains a separate
+translation unit; only its entry is renamed, and its actual array length is
+exposed. A thin guest entry calls every batch and sums those lengths. C and
+LLVM objects remain unchanged. Input hashes name every original batch file.
+This avoids repeating environment startup for each small compiler batch; it
+keeps the original mapping, link-size checks and per-process timeouts. A failed
+batch, wrong sum or incomplete control matrix still fails the whole group.
+
+Generated integer bridges link a shared freestanding `memcpy`/`memset` byte
+runtime, compiled without builtin substitution. Its independent native gate
+checks all bytes, unaligned offsets, zero lengths and exact returned pointers.
+The same runtime is used by single-batch and grouped profiles; it contains no
+fixture values or comparison results. Generated projections remain unchanged.
+
+The `sp-writeback`, `sp-vector-writeback`, `sp-pair` and `sp-neon-group-0/1/2`
+profiles, with matching `el0-` variants, consume the separate raw-SP exports.
+They retain literal Rn=31 and compare complete values, completed SP and all
+neighboring bytes through all five routes and four effective CPTA/CPTA0 modes.
+Every mode requires actual SCTLR_EL1.SA readback at EL1 or SA0 readback at EL0;
+the EL0 profiles also require the hardware-saved execution origin. Scalar,
+SIMD and pair reports contain their execution case and the shared SP admission
+case. NEON reports require that same admission case and all 24 SP batches.
+Each profile grants only its specific raw-SP primitive qualification. Normal
+completion does not qualify a reconstructed frame/call/unwind ABI, asynchronous
+unwind, tagged or overflowing addresses, fault identity or Apple CPA2 hardware.
+
+`sp-flow` and `el0-sp-flow` consume twenty original-SP sequences, one for each
+scalar, vector, pair and NEON writeback identity. The completed base passes
+through copies into a second literal-SP load. The exact source-flow tests must
+also pass, including all incoming PHI arms, anchored loops and mutable source
+uses before and after reassignment. Each route compares the second value,
+completed SP and every buffer byte. These profiles require the same four
+controls, alignment readbacks and EL0 origin as the other SP profiles; they do
+not grant a reconstructed stack or unwind ABI.
+
+`sp-pauth` and `el0-sp-pauth` require actual PAuth capability, EnDA/EnDB
+readback and distinct APDA/APDB key readback. The generated harness must also
+observe changed signature bits for both keys. Seven independent LDRAA/B words
+cover offset and writeback addressing, both displacement limits and discarded
+architectural destinations. All five generated routes compare the combined
+load, outgoing signed or authenticated base and complete guarded memory.
+Successful accesses do not qualify invalid-PAC fault ordering or Apple unwind.
+
+`sp-pauth-faults`, `fpac-sp-pauth-faults` and
+`fpac-combine-sp-pauth-faults`, with matching `el0-` variants, consume those
+same unchanged exports. They configure the model's real enhanced PAC level
+and require architecture-level readback of 1, 4 or 5 respectively. Every word
+has an aligned valid completion control plus valid-PAC/misaligned-SP,
+invalid-PAC/aligned-SP and invalid-PAC/misaligned-SP stimuli. All four CPTA
+modes require 21 successful fault comparisons per generated route. The
+independent native words and generated functions must agree on complete ESR,
+raw signed SP, hardware exception origin and exact fault instruction; every
+guarded memory byte remains unchanged. FPAC without FPACCOMBINE must retain
+the combined load's fault order instead of substituting standalone AUTDA/B.
+
+The assembly recovery probe saves the AAPCS64 callee-saved GPR and low SIMD
+bank, recovers the controlled wrapper's SP after a synchronous fault, and
+checks a separate normal-completion path. Exception entry may enable PAN;
+the handler clears it before reading the shared recovery state and restores
+the original PSTATE through ERET. `CptaFaultProbe.def` owns the layout and
+instruction constants; `CptaPAuthFaultHarness.def` owns the fault oracle.
+These profiles qualify synchronous primitive faults in the official model.
+They do not qualify an Apple call/frame/unwind ABI or asynchronous unwind.
+
+`authenticated_calls.py` consumes the complete five-test
+`AArch64AuthenticatedCall` report and its two matching
+`authenticated_call_artifact_dir` properties. Each of nine batches supplies
+both generated C files, their O0/O2 LLVM IR, and five actual ELF objects emitted
+with NeverD's configured LLVM. These objects are linked unchanged except for
+renaming the exported entry symbol. The environment compiler builds only the
+independent assembly oracle, integer callback harness and guest.
+
+```sh
+python3 neverd-cpta/authenticated_calls.py \
+  --artifacts /path/to/authenticated-call-export \
+  --test-report /path/to/authenticated-call-tests.json \
+  --neverd-revision FULL_40_CHARACTER_COMMIT
+```
+
+The matrix runs five output routes, three actual instruction-PAC feature levels
+(PAuth, FPAC and FPACCOMBINE), and EL1/EL0: 30 guests. Every guest reads the actual
+APIA/APIB feature level, installs and reads back independent nonzero keys, and
+requires SCTLR.EnIA/EnIB. All four CPTA/CPTA0 settings remain mandatory. Eight
+IA/IB calls cover zero/dynamic modifiers and one/ten integer arguments, including
+stack arguments; a ninth raw BLR control must execute without authentication.
+Every valid original/projected pair must return the independently calculated
+result and execute its callback once. Wrong key, wrong discriminator and PAC-bit
+corruption each must fault synchronously before either callback executes.
+The fault probe saves the actual exception PC and reads an instruction only
+inside the mapped guest range, since baseline invalid branches can fault at an
+unmapped poisoned destination.
+
+The C O0 routes can retain an auth-and-resign sequence. Their known invalid
+signature diagnostics differ from the original combined branch: LLVM's key
+specific BRK under baseline PAuth, and a noncombined authentication fault under
+FPAC. Each such difference must be observed and counted exactly; the native and
+C O2 routes require the original exception class. FPACCOMBINE requires matching
+classes on all routes. Passing grants only
+`integer_authenticated_call_abi_qualified`, and
+`original_exception_class_qualified` stays false on the affected C O0 routes.
+Authenticated FP/HFA/aggregate/variadic ABI, exact exception PC, whole-image
+relocations and authenticated storage, Darwin signed unwind and native Apple
+CPA2 remain unqualified. The default Actions workflow still validates the base
+environments and evidence gates; it does not claim to have consumed these
+separately supplied NeverD exports.
+
+`CptaAuthenticatedCalls.def` owns the input inventory, model settings and gates;
+the `CptaAuthenticatedCall*.def` fixtures own the independent call instructions,
+keys, exception observations and expected integer results. A preinstalled model
+can be selected with `--model /path/to/FVP_Base_RevC-2xAEMvA`; the model version
+and full parameter listing are still recorded. Provenance preserves the exact
+source commit, all input hashes, environment source hashes and pinned archive
+hash. Use the model's library path only for its own process if the installation
+requires it; exporting its bundled C++ runtime for the guest compiler can prevent
+Clang from starting.
+
+`typed_calls.py` separately consumes only
+`AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall` and its
+single matching artifact export. Its 200 groups cover signed/unsigned 8/16/32-bit
+and 128-bit integers, 64-bit integers and pointers, fixed f32/f64 calls, direct
+one/two-word records, naturally padded integer records, and one-to-four-member
+f32/f64 HFAs including nested records. Exhausted GP/FP banks preserve complete
+record spills and aligned 128-bit values. Mixed scalar operands and Darwin
+stack variadics remain covered,
+with IA/IB, zero/dynamic discriminators and raw BLR controls. All five routes
+are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
+one self-contained text section with no code relocations. It copies the text
+bytes into an ELF guest section; it neither retargets LLVM IR nor patches any
+instruction. The outer entry uses full-width integer carriers on both ABIs.
+
+```sh
+python3 neverd-cpta/typed_calls.py \
+  --artifacts /path/to/typed-call-export \
+  --test-report /path/to/typed-call-test.json \
+  --neverd-revision FULL_40_CHARACTER_COMMIT
+```
+
+The independent assembly callbacks check every argument member's bits, position
+and stack alignment, then return exact integer, pointer, floating or record
+values. Result checks consume every logical member, exclude padding, and poison
+the padding of returned GP records independently of the projected implementation.
+Narrow GP operands must have the correct sign/zero extension in all 32 W bits,
+including when their outer integer carrier contains unrelated high bits. Fixed
+byte/halfword/f32 stack spills are one/two/four bytes apart, while variadic tails
+use eight-byte slots even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
+with 480 invalid-signature pairs per mode. Integer and typed profiles share their
+key installation, fault probe and exception-class policy. Typed success grants
+the existing `darwin_scalar_authenticated_call_abi_qualified` field for this
+bounded explicit-value profile. It does not qualify arbitrary record layouts,
+indirect by-value copies/results, automatic complete prototype recovery, dyld
+binding, whole images, native Apple execution, signed exception unwinding or
+exact exception PC/ESR. Use a separately filtered report
+for the original five integer tests when running `authenticated_calls.py`.

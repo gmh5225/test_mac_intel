@@ -1,0 +1,24 @@
+//===- CptaAuthenticatedCallProbe.def -------------------------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+#include "CptaFaultProbe.def"
+#include <stdint.h>
+struct Observation {
+  uint64_t Low, High, Completed, ESR, SP, Origin, Word, Faulted;
+};
+_Static_assert(sizeof(struct Observation) == CPA_FAULT_OBSERVATION_BYTES,
+               "Authenticated call probe layout changed");
+typedef unsigned __int128 (*ProbeFunction)(uint64_t);
+extern void probeGeneratedPAuth(ProbeFunction, uint64_t, struct Observation *);
+volatile uint64_t Called;
+static uint64_t Pointer, Modifier;
+static uint64_t signPointer(uint64_t Value, uint64_t Modifier, unsigned B) {
+  if (B)
+    __asm__ volatile("pacib %0,%1" : "+r"(Value) : "r"(Modifier));
+  else
+    __asm__ volatile("pacia %0,%1" : "+r"(Value) : "r"(Modifier));
+  return Value;
+}

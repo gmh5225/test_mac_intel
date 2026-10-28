@@ -1,0 +1,35 @@
+//===- CptaAuthenticatedCallSetup.def ---------------------------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+void callRecord(const char *Name, uint64_t Value) { record(Name, Value); }
+static void configureCallKeys(void) {
+  uint64_t Feature, Control, AL, AH, BL, BH;
+  __asm__ volatile(CPA_READ_ISAR1 : "=r"(Feature));
+  unsigned APA = (Feature >> CPA_PAUTH_APA_SHIFT) & CPA_EL_FIELD_MASK,
+           API = (Feature >> CPA_PAUTH_API_SHIFT) & CPA_EL_FIELD_MASK;
+  unsigned Level = APA > API ? APA : API;
+  record("call-pauth-level", Level);
+  expect(Level == CALL_PAUTH_LEVEL);
+  uint64_t A0 = CPA_PAUTH_KEY_A_LO, A1 = CPA_PAUTH_KEY_A_HI;
+  uint64_t B0 = CPA_PAUTH_KEY_B_LO, B1 = CPA_PAUTH_KEY_B_HI;
+  __asm__ volatile(
+      "msr APIAKeyLo_EL1, %0\n\tmsr APIAKeyHi_EL1, %1\n\tmsr APIBKeyLo_EL1, "
+      "%2\n\tmsr APIBKeyHi_EL1, %3\n\tisb" ::"r"(A0),
+      "r"(A1), "r"(B0), "r"(B1)
+      : "memory");
+  __asm__ volatile("mrs %0, APIAKeyLo_EL1\n\tmrs %1, APIAKeyHi_EL1\n\tmrs %2, "
+                   "APIBKeyLo_EL1\n\tmrs %3, APIBKeyHi_EL1"
+                   : "=r"(AL), "=r"(AH), "=r"(BL), "=r"(BH));
+  unsigned Keys = AL == A0 && AH == A1 && BL == B0 && BH == B1;
+  record("call-key-readback", Keys);
+  expect(Keys);
+  __asm__ volatile("mrs %0, SCTLR_EL1" : "=r"(Control));
+  Control |= CPA_CALL_PAUTH_ENABLE;
+  __asm__ volatile("msr SCTLR_EL1, %0\n\tisb" ::"r"(Control) : "memory");
+  __asm__ volatile("mrs %0, SCTLR_EL1" : "=r"(Control));
+  record("call-controls", Control & CPA_CALL_PAUTH_ENABLE);
+  expect((Control & CPA_CALL_PAUTH_ENABLE) == CPA_CALL_PAUTH_ENABLE);
+}

@@ -1,0 +1,21 @@
+//===- CptaTypedCallHarness.def - Darwin typed call oracle -------*- C -*-===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+#include "CptaAuthenticatedCallProbe.def"
+
+@DECLARATIONS@
+static const struct {
+  ProbeFunction Projected, Original;
+  uint64_t Target;
+  unsigned Key, Zero, Raw;
+  uint64_t Expected;
+} Cases[] = {
+@CASES@
+};
+
+static uint64_t expectedCall(unsigned C) { return Cases[C].Expected; }
+
+#include "CptaAuthenticatedCallChecks.def"

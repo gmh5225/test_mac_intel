@@ -1,0 +1,765 @@
+{
+  "scope": "Controlled PAC execution of unchanged self-contained Darwin explicit scalar, 128-bit integer, one/two-word record and f32/f64 HFA calls, including register exhaustion and packed stack placement. Supplied prototypes, not automatic complete recovery. Indirect copies/results, arbitrary records, authenticated whole images, native Apple execution, signed exception unwinding and exact fault PC/ESR remain unqualified.",
+  "output_directory": "cpta-typed-calls",
+  "test_report_cases": [
+    "AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall"
+  ],
+  "export_count": 1,
+  "qualification_key": "darwin_scalar_authenticated_call_abi_qualified",
+  "object_symbol": "_authenticated_dispatch",
+  "directory": "typed-{shape}-{key}-{zero}-{raw}",
+  "shapes": [
+    {
+      "name": "f64-one",
+      "parameters": "d",
+      "return_kind": "d",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "f64-ten",
+      "parameters": "dddddddddd",
+      "return_kind": "d",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "f32-ten",
+      "parameters": "ffffffffff",
+      "return_kind": "f",
+      "return_bytes": 4,
+      "fixed": -1
+    },
+    {
+      "name": "mixed-ten",
+      "parameters": "ididididid",
+      "return_kind": "d",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "variadic-double",
+      "parameters": "iddddddddd",
+      "return_kind": "d",
+      "return_bytes": 8,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-mixed",
+      "parameters": "dididididi",
+      "return_kind": "f",
+      "return_bytes": 4,
+      "fixed": 1
+    },
+    {
+      "name": "signed-byte-ten",
+      "parameters": "bbbbbbbbbb",
+      "return_kind": "b",
+      "return_bytes": 1,
+      "fixed": -1
+    },
+    {
+      "name": "unsigned-byte-ten",
+      "parameters": "BBBBBBBBBB",
+      "return_kind": "B",
+      "return_bytes": 1,
+      "fixed": -1
+    },
+    {
+      "name": "signed-half-ten",
+      "parameters": "hhhhhhhhhh",
+      "return_kind": "h",
+      "return_bytes": 2,
+      "fixed": -1
+    },
+    {
+      "name": "unsigned-half-ten",
+      "parameters": "HHHHHHHHHH",
+      "return_kind": "H",
+      "return_bytes": 2,
+      "fixed": -1
+    },
+    {
+      "name": "word-ten",
+      "parameters": "wWwWwWwWwW",
+      "return_kind": "w",
+      "return_bytes": 4,
+      "fixed": -1
+    },
+    {
+      "name": "pointer-ten",
+      "parameters": "pppppppppp",
+      "return_kind": "p",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "mixed-narrow",
+      "parameters": "bBhHwpbBhp",
+      "return_kind": "W",
+      "return_bytes": 4,
+      "fixed": -1
+    },
+    {
+      "name": "variadic-narrow",
+      "parameters": "bididididi",
+      "return_kind": "h",
+      "return_bytes": 2,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-packed-prefix",
+      "parameters": "bbbbbbbbbbidi",
+      "return_kind": "B",
+      "return_bytes": 1,
+      "fixed": 10
+    },
+    {
+      "name": "wide-one",
+      "parameters": "q",
+      "return_kind": "q",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "wide-odd",
+      "parameters": "iqi",
+      "return_kind": "Q",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "wide-last-pair",
+      "parameters": "iiiiiiQi",
+      "return_kind": "q",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "wide-whole-spill",
+      "parameters": "iiiiiiiqi",
+      "return_kind": "Q",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "wide-packed-spill",
+      "parameters": "iiiiiiiibQbq",
+      "return_kind": "q",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "word-pair",
+      "parameters": "ia",
+      "return_kind": "a",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "word-pair-spill",
+      "parameters": "iiiiiiiiaa",
+      "return_kind": "a",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "word-pair-packed",
+      "parameters": "iiiiiiiiba",
+      "return_kind": "a",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "narrow-word-pair",
+      "parameters": "ir",
+      "return_kind": "r",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f32-two",
+      "parameters": "t",
+      "return_kind": "t",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f32-three",
+      "parameters": "u",
+      "return_kind": "u",
+      "return_bytes": 12,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f32-four",
+      "parameters": "v",
+      "return_kind": "v",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f64-two",
+      "parameters": "x",
+      "return_kind": "x",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f64-three",
+      "parameters": "y",
+      "return_kind": "y",
+      "return_bytes": 24,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f64-four",
+      "parameters": "z",
+      "return_kind": "z",
+      "return_bytes": 32,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-nested",
+      "parameters": "n",
+      "return_kind": "n",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f32-exhausted",
+      "parameters": "ffffffuf",
+      "return_kind": "u",
+      "return_bytes": 12,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f64-exhausted",
+      "parameters": "dddddddxd",
+      "return_kind": "x",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-packed-spill",
+      "parameters": "iiiiiiiiifffffffvf",
+      "return_kind": "v",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "wide-and-hfa",
+      "parameters": "qazn",
+      "return_kind": "z",
+      "return_bytes": 32,
+      "fixed": -1
+    },
+    {
+      "name": "word-one",
+      "parameters": "A",
+      "return_kind": "A",
+      "return_bytes": 8,
+      "fixed": -1
+    },
+    {
+      "name": "word-pointer-pair",
+      "parameters": "o",
+      "return_kind": "o",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "pointer-pair",
+      "parameters": "O",
+      "return_kind": "O",
+      "return_bytes": 16,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f32-one",
+      "parameters": "s",
+      "return_kind": "s",
+      "return_bytes": 4,
+      "fixed": -1
+    },
+    {
+      "name": "hfa-f64-one",
+      "parameters": "S",
+      "return_kind": "S",
+      "return_bytes": 8,
+      "fixed": -1
+    }
+  ],
+  "variants": [
+    {
+      "key": 0,
+      "zero": false,
+      "raw": false
+    },
+    {
+      "key": 0,
+      "zero": true,
+      "raw": false
+    },
+    {
+      "key": 1,
+      "zero": false,
+      "raw": false
+    },
+    {
+      "key": 1,
+      "zero": true,
+      "raw": false
+    },
+    {
+      "key": 0,
+      "zero": false,
+      "raw": true
+    }
+  ],
+  "kinds": {
+    "i": {
+      "bytes": 8,
+      "gp": "x"
+    },
+    "d": {
+      "bytes": 8,
+      "gp": "x",
+      "fp": "d"
+    },
+    "f": {
+      "bytes": 4,
+      "gp": "w",
+      "fp": "s"
+    },
+    "b": {
+      "bytes": 1,
+      "gp": "w",
+      "signed": true,
+      "memory": "b",
+      "extend": "sxtb"
+    },
+    "B": {
+      "bytes": 1,
+      "gp": "w",
+      "signed": false,
+      "memory": "b",
+      "extend": "uxtb"
+    },
+    "h": {
+      "bytes": 2,
+      "gp": "w",
+      "signed": true,
+      "memory": "h",
+      "extend": "sxth"
+    },
+    "H": {
+      "bytes": 2,
+      "gp": "w",
+      "signed": false,
+      "memory": "h",
+      "extend": "uxth"
+    },
+    "w": {
+      "bytes": 4,
+      "gp": "w",
+      "signed": true,
+      "memory": ""
+    },
+    "W": {
+      "bytes": 4,
+      "gp": "w",
+      "signed": false,
+      "memory": ""
+    },
+    "p": {
+      "bytes": 8,
+      "gp": "x",
+      "signed": false,
+      "memory": ""
+    },
+    "q": {
+      "bytes": 16,
+      "fields": "ii",
+      "alignment": 16
+    },
+    "Q": {
+      "bytes": 16,
+      "fields": "ii",
+      "alignment": 16
+    },
+    "a": {
+      "bytes": 16,
+      "fields": "ii",
+      "alignment": 8
+    },
+    "t": {
+      "bytes": 8,
+      "fields": "ff",
+      "alignment": 4
+    },
+    "u": {
+      "bytes": 12,
+      "fields": "fff",
+      "alignment": 4
+    },
+    "v": {
+      "bytes": 16,
+      "fields": "ffff",
+      "alignment": 4
+    },
+    "x": {
+      "bytes": 16,
+      "fields": "dd",
+      "alignment": 8
+    },
+    "y": {
+      "bytes": 24,
+      "fields": "ddd",
+      "alignment": 8
+    },
+    "z": {
+      "bytes": 32,
+      "fields": "dddd",
+      "alignment": 8
+    },
+    "n": {
+      "bytes": 16,
+      "fields": "tt",
+      "alignment": 4
+    },
+    "r": {
+      "bytes": 16,
+      "fields": "wi",
+      "alignment": 8
+    },
+    "A": {
+      "bytes": 8,
+      "alignment": 8,
+      "fields": "i"
+    },
+    "o": {
+      "bytes": 16,
+      "alignment": 8,
+      "fields": "ip"
+    },
+    "O": {
+      "bytes": 16,
+      "alignment": 8,
+      "fields": "pp"
+    },
+    "s": {
+      "bytes": 4,
+      "alignment": 4,
+      "fields": "f"
+    },
+    "S": {
+      "bytes": 8,
+      "alignment": 8,
+      "fields": "d"
+    }
+  },
+  "word_bytes": 8,
+  "frame_alignment": 16,
+  "register_arguments": 8,
+  "outer_header_arguments": 2,
+  "fault_stimuli": 3,
+  "values": {
+    "i": [
+      "0x8123456789abcdef",
+      "0xfeedbabe12345678",
+      "0x7fffffffffffffff",
+      "0x1000000000000001",
+      "0xfedcba9876543210",
+      "0",
+      "1",
+      "0xffffffffffffffff",
+      "0x0011223344556677",
+      "0xdeadbeefcafef00d",
+      "0x8123456789abcdef",
+      "0xfeedbabe12345678",
+      "0x7fffffffffffffff"
+    ],
+    "d": [
+      "0x8000000000000000",
+      "0x3ff0000000000000",
+      "0xbff4000000000000",
+      "0x4004000000000000",
+      "0xc008000000000000",
+      "0x4016000000000000",
+      "0x4027800000000000",
+      "0xc031000000000000",
+      "0x3fd0000000000000",
+      "0x4031800000000000",
+      "0x8000000000000000",
+      "0x3ff0000000000000",
+      "0xbff4000000000000"
+    ],
+    "f": [
+      "0x80000000",
+      "0x3f800000",
+      "0xbfa00000",
+      "0x40200000",
+      "0xc0400000",
+      "0x40b00000",
+      "0x413c0000",
+      "0xc1880000",
+      "0x3e800000",
+      "0x418c0000",
+      "0x80000000",
+      "0x3f800000",
+      "0xbfa00000"
+    ],
+    "b": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "B": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "h": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "H": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "w": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "W": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "p": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ]
+  },
+  "results": {
+    "4": "0xc0b00000",
+    "8": "0xc016000000000000"
+  },
+  "callback": "typed_target_{shape_index}",
+  "original": "original_{index}",
+  "text_file": "projected-{index}.bin",
+  "assembly_file": "projected-{index}.S",
+  "fixtures": [
+    {
+      "file": "typed-harness.c",
+      "language": "c",
+      "generated": true
+    },
+    {
+      "file": "typed-original.S",
+      "language": "assembler-with-cpp",
+      "generated": true
+    }
+  ],
+  "harness_template": "CptaTypedCallHarness.def",
+  "original_template": "CptaTypedCallOriginal.def",
+  "templates": {
+    "argument": "uint64_t",
+    "argument_value": "{value}ULL",
+    "declaration": "extern uint64_t {name}({parameters});\nstatic unsigned __int128 {name}_outer(uint64_t Unused) {{\n  (void)Unused;\n  return {name}(Pointer, Modifier, {values});\n}}\n",
+    "callback_declaration": "extern void {name}(void);\n",
+    "case": "  {{{projected}_outer, {original}_outer, (uint64_t){callback}, {key}, {zero}, {raw}, {expected}ULL}},\n",
+    "symbol": ".global {name}\n.type {name},%function\n{name}:\n",
+    "frame_open": "  sub sp,sp,#{frame}\n  stp x29,x30,[sp,#{saved}]\n  mov x16,x0\n  mov x17,x1\n",
+    "stage_register": "  str x{reg},[sp,#{offset}]\n",
+    "stage_stack": "  ldr x9,[sp,#{incoming}]\n  str x9,[sp,#{offset}]\n",
+    "load_gp": "  ldr {gp}{reg},[sp,#{offset}]\n",
+    "load_fp": "  ldr {fp}{reg},[sp,#{offset}]\n",
+    "load_stack": "  ldr {gp}9,[sp,#{stage}]\n  str{memory} {gp}9,[sp,#{offset}]\n",
+    "calls": [
+      "  blraa x16,x17\n",
+      "  blrab x16,x17\n"
+    ],
+    "zero_calls": [
+      "  blraaz x16\n",
+      "  blrabz x16\n"
+    ],
+    "raw_call": "  blr x16\n",
+    "frame_close": "  fmov {gp}0,{fp}0\n  ldp x29,x30,[sp,#{saved}]\n  add sp,sp,#{frame}\n  ret\n",
+    "callback_start": "  adrp x14,Called\n  add x14,x14,:lo12:Called\n  ldr x15,[x14]\n  add x15,x15,#1\n  str x15,[x14]\n  mov x14,sp\n  and x14,x14,#{alignment_mask}\n",
+    "read_gp": "  mov {gp}10,{gp}{reg}\n",
+    "read_fp": "  fmov {gp}10,{fp}{reg}\n",
+    "read_stack": "  ldr{memory} {gp}10,[sp,#{offset}]\n",
+    "check": "  ldr {gp}11,={value}\n  cmp {gp}10,{gp}11\n  cset x12,ne\n  orr x14,x14,x12\n",
+    "callback_end": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}10,{gp}10,{gp}zr,eq\n  fmov {fp}0,{gp}10\n  ret\n",
+    "extend_gp": "  {extend} w{reg},w{reg}\n",
+    "frame_close_integer": "{narrow}  ldp x29,x30,[sp,#{saved}]\n  add sp,sp,#{frame}\n  ret\n",
+    "narrow_return": "  ubfx w0,w0,#0,#{bits}\n",
+    "callback_end_integer": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}0,{gp}10,{gp}zr,eq\n  ret\n",
+    "callback_member_gp": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}{reg},{gp}10,{gp}zr,eq\n",
+    "callback_member_fp": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}10,{gp}10,{gp}zr,eq\n  fmov {fp}{reg},{gp}10\n",
+    "callback_members_end": "  ret\n",
+    "result_start": "  mov x13,xzr\n",
+    "result_mix": "  eor x13,x13,x10\n",
+    "result_finish": "  mov x0,x13\n"
+  },
+  "input_error": "The complete typed-call test and its single artifact export must complete",
+  "sample_flag": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT={count}",
+  "integer_results": {
+    "b": "0x85",
+    "B": "0xe7",
+    "h": "0x8123",
+    "H": "0xfedc",
+    "w": "0x87654321",
+    "W": "0xdeadbeef",
+    "p": "0x0012345689abcdef"
+  },
+  "promoted_integer_bytes": 4,
+  "bits_per_byte": 8,
+  "composite_results": {
+    "q": [
+      "0x1000000000000001",
+      "0xfedcba9876543210"
+    ],
+    "Q": [
+      "0x1000000000000001",
+      "0xfedcba9876543210"
+    ],
+    "a": [
+      "0x1000000000000001",
+      "0xfedcba9876543210"
+    ],
+    "t": [
+      "0x40200000",
+      "0xc0400000"
+    ],
+    "u": [
+      "0x40200000",
+      "0xc0400000",
+      "0x40b00000"
+    ],
+    "v": [
+      "0x40200000",
+      "0xc0400000",
+      "0x40b00000",
+      "0x413c0000"
+    ],
+    "x": [
+      "0x4004000000000000",
+      "0xc008000000000000"
+    ],
+    "y": [
+      "0x4004000000000000",
+      "0xc008000000000000",
+      "0x4016000000000000"
+    ],
+    "z": [
+      "0x4004000000000000",
+      "0xc008000000000000",
+      "0x4016000000000000",
+      "0x4027800000000000"
+    ],
+    "n": [
+      "0x40200000",
+      "0xc0400000",
+      "0x40b00000",
+      "0x413c0000"
+    ],
+    "r": [
+      "0x0123456700770100",
+      "0xfedcba9876543210"
+    ],
+    "A": [
+      "0x1000000000000001"
+    ],
+    "o": [
+      "0x1000000000000001",
+      "0x8675309a80008000"
+    ],
+    "O": [
+      "0x0123456700770100",
+      "0x8675309a80008000"
+    ],
+    "s": [
+      "0x40200000"
+    ],
+    "S": [
+      "0x4004000000000000"
+    ]
+  }
+}
