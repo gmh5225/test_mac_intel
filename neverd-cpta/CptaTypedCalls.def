@@ -184,5 +184,6 @@
     "check": "  ldr {gp}11,={value}\n  cmp {gp}10,{gp}11\n  cset x12,ne\n  orr x14,x14,x12\n",
     "callback_end": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}10,{gp}10,{gp}zr,eq\n  fmov {fp}0,{gp}10\n  ret\n"
   },
-  "input_error": "The complete typed-call test and its single artifact export must complete"
+  "input_error": "The complete typed-call test and its single artifact export must complete",
+  "sample_flag": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT={count}"
 }

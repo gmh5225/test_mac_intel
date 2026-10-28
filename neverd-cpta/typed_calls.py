@@ -29,6 +29,7 @@ CONFIG["faults_per_mode"] = (POLICY["fault_stimuli"]
 CONFIG["guest_flags"] = [flag for flag in CONFIG["guest_flags"]
                          if not flag.startswith("-DCPA_PAUTH_FAULT_COUNT=")]
 CONFIG["guest_flags"].append(f'-DCPA_PAUTH_FAULT_COUNT={CONFIG["faults_per_mode"]}')
+CONFIG["guest_flags"].append(POLICY["sample_flag"].format(count=len(CONFIG["cases"])))
 
 
 def aligned(value, alignment):

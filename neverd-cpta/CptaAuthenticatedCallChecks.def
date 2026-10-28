@@ -37,8 +37,17 @@ int neverdPAuthFaultMain(void) {
         if (!Actual.Completed || !Original.Completed || Actual.Faulted ||
             Original.Faulted || Actual.Low != Expected ||
             Original.Low != Expected || Actual.High || Original.High ||
-            NativeCalls != 1 || Called != 1)
+            NativeCalls != 1 || Called != 1) {
+          callRecord("failed-call-case", C);
+          callRecord("native-value", Original.Low);
+          callRecord("projected-value", Actual.Low);
+          callRecord("expected-value", Expected);
+          callRecord("native-esr", Original.ESR);
+          callRecord("projected-esr", Actual.ESR);
+          callRecord("native-callback-count", NativeCalls);
+          callRecord("projected-callback-count", Called);
           return 100 + C;
+        }
       } else {
         unsigned EC = Original.ESR >> 26;
 #if defined(CPA_GENERATED_EL0_MEMORY)
