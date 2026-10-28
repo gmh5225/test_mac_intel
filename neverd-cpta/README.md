@@ -346,8 +346,9 @@ Clang from starting.
 
 `typed_calls.py` separately consumes only
 `AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall` and its
-single matching artifact export. Its 30 groups cover fixed f32/f64 calls,
-exhausted FP registers, mixed integer/FP operands and Darwin stack variadics,
+single matching artifact export. Its 75 groups cover signed/unsigned 8/16/32-bit
+integers, 64-bit integers and pointers, fixed f32/f64 calls, exhausted GP/FP
+registers, mixed operands and Darwin stack variadics,
 with IA/IB, zero/dynamic discriminators and raw BLR controls. All five routes
 are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
 one self-contained text section with no code relocations. It copies the text
@@ -362,10 +363,12 @@ python3 neverd-cpta/typed_calls.py \
 ```
 
 The independent assembly callbacks check every argument's bits, position and
-stack alignment, then return an exact floating bit pattern. In particular,
-fixed f32 stack spills are four bytes apart while variadic tails use eight-byte
-slots. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
-with 72 invalid-signature pairs per mode. Integer and typed profiles share their
+stack alignment, then return an exact integer, pointer or floating bit pattern.
+Narrow GP operands must have the correct sign/zero extension in all 32 W bits,
+including when their outer integer carrier contains unrelated high bits. Fixed
+byte/halfword/f32 stack spills are one/two/four bytes apart, while variadic tails
+use eight-byte slots even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
+with 180 invalid-signature pairs per mode. Integer and typed profiles share their
 key installation, fault probe and exception-class policy. Typed success grants
 only `darwin_scalar_authenticated_call_abi_qualified`; HFA/aggregate calls,
 dyld binding, whole images, native Apple execution, signed exception unwinding

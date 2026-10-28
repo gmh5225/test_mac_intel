@@ -41,7 +41,7 @@ def placements(shape):
     registers = {"gp": 0, "fp": 0}
     stack, result = 0, []
     for index, kind in enumerate(shape["parameters"]):
-        scalar = POLICY["kinds"][kind]
+        scalar = {"memory": "", **POLICY["kinds"][kind]}
         bank = "fp" if "fp" in scalar else "gp"
         variadic = shape["fixed"] >= 0 and index >= shape["fixed"]
         if not variadic and registers[bank] < POLICY["register_arguments"]:
@@ -53,6 +53,17 @@ def placements(shape):
             result.append({"bank": "stack", "offset": stack, **scalar})
             stack += size
     return result, stack
+
+
+def integer_bits(value, scalar, stack=False):
+    """The oracle checks source bytes on the stack, promoted W bits in GP registers."""
+    bits = scalar["bytes"] * POLICY["bits_per_byte"]
+    value = int(value, 0) & ((1 << bits) - 1)
+    if not stack and scalar["bytes"] < POLICY["promoted_integer_bytes"]:
+        if scalar.get("signed") and value & (1 << (bits - 1)):
+            value -= 1 << bits
+        value &= (1 << (POLICY["promoted_integer_bytes"] * POLICY["bits_per_byte"])) - 1
+    return hex(value)
 
 
 def prepare_object(source, target, case, logs, config):
@@ -83,14 +94,21 @@ def prepare_fixtures(work, config):
         name = POLICY["callback"].format(shape_index=shape_index)
         declarations.append(render("callback_declaration", name=name))
         locations, stack = placements(shape)
-        expected = POLICY["results"][str(shape["return_bytes"])]
-        result = POLICY["kinds"]["f" if shape["return_bytes"] == POLICY["kinds"]["f"]["bytes"] else "d"]
+        result = POLICY["kinds"][shape["return_kind"]]
+        floating = "fp" in result
+        expected = (POLICY["results"][str(result["bytes"])] if floating else
+                    POLICY["integer_results"][shape["return_kind"]])
         functions.append(render("symbol", name=name))
         functions.append(render("callback_start", alignment_mask=POLICY["frame_alignment"] - 1))
         for index, (kind, location) in enumerate(zip(shape["parameters"], locations)):
             functions.append(render("read_" + location["bank"], **location))
-            functions.append(render("check", **location, value=POLICY["values"][kind][index]))
-        functions.append(render("callback_end", **result, expected=expected))
+            value = POLICY["values"][kind][index]
+            if "fp" not in location:
+                value = integer_bits(value, location, location["bank"] == "stack")
+            functions.append(render("check", **location, value=value))
+        functions.append(render("callback_end" if floating else "callback_end_integer",
+                                **result, expected=expected if floating else
+                                integer_bits(expected, result)))
         outgoing = aligned(stack, POLICY["frame_alignment"])
         saved = outgoing + aligned(len(locations) * POLICY["word_bytes"], POLICY["frame_alignment"])
         frame = saved + POLICY["frame_alignment"]
@@ -124,9 +142,14 @@ def prepare_fixtures(work, config):
                     functions.append(render("load_stack", **location, stage=stage))
                 else:
                     functions.append(render("load_" + location["bank"], **location, offset=stage))
+                    if "extend" in location:
+                        functions.append(render("extend_gp", **location))
             functions.append(templates["raw_call"] if case["raw"] else
                              templates["zero_calls" if case["zero"] else "calls"][case["key"]])
-            functions.append(render("frame_close", **result, frame=frame, saved=saved))
+            narrow = (render("narrow_return", bits=result["bytes"] * POLICY["bits_per_byte"])
+                      if not floating and result["bytes"] < POLICY["promoted_integer_bytes"] else "")
+            functions.append(render("frame_close" if floating else "frame_close_integer",
+                                    **result, frame=frame, saved=saved, narrow=narrow))
     (work / config["fixtures"][0]["file"]).write_text(
         (ROOT / POLICY["harness_template"]).read_text()
         .replace("@DECLARATIONS@", "".join(declarations)).replace("@CASES@", "".join(cases)))

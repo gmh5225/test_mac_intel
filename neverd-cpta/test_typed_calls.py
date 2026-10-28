@@ -1,6 +1,7 @@
 """Keep Darwin ABI and unchanged-instruction qualification boundaries explicit."""
 
 import copy
+import json
 from pathlib import Path
 import struct
 import tempfile
@@ -10,6 +11,9 @@ import authenticated_calls as calls
 import macho_text
 import typed_calls as typed
 import test_authenticated_calls as integer_tests
+
+
+EXPECTED = json.loads((typed.ROOT / "CptaTypedCallTestCases.def").read_text())
 
 
 class TypedCallTests(unittest.TestCase):
@@ -27,6 +31,20 @@ class TypedCallTests(unittest.TestCase):
             self.assertEqual([item["bank"] for item in locations[1:]], ["stack"] * 9)
             self.assertEqual([item["offset"] for item in locations[1:]], list(range(0, 72, 8)))
 
+    def test_narrow_register_extensions_and_packed_stack_bytes(self):
+        shapes = {shape["name"]: shape for shape in typed.POLICY["shapes"]}
+        for case in EXPECTED["layouts"]:
+            with self.subTest(case=case):
+                locations, stack = typed.placements(shapes[case["name"]])
+                self.assertEqual(stack, case["stack"])
+                self.assertEqual([location["offset"] for location in locations
+                                  if location["bank"] == "stack"], case["offsets"])
+        for case in EXPECTED["extensions"]:
+            with self.subTest(case=case):
+                scalar = typed.POLICY["kinds"][case["kind"]]
+                self.assertEqual(typed.integer_bits(case["value"], scalar), case["register"])
+                self.assertEqual(typed.integer_bits(case["value"], scalar, True), case["stack"])
+
     def test_typed_profile_does_not_weaken_the_integer_contract(self):
         integer = copy.deepcopy(calls.CONFIG)
         helper = integer_tests.AuthenticatedCallTests()
@@ -34,8 +52,8 @@ class TypedCallTests(unittest.TestCase):
             for feature in typed.CONFIG["features"]:
                 for el0 in (False, True):
                     config = calls.configuration(route, feature, el0, typed.CONFIG)
-                    self.assertEqual(config["gate_values"]["neverd-memory-samples"], 30)
-                    self.assertEqual(config["gate_values"]["neverd-pauth-faults-on"], 72)
+                    self.assertEqual(config["gate_values"]["neverd-memory-samples"], EXPECTED["samples"])
+                    self.assertEqual(config["gate_values"]["neverd-pauth-faults-on"], EXPECTED["faults_per_mode"])
                     self.assertFalse(calls.assess(helper.transcript(route, feature, el0),
                                                   0, route, feature, el0, typed.CONFIG)["passed"])
         self.assertEqual(calls.CONFIG, integer)

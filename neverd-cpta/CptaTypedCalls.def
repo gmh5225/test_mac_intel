@@ -1,5 +1,5 @@
 {
-  "scope": "Controlled PAC execution of self-contained Darwin scalar authenticated calls: fixed f32/f64, exhausted FP registers, mixed integer/FP and Darwin stack variadics, IA/IB, zero/dynamic discriminator and raw controls. Actual Mach-O text is copied without code generation or instruction changes. Does not qualify aggregates/HFAs, authenticated storage, whole images, native Apple execution, signed exception unwinding or exact fault PC/ESR.",
+  "scope": "Controlled PAC execution of self-contained Darwin scalar authenticated calls: signed/unsigned 8/16/32-bit integers, 64-bit integers and pointers, f32/f64, exhausted GP/FP registers, packed fixed spills and Darwin stack variadics, IA/IB, zero/dynamic discriminator and raw controls. Actual Mach-O text is copied without code generation or instruction changes. Does not qualify aggregates/HFAs, authenticated storage, whole images, native Apple execution, signed exception unwinding or exact fault PC/ESR.",
   "output_directory": "cpta-typed-calls",
   "test_report_cases": [
     "AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall"
@@ -13,37 +13,97 @@
       "name": "f64-one",
       "parameters": "d",
       "return_bytes": 8,
-      "fixed": -1
+      "fixed": -1,
+      "return_kind": "d"
     },
     {
       "name": "f64-ten",
       "parameters": "dddddddddd",
       "return_bytes": 8,
-      "fixed": -1
+      "fixed": -1,
+      "return_kind": "d"
     },
     {
       "name": "f32-ten",
       "parameters": "ffffffffff",
       "return_bytes": 4,
-      "fixed": -1
+      "fixed": -1,
+      "return_kind": "f"
     },
     {
       "name": "mixed-ten",
       "parameters": "ididididid",
       "return_bytes": 8,
-      "fixed": -1
+      "fixed": -1,
+      "return_kind": "d"
     },
     {
       "name": "variadic-double",
       "parameters": "iddddddddd",
       "return_bytes": 8,
-      "fixed": 1
+      "fixed": 1,
+      "return_kind": "d"
     },
     {
       "name": "variadic-mixed",
       "parameters": "dididididi",
       "return_bytes": 4,
+      "fixed": 1,
+      "return_kind": "f"
+    },
+    {
+      "name": "signed-byte-ten",
+      "parameters": "bbbbbbbbbb",
+      "return_kind": "b",
+      "fixed": -1
+    },
+    {
+      "name": "unsigned-byte-ten",
+      "parameters": "BBBBBBBBBB",
+      "return_kind": "B",
+      "fixed": -1
+    },
+    {
+      "name": "signed-half-ten",
+      "parameters": "hhhhhhhhhh",
+      "return_kind": "h",
+      "fixed": -1
+    },
+    {
+      "name": "unsigned-half-ten",
+      "parameters": "HHHHHHHHHH",
+      "return_kind": "H",
+      "fixed": -1
+    },
+    {
+      "name": "word-ten",
+      "parameters": "wWwWwWwWwW",
+      "return_kind": "w",
+      "fixed": -1
+    },
+    {
+      "name": "pointer-ten",
+      "parameters": "pppppppppp",
+      "return_kind": "p",
+      "fixed": -1
+    },
+    {
+      "name": "mixed-narrow",
+      "parameters": "bBhHwpbBhp",
+      "return_kind": "W",
+      "fixed": -1
+    },
+    {
+      "name": "variadic-narrow",
+      "parameters": "bididididi",
+      "return_kind": "h",
       "fixed": 1
+    },
+    {
+      "name": "variadic-packed-prefix",
+      "parameters": "bbbbbbbbbbidi",
+      "return_kind": "B",
+      "fixed": 10
     }
   ],
   "variants": [
@@ -87,6 +147,52 @@
       "bytes": 4,
       "gp": "w",
       "fp": "s"
+    },
+    "b": {
+      "bytes": 1,
+      "gp": "w",
+      "signed": true,
+      "memory": "b",
+      "extend": "sxtb"
+    },
+    "B": {
+      "bytes": 1,
+      "gp": "w",
+      "signed": false,
+      "memory": "b",
+      "extend": "uxtb"
+    },
+    "h": {
+      "bytes": 2,
+      "gp": "w",
+      "signed": true,
+      "memory": "h",
+      "extend": "sxth"
+    },
+    "H": {
+      "bytes": 2,
+      "gp": "w",
+      "signed": false,
+      "memory": "h",
+      "extend": "uxth"
+    },
+    "w": {
+      "bytes": 4,
+      "gp": "w",
+      "signed": true,
+      "memory": ""
+    },
+    "W": {
+      "bytes": 4,
+      "gp": "w",
+      "signed": false,
+      "memory": ""
+    },
+    "p": {
+      "bytes": 8,
+      "gp": "x",
+      "signed": false,
+      "memory": ""
     }
   },
   "word_bytes": 8,
@@ -105,7 +211,10 @@
       "1",
       "0xffffffffffffffff",
       "0x0011223344556677",
-      "0xdeadbeefcafef00d"
+      "0xdeadbeefcafef00d",
+      "0x8123456789abcdef",
+      "0xfeedbabe12345678",
+      "0x7fffffffffffffff"
     ],
     "d": [
       "0x8000000000000000",
@@ -117,7 +226,10 @@
       "0x4027800000000000",
       "0xc031000000000000",
       "0x3fd0000000000000",
-      "0x4031800000000000"
+      "0x4031800000000000",
+      "0x8000000000000000",
+      "0x3ff0000000000000",
+      "0xbff4000000000000"
     ],
     "f": [
       "0x80000000",
@@ -129,7 +241,115 @@
       "0x413c0000",
       "0xc1880000",
       "0x3e800000",
-      "0x418c0000"
+      "0x418c0000",
+      "0x80000000",
+      "0x3f800000",
+      "0xbfa00000"
+    ],
+    "b": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "B": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "h": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "H": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "w": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "W": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
+    ],
+    "p": [
+      "0xaabbccddfecc8180",
+      "0x123456780133007f",
+      "0xfedcba9880ff80ff",
+      "0x0123456700770100",
+      "0x8675309a80008000",
+      "0x5647382989ab0000",
+      "0xcafebabeffff0001",
+      "0x00112233ffffffff",
+      "0x10203040a1b2d3e4",
+      "0x876543219abc9876",
+      "0x9000000000000001",
+      "0xaaaabbbbcccc0002",
+      "0x1234567887650003"
     ]
   },
   "results": {
@@ -166,7 +386,7 @@
     "stage_stack": "  ldr x9,[sp,#{incoming}]\n  str x9,[sp,#{offset}]\n",
     "load_gp": "  ldr {gp}{reg},[sp,#{offset}]\n",
     "load_fp": "  ldr {fp}{reg},[sp,#{offset}]\n",
-    "load_stack": "  ldr {gp}9,[sp,#{stage}]\n  str {gp}9,[sp,#{offset}]\n",
+    "load_stack": "  ldr {gp}9,[sp,#{stage}]\n  str{memory} {gp}9,[sp,#{offset}]\n",
     "calls": [
       "  blraa x16,x17\n",
       "  blrab x16,x17\n"
@@ -180,10 +400,25 @@
     "callback_start": "  adrp x14,Called\n  add x14,x14,:lo12:Called\n  ldr x15,[x14]\n  add x15,x15,#1\n  str x15,[x14]\n  mov x14,sp\n  and x14,x14,#{alignment_mask}\n",
     "read_gp": "  mov {gp}10,{gp}{reg}\n",
     "read_fp": "  fmov {gp}10,{fp}{reg}\n",
-    "read_stack": "  ldr {gp}10,[sp,#{offset}]\n",
+    "read_stack": "  ldr{memory} {gp}10,[sp,#{offset}]\n",
     "check": "  ldr {gp}11,={value}\n  cmp {gp}10,{gp}11\n  cset x12,ne\n  orr x14,x14,x12\n",
-    "callback_end": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}10,{gp}10,{gp}zr,eq\n  fmov {fp}0,{gp}10\n  ret\n"
+    "callback_end": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}10,{gp}10,{gp}zr,eq\n  fmov {fp}0,{gp}10\n  ret\n",
+    "extend_gp": "  {extend} w{reg},w{reg}\n",
+    "frame_close_integer": "{narrow}  ldp x29,x30,[sp,#{saved}]\n  add sp,sp,#{frame}\n  ret\n",
+    "narrow_return": "  ubfx w0,w0,#0,#{bits}\n",
+    "callback_end_integer": "  ldr {gp}10,={expected}\n  cmp x14,#0\n  csel {gp}0,{gp}10,{gp}zr,eq\n  ret\n"
   },
   "input_error": "The complete typed-call test and its single artifact export must complete",
-  "sample_flag": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT={count}"
+  "sample_flag": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT={count}",
+  "integer_results": {
+    "b": "0x85",
+    "B": "0xe7",
+    "h": "0x8123",
+    "H": "0xfedc",
+    "w": "0x87654321",
+    "W": "0xdeadbeef",
+    "p": "0x0012345689abcdef"
+  },
+  "promoted_integer_bytes": 4,
+  "bits_per_byte": 8
 }
