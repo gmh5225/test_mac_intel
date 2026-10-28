@@ -346,9 +346,12 @@ Clang from starting.
 
 `typed_calls.py` separately consumes only
 `AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall` and its
-single matching artifact export. Its 75 groups cover signed/unsigned 8/16/32-bit
-integers, 64-bit integers and pointers, fixed f32/f64 calls, exhausted GP/FP
-registers, mixed operands and Darwin stack variadics,
+single matching artifact export. Its 200 groups cover signed/unsigned 8/16/32-bit
+and 128-bit integers, 64-bit integers and pointers, fixed f32/f64 calls, direct
+one/two-word records, naturally padded integer records, and one-to-four-member
+f32/f64 HFAs including nested records. Exhausted GP/FP banks preserve complete
+record spills and aligned 128-bit values. Mixed scalar operands and Darwin
+stack variadics remain covered,
 with IA/IB, zero/dynamic discriminators and raw BLR controls. All five routes
 are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
 one self-contained text section with no code relocations. It copies the text
@@ -362,15 +365,19 @@ python3 neverd-cpta/typed_calls.py \
   --neverd-revision FULL_40_CHARACTER_COMMIT
 ```
 
-The independent assembly callbacks check every argument's bits, position and
-stack alignment, then return an exact integer, pointer or floating bit pattern.
+The independent assembly callbacks check every argument member's bits, position
+and stack alignment, then return exact integer, pointer, floating or record
+values. Result checks consume every logical member, exclude padding, and poison
+the padding of returned GP records independently of the projected implementation.
 Narrow GP operands must have the correct sign/zero extension in all 32 W bits,
 including when their outer integer carrier contains unrelated high bits. Fixed
 byte/halfword/f32 stack spills are one/two/four bytes apart, while variadic tails
 use eight-byte slots even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
-with 180 invalid-signature pairs per mode. Integer and typed profiles share their
+with 480 invalid-signature pairs per mode. Integer and typed profiles share their
 key installation, fault probe and exception-class policy. Typed success grants
-only `darwin_scalar_authenticated_call_abi_qualified`; HFA/aggregate calls,
-dyld binding, whole images, native Apple execution, signed exception unwinding
-and exact exception PC/ESR remain unqualified. Use a separately filtered report
+the existing `darwin_scalar_authenticated_call_abi_qualified` field for this
+bounded explicit-value profile. It does not qualify arbitrary record layouts,
+indirect by-value copies/results, automatic complete prototype recovery, dyld
+binding, whole images, native Apple execution, signed exception unwinding or
+exact exception PC/ESR. Use a separately filtered report
 for the original five integer tests when running `authenticated_calls.py`.
