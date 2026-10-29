@@ -1,0 +1,30 @@
+name: WMF Simulator new personality implementations
+on:
+  push:
+    branches: [codex/wmf-simulator-provider-inventory]
+    paths:
+      - .github/workflows/wmf-simulator-personality-implementations.yml
+      - wmf-personality-implementations/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  personalities:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify actual current runtime and read only new personality function scopes
+        run: python3 -B wmf-personality-implementations/collect.py
+      - name: Preserve complete new function bits, raw contexts and command receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-new-platform7-personality-implementations-${{ github.run_attempt }}
+          path: wmf-personality-provider-records/
+          if-no-files-found: error
+          retention-days: 14
