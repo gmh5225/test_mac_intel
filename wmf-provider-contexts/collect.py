@@ -97,6 +97,38 @@ def contexts(name, expected, root):
         pointer_formats=sorted(set(record['pointer_format'] for record in records if not record['starts_absent'])))
 
 
+def resolve_context_runtime_with_cold_start_deadline():
+    label = 'actual-target26_5-runtime-resolution'
+    argv = ['xcrun', 'simctl', 'list', 'runtimes', '--json']
+    record = dict(argv=argv, started=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                  developer_dir=os.environ.get('DEVELOPER_DIR'), timeout_seconds=180,
+                  scope='new_raw_context_runtime_metadata_cold_start_only')
+    with (OUT / (label + '.stdout')).open('xb') as stdout, (OUT / (label + '.stderr')).open('xb') as stderr:
+        try:
+            process = parent.subprocess.run(argv, stdout=stdout, stderr=stderr, timeout=180)
+            record['returncode'] = process.returncode
+        except parent.subprocess.TimeoutExpired:
+            record['returncode'] = None
+            record['timed_out'] = True
+    record['ended'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    for field in ('stdout', 'stderr'):
+        data = (OUT / (label + '.' + field)).read_bytes()
+        record[field] = dict(bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
+    parent.save(label + '-command.json', record)
+    assert record['returncode'] == 0
+    result = json.loads((OUT / 'actual-target26_5-runtime-resolution.stdout').read_bytes())
+    candidates = [runtime for runtime in result['runtimes']
+                  if runtime.get('identifier') == 'com.apple.CoreSimulator.SimRuntime.iOS-26-5']
+    assert len(candidates) == 1
+    runtime = candidates[0]
+    assert runtime['version'] == '26.5' and runtime['buildversion'] == '23F77'
+    assert runtime['isAvailable'] is True and 'arm64' in runtime['supportedArchitectures']
+    root = runtime['runtimeRoot']
+    assert isinstance(root, str) and Path(root).is_absolute()
+    parent.save('actual-current-target26_5-runtime-record.json', runtime)
+    return Path(root)
+
+
 def main():
     parent.OUT = OUT
     OUT.mkdir()
@@ -108,7 +140,7 @@ def main():
     assert json.loads(settings)['Version'] == '26.5'
     with (OUT / 'actual-context-SDK26_5-Settings.json').open('xb') as stream:
         stream.write(settings)
-    root = parent.resolve_current_target_runtime()
+    root = resolve_context_runtime_with_cold_start_deadline()
     summaries = [contexts(name, expected, root) for name, expected in EXPECTED.items()]
     parent.save('complete-new-provider-raw-context-domain.json', dict(
         at=datetime.datetime.now(datetime.timezone.utc).isoformat(), run_id=os.environ['GITHUB_RUN_ID'],

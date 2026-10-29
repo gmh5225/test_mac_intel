@@ -14,3 +14,8 @@ No previous function disassembly, inventory, or runtime probe is repeated. No
 Simulator is booted and no target provider or original application is executed.
 No complete Apple provider binary is uploaded. Raw metadata does not qualify
 source values, callbacks, exception semantics, access footprints, or lifetimes.
+
+The new context-only runtime metadata request has a 180-second cold-start
+deadline after the first 55-second attempt returned no data. All version, UUID,
+whole-file, slice-hash and raw-range checks remain identical. A timeout never
+counts as a successful runtime resolution. Earlier collectors are unchanged.
