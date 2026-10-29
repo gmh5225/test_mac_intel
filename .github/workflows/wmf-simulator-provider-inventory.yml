@@ -1,0 +1,35 @@
+name: WMF Simulator provider inventory
+on:
+  push:
+    branches: [codex/wmf-simulator-provider-inventory]
+    paths:
+      - .github/workflows/wmf-simulator-provider-inventory.yml
+      - wmf-provider-inventory/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    name: Native ARM64 ${{ matrix.runner }} Simulator providers
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Inventory installed SDKs and run an independently authored provider probe
+        env:
+          WMF_INVENTORY_RUNNER: ${{ matrix.runner }}
+        run: python3 -B wmf-provider-inventory/collect.py
+      - name: Preserve complete inventory, commands, and authored probe outputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-simulator-providers-${{ matrix.runner }}-${{ github.run_attempt }}
+          path: wmf-provider-records/
+          if-no-files-found: error
+          retention-days: 14
