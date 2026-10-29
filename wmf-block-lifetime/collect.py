@@ -20,7 +20,7 @@ spec = importlib.util.spec_from_file_location('wmf_existing_context_reader', REP
 context = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(context)
 parent = context.parent
-OUT = Path('wmf-block-lifetime-records')
+OUT = Path('wmf-block-lifetime-reused-build-records')
 COMMANDS = []
 EXPECTED_NEW = {
     'compiler_rt': dict(relative='usr/lib/system/libcompiler_rt.dylib', uuid='5539B26B-6FA7-341F-9C21-25F04BC8138B',
@@ -86,28 +86,44 @@ def main():
     parent.save('actual-four-provider-whole-slice-UUID-prerequisites.json', providers)
     source = REPO / 'wmf-block-lifetime/BlockLifetimeProbe.mm'
     (OUT / 'BlockLifetimeProbe.mm').write_bytes(source.read_bytes())
-    compiler = parent.DEVELOPER / 'Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++'
-    run('actual-explicit-compiler-version', [compiler, '--version'])
-    common = [compiler, '-x', 'objective-c++', '-std=c++20', '-fblocks', '-fno-objc-arc',
-              '-O0', '-g0', '-target', 'arm64-apple-ios17.6-simulator', '-isysroot', parent.SDK]
-    run('authored-explicit-SDK26_5-IR', common + ['-S', '-emit-llvm', source, '-o', OUT / 'authored-current-platform7.ll'])
-    run('authored-explicit-SDK26_5-assembly', common + ['-S', source, '-o', OUT / 'authored-current-platform7.s'])
+    # Consume the successful first build byte for byte. No compiler, IR
+    # producer or assembly producer is restarted in this successor.
+    frozen = json.loads((REPO / 'wmf-block-lifetime/frozen-first-build.json').read_bytes())
+    incoming = REPO / 'wmf-frozen-first-build'
+    assert frozen['first_run'] == '40921122862' and frozen['first_native_fixture_never_executed'] is True
+    for relative, digest in frozen['files'].items():
+        assert hashlib.sha256((incoming / relative).read_bytes()).hexdigest() == digest, relative
+    assert not (incoming / 'execute-only-new-authored-lifetime-fixture-command.json').exists()
+    source_bytes = source.read_bytes()
+    assert hashlib.sha256(source_bytes).hexdigest() == frozen['source_sha256']
+    assert source_bytes == (incoming / 'BlockLifetimeProbe.mm').read_bytes()
+    assert settings == (incoming / 'actual-explicit-SDK26_5-Settings.json').read_bytes()
+    for label in ['authored-explicit-SDK26_5-IR', 'authored-explicit-SDK26_5-assembly', 'authored-explicit-SDK26_5-compile-link']:
+        assert json.loads((incoming / (label + '-command.json')).read_bytes())['returncode'] == 0
+    bindings = json.loads((incoming / 'actual-authored-complete-compile-dependency-hashes.json').read_bytes())
+    assert all(hashlib.sha256(Path(path).read_bytes()).hexdigest() == digest for path, digest in bindings.items())
+    shutil.copytree(incoming, OUT / 'frozen-first-run')
     binary = OUT / 'WMFAuthoredBlockLifetime'
-    run('authored-explicit-SDK26_5-compile-link', common + [source, '-framework', 'Foundation',
-        '-MD', '-MF', OUT / 'authored-current-platform7.d', '-o', binary])
+    binary.write_bytes((incoming / 'WMFAuthoredBlockLifetime').read_bytes())
+    assert hashlib.sha256(binary.read_bytes()).hexdigest() == frozen['binary_sha256']
+    binary.chmod(0o755)
     image = context.MachO(binary.read_bytes())
+    assert image.uuid == frozen['binary_UUID']
     assert image.header['filetype'] == 2 and image.versions
     assert all(v['platform'] == 7 and v['minos_bits'] == 0x110600 and v['sdk_bits'] == 0x1a0500 for v in image.versions)
     parent.save('actual-authored-binary-before-execution.json', dict(path=str(binary), **image.manifest()))
-    deps = (OUT / 'authored-current-platform7.d').read_text().replace('\\\n', '')
-    deps = shlex.split(deps.split(':', 1)[1])
-    bindings = {str(Path(p).resolve()): hashlib.sha256(Path(p).resolve().read_bytes()).hexdigest() for p in deps}
-    parent.save('actual-authored-complete-compile-dependency-hashes.json', bindings)
+    parent.save('actual-all-first-build-inputs-and-current-header-dependencies-reused.json', dict(
+        first_run=frozen['first_run'], binary_sha256=image.whole_sha256, binary_UUID=image.uuid,
+        first_artifact_files=frozen['files'], source_sha256=frozen['source_sha256'],
+        exact_current_compile_dependency_hashes=bindings, first_three_compile_commands_reused=True,
+        no_compiler_or_IR_or_assembly_producer_reexecution=True))
     run('actual-new-device-types', ['xcrun', 'simctl', 'list', 'devicetypes', '--json'])
     types = json.loads((OUT / 'actual-new-device-types.stdout').read_bytes())['devicetypes']
-    choices = [item for item in types if item.get('productFamily') == 'iPhone']
+    choices = [item for item in types if item.get('productFamily') == 'iPhone'
+               and item.get('name', '').startswith('iPhone')
+               and item['minRuntimeVersion'] <= 0x1a0500 <= item['maxRuntimeVersion']]
     assert choices
-    choice = choices[-1]
+    choice = max(choices, key=lambda item: (item['minRuntimeVersion'], item['identifier']))
     run('create-only-owned-lifetime-device', ['xcrun', 'simctl', 'create', 'Authored Block Lifetime ' + os.environ['GITHUB_RUN_ID'],
                                            choice['identifier'], 'com.apple.CoreSimulator.SimRuntime.iOS-26-5'])
     device = (OUT / 'create-only-owned-lifetime-device.stdout').read_text().strip()
