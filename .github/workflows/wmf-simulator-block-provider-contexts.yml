@@ -1,0 +1,30 @@
+name: WMF Simulator Block provider contexts
+on:
+  push:
+    branches: [codex/wmf-simulator-provider-inventory]
+    paths:
+      - .github/workflows/wmf-simulator-block-provider-contexts.yml
+      - wmf-provider-contexts/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  contexts:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Read new import, fixup-page and unwind contexts from matched static files
+        run: python3 -B wmf-provider-contexts/collect.py
+      - name: Preserve complete new raw metadata and command receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-static-platform7-provider-contexts-${{ github.run_attempt }}
+          path: wmf-provider-context-records/
+          if-no-files-found: error
+          retention-days: 14
