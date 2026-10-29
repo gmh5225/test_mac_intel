@@ -114,7 +114,23 @@ def collect_provider(name, relative, expected, temporary):
     return scope
 
 
+def resolve_current_target_runtime():
+    run('actual-target26_5-runtime-resolution', ['xcrun', 'simctl', 'list', 'runtimes', '--json'])
+    result = json.loads((OUT / 'actual-target26_5-runtime-resolution.stdout').read_bytes())
+    candidates = [runtime for runtime in result['runtimes']
+                  if runtime.get('identifier') == 'com.apple.CoreSimulator.SimRuntime.iOS-26-5']
+    assert len(candidates) == 1
+    runtime = candidates[0]
+    assert runtime['version'] == '26.5' and runtime['buildversion'] == '23F77'
+    assert runtime['isAvailable'] is True and 'arm64' in runtime['supportedArchitectures']
+    root = runtime['runtimeRoot']
+    assert isinstance(root, str) and Path(root).is_absolute()
+    save('actual-current-target26_5-runtime-record.json', runtime)
+    return Path(root)
+
+
 def main():
+    global ROOT
     OUT.mkdir()
     assert os.environ.get('RUNNER_ARCH') == 'ARM64'
     assert os.environ.get('DEVELOPER_DIR') == str(DEVELOPER)
@@ -126,6 +142,7 @@ def main():
     assert decoded['SupportedTargets']['iphonesimulator']['BuildVersionPlatformID'] == '7'
     assert '17.6' in decoded['SupportedTargets']['iphonesimulator']['ValidDeploymentTargets']
     (OUT / 'actual-SDK26_5-Settings.json').write_bytes(settings)
+    ROOT = resolve_current_target_runtime()
     version = plistlib.loads((ROOT / 'System/Library/CoreServices/SystemVersion.plist').read_bytes())
     assert version['ProductVersion'] == '26.5' and version['ProductBuildVersion'] == '23F77'
     save('actual-runtime26_5-version.json', version)

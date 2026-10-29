@@ -1,5 +1,8 @@
 # Static Simulator Block provider functions
 
+The current runner resolves the exact 26.5/23F77 runtime record with simctl before
+reading its root path. This does not boot a Simulator or rerun the inventory.
+
 This separate domain reads the iOS Simulator 26.5 (23F77) dispatch and Blocks
 implementations using Xcode 26.5. Each static file must have the exact UUID
 observed in the earlier independent Simulator process. The previous inventory
