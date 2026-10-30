@@ -1,0 +1,31 @@
+name: WMF merged Set entry compiler transport
+on:
+  push:
+    branches: [codex/wmf-merged-set-entry-xcode265]
+    paths:
+      - .github/workflows/wmf-merged-set-entry-compiler.yml
+      - wmf-merged-set-entry/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    name: Xcode 26.5 authored merged Set entry, five Darwin profiles
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile independently authored Swift to IR, SIL, and assembly
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+        run: python3 -B wmf-merged-set-entry/collect.py
+      - name: Preserve full compiler commands and authored outputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-merged-set-entry-xcode265-${{ github.run_attempt }}
+          path: wmf-merged-set-entry-records/
+          if-no-files-found: error
+          retention-days: 14
