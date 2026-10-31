@@ -1,0 +1,30 @@
+name: WMF public NSObject Set filter compiler transport
+"on":
+  push:
+    branches: [codex/wmf-nsobject-set-filter-xcode265-r6429]
+    paths:
+      - .github/workflows/wmf-nsobject-set-filter-compiler.yml
+      - wmf-nsobject-set-filter/**
+permissions:
+  contents: read
+jobs:
+  compile:
+    name: Xcode 26.5 new public NSObject and generic Set filter client
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile authored public filter clients to IR SIL and assembly
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+        run: python3 -B wmf-nsobject-set-filter/collect.py
+      - name: Preserve full compiler inputs outputs commands and actual failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-nsobject-set-filter-xcode265-${{ github.run_attempt }}
+          path: wmf-nsobject-set-filter-records/
+          if-no-files-found: error
+          retention-days: 14
