@@ -1,0 +1,30 @@
+name: WMF single profile-instrumented resilient-proxy-predicate filter compiler transport
+"on":
+  push:
+    branches: [codex/wmf-single-profiled-proxy-filter-xcode265-r6489]
+    paths:
+      - .github/workflows/wmf-single-profiled-proxy-filter-compiler.yml
+      - wmf-single-profiled-proxy-filter/**
+permissions:
+  contents: read
+jobs:
+  compile:
+    name: Xcode 26.5 new single profile-instrumented resilient-proxy-predicate Set filter clients
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Compile authored single profile-instrumented resilient-proxy-predicate filter clients to IR SIL and assembly
+        env:
+          DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+        run: python3 -B wmf-single-profiled-proxy-filter/collect.py
+      - name: Preserve full compiler inputs outputs commands and actual failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-single-profiled-proxy-filter-xcode265-${{ github.run_attempt }}
+          path: wmf-single-profiled-proxy-filter-records/
+          if-no-files-found: error
+          retention-days: 14
