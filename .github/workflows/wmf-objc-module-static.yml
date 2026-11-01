@@ -1,0 +1,31 @@
+name: WMF selected ObjC complete new module remainder
+on:
+  push:
+    branches: [codex/wmf-objc-module-static-closure]
+    paths:
+      - .github/workflows/wmf-objc-module-static.yml
+      - wmf-objc-module-static/**
+permissions:
+  contents: read
+jobs:
+  collect:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test only the nine new ObjC provider frontier boundaries
+        run: python3 -B -m unittest discover -s wmf-objc-module-static -p 'test_objc_module.py' -v
+      - name: Read complete new selected ObjC intervals
+        run: python3 -B wmf-objc-module-static/objc_module_collect.py
+      - name: Preserve complete static intervals and any failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-objc-module-static-${{ github.run_id }}-${{ github.run_attempt }}
+          path: wmf-objc-module-static-records/
+          if-no-files-found: error
+          retention-days: 14
