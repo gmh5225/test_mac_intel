@@ -1,0 +1,39 @@
+name: WMF new allocator module remainder and NSError class owner
+on:
+  push:
+    branches: [codex/wmf-zone-static-closure]
+    paths:
+      - .github/workflows/wmf-zone-static.yml
+      - wmf-zone-static/**
+permissions:
+  contents: read
+  actions: read
+jobs:
+  collect:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Test only the new static remainder boundaries
+        run: python3 -B -m unittest discover -s wmf-zone-static -p 'test_zone.py' -v
+      - name: Reuse the complete closed backend prefix
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: wmf-allocator-backend-static-41285422873-1
+          run-id: 41285422873
+          github-token: ${{ github.token }}
+          path: prior-backend
+      - name: Read the new static module intervals
+        run: python3 -B wmf-zone-static/zone_collect.py
+      - name: Preserve complete new intervals and failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-zone-static-${{ github.run_id }}-${{ github.run_attempt }}
+          path: wmf-zone-static-records/
+          if-no-files-found: error
+          retention-days: 14
