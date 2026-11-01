@@ -1,0 +1,72 @@
+name: NeverD Windows ARM64 native qualification
+run-name: NeverD Windows ARM64 / ${{ github.head_ref || github.ref_name }} / ${{ github.sha }}
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/neverd-windows-arm64.yml
+      - arm64-windows/**
+
+permissions:
+  contents: read
+
+jobs:
+  original-oracles:
+    name: Original Windows ARM64 context, memory and exclusives
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 1653e4cfaaf5b9f9138c99750aa7984933f2cc2d
+          path: neverd-source
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+          architecture: arm64
+      - name: Require a native ARM64 process and record provenance
+        env:
+          EXPECTED_SOURCE: 1653e4cfaaf5b9f9138c99750aa7984933f2cc2d
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory -Force evidence | Out-Null
+          python -c "import json,os,platform,subprocess; from pathlib import Path; h=platform.machine().lower(); assert platform.system()=='Windows' and h in ('arm64','aarch64'), h; s=subprocess.check_output(['git','-C','neverd-source','rev-parse','HEAD'],text=True).strip(); assert s==os.environ['EXPECTED_SOURCE']; r={'source':s,'harness':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),'machine':h,'system':platform.platform(),'python':platform.python_version(),'run_id':os.environ['GITHUB_RUN_ID'],'attempt':os.environ['GITHUB_RUN_ATTEMPT']}; Path('evidence/provenance.json').write_text(json.dumps(r,indent=2)); print(json.dumps(r))"
+          Get-CimInstance Win32_Processor | Select-Object Name,Architecture | ConvertTo-Json | Out-File evidence/cpu.json
+      - name: Check the observation validators
+        working-directory: neverd-source
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m unittest scripts.tests.test_check_windows_memory_write scripts.tests.test_check_aarch64_exclusives -v
+      - name: Execute the original caller-context fixture
+        working-directory: neverd-source
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python scripts/check_windows_context.py --arch AArch64 --output ../evidence/context
+      - name: Execute original cross-page process writes
+        working-directory: neverd-source
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python scripts/check_windows_memory_write.py --arch AArch64 --output ../evidence/memory-write
+      - name: Execute original exclusive loops and fault observations
+        working-directory: neverd-source
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python scripts/check_aarch64_exclusives.py --output ../evidence/exclusives
+      - name: Preserve original native observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neverd-windows-arm64-original-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 14
