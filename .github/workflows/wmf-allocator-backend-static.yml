@@ -1,0 +1,31 @@
+name: WMF allocator backend and failure tail static evidence
+on:
+  push:
+    branches: [codex/wmf-allocator-backend-static]
+    paths:
+      - .github/workflows/wmf-allocator-backend-static.yml
+      - wmf-allocator-backend-static/**
+permissions:
+  contents: read
+jobs:
+  collect:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify new raw reexport header reader
+        run: python3 -B -m unittest discover -s wmf-allocator-backend-static -p 'test_*.py' -v
+      - name: Read only new allocator and failure-tail functions
+        run: python3 -B wmf-allocator-backend-static/backend_collect.py
+      - name: Preserve complete new function and failure records
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-allocator-backend-static-${{ github.run_id }}-${{ github.run_attempt }}
+          path: wmf-allocator-backend-static-records/
+          if-no-files-found: error
+          retention-days: 14
