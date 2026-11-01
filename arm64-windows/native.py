@@ -245,12 +245,14 @@ def materialize_image(dll, source, provider):
             value = struct.unpack_from("<Q", image, (original or slots) + index * 8)[0]
             if not value:
                 break
-            assert not value >> 63, "fixture imports must have names"
-            name = text(value + 2)
-            try:
-                address = C.cast(getattr(provider, name), C.c_void_p).value
-            except AttributeError:
-                address = C.cast(getattr(C.WinDLL(module), name), C.c_void_p).value
+            if value >> 63:
+                address = C.cast(C.WinDLL(module)[value & 0xFFFF], C.c_void_p).value
+            else:
+                name = text(value + 2)
+                try:
+                    address = C.cast(getattr(provider, name), C.c_void_p).value
+                except AttributeError:
+                    address = C.cast(getattr(C.WinDLL(module), name), C.c_void_p).value
             struct.pack_into("<Q", image, slots + index * 8, address)
             index += 1
         descriptor += 20
