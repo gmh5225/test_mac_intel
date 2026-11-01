@@ -26,3 +26,12 @@ New malloc file identities are observations, not guesses from their path or
 symbol names. LibSystem re-export resolution, actual symbol interposition,
 allocation region/freshness/validity, original provider binding, object values,
 callback effects and lifetime remain independent obligations.
+
+The actual first backend job 41284969525 failed before saving any new function
+body. Its six raw-header tests passed and its complete LibSystem raw context
+was saved. The outlined local name occurs sixteen times. This narrow successor
+uses the exact prior `0x3bc254 B -> 0x6ab4c` machine edge to select its one full
+nlist record and function start. Unique-name seeds retain their original rule.
+The saved LibSystem prefix is downloaded and hash-bound; only current file hash
+and runtime identity are freshly checked. The six passed raw-header tests and
+the eight closed Core disassemblies are not rerun.

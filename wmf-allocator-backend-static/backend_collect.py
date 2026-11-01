@@ -75,8 +75,11 @@ def only_load_commands(data):
 
 def select_new(image, names, closed):
     pending, seeds, selected, deferred, reused = deque(), [], {}, [], []
-    for name in names:
-        found = [row for row in image.symbols if row['name']==name and row['type']&0x0e==0x0e and not row['type']&0xe0]
+    for selector in names:
+        name = selector if isinstance(selector,str) else selector[0]
+        exact = None if isinstance(selector,str) else selector[1]
+        found = [row for row in image.symbols if row['name']==name and row['type']&0x0e==0x0e and not row['type']&0xe0
+                 and (exact is None or row['value']==exact)]
         assert len(found)==1 and found[0]['value'] in image.function_starts, name
         seeds.append(found[0]);pending.append((found[0]['value'],0))
     while pending:
@@ -116,10 +119,26 @@ def main():
     assert version['ProductVersion']=='26.5' and version['ProductBuildVersion']=='23F77'
     shared.save('actual-current-runtime-version.json',version)
     relative='usr/lib/libSystem.B.dylib'
-    shared.save('LibSystem-complete-raw-reexport-context.json',dict(path=str(root/relative),
-        **only_load_commands((root/relative).read_bytes())))
+    prefix_pin=pins['successful_backend_prefix']
+    prefix_path=Path('prior-backend-prefix')/prefix_pin['file']
+    prefix_bytes=prefix_path.read_bytes()
+    assert len(prefix_bytes)==prefix_pin['bytes'] and hashlib.sha256(prefix_bytes).hexdigest()==prefix_pin['sha256']
+    prefix=json.loads(prefix_bytes)
+    assert hashlib.sha256((root/relative).read_bytes()).hexdigest()==prefix['whole_file_sha256']
+    shared.save('LibSystem-successful-prefix-reuse.json',dict(pin=prefix_pin,
+        prior_complete_raw_context=prefix,current_whole_file_sha256=prefix['whole_file_sha256'],
+        complete_LibSystem_load_command_and_export_collection_reexecuted=False))
+    outline=pins['Core']['deferred_outline_target']
+    edge=outline['complete_prior_branch']
+    word=int(edge['word_hex'],16); immediate=word&0x3ffffff
+    if immediate&(1<<25):immediate-=1<<26
+    assert word&0xfc000000==0x14000000
+    assert int(edge['pc'],16)+4*immediate==int(edge['target'],16)
+    assert hashlib.sha256(word.to_bytes(4,'little')).hexdigest()==outline['complete_prior_cold_body_sha256']
+    assert outline['complete_prior_cold_body_start']==edge['pc']
+    assert int(outline['complete_prior_cold_body_end'],16)==int(edge['pc'],16)+4
     providers=[
-        ('Core','usr/lib/swift/libswiftCore.dylib',['__ZN5swift11fatalErrorvEjPKcPc','_OUTLINED_FUNCTION_0']),
+        ('Core','usr/lib/swift/libswiftCore.dylib',['__ZN5swift11fatalErrorvEjPKcPc',('_OUTLINED_FUNCTION_0',int(edge['target'],16))]),
         ('malloc','usr/lib/system/libsystem_malloc.dylib',['_malloc_type_malloc','_malloc_type_posix_memalign']),
         ('objc','usr/lib/libobjc.A.dylib',['_class_createInstance','_objc_release'])]
     summaries=[]
