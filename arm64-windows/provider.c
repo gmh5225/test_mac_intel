@@ -93,3 +93,49 @@ API void NdisCloseConfiguration(void *handle) {
   record(3);
   record((uintptr_t)handle);
 }
+
+API int32_t RxRegisterMinirdr(void **device, void *driver, void *dispatch,
+                              uint32_t controls, void *name, uint32_t extension,
+                              uint32_t type, uint32_t characteristics) {
+  record(41);
+  record((uintptr_t)device);
+  record((uintptr_t)driver);
+  record((uintptr_t)dispatch);
+  record(controls);
+  record((uintptr_t)name);
+  record(extension);
+  record(type);
+  record(characteristics);
+  *device = (void *)((uintptr_t)driver ^ UINT64_C(0x5678000) ^ controls);
+  return (int32_t)(0xc0001200u | mode);
+}
+API int32_t RxStartMinirdr(void *context, uint8_t *post) {
+  record(42);
+  record((uintptr_t)context);
+  record((uintptr_t)post);
+  *post = (uint8_t)(mode ^ 0xa5);
+  return (int32_t)(0x80000300u | mode);
+}
+API void RxpUnregisterMinirdr(void *device) {
+  record(43);
+  record((uintptr_t)device);
+}
+API void *RxCreateRxContext(void *irp, void *device, uint32_t flags) {
+  record(44);
+  record((uintptr_t)irp);
+  record((uintptr_t)device);
+  record(flags);
+  return (void *)(UINT64_C(0x100000000) | (flags ^ UINT64_C(0x11223344)));
+}
+API int32_t RxInitializeDispatcher(void) {
+  record(45);
+  return (int32_t)(0xc0004500u | mode);
+}
+API int32_t RxInitializeRxTimer(void) {
+  record(46);
+  return (int32_t)(0xc0004600u | mode);
+}
+API int32_t RxTearDownDispatcher(void) {
+  record(47);
+  return (int32_t)(0xc0004700u | mode);
+}

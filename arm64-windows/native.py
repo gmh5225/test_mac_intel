@@ -56,7 +56,7 @@ def run(command, out, name):
         )
 
 
-def build(payload, out, arch):
+def build(payload, out, arch, functions, provider_source, variants):
     clang, link = (tool("clang"), tool("lld-link"))
     commands = []
 
@@ -87,7 +87,7 @@ def build(payload, out, arch):
         )
 
     provider = out / "provider.obj"
-    compile(ROOT / "provider.c", provider, "-O2")
+    compile(provider_source, provider, "-O2")
     invoke(
         [
             link,
@@ -101,7 +101,7 @@ def build(payload, out, arch):
         ],
         "provider-link",
     )
-    for category in FUNCTIONS:
+    for category in functions:
         objects = [payload / ("original-" + category + ".obj")]
         invoke(
             [
@@ -117,10 +117,8 @@ def build(payload, out, arch):
             ],
             "original-" + category + "-link",
         )
-    for variant in ["baseline-llvmc"] + [
-        r + "-" + o for r in ["highc", "llvmc"] for o in ["O0", "O2"]
-    ]:
-        for category, names in FUNCTIONS.items():
+    for variant in variants:
+        for category, names in functions.items():
             if variant == "baseline-llvmc" and category != "user":
                 continue
             objects = []
@@ -533,7 +531,14 @@ def main():
     for name, expected in manifest["files"].items():
         assert digest(payload / name) == expected, name
     assert not manifest["source_dirty"]
-    build(payload, out, a.arch)
+    build(
+        payload,
+        out,
+        a.arch,
+        FUNCTIONS,
+        ROOT / "provider.c",
+        ["baseline-llvmc", "highc-O0", "highc-O2", "llvmc-O0", "llvmc-O2"],
+    )
     rows = []
     for variant in ["baseline-llvmc", "highc-O0", "highc-O2", "llvmc-O0", "llvmc-O2"]:
         result = subprocess.run(

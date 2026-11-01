@@ -41,3 +41,14 @@ architecture and rejects mismatching PE machine types before executing a DLL.
 
 No private driver or game sample is included. The source checkout and its
 license remain separate from this harness.
+
+The RDBSS job has a separate `rdbss-payload/*/manifest.json`, including the
+NeverD revision and Microsoft catalog manifest hash. It compares seven
+original WDK C++ callers with both C routes at O0/O2 on native Windows ARM64
+and x64. Three independent input seeds check all eight registration arguments,
+32-bit fields with their high bit set, signed status results, a pointer result,
+void unregister, and three no-argument APIs. Pointer and byte output buffers
+retain canaries on both sides. Each original result is first checked against
+an independent expected trace and exact output, then compared with recovered C.
+RDBSS remains an explicit ABI model in a user process, not a loaded driver or
+an implementation of the real RDBSS service.
