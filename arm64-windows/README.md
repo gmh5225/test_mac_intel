@@ -52,3 +52,11 @@ retain canaries on both sides. Each original result is first checked against
 an independent expected trace and exact output, then compared with recovered C.
 RDBSS remains an explicit ABI model in a user process, not a loaded driver or
 an implementation of the real RDBSS service.
+
+The unary job has its own `unary-payload/*/manifest.json`. It compares 20 x64
+and 14 ARM64 original assembly functions with both captured C routes at O0/O2,
+using 262 independent unsigned inputs per function. Both original and recovered
+results must match an unsigned Python oracle, including signed minima, 32-bit
+narrowing, and mixed negation/complement counterexamples. The x64 cases also
+observe final carry and overflow after arithmetic negation. These are native
+user-process machine/value comparisons; they do not execute a driver or API.
