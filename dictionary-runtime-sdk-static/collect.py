@@ -12,7 +12,7 @@ import subprocess
 
 PROFILES = (('ios-arm64', 'iphoneos', 'arm64-apple-ios18.0'), ('ios-simulator-x64', 'iphonesimulator', 'x86_64-apple-ios18.0-simulator'))
 SYMBOLS = {'dictionary_count': '$ss17__CocoaDictionaryV5countSivg', 'dictionary_lookup': '$ss17__CocoaDictionaryV6lookupyyXlSgyXlF', 'set_clear': '$ss10_NativeSetV9removeAll8isUniqueySb_tF'}
-PROBE = 'import Foundation\n\n@inline(never)\npublic func nd_sdk_dictionary_count<Key: Hashable, Value>(_ dictionary: [Key: Value]) -> Int {\n    dictionary.count\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_lookup<Key: Hashable, Value>(_ dictionary: [Key: Value], _ key: Key) -> Value? {\n    dictionary[key]\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_set_clear<Element: Hashable>(_ set: inout Set<Element>) {\n    set.removeAll(keepingCapacity: true)\n}\n'
+PROBE = 'import Foundation\n\n@inline(never)\npublic func nd_sdk_dictionary_count(_ dictionary: __CocoaDictionary) -> Int {\n    dictionary.count\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_lookup(_ dictionary: __CocoaDictionary, _ key: AnyObject) -> AnyObject? {\n    dictionary.lookup(key)\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_set_clear<Element: Hashable>(_ set: inout _NativeSet<Element>, _ unique: Bool) {\n    set.removeAll(isUnique: unique)\n}\n'
 
 
 def write_json(path, value):
@@ -75,15 +75,15 @@ def collect_profile(output, profile):
     version = command([str(compiler), "--version"], output, "swiftc-version")
     source = output / "probe.swift"
     source.write_text(PROBE)
-    arguments = [str(compiler), "-frontend", "-parse-as-library", "-module-name",
+    arguments = [str(compiler), "-frontend", "-disable-access-control", "-parse-as-library", "-module-name",
                  "NeverDDictionaryRuntimeProbe", "-target", target, "-sdk", str(sdk),
                  "-module-cache-path", str(output.parent.parent / "dictionary-runtime-module-cache" / name),
                  "-warnings-as-errors"]
     ir = output / "probe.ll"
     sil = output / "probe.sil"
     # These compiler invocations are deliberately serial and produce no executable.
-    command(arguments + ["-emit-ir", "-O", str(source), "-o", str(ir)], output, "compile-IR-only")
-    command(arguments + ["-emit-sil", "-O", str(source), "-o", str(sil)], output, "compile-SIL-only")
+    command(arguments + ["-emit-ir", "-Onone", str(source), "-o", str(ir)], output, "compile-IR-only")
+    command(arguments + ["-emit-silgen", "-Onone", str(source), "-o", str(sil)], output, "compile-SIL-only")
     abi = client_ir(ir.read_text())
     result = dict(status="COMPLETE_STATIC_SDK_CLIENT_ABI", profile=name, sdk_name=sdk_name,
                   sdk=str(sdk), sdk_version=sdk_version, requested_target=target,
