@@ -67,11 +67,23 @@ class TypedCallTests(unittest.TestCase):
                     self.assertFalse(calls.assess(helper.transcript(route, feature, el0),
                                                   0, route, feature, el0, typed.CONFIG)["passed"])
         self.assertEqual(calls.CONFIG, integer)
-        report = {"tests": 1, "failures": 0, "errors": 0, "testsuites": [{
-            "name": "AArch64AuthenticatedCall", "testsuite": [{
-                "name": "ExplicitTypesKeepAuthenticationOnTheCall", "status": "RUN",
-                "result": "COMPLETED", typed.CONFIG["artifact_property"]: self.id()}]}]}
+        suites = []
+        for identity in typed.CONFIG["test_report_cases"]:
+            suite, name = identity.split(".", 1)
+            suites.append({"name": suite, "testsuite": [{
+                "name": name, "status": "RUN", "result": "COMPLETED",
+                typed.CONFIG["artifact_property"]: self.id()}]})
+        report = {"tests": len(suites), "failures": 0, "errors": 0,
+                  "testsuites": suites}
         self.assertEqual(calls.validate_test_report(report, typed.CONFIG), self.id())
+        missing = copy.deepcopy(report)
+        missing["testsuites"].pop()
+        with self.assertRaises(ValueError):
+            calls.validate_test_report(missing, typed.CONFIG)
+        duplicate = copy.deepcopy(report)
+        duplicate["testsuites"][-1] = duplicate["testsuites"][0]
+        with self.assertRaises(ValueError):
+            calls.validate_test_report(duplicate, typed.CONFIG)
         report["testsuites"][0]["testsuite"][0]["result"] = "SKIPPED"
         with self.assertRaises(ValueError):
             calls.validate_test_report(report, typed.CONFIG)

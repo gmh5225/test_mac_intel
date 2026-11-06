@@ -1,10 +1,6 @@
 {
-  "scope": "Controlled PAC execution of unchanged self-contained Darwin explicit scalar, 128-bit integer, one/two-word record and f32/f64 HFA calls, including register exhaustion and packed stack placement. Supplied prototypes, not automatic complete recovery. Indirect copies/results, arbitrary records, authenticated whole images, native Apple execution, signed exception unwinding and exact fault PC/ESR remain unqualified.",
+  "scope": "Controlled PAC execution of unchanged self-contained Darwin explicit scalar, 128-bit integer, one/two-word record and f32/f64 HFA calls, including register exhaustion, packed fixed stack placement, and whole aligned variadic values. Default promotions apply to scalar tails; HFA members retain their original widths. Supplied prototypes, not automatic complete recovery. Indirect copies/results, arbitrary records, authenticated whole images, native Apple execution, signed exception unwinding and exact fault PC/ESR remain unqualified.",
   "output_directory": "cpta-typed-calls",
-  "test_report_cases": [
-    "AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall"
-  ],
-  "export_count": 1,
   "qualification_key": "darwin_scalar_authenticated_call_abi_qualified",
   "object_symbol": "_authenticated_dispatch",
   "directory": "typed-{shape}-{key}-{zero}-{raw}",
@@ -288,6 +284,132 @@
       "return_kind": "S",
       "return_bytes": 8,
       "fixed": -1
+    },
+    {
+      "name": "variadic-wide",
+      "parameters": "iq",
+      "return_kind": "q",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-wide-aligned",
+      "parameters": "iwQiq",
+      "return_kind": "Q",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-wide-prefix",
+      "parameters": "qQi",
+      "return_kind": "q",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-word-pair",
+      "parameters": "ia",
+      "return_kind": "a",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-padded-pair",
+      "parameters": "ir",
+      "return_kind": "r",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-pair-prefix",
+      "parameters": "aaaaawq",
+      "return_kind": "a",
+      "return_bytes": 16,
+      "fixed": 5
+    },
+    {
+      "name": "variadic-hfa-prefix",
+      "parameters": "fffffffuq",
+      "return_kind": "u",
+      "return_bytes": 12,
+      "fixed": 8
+    },
+    {
+      "name": "variadic-value-packed-prefix",
+      "parameters": "bbbbbbbbbwqarudnsz",
+      "return_kind": "z",
+      "return_bytes": 32,
+      "fixed": 9
+    },
+    {
+      "name": "variadic-hfa-f32-one",
+      "parameters": "is",
+      "return_kind": "s",
+      "return_bytes": 4,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f32-two",
+      "parameters": "it",
+      "return_kind": "t",
+      "return_bytes": 8,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f32-three",
+      "parameters": "iu",
+      "return_kind": "u",
+      "return_bytes": 12,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f32-four",
+      "parameters": "iv",
+      "return_kind": "v",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f64-one",
+      "parameters": "iS",
+      "return_kind": "S",
+      "return_bytes": 8,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f64-two",
+      "parameters": "ix",
+      "return_kind": "x",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f64-three",
+      "parameters": "iy",
+      "return_kind": "y",
+      "return_bytes": 24,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-f64-four",
+      "parameters": "iz",
+      "return_kind": "z",
+      "return_bytes": 32,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-hfa-nested",
+      "parameters": "in",
+      "return_kind": "n",
+      "return_bytes": 16,
+      "fixed": 1
+    },
+    {
+      "name": "variadic-pointer-pair",
+      "parameters": "ioO",
+      "return_kind": "O",
+      "return_bytes": 16,
+      "fixed": 1
     }
   ],
   "variants": [
@@ -761,5 +883,6 @@
     "S": [
       "0x4004000000000000"
     ]
-  }
+  },
+  "test_case": "ByShape/AArch64TypedAuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall/{name}"
 }

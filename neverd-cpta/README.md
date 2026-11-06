@@ -345,13 +345,14 @@ requires it; exporting its bundled C++ runtime for the guest compiler can preven
 Clang from starting.
 
 `typed_calls.py` separately consumes only
-`AArch64AuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall` and its
-single matching artifact export. Its 200 groups cover signed/unsigned 8/16/32-bit
+`ByShape/AArch64TypedAuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall/*`
+with exactly one completed test and matching artifact export per declared shape.
+Missing, duplicated and skipped shapes are refused. Its 290 groups cover signed/unsigned 8/16/32-bit
 and 128-bit integers, 64-bit integers and pointers, fixed f32/f64 calls, direct
 one/two-word records, naturally padded integer records, and one-to-four-member
 f32/f64 HFAs including nested records. Exhausted GP/FP banks preserve complete
 record spills and aligned 128-bit values. Mixed scalar operands and Darwin
-stack variadics remain covered,
+stack variadics include 128-bit values and direct records,
 with IA/IB, zero/dynamic discriminators and raw BLR controls. All five routes
 are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
 one self-contained text section with no code relocations. It copies the text
@@ -372,8 +373,9 @@ the padding of returned GP records independently of the projected implementation
 Narrow GP operands must have the correct sign/zero extension in all 32 W bits,
 including when their outer integer carrier contains unrelated high bits. Fixed
 byte/halfword/f32 stack spills are one/two/four bytes apart, while variadic tails
-use eight-byte slots even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
-with 480 invalid-signature pairs per mode. Integer and typed profiles share their
+use whole objects rounded to eight-byte slots, preserving higher natural
+alignment and dense HFA member offsets, even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
+with 696 invalid-signature pairs per mode. Integer and typed profiles share their
 key installation, fault probe and exception-class policy. Typed success grants
 the existing `darwin_scalar_authenticated_call_abi_qualified` field for this
 bounded explicit-value profile. It does not qualify arbitrary record layouts,

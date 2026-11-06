@@ -13,6 +13,11 @@ ROOT = Path(__file__).resolve().parent
 POLICY = json.loads((ROOT / "CptaTypedCalls.def").read_text())
 CONFIG = copy.deepcopy(calls.CONFIG)
 CONFIG.update(POLICY)
+CONFIG["test_report_cases"] = [
+    POLICY["test_case"].format(name=shape["name"].replace("-", "_"))
+    for shape in POLICY["shapes"]
+]
+CONFIG["export_count"] = len(POLICY["shapes"])
 CONFIG["errors"]["input"] = POLICY["input_error"]
 CONFIG["cases"] = []
 for shape_index, shape in enumerate(POLICY["shapes"]):
@@ -65,8 +70,10 @@ def placements(shape):
         if not fits:
             if composite:
                 registers[bank] = POLICY["register_arguments"]
-            size = POLICY["word_bytes"] if variadic else value["bytes"]
-            alignment = POLICY["word_bytes"] if variadic else value.get("alignment", size)
+            size = aligned(value["bytes"], POLICY["word_bytes"]) if variadic else value["bytes"]
+            alignment = value.get("alignment", value["bytes"])
+            if variadic:
+                alignment = max(POLICY["word_bytes"], alignment)
             stack = aligned(stack, alignment)
         for part, member in enumerate(members):
             location = {"memory": "", **member, "argument": index, "part": part}
