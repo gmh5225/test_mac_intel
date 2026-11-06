@@ -71,15 +71,25 @@ def client_ir(text):
             raise ValueError("authored SDK client has an unexpected return ABI")
         definitions[name] = rows[0]
     strings = {support.llvm_bytes(s) for s in re.findall(r'c"([^"\n]*)"', text)}
-    if not {s.encode() + b"\0" for s in METHODS} <= strings:
-        raise ValueError("complete SDK selector strings are missing")
+    selector_sources = {}
+    for selector in METHODS:
+        if selector.encode() + b"\0" in strings:
+            selector_sources[selector] = "compiler selector string"
+            continue
+        call = re.compile(r'\b(?:call|invoke)\s+i64\s+@"objc_msgSend\$' +
+                          re.escape(selector) + r'"\(')
+        matches = [line.strip() for line in text.splitlines() if call.search(line)]
+        if len(matches) != 1:
+            raise ValueError("complete fixed-result selector call is missing or ambiguous")
+        selector_sources[selector] = matches[0]
     if b"v8@?0\0" not in strings:
         raise ValueError("complete compiler block signature is missing")
     invokes = [s for s in text.splitlines()
                if s.startswith("define ") and "block_invoke" in s]
     if not invokes or any("void " not in s or "ptr " not in s for s in invokes):
         raise ValueError("compiler block invoke ABI is missing or conflicting")
-    return dict(client_definitions=definitions, block_signature="v8@?0",
+    return dict(client_definitions=definitions, selector_sources=selector_sources,
+                block_signature="v8@?0",
                 invoke_definitions=invokes,
                 memory_or_lifetime_contract_granted=False)
 

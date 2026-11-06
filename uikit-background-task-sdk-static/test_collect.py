@@ -60,5 +60,24 @@ class Boundaries(unittest.TestCase):
             with self.assertRaises(ValueError): collect.client_ir(text)
 
 
+    def test_actual_compiler_selector_stubs_preserve_the_fixed_result(self):
+        from pathlib import Path
+        ir = Path(__file__).with_name("observed-arm64-O0-selector-stubs.ll").read_text()
+        row = collect.client_ir(ir)
+        self.assertEqual(set(row["selector_sources"]), set(collect.METHODS))
+        self.assertTrue(all('call i64 @"objc_msgSend$' in v
+                            for v in row["selector_sources"].values()))
+
+    def test_stub_declaration_or_wrong_call_return_cannot_replace_the_call(self):
+        from pathlib import Path
+        ir = Path(__file__).with_name("observed-arm64-O0-selector-stubs.ll").read_text()
+        original = 'call i64 @"objc_msgSend$beginBackgroundTaskWithExpirationHandler:"('
+        self.assertIn(original, ir)
+        for replacement in ['call ptr @"objc_msgSend$beginBackgroundTaskWithExpirationHandler:"(',
+                            'call i64 @"foreign$beginBackgroundTaskWithExpirationHandler:"(']:
+            with self.assertRaises(ValueError):
+                collect.client_ir(ir.replace(original, replacement))
+
+
 if __name__ == "__main__":
     unittest.main()
