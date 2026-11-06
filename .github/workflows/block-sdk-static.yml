@@ -1,10 +1,10 @@
-name: Dictionary and Set runtime SDK client ABI - static only
+name: String borrowing SDK client ABI - static only
 on:
   push:
-    branches: [codex/wmf-native-set-layout-sdk-r7980]
+    branches: [codex/wmf-string-borrow-sdk-r8032]
     paths:
       - .github/workflows/block-sdk-static.yml
-      - dictionary-runtime-sdk-static/**
+      - string-borrow-sdk-static/**
 permissions:
   contents: read
 jobs:
@@ -18,14 +18,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate imported ABI extraction boundaries
-        run: python3 -B -m unittest discover -s dictionary-runtime-sdk-static -p 'test_collect.py' -v
+        run: python3 -B -m unittest discover -s string-borrow-sdk-static -p 'test_collect.py' -v
       - name: Compile authored Foundation clients to LLVM IR and SIL
-        run: python3 -B dictionary-runtime-sdk-static/collect.py --output dictionary-runtime-sdk-records
+        run: python3 -B string-borrow-sdk-static/collect.py --output string-borrow-sdk-records
       - name: Preserve exact client ABI evidence and failures
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: dictionary-runtime-sdk-static-${{ github.run_id }}-${{ github.run_attempt }}
-          path: dictionary-runtime-sdk-records/
+          name: string-borrow-sdk-static-${{ github.run_id }}-${{ github.run_attempt }}
+          path: string-borrow-sdk-records/
           if-no-files-found: error
           retention-days: 14
