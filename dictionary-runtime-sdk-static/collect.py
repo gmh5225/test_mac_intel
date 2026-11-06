@@ -12,7 +12,7 @@ import subprocess
 
 PROFILES = (('ios-arm64', 'iphoneos', 'arm64-apple-ios18.0'), ('ios-simulator-x64', 'iphonesimulator', 'x86_64-apple-ios18.0-simulator'))
 SYMBOLS = {'dictionary_count': '$ss17__CocoaDictionaryV5countSivg', 'dictionary_lookup': '$ss17__CocoaDictionaryV6lookupyyXlSgyXlF', 'set_clear': '$ss10_NativeSetV9removeAll8isUniqueySb_tF'}
-PROBE = 'import Foundation\n\n@inline(never)\npublic func nd_sdk_dictionary_count(_ dictionary: __CocoaDictionary) -> Int {\n    dictionary.count\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_lookup(_ dictionary: __CocoaDictionary, _ key: AnyObject) -> AnyObject? {\n    dictionary.lookup(key)\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_set_clear<Element: Hashable>(_ set: inout _NativeSet<Element>, _ unique: Bool) {\n    set.removeAll(isUnique: unique)\n}\n'
+PROBE = 'import Foundation\n\n@inline(never)\npublic func nd_sdk_dictionary_count(_ dictionary: __CocoaDictionary) -> Int {\n    dictionary.count\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_lookup(_ dictionary: __CocoaDictionary, _ key: AnyObject) -> AnyObject? {\n    dictionary.lookup(key)\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_set_clear<Element: Hashable>(_ set: inout _NativeSet<Element>, _ unique: Bool) {\n    set.removeAll(isUnique: unique)\n}\n\n@inline(never)\npublic func nd_sdk_dictionary_set_layout<Element: Hashable>(_ element: Element.Type) -> Int {\n    MemoryLayout<_NativeSet<Element>>.size\n}\n'
 
 
 def write_json(path, value):
@@ -49,8 +49,11 @@ def client_ir(text):
         imports[label] = dict(symbol=symbol, declaration=declarations[0],
                               direct_calls=calls, declaration_attribute_groups=attributes)
     wrappers = [line for line in lines if line.startswith("define ") and "nd_sdk_dictionary_" in line]
-    if len(wrappers) != 3:
-        raise ValueError("authored client does not have three wrapper definitions")
+    if len(wrappers) != 4:
+        raise ValueError("authored client does not have four wrapper definitions")
+    layout = re.findall(r'^define [^\n]*nd_sdk_dictionary_set_layout[^\n]*\{\n(.*?)^\}', text, re.M | re.S)
+    if len(layout) != 1 or not re.search(r'^  ret i64 8$', layout[0], re.M):
+        raise ValueError("NativeSet layout wrapper does not independently return eight bytes")
     return dict(target_triple=triples[0], data_layout=layouts[0], imports=imports,
                 authored_wrapper_definitions=wrappers)
 

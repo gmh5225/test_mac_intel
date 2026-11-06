@@ -11,6 +11,7 @@ class ImportedABIBoundaries(unittest.TestCase):
             lines += ['declare swiftcc void @"' + symbol + '"(ptr sret(%T) noalias, i64, ptr swiftself) #7',
                       '  call swiftcc void @"' + symbol + '"(ptr sret(%T) %out, i64 %s, ptr swiftself %self)',
                       'define swiftcc void @"nd_sdk_dictionary_' + label + '"() {']
+        lines += ['define swiftcc i64 @"nd_sdk_dictionary_set_layout"() {', '  ret i64 8', '}']
         lines.append('attributes #7 = { nounwind "frame-pointer"="all" }')
         return "\n".join(lines)
 
@@ -67,6 +68,12 @@ class ImportedABIBoundaries(unittest.TestCase):
         text = self.fixture().replace('nd_sdk_dictionary_dictionary_count', 'unrelated')
         with self.assertRaises(ValueError):
             collect.client_ir(text)
+
+    def test_layout_without_exact_eight_byte_return_refuses(self):
+        for changed in [self.fixture().replace('ret i64 8', 'ret i64 16'),
+                        self.fixture().replace('nd_sdk_dictionary_set_layout', 'unrelated')]:
+            with self.assertRaises(ValueError):
+                collect.client_ir(changed)
 
     def test_unquoted_llvm_identifiers_preserve_same_import(self):
         text = self.fixture()
