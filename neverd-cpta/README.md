@@ -391,3 +391,26 @@ arbitrary record layouts, automatic complete prototype recovery, dyld
 binding, whole images, native Apple execution, signed exception unwinding or
 exact exception PC/ESR. Use a separately filtered report
 for the original five integer tests when running `authenticated_calls.py`.
+
+`result_storage_calls.py` consumes only
+`AArch64AuthenticatedCall.IndirectResultsKeepOriginalStorageAndPAC` and its
+matching artifact export. It reuses unchanged Mach-O text extraction for five
+IA/IB, zero/dynamic modifier and raw variants, then runs the 30-guest PAC/EL
+matrix with every CPTA/CPTA0 setting. Its independent callback writes through
+x8, reads through an aliased ordinary parameter, records the exact buffer
+address and clobbers x8. Wrappers check all result bytes and surrounding guards.
+Wrong key, wrong modifier and damaged signatures must fault before the callback;
+all routes require the original exception class, with no C O0 exception.
+
+```sh
+python3 neverd-cpta/result_storage_calls.py \
+  --artifacts /path/to/result-storage-export \
+  --test-report /path/to/result-storage-test.json \
+  --neverd-revision <full-tested-commit>
+```
+
+This profile qualifies only the supplied original-storage call fixture. It
+does not qualify every stack/FP/variadic hidden-result shape, whole-image
+authenticated storage, native Apple PAC, signed exception unwinding or exact
+fault PCs. A successful ordinary arm64 process is not PAC evidence unless
+independent controls show that signing actually changes the target bits.
