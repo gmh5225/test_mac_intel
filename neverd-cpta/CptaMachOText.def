@@ -1,0 +1,23 @@
+{
+  "magic": 4277009103,
+  "cpu": 16777228,
+  "subtypes": [0, 2],
+  "subtype_mask": 16777215,
+  "object": 1,
+  "segment_command": 25,
+  "symbols_command": 2,
+  "text_segment": "__TEXT",
+  "text_section": "__text",
+  "symbol_type_mask": 14,
+  "symbol_section_type": 14,
+  "symbol_debug_mask": 224,
+  "header_format": "<8I",
+  "command_format": "<2I",
+  "segment_format": "<2I16s4Q4I",
+  "section_format": "<16s16s2Q8I",
+  "symbols_format": "<6I",
+  "symbol_format": "<IBBHQ",
+  "alignment": 4,
+  "assembly": ".text\n.p2align 2\n.global {symbol}\n.type {symbol},%function\n{symbol} = . + {entry}\n.incbin \"{path}\"\n",
+  "error": "Expected one relocation-free AArch64 Mach-O text section and its exact defined entry"
+}
