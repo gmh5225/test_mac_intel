@@ -105,21 +105,34 @@ def integer_bits(value, scalar, stack=False):
     return hex(value)
 
 
-def prepare_object(source, target, case, logs, config):
-    text, entry = macho_text.extract(source.read_bytes(), config["object_symbol"])
-    path = target.parent / config["text_file"].format(**case)
-    path.write_bytes(text)
-    assembly = target.parent / config["assembly_file"].format(**case)
-    assembly.write_text(macho_text.CONFIG["assembly"].format(
-        symbol=config["renamed_symbol"].format(**case), entry=entry, path=path))
+def prepare_objects(inputs, route, work, logs, config):
+    expected, fragments = bytearray(), []
+    for case in config["cases"]:
+        source = inputs / case["directory"] / (route + ".o")
+        text, entry = macho_text.extract(source.read_bytes(), config["object_symbol"])
+        path = work / config["text_file"].format(**case)
+        path.write_bytes(text)
+        fragments.append(macho_text.CONFIG["assembly"].format(
+            symbol=config["renamed_symbol"].format(**case), entry=entry, path=path))
+        (logs / path.with_suffix(".json").name).write_text(json.dumps({
+            "input_sha256": calls.digest(source), "instruction_sha256": calls.digest(path),
+            "entry_offset": entry, "instruction_bytes": len(text),
+            "batch_offset": len(expected), "retargeted_or_patched": False,
+        }, indent=2) + "\n")
+        expected.extend(text)
+    assembly = work / config["batch_assembly"]
+    assembly.write_text("".join(fragments))
+    target = work / config["batch_object"]
     run.execute([config["compiler"], *run.CONFIG["compiler_flags"], "-c",
                  str(assembly), "-o", str(target)], logs, target.stem,
                 run.CONFIG["build_timeout_seconds"]).check_returncode()
-    (logs / (target.stem + ".json")).write_text(json.dumps({
-        "input_sha256": calls.digest(source), "instruction_sha256": calls.digest(path),
-        "entry_offset": entry, "instruction_bytes": len(text),
-        "retargeted_or_patched": False,
-    }, indent=2) + "\n")
+    copied = work / config["batch_text"]
+    run.execute([config["objcopy"], config["batch_dump"].format(path=copied),
+                 str(target)], logs, copied.stem + config["batch_dump_log"],
+                run.CONFIG["build_timeout_seconds"]).check_returncode()
+    if copied.read_bytes() != expected:
+        raise ValueError(config["batch_error"])
+    return [target]
 
 
 def prepare_fixtures(work, config):
@@ -221,4 +234,5 @@ def prepare_fixtures(work, config):
 
 
 if __name__ == "__main__":
-    calls.main(CONFIG, prepare_object, prepare_fixtures)
+    calls.main(CONFIG, prepare_fixtures=prepare_fixtures,
+               prepare_objects=prepare_objects)

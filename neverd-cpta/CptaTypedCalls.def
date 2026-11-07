@@ -745,7 +745,13 @@
   "callback": "typed_target_{shape_index}",
   "original": "original_{index}",
   "text_file": "projected-{index}.bin",
-  "assembly_file": "projected-{index}.S",
+  "objects_directory": "{route}-objects",
+  "batch_assembly": "projected.S",
+  "batch_object": "projected.o",
+  "batch_text": "projected.bin",
+  "batch_dump": "--dump-section=.text={path}",
+  "batch_dump_log": "-text",
+  "batch_error": "Projected batch changed Mach-O instruction bytes",
   "fixtures": [
     {
       "file": "typed-harness.c",

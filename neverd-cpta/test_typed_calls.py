@@ -4,8 +4,10 @@ import copy
 import json
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 import authenticated_calls as calls
 import macho_text
@@ -17,6 +19,40 @@ EXPECTED = json.loads((typed.ROOT / "CptaTypedCallTestCases.def").read_text())
 
 
 class TypedCallTests(unittest.TestCase):
+    def test_batch_retains_entries_and_refuses_changed_instruction_bytes(self):
+        expected = EXPECTED["batch"]
+        exact = bytes.fromhex(expected["text"])
+        corrupt = bytes([exact[0] ^ expected["corrupt_mask"]]) + exact[1:]
+        for copied in (exact, exact[:-1], corrupt):
+            with self.subTest(copied=copied), tempfile.TemporaryDirectory() as temporary:
+                work = Path(temporary)
+                config = copy.deepcopy(typed.CONFIG)
+                config["cases"] = config["cases"][:len(expected["entries"])]
+                route = config["routes"][0]
+                for case, entry in zip(config["cases"], expected["entries"]):
+                    source = work / case["directory"] / (route + ".o")
+                    source.parent.mkdir()
+                    source.write_bytes(MachOTextTests().fixture(entry=entry))
+
+                def execute(command, *args):
+                    if command[0] == config["objcopy"]:
+                        (work / config["batch_text"]).write_bytes(copied)
+                    return subprocess.CompletedProcess(command, 0)
+
+                with mock.patch.object(typed.run, "execute", side_effect=execute):
+                    if copied == exact:
+                        self.assertEqual(typed.prepare_objects(work, route, work, work, config),
+                                         [work / config["batch_object"]])
+                    else:
+                        with self.assertRaisesRegex(ValueError, config["batch_error"]):
+                            typed.prepare_objects(work, route, work, work, config)
+                records = [json.loads((work / config["text_file"].format(**case))
+                                      .with_suffix(".json").read_text())
+                           for case in config["cases"]]
+                self.assertEqual([r["entry_offset"] for r in records], expected["entries"])
+                self.assertEqual([r["batch_offset"] for r in records], expected["offsets"])
+                self.assertTrue(all(not r["retargeted_or_patched"] for r in records))
+
     def test_darwin_fixed_spills_and_variadic_tail_are_distinct(self):
         by_name = {shape["name"]: shape for shape in typed.POLICY["shapes"]}
         floats, stack = typed.placements(by_name["f32-ten"])

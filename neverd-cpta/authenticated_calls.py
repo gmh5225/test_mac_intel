@@ -76,7 +76,8 @@ def prepare_elf(source, target, case, logs, config):
                 run.CONFIG["build_timeout_seconds"]).check_returncode()
 
 
-def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None):
+def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None,
+         prepare_objects=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--test-report", type=Path, required=True)
@@ -125,6 +126,13 @@ def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None):
     summary_path = evidence / "summary.json"
     summary_path.write_text(json.dumps(summary, indent=2) + "\n")
     for route in config["routes"]:
+        prepared = None
+        if prepare_objects is not None:
+            work = output / config["objects_directory"].format(route=route)
+            work.mkdir()
+            logs = work / "evidence"
+            logs.mkdir()
+            prepared = prepare_objects(inputs, route, work, logs, config)
         for feature in config["features"]:
             for el0 in (False, True):
                 label = f'{route}-pac{feature["parameter"]}-el{0 if el0 else 1}'
@@ -132,12 +140,13 @@ def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None):
                 work.mkdir()
                 logs = work / "evidence"
                 logs.mkdir()
-                objects = []
-                for case in config["cases"]:
-                    source = inputs / case["directory"] / (route + ".o")
-                    target = work / f'projected-{case["index"]}.o'
-                    prepare_object(source, target, case, logs, config)
-                    objects.append(target)
+                objects = list(prepared) if prepared is not None else []
+                if prepared is None:
+                    for case in config["cases"]:
+                        source = inputs / case["directory"] / (route + ".o")
+                        target = work / f'projected-{case["index"]}.o'
+                        prepare_object(source, target, case, logs, config)
+                        objects.append(target)
                 flags = [*config["guest_flags"],
                          config["level_flag"].format(**feature)]
                 if el0:

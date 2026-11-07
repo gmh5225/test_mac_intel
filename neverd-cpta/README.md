@@ -358,6 +358,10 @@ are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
 one self-contained text section with no code relocations. It copies the text
 bytes into an ELF guest section; it neither retargets LLVM IR nor patches any
 instruction. The outer entry uses full-width integer carriers on both ABIs.
+Each route prepares one batch object shared by its six PAC/EL guests. Before
+linking any guest, the complete assembled text section must equal the
+concatenated original Mach-O bytes. Per-input entry offsets and instruction
+hashes remain recorded; truncation or any byte change fails preparation.
 
 ```sh
 python3 neverd-cpta/typed_calls.py \
