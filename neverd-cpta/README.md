@@ -347,12 +347,13 @@ Clang from starting.
 `typed_calls.py` separately consumes only
 `ByShape/AArch64TypedAuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall/*`
 with exactly one completed test and matching artifact export per declared shape.
-Missing, duplicated and skipped shapes are refused. Its 290 groups cover signed/unsigned 8/16/32-bit
+Missing, duplicated and skipped shapes are refused. Its 325 groups cover signed/unsigned 8/16/32-bit
 and 128-bit integers, 64-bit integers and pointers, fixed f32/f64 calls, direct
 one/two-word records, naturally padded integer records, and one-to-four-member
 f32/f64 HFAs including nested records. Exhausted GP/FP banks preserve complete
 record spills and aligned 128-bit values. Mixed scalar operands and Darwin
-stack variadics include 128-bit values and direct records,
+stack variadics include 128-bit values, direct records and original indirect
+record pointers (including mixed and nested records and exhausted GP banks),
 with IA/IB, zero/dynamic discriminators and raw BLR controls. All five routes
 are actual Mach-O objects. `macho_text.py` requires the exact defined entry and
 one self-contained text section with no code relocations. It copies the text
@@ -379,11 +380,14 @@ including when their outer integer carrier contains unrelated high bits. Fixed
 byte/halfword/f32 stack spills are one/two/four bytes apart, while variadic tails
 use whole objects rounded to eight-byte slots, preserving higher natural
 alignment and dense HFA member offsets, even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
-with 696 invalid-signature pairs per mode. Integer and typed profiles share their
+with 780 invalid-signature pairs per mode. Integer and typed profiles share their
 key installation, fault probe and exception-class policy. Typed success grants
 the existing `darwin_scalar_authenticated_call_abi_qualified` field for this
-bounded explicit-value profile. It does not qualify arbitrary record layouts,
-indirect by-value copies/results, automatic complete prototype recovery, dyld
+bounded explicit-value profile. Indirect arguments preserve their original
+pointer bits; the guest does not dereference these synthetic addresses. Native
+NeverD SDK fixtures separately check actual record addresses, aliases and writes.
+This model does not qualify logical by-value copy reconstruction, hidden results,
+arbitrary record layouts, automatic complete prototype recovery, dyld
 binding, whole images, native Apple execution, signed exception unwinding or
 exact exception PC/ESR. Use a separately filtered report
 for the original five integer tests when running `authenticated_calls.py`.

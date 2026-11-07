@@ -60,6 +60,10 @@ def placements(shape):
     stack, result = 0, []
     for index, kind in enumerate(shape["parameters"]):
         value = POLICY["kinds"][kind]
+        # These calls retain the original ABI copy address; no extra object
+        # is loaded or synthesized by the reconstructed caller.
+        kind = value.get("transport", kind)
+        value = POLICY["kinds"][kind]
         members = value_members(kind)
         composite = "fields" in value
         floating = all("fp" in member for member in members)

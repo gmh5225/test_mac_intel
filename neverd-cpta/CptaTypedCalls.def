@@ -1,5 +1,5 @@
 {
-  "scope": "Controlled PAC execution of unchanged self-contained Darwin explicit scalar, 128-bit integer, one/two-word record and f32/f64 HFA calls, including register exhaustion, packed fixed stack placement, and whole aligned variadic values. Default promotions apply to scalar tails; HFA members retain their original widths. Supplied prototypes, not automatic complete recovery. Indirect copies/results, arbitrary records, authenticated whole images, native Apple execution, signed exception unwinding and exact fault PC/ESR remain unqualified.",
+  "scope": "Controlled PAC execution of unchanged self-contained Darwin explicit scalar, 128-bit integer, direct record/HFA and indirect aggregate pointer calls. Includes register exhaustion, packed fixed stack placement, whole aligned variadic values, and exact original indirect parameter pointer transport. Indirect pointer contents and storage writes require separate native fixtures. Supplied prototypes, not automatic complete recovery. Hidden results, authenticated whole images, native Apple PAC execution, signed exception unwinding and exact fault PC/ESR remain unqualified.",
   "output_directory": "cpta-typed-calls",
   "qualification_key": "darwin_scalar_authenticated_call_abi_qualified",
   "object_symbol": "_authenticated_dispatch",
@@ -410,6 +410,48 @@
       "return_kind": "O",
       "return_bytes": 16,
       "fixed": 1
+    },
+    {
+      "name": "indirect-three-words",
+      "parameters": "j",
+      "return_kind": "i",
+      "fixed": -1
+    },
+    {
+      "name": "indirect-mixed",
+      "parameters": "iJd",
+      "return_kind": "d",
+      "fixed": -1
+    },
+    {
+      "name": "indirect-transform",
+      "parameters": "k",
+      "return_kind": "i",
+      "fixed": -1
+    },
+    {
+      "name": "indirect-nested",
+      "parameters": "K",
+      "return_kind": "i",
+      "fixed": -1
+    },
+    {
+      "name": "indirect-spill",
+      "parameters": "iiiiiiiijK",
+      "return_kind": "i",
+      "fixed": -1
+    },
+    {
+      "name": "variadic-indirect",
+      "parameters": "ijJkK",
+      "return_kind": "i",
+      "fixed": 1
+    },
+    {
+      "name": "variadic-indirect-prefix",
+      "parameters": "iiiiiiiijkK",
+      "return_kind": "i",
+      "fixed": 9
     }
   ],
   "variants": [
@@ -579,6 +621,30 @@
       "bytes": 8,
       "alignment": 8,
       "fields": "d"
+    },
+    "j": {
+      "bytes": 24,
+      "fields": "iii",
+      "alignment": 8,
+      "transport": "p"
+    },
+    "J": {
+      "bytes": 24,
+      "fields": "idp",
+      "alignment": 8,
+      "transport": "p"
+    },
+    "k": {
+      "bytes": 48,
+      "fields": "dddddd",
+      "alignment": 8,
+      "transport": "p"
+    },
+    "K": {
+      "bytes": 48,
+      "fields": "JJ",
+      "alignment": 8,
+      "transport": "p"
     }
   },
   "word_bytes": 8,
@@ -815,7 +881,8 @@
     "H": "0xfedc",
     "w": "0x87654321",
     "W": "0xdeadbeef",
-    "p": "0x0012345689abcdef"
+    "p": "0x0012345689abcdef",
+    "i": "0xabcdef9876543210"
   },
   "promoted_integer_bytes": 4,
   "bits_per_byte": 8,
