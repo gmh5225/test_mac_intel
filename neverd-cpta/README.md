@@ -401,6 +401,11 @@ x8, reads through an aliased ordinary parameter, records the exact buffer
 address and clobbers x8. Wrappers check all result bytes and surrounding guards.
 Wrong key, wrong modifier and damaged signatures must fault before the callback;
 all routes require the original exception class, with no C O0 exception.
+The C export fixture uses `-ffreestanding -fexceptions -fno-stack-protector`:
+the guest has no Darwin stack-check runtime. The extractor still rejects any
+text relocation; it never removes runtime calls or edits exported instructions.
+NeverD's separate public SDK tests retain host compiler defaults and execute
+ordinary C++ exception unwinding through the original and both projected calls.
 
 ```sh
 python3 neverd-cpta/result_storage_calls.py \
