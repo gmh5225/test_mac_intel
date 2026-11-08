@@ -395,10 +395,18 @@ binding, whole images, native Apple execution, signed exception unwinding or
 exact exception PC/ESR. Use a separately filtered report
 for the original five integer tests when running `authenticated_calls.py`.
 
-After a complete successful matrix, the runner removes its downloaded model
-archive, extracted installer and model installation. It retains input objects,
-guest sources, logs and qualification records. A supplied `--model` installation
-is never removed; failed runs retain their tools for diagnosis.
+The primitive, generated-memory, grouped-memory and authenticated-call drivers
+share an owned scratch slot and a serialized `.cpta-model` cache next to their
+output directories. A valid pinned installation is reused. Download archives
+and installers are removed after preparation, including failed preparation.
+Reproducible objects, projected copies and generated fixture sources are
+removed on success, failure and normal interruption. A strong kill can leave
+the owned scratch slot; the next invocation recovers it only after acquiring
+the same lock. Formal input snapshots, the single linked guest per case,
+diagnostics and compact qualification records remain. Identical inputs can
+reuse an owned output directory; different inputs require a separate output.
+Caller-supplied `--model` installations are never removed. No adjacent run
+directory, original SDK, source checkout or existing recovery archive is scanned.
 
 `result_storage_calls.py` consumes only
 `AArch64AuthenticatedCall.IndirectResultsKeepOriginalStorageAndPAC` and its
@@ -410,8 +418,10 @@ address and clobbers x8. Wrappers check all result bytes and surrounding guards.
 Wrong key, wrong modifier and damaged signatures must fault before the callback;
 all routes require the original exception class, with no C O0 exception.
 The C export fixture uses `-ffreestanding -fexceptions -fno-stack-protector`:
-the guest has no Darwin stack-check runtime. The extractor still rejects any
-text relocation; it never removes runtime calls or edits exported instructions.
+the guest has no Darwin stack-check runtime. The default extractor still rejects text relocations. Typed drivers additionally
+accept only declared external `memcpy` CALL26 relocations and link the tested
+freestanding byte-copy runtime. They compare every final input byte, allowing
+only the exact declared branch displacement; other relocations remain errors.
 NeverD's separate public SDK tests retain host compiler defaults and execute
 ordinary C++ exception unwinding through the original and both projected calls.
 
@@ -428,17 +438,18 @@ authenticated storage, native Apple PAC, signed exception unwinding or exact
 fault PCs. A successful ordinary arm64 process is not PAC evidence unless
 independent controls show that signing actually changes the target bits.
 
-`recovered_calls.py` requires the distinct 47-case
+`recovered_calls.py` requires the distinct 73-case
 `AArch64RecoveredAuthenticatedCall.NativeTypesKeepAuthenticationOnTheCall`
 report and `recovered-*` exports. These fixtures carry complete fixed C
 `NativeAnalysis` signatures, without analyst occurrence bindings or source-only
 projection permission. They cover scalar, 128-bit integer, direct record/HFA and full SIMD128
-arguments/results, including exhausted registers and packed stack values.
+arguments/results and one-to-four-member 64/128-bit HVAs, including nested
+records, arrays, exhausted registers and packed stack values.
 Indirect records retain their original addresses. Vector lanes use distinct
 64-bit patterns and compares the complete 128-bit result without a commutative
 checksum; the independent oracle assigns one Q register per vector
 and aligns an entire spilled vector to 16 bytes. The
-five unchanged object routes run against independent original Darwin call
+five object routes run against independent original Darwin call
 bodies under both keys and zero/nonzero modifiers; raw calls are controls.
 Every route requires the original exception class, including C at O0.
 
@@ -454,7 +465,7 @@ This profile qualifies transport of an established recovered ABI, not the
 accuracy of automatic type recovery. New logical copies, complete
 authenticated image execution, signed exception unwinding, native
 Apple PAC/CPA2 and exact fault PC/full ESR remain separate qualifications.
-Successful runs remove their owned model installation after recording results.
+The lifecycle rules above also apply to this shared authenticated-call driver.
 
 
 `recovered_result_storage_calls.py` independently requires

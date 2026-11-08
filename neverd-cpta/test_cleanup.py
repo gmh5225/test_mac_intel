@@ -1,5 +1,6 @@
 """Successful runs remove only the disposable tools they installed."""
 
+import copy
 import json
 import fcntl
 import os
@@ -8,6 +9,8 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -18,6 +21,36 @@ CASES = json.loads(Path(__file__).with_name("CptaCleanupTestCases.def").read_tex
 
 
 class CleanupTests(unittest.TestCase):
+    measurements = {}
+
+    def test_pending_consumer_keeps_the_lock_after_controller_strong_kill(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "output"
+            scratch = root / run.LIFECYCLE["scratch"]
+            release = scratch / CASES["consumer_release"]
+            with subprocess.Popen([sys.executable, "-c", CASES["producer"],
+                                   str(root), CASES["consumer"]],
+                                  env=dict(os.environ, PYTHONPATH=str(run.ROOT))) as child:
+                try:
+                    end = time.monotonic() + CASES["consumer_wait_seconds"]
+                    while not (scratch / CASES["consumer_ready"]).exists() and time.monotonic() < end:
+                        time.sleep(0.01)
+                    self.assertTrue((scratch / CASES["consumer_ready"]).exists())
+                    child.kill()
+                    child.wait(timeout=CASES["child_timeout"])
+                    with (root / run.LIFECYCLE["lock"]).open("a+") as lock:
+                        with self.assertRaises(BlockingIOError):
+                            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    release.touch()
+                    with run.artifact_session(root) as recovered:
+                        self.assertFalse(any(recovered.iterdir()))
+                finally:
+                    if scratch.exists():
+                        release.touch()
+                    if child.poll() is None:
+                        child.kill()
+                        child.wait()
+
     def test_repeated_success_failure_and_abandonment_are_bounded(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "output"
@@ -38,6 +71,84 @@ class CleanupTests(unittest.TestCase):
                     counts.append((len(files), sum(p.stat().st_size for p in files)))
             self.assertEqual(len({row[0] for row in counts}), 1)
             self.assertLessEqual(max(row[1] for row in counts) - min(row[1] for row in counts), 1)
+            self.measurements["sessions"] = counts
+
+    def test_actual_driver_entry_points_clean_failed_installations_and_reuse_inputs(self):
+        import authenticated_calls as calls
+        import generated_memory as generated
+        import grouped_memory as grouped
+
+        for entry in ("primitive", "authenticated", "generated", "grouped"):
+            with self.subTest(entry=entry), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                output, artifacts = root / "output", root / "artifacts"
+                artifacts.mkdir()
+                report = root / "tests.json"
+                report.write_text("{}\n")
+                args = SimpleNamespace(output=output, artifacts=artifacts,
+                                       test_report=report, neverd_revision="0" * 40,
+                                       profile=generated.CONFIG["default_profile"],
+                                       compiler=generated.CONFIG["compiler"],
+                                       linker=generated.CONFIG["linker"])
+                config = copy.deepcopy(calls.CONFIG)
+                config["cases"] = config["cases"][:1]
+                profile = generated.select_profile(args.profile)
+                profile["artifact_batches"] = ["batch"]
+                files = {route["file"] for route in generated.CONFIG["routes"]}
+                files.add(generated.CONFIG["harness_file"])
+                for directory in (artifacts, artifacts / "batch"):
+                    directory.mkdir(exist_ok=True)
+                    for name in files:
+                        (directory / name).write_text(CASES["payload"])
+                for case in config["cases"]:
+                    directory = artifacts / case["directory"]
+                    directory.mkdir()
+                    for name in config["source_files"] + [r + ".o" for r in config["routes"]]:
+                        (directory / name).write_text(CASES["payload"])
+
+                def fail_install(work, evidence):
+                    partial = work / run.CONFIG["model_install_directory"]
+                    partial.mkdir()
+                    (partial / CASES["scratch_file"]).write_text(CASES["payload"])
+                    (evidence / CASES["diagnostic_file"]).write_text(CASES["payload"])
+                    raise RuntimeError(CASES["payload"])
+
+                def build(compiler, linker, work, evidence, *args):
+                    (work / CASES["scratch_file"]).write_text(CASES["payload"])
+                    guest = evidence / run.CONFIG["guest_elf"]
+                    guest.write_text(CASES["payload"])
+                    return guest
+
+                arguments = [str(run.ROOT), "--artifacts", str(artifacts),
+                             "--test-report", str(report), "--neverd-revision",
+                             args.neverd_revision, "--output", str(output)]
+                counts = []
+                for _ in range(CASES["iterations"]):
+                    with mock.patch.object(run, "prepare", side_effect=fail_install), \
+                         mock.patch.object(run, "build", side_effect=build), \
+                         mock.patch.object(calls, "validate_test_report", return_value=str(artifacts)), \
+                         mock.patch.object(generated, "validate_test_report", return_value=str(artifacts)), \
+                         mock.patch.object(sys, "argv", [str(run.ROOT)] if entry == "primitive" else arguments), \
+                         mock.patch.dict(run.CONFIG, {"workspace_directory": str(output),
+                                                     "evidence_directory": str(root / "evidence")}), \
+                         self.assertRaises(RuntimeError):
+                        if entry == "primitive":
+                            run.main()
+                        elif entry == "authenticated":
+                            calls.main(config)
+                        elif entry == "generated":
+                            generated.main()
+                        else:
+                            grouped.execute(args, profile, generated.configuration(profile),
+                                            str(artifacts), generated.CONFIG, generated.assess,
+                                            generated.compile_freestanding_runtime)
+                    self.assertFalse((output / run.LIFECYCLE["scratch"]).exists())
+                    self.assertFalse((root / run.LIFECYCLE["cache_directory"] /
+                                      run.LIFECYCLE["scratch"]).exists())
+                    files = [p for p in root.rglob("*") if p.is_file()]
+                    counts.append((len(files), sum(p.stat().st_size for p in files)))
+                self.assertEqual(len(set(counts)), 1)
+                self.measurements[entry] = counts
 
     def test_signals_release_the_owner_and_strong_kill_recovers_next_start(self):
         for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGKILL):

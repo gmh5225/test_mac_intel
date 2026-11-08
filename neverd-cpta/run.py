@@ -18,6 +18,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent
 CONFIG = json.loads((ROOT / "CptaEnvironment.def").read_text())
 LIFECYCLE = json.loads((ROOT / "CptaArtifactLifecycle.def").read_text())
+ACTIVE_LOCKS = []
 
 
 def remove_product(path):
@@ -53,11 +54,13 @@ def artifact_session(root):
             raise SystemExit(LIFECYCLE["terminated"])
 
         signal.signal(signal.SIGTERM, terminate)
+        ACTIVE_LOCKS.append(lock.fileno())
         completed = False
         try:
             yield scratch
             completed = True
         finally:
+            ACTIVE_LOCKS.remove(lock.fileno())
             signal.signal(signal.SIGTERM, previous)
             files = [path for path in scratch.rglob("*") if path.is_file()]
             receipt = {"completed": completed, "recovered_interrupted_scratch": recovered,
@@ -168,7 +171,7 @@ def execute(command, evidence, label, timeout, env=None):
     with log.open("w") as output:
         result = subprocess.run(
             command, text=True, stdout=output, stderr=subprocess.STDOUT,
-            timeout=timeout, env=env, check=False,
+            timeout=timeout, env=env, check=False, pass_fds=tuple(ACTIVE_LOCKS),
         )
     result.stdout = log.read_text(errors="replace")
     return result
@@ -254,8 +257,15 @@ def inspect_model(model, evidence):
     version.check_returncode()
     if CONFIG["model_version"] not in version.stdout:
         raise ValueError(CONFIG["model_version_error"])
-    execute([str(model), "--list-params"], evidence, "model-parameters",
-            CONFIG["timeout_seconds"]).check_returncode()
+    parameters = execute([str(model), "--list-params"], evidence,
+                         LIFECYCLE["model_parameters_label"], CONFIG["timeout_seconds"])
+    parameters.check_returncode()
+    raw = (evidence / (LIFECYCLE["model_parameters_label"] + ".log")).read_bytes()
+    (evidence / LIFECYCLE["model_parameters_summary"]).write_text(json.dumps({
+        "sha256": hashlib.sha256(raw).hexdigest(), "bytes": len(raw),
+        "reconstruct_with_recorded_command": True,
+    }, indent=2) + "\n")
+    (evidence / (LIFECYCLE["model_parameters_label"] + ".log")).unlink()
 
 
 def model_command(model, guest, config=None):
