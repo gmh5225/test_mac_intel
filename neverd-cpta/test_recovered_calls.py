@@ -11,7 +11,14 @@ import typed_calls as typed
 
 class RecoveredCallTests(unittest.TestCase):
     def test_explicit_exports_cannot_qualify_recovered_calls(self):
-        report = integer_tests.AuthenticatedCallTests().report()
+        report = {"tests": len(typed.CONFIG["test_report_cases"]),
+                  "failures": 0, "errors": 0, "testsuites": []}
+        for identity in typed.CONFIG["test_report_cases"]:
+            suite, name = identity.rsplit(".", 1)
+            report["testsuites"].append({"name": suite, "testsuite": [{
+                "name": name, "status": "RUN", "result": "COMPLETED",
+                typed.CONFIG["artifact_property"]: self.id()}]})
+        self.assertEqual(calls.validate_test_report(report, typed.CONFIG), self.id())
         with self.assertRaises(ValueError):
             calls.validate_test_report(report, recovered.CONFIG)
         self.assertTrue(set(recovered.CONFIG["test_report_cases"]).isdisjoint(
