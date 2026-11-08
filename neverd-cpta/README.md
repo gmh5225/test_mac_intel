@@ -427,3 +427,27 @@ does not qualify every stack/FP/variadic hidden-result shape, whole-image
 authenticated storage, native Apple PAC, signed exception unwinding or exact
 fault PCs. A successful ordinary arm64 process is not PAC evidence unless
 independent controls show that signing actually changes the target bits.
+
+`recovered_calls.py` requires the distinct 36-case
+`AArch64RecoveredAuthenticatedCall.NativeTypesKeepAuthenticationOnTheCall`
+report and `recovered-*` exports. These fixtures carry complete fixed C
+`NativeAnalysis` signatures, without analyst occurrence bindings or source-only
+projection permission. They cover scalar, 128-bit integer and direct record/HFA
+arguments/results, including exhausted registers and packed stack values. The
+five unchanged object routes run against independent original Darwin call
+bodies under both keys and zero/nonzero modifiers; raw calls are controls.
+Every route requires the original exception class, including C at O0.
+
+```sh
+python3 neverd-cpta/recovered_calls.py \
+  --artifacts /path/to/recovered-export \
+  --test-report /path/to/recovered-tests.json \
+  --neverd-revision FULL_COMMIT_SHA \
+  --output recovered-model
+```
+
+This profile qualifies transport of an established recovered ABI, not the
+accuracy of automatic type recovery. Indirect native copies, hidden results,
+complete authenticated image execution, signed exception unwinding, native
+Apple PAC/CPA2 and exact fault PC/full ESR remain separate qualifications.
+Successful runs remove their owned model installation after recording results.
