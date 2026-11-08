@@ -167,6 +167,10 @@ def prepare_fixtures(work, config):
         else:
             expected = (POLICY["results"][str(result["bytes"])] if floating else
                         POLICY["integer_results"][shape["return_kind"]])
+        expected_literal = expected + "ULL"
+        if result.get("vector"):
+            low, high = POLICY["composite_results"][shape["return_kind"]]
+            expected_literal = render("vector_value", low=low, high=high)
         functions.append(render("symbol", name=name))
         functions.append(render("callback_start", alignment_mask=POLICY["frame_alignment"] - 1))
         for location in locations:
@@ -196,14 +200,14 @@ def prepare_fixtures(work, config):
             projected = config["renamed_symbol"].format(**case)
             for target in (original, projected):
                 declarations.append(render(
-                    "declaration", name=target,
+                    "declaration_vector" if result.get("vector") else "declaration", name=target,
                     parameters=", ".join([templates["argument"]] * (
                         len(locations) + POLICY["outer_header_arguments"])),
                     values=", ".join(render("argument_value", value=carrier_value(location))
                                      for location in locations)))
             cases.append(render("case", projected=projected, original=original,
                                 callback=name, key=case["key"], zero=int(case["zero"]),
-                                raw=int(case["raw"]), expected=expected))
+                                raw=int(case["raw"]), expected=expected_literal))
             functions.append(render("symbol", name=original))
             functions.append(render("frame_open", frame=frame, saved=saved))
             for index, location in enumerate(locations):
@@ -235,6 +239,8 @@ def prepare_fixtures(work, config):
                                      **member, reg=0 if result.get("vector") else index, lane=index)
                     narrow += templates["result_mix"]
                 narrow += templates["result_finish"]
+            if result.get("vector"):
+                narrow = templates["return_vector"]
             functions.append(render("frame_close" if floating else "frame_close_integer",
                                     **result, frame=frame, saved=saved, narrow=narrow))
     (work / config["fixtures"][0]["file"]).write_text(

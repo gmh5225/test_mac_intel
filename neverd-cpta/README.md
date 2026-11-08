@@ -435,7 +435,8 @@ report and `recovered-*` exports. These fixtures carry complete fixed C
 projection permission. They cover scalar, 128-bit integer, direct record/HFA and full SIMD128
 arguments/results, including exhausted registers and packed stack values.
 Indirect records retain their original addresses. Vector lanes use distinct
-64-bit patterns; the independent oracle assigns one Q register per vector
+64-bit patterns and compares the complete 128-bit result without a commutative
+checksum; the independent oracle assigns one Q register per vector
 and aligns an entire spilled vector to 16 bytes. The
 five unchanged object routes run against independent original Darwin call
 bodies under both keys and zero/nonzero modifiers; raw calls are controls.

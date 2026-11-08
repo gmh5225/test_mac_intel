@@ -18,7 +18,7 @@ int neverdPAuthFaultMain(void) {
   Faults = 0;
   AlternateFaults = 0;
   for (unsigned C = 0; C < sizeof(Cases) / sizeof(*Cases); ++C) {
-    const uint64_t Expected = expectedCall(C);
+    const unsigned __int128 Expected = expectedCall(C);
     Modifier = Cases[C].Zero ? 0 : 0xfedcba9876543210ULL;
     for (unsigned Mode = 0; Mode < (Cases[C].Raw ? 1 : 4); ++Mode) {
       Pointer = Cases[C].Raw
@@ -35,13 +35,18 @@ int neverdPAuthFaultMain(void) {
       probeGeneratedPAuth(Cases[C].Projected, 0, &Actual);
       if (Mode == 0) {
         if (!Actual.Completed || !Original.Completed || Actual.Faulted ||
-            Original.Faulted || Actual.Low != Expected ||
-            Original.Low != Expected || Actual.High || Original.High ||
+            Original.Faulted || Actual.Low != (uint64_t)Expected ||
+            Original.Low != (uint64_t)Expected ||
+            Actual.High != (uint64_t)(Expected >> 64) ||
+            Original.High != (uint64_t)(Expected >> 64) ||
             NativeCalls != 1 || Called != 1) {
           callRecord("failed-call-case", C);
           callRecord("native-value", Original.Low);
           callRecord("projected-value", Actual.Low);
-          callRecord("expected-value", Expected);
+          callRecord("expected-value", (uint64_t)Expected);
+          callRecord("native-high-value", Original.High);
+          callRecord("projected-high-value", Actual.High);
+          callRecord("expected-high-value", (uint64_t)(Expected >> 64));
           callRecord("native-esr", Original.ESR);
           callRecord("projected-esr", Actual.ESR);
           callRecord("native-callback-count", NativeCalls);
