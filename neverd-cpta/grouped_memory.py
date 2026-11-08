@@ -149,3 +149,4 @@ def execute(args, profile, config, report_origin, definitions, assess, compile_r
             raise SystemExit(definitions["errors"]["matrix"])
     summary["passed"] = True
     save()
+    run.remove_model_tools(tools)

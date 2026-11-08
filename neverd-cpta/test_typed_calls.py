@@ -19,6 +19,24 @@ EXPECTED = json.loads((typed.ROOT / "CptaTypedCallTestCases.def").read_text())
 
 
 class TypedCallTests(unittest.TestCase):
+    def test_every_typed_route_requires_the_original_exception_class(self):
+        helper = integer_tests.AuthenticatedCallTests()
+        for route in typed.CONFIG["routes"]:
+            for feature in typed.CONFIG["features"]:
+                for el0 in (False, True):
+                    config = calls.configuration(route, feature, el0, typed.CONFIG)
+                    values = config["gate_values"]
+                    transcript = helper.transcript(route, feature, el0, changes=values)
+                    result = calls.assess(transcript, 0, route, feature, el0, typed.CONFIG)
+                    self.assertTrue(result["passed"])
+                    self.assertTrue(result["original_exception_class_qualified"])
+                    for mode in typed.CONFIG["modes"]:
+                        key = typed.CONFIG["difference_record"].format(mode=mode)
+                        bad = helper.transcript(route, feature, el0,
+                                                changes={**values, key: values[key] + 1})
+                        self.assertFalse(calls.assess(bad, 0, route, feature,
+                                                     el0, typed.CONFIG)["passed"])
+
     def test_batch_retains_entries_and_refuses_changed_instruction_bytes(self):
         expected = EXPECTED["batch"]
         exact = bytes.fromhex(expected["text"])

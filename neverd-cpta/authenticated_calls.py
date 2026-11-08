@@ -179,6 +179,7 @@ def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None,
     summary_path.write_text(json.dumps(summary, indent=2) + "\n")
     if not summary["passed"]:
         raise RuntimeError(config["errors"]["matrix"])
+    run.remove_model_tools(tools)
 
 
 if __name__ == "__main__":

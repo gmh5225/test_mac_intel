@@ -194,6 +194,7 @@ def main():
             raise SystemExit(CONFIG["errors"]["matrix"])
     summary["passed"] = True
     save()
+    run.remove_model_tools(tools)
 
 
 if __name__ == "__main__":

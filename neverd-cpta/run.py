@@ -108,7 +108,7 @@ def prepare(workspace, evidence):
                 raise ValueError("Expected a regular official installer file")
             with package.extractfile(member) as source, (workspace / name).open("wb") as target:
                 shutil.copyfileobj(source, target)
-    installed = workspace / "installed"
+    installed = workspace / CONFIG["model_install_directory"]
     result = execute(
         ["sh", str(workspace / CONFIG["model_installer"]),
          "--i-agree-to-the-contained-eula", "--no-interactive", "--skip-menu-install",
@@ -117,6 +117,17 @@ def prepare(workspace, evidence):
     )
     result.check_returncode()
     return installed / CONFIG["model_binary"]
+
+
+def remove_model_tools(workspace):
+    """Drop only this run's reproducible model package and installation."""
+    for name in (CONFIG["model_archive"], CONFIG["model_installer"],
+                 CONFIG["model_install_directory"]):
+        path = workspace / name
+        if path.is_dir() and not path.is_symlink():
+            shutil.rmtree(path)
+        else:
+            path.unlink(missing_ok=True)
 
 
 def build(compiler, linker, workspace, evidence, extra_flags=(), extra_objects=()):
@@ -210,6 +221,7 @@ def main():
     print(json.dumps(report, indent=2))
     if not report["passed"]:
         raise SystemExit(1)
+    remove_model_tools(workspace)
 
 
 if __name__ == "__main__":

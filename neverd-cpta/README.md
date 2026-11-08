@@ -381,7 +381,10 @@ byte/halfword/f32 stack spills are one/two/four bytes apart, while variadic tail
 use whole objects rounded to eight-byte slots, preserving higher natural
 alignment and dense HFA member offsets, even after a packed fixed prefix. The same 30-guest PAC/EL/CPTA matrix and callback-before-fault gates apply,
 with 780 invalid-signature pairs per mode. Integer and typed profiles share their
-key installation, fault probe and exception-class policy. Typed success grants
+key installation and fault probe. Typed calls require the original exception
+class on every route and optimization level; intermediate-resign differences
+are no longer admitted in this profile. This does not change the separately
+qualified generic integer profile. Typed success grants
 the existing `darwin_scalar_authenticated_call_abi_qualified` field for this
 bounded explicit-value profile. Indirect arguments preserve their original
 pointer bits; the guest does not dereference these synthetic addresses. Native
@@ -391,6 +394,11 @@ arbitrary record layouts, automatic complete prototype recovery, dyld
 binding, whole images, native Apple execution, signed exception unwinding or
 exact exception PC/ESR. Use a separately filtered report
 for the original five integer tests when running `authenticated_calls.py`.
+
+After a complete successful matrix, the runner removes its downloaded model
+archive, extracted installer and model installation. It retains input objects,
+guest sources, logs and qualification records. A supplied `--model` installation
+is never removed; failed runs retain their tools for diagnosis.
 
 `result_storage_calls.py` consumes only
 `AArch64AuthenticatedCall.IndirectResultsKeepOriginalStorageAndPAC` and its
