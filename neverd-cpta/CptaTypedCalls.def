@@ -645,6 +645,12 @@
       "fields": "JJ",
       "alignment": 8,
       "transport": "p"
+    },
+    "V": {
+      "bytes": 16,
+      "fields": "ii",
+      "alignment": 16,
+      "vector": true
     }
   },
   "word_bytes": 8,
@@ -870,7 +876,10 @@
     "callback_members_end": "  ret\n",
     "result_start": "  mov x13,xzr\n",
     "result_mix": "  eor x13,x13,x10\n",
-    "result_finish": "  mov x0,x13\n"
+    "result_finish": "  mov x0,x13\n",
+    "read_vector": "  umov x10,v{reg}.d[{lane}]\n",
+    "load_vector": "  ldr x9,[sp,#{offset}]\n  ins v{reg}.d[{lane}],x9\n",
+    "callback_member_vector": "  ldr x10,={expected}\n  cmp x14,#0\n  csel x10,x10,xzr,eq\n  ins v0.d[{lane}],x10\n"
   },
   "input_error": "The complete typed-call test and its single artifact export must complete",
   "sample_flag": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT={count}",
@@ -955,6 +964,10 @@
     ],
     "S": [
       "0x4004000000000000"
+    ],
+    "V": [
+      "0x8123456789abcdef",
+      "0x1020304050607080"
     ]
   },
   "test_case": "ByShape/AArch64TypedAuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall/{name}",

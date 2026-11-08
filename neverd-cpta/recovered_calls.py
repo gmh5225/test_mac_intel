@@ -16,14 +16,17 @@ CONFIG["test_report_cases"] = [
 ]
 CONFIG["export_count"] = len(POLICY["shapes"])
 CONFIG["cases"] = []
-for original in typed.CONFIG["cases"]:
-    if original["shape"] not in POLICY["shapes"]:
+CONFIG["fixture_shapes"] = typed.POLICY["shapes"] + POLICY["native_shapes"]
+for shape_index, shape in enumerate(CONFIG["fixture_shapes"]):
+    if shape["name"] not in POLICY["shapes"]:
         continue
-    case = {**original, "index": len(CONFIG["cases"])}
-    case["directory"] = POLICY["directory"].format(
-        **{key: str(value).lower() if isinstance(value, bool) else value
-           for key, value in case.items()})
-    CONFIG["cases"].append(case)
+    for variant in typed.POLICY["variants"]:
+        case = {**variant, "shape": shape["name"], "shape_index": shape_index,
+                "index": len(CONFIG["cases"])}
+        case["directory"] = POLICY["directory"].format(
+            **{key: str(value).lower() if isinstance(value, bool) else value
+               for key, value in case.items()})
+        CONFIG["cases"].append(case)
 CONFIG["required_gates"]["neverd-memory-samples"] = len(CONFIG["cases"])
 CONFIG["faults_per_mode"] = (CONFIG["fault_stimuli"]
                              * sum(not case["raw"] for case in CONFIG["cases"]))

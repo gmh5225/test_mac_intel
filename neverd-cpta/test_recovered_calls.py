@@ -1,10 +1,15 @@
 """Recovered-call evidence must not inherit explicit-prototype qualification."""
 
 import copy
+import json
+import tempfile
+from pathlib import Path
 import unittest
 
 import authenticated_calls as calls
 import recovered_calls as recovered
+import recovered_result_storage_calls as recovered_storage
+import result_storage_calls as storage
 import test_authenticated_calls as integer_tests
 import typed_calls as typed
 
@@ -23,6 +28,39 @@ class RecoveredCallTests(unittest.TestCase):
             calls.validate_test_report(report, recovered.CONFIG)
         self.assertTrue(set(recovered.CONFIG["test_report_cases"]).isdisjoint(
             typed.CONFIG["test_report_cases"]))
+
+    def test_native_vectors_use_one_register_and_aligned_whole_stack_values(self):
+        expected = json.loads((typed.ROOT / "CptaTypedCallTestCases.def").read_text())
+        shapes = {shape["name"]: shape for shape in recovered.POLICY["native_shapes"]}
+        for case in expected["native_vector_layouts"]:
+            with self.subTest(case=case["name"]):
+                locations, stack = typed.placements(shapes[case["name"]])
+                self.assertEqual(stack, case["stack"])
+                self.assertEqual([p["offset"] for p in locations if p["bank"] == "stack"],
+                                 case["offsets"])
+                self.assertEqual([p["reg"] for p in locations if p["bank"] == "vector"],
+                                 case["vector_registers"])
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            typed.prepare_fixtures(work, recovered.CONFIG)
+            for fixture in recovered.CONFIG["fixtures"]:
+                self.assertNotIn("@", (work / fixture["file"]).read_text())
+
+    def test_recovered_storage_requires_its_own_passing_test(self):
+        suites = []
+        for identity in storage.CONFIG["test_report_cases"]:
+            suite, name = identity.rsplit(".", 1)
+            suites.append({"name": suite, "testsuite": [{
+                "name": name, "status": "RUN", "result": "COMPLETED",
+                storage.CONFIG["artifact_property"]: self.id()}]})
+        report = {"tests": len(suites), "failures": 0, "errors": 0,
+                  "testsuites": suites}
+        self.assertEqual(calls.validate_test_report(report, storage.CONFIG), self.id())
+        with self.assertRaises(ValueError):
+            calls.validate_test_report(report, recovered_storage.CONFIG)
+        for field in ("required_gates", "faults_per_mode", "modes", "routes"):
+            self.assertEqual(recovered_storage.CONFIG[field], storage.CONFIG[field])
+        self.assertNotEqual(recovered_storage.CONFIG["cases"], storage.CONFIG["cases"])
 
     def test_all_recovered_routes_require_original_exception_classes(self):
         original = copy.deepcopy(typed.CONFIG)

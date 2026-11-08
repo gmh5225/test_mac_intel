@@ -1,5 +1,5 @@
 {
-  "scope": "Controlled PAC execution for complete recovered NativeAnalysis fixed C prototypes with scalar, 128-bit integer and direct record/HFA values. ABI recovery accuracy itself is not established by supplied IR fixtures. All five unchanged Mach-O routes require original exception classes. Raw indirect calls are controls. Indirect by-value copies, hidden results, signed exception unwinding, authenticated whole-image execution, native Apple PAC and exact fault PC/full ESR remain unqualified.",
+  "scope": "Controlled PAC execution for complete recovered NativeAnalysis fixed C prototypes with scalar, 128-bit integer, full SIMD128, record/HFA and original indirect record address operands. ABI recovery accuracy itself is not established by supplied IR fixtures. All five unchanged Mach-O routes require original exception classes. Raw indirect calls are controls. Hidden results are qualified separately. Signed exception unwinding, authenticated whole-image execution, native Apple PAC and exact fault PC/full ESR remain unqualified.",
   "output_directory": "cpta-recovered-calls",
   "qualification_key": "darwin_recovered_authenticated_call_abi_qualified",
   "directory": "recovered-{shape}-{key}-{zero}-{raw}",
@@ -39,10 +39,59 @@
     "word-pointer-pair",
     "pointer-pair",
     "hfa-f32-one",
-    "hfa-f64-one"
+    "hfa-f64-one",
+    "indirect-three-words",
+    "indirect-mixed",
+    "indirect-transform",
+    "indirect-nested",
+    "indirect-spill",
+    "vector-one",
+    "vector-ten",
+    "vector-mixed",
+    "vector-packed-spill",
+    "vector-hfa-exhausted",
+    "vector-indirect"
   ],
   "test_case": "ByShape/AArch64RecoveredAuthenticatedCall.NativeTypesKeepAuthenticationOnTheCall/{name}",
   "input_error": "Complete recovered-prototype exports and their exact passing test report are required.",
   "fault_count_prefix": "-DCPA_PAUTH_FAULT_COUNT=",
-  "sample_count_prefix": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT="
+  "sample_count_prefix": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT=",
+  "native_shapes": [
+    {
+      "name": "vector-one",
+      "parameters": "V",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-ten",
+      "parameters": "VVVVVVVVVV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-mixed",
+      "parameters": "iVdVqVfV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-packed-spill",
+      "parameters": "iiiiiiiibVVVVVVVVVVb",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-hfa-exhausted",
+      "parameters": "dddddddxV",
+      "return_kind": "V",
+      "fixed": -1
+    },
+    {
+      "name": "vector-indirect",
+      "parameters": "JV",
+      "return_kind": "V",
+      "fixed": -1
+    }
+  ]
 }

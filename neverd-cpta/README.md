@@ -428,12 +428,15 @@ authenticated storage, native Apple PAC, signed exception unwinding or exact
 fault PCs. A successful ordinary arm64 process is not PAC evidence unless
 independent controls show that signing actually changes the target bits.
 
-`recovered_calls.py` requires the distinct 36-case
+`recovered_calls.py` requires the distinct 47-case
 `AArch64RecoveredAuthenticatedCall.NativeTypesKeepAuthenticationOnTheCall`
 report and `recovered-*` exports. These fixtures carry complete fixed C
 `NativeAnalysis` signatures, without analyst occurrence bindings or source-only
-projection permission. They cover scalar, 128-bit integer and direct record/HFA
-arguments/results, including exhausted registers and packed stack values. The
+projection permission. They cover scalar, 128-bit integer, direct record/HFA and full SIMD128
+arguments/results, including exhausted registers and packed stack values.
+Indirect records retain their original addresses. Vector lanes use distinct
+64-bit patterns; the independent oracle assigns one Q register per vector
+and aligns an entire spilled vector to 16 bytes. The
 five unchanged object routes run against independent original Darwin call
 bodies under both keys and zero/nonzero modifiers; raw calls are controls.
 Every route requires the original exception class, including C at O0.
@@ -447,7 +450,16 @@ python3 neverd-cpta/recovered_calls.py \
 ```
 
 This profile qualifies transport of an established recovered ABI, not the
-accuracy of automatic type recovery. Indirect native copies, hidden results,
-complete authenticated image execution, signed exception unwinding, native
+accuracy of automatic type recovery. New logical copies, complete
+authenticated image execution, signed exception unwinding, native
 Apple PAC/CPA2 and exact fault PC/full ESR remain separate qualifications.
 Successful runs remove their owned model installation after recording results.
+
+
+`recovered_result_storage_calls.py` independently requires
+`AArch64AuthenticatedCall.NativeIndirectResultsKeepOriginalStorageAndPAC`
+and `recovered-result-storage-*` exports. It reuses the original-storage oracle
+for parameter/result aliasing, exact x8 addresses, guards, and memory effects.
+An analyst x8 report cannot qualify the recovered native profile. Both profiles
+accept `--model` to reuse one caller-owned installation; callers remove that
+installation after all runs and retain the recorded hashes and diagnostics.

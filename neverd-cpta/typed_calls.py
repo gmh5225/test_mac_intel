@@ -66,9 +66,10 @@ def placements(shape):
         value = POLICY["kinds"][kind]
         members = value_members(kind)
         composite = "fields" in value
-        floating = all("fp" in member for member in members)
+        vector = value.get("vector", False)
+        floating = vector or all("fp" in member for member in members)
         bank = "fp" if floating else "gp"
-        count = len(members) if floating else aligned(value["bytes"], POLICY["word_bytes"]) // POLICY["word_bytes"]
+        count = 1 if vector else len(members) if floating else aligned(value["bytes"], POLICY["word_bytes"]) // POLICY["word_bytes"]
         variadic = shape["fixed"] >= 0 and index >= shape["fixed"]
         fits = not variadic and registers[bank] + count <= POLICY["register_arguments"]
         if not fits:
@@ -82,7 +83,10 @@ def placements(shape):
         for part, member in enumerate(members):
             location = {"memory": "", **member, "argument": index, "part": part}
             if fits:
-                location.update(bank=bank, reg=registers[bank] + (part if floating else member["source_offset"] // POLICY["word_bytes"]))
+                location.update(bank="vector" if vector else bank,
+                                reg=registers[bank] + (0 if vector else part if floating else member["source_offset"] // POLICY["word_bytes"]))
+                if vector:
+                    location["lane"] = part
             else:
                 location.update(bank="stack", offset=stack + member["source_offset"])
             result.append(location)
@@ -146,7 +150,7 @@ def prepare_fixtures(work, config):
         return templates[template].format(**values)
 
     functions, declarations, cases = [], [], []
-    for shape_index, shape in enumerate(POLICY["shapes"]):
+    for shape_index, shape in enumerate(config.get("fixture_shapes", POLICY["shapes"])):
         name = POLICY["callback"].format(shape_index=shape_index)
         declarations.append(render("callback_declaration", name=name))
         locations, stack = placements(shape)
@@ -176,8 +180,9 @@ def prepare_fixtures(work, config):
                 returned = dict(member)
                 if "fp" not in returned:
                     returned["gp"] = POLICY["kinds"]["i"]["gp"]
-                functions.append(render("callback_member_fp" if "fp" in member else "callback_member_gp",
-                                        **returned, reg=index, expected=value))
+                functions.append(render("callback_member_vector" if result.get("vector") else
+                                        "callback_member_fp" if "fp" in member else "callback_member_gp",
+                                        **returned, reg=index, lane=index, expected=value))
             functions.append(templates["callback_members_end"])
         else:
             functions.append(render("callback_end" if floating else "callback_end_integer",
@@ -225,7 +230,9 @@ def prepare_fixtures(work, config):
             if composite:
                 narrow = templates["result_start"]
                 for index, member in enumerate(result_members):
-                    narrow += render("read_fp" if "fp" in member else "read_gp", **member, reg=index)
+                    narrow += render("read_vector" if result.get("vector") else
+                                     "read_fp" if "fp" in member else "read_gp",
+                                     **member, reg=0 if result.get("vector") else index, lane=index)
                     narrow += templates["result_mix"]
                 narrow += templates["result_finish"]
             functions.append(render("frame_close" if floating else "frame_close_integer",
