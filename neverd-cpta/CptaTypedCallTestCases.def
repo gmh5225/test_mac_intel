@@ -536,5 +536,147 @@
       ],
       "vector_registers": []
     }
+  ],
+  "hva_layouts": [
+    {
+      "name": "hva64-last-bank",
+      "stack": 0,
+      "hva_argument": 4,
+      "registers": [
+        4,
+        5
+      ],
+      "lanes": [
+        0,
+        0
+      ],
+      "offsets": []
+    },
+    {
+      "name": "hva128-last-bank",
+      "stack": 0,
+      "hva_argument": 6,
+      "registers": [
+        6,
+        6,
+        7,
+        7
+      ],
+      "lanes": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "offsets": []
+    },
+    {
+      "name": "hva64-exhausted",
+      "stack": 32,
+      "hva_argument": 6,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        0,
+        8,
+        16
+      ]
+    },
+    {
+      "name": "hva128-exhausted",
+      "stack": 48,
+      "hva_argument": 7,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        0,
+        8,
+        16,
+        24
+      ]
+    },
+    {
+      "name": "hva64-packed-spill",
+      "stack": 41,
+      "hva_argument": 15,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        8,
+        16,
+        24
+      ]
+    },
+    {
+      "name": "hva128-packed-spill",
+      "stack": 88,
+      "hva_argument": 17,
+      "registers": [],
+      "lanes": [],
+      "offsets": [
+        16,
+        24,
+        32,
+        40,
+        48,
+        56,
+        64,
+        72
+      ]
+    },
+    {
+      "name": "hva64-array",
+      "stack": 0,
+      "hva_argument": 0,
+      "registers": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "lanes": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "offsets": []
+    },
+    {
+      "name": "hva128-array",
+      "stack": 0,
+      "hva_argument": 0,
+      "registers": [
+        0,
+        0,
+        1,
+        1,
+        2,
+        2
+      ],
+      "lanes": [
+        0,
+        1,
+        0,
+        1,
+        0,
+        1
+      ],
+      "offsets": []
+    }
+  ],
+  "hva_observation_markers": [
+    "Before[2], Value[8], After[2]",
+    "Observed.Value[7] == 0x0102030405060708ULL",
+    "Observed.Before[0]",
+    "Observed.After[1]",
+    "ins v3.d[1],x10",
+    "str x10,[x9,#56]"
+  ],
+  "non_hva_kinds": [
+    "E",
+    "I",
+    "2",
+    "3"
   ]
 }

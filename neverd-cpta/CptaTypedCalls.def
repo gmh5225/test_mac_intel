@@ -651,6 +651,126 @@
       "fields": "ii",
       "alignment": 16,
       "vector": true
+    },
+    "e": {
+      "bytes": 8,
+      "fields": "i",
+      "alignment": 8,
+      "vector": true
+    },
+    "c": {
+      "bytes": 8,
+      "fields": "e",
+      "alignment": 8
+    },
+    "C": {
+      "bytes": 16,
+      "fields": "ee",
+      "alignment": 8
+    },
+    "l": {
+      "bytes": 24,
+      "fields": "eee",
+      "alignment": 8
+    },
+    "L": {
+      "bytes": 32,
+      "fields": "eeee",
+      "alignment": 8
+    },
+    "m": {
+      "bytes": 16,
+      "fields": "V",
+      "alignment": 16
+    },
+    "M": {
+      "bytes": 32,
+      "fields": "VV",
+      "alignment": 16
+    },
+    "F": {
+      "bytes": 48,
+      "fields": "VVV",
+      "alignment": 16
+    },
+    "G": {
+      "bytes": 64,
+      "fields": "VVVV",
+      "alignment": 16
+    },
+    "P": {
+      "bytes": 32,
+      "fields": "CC",
+      "alignment": 8
+    },
+    "R": {
+      "bytes": 64,
+      "fields": "MM",
+      "alignment": 16
+    },
+    "T": {
+      "bytes": 16,
+      "fields": "ee",
+      "alignment": 8
+    },
+    "U": {
+      "bytes": 32,
+      "fields": "TT",
+      "alignment": 8
+    },
+    "X": {
+      "bytes": 48,
+      "fields": "VVV",
+      "alignment": 16
+    },
+    "Y": {
+      "bytes": 48,
+      "fields": "X",
+      "alignment": 16
+    },
+    "N": {
+      "bytes": 12,
+      "fields": "fff",
+      "alignment": 4
+    },
+    "D": {
+      "bytes": 12,
+      "fields": "N",
+      "alignment": 4
+    },
+    "E": {
+      "bytes": 40,
+      "fields": "eeeee",
+      "alignment": 8,
+      "transport": "p"
+    },
+    "I": {
+      "bytes": 80,
+      "fields": "VVVVV",
+      "alignment": 16,
+      "transport": "p"
+    },
+    "2": {
+      "bytes": 32,
+      "fields": "eV",
+      "alignment": 16,
+      "transport": "p"
+    },
+    "3": {
+      "bytes": 32,
+      "fields": "Vi",
+      "alignment": 16,
+      "transport": "p"
+    },
+    "4": {
+      "bytes": 64,
+      "fields": "MM",
+      "alignment": 16
+    },
+    "5": {
+      "bytes": 64,
+      "fields": "4",
+      "alignment": 16
     }
   },
   "word_bytes": 8,
@@ -879,10 +999,16 @@
     "result_finish": "  mov x0,x13\n",
     "read_vector": "  umov x10,v{reg}.d[{lane}]\n",
     "load_vector": "  ldr x9,[sp,#{offset}]\n  ins v{reg}.d[{lane}],x9\n",
-    "callback_member_vector": "  ldr x10,={expected}\n  cmp x14,#0\n  csel x10,x10,xzr,eq\n  ins v0.d[{lane}],x10\n",
+    "callback_member_vector": "  ldr x10,={expected}\n  cmp x14,#0\n  csel x10,x10,xzr,eq\n  ins v{reg}.d[{lane}],x10\n",
     "declaration_vector": "extern struct VectorResult {name}({parameters});\nstatic unsigned __int128 {name}_outer(uint64_t Unused) {{\n  (void)Unused;\n  struct VectorResult Value = {name}(Pointer, Modifier, {values});\n  return ((unsigned __int128)Value.High << 64) | Value.Low;\n}}\n",
     "vector_value": "(((unsigned __int128){high}ULL << 64) | {low}ULL)",
-    "return_vector": "  umov x0,v0.d[0]\n  umov x1,v0.d[1]\n"
+    "return_vector": "  umov x0,v0.d[0]\n  umov x1,v0.d[1]\n",
+    "return_vector64": "  umov x0,v0.d[0]\n",
+    "observed_load": "  ldr x9,[sp,#{offset}]\n",
+    "observed_word": "  umov x10,v{reg}.d[{lane}]\n  str x10,[x9,#{offset}]\n",
+    "observed_return": "  mov x0,x9\n",
+    "declaration_observed": "extern uint64_t {name}({parameters});\nstatic unsigned __int128 {name}_outer(uint64_t Unused) {{\n  (void)Unused;\n  struct {{ uint64_t Before[{guard_words}], Value[{words}], After[{guard_words}]; }} __attribute__((aligned({alignment}))) Observed = {{ .Before = {{{guards}}}, .Value = {{0}}, .After = {{{guards}}} }};\n  uint64_t Address = (uint64_t)(uintptr_t)Observed.Value;\n  uint64_t Returned = {name}(Pointer, Modifier, {values}, Address);\n  return Returned == Address && {checks};\n}}\n",
+    "observed_check": "Observed.{field}[{index}] == {value}ULL"
   },
   "input_error": "The complete typed-call test and its single artifact export must complete",
   "sample_flag": "-DCPA_AUTHENTICATED_CALL_SAMPLE_COUNT={count}",
@@ -971,9 +1097,114 @@
     "V": [
       "0x8123456789abcdef",
       "0x1020304050607080"
+    ],
+    "e": [
+      "0x8123456789abcdef"
+    ],
+    "c": [
+      "0x8123456789abcdef"
+    ],
+    "C": [
+      "0x8123456789abcdef",
+      "0x1020304050607080"
+    ],
+    "l": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d"
+    ],
+    "L": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe"
+    ],
+    "m": [
+      "0x8123456789abcdef",
+      "0x1020304050607080"
+    ],
+    "M": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe"
+    ],
+    "F": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe",
+      "0x1122334455667788",
+      "0xfedcba9876543210"
+    ],
+    "G": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe",
+      "0x1122334455667788",
+      "0xfedcba9876543210",
+      "0x9080706050403020",
+      "0x0102030405060708"
+    ],
+    "P": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe"
+    ],
+    "R": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe",
+      "0x1122334455667788",
+      "0xfedcba9876543210",
+      "0x9080706050403020",
+      "0x0102030405060708"
+    ],
+    "U": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe"
+    ],
+    "Y": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe",
+      "0x1122334455667788",
+      "0xfedcba9876543210"
+    ],
+    "D": [
+      "0x40200000",
+      "0xc0400000",
+      "0x40b00000"
+    ],
+    "5": [
+      "0x8123456789abcdef",
+      "0x1020304050607080",
+      "0xdeadbeefcafef00d",
+      "0x7ffffffffffffffe",
+      "0x1122334455667788",
+      "0xfedcba9876543210",
+      "0x9080706050403020",
+      "0x0102030405060708"
     ]
   },
   "test_case": "ByShape/AArch64TypedAuthenticatedCall.ExplicitTypesKeepAuthenticationOnTheCall/{name}",
   "alternate_routes": [],
-  "alternate_levels": []
+  "alternate_levels": [],
+  "max_hva_members": 4,
+  "observation_guard_words": 2,
+  "observation_guards": [
+    "0xa15a5aa5f0f00f0f",
+    "0xd3c4b5a698877869"
+  ],
+  "observation_fields": [
+    "Before",
+    "After"
+  ],
+  "observation_value_field": "Value"
 }

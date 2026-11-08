@@ -54,6 +54,29 @@ def value_members(kind, offset=0):
     return members
 
 
+def vector_members(kind):
+    value = POLICY["kinds"][kind]
+    if value.get("vector"):
+        return [value["bytes"]]
+    if "fields" not in value:
+        return []
+    result = []
+    for field in value["fields"]:
+        members = vector_members(field)
+        if not members:
+            return []
+        result.extend(members)
+    return result
+
+
+def vector_shape(kind):
+    members = vector_members(kind)
+    if (not members or len(members) > POLICY["max_hva_members"]
+            or any(size != members[0] for size in members)):
+        return None
+    return members[0], len(members)
+
+
 def placements(shape):
     """Independent Darwin PCS, keeping each composite wholly in one bank or stack."""
     registers = {"gp": 0, "fp": 0}
@@ -66,10 +89,10 @@ def placements(shape):
         value = POLICY["kinds"][kind]
         members = value_members(kind)
         composite = "fields" in value
-        vector = value.get("vector", False)
+        vector = vector_shape(kind)
         floating = vector or all("fp" in member for member in members)
         bank = "fp" if floating else "gp"
-        count = 1 if vector else len(members) if floating else aligned(value["bytes"], POLICY["word_bytes"]) // POLICY["word_bytes"]
+        count = vector[1] if vector else len(members) if floating else aligned(value["bytes"], POLICY["word_bytes"]) // POLICY["word_bytes"]
         variadic = shape["fixed"] >= 0 and index >= shape["fixed"]
         fits = not variadic and registers[bank] + count <= POLICY["register_arguments"]
         if not fits:
@@ -84,9 +107,9 @@ def placements(shape):
             location = {"memory": "", **member, "argument": index, "part": part}
             if fits:
                 location.update(bank="vector" if vector else bank,
-                                reg=registers[bank] + (0 if vector else part if floating else member["source_offset"] // POLICY["word_bytes"]))
+                                reg=registers[bank] + (member["source_offset"] // vector[0] if vector else part if floating else member["source_offset"] // POLICY["word_bytes"]))
                 if vector:
-                    location["lane"] = part
+                    location["lane"] = member["source_offset"] % vector[0] // POLICY["word_bytes"]
             else:
                 location.update(bank="stack", offset=stack + member["source_offset"])
             result.append(location)
@@ -157,6 +180,9 @@ def prepare_fixtures(work, config):
         result = POLICY["kinds"][shape["return_kind"]]
         floating = "fp" in result
         composite = "fields" in result
+        vector = vector_shape(shape["return_kind"])
+        observed = bool(vector and not result.get("vector"))
+        wide_vector = result.get("vector") and result["bytes"] > POLICY["word_bytes"]
         result_members = value_members(shape["return_kind"])
         if composite:
             expected_bits = 0
@@ -168,7 +194,7 @@ def prepare_fixtures(work, config):
             expected = (POLICY["results"][str(result["bytes"])] if floating else
                         POLICY["integer_results"][shape["return_kind"]])
         expected_literal = expected + "ULL"
-        if result.get("vector"):
+        if wide_vector:
             low, high = POLICY["composite_results"][shape["return_kind"]]
             expected_literal = render("vector_value", low=low, high=high)
         functions.append(render("symbol", name=name))
@@ -184,33 +210,50 @@ def prepare_fixtures(work, config):
                 returned = dict(member)
                 if "fp" not in returned:
                     returned["gp"] = POLICY["kinds"]["i"]["gp"]
-                functions.append(render("callback_member_vector" if result.get("vector") else
+                functions.append(render("callback_member_vector" if vector else
                                         "callback_member_fp" if "fp" in member else "callback_member_gp",
-                                        **returned, reg=index, lane=index, expected=value))
+                                        **returned,
+                                        reg=member["source_offset"] // vector[0] if vector else index,
+                                        lane=member["source_offset"] % vector[0] // POLICY["word_bytes"] if vector else index,
+                                        expected=value))
             functions.append(templates["callback_members_end"])
         else:
             functions.append(render("callback_end" if floating else "callback_end_integer",
                                     **result, expected=expected if floating else
                                     integer_bits(expected, result)))
         outgoing = aligned(stack, POLICY["frame_alignment"])
-        saved = outgoing + aligned(len(locations) * POLICY["word_bytes"], POLICY["frame_alignment"])
+        saved = outgoing + aligned((len(locations) + int(observed)) * POLICY["word_bytes"], POLICY["frame_alignment"])
         frame = saved + POLICY["frame_alignment"]
         for case in (case for case in config["cases"] if case["shape_index"] == shape_index):
             original = POLICY["original"].format(**case)
             projected = config["renamed_symbol"].format(**case)
             for target in (original, projected):
+                observation = {}
+                if observed:
+                    checks = [render("observed_check", field=field, index=index, value=value)
+                              for field in POLICY["observation_fields"]
+                              for index, value in enumerate(POLICY["observation_guards"])]
+                    checks.extend(render("observed_check", field=POLICY["observation_value_field"],
+                                         index=index, value=value)
+                                  for index, value in enumerate(POLICY["composite_results"][shape["return_kind"]]))
+                    observation = {"words": len(result_members),
+                                   "guard_words": POLICY["observation_guard_words"],
+                                   "alignment": POLICY["frame_alignment"],
+                                   "guards": ", ".join(value + "ULL" for value in POLICY["observation_guards"]),
+                                   "checks": " && ".join(checks)}
                 declarations.append(render(
-                    "declaration_vector" if result.get("vector") else "declaration", name=target,
+                    "declaration_observed" if observed else
+                    "declaration_vector" if wide_vector else "declaration", name=target,
                     parameters=", ".join([templates["argument"]] * (
-                        len(locations) + POLICY["outer_header_arguments"])),
+                        len(locations) + POLICY["outer_header_arguments"] + int(observed))),
                     values=", ".join(render("argument_value", value=carrier_value(location))
-                                     for location in locations)))
+                                     for location in locations), **observation))
             cases.append(render("case", projected=projected, original=original,
                                 callback=name, key=case["key"], zero=int(case["zero"]),
-                                raw=int(case["raw"]), expected=expected_literal))
+                                raw=int(case["raw"]), expected=int(observed) if observed else expected_literal))
             functions.append(render("symbol", name=original))
             functions.append(render("frame_open", frame=frame, saved=saved))
-            for index, location in enumerate(locations):
+            for index in range(len(locations) + int(observed)):
                 argument = index + POLICY["outer_header_arguments"]
                 offset = outgoing + index * POLICY["word_bytes"]
                 if argument < POLICY["register_arguments"]:
@@ -240,7 +283,14 @@ def prepare_fixtures(work, config):
                     narrow += templates["result_mix"]
                 narrow += templates["result_finish"]
             if result.get("vector"):
-                narrow = templates["return_vector"]
+                narrow = templates["return_vector" if wide_vector else "return_vector64"]
+            if observed:
+                narrow = render("observed_load", offset=outgoing + len(locations) * POLICY["word_bytes"])
+                for member in result_members:
+                    offset = member["source_offset"]
+                    narrow += render("observed_word", offset=offset, reg=offset // vector[0],
+                                     lane=offset % vector[0] // POLICY["word_bytes"])
+                narrow += templates["observed_return"]
             functions.append(render("frame_close" if floating else "frame_close_integer",
                                     **result, frame=frame, saved=saved, narrow=narrow))
     (work / config["fixtures"][0]["file"]).write_text(

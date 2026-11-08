@@ -62,6 +62,27 @@ class RecoveredCallTests(unittest.TestCase):
             self.assertEqual(recovered_storage.CONFIG[field], storage.CONFIG[field])
         self.assertNotEqual(recovered_storage.CONFIG["cases"], storage.CONFIG["cases"])
 
+    def test_hva_whole_banks_nested_arrays_and_every_return_word(self):
+        expected = json.loads((typed.ROOT / "CptaTypedCallTestCases.def").read_text())
+        shapes = {shape["name"]: shape for shape in recovered.POLICY["native_shapes"]}
+        for case in expected["hva_layouts"]:
+            with self.subTest(case=case["name"]):
+                locations, stack = typed.placements(shapes[case["name"]])
+                self.assertEqual(stack, case["stack"])
+                members = [p for p in locations if p["argument"] == case["hva_argument"]]
+                self.assertEqual([p["reg"] for p in members if p["bank"] == "vector"], case["registers"])
+                self.assertEqual([p["lane"] for p in members if p["bank"] == "vector"], case["lanes"])
+                self.assertEqual([p["offset"] for p in members if p["bank"] == "stack"], case["offsets"])
+        for kind in expected["non_hva_kinds"]:
+            self.assertIsNone(typed.vector_shape(kind))
+        with tempfile.TemporaryDirectory() as temporary:
+            work = Path(temporary)
+            typed.prepare_fixtures(work, recovered.CONFIG)
+            source = "".join((work / item["file"]).read_text()
+                             for item in recovered.CONFIG["fixtures"])
+            for marker in expected["hva_observation_markers"]:
+                self.assertIn(marker, source)
+
     def test_all_recovered_routes_require_original_exception_classes(self):
         original = copy.deepcopy(typed.CONFIG)
         helper = integer_tests.AuthenticatedCallTests()
