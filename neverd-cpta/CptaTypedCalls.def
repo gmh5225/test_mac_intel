@@ -880,7 +880,7 @@
     "read_vector": "  umov x10,v{reg}.d[{lane}]\n",
     "load_vector": "  ldr x9,[sp,#{offset}]\n  ins v{reg}.d[{lane}],x9\n",
     "callback_member_vector": "  ldr x10,={expected}\n  cmp x14,#0\n  csel x10,x10,xzr,eq\n  ins v0.d[{lane}],x10\n",
-    "declaration_vector": "extern unsigned __int128 {name}({parameters});\nstatic unsigned __int128 {name}_outer(uint64_t Unused) {{\n  (void)Unused;\n  return {name}(Pointer, Modifier, {values});\n}}\n",
+    "declaration_vector": "extern struct VectorResult {name}({parameters});\nstatic unsigned __int128 {name}_outer(uint64_t Unused) {{\n  (void)Unused;\n  struct VectorResult Value = {name}(Pointer, Modifier, {values});\n  return ((unsigned __int128)Value.High << 64) | Value.Low;\n}}\n",
     "vector_value": "(((unsigned __int128){high}ULL << 64) | {low}ULL)",
     "return_vector": "  umov x0,v0.d[0]\n  umov x1,v0.d[1]\n"
   },
