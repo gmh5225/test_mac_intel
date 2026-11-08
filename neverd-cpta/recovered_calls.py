@@ -43,4 +43,4 @@ CONFIG["errors"]["input"] = POLICY["input_error"]
 
 if __name__ == "__main__":
     calls.main(CONFIG, prepare_fixtures=typed.prepare_fixtures,
-               prepare_objects=typed.prepare_objects)
+               prepare_objects=typed.prepare_objects, verify_guest=typed.verify_guest)

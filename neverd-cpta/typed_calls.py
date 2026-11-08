@@ -138,17 +138,26 @@ def integer_bits(value, scalar, stack=False):
 
 def prepare_objects(inputs, route, work, logs, config):
     expected, fragments = bytearray(), []
+    runtime_required = False
     for case in config["cases"]:
         source = inputs / case["directory"] / (route + ".o")
-        text, entry = macho_text.extract(source.read_bytes(), config["object_symbol"])
+        text, entry, relocations = macho_text.read(
+            source.read_bytes(), config["object_symbol"], config["runtime_calls"])
         path = work / config["text_file"].format(**case)
         path.write_bytes(text)
         fragments.append(macho_text.CONFIG["assembly"].format(
             symbol=config["renamed_symbol"].format(**case), entry=entry, path=path))
+        for relocation in relocations:
+            fragments.append(macho_text.CONFIG["relocation_assembly"].format(
+                symbol=config["renamed_symbol"].format(**case), entry=entry,
+                offset=relocation["offset"],
+                target=config["runtime_calls"][relocation["symbol"]]))
+        runtime_required |= bool(relocations)
         (logs / path.with_suffix(".json").name).write_text(json.dumps({
             "input_sha256": calls.digest(source), "instruction_sha256": calls.digest(path),
             "entry_offset": entry, "instruction_bytes": len(text),
-            "batch_offset": len(expected), "retargeted_or_patched": False,
+            "batch_offset": len(expected), "retargeted_or_patched": bool(relocations),
+            "declared_call_relocations": relocations,
         }, indent=2) + "\n")
         expected.extend(text)
     assembly = work / config["batch_assembly"]
@@ -163,7 +172,33 @@ def prepare_objects(inputs, route, work, logs, config):
                 run.CONFIG["build_timeout_seconds"]).check_returncode()
     if copied.read_bytes() != expected:
         raise ValueError(config["batch_error"])
-    return [target]
+    if not runtime_required:
+        return [target]
+    from types import SimpleNamespace
+    import generated_memory
+    policy = json.loads((ROOT / config["runtime_policy"]).read_text())
+    runtime = generated_memory.compile_freestanding_runtime(
+        SimpleNamespace(compiler=config["compiler"]), work, logs, [], policy)
+    return [target, runtime]
+
+
+def verify_guest(guest, inputs, route, logs, config):
+    data = guest.read_bytes()
+    symbols = macho_text.linked_symbols(data)
+    relocated = []
+    for case in config["cases"]:
+        source = inputs / case["directory"] / (route + ".o")
+        text, entry, relocations = macho_text.read(
+            source.read_bytes(), config["object_symbol"], config["runtime_calls"])
+        name = config["renamed_symbol"].format(**case)
+        macho_text.verify_linked(data, symbols, name, text, entry, relocations,
+                                config["runtime_calls"])
+        if relocations:
+            relocated.append({"case": case["directory"], "relocations": relocations})
+    (logs / macho_text.CONFIG["linked_report"]).write_text(json.dumps({
+        "checked_objects": len(config["cases"]), "guest_sha256": calls.digest(guest),
+        "exact_outside_declared_relocations": True, "relocated": relocated,
+    }, indent=2) + "\n")
 
 
 def prepare_fixtures(work, config):
@@ -302,4 +337,4 @@ def prepare_fixtures(work, config):
 
 if __name__ == "__main__":
     calls.main(CONFIG, prepare_fixtures=prepare_fixtures,
-               prepare_objects=prepare_objects)
+               prepare_objects=prepare_objects, verify_guest=verify_guest)

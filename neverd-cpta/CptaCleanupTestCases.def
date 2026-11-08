@@ -5,5 +5,12 @@
     "evidence/report.json",
     "input/projected.o",
     "external/model"
-  ]
+  ],
+  "iterations": 4,
+  "scratch_file": "temporary.o",
+  "input_file": "input.o",
+  "diagnostic_file": "diagnostic.log",
+  "ready": "ready",
+  "child_timeout": 10,
+  "child": "import sys,time\nfrom pathlib import Path\nimport run\nroot=Path(sys.argv[1])\nwith run.artifact_session(root) as scratch:\n (scratch / \"temporary.o\").write_bytes(b\"disposable\")\n (root / \"diagnostic.log\").write_bytes(b\"diagnostic\")\n print(\"ready\",flush=True)\n time.sleep(30)\n"
 }

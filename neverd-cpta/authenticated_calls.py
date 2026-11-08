@@ -2,6 +2,7 @@
 """Execute actual NeverD call exports with controlled instruction PAC keys."""
 
 import argparse
+from contextlib import ExitStack
 import copy
 import hashlib
 import json
@@ -77,7 +78,7 @@ def prepare_elf(source, target, case, logs, config):
 
 
 def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None,
-         prepare_objects=None):
+         prepare_objects=None, verify_guest=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--test-report", type=Path, required=True)
@@ -90,96 +91,97 @@ def main(config=CONFIG, prepare_object=prepare_elf, prepare_fixtures=None,
         raise ValueError(config["errors"]["revision"])
     origin = validate_test_report(json.loads(args.test_report.read_text()), config)
     output = args.output.resolve()
-    output.mkdir()
-    inputs, evidence = output / "input", output / "evidence"
-    inputs.mkdir()
-    evidence.mkdir()
-    shutil.copy2(args.test_report, inputs / "tests.json")
-    for case in config["cases"]:
-        directory = inputs / case["directory"]
-        directory.mkdir()
-        files = config["source_files"] + [route + ".o" for route in config["routes"]]
-        for name in files:
-            shutil.copy2(args.artifacts / case["directory"] / name, directory / name)
-    provenance = {
-        "neverd_revision": args.neverd_revision, "input_export_origin": origin,
-        "input_sha256": {path.relative_to(inputs).as_posix(): digest(path)
-                         for path in sorted(inputs.rglob("*")) if path.is_file()},
-        "environment_source_sha256": {path.name: digest(path)
-                                      for path in sorted(ROOT.iterdir()) if path.is_file()},
-        "model_archive_sha256": run.CONFIG["model_sha256"],
-        "scope": config["scope"],
-    }
-    (evidence / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
-    tools = output / "tools"
-    tools.mkdir()
-    model = args.model.resolve() if args.model else run.prepare(tools, evidence)
-    provenance["model_supplied"] = args.model is not None
-    provenance["model_binary_sha256"] = digest(model)
-    (evidence / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
-    run.inspect_model(model, evidence)
-    for executable in (config["compiler"], config["linker"], config["objcopy"]):
-        run.execute([executable, "--version"], evidence, executable,
-                    run.CONFIG["build_timeout_seconds"]).check_returncode()
-    summary = {"passed": False, "neverd_revision": args.neverd_revision,
-               "scope": config["scope"], "results": []}
-    summary_path = evidence / "summary.json"
-    summary_path.write_text(json.dumps(summary, indent=2) + "\n")
-    for route in config["routes"]:
-        prepared = None
-        if prepare_objects is not None:
-            work = output / config["objects_directory"].format(route=route)
-            work.mkdir()
-            logs = work / "evidence"
-            logs.mkdir()
-            prepared = prepare_objects(inputs, route, work, logs, config)
-        for feature in config["features"]:
-            for el0 in (False, True):
-                label = f'{route}-pac{feature["parameter"]}-el{0 if el0 else 1}'
-                work = output / label
+    with run.artifact_session(output) as scratch, ExitStack() as stack:
+        inputs, evidence = output / "input", output / "evidence"
+        inputs.mkdir(exist_ok=True)
+        evidence.mkdir(exist_ok=True)
+        run.copy_input(args.test_report, inputs / "tests.json", scratch)
+        for case in config["cases"]:
+            directory = inputs / case["directory"]
+            directory.mkdir(exist_ok=True)
+            files = config["source_files"] + [route + ".o" for route in config["routes"]]
+            for name in files:
+                run.copy_input(args.artifacts / case["directory"] / name, directory / name, scratch)
+        provenance = {
+            "neverd_revision": args.neverd_revision, "input_export_origin": origin,
+            "input_sha256": {path.relative_to(inputs).as_posix(): digest(path)
+                             for path in sorted(inputs.rglob("*")) if path.is_file()},
+            "environment_source_sha256": {path.name: digest(path)
+                                          for path in sorted(ROOT.iterdir()) if path.is_file()},
+            "model_archive_sha256": run.CONFIG["model_sha256"],
+            "scope": config["scope"],
+        }
+        (evidence / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+        tools = scratch / "tools"
+        tools.mkdir()
+        model = stack.enter_context(run.model_session(output.parent, evidence, args.model))
+        provenance["model_supplied"] = args.model is not None
+        provenance["model_binary_sha256"] = digest(model)
+        (evidence / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+        run.inspect_model(model, evidence)
+        for executable in (config["compiler"], config["linker"], config["objcopy"]):
+            run.execute([executable, "--version"], evidence, executable,
+                        run.CONFIG["build_timeout_seconds"]).check_returncode()
+        summary = {"passed": False, "neverd_revision": args.neverd_revision,
+                   "scope": config["scope"], "results": []}
+        summary_path = evidence / "summary.json"
+        summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+        for route in config["routes"]:
+            prepared = None
+            if prepare_objects is not None:
+                work = scratch / config["objects_directory"].format(route=route)
                 work.mkdir()
-                logs = work / "evidence"
-                logs.mkdir()
-                objects = list(prepared) if prepared is not None else []
-                if prepared is None:
-                    for case in config["cases"]:
-                        source = inputs / case["directory"] / (route + ".o")
-                        target = work / f'projected-{case["index"]}.o'
-                        prepare_object(source, target, case, logs, config)
+                logs = evidence / work.name
+                logs.mkdir(exist_ok=True)
+                prepared = prepare_objects(inputs, route, work, logs, config)
+            for feature in config["features"]:
+                for el0 in (False, True):
+                    label = f'{route}-pac{feature["parameter"]}-el{0 if el0 else 1}'
+                    work = scratch / label
+                    work.mkdir()
+                    logs = evidence / work.name
+                    logs.mkdir(exist_ok=True)
+                    objects = list(prepared) if prepared is not None else []
+                    if prepared is None:
+                        for case in config["cases"]:
+                            source = inputs / case["directory"] / (route + ".o")
+                            target = work / f'projected-{case["index"]}.o'
+                            prepare_object(source, target, case, logs, config)
+                            objects.append(target)
+                    flags = [*config["guest_flags"],
+                             config["level_flag"].format(**feature)]
+                    if el0:
+                        flags.append(config["el0_flag"])
+                    if route != config["routes"][0]:
+                        flags.append(config["source_flag"])
+                    if prepare_fixtures:
+                        prepare_fixtures(work, config)
+                    for fixture in config["fixtures"]:
+                        source = (work if fixture.get("generated") else ROOT) / fixture["file"]
+                        target = work / (source.name + ".o")
+                        run.execute([config["compiler"], *run.CONFIG["compiler_flags"],
+                                     *flags, "-I", str(ROOT), "-x", fixture["language"],
+                                     "-c", str(source), "-o", str(target)], logs,
+                                    source.name, run.CONFIG["build_timeout_seconds"]).check_returncode()
                         objects.append(target)
-                flags = [*config["guest_flags"],
-                         config["level_flag"].format(**feature)]
-                if el0:
-                    flags.append(config["el0_flag"])
-                if route != config["routes"][0]:
-                    flags.append(config["source_flag"])
-                if prepare_fixtures:
-                    prepare_fixtures(work, config)
-                for fixture in config["fixtures"]:
-                    source = (work if fixture.get("generated") else ROOT) / fixture["file"]
-                    target = work / (source.name + ".o")
-                    run.execute([config["compiler"], *run.CONFIG["compiler_flags"],
-                                 *flags, "-I", str(ROOT), "-x", fixture["language"],
-                                 "-c", str(source), "-o", str(target)], logs,
-                                source.name, run.CONFIG["build_timeout_seconds"]).check_returncode()
-                    objects.append(target)
-                guest = run.build(config["compiler"], config["linker"], work,
-                                  logs, flags, objects)
-                model_config = configuration(route, feature, el0, config)
-                result = run.execute(run.model_command(model, guest, model_config), logs,
-                                     "guest", run.CONFIG["timeout_seconds"], os.environ.copy())
-                report = assess(result.stdout, result.returncode, route, feature, el0, config)
-                report.update(route=route, level=feature["level"], el0=el0,
-                              guest_sha256=digest(guest), model_parameters=model_config["model_parameters"])
-                (logs / "report.json").write_text(json.dumps(report, indent=2) + "\n")
-                summary["results"].append(report)
-                summary_path.write_text(json.dumps(summary, indent=2) + "\n")
-                print(label, report["passed"], flush=True)
-    summary["passed"] = all(row["passed"] for row in summary["results"])
-    summary_path.write_text(json.dumps(summary, indent=2) + "\n")
-    if not summary["passed"]:
-        raise RuntimeError(config["errors"]["matrix"])
-    run.remove_model_tools(tools)
+                    guest = run.build(config["compiler"], config["linker"], work,
+                                      logs, flags, objects)
+                    if verify_guest:
+                        verify_guest(guest, inputs, route, logs, config)
+                    model_config = configuration(route, feature, el0, config)
+                    result = run.execute(run.model_command(model, guest, model_config), logs,
+                                         "guest", run.CONFIG["timeout_seconds"], os.environ.copy())
+                    report = assess(result.stdout, result.returncode, route, feature, el0, config)
+                    report.update(route=route, level=feature["level"], el0=el0,
+                                  guest_sha256=digest(guest), model_parameters=model_config["model_parameters"])
+                    (logs / "report.json").write_text(json.dumps(report, indent=2) + "\n")
+                    summary["results"].append(report)
+                    summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+                    print(label, report["passed"], flush=True)
+        summary["passed"] = all(row["passed"] for row in summary["results"])
+        summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+        if not summary["passed"]:
+            raise RuntimeError(config["errors"]["matrix"])
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@
 """Execute actual, qualified NeverD immediate-memory exports in the Arm model."""
 
 import argparse
+from contextlib import ExitStack
 import copy
 import hashlib
 import json
@@ -103,98 +104,97 @@ def main():
                                       CONFIG, assess,
                                       compile_freestanding_runtime)
     root = args.output.resolve()
-    root.mkdir()
-    tools = root / CONFIG["tools_directory"]
-    evidence = root / CONFIG["evidence_directory"]
-    inputs = evidence / CONFIG["input_directory"]
-    tools.mkdir()
-    evidence.mkdir()
-    inputs.mkdir()
-    shutil.copy2(args.test_report, inputs / CONFIG["test_report_file"])
-    filenames = {route["file"] for route in CONFIG["routes"]}
-    filenames.add(CONFIG["harness_file"])
-    for name in sorted(filenames):
-        shutil.copy2(args.artifacts / name, inputs / name)
-    headers = tools / CONFIG["headers_directory"]
-    headers.mkdir()
-    for name, contents in CONFIG["headers"].items():
-        (headers / name).write_text(contents)
-    for name in profile.get("support_headers", []):
-        shutil.copy2(run.ROOT / name, headers / name)
-    generated_flags = [*profile["generated_flags"], CONFIG["headers_include_flag"],
-                       str(headers)]
-    provenance = {
-        "neverd_revision": args.neverd_revision,
-        "input_export_origin": export_origin,
-        "input_sha256": {p.name: digest(p) for p in inputs.iterdir()},
-        "environment_source_sha256": {
-            p.name: digest(p) for p in run.ROOT.iterdir() if p.is_file()
-        },
-        "workflow_commit": os.environ.get("GITHUB_SHA"),
-        "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
-        "generated_header_sha256": {p.name: digest(p) for p in headers.iterdir()},
-        "model_archive_sha256": run.CONFIG["model_sha256"],
-        "model_parameters": config["model_parameters"],
-        "scope": profile["scope"],
-        "profile": args.profile,
-    }
-    (evidence / CONFIG["provenance_file"]).write_text(json.dumps(provenance, indent=2) + "\n")
-    summary = {"passed": False, "neverd_revision": args.neverd_revision,
-               "profile": args.profile, "results": []}
+    with run.artifact_session(root) as scratch, ExitStack() as stack:
+        tools = scratch / CONFIG["tools_directory"]
+        evidence = root / CONFIG["evidence_directory"]
+        inputs = evidence / CONFIG["input_directory"]
+        tools.mkdir()
+        evidence.mkdir(exist_ok=True)
+        inputs.mkdir(exist_ok=True)
+        run.copy_input(args.test_report, inputs / CONFIG["test_report_file"], scratch)
+        filenames = {route["file"] for route in CONFIG["routes"]}
+        filenames.add(CONFIG["harness_file"])
+        for name in sorted(filenames):
+            run.copy_input(args.artifacts / name, inputs / name, scratch)
+        headers = tools / CONFIG["headers_directory"]
+        headers.mkdir()
+        for name, contents in CONFIG["headers"].items():
+            (headers / name).write_text(contents)
+        for name in profile.get("support_headers", []):
+            shutil.copy2(run.ROOT / name, headers / name)
+        generated_flags = [*profile["generated_flags"], CONFIG["headers_include_flag"],
+                           str(headers)]
+        provenance = {
+            "neverd_revision": args.neverd_revision,
+            "input_export_origin": export_origin,
+            "input_sha256": {p.name: digest(p) for p in inputs.iterdir()},
+            "environment_source_sha256": {
+                p.name: digest(p) for p in run.ROOT.iterdir() if p.is_file()
+            },
+            "workflow_commit": os.environ.get("GITHUB_SHA"),
+            "workflow_run_id": os.environ.get("GITHUB_RUN_ID"),
+            "generated_header_sha256": {p.name: digest(p) for p in headers.iterdir()},
+            "model_archive_sha256": run.CONFIG["model_sha256"],
+            "model_parameters": config["model_parameters"],
+            "scope": profile["scope"],
+            "profile": args.profile,
+        }
+        (evidence / CONFIG["provenance_file"]).write_text(json.dumps(provenance, indent=2) + "\n")
+        summary = {"passed": False, "neverd_revision": args.neverd_revision,
+                   "profile": args.profile, "results": []}
 
-    def save():
-        (evidence / CONFIG["summary_file"]).write_text(json.dumps(summary, indent=2) + "\n")
+        def save():
+            (evidence / CONFIG["summary_file"]).write_text(json.dumps(summary, indent=2) + "\n")
 
-    save()
-    model = run.prepare(tools, evidence)
-    run.inspect_model(model, evidence)
-    for label, executable in (("compiler-version", args.compiler), ("linker-version", args.linker)):
-        run.execute([executable, "--version"], evidence, label,
-                    run.CONFIG["build_timeout_seconds"]).check_returncode()
-    harness = (inputs / CONFIG["harness_file"]).read_text()
-    if harness.count(CONFIG["main_token"]) != 1:
-        raise ValueError(CONFIG["errors"]["harness"])
-    harness = harness.replace(CONFIG["main_token"], CONFIG["main_replacement"])
-    (tools / CONFIG["harness_file"]).write_text(harness + profile["count_function"])
-    harness_object = tools / CONFIG["harness_object"]
-    run.execute(
-        [args.compiler, *run.CONFIG["compiler_flags"], *generated_flags,
-         "-c", str(tools / CONFIG["harness_file"]), "-o", str(harness_object)],
-        evidence, "harness-compile", run.CONFIG["build_timeout_seconds"],
-    ).check_returncode()
-    runtime_object = compile_freestanding_runtime(args, tools, evidence,
-                                                  generated_flags, CONFIG)
-    for route in CONFIG["routes"]:
-        work = tools / route["name"]
-        observations = evidence / route["name"]
-        work.mkdir()
-        observations.mkdir()
-        projection = work / CONFIG["projection_object"]
-        if route["compile_c"]:
-            run.execute(
-                [args.compiler, *run.CONFIG["compiler_flags"], *generated_flags,
-                 route["optimization"], "-c", str(inputs / route["file"]), "-o", str(projection)],
-                observations, "projection-compile", run.CONFIG["build_timeout_seconds"],
-            ).check_returncode()
-        else:
-            shutil.copy2(inputs / route["file"], projection)
-        guest = run.build(args.compiler, args.linker, work, observations,
-                          profile["guest_flags"], [harness_object, projection, runtime_object])
-        start = time.monotonic()
-        result = run.execute(run.model_command(model, guest, config), observations, "guest",
-                             run.CONFIG["timeout_seconds"])
-        report = assess(result.stdout, result.returncode, profile)
-        report.update(route=route["name"], model_returncode=result.returncode,
-                      seconds=round(time.monotonic() - start, 3), guest_sha256=digest(guest))
-        (observations / run.CONFIG["report"]).write_text(json.dumps(report, indent=2) + "\n")
-        summary["results"].append(report)
         save()
-        print(json.dumps(report), flush=True)
-        if not report["passed"]:
-            raise SystemExit(CONFIG["errors"]["matrix"])
-    summary["passed"] = True
-    save()
-    run.remove_model_tools(tools)
+        model = stack.enter_context(run.model_session(root.parent, evidence))
+        run.inspect_model(model, evidence)
+        for label, executable in (("compiler-version", args.compiler), ("linker-version", args.linker)):
+            run.execute([executable, "--version"], evidence, label,
+                        run.CONFIG["build_timeout_seconds"]).check_returncode()
+        harness = (inputs / CONFIG["harness_file"]).read_text()
+        if harness.count(CONFIG["main_token"]) != 1:
+            raise ValueError(CONFIG["errors"]["harness"])
+        harness = harness.replace(CONFIG["main_token"], CONFIG["main_replacement"])
+        (tools / CONFIG["harness_file"]).write_text(harness + profile["count_function"])
+        harness_object = tools / CONFIG["harness_object"]
+        run.execute(
+            [args.compiler, *run.CONFIG["compiler_flags"], *generated_flags,
+             "-c", str(tools / CONFIG["harness_file"]), "-o", str(harness_object)],
+            evidence, "harness-compile", run.CONFIG["build_timeout_seconds"],
+        ).check_returncode()
+        runtime_object = compile_freestanding_runtime(args, tools, evidence,
+                                                      generated_flags, CONFIG)
+        for route in CONFIG["routes"]:
+            work = tools / route["name"]
+            observations = evidence / route["name"]
+            work.mkdir()
+            observations.mkdir(exist_ok=True)
+            projection = work / CONFIG["projection_object"]
+            if route["compile_c"]:
+                run.execute(
+                    [args.compiler, *run.CONFIG["compiler_flags"], *generated_flags,
+                     route["optimization"], "-c", str(inputs / route["file"]), "-o", str(projection)],
+                    observations, "projection-compile", run.CONFIG["build_timeout_seconds"],
+                ).check_returncode()
+            else:
+                shutil.copy2(inputs / route["file"], projection)
+            guest = run.build(args.compiler, args.linker, work, observations,
+                              profile["guest_flags"], [harness_object, projection, runtime_object])
+            start = time.monotonic()
+            result = run.execute(run.model_command(model, guest, config), observations, "guest",
+                                 run.CONFIG["timeout_seconds"])
+            report = assess(result.stdout, result.returncode, profile)
+            report.update(route=route["name"], model_returncode=result.returncode,
+                          seconds=round(time.monotonic() - start, 3), guest_sha256=digest(guest))
+            (observations / run.CONFIG["report"]).write_text(json.dumps(report, indent=2) + "\n")
+            summary["results"].append(report)
+            save()
+            print(json.dumps(report), flush=True)
+            if not report["passed"]:
+                raise SystemExit(CONFIG["errors"]["matrix"])
+        summary["passed"] = True
+        save()
 
 
 if __name__ == "__main__":

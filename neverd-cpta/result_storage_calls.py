@@ -57,4 +57,4 @@ def prepare_fixtures(work, config):
 
 if __name__ == "__main__":
     calls.main(CONFIG, prepare_fixtures=prepare_fixtures,
-               prepare_objects=typed.prepare_objects)
+               prepare_objects=typed.prepare_objects, verify_guest=typed.verify_guest)
