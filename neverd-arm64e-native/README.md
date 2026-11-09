@@ -1,14 +1,13 @@
 # Native Apple arm64e environment
 
-This workflow probes GitHub-hosted Apple Silicon macOS 15, macOS 26 and Xcode 27
-images. The labels come from GitHub's current
+This workflow probes GitHub-hosted Apple Silicon macOS 26 and Xcode 27 images. The labels come from GitHub's current
 [runner inventory](https://github.com/actions/runner-images/blob/main/README.md).
 The repository name does not select Intel hardware for these jobs.
 
 `Environment.def` pins the NeverD source and owns the runner list, commands,
 deadlines and build location. Each runner first executes NeverD's shared
 compiler-original four-key PAC gate and compact/DWARF C++ call/catch/cleanup
-controls. Disabled PAC, unavailable arm64e execution, a missing marker or a
+dylib controls through `dlopen`, matching the installed-image loader. Disabled PAC, unavailable arm64e execution, a missing marker or a
 failed control stops the job before dependency downloads and building. Exit 2
 from an unavailable probe is a failed qualification, not a successful skipped job.
 
@@ -31,3 +30,8 @@ versions that reject non-platform arm64e preview executables, an administrator
 must configure a dedicated compatible test host before native qualification can
 pass. The workflow reports observed availability; hosted runner labels alone do
 not prove PAC or signed-unwind support.
+
+The macOS 15 runner rejected the arm64e preview executable before entry. Newer
+runners execute PAC, but the compiler-original executable with static B-key
+fixups fails during startup; the equivalent `dlopen` library passes. Startup
+loading remains outside this dylib installation qualification.
