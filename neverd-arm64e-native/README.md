@@ -55,3 +55,8 @@ NeverD-installed threaded image and an unmodified `ld-classic` control. The
 native matrix explicitly converts legacy inputs to modern chained metadata
 before final signing; it does not claim unchanged threaded-output support on
 that runner. Original threaded encoding remains covered by offline tests.
+
+The native build deadline is 50 minutes and the enclosing job deadline is 75
+minutes, both owned by `Environment.def`. A macOS 26 cold build reached
+1433 of 1435 actions at the former 40-minute deadline. A build timeout remains
+a failed qualification and retains diagnostics before removing its owned build.
