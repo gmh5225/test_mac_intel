@@ -1,6 +1,7 @@
 """Diagnose executable publication with an immutable locally built test host."""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -58,8 +59,25 @@ def main():
             raise ValueError(POLICY["installation_failed"])
         output = root / POLICY["installation"]
         output.mkdir()
-        installed = native.run_installation(
-            output, build, startup / native.POLICY["report_name"], executable=True)
+        try:
+            installed = native.run_installation(
+                output, build, startup / native.POLICY["report_name"], executable=True)
+        except ValueError:
+            # Retain one exact failing specimen for load-command diagnosis.
+            # This extra invocation never replaces the failed qualification.
+            env = dict(os.environ, **native.POLICY["test_environment"])
+            env[native.POLICY["artifact_environment"]] = str(root / POLICY["diagnostic_fixtures"])
+            env[native.POLICY["executable_environment"]] = native.POLICY["executable_environment_value"]
+            with native.OwnedProducts(root, False) as products:
+                profile = native.startup_profile(products, root)
+            result = subprocess.run([
+                *profile["launcher"], str(binary),
+                native.POLICY["gtest_prefix"] + POLICY["diagnostic_case"],
+                POLICY["gtest_xml_prefix"] + str(root / POLICY["diagnostic_xml"])],
+                env=env, capture_output=True, text=True, timeout=POLICY["test_timeout"])
+            native.save(root / POLICY["diagnostic_output"], {
+                "returncode": result.returncode, "stdout": result.stdout, "stderr": result.stderr})
+            raise
         if installed["status"] != native.POLICY["passed"]:
             raise ValueError(POLICY["installation_failed"])
         report["passed"] = True
