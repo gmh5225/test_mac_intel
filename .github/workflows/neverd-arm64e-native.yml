@@ -1,0 +1,103 @@
+name: NeverD native Apple PAC and signed language unwinding
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/neverd-arm64e-native]
+    paths:
+      - neverd-arm64e-native/**
+      - .github/workflows/neverd-arm64e-native.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neverd-arm64e-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    outputs:
+      repository: ${{ steps.policy.outputs.repository }}
+      revision: ${{ steps.policy.outputs.revision }}
+      runners: ${{ steps.policy.outputs.runners }}
+      legacy_runner: ${{ steps.policy.outputs.legacy_runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify environment controller gates and cleanup
+        run: python3 -m unittest discover -s neverd-arm64e-native -p 'test_*.py' -v
+      - id: policy
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          policy = json.loads(Path('neverd-arm64e-native/Environment.def').read_text())
+          assert re.fullmatch('[0-9a-f]{40}', policy['source_revision'])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              print('repository=' + policy['source_repository'], file=out)
+              print('revision=' + policy['source_revision'], file=out)
+              print('runners=' + json.dumps(policy['runners']), file=out)
+              print('legacy_runner=' + policy['legacy_runner'], file=out)
+          PY
+
+  legacy:
+    needs: policy
+    runs-on: ${{ needs.policy.outputs.legacy_runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.policy.outputs.repository }}
+          ref: ${{ needs.policy.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+      - name: Produce owned threaded inputs with real ld-classic
+        run: python3 neverd/scripts/verify_arm64e_native.py legacy --output legacy-fixtures
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: legacy-fixtures
+          path: legacy-fixtures/
+          if-no-files-found: error
+          retention-days: 14
+
+  native:
+    needs: [policy, legacy]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.policy.outputs.runners) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out the immutable NeverD source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.policy.outputs.repository }}
+          ref: ${{ needs.policy.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+          submodules: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: legacy-fixtures
+          path: legacy-fixtures
+      - name: Validate native evidence rejection before executing controls
+        working-directory: neverd
+        run: python3 -m unittest scripts.tests.test_verify_arm64e_native -v
+      - name: Qualify real PAC, compiler-original unwinding, and installed images
+        run: python3 neverd-arm64e-native/run.py --source neverd --output native-evidence
+      - name: Preserve complete or failed native environment evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neverd-arm64e-native-${{ matrix.runner }}-${{ github.run_attempt }}
+          path: native-evidence/
+          if-no-files-found: error
+          retention-days: 14

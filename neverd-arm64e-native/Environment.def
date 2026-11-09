@@ -1,0 +1,124 @@
+{
+  "source_repository": "NeverSight/NeverD",
+  "source_revision": "1effda391527a2235e2f4fe907ea1bd67ad7f053",
+  "runners": [
+    "macos-26",
+    "xcode-27"
+  ],
+  "revision_command": [
+    "git",
+    "rev-parse",
+    "HEAD"
+  ],
+  "build_directory": "build-arm64e-native",
+  "source_argument": "--source",
+  "output_argument": "--output",
+  "termination_code": 143,
+  "report_name": "environment-report.json",
+  "log_suffix": ".log",
+  "qualification_report": "installation/report.json",
+  "build_diagnostics_directory": "build-diagnostics",
+  "build_diagnostics": [
+    "CMakeCache.txt",
+    "CMakeFiles/CMakeConfigureLog.yaml"
+  ],
+  "errors": {
+    "revision": "Checked-out NeverD revision differs from the pinned native source",
+    "existing_build": "Native environment build directory already exists; preserve it and use a fresh checkout",
+    "qualification": "Native installation did not publish a successful qualification"
+  },
+  "stages": [
+    {
+      "name": "preflight",
+      "timeout": 300,
+      "argv": [
+        "python3",
+        "scripts/verify_arm64e_native.py",
+        "probe",
+        "--output",
+        "{output}/probe"
+      ]
+    },
+    {
+      "name": "build-tools",
+      "timeout": 900,
+      "argv": [
+        "brew",
+        "install",
+        "cmake",
+        "lld",
+        "ninja",
+        "llvm@22"
+      ]
+    },
+    {
+      "name": "dependencies",
+      "timeout": 1200,
+      "argv": [
+        "git",
+        "submodule",
+        "update",
+        "--init",
+        "--recursive",
+        "--depth",
+        "1",
+        "third_party/capstone",
+        "third_party/unicorn",
+        "signatures",
+        "third_party/highway",
+        "third_party/simdutf",
+        "third_party/simdjson",
+        "third_party/mimalloc",
+        "third_party/oneTBB"
+      ]
+    },
+    {
+      "name": "configure",
+      "timeout": 900,
+      "argv": [
+        "cmake",
+        "-S",
+        "{source}",
+        "-B",
+        "{build}",
+        "-G",
+        "Ninja",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DBUILD_TESTING=ON",
+        "-DNEVERD_BUILD_GUI=OFF",
+        "-DNEVERD_LLVM_PREBUILT=ON"
+      ]
+    },
+    {
+      "name": "build",
+      "timeout": 2400,
+      "argv": [
+        "python3",
+        "scripts/build.py",
+        "{build}",
+        "--target",
+        "NeverDArm64eAnalysisTests",
+        "--parallel",
+        "4"
+      ]
+    },
+    {
+      "name": "installation",
+      "timeout": 1800,
+      "argv": [
+        "python3",
+        "scripts/verify_arm64e_native.py",
+        "run",
+        "--build-dir",
+        "{build}",
+        "--probe-report",
+        "{output}/probe/report.json",
+        "--output",
+        "{output}/installation",
+        "--legacy-fixtures",
+        "{source}/../legacy-fixtures"
+      ]
+    }
+  ],
+  "legacy_runner": "macos-15"
+}
