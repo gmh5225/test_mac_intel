@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: neverd-arm64e-native-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   policy:
     runs-on: ubuntu-24.04
