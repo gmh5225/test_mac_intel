@@ -42,6 +42,12 @@ class NativeEnvironmentTests(unittest.TestCase):
         stage.assert_not_called()
         self.assertFalse(self.output.exists())
 
+    def test_failed_startup_stops_before_tools_dependencies_and_build(self):
+        with mock.patch.object(run, "stage", side_effect=[0, CASES["stage_failure"]]) as stage:
+            self.assertEqual(run.execute(self.source, self.output, self.policy), CASES["stage_failure"])
+        self.assertEqual(stage.call_count, 2)
+        self.assertFalse(self.build.exists())
+
     def test_existing_build_is_never_reused_or_deleted(self):
         self.build.mkdir()
         product = self.build / CASES["partial_binary"]
@@ -67,6 +73,11 @@ class NativeEnvironmentTests(unittest.TestCase):
 
     def test_successful_processes_cannot_replace_native_qualification(self):
         def complete(*args):
+            startup = self.output / self.policy["startup_report"]
+            startup.parent.mkdir(exist_ok=True)
+            startup.write_text(json.dumps({self.policy["startup_qualification_key"]: True,
+                                          "source_revision": CASES["revision"],
+                                          "fixup_loader": self.policy["startup_fixup_loader"]}))
             report = self.output / self.policy["qualification_report"]
             report.parent.mkdir(exist_ok=True)
             report.write_text(json.dumps({CASES["report_key"]: False}))
@@ -76,6 +87,28 @@ class NativeEnvironmentTests(unittest.TestCase):
             run.execute(self.source, self.output, self.policy)
         result = json.loads((self.output / self.policy["report_name"]).read_text())
         self.assertFalse(result[CASES["report_key"]])
+
+    def test_complete_reports_bind_startup_profile_and_native_publication(self):
+        def complete(*args):
+            startup = self.output / self.policy["startup_report"]
+            startup.parent.mkdir(exist_ok=True)
+            startup.write_text(json.dumps({self.policy["startup_qualification_key"]: True,
+                                          "source_revision": CASES["revision"],
+                                          "fixup_loader": self.policy["startup_fixup_loader"]}))
+            installed = self.output / self.policy["qualification_report"]
+            installed.parent.mkdir(exist_ok=True)
+            installed.write_text(json.dumps({CASES["report_key"]: True,
+                                            self.policy["publication_qualification_key"]: True,
+                                            "source_revision": CASES["revision"]}))
+            return 0
+
+        with mock.patch.object(run, "stage", side_effect=complete):
+            self.assertEqual(run.execute(self.source, self.output, self.policy), 0)
+        result = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertTrue(result[self.policy["startup_qualification_key"]])
+        self.assertTrue(result[self.policy["publication_qualification_key"]])
+        self.assertEqual(result[self.policy["startup_fixup_loader_key"]],
+                         self.policy["startup_fixup_loader"])
 
 
 if __name__ == "__main__":

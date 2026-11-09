@@ -3,7 +3,7 @@ name: NeverD native Apple PAC and signed language unwinding
 on:
   workflow_dispatch:
   push:
-    branches: [codex/neverd-arm64e-native]
+    branches: [codex/neverd-arm64e-native, codex/neverd-arm64e-publication]
     paths:
       - neverd-arm64e-native/**
       - .github/workflows/neverd-arm64e-native.yml
@@ -23,6 +23,7 @@ jobs:
       revision: ${{ steps.policy.outputs.revision }}
       runners: ${{ steps.policy.outputs.runners }}
       legacy_runner: ${{ steps.policy.outputs.legacy_runner }}
+      native_timeout_minutes: ${{ steps.policy.outputs.native_timeout_minutes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -41,6 +42,7 @@ jobs:
               print('revision=' + policy['source_revision'], file=out)
               print('runners=' + json.dumps(policy['runners']), file=out)
               print('legacy_runner=' + policy['legacy_runner'], file=out)
+              print('native_timeout_minutes=' + str(policy['native_timeout_minutes']), file=out)
           PY
 
   legacy:
@@ -67,7 +69,7 @@ jobs:
   native:
     needs: [policy, legacy]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    timeout-minutes: ${{ fromJSON(needs.policy.outputs.native_timeout_minutes) }}
     strategy:
       fail-fast: false
       matrix:
