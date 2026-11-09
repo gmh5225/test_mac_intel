@@ -1,6 +1,7 @@
 """Exercise strict preflight ordering and owned build cleanup."""
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -88,7 +89,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         result = json.loads((self.output / self.policy["report_name"]).read_text())
         self.assertFalse(result[CASES["report_key"]])
 
-    def test_complete_reports_bind_startup_profile_and_native_publication(self):
+    def complete_reports(self, mutation=None):
         def complete(*args):
             startup = self.output / self.policy["startup_report"]
             startup.parent.mkdir(exist_ok=True)
@@ -100,15 +101,37 @@ class NativeEnvironmentTests(unittest.TestCase):
             installed.write_text(json.dumps({CASES["report_key"]: True,
                                             self.policy["publication_qualification_key"]: True,
                                             "source_revision": CASES["revision"]}))
+            executable = self.output / self.policy["executable_report"]
+            executable.parent.mkdir(exist_ok=True)
+            report = {self.policy["executable_qualification_key"]: True,
+                      "source_revision": CASES["revision"],
+                      "fixup_loader": self.policy["startup_fixup_loader"],
+                      "probe_report_sha256": hashlib.sha256(startup.read_bytes()).hexdigest()}
+            report.update(mutation or {})
+            executable.write_text(json.dumps(report))
             return 0
+        return complete
 
-        with mock.patch.object(run, "stage", side_effect=complete):
+    def test_complete_reports_bind_startup_profile_and_native_publication(self):
+        with mock.patch.object(run, "stage", side_effect=self.complete_reports()):
             self.assertEqual(run.execute(self.source, self.output, self.policy), 0)
         result = json.loads((self.output / self.policy["report_name"]).read_text())
         self.assertTrue(result[self.policy["startup_qualification_key"]])
         self.assertTrue(result[self.policy["publication_qualification_key"]])
+        self.assertTrue(result[self.policy["executable_qualification_key"]])
         self.assertEqual(result[self.policy["startup_fixup_loader_key"]],
                          self.policy["startup_fixup_loader"])
+
+    def test_executable_result_cannot_substitute_stale_or_wrong_profile_evidence(self):
+        for mutation in CASES["executable_mutations"]:
+            with self.subTest(mutation=mutation):
+                self.output = self.root / str(CASES["executable_mutations"].index(mutation))
+                with mock.patch.object(run, "stage", side_effect=self.complete_reports(mutation)), \
+                        self.assertRaises(ValueError):
+                    run.execute(self.source, self.output, self.policy)
+                result = json.loads((self.output / self.policy["report_name"]).read_text())
+                self.assertFalse(result[self.policy["executable_qualification_key"]])
+                self.assertFalse(result["passed"])
 
 
 if __name__ == "__main__":

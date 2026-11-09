@@ -1,6 +1,6 @@
 {
   "source_repository": "NeverSight/NeverD",
-  "source_revision": "ecb93958b046bdb22a5d256d18d4a278f97e3dbc",
+  "source_revision": "36c3d0639358edfae31139c4fd388b8ca904a917",
   "runners": [
     "macos-26",
     "xcode-27"
@@ -26,7 +26,8 @@
     "revision": "Checked-out NeverD revision differs from the pinned native source",
     "existing_build": "Native environment build directory already exists; preserve it and use a fresh checkout",
     "qualification": "Native installation did not publish a successful qualification",
-    "startup": "Native startup did not qualify the explicit userspace fixup profile"
+    "startup": "Native startup did not qualify the explicit userspace fixup profile",
+    "executable": "Native executable publication requires successful same-source tests bound to the startup probe"
   },
   "stages": [
     {
@@ -152,6 +153,21 @@
         "--legacy-fixtures",
         "{source}/../legacy-fixtures"
       ]
+    },
+    {
+      "name": "executable-publication",
+      "timeout": 900,
+      "argv": [
+        "python3",
+        "scripts/verify_arm64e_native.py",
+        "run-executable",
+        "--build-dir",
+        "{build}",
+        "--probe-report",
+        "{output}/startup/report.json",
+        "--output",
+        "{output}/executable"
+      ]
     }
   ],
   "legacy_runner": "macos-15",
@@ -161,5 +177,8 @@
   "startup_fixup_loader": "userspace",
   "startup_fixup_loader_key": "startup_fixup_loader",
   "startup_qualification_hash_key": "startup_qualification_sha256",
-  "native_timeout_minutes": 75
+  "native_timeout_minutes": 75,
+  "executable_report": "executable/report.json",
+  "executable_qualification_key": "native_executable_publication_qualified",
+  "executable_qualification_hash_key": "executable_qualification_sha256"
 }

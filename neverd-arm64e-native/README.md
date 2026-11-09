@@ -14,9 +14,9 @@ from an unavailable probe is a failed qualification, not a successful skipped jo
 Only a passing preflight permits a Release build with the configured LLVM r6
 package. `scripts/build.py` owns compilation and dependency refresh. The verifier
 checks signature parsing and real 4 KiB/16 KiB `codesign` page preservation,
-then requires all sixteen registered native installation/publication cases to run, with no
+then requires all twenty registered native installation/publication cases to run, with no
 skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language records and relocated
-original signed language frames, plus compact/DWARF publication through original entry addresses. It binds the source revision, fixture hashes,
+original signed language frames, plus compact/DWARF publication through original entry addresses for both chained and migrated threaded inputs. It binds the source revision, fixture hashes,
 preflight report and executed test binary. General whole-image publication stays
 outside this qualification.
 
@@ -41,6 +41,15 @@ SDK-derived process sandbox denies `map_with_linking_np`, causing dyld to apply
 fixups in userspace; all four PAC keys retain their valid/corrupt controls. The
 report binds both prerequisites and native publication to the same source SHA.
 Default system startup still fails and is not reported as qualified.
+
+After the twenty dylib cases, `run-executable` requires four additional
+O0/O2 compact/DWARF publication cases. Each runs its original main executable,
+then the signed published main through the retained startup entry, including
+new authenticated providers, RELRO, catches and cleanup. This stage re-derives
+the SDK sandbox profile and requires the exact successful startup report.
+The controller binds its result to that report's hash and the pinned source.
+Only this separate result grants `native_executable_publication_qualified`;
+general lifted-image publication remains unqualified.
 
 A separate macOS 15 producer compiles the four original threaded dylibs with its
 real `ld-classic`. It does not execute arm64e. The native jobs download those

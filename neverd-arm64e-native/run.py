@@ -43,6 +43,7 @@ def execute(source, output, policy=POLICY):
               policy["startup_qualification_key"]: False,
               policy["startup_fixup_loader_key"]: policy["startup_fixup_loader"],
               policy["publication_qualification_key"]: False,
+              policy["executable_qualification_key"]: False,
               "whole_image_publication_qualified": False, "stages": []}
     variables = {"source": str(source), "output": str(output), "build": str(build)}
     previous = signal.getsignal(signal.SIGTERM)
@@ -74,11 +75,21 @@ def execute(source, output, policy=POLICY):
                 not result.get(policy["publication_qualification_key"]) or
                 result.get("source_revision") != revision):
             raise ValueError(policy["errors"]["qualification"])
-        report[policy["startup_qualification_hash_key"]] = hashlib.sha256(startup.read_bytes()).hexdigest()
+        startup_hash = hashlib.sha256(startup.read_bytes()).hexdigest()
+        executable = output / policy["executable_report"]
+        launched = json.loads(executable.read_text())
+        if (not launched.get(policy["executable_qualification_key"]) or
+                launched.get("source_revision") != revision or
+                launched.get("probe_report_sha256") != startup_hash or
+                launched.get("fixup_loader") != policy["startup_fixup_loader"]):
+            raise ValueError(policy["errors"]["executable"])
+        report[policy["executable_qualification_hash_key"]] = hashlib.sha256(executable.read_bytes()).hexdigest()
+        report[policy["startup_qualification_hash_key"]] = startup_hash
         report["qualification_sha256"] = hashlib.sha256(qualification.read_bytes()).hexdigest()
         report["native_installer_call_unwind_qualified"] = True
         report[policy["startup_qualification_key"]] = True
         report[policy["publication_qualification_key"]] = True
+        report[policy["executable_qualification_key"]] = True
         report["passed"] = True
         return 0
     finally:
