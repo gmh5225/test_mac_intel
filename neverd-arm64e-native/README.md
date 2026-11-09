@@ -13,9 +13,9 @@ from an unavailable probe is a failed qualification, not a successful skipped jo
 
 Only a passing preflight permits a Release build with the configured LLVM r6
 package. `scripts/build.py` owns compilation and dependency refresh. The verifier
-then requires all twelve registered native installation cases to run, with no
+then requires all sixteen registered native installation/publication cases to run, with no
 skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language records and relocated
-original signed language frames. It binds the source revision, fixture hashes,
+original signed language frames, plus compact/DWARF publication through original entry addresses. It binds the source revision, fixture hashes,
 preflight report and executed test binary. General whole-image publication stays
 outside this qualification.
 
@@ -34,7 +34,12 @@ not prove PAC or signed-unwind support.
 The macOS 15 runner rejected the arm64e preview executable before entry. Newer
 runners execute PAC, but the compiler-original executable with static B-key
 fixups fails during startup; the equivalent `dlopen` library passes. Startup
-loading remains outside this dylib installation qualification.
+loading uses a separate explicit userspace-fixup prerequisite. The controller runs
+`probe-startup --startup-fixups userspace` before acquiring build inputs. This
+SDK-derived process sandbox denies `map_with_linking_np`, causing dyld to apply
+fixups in userspace; all four PAC keys retain their valid/corrupt controls. The
+report binds both prerequisites and native publication to the same source SHA.
+Default system startup still fails and is not reported as qualified.
 
 A separate macOS 15 producer compiles the four original threaded dylibs with its
 real `ld-classic`. It does not execute arm64e. The native jobs download those

@@ -40,6 +40,9 @@ def execute(source, output, policy=POLICY):
     output.mkdir(parents=True, exist_ok=False)
     report = {"source_revision": revision, "passed": False,
               "native_installer_call_unwind_qualified": False,
+              policy["startup_qualification_key"]: False,
+              policy["startup_fixup_loader_key"]: policy["startup_fixup_loader"],
+              policy["publication_qualification_key"]: False,
               "whole_image_publication_qualified": False, "stages": []}
     variables = {"source": str(source), "output": str(output), "build": str(build)}
     previous = signal.getsignal(signal.SIGTERM)
@@ -59,12 +62,23 @@ def execute(source, output, policy=POLICY):
                                           item["timeout"])
             if record["returncode"]:
                 return record["returncode"]
+        startup = output / policy["startup_report"]
+        control = json.loads(startup.read_text())
+        if (not control.get(policy["startup_qualification_key"]) or
+                control.get("source_revision") != revision or
+                control.get("fixup_loader") != policy["startup_fixup_loader"]):
+            raise ValueError(policy["errors"]["startup"])
         qualification = output / policy["qualification_report"]
         result = json.loads(qualification.read_text())
-        if not result.get("native_installer_call_unwind_qualified"):
+        if (not result.get("native_installer_call_unwind_qualified") or
+                not result.get(policy["publication_qualification_key"]) or
+                result.get("source_revision") != revision):
             raise ValueError(policy["errors"]["qualification"])
+        report[policy["startup_qualification_hash_key"]] = hashlib.sha256(startup.read_bytes()).hexdigest()
         report["qualification_sha256"] = hashlib.sha256(qualification.read_bytes()).hexdigest()
         report["native_installer_call_unwind_qualified"] = True
+        report[policy["startup_qualification_key"]] = True
+        report[policy["publication_qualification_key"]] = True
         report["passed"] = True
         return 0
     finally:
