@@ -14,9 +14,11 @@ from an unavailable probe is a failed qualification, not a successful skipped jo
 Only a passing preflight permits a Release build with the configured LLVM r6
 package. `scripts/build.py` owns compilation and dependency refresh. The verifier
 checks signature parsing and real 4 KiB/16 KiB `codesign` page preservation,
-then requires all twenty registered native installation/publication cases to run, with no
-skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language records and relocated
-original signed language frames, plus compact/DWARF publication through original entry addresses for both chained and migrated threaded inputs. It binds the source revision, fixture hashes,
+then requires all twenty registered native installation/publication cases to run,
+with no skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language
+records and relocated original signed language frames, plus compact/DWARF
+publication through original entry addresses for both chained and migrated
+threaded inputs. It binds the source revision, fixture hashes,
 preflight report and executed test binary. General whole-image publication stays
 outside this qualification.
 
