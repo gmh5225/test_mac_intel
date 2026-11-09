@@ -14,7 +14,7 @@ from an unavailable probe is a failed qualification, not a successful skipped jo
 Only a passing preflight permits a Release build with the configured LLVM r6
 package. `scripts/build.py` owns compilation and dependency refresh. The verifier
 then requires all twelve registered native installation cases to run, with no
-skips: O0/O2, chained/threaded fixups, compact/DWARF language records and relocated
+skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language records and relocated
 original signed language frames. It binds the source revision, fixture hashes,
 preflight report and executed test binary. General whole-image publication stays
 outside this qualification.
@@ -35,3 +35,17 @@ The macOS 15 runner rejected the arm64e preview executable before entry. Newer
 runners execute PAC, but the compiler-original executable with static B-key
 fixups fails during startup; the equivalent `dlopen` library passes. Startup
 loading remains outside this dylib installation qualification.
+
+A separate macOS 15 producer compiles the four original threaded dylibs with its
+real `ld-classic`. It does not execute arm64e. The native jobs download those
+owned test images and verify their source revision, source hashes and exact
+binary hashes before running the same installation matrix. New replacement
+objects and execution controls still come from each execution host's compiler.
+No Apple linker binaries are uploaded. A missing legacy linker fails the
+producer, and a missing or changed artifact fails qualification.
+
+The Xcode 27 diagnostic found the same lost authenticated import addend in a
+NeverD-installed threaded image and an unmodified `ld-classic` control. The
+native matrix explicitly converts legacy inputs to modern chained metadata
+before final signing; it does not claim unchanged threaded-output support on
+that runner. Original threaded encoding remains covered by offline tests.
