@@ -1,6 +1,6 @@
 {
   "source_repository": "NeverSight/NeverD",
-  "source_revision": "6b3ec9c6e7b9bbb592576f611b326df60aba79f6",
+  "source_revision": "ecb93958b046bdb22a5d256d18d4a278f97e3dbc",
   "runners": [
     "macos-26",
     "xcode-27"
@@ -112,6 +112,26 @@
         "{build}",
         "--target",
         "NeverDArm64eAnalysisTests",
+        "NeverDMachOSignerTests",
+        "NeverDMachOSignaturePolicyTests",
+        "--parallel",
+        "4"
+      ]
+    },
+    {
+      "name": "signing",
+      "timeout": 300,
+      "argv": [
+        "ctest",
+        "--test-dir",
+        "{build}",
+        "--build-config",
+        "Release",
+        "-L",
+        "^NeverDMachO(Signer|SignaturePolicy)Tests$",
+        "--output-on-failure",
+        "--output-junit",
+        "{output}/signing.xml",
         "--parallel",
         "4"
       ]
