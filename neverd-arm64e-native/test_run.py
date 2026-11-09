@@ -1,0 +1,82 @@
+"""Exercise strict preflight ordering and owned build cleanup."""
+
+import copy
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest import mock
+
+import run
+
+CASES = json.loads(Path(__file__).with_name("TestCases.def").read_text())
+
+
+class NativeEnvironmentTests(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.source = self.root / CASES["source_directory"]
+        self.source.mkdir()
+        self.output = self.root / CASES["output_directory"]
+        self.policy = copy.deepcopy(run.POLICY)
+        self.policy["source_revision"] = CASES["revision"]
+        self.build = self.source / self.policy["build_directory"]
+        patch = mock.patch.object(run.subprocess, "check_output", return_value=CASES["revision"])
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def test_unavailable_preflight_stops_before_tools_dependencies_and_build(self):
+        with mock.patch.object(run, "stage", return_value=CASES["stage_failure"]) as stage:
+            self.assertEqual(run.execute(self.source, self.output, self.policy), CASES["stage_failure"])
+        stage.assert_called_once()
+        report = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertFalse(report[CASES["report_key"]])
+        self.assertFalse(self.build.exists())
+
+    def test_wrong_revision_stops_before_output_or_execution(self):
+        self.policy["source_revision"] = CASES["wrong_revision"]
+        with mock.patch.object(run, "stage") as stage, self.assertRaises(ValueError):
+            run.execute(self.source, self.output, self.policy)
+        stage.assert_not_called()
+        self.assertFalse(self.output.exists())
+
+    def test_existing_build_is_never_reused_or_deleted(self):
+        self.build.mkdir()
+        product = self.build / CASES["partial_binary"]
+        product.write_text(CASES["payload"])
+        with self.assertRaises(ValueError):
+            run.execute(self.source, self.output, self.policy)
+        self.assertEqual(product.read_text(), CASES["payload"])
+
+    def test_partial_owned_build_is_removed_after_failure(self):
+        def fail(*args):
+            self.build.mkdir()
+            (self.build / CASES["partial_binary"]).write_text(CASES["payload"])
+            (self.build / CASES["diagnostic"]).write_text(CASES["diagnostic_payload"])
+            raise RuntimeError(CASES["exception"])
+
+        with mock.patch.object(run, "stage", side_effect=fail), self.assertRaises(RuntimeError):
+            run.execute(self.source, self.output, self.policy)
+        self.assertFalse(self.build.exists())
+        diagnostic = self.output / self.policy["build_diagnostics_directory"] / CASES["diagnostic"]
+        self.assertEqual(diagnostic.read_text(), CASES["diagnostic_payload"])
+        report = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertFalse(report[CASES["report_key"]])
+
+    def test_successful_processes_cannot_replace_native_qualification(self):
+        def complete(*args):
+            report = self.output / self.policy["qualification_report"]
+            report.parent.mkdir(exist_ok=True)
+            report.write_text(json.dumps({CASES["report_key"]: False}))
+            return 0
+
+        with mock.patch.object(run, "stage", side_effect=complete), self.assertRaises(ValueError):
+            run.execute(self.source, self.output, self.policy)
+        result = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertFalse(result[CASES["report_key"]])
+
+
+if __name__ == "__main__":
+    unittest.main()

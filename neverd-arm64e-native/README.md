@@ -1,0 +1,33 @@
+# Native Apple arm64e environment
+
+This workflow probes GitHub-hosted Apple Silicon macOS 15, macOS 26 and Xcode 27
+images. The labels come from GitHub's current
+[runner inventory](https://github.com/actions/runner-images/blob/main/README.md).
+The repository name does not select Intel hardware for these jobs.
+
+`Environment.def` pins the NeverD source and owns the runner list, commands,
+deadlines and build location. Each runner first executes NeverD's shared
+compiler-original four-key PAC gate and compact/DWARF C++ call/catch/cleanup
+controls. Disabled PAC, unavailable arm64e execution, a missing marker or a
+failed control stops the job before dependency downloads and building. Exit 2
+from an unavailable probe is a failed qualification, not a successful skipped job.
+
+Only a passing preflight permits a Release build with the configured LLVM r6
+package. `scripts/build.py` owns compilation and dependency refresh. The verifier
+then requires all twelve registered native installation cases to run, with no
+skips: O0/O2, chained/threaded fixups, compact/DWARF language records and relocated
+original signed language frames. It binds the source revision, fixture hashes,
+preflight report and executed test binary. General whole-image publication stays
+outside this qualification.
+
+Every job uploads complete or failed diagnostics. Generated preflight executables
+are journaled and removed by NeverD. The controller refuses an existing build
+directory, preserves configuration diagnostics, and removes its own build on
+completion or failure. It does not install another model or use model results as
+native execution evidence.
+
+No workflow changes boot policy, NVRAM or SIP, or reboots its host. On macOS
+versions that reject non-platform arm64e preview executables, an administrator
+must configure a dedicated compatible test host before native qualification can
+pass. The workflow reports observed availability; hosted runner labels alone do
+not prove PAC or signed-unwind support.
