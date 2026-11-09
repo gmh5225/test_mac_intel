@@ -61,6 +61,16 @@ objects and execution controls still come from each execution host's compiler.
 No Apple linker binaries are uploaded. A missing legacy linker fails the
 producer, and a missing or changed artifact fails qualification.
 
+The [cold source run](https://github.com/gmh5225/test_mac_intel/actions/runs/42694273043)
+builds NeverD `3e5fb93c816902d4b9893c1a54ffb353e3e3f117` independently on both
+native hosts. Each passes 33 signing tests, twenty dylib cases, four main cases
+and both six-control prerequisites without failures or skips; both owned builds
+are removed. The current pin additionally preserves loader-owned zero slots in
+main RELRO storage. Its [separate delivered-host replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42704012121)
+at `6eb5e0af5333e7419f402fa3704a6c2f523dcec9` passes all twenty dylib and four main
+cases on each host. That follow-up is an immutable binary delivery, with its own
+source/binary/report identities, rather than another cold source build.
+
 The Xcode 27 diagnostic found the same lost authenticated import addend in a
 NeverD-installed threaded image and an unmodified `ld-classic` control. The
 native matrix explicitly converts legacy inputs to modern chained metadata
