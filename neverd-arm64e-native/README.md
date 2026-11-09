@@ -14,9 +14,11 @@ from an unavailable probe is a failed qualification, not a successful skipped jo
 Only a passing preflight permits a Release build with the configured LLVM r6
 package. `scripts/build.py` owns compilation and dependency refresh. The verifier
 checks signature parsing and real 4 KiB/16 KiB `codesign` page preservation,
-then requires all sixteen registered native installation/publication cases to run, with no
-skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language records and relocated
-original signed language frames, plus compact/DWARF publication through original entry addresses. It binds the source revision, fixture hashes,
+then requires all twenty registered native installation/publication cases to run,
+with no skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language
+records and relocated original signed language frames, plus compact/DWARF
+publication through original entry addresses for both chained and migrated
+threaded inputs. It binds the source revision, fixture hashes,
 preflight report and executed test binary. General whole-image publication stays
 outside this qualification.
 
@@ -42,6 +44,15 @@ fixups in userspace; all four PAC keys retain their valid/corrupt controls. The
 report binds both prerequisites and native publication to the same source SHA.
 Default system startup still fails and is not reported as qualified.
 
+After the twenty dylib cases, `run-executable` requires four additional
+O0/O2 compact/DWARF publication cases. Each runs its original main executable,
+then the signed published main through the retained startup entry, including
+new authenticated providers, RELRO, catches and cleanup. This stage re-derives
+the SDK sandbox profile and requires the exact successful startup report.
+The controller binds its result to that report's hash and the pinned source.
+Only this separate result grants `native_executable_publication_qualified`;
+general lifted-image publication remains unqualified.
+
 A separate macOS 15 producer compiles the four original threaded dylibs with its
 real `ld-classic`. It does not execute arm64e. The native jobs download those
 owned test images and verify their source revision, source hashes and exact
@@ -49,6 +60,16 @@ binary hashes before running the same installation matrix. New replacement
 objects and execution controls still come from each execution host's compiler.
 No Apple linker binaries are uploaded. A missing legacy linker fails the
 producer, and a missing or changed artifact fails qualification.
+
+The [cold source run](https://github.com/gmh5225/test_mac_intel/actions/runs/42694273043)
+builds NeverD `3e5fb93c816902d4b9893c1a54ffb353e3e3f117` independently on both
+native hosts. Each passes 33 signing tests, twenty dylib cases, four main cases
+and both six-control prerequisites without failures or skips; both owned builds
+are removed. The current pin additionally preserves loader-owned zero slots in
+main RELRO storage. Its [separate delivered-host replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42704012121)
+at `6eb5e0af5333e7419f402fa3704a6c2f523dcec9` passes all twenty dylib and four main
+cases on each host. That follow-up is an immutable binary delivery, with its own
+source/binary/report identities, rather than another cold source build.
 
 The Xcode 27 diagnostic found the same lost authenticated import addend in a
 NeverD-installed threaded image and an unmodified `ld-classic` control. The
