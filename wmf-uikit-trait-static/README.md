@@ -14,3 +14,5 @@ retention. Successful compilation is collection evidence only; current ABI,
 capture extent, lifetime, effects and original-body proofs remain separate.
 
 The follow-up captures weak self as well as DynamicSelf metadata. The prior successful metadata-only capture sample is retained independently; neither sample is treated as original capture-layout or lifetime permission.
+
+This follow-up uses the same authored weak/DynamicSelf source with -Onone to retain the separate closure implementation and forwarding declarations. Exactly 14 static commands and the same five SDK targets remain allowed. The optimized collection remains independently retained. No callback, executable, Simulator, original image or provider is run; original machine/body/identity/lifetime proofs remain mandatory.

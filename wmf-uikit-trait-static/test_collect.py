@@ -53,6 +53,10 @@ class StaticBoundaryTests(unittest.TestCase):
         command = c.compiler_command(c.PROFILES[0], roots['iphoneos'],
                                      Path('/out/authored.swift'), Path('/out/arm64-ios.ll'), 'ir')
         self.assertTrue(c.permitted(command, roots, Path('/out/authored.swift'), Path('/out')))
+        self.assertIn('-Onone', command)
+        optimized = ['-O' if item == '-Onone' else item for item in command]
+        self.assertFalse(c.permitted(optimized, roots,
+                                     Path('/out/authored.swift'), Path('/out')))
         for addition in ('-emit-executable', '-Xfrontend', '/out/WMF'):
             self.assertFalse(c.permitted(command + [addition], roots,
                                          Path('/out/authored.swift'), Path('/out')))

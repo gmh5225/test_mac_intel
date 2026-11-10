@@ -60,7 +60,7 @@ def compiler_command(profile, sdk, source, output, mode):
     label, kind, target = profile
     sdk, source, output = Path(sdk), Path(source), Path(output)
     command = ['xcrun', 'swiftc', '-sdk', str(sdk), '-target', target,
-               '-parse-as-library', '-O', '-module-name', 'AuthoredUIKitTraitMetadata',
+               '-parse-as-library', '-Onone', '-module-name', 'AuthoredUIKitTraitMetadata',
                '-emit-' + mode, str(source), '-o', str(output)]
     if kind == 'macosx':
         command += ['-F', str(sdk / 'System/iOSSupport/System/Library/Frameworks'),
