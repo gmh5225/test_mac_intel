@@ -1,0 +1,38 @@
+{
+  "source_repository": "NeverSight/NeverD",
+  "source_revision": "e4668e4c6fe5862b9b5f1215aaa2431ae1724235",
+  "runners": [
+    "macos-26",
+    "xcode-27"
+  ],
+  "timeout_minutes": 20,
+  "source": "neverd",
+  "evidence": "entry-replay-evidence",
+  "asset": "entry-host.tar.gz",
+  "asset_sha256": "362e95a38197ea433e1d971adf6b133a3ab79247ad7aa2402069422a4c42fcf2",
+  "release": "neverd-arm64e-native-entry",
+  "repository": "gmh5225/test_mac_intel",
+  "download": [
+    "gh",
+    "release",
+    "download",
+    "{release}",
+    "--repo",
+    "{repository}",
+    "--pattern",
+    "{asset}"
+  ],
+  "host": "NeverDArm64eAnalysisTests",
+  "manifest": "manifest.json",
+  "compiler": "/usr/bin/clang++",
+  "probe": "probe",
+  "entries": "entries",
+  "report": "delivery-report.json",
+  "errors": {
+    "source": "The checked-out source differs from the pinned entry implementation",
+    "archive": "The delivered entry test archive hash differs",
+    "identity": "The delivered entry test host/source identity differs",
+    "probe": "Compiler-original PAC and signed unwinding are not qualified",
+    "entry": "The complete reconstructed entry matrix did not qualify"
+  }
+}
