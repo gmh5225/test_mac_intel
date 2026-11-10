@@ -69,7 +69,7 @@ The [cold source run](https://github.com/gmh5225/test_mac_intel/actions/runs/426
 builds NeverD `3e5fb93c816902d4b9893c1a54ffb353e3e3f117` independently on both
 native hosts. Each passes 33 signing tests, twenty dylib cases, four main cases
 and both six-control prerequisites without failures or skips; both owned builds
-are removed. The current pin additionally preserves loader-owned zero slots in
+are removed. The later loader-slot fix preserves dyld-owned zero slots in
 main RELRO storage. Its [separate delivered-host replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42704012121)
 at `6eb5e0af5333e7419f402fa3704a6c2f523dcec9` passes all twenty dylib and four main
 cases on each host. That follow-up is an immutable binary delivery, with its own
@@ -85,3 +85,14 @@ The native build deadline is 50 minutes and the enclosing job deadline is 75
 minutes, both owned by `Environment.def`. A macOS 26 cold build reached
 1433 of 1435 actions at the former 40-minute deadline. A build timeout remains
 a failed qualification and retains diagnostics before removing its owned build.
+
+The [default-system publication replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42746949630)
+qualifies the current source pin `e5a0fddc68b2fd03c2f25445aca674cef32ab3e6`
+on both hosts with 20 dylib, 4 userspace-main and 4 default-system-main cases
+each, zero failures and zero skips. Both prerequisite profiles pass all six
+controls. The default gate launches CTest directly and binds the system probe
+hash. This replay uses one identified local Release/r6 binary; it is not a cold
+source build. The temporary delivery and workflow are removed after preserving
+source, binary and report hashes. Current native hosts are Apple M1 virtual
+CPUs; the Xcode 27 host reports CPA and CPA2 absent. FVP success remains separate
+from native Apple CPTA-on qualification.
