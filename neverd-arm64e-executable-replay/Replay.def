@@ -55,5 +55,90 @@
     "llvm@22"
   ],
   "ir_compiler_suffix": "bin/clang++",
-  "ir_tools_timeout": 900
+  "ir_tools_timeout": 900,
+  "diagnostic": {
+    "directory": "producer-control",
+    "case": "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedIREntriesExecute/0",
+    "fixture_glob": "neverd-auth-object-*",
+    "timeout": 120,
+    "compile_ir": [
+      "{compiler}",
+      "-target",
+      "arm64e-apple-macosx14.0.0",
+      "-c",
+      "{fixture}/native-object.ll",
+      "-o",
+      "{fixture}/clang22-object.o"
+    ],
+    "objects": [
+      "native-object.o",
+      "clang22-object.o"
+    ],
+    "link": [
+      "/usr/bin/clang++",
+      "-arch",
+      "arm64e",
+      "-std=c++20",
+      "-fno-omit-frame-pointer",
+      "-fno-optimize-sibling-calls",
+      "-dynamiclib",
+      "-O0",
+      "-DNEVERD_AUTH_CONTROL",
+      "{fixture}/fixture.cpp",
+      "{fixture}/{object}",
+      "{fixture}/provider.cpp",
+      "{fixture}/native-runtime.cpp",
+      "-o",
+      "{fixture}/{object}.dylib"
+    ],
+    "run": [
+      "{fixture}/native-loader.out",
+      "{fixture}/{object}.dylib"
+    ],
+    "debug": [
+      "/usr/bin/xcrun",
+      "lldb",
+      "--batch",
+      "-o",
+      "settings set target.disable-aslr false",
+      "-o",
+      "run",
+      "-o",
+      "bt",
+      "-o",
+      "register read pc lr sp fp",
+      "--",
+      "{fixture}/native-loader.out",
+      "{fixture}/{object}.dylib"
+    ],
+    "inspect": [
+      "native-object.o",
+      "clang22-object.o",
+      "native-object.o.dylib",
+      "clang22-object.o.dylib",
+      "installed.dylib"
+    ],
+    "dumps": [
+      [
+        "/usr/bin/xcrun",
+        "dwarfdump",
+        "--eh-frame"
+      ],
+      [
+        "/usr/bin/xcrun",
+        "otool",
+        "-l"
+      ],
+      [
+        "/usr/bin/xcrun",
+        "otool",
+        "-tvV"
+      ]
+    ],
+    "test_log": "test.json",
+    "compile_log": "compile-ir.json",
+    "record_suffix": ".json",
+    "run_suffix": "-run",
+    "debug_suffix": "-debug"
+  }
 }

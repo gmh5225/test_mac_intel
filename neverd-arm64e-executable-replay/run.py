@@ -1,6 +1,7 @@
 """Diagnose executable publication with an immutable locally built test host."""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -9,6 +10,39 @@ import tarfile
 POLICY = json.loads(Path(__file__).with_name("Replay.def").read_text())
 sys.path.insert(0, str(Path(POLICY["source"]) / "scripts"))
 import verify_arm64e_native as native
+
+
+def diagnose_producer(root, binary, compiler):
+    policy = POLICY["diagnostic"]
+    output = root / policy["directory"]
+    output.mkdir()
+    variables = {"compiler": str(compiler)}
+
+    def run(name, argv, env=None):
+        command = [arg.format_map(variables) for arg in argv]
+        result = subprocess.run(command, capture_output=True, text=True,
+                                env=env, timeout=policy["timeout"])
+        native.save(output / name, {"argv": command, "returncode": result.returncode,
+                                    "stdout": result.stdout, "stderr": result.stderr})
+        return result.returncode
+
+    env = dict(os.environ, **native.POLICY["test_environment"])
+    env[native.POLICY["artifact_environment"]] = str(output)
+    env[native.fixture_contract()["ir_compiler_environment"]] = str(compiler)
+    run(policy["test_log"], [str(binary), native.POLICY["gtest_prefix"] + policy["case"]], env)
+    fixture, = output.glob(policy["fixture_glob"])
+    variables["fixture"] = str(fixture)
+    run(policy["compile_log"], policy["compile_ir"])
+    for obj in policy["objects"]:
+        variables["object"] = obj
+        if not run(obj + policy["record_suffix"], policy["link"]):
+            run(obj + policy["run_suffix"] + policy["record_suffix"], policy["run"])
+            run(obj + policy["debug_suffix"] + policy["record_suffix"], policy["debug"])
+    for name in policy["inspect"]:
+        path = fixture / name
+        if path.is_file():
+            for index, argv in enumerate(policy["dumps"]):
+                run(name + str(index) + policy["record_suffix"], [*argv, str(path)])
 
 
 def main():
@@ -74,6 +108,7 @@ def main():
         subprocess.run(POLICY["ir_tools"], check=True, timeout=POLICY["ir_tools_timeout"])
         prefix = subprocess.check_output(POLICY["ir_prefix"], text=True).strip()
         compiler = Path(prefix) / POLICY["ir_compiler_suffix"]
+        diagnose_producer(root, binary, compiler)
         for executable, name in ((False, "generated_installation"),
                                  (True, "generated_executable_installation")):
             generated = root / POLICY[name]
