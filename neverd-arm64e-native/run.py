@@ -46,6 +46,7 @@ def execute(source, output, policy=POLICY):
               policy["executable_qualification_key"]: False,
               policy["default_executable_qualification_key"]: False,
               "whole_image_publication_qualified": False, "stages": []}
+    report.update({item["key"]: False for item in policy["generated_reports"]})
     variables = {"source": str(source), "output": str(output), "build": str(build)}
     previous = signal.getsignal(signal.SIGTERM)
 
@@ -55,6 +56,11 @@ def execute(source, output, policy=POLICY):
     signal.signal(signal.SIGTERM, terminate)
     try:
         for item in policy["stages"]:
+            if "{ir_compiler}" in item["argv"] and "ir_compiler" not in variables:
+                prefix = subprocess.check_output(policy["ir_compiler_prefix_command"],
+                                                 cwd=source, text=True,
+                                                 timeout=policy["ir_compiler_timeout"]).strip()
+                variables["ir_compiler"] = str(Path(prefix) / policy["ir_compiler_suffix"])
             argv = [value.format_map(variables) for value in item["argv"]]
             record = {"name": item["name"], "argv": argv, "returncode": None}
             report["stages"].append(record)
@@ -94,6 +100,16 @@ def execute(source, output, policy=POLICY):
                 default.get("probe_report_sha256") != hashlib.sha256(probe.read_bytes()).hexdigest()):
             raise ValueError(policy["errors"]["default_executable"])
         report[policy["default_executable_qualification_hash_key"]] = hashlib.sha256(default_executable.read_bytes()).hexdigest()
+        for item in policy["generated_reports"]:
+            path = output / item["path"]
+            generated = json.loads(path.read_text())
+            if (not generated.get(item["key"]) or
+                    generated.get("source_revision") != revision or
+                    generated.get("fixup_loader") != policy["default_fixup_loader"] or
+                    generated.get("probe_report_sha256") != hashlib.sha256(probe.read_bytes()).hexdigest() or
+                    not generated.get("ir_compiler", {}).get("sha256")):
+                raise ValueError(policy["errors"]["generated"])
+            report[item["key"]] = True
         report[policy["startup_qualification_hash_key"]] = startup_hash
         report["qualification_sha256"] = hashlib.sha256(qualification.read_bytes()).hexdigest()
         report["native_installer_call_unwind_qualified"] = True

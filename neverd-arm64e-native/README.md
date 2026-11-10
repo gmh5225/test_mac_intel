@@ -87,7 +87,7 @@ minutes, both owned by `Environment.def`. A macOS 26 cold build reached
 a failed qualification and retains diagnostics before removing its owned build.
 
 The [default-system publication replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42746949630)
-qualifies the current source pin `e5a0fddc68b2fd03c2f25445aca674cef32ab3e6`
+qualifies source `e5a0fddc68b2fd03c2f25445aca674cef32ab3e6`
 on both hosts with 20 dylib, 4 userspace-main and 4 default-system-main cases
 each, zero failures and zero skips. Both prerequisite profiles pass all six
 controls. The default gate launches CTest directly and binds the system probe
@@ -96,3 +96,13 @@ source build. The temporary delivery and workflow are removed after preserving
 source, binary and report hashes. Current native hosts are Apple M1 virtual
 CPUs; the Xcode 27 host reports CPA and CPA2 absent. FVP success remains separate
 from native Apple CPTA-on qualification.
+
+
+The canonical-IR producer adds two independent four-case gates: generated dylib
+publication and generated main-executable publication under the system loader.
+They select the installed Clang 22 frontend explicitly, retain its version/hash,
+and use the r6 NeverD MC object backend. Authentication recipes, new providers,
+RELRO and signed language frames pass through the same transactional installer.
+`Environment.def` owns both stage commands; the controller binds their reports
+to the same source and system probe. Their separate qualification flags do not
+qualify arbitrary lifted modules or native Apple CPTA-on.

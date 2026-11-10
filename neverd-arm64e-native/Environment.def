@@ -1,6 +1,6 @@
 {
   "source_repository": "NeverSight/NeverD",
-  "source_revision": "e5a0fddc68b2fd03c2f25445aca674cef32ab3e6",
+  "source_revision": "f8c7a979e1cc365599685317bbd4d52fb2ef8720",
   "runners": [
     "macos-26",
     "xcode-27"
@@ -28,7 +28,8 @@
     "qualification": "Native installation did not publish a successful qualification",
     "startup": "Native startup did not qualify the explicit userspace fixup profile",
     "executable": "Native executable publication requires successful same-source tests bound to the startup probe",
-    "default_executable": "Default system executable publication requires same-source PAC/unwind controls and a complete unsandboxed publication result"
+    "default_executable": "Default system executable publication requires same-source PAC/unwind controls and a complete unsandboxed publication result",
+    "generated": "Generated native publication requires exact source and system preflight identities, compiler provenance and a complete runtime matrix"
   },
   "stages": [
     {
@@ -184,6 +185,40 @@
         "--output",
         "{output}/default-executable"
       ]
+    },
+    {
+      "name": "generated-publication",
+      "timeout": 900,
+      "argv": [
+        "python3",
+        "scripts/verify_arm64e_native.py",
+        "run-generated",
+        "--build-dir",
+        "{build}",
+        "--probe-report",
+        "{output}/probe/report.json",
+        "--ir-compiler",
+        "{ir_compiler}",
+        "--output",
+        "{output}/generated"
+      ]
+    },
+    {
+      "name": "generated-executable-publication",
+      "timeout": 900,
+      "argv": [
+        "python3",
+        "scripts/verify_arm64e_native.py",
+        "run-generated-executable",
+        "--build-dir",
+        "{build}",
+        "--probe-report",
+        "{output}/probe/report.json",
+        "--ir-compiler",
+        "{ir_compiler}",
+        "--output",
+        "{output}/generated-executable"
+      ]
     }
   ],
   "legacy_runner": "macos-15",
@@ -201,5 +236,22 @@
   "default_executable_qualification_key": "native_default_executable_publication_qualified",
   "default_executable_qualification_hash_key": "default_executable_qualification_sha256",
   "default_fixup_loader": "system",
-  "probe_report": "probe/report.json"
+  "probe_report": "probe/report.json",
+  "ir_compiler_prefix_command": [
+    "brew",
+    "--prefix",
+    "llvm@22"
+  ],
+  "ir_compiler_suffix": "bin/clang++",
+  "ir_compiler_timeout": 30,
+  "generated_reports": [
+    {
+      "path": "generated/report.json",
+      "key": "native_generated_ir_publication_qualified"
+    },
+    {
+      "path": "generated-executable/report.json",
+      "key": "native_generated_executable_publication_qualified"
+    }
+  ]
 }

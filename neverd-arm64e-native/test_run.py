@@ -89,7 +89,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         result = json.loads((self.output / self.policy["report_name"]).read_text())
         self.assertFalse(result[CASES["report_key"]])
 
-    def complete_reports(self, mutation=None, default_mutation=None):
+    def complete_reports(self, mutation=None, default_mutation=None, generated_mutation=None):
         def complete(*args):
             startup = self.output / self.policy["startup_report"]
             startup.parent.mkdir(exist_ok=True)
@@ -120,6 +120,15 @@ class NativeEnvironmentTests(unittest.TestCase):
                       "probe_report_sha256": hashlib.sha256(probe.read_bytes()).hexdigest()}
             report.update(default_mutation or {})
             default.write_text(json.dumps(report))
+            for item in self.policy["generated_reports"]:
+                path = self.output / item["path"]
+                path.parent.mkdir(exist_ok=True)
+                report = {item["key"]: True, "source_revision": CASES["revision"],
+                          "fixup_loader": self.policy["default_fixup_loader"],
+                          "probe_report_sha256": hashlib.sha256(probe.read_bytes()).hexdigest(),
+                          "ir_compiler": {"sha256": CASES["compiler_hash"]}}
+                report.update(generated_mutation or {})
+                path.write_text(json.dumps(report))
             return 0
         return complete
 
@@ -154,6 +163,16 @@ class NativeEnvironmentTests(unittest.TestCase):
                     run.execute(self.source, self.output, self.policy)
                 result = json.loads((self.output / self.policy["report_name"]).read_text())
                 self.assertFalse(result[self.policy["default_executable_qualification_key"]])
+                self.assertFalse(result["passed"])
+
+    def test_generated_publication_requires_current_system_probe_and_frontend(self):
+        for index, mutation in enumerate(CASES["generated_mutations"]):
+            with self.subTest(mutation=mutation):
+                self.output = self.root / str(index)
+                with mock.patch.object(run, "stage", side_effect=self.complete_reports(
+                        generated_mutation=mutation)), self.assertRaises(ValueError):
+                    run.execute(self.source, self.output, self.policy)
+                result = json.loads((self.output / self.policy["report_name"]).read_text())
                 self.assertFalse(result["passed"])
 
 

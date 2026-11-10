@@ -1,0 +1,59 @@
+{
+  "source_revision": "f8c7a979e1cc365599685317bbd4d52fb2ef8720",
+  "asset": "native-generated-image-host.tar.gz",
+  "asset_sha256": "876ed0c1cd767176805834a953636124c3ce2f46aa2bbcd294ff2448f3ee2124",
+  "release": "neverd-arm64e-generated-image-20261110",
+  "repository": "gmh5225/test_mac_intel",
+  "source": "neverd",
+  "evidence": "generated-image-replay-evidence",
+  "host": "NeverDArm64eAnalysisTests",
+  "manifest": "manifest.json",
+  "download": [
+    "gh",
+    "release",
+    "download",
+    "{release}",
+    "--repo",
+    "{repository}",
+    "--pattern",
+    "{asset}"
+  ],
+  "ctest_registry": "CTestTestfile.cmake",
+  "test_definition": "add_test([=[{case}]=] [=[{binary}]=] [=[--gtest_filter={case}]=])\n",
+  "report": "replay-report.json",
+  "probe": "startup",
+  "installation": "installation",
+  "build": "build",
+  "source_mismatch": "Replay source does not match the pinned source",
+  "asset_mismatch": "Replay asset hash mismatch",
+  "binary_mismatch": "Replay test host does not match the build manifest",
+  "probe_failed": "Native startup preflight did not qualify",
+  "installation_failed": "Native executable cases did not qualify",
+  "runners": [
+    "macos-26",
+    "xcode-27"
+  ],
+  "legacy_runner": "macos-15",
+  "replay_timeout": 25,
+  "legacy_timeout": 10,
+  "preflight": "probe",
+  "legacy_fixtures": "legacy-fixtures",
+  "dylib_installation": "dylib-installation",
+  "test_timeout": 120,
+  "test_properties": "set_tests_properties([=[{case}]=] PROPERTIES SKIP_REGULAR_EXPRESSION [==[\\[  SKIPPED \\]]==] TIMEOUT {test_timeout})\n",
+  "default_installation": "default-installation",
+  "generated_installation": "generated",
+  "generated_executable_installation": "generated-executable",
+  "ir_tools": [
+    "brew",
+    "install",
+    "llvm@22"
+  ],
+  "ir_prefix": [
+    "brew",
+    "--prefix",
+    "llvm@22"
+  ],
+  "ir_compiler_suffix": "bin/clang++",
+  "ir_tools_timeout": 900
+}
