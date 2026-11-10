@@ -1,7 +1,7 @@
 {
-  "source_revision": "f8c7a979e1cc365599685317bbd4d52fb2ef8720",
-  "asset": "native-generated-image-host.tar.gz",
-  "asset_sha256": "876ed0c1cd767176805834a953636124c3ce2f46aa2bbcd294ff2448f3ee2124",
+  "source_revision": "0d3511620291254bffcaa90a356870016f2741f4",
+  "asset": "native-generated-fixed-fork-host.tar.gz",
+  "asset_sha256": "7476e9284e5358843f048757d55689e2c626bd6c534b74d4aea09e811745baf0",
   "release": "neverd-arm64e-generated-image-20261110",
   "repository": "gmh5225/test_mac_intel",
   "source": "neverd",
@@ -56,127 +56,5 @@
   ],
   "ir_compiler_suffix": "bin/clang++",
   "ir_tools_timeout": 900,
-  "diagnostic": {
-    "directory": "producer-control",
-    "case": "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedIREntriesExecute/0",
-    "fixture_glob": "neverd-auth-object-*",
-    "timeout": 120,
-    "compile_ir": [
-      "{compiler}",
-      "-target",
-      "arm64e-apple-macosx14.0.0",
-      "-c",
-      "{fixture}/native-object.ll",
-      "-o",
-      "{fixture}/clang22-object.o"
-    ],
-    "objects": [
-      "native-object.o",
-      "clang22-object.o",
-      "apple-assembled.o",
-      "darwin-cfi.o"
-    ],
-    "link": [
-      "/usr/bin/clang++",
-      "-arch",
-      "arm64e",
-      "-std=c++20",
-      "-fno-omit-frame-pointer",
-      "-fno-optimize-sibling-calls",
-      "-dynamiclib",
-      "-O0",
-      "-DNEVERD_AUTH_CONTROL",
-      "{fixture}/fixture.cpp",
-      "{fixture}/{object}",
-      "{fixture}/provider.cpp",
-      "{fixture}/native-runtime.cpp",
-      "-o",
-      "{fixture}/{object}.dylib"
-    ],
-    "run": [
-      "{fixture}/native-loader.out",
-      "{fixture}/{object}.dylib"
-    ],
-    "debug": [
-      "/usr/bin/xcrun",
-      "lldb",
-      "--batch",
-      "-o",
-      "settings set target.disable-aslr false",
-      "-o",
-      "run",
-      "-k",
-      "bt",
-      "-k",
-      "register read pc lr sp fp",
-      "--",
-      "{fixture}/native-loader.out",
-      "{fixture}/{object}.dylib"
-    ],
-    "inspect": [
-      "native-object.o",
-      "clang22-object.o",
-      "native-object.o.dylib",
-      "clang22-object.o.dylib",
-      "installed.dylib",
-      "apple-assembled.o",
-      "darwin-cfi.o",
-      "darwin-cfi.o.dylib"
-    ],
-    "dumps": [
-      [
-        "/usr/bin/xcrun",
-        "dwarfdump",
-        "--eh-frame"
-      ],
-      [
-        "/usr/bin/xcrun",
-        "otool",
-        "-l"
-      ],
-      [
-        "/usr/bin/xcrun",
-        "otool",
-        "-tvV"
-      ]
-    ],
-    "test_log": "test.json",
-    "compile_log": "compile-ir.json",
-    "record_suffix": ".json",
-    "run_suffix": "-run",
-    "debug_suffix": "-debug",
-    "compile_asm": [
-      "{compiler}",
-      "-target",
-      "arm64e-apple-macosx14.0.0",
-      "-S",
-      "{fixture}/native-object.ll",
-      "-o",
-      "{fixture}/clang22-object.s"
-    ],
-    "assemble": [
-      "/usr/bin/clang++",
-      "-target",
-      "arm64e-apple-macosx14.0.0",
-      "-c",
-      "{fixture}/{assembly}",
-      "-o",
-      "{fixture}/{object}"
-    ],
-    "assembly": "clang22-object.s",
-    "darwin_assembly": "darwin-cfi.s",
-    "directive": ".cfi_negate_ra_state",
-    "ablation_log": "cfi-ablation.json",
-    "compile_asm_log": "compile-asm.json",
-    "assembly_controls": [
-      [
-        "clang22-object.s",
-        "apple-assembled.o"
-      ],
-      [
-        "darwin-cfi.s",
-        "darwin-cfi.o"
-      ]
-    ]
-  }
+  "llvm_revision": "5676029e378c9e37adc16c8216a8e8453ffafcae"
 }

@@ -103,7 +103,6 @@ source, binary and report hashes. Current native hosts are Apple M1 virtual
 CPUs; the Xcode 27 host reports CPA and CPA2 absent. FVP success remains separate
 from native Apple CPTA-on qualification.
 
-
 The canonical-IR producer adds two independent four-case gates: generated dylib
 publication and generated main-executable publication under the system loader.
 They select the installed Clang 22 frontend explicitly, retain its version/hash,
@@ -122,3 +121,14 @@ has merged. Its [independent native controls](https://github.com/gmh5225/test_ma
 pass all four O0/O2 compact/DWARF cases and all six preflight controls on each
 host. These controls use Apple linking without NeverD installation; the source
 profile above separately qualifies the generated-image publication pipeline.
+
+The [generated-image cold source run](https://github.com/gmh5225/test_mac_intel/actions/runs/42762192123)
+uses NeverD `eabb96c44b7abaac2f628851968c05a090de5b5d` and merged LLVM
+`5676029e378c9e37adc16c8216a8e8453ffafcae`. Both hosts independently pass
+36 native cases, 33 signing tests and both six-control prerequisites, with no
+failures or skips. This includes all eight generated dylib/main cases with
+Clang 22.1.8 as the explicit IR frontend. Source, compiler, test-binary, probe
+and XML hashes were independently checked, and both owned builds were removed.
+Both hosts report Apple M1 virtual CPUs; macOS 26 does not expose the CPA/CPA2
+sysctls, while Xcode 27 reports both features as zero. Native CPTA-on remains
+unqualified.
