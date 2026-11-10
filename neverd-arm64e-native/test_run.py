@@ -89,7 +89,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         result = json.loads((self.output / self.policy["report_name"]).read_text())
         self.assertFalse(result[CASES["report_key"]])
 
-    def complete_reports(self, mutation=None):
+    def complete_reports(self, mutation=None, default_mutation=None):
         def complete(*args):
             startup = self.output / self.policy["startup_report"]
             startup.parent.mkdir(exist_ok=True)
@@ -109,6 +109,17 @@ class NativeEnvironmentTests(unittest.TestCase):
                       "probe_report_sha256": hashlib.sha256(startup.read_bytes()).hexdigest()}
             report.update(mutation or {})
             executable.write_text(json.dumps(report))
+            probe = self.output / self.policy["probe_report"]
+            probe.parent.mkdir(exist_ok=True)
+            probe.write_text(json.dumps({"source_revision": CASES["revision"]}))
+            default = self.output / self.policy["default_executable_report"]
+            default.parent.mkdir(exist_ok=True)
+            report = {self.policy["default_executable_qualification_key"]: True,
+                      "source_revision": CASES["revision"],
+                      "fixup_loader": self.policy["default_fixup_loader"],
+                      "probe_report_sha256": hashlib.sha256(probe.read_bytes()).hexdigest()}
+            report.update(default_mutation or {})
+            default.write_text(json.dumps(report))
             return 0
         return complete
 
@@ -119,6 +130,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         self.assertTrue(result[self.policy["startup_qualification_key"]])
         self.assertTrue(result[self.policy["publication_qualification_key"]])
         self.assertTrue(result[self.policy["executable_qualification_key"]])
+        self.assertTrue(result[self.policy["default_executable_qualification_key"]])
         self.assertEqual(result[self.policy["startup_fixup_loader_key"]],
                          self.policy["startup_fixup_loader"])
 
@@ -131,6 +143,17 @@ class NativeEnvironmentTests(unittest.TestCase):
                     run.execute(self.source, self.output, self.policy)
                 result = json.loads((self.output / self.policy["report_name"]).read_text())
                 self.assertFalse(result[self.policy["executable_qualification_key"]])
+                self.assertFalse(result["passed"])
+
+    def test_default_startup_cannot_substitute_userspace_or_stale_evidence(self):
+        for index, mutation in enumerate(CASES["default_executable_mutations"]):
+            with self.subTest(mutation=mutation):
+                self.output = self.root / str(index)
+                with mock.patch.object(run, "stage", side_effect=self.complete_reports(
+                        default_mutation=mutation)), self.assertRaises(ValueError):
+                    run.execute(self.source, self.output, self.policy)
+                result = json.loads((self.output / self.policy["report_name"]).read_text())
+                self.assertFalse(result[self.policy["default_executable_qualification_key"]])
                 self.assertFalse(result["passed"])
 
 

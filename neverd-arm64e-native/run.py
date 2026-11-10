@@ -44,6 +44,7 @@ def execute(source, output, policy=POLICY):
               policy["startup_fixup_loader_key"]: policy["startup_fixup_loader"],
               policy["publication_qualification_key"]: False,
               policy["executable_qualification_key"]: False,
+              policy["default_executable_qualification_key"]: False,
               "whole_image_publication_qualified": False, "stages": []}
     variables = {"source": str(source), "output": str(output), "build": str(build)}
     previous = signal.getsignal(signal.SIGTERM)
@@ -84,12 +85,22 @@ def execute(source, output, policy=POLICY):
                 launched.get("fixup_loader") != policy["startup_fixup_loader"]):
             raise ValueError(policy["errors"]["executable"])
         report[policy["executable_qualification_hash_key"]] = hashlib.sha256(executable.read_bytes()).hexdigest()
+        default_executable = output / policy["default_executable_report"]
+        default = json.loads(default_executable.read_text())
+        probe = output / policy["probe_report"]
+        if (not default.get(policy["default_executable_qualification_key"]) or
+                default.get("source_revision") != revision or
+                default.get("fixup_loader") != policy["default_fixup_loader"] or
+                default.get("probe_report_sha256") != hashlib.sha256(probe.read_bytes()).hexdigest()):
+            raise ValueError(policy["errors"]["default_executable"])
+        report[policy["default_executable_qualification_hash_key"]] = hashlib.sha256(default_executable.read_bytes()).hexdigest()
         report[policy["startup_qualification_hash_key"]] = startup_hash
         report["qualification_sha256"] = hashlib.sha256(qualification.read_bytes()).hexdigest()
         report["native_installer_call_unwind_qualified"] = True
         report[policy["startup_qualification_key"]] = True
         report[policy["publication_qualification_key"]] = True
         report[policy["executable_qualification_key"]] = True
+        report[policy["default_executable_qualification_key"]] = True
         report["passed"] = True
         return 0
     finally:

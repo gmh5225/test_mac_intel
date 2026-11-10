@@ -42,7 +42,7 @@ loading uses a separate explicit userspace-fixup prerequisite. The controller ru
 SDK-derived process sandbox denies `map_with_linking_np`, causing dyld to apply
 fixups in userspace; all four PAC keys retain their valid/corrupt controls. The
 report binds both prerequisites and native publication to the same source SHA.
-Default system startup still fails and is not reported as qualified.
+An unchanged compiler-original main with B-key chains remains a separate failing control; it is not silently retried or counted as qualified.
 
 After the twenty dylib cases, `run-executable` requires four additional
 O0/O2 compact/DWARF publication cases. Each runs its original main executable,
@@ -50,8 +50,12 @@ then the signed published main through the retained startup entry, including
 new authenticated providers, RELRO, catches and cleanup. This stage re-derives
 the SDK sandbox profile and requires the exact successful startup report.
 The controller binds its result to that report's hash and the pinned source.
-Only this separate result grants `native_executable_publication_qualified`;
-general lifted-image publication remains unqualified.
+The separate `run-default-executable` stage then runs the same four publication
+cases directly, using the successful system PAC/dylib control report. NeverD
+prepares B-key chain pages before signing so default dyld can apply every key.
+The controller requires `native_default_executable_publication_qualified`, the
+system loader identity and the exact preflight hash. A userspace-profile result
+cannot satisfy this gate. General lifted-image publication remains unqualified.
 
 A separate macOS 15 producer compiles the four original threaded dylibs with its
 real `ld-classic`. It does not execute arm64e. The native jobs download those
@@ -65,7 +69,7 @@ The [cold source run](https://github.com/gmh5225/test_mac_intel/actions/runs/426
 builds NeverD `3e5fb93c816902d4b9893c1a54ffb353e3e3f117` independently on both
 native hosts. Each passes 33 signing tests, twenty dylib cases, four main cases
 and both six-control prerequisites without failures or skips; both owned builds
-are removed. The current pin additionally preserves loader-owned zero slots in
+are removed. The later loader-slot fix preserves dyld-owned zero slots in
 main RELRO storage. Its [separate delivered-host replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42704012121)
 at `6eb5e0af5333e7419f402fa3704a6c2f523dcec9` passes all twenty dylib and four main
 cases on each host. That follow-up is an immutable binary delivery, with its own
@@ -81,3 +85,14 @@ The native build deadline is 50 minutes and the enclosing job deadline is 75
 minutes, both owned by `Environment.def`. A macOS 26 cold build reached
 1433 of 1435 actions at the former 40-minute deadline. A build timeout remains
 a failed qualification and retains diagnostics before removing its owned build.
+
+The [default-system publication replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42746949630)
+qualifies the current source pin `e5a0fddc68b2fd03c2f25445aca674cef32ab3e6`
+on both hosts with 20 dylib, 4 userspace-main and 4 default-system-main cases
+each, zero failures and zero skips. Both prerequisite profiles pass all six
+controls. The default gate launches CTest directly and binds the system probe
+hash. This replay uses one identified local Release/r6 binary; it is not a cold
+source build. The temporary delivery and workflow are removed after preserving
+source, binary and report hashes. Current native hosts are Apple M1 virtual
+CPUs; the Xcode 27 host reports CPA and CPA2 absent. FVP success remains separate
+from native Apple CPTA-on qualification.
