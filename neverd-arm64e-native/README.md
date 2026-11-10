@@ -132,3 +132,12 @@ and XML hashes were independently checked, and both owned builds were removed.
 Both hosts report Apple M1 virtual CPUs; macOS 26 does not expose the CPA/CPA2
 sysctls, while Xcode 27 reports both features as zero. Native CPTA-on remains
 unqualified.
+
+The [integrated source replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42772199612)
+uses the immutable local Release host from NeverD
+`0d3511620291254bffcaa90a356870016f2741f4` with the same merged LLVM source.
+Both native hosts pass all 36 execution cases and both six-control prerequisites,
+with no failures or skips. Archive, manifest, source, binary, probe and runtime
+XML hashes were independently checked. This delivery is separate from the
+cold builds; its temporary workflows and draft-release assets are removed after
+preserving evidence. The maintained source profile pins this tested implementation.
