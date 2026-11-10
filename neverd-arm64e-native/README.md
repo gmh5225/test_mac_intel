@@ -4,15 +4,19 @@ This workflow probes GitHub-hosted Apple Silicon macOS 26 and Xcode 27 images. T
 [runner inventory](https://github.com/actions/runner-images/blob/main/README.md).
 The repository name does not select Intel hardware for these jobs.
 
-`Environment.def` pins the NeverD source and owns the runner list, commands,
+`Environment.def` pins the NeverD and LLVM fork sources and owns the runner list, commands,
 deadlines and build location. Each runner first executes NeverD's shared
 compiler-original four-key PAC gate and compact/DWARF C++ call/catch/cleanup
 dylib controls through `dlopen`, matching the installed-image loader. Disabled PAC, unavailable arm64e execution, a missing marker or a
 failed control stops the job before dependency downloads and building. Exit 2
 from an unavailable probe is a failed qualification, not a successful skipped job.
 
-Only a passing preflight permits a Release build with the configured LLVM r6
-package. `scripts/build.py` owns compilation and dependency refresh. The verifier
+Only a passing preflight permits a Release build from the pinned LLVM fork
+source. The controller verifies its checkout identity before configuration and
+records it in the final report. NeverD's default prebuilt release remains r6;
+this environment deliberately selects `NEVERD_LLVM_PREBUILT=OFF` to validate
+the fork's Darwin signed-return CFI correction. `scripts/build.py` owns
+compilation and dependency refresh. The verifier
 checks signature parsing and real 4 KiB/16 KiB `codesign` page preservation,
 then requires all twenty registered native installation/publication cases to run,
 with no skips: O0/O2, chained and migrated threaded inputs, compact/DWARF language
@@ -81,13 +85,15 @@ native matrix explicitly converts legacy inputs to modern chained metadata
 before final signing; it does not claim unchanged threaded-output support on
 that runner. Original threaded encoding remains covered by offline tests.
 
-The native build deadline is 50 minutes and the enclosing job deadline is 75
-minutes, both owned by `Environment.def`. A macOS 26 cold build reached
-1433 of 1435 actions at the former 40-minute deadline. A build timeout remains
-a failed qualification and retains diagnostics before removing its owned build.
+The previous prebuilt profile needed a 50-minute build budget: a macOS 26 cold
+build reached 1433 of 1435 actions at its former 40-minute deadline. The current
+source profile also builds LLVM for X86, ARM and AArch64, so `Environment.def`
+allows 150 minutes for compilation and 180 for the enclosing job. A timeout
+still fails qualification and preserves diagnostics before removing the owned
+build; the controller does not retry or substitute a prebuilt producer.
 
 The [default-system publication replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42746949630)
-qualifies the current source pin `e5a0fddc68b2fd03c2f25445aca674cef32ab3e6`
+qualifies source `e5a0fddc68b2fd03c2f25445aca674cef32ab3e6`
 on both hosts with 20 dylib, 4 userspace-main and 4 default-system-main cases
 each, zero failures and zero skips. Both prerequisite profiles pass all six
 controls. The default gate launches CTest directly and binds the system probe
@@ -96,3 +102,42 @@ source build. The temporary delivery and workflow are removed after preserving
 source, binary and report hashes. Current native hosts are Apple M1 virtual
 CPUs; the Xcode 27 host reports CPA and CPA2 absent. FVP success remains separate
 from native Apple CPTA-on qualification.
+
+The canonical-IR producer adds two independent four-case gates: generated dylib
+publication and generated main-executable publication under the system loader.
+They select the installed Clang 22 frontend explicitly, retain its version/hash,
+and use the pinned LLVM fork through NeverD's MC object backend. The r6 producer
+emits explicit generic RA-state CFI that fails native catch/cleanup on macOS 26;
+NeverD rejects that incompatible classic arm64e object without publishing it.
+The correction lives directly in the LLVM fork, with no assembly stripping or
+NeverD build patch. Authentication recipes, new providers,
+RELRO and signed language frames pass through the same transactional installer.
+`Environment.def` owns both stage commands; the controller binds their reports
+to the same source and system probe. Their separate qualification flags do not
+qualify arbitrary lifted modules or native Apple CPTA-on.
+
+The [LLVM fork correction](https://github.com/NeverSight/llvm-project/pull/8)
+has merged. Its [independent native controls](https://github.com/gmh5225/test_mac_intel/actions/runs/42761893719)
+pass all four O0/O2 compact/DWARF cases and all six preflight controls on each
+host. These controls use Apple linking without NeverD installation; the source
+profile above separately qualifies the generated-image publication pipeline.
+
+The [generated-image cold source run](https://github.com/gmh5225/test_mac_intel/actions/runs/42762192123)
+uses NeverD `eabb96c44b7abaac2f628851968c05a090de5b5d` and merged LLVM
+`5676029e378c9e37adc16c8216a8e8453ffafcae`. Both hosts independently pass
+36 native cases, 33 signing tests and both six-control prerequisites, with no
+failures or skips. This includes all eight generated dylib/main cases with
+Clang 22.1.8 as the explicit IR frontend. Source, compiler, test-binary, probe
+and XML hashes were independently checked, and both owned builds were removed.
+Both hosts report Apple M1 virtual CPUs; macOS 26 does not expose the CPA/CPA2
+sysctls, while Xcode 27 reports both features as zero. Native CPTA-on remains
+unqualified.
+
+The [integrated source replay](https://github.com/gmh5225/test_mac_intel/actions/runs/42772199612)
+uses the immutable local Release host from NeverD
+`0d3511620291254bffcaa90a356870016f2741f4` with the same merged LLVM source.
+Both native hosts pass all 36 execution cases and both six-control prerequisites,
+with no failures or skips. Archive, manifest, source, binary, probe and runtime
+XML hashes were independently checked. This delivery is separate from the
+cold builds; its temporary workflows and draft-release assets are removed after
+preserving evidence. The maintained source profile pins this tested implementation.

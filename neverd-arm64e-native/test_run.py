@@ -23,6 +23,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         self.output = self.root / CASES["output_directory"]
         self.policy = copy.deepcopy(run.POLICY)
         self.policy["source_revision"] = CASES["revision"]
+        self.policy["llvm_revision"] = CASES["revision"]
         self.build = self.source / self.policy["build_directory"]
         patch = mock.patch.object(run.subprocess, "check_output", return_value=CASES["revision"])
         patch.start()
@@ -42,6 +43,19 @@ class NativeEnvironmentTests(unittest.TestCase):
             run.execute(self.source, self.output, self.policy)
         stage.assert_not_called()
         self.assertFalse(self.output.exists())
+
+    def test_wrong_llvm_revision_stops_before_configuration_and_publication(self):
+        self.policy["llvm_revision"] = CASES["wrong_revision"]
+        with mock.patch.object(run, "stage", return_value=0) as stage, \
+                self.assertRaisesRegex(ValueError, self.policy["errors"]["llvm_revision"]):
+            run.execute(self.source, self.output, self.policy)
+        self.assertEqual(stage.call_count, next(
+            index for index, item in enumerate(self.policy["stages"], 1)
+            if item["name"] == self.policy["llvm_source_stage"]))
+        result = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["llvm_revision"], CASES["revision"])
+        self.assertFalse(self.build.exists())
 
     def test_failed_startup_stops_before_tools_dependencies_and_build(self):
         with mock.patch.object(run, "stage", side_effect=[0, CASES["stage_failure"]]) as stage:
@@ -89,7 +103,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         result = json.loads((self.output / self.policy["report_name"]).read_text())
         self.assertFalse(result[CASES["report_key"]])
 
-    def complete_reports(self, mutation=None, default_mutation=None):
+    def complete_reports(self, mutation=None, default_mutation=None, generated_mutation=None):
         def complete(*args):
             startup = self.output / self.policy["startup_report"]
             startup.parent.mkdir(exist_ok=True)
@@ -120,6 +134,15 @@ class NativeEnvironmentTests(unittest.TestCase):
                       "probe_report_sha256": hashlib.sha256(probe.read_bytes()).hexdigest()}
             report.update(default_mutation or {})
             default.write_text(json.dumps(report))
+            for item in self.policy["generated_reports"]:
+                path = self.output / item["path"]
+                path.parent.mkdir(exist_ok=True)
+                report = {item["key"]: True, "source_revision": CASES["revision"],
+                          "fixup_loader": self.policy["default_fixup_loader"],
+                          "probe_report_sha256": hashlib.sha256(probe.read_bytes()).hexdigest(),
+                          "ir_compiler": {"sha256": CASES["compiler_hash"]}}
+                report.update(generated_mutation or {})
+                path.write_text(json.dumps(report))
             return 0
         return complete
 
@@ -127,6 +150,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         with mock.patch.object(run, "stage", side_effect=self.complete_reports()):
             self.assertEqual(run.execute(self.source, self.output, self.policy), 0)
         result = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertEqual(result["llvm_revision"], self.policy["llvm_revision"])
         self.assertTrue(result[self.policy["startup_qualification_key"]])
         self.assertTrue(result[self.policy["publication_qualification_key"]])
         self.assertTrue(result[self.policy["executable_qualification_key"]])
@@ -154,6 +178,16 @@ class NativeEnvironmentTests(unittest.TestCase):
                     run.execute(self.source, self.output, self.policy)
                 result = json.loads((self.output / self.policy["report_name"]).read_text())
                 self.assertFalse(result[self.policy["default_executable_qualification_key"]])
+                self.assertFalse(result["passed"])
+
+    def test_generated_publication_requires_current_system_probe_and_frontend(self):
+        for index, mutation in enumerate(CASES["generated_mutations"]):
+            with self.subTest(mutation=mutation):
+                self.output = self.root / str(index)
+                with mock.patch.object(run, "stage", side_effect=self.complete_reports(
+                        generated_mutation=mutation)), self.assertRaises(ValueError):
+                    run.execute(self.source, self.output, self.policy)
+                result = json.loads((self.output / self.policy["report_name"]).read_text())
                 self.assertFalse(result["passed"])
 
 
