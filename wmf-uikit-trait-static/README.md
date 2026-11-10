@@ -12,3 +12,5 @@ callback, load WMF, execute original providers, or execute generated code.
 Nine fake boundary tests cover the exact compiler allowlist and failure
 retention. Successful compilation is collection evidence only; current ABI,
 capture extent, lifetime, effects and original-body proofs remain separate.
+
+The follow-up captures weak self as well as DynamicSelf metadata. The prior successful metadata-only capture sample is retained independently; neither sample is treated as original capture-layout or lifetime permission.
