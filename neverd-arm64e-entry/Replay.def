@@ -1,6 +1,6 @@
 {
   "source_repository": "NeverSight/NeverD",
-  "source_revision": "e4668e4c6fe5862b9b5f1215aaa2431ae1724235",
+  "source_revision": "2201fbe2f1291e61ebca8856b3f726d314cdda21",
   "runners": [
     "macos-26",
     "xcode-27"
@@ -8,8 +8,8 @@
   "timeout_minutes": 20,
   "source": "neverd",
   "evidence": "entry-replay-evidence",
-  "asset": "entry-host.tar.gz",
-  "asset_sha256": "362e95a38197ea433e1d971adf6b133a3ab79247ad7aa2402069422a4c42fcf2",
+  "asset": "entry-host-indexed.tar.gz",
+  "asset_sha256": "2015e959682df00214c9a1e707fd940035f3efccb18d5af2310e915f614c97a5",
   "release": "neverd-arm64e-native-entry",
   "repository": "gmh5225/test_mac_intel",
   "download": [
@@ -24,7 +24,6 @@
   ],
   "host": "NeverDArm64eAnalysisTests",
   "manifest": "manifest.json",
-  "compiler": "/usr/bin/clang++",
   "probe": "probe",
   "entries": "entries",
   "report": "delivery-report.json",
@@ -34,5 +33,10 @@
     "identity": "The delivered entry test host/source identity differs",
     "probe": "Compiler-original PAC and signed unwinding are not qualified",
     "entry": "The complete reconstructed entry matrix did not qualify"
-  }
+  },
+  "compiler_lookup": [
+    "/usr/bin/xcrun",
+    "--find",
+    "clang++"
+  ]
 }

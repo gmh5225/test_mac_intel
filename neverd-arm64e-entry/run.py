@@ -11,7 +11,7 @@ sys.path.insert(0, str(Path(POLICY["source"]) / "scripts"))
 import verify_arm64e_entry as entry
 
 
-def unwind_control(output):
+def unwind_control(output, compiler, sdk):
     native = entry.native
     policy = json.loads(Path(__file__).with_name("UnwindControl.def").read_text())
     directory = output / policy["directory"]
@@ -21,17 +21,18 @@ def unwind_control(output):
     loader_source = directory / policy["loader_source"]
     loader_source.write_text(native.fixture_contract()["loader"])
     rows = []
+    compile_args = [*policy["compile_args"], entry.POLICY["sysroot_option"], sdk]
     with entry.OwnedProducts(directory, False) as products:
         loader = directory / policy["loader"]
         products.append(loader)
         native.command(products, directory, policy["loader"],
-                       [POLICY["compiler"], *policy["compile_args"], str(loader_source),
+                       [str(compiler), *compile_args, str(loader_source),
                         policy["output_option"], str(loader)], policy["timeout"]).check_returncode()
         for profile in policy["profiles"]:
             library = directory / profile["name"]
             products.append(library)
             native.command(products, directory, profile["name"] + policy["compile_suffix"],
-                           [POLICY["compiler"], *policy["compile_args"], *policy["library_args"],
+                           [str(compiler), *compile_args, *policy["library_args"],
                             *profile["args"], str(source), policy["output_option"], str(library)],
                            policy["timeout"]).check_returncode()
             native.command(products, directory, profile["name"] + policy["sections_suffix"],
@@ -72,13 +73,19 @@ def main():
         control = native.probe(probe)
         if control["status"] != native.POLICY["passed"]:
             raise ValueError(POLICY["errors"]["probe"])
-        unwind_control(output)
+        lookup = subprocess.run(POLICY["compiler_lookup"], capture_output=True, text=True,
+                                timeout=entry.POLICY["tool_timeout"])
+        report["compiler_lookup"] = {"argv": lookup.args, "returncode": lookup.returncode,
+                                     "stdout": lookup.stdout, "stderr": lookup.stderr}
+        lookup.check_returncode()
+        compiler = Path(lookup.stdout.strip()).absolute()
         entries = output / POLICY["entries"]
         entries.mkdir()
-        result = entry.run(entries, binary, Path(POLICY["compiler"]),
+        result = entry.run(entries, binary, compiler,
                            probe / native.POLICY["report_name"])
         if not result["native_reconstructed_entry_qualified"]:
             raise ValueError(POLICY["errors"]["entry"])
+        unwind_control(output, compiler, result["sdk_path"])
         report["entry_report_sha256"] = native.digest(entries / entry.POLICY["report_name"])
         report["passed"] = True
     finally:
