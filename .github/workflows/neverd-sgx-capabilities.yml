@@ -1,0 +1,37 @@
+name: NeverD SGX runner capability discovery
+
+on:
+  push:
+    branches: [codex/neverd-sgx-capabilities-20261109]
+    paths:
+      - neverd-sgx-capabilities/**
+      - .github/workflows/neverd-sgx-capabilities.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capabilities:
+    name: SGX discovery / ${{ matrix.image }}
+    runs-on: ${{ matrix.image }}
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        image: [ubuntu-24.04, macos-15-intel, macos-26-intel]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Probe CPUID, EPC and SGX driver access
+        run: python3 neverd-sgx-capabilities/probe.py --output sgx-capabilities
+      - name: Retain discovery evidence, including unavailable SGX
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: neverd-sgx-capability-${{ matrix.image }}
+          path: sgx-capabilities/
+          if-no-files-found: error
+          retention-days: 14
