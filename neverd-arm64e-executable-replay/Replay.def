@@ -72,7 +72,9 @@
     ],
     "objects": [
       "native-object.o",
-      "clang22-object.o"
+      "clang22-object.o",
+      "apple-assembled.o",
+      "darwin-cfi.o"
     ],
     "link": [
       "/usr/bin/clang++",
@@ -103,9 +105,9 @@
       "settings set target.disable-aslr false",
       "-o",
       "run",
-      "-o",
+      "-k",
       "bt",
-      "-o",
+      "-k",
       "register read pc lr sp fp",
       "--",
       "{fixture}/native-loader.out",
@@ -116,7 +118,10 @@
       "clang22-object.o",
       "native-object.o.dylib",
       "clang22-object.o.dylib",
-      "installed.dylib"
+      "installed.dylib",
+      "apple-assembled.o",
+      "darwin-cfi.o",
+      "darwin-cfi.o.dylib"
     ],
     "dumps": [
       [
@@ -139,6 +144,39 @@
     "compile_log": "compile-ir.json",
     "record_suffix": ".json",
     "run_suffix": "-run",
-    "debug_suffix": "-debug"
+    "debug_suffix": "-debug",
+    "compile_asm": [
+      "{compiler}",
+      "-target",
+      "arm64e-apple-macosx14.0.0",
+      "-S",
+      "{fixture}/native-object.ll",
+      "-o",
+      "{fixture}/clang22-object.s"
+    ],
+    "assemble": [
+      "/usr/bin/clang++",
+      "-target",
+      "arm64e-apple-macosx14.0.0",
+      "-c",
+      "{fixture}/{assembly}",
+      "-o",
+      "{fixture}/{object}"
+    ],
+    "assembly": "clang22-object.s",
+    "darwin_assembly": "darwin-cfi.s",
+    "directive": ".cfi_negate_ra_state",
+    "ablation_log": "cfi-ablation.json",
+    "compile_asm_log": "compile-asm.json",
+    "assembly_controls": [
+      [
+        "clang22-object.s",
+        "apple-assembled.o"
+      ],
+      [
+        "darwin-cfi.s",
+        "darwin-cfi.o"
+      ]
+    ]
   }
 }

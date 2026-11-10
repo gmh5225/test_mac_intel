@@ -33,11 +33,24 @@ def diagnose_producer(root, binary, compiler):
     fixture, = output.glob(policy["fixture_glob"])
     variables["fixture"] = str(fixture)
     run(policy["compile_log"], policy["compile_ir"])
+    run(policy["compile_asm_log"], policy["compile_asm"])
+    assembly = fixture / policy["assembly"]
+    original = assembly.read_text().splitlines(keepends=True)
+    changed = [line for line in original if line.strip() != policy["directive"]]
+    darwin = fixture / policy["darwin_assembly"]
+    darwin.write_text("".join(changed))
+    native.save(output / policy["ablation_log"], {
+        "original_sha256": native.digest(assembly), "changed_sha256": native.digest(darwin),
+        "removed_directives": len(original) - len(changed),
+        "diagnostic_only": True})
+    for assembly_name, object_name in policy["assembly_controls"]:
+        variables.update(assembly=assembly_name, object=object_name)
+        run(object_name + policy["record_suffix"], policy["assemble"])
     for obj in policy["objects"]:
         variables["object"] = obj
         if not run(obj + policy["record_suffix"], policy["link"]):
-            run(obj + policy["run_suffix"] + policy["record_suffix"], policy["run"])
-            run(obj + policy["debug_suffix"] + policy["record_suffix"], policy["debug"])
+            if run(obj + policy["run_suffix"] + policy["record_suffix"], policy["run"]):
+                run(obj + policy["debug_suffix"] + policy["record_suffix"], policy["debug"])
     for name in policy["inspect"]:
         path = fixture / name
         if path.is_file():
