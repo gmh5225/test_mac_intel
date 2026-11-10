@@ -1,0 +1,76 @@
+{
+  "source_revision": "0094b433d350a72424c578da5879878d621be6d2",
+  "source": "neverd",
+  "output": "default-startup-evidence",
+  "timeout": 60,
+  "runner": "macos-26",
+  "header_format": "<8I",
+  "header_size": 32,
+  "command_format": "<II",
+  "word_format": "<Q",
+  "half_format": "<H",
+  "integer_format": "<I",
+  "segment_command": 25,
+  "chain_command": 2147483700,
+  "segment_file_offset": 40,
+  "chain_data_offset": 8,
+  "starts_offset": 4,
+  "start_fields": "<IHHQIHH",
+  "page_size_offset": 4,
+  "chain_next_shift": 51,
+  "chain_next_mask": 2047,
+  "chain_stride": 8,
+  "chain_formats": [
+    1,
+    9,
+    12
+  ],
+  "large_page": 16384,
+  "small_page": 4096,
+  "page_none": 65535,
+  "page_multi": 32768,
+  "signature_description": [
+    "/usr/bin/codesign",
+    "--display",
+    "--verbose=4"
+  ],
+  "signature_page_pattern": "Page size=(\\d+)",
+  "sign_command": [
+    "/usr/bin/codesign",
+    "--force",
+    "--sign",
+    "-",
+    "--pagesize"
+  ],
+  "sysctl_command": [
+    "/usr/sbin/sysctl",
+    "-a"
+  ],
+  "feature_pattern": "^(machdep.cpu.brand_string|hw.model|hw.optional.arm.FEAT_(CPA|CPA2|PAuth|PAC|FPAC))",
+  "expected_default_return": -5,
+  "label": "startup{optimization}-dwarf-{dwarf}",
+  "original_suffix": "-original.out",
+  "candidate_suffix": "-4k.out",
+  "after_suffix": "-original-after.out",
+  "contract_error": "The diagnostic requires a single occupied 16 KiB ARM64E fixup page per segment with every slot in its first 4 KiB",
+  "source_error": "The checkout does not match the pinned diagnostic revision",
+  "probe_error": "The four-key PAC and original dylib prerequisites did not pass",
+  "page_error": "The original CodeDirectory page size was not reported exactly once",
+  "case_error": "The default/4-KiB/default startup comparison did not match the required outcomes",
+  "source_option": "--source",
+  "preflight_directory": "probe",
+  "feature_label": "features",
+  "header_command_count": 4,
+  "labels": {
+    "compile": "-compile",
+    "signature-description": "-signature-description",
+    "sign": "-sign",
+    "verify": "-verify",
+    "fixups": "-fixups"
+  },
+  "modes": [
+    "default",
+    "default-4k",
+    "default-after"
+  ]
+}
