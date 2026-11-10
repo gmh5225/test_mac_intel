@@ -1,0 +1,392 @@
+//===- guest.c - CPA2 capability and EL1 execution controls -------------===//
+//
+// NeverD Decompiler
+//
+//===----------------------------------------------------------------------===//
+
+#include "CptaGuest.def"
+
+#include <stddef.h>
+#include <stdint.h>
+
+static unsigned Passed, Failed;
+
+static void writeText(const char *Text) {
+  register uint64_t Operation __asm__(CPA_OPERATION_REGISTER) =
+      CPA_SEMIHOST_WRITE0;
+  register const char *Parameter __asm__(CPA_PARAMETER_REGISTER) = Text;
+  __asm__ volatile(CPA_SEMIHOST_TRAP
+                   : CPA_REGISTER_INOUT(Operation)
+                   : CPA_REGISTER_INPUT(Parameter)
+                   : CPA_MEMORY_CLOBBER);
+}
+
+static void record(const char *Name, uint64_t Value) {
+  char Digits[sizeof(Value) * 2 + 1];
+  for (size_t I = 0; I < sizeof(Value) * 2; ++I)
+    Digits[I] = CPA_HEX_DIGITS[(Value >> ((sizeof(Value) * 2 - I - 1) * 4)) &
+                               CPA_EL_FIELD_MASK];
+  Digits[sizeof(Value) * 2] = 0;
+  writeText(CPA_ROW_PREFIX);
+  writeText(Name);
+  writeText(CPA_ROW_VALUE);
+  writeText(Digits);
+  writeText(CPA_ROW_END);
+}
+
+static void expect(int Condition) {
+  if (Condition)
+    ++Passed;
+  else
+    record(CPA_FAILURE_INDEX_NAME, Passed + ++Failed);
+}
+
+extern const unsigned char GuestDataStart[];
+_Alignas(CPA_PAGE_BYTES) static uint64_t NormalRoot[CPA_TABLE_ENTRIES];
+_Alignas(CPA_PAGE_BYTES) static uint64_t NormalL2[CPA_TABLE_ENTRIES];
+_Alignas(CPA_PAGE_BYTES) static uint64_t NormalL3[CPA_TABLE_ENTRIES];
+
+static void configureNormalMemory(void) {
+  NormalRoot[CPA_ROOT_INDEX] = (uint64_t)NormalL2 | CPA_TABLE_DESCRIPTOR;
+  NormalL2[CPA_L2_INDEX] = (uint64_t)NormalL3 | CPA_TABLE_DESCRIPTOR;
+  for (unsigned I = 0; I != CPA_TABLE_ENTRIES; ++I) {
+    const uint64_t Address = CPA_GUEST_BASE + (uint64_t)I * CPA_PAGE_BYTES;
+#if defined(CPA_GENERATED_EL0_MEMORY)
+    const uint64_t CodePage = CPA_SHARED_CODE_PAGE;
+#else
+    const uint64_t CodePage = CPA_CODE_PAGE;
+#endif
+    NormalL3[I] =
+        Address |
+        (Address < (uint64_t)GuestDataStart ? CodePage : CPA_DATA_PAGE);
+  }
+  const uint64_t MAIR = CPA_NORMAL_MAIR;
+  const uint64_t TCR = CPA_NORMAL_TCR;
+  const uint64_t TTBR = (uint64_t)NormalRoot;
+  __asm__ volatile(CPA_CONFIGURE_TRANSLATION
+                   :
+                   : CPA_REGISTER_INPUT(MAIR), CPA_REGISTER_INPUT(TCR),
+                     CPA_REGISTER_INPUT(TTBR)
+                   : CPA_MEMORY_CLOBBER);
+  uint64_t SCTLR, Observed;
+  __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(SCTLR));
+  SCTLR = (SCTLR & ~CPA_MEMORY_SCTLR_CLEAR) | CPA_MEMORY_SCTLR_SET;
+  __asm__ volatile(CPA_WRITE_SCTLR
+                   :
+                   : CPA_REGISTER_INPUT(SCTLR)
+                   : CPA_MEMORY_CLOBBER);
+  __asm__ volatile(CPA_READ_MAIR : CPA_REGISTER_OUTPUT(Observed));
+  record(CPA_NORMAL_MAIR_NAME, Observed);
+  expect(Observed == MAIR);
+  __asm__ volatile(CPA_READ_TCR : CPA_REGISTER_OUTPUT(Observed));
+  record(CPA_NORMAL_TCR_NAME, Observed);
+  expect(Observed == TCR);
+  __asm__ volatile(CPA_READ_TTBR : CPA_REGISTER_OUTPUT(Observed));
+  record(CPA_NORMAL_TTBR_NAME, Observed == TTBR);
+  expect(Observed == TTBR);
+  __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Observed));
+  record(CPA_NORMAL_SCTLR_NAME, Observed & CPA_MEMORY_SCTLR_MASK);
+  expect((Observed & CPA_MEMORY_SCTLR_MASK) == CPA_MEMORY_SCTLR_SET);
+  __asm__ volatile(CPA_READ_PAN : CPA_REGISTER_OUTPUT(Observed));
+  record(CPA_NORMAL_PAN_NAME, Observed);
+  expect(Observed == 0);
+  __asm__ volatile(CPA_READ_UAO : CPA_REGISTER_OUTPUT(Observed));
+  record(CPA_NORMAL_UAO_NAME, Observed);
+  expect(Observed == 0);
+}
+
+#if defined(CPA_GENERATED_SP_PAUTH)
+static void configurePAuthData(void) {
+  uint64_t Feature;
+  __asm__ volatile(CPA_READ_ISAR1 : CPA_REGISTER_OUTPUT(Feature));
+  const unsigned Supported =
+      ((Feature >> CPA_PAUTH_APA_SHIFT) & CPA_EL_FIELD_MASK) != 0 ||
+      ((Feature >> CPA_PAUTH_API_SHIFT) & CPA_EL_FIELD_MASK) != 0;
+  record(CPA_PAUTH_FEATURE_NAME, Supported);
+  expect(Supported);
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+  const unsigned APALevel =
+      (Feature >> CPA_PAUTH_APA_SHIFT) & CPA_EL_FIELD_MASK;
+  const unsigned APILevel =
+      (Feature >> CPA_PAUTH_API_SHIFT) & CPA_EL_FIELD_MASK;
+  const unsigned PAuthLevel = APALevel > APILevel ? APALevel : APILevel;
+  record(CPA_FAULT_PAUTH_FEATURE_NAME, PAuthLevel);
+  expect(PAuthLevel == CPA_PAUTH_FAULT_FEATURE_LEVEL);
+#endif
+  if (!Supported)
+    return;
+  const uint64_t ALo = CPA_PAUTH_KEY_A_LO, AHi = CPA_PAUTH_KEY_A_HI;
+  const uint64_t BLo = CPA_PAUTH_KEY_B_LO, BHi = CPA_PAUTH_KEY_B_HI;
+  __asm__ volatile(CPA_WRITE_PAUTH_KEYS
+                   :
+                   : CPA_REGISTER_INPUT(ALo), CPA_REGISTER_INPUT(AHi),
+                     CPA_REGISTER_INPUT(BLo), CPA_REGISTER_INPUT(BHi)
+                   : CPA_MEMORY_CLOBBER);
+  uint64_t ReadALo, ReadAHi, ReadBLo, ReadBHi;
+  __asm__ volatile(CPA_READ_PAUTH_KEYS
+                   : CPA_REGISTER_OUTPUT(ReadALo), CPA_REGISTER_OUTPUT(ReadAHi),
+                     CPA_REGISTER_OUTPUT(ReadBLo),
+                     CPA_REGISTER_OUTPUT(ReadBHi));
+  const unsigned KeysMatch =
+      ReadALo == ALo && ReadAHi == AHi && ReadBLo == BLo && ReadBHi == BHi;
+  record(CPA_PAUTH_KEYS_NAME, KeysMatch);
+  expect(KeysMatch);
+  uint64_t Control;
+  __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Control));
+  Control |= CPA_PAUTH_ENABLE;
+  __asm__ volatile(CPA_WRITE_SCTLR
+                   :
+                   : CPA_REGISTER_INPUT(Control)
+                   : CPA_MEMORY_CLOBBER);
+  __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Control));
+  record(CPA_PAUTH_CONTROLS_NAME, Control & CPA_PAUTH_ENABLE);
+  expect((Control & CPA_PAUTH_ENABLE) == CPA_PAUTH_ENABLE);
+}
+#endif
+
+void reportUnexpected(uint64_t ESR, uint64_t ELR, uint64_t FAR,
+                      uint64_t Stack) {
+  record(CPA_UNEXPECTED_ESR_NAME, ESR);
+  record(CPA_UNEXPECTED_ELR_NAME, ELR);
+  record(CPA_UNEXPECTED_FAR_NAME, FAR);
+  record(CPA_UNEXPECTED_SP_NAME, Stack);
+}
+
+__attribute__((noreturn)) static void finish(void) {
+  record(CPA_TESTS_NAME, Passed);
+  record(CPA_FAILURES_NAME, Failed);
+  record(CPA_COMPLETE_NAME, 1);
+  uint64_t Parameters[] = {CPA_SEMIHOST_APPLICATION_EXIT, Failed != 0};
+  register uint64_t Operation __asm__(CPA_OPERATION_REGISTER) =
+      CPA_SEMIHOST_EXIT_EXTENDED;
+  register uint64_t *Parameter __asm__(CPA_PARAMETER_REGISTER) = Parameters;
+  __asm__ volatile(CPA_SEMIHOST_TRAP
+                   : CPA_REGISTER_INOUT(Operation)
+                   : CPA_REGISTER_INPUT(Parameter)
+                   : CPA_MEMORY_CLOBBER);
+  for (;;)
+    __asm__ volatile(CPA_WAIT);
+}
+
+extern uint64_t probeStack(uint64_t Address, uint64_t UseSP);
+extern void copyVector(const void *Source, void *Destination, uint64_t Offset);
+
+#if defined(CPA_GENERATED_EL0_MEMORY) && !defined(CPA_GENERATED_MEMORY)
+int CPA_GENERATED_ENTRY(void) {
+  _Alignas(CPA_SP_ALIGNMENT)
+      uint64_t Source[CPA_MEMORY_BYTES / sizeof(uint64_t)];
+  _Alignas(CPA_SP_ALIGNMENT)
+      uint64_t Destination[CPA_MEMORY_BYTES / sizeof(uint64_t)];
+  for (size_t I = 0; I != sizeof(Source) / sizeof(*Source); ++I) {
+    Source[I] = CPA_MEMORY_PATTERN + I;
+    Destination[I] = 0;
+  }
+  uint64_t Loaded;
+  const uint64_t Offset = sizeof(uint64_t);
+  __asm__ volatile(CPA_LOAD_GPR
+                   : CPA_REGISTER_OUTPUT(Loaded)
+                   : CPA_REGISTER_INPUT(Source), CPA_REGISTER_INPUT(Offset)
+                   : CPA_MEMORY_CLOBBER);
+  copyVector(Source, Destination, 0);
+  return Loaded != Source[1] || Destination[0] != Source[0] ||
+         Destination[1] != Source[1] || Destination[2] != 0 ||
+         Destination[3] != 0;
+}
+#endif
+
+#if defined(CPA_GENERATED_MEMORY)
+extern int CPA_GENERATED_ENTRY(void);
+extern unsigned CPA_GENERATED_SAMPLES(void);
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+extern unsigned neverdPAuthFaultCount(void);
+static const char *const PAuthFaultCounts[] = {
+    CPA_FAULT_MODE_OFF_NAME, CPA_FAULT_MODE_ON_NAME, CPA_FAULT_MODE_CPTA0_NAME,
+    CPA_FAULT_MODE_BOTH_NAME};
+#endif
+#endif
+
+static const struct {
+  uint64_t Bits;
+  const char *ControlName;
+  const char *MemoryName;
+  const char *StackAlignmentName;
+} Controls[] = {
+#define CPA_CONTROL_CASE(Bits, ControlName, MemoryName, AlignmentName)         \
+  {Bits, ControlName, MemoryName, AlignmentName},
+#include "CptaGuest.def"
+};
+
+#if defined(CPA_GENERATED_EL0_MEMORY)
+struct GeneratedEL0Result {
+  uint64_t Value;
+  uint64_t Origin;
+};
+extern struct GeneratedEL0Result runGeneratedAtEL0(void);
+static const char *const EL0Origins[] = {
+#define CPA_EL0_ORIGIN_CASE(Name) Name,
+#include "CptaGuest.def"
+};
+_Static_assert(sizeof(EL0Origins) / sizeof(*EL0Origins) ==
+                   sizeof(Controls) / sizeof(*Controls),
+               CPA_EL0_CONTROL_COUNT_MESSAGE);
+#endif
+
+#if defined(CPA_GENERATED_AUTHENTICATED_CALLS)
+#include "CptaAuthenticatedCallSetup.def"
+#endif
+
+void guestMain(void) {
+  uint64_t EL, PFR, ISAR;
+  __asm__ volatile(CPA_READ_EL : CPA_REGISTER_OUTPUT(EL));
+  __asm__ volatile(CPA_READ_PFR : CPA_REGISTER_OUTPUT(PFR));
+  __asm__ volatile(CPA_READ_ISAR3 : CPA_REGISTER_OUTPUT(ISAR));
+  record(CPA_EL_NAME, EL);
+  record(CPA_PFR_NAME, PFR);
+  record(CPA_ISAR_NAME, ISAR);
+  expect(EL == CPA_EL1);
+  expect(((PFR >> CPA_EL2_SHIFT) & CPA_EL_FIELD_MASK) == 0);
+  expect(((PFR >> CPA_EL3_SHIFT) & CPA_EL_FIELD_MASK) == 0);
+  expect((ISAR & CPA_EL_FIELD_MASK) == CPA_FEATURE_LEVEL);
+#if defined(CPA_GENERATED_ORDERED_MEMORY)
+  uint64_t ISAR1;
+  __asm__ volatile(CPA_READ_ISAR1 : CPA_REGISTER_OUTPUT(ISAR1));
+  const uint64_t OrderedLevel =
+      (ISAR1 >> CPA_ORDERED_FEATURE_SHIFT) & CPA_EL_FIELD_MASK;
+  record(CPA_ORDERED_FEATURE_NAME, OrderedLevel);
+  expect(OrderedLevel == CPA_ORDERED_FEATURE_LEVEL);
+#endif
+  if (Failed)
+    finish();
+
+  configureNormalMemory();
+#if defined(CPA_GENERATED_AUTHENTICATED_CALLS)
+  configureCallKeys();
+#endif
+  if (Failed)
+    finish();
+#if defined(CPA_GENERATED_SP_PAUTH)
+  configurePAuthData();
+  if (Failed)
+    finish();
+#endif
+#if defined(CPA_GENERATED_MEMORY)
+  const unsigned Samples = CPA_GENERATED_SAMPLES();
+  record(CPA_GENERATED_SAMPLES_NAME, Samples);
+  expect(Samples == CPA_GENERATED_SAMPLE_COUNT);
+  if (Failed)
+    finish();
+#endif
+  const uint64_t FP = CPA_FP_ENABLE;
+  __asm__ volatile(CPA_WRITE_CPACR
+                   :
+                   : CPA_REGISTER_INPUT(FP)
+                   : CPA_MEMORY_CLOBBER);
+  for (unsigned Mode = 0; Mode != sizeof(Controls) / sizeof(*Controls);
+       ++Mode) {
+    const uint64_t Control = Controls[Mode].Bits;
+    const int Enabled = (Control & CPA_CPTA) != 0;
+    uint64_t Observed;
+    __asm__ volatile(CPA_WRITE_SCTLR2
+                     :
+                     : CPA_REGISTER_INPUT(Control)
+                     : CPA_MEMORY_CLOBBER);
+    __asm__ volatile(CPA_READ_SCTLR2 : CPA_REGISTER_OUTPUT(Observed));
+    record(Controls[Mode].ControlName, Observed);
+    expect(Observed == Control);
+#define CPA_ARITHMETIC_CASE(Base, Offset, Unchecked, Checked)                  \
+  do {                                                                         \
+    register uint64_t Result __asm__(CPA_RESULT_REGISTER);                     \
+    register uint64_t B __asm__(CPA_BASE_REGISTER) = Base;                     \
+    register uint64_t O __asm__(CPA_OFFSET_REGISTER) = (uint64_t)(Offset);     \
+    __asm__ volatile(CPA_ADDPT                                                 \
+                     : CPA_REGISTER_OUTPUT(Result)                             \
+                     : CPA_REGISTER_INPUT(B), CPA_REGISTER_INPUT(O));          \
+    expect(Result == (Enabled ? Checked : Unchecked));                         \
+  } while (0);
+#include "CptaGuest.def"
+
+    _Alignas(CPA_SP_ALIGNMENT)
+        uint64_t Source[CPA_MEMORY_BYTES / sizeof(uint64_t)];
+    _Alignas(CPA_SP_ALIGNMENT)
+        uint64_t Destination[CPA_MEMORY_BYTES / sizeof(uint64_t)];
+    for (size_t I = 0; I != sizeof(Source) / sizeof(*Source); ++I) {
+      Source[I] = CPA_MEMORY_PATTERN + I;
+      Destination[I] = 0;
+    }
+    uint64_t Loaded;
+    const uint64_t Offset = sizeof(uint64_t);
+    __asm__ volatile(CPA_LOAD_GPR
+                     : CPA_REGISTER_OUTPUT(Loaded)
+                     : CPA_REGISTER_INPUT(Source), CPA_REGISTER_INPUT(Offset)
+                     : CPA_MEMORY_CLOBBER);
+    expect(Loaded == Source[1]);
+    copyVector(Source, Destination, 0);
+    expect(Destination[0] == Source[0] && Destination[1] == Source[1]);
+    expect(Destination[2] == 0 && Destination[3] == 0);
+
+    uint64_t SavedSCTLR;
+    __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(SavedSCTLR));
+    for (unsigned AlignCheck = 0; AlignCheck != 2; ++AlignCheck) {
+      const uint64_t SCTLR =
+          AlignCheck ? SavedSCTLR | CPA_SA : SavedSCTLR & ~CPA_SA;
+      __asm__ volatile(CPA_WRITE_SCTLR
+                       :
+                       : CPA_REGISTER_INPUT(SCTLR)
+                       : CPA_MEMORY_CLOBBER);
+      for (unsigned UseSP = 0; UseSP != 2; ++UseSP)
+        for (unsigned Misaligned = 0; Misaligned != 2; ++Misaligned) {
+          // Eight-byte alignment satisfies the load while violating SP's
+          // sixteen-byte check. The same address in X0 is the control.
+          const uint64_t Address =
+              (uint64_t)Source + Misaligned * sizeof(uint64_t);
+          const uint64_t ESR = probeStack(Address, UseSP);
+          expect(AlignCheck && UseSP && Misaligned
+                     ? ESR >> CPA_ESR_EC_SHIFT == CPA_SP_ALIGNMENT_EC
+                     : ESR == 0);
+        }
+    }
+    __asm__ volatile(CPA_WRITE_SCTLR
+                     :
+                     : CPA_REGISTER_INPUT(SavedSCTLR)
+                     : CPA_MEMORY_CLOBBER);
+#if defined(CPA_GENERATED_MEMORY) || defined(CPA_GENERATED_EL0_MEMORY)
+#if defined(CPA_GENERATED_STACK_MEMORY)
+#if defined(CPA_GENERATED_EL0_MEMORY)
+    const uint64_t StackAlignmentMask = CPA_SA0;
+#else
+    const uint64_t StackAlignmentMask = CPA_SA;
+#endif
+    const uint64_t StackSCTLR = SavedSCTLR | StackAlignmentMask;
+    __asm__ volatile(CPA_WRITE_SCTLR
+                     :
+                     : CPA_REGISTER_INPUT(StackSCTLR)
+                     : CPA_MEMORY_CLOBBER);
+    __asm__ volatile(CPA_READ_SCTLR : CPA_REGISTER_OUTPUT(Observed));
+    record(Controls[Mode].StackAlignmentName, Observed & StackAlignmentMask);
+    expect((Observed & StackAlignmentMask) == StackAlignmentMask);
+#endif
+#if defined(CPA_GENERATED_EL0_MEMORY)
+    const struct GeneratedEL0Result EL0Result = runGeneratedAtEL0();
+    record(EL0Origins[Mode], EL0Result.Origin);
+    expect(EL0Result.Origin == CPA_EL0_ORIGIN);
+    const unsigned MemoryResult = (unsigned)EL0Result.Value;
+#else
+    const unsigned MemoryResult = CPA_GENERATED_ENTRY();
+#endif
+    record(Controls[Mode].MemoryName, MemoryResult);
+    expect(MemoryResult == 0);
+#if defined(CPA_GENERATED_PAUTH_FAULTS)
+    const unsigned Faults = neverdPAuthFaultCount();
+    record(PAuthFaultCounts[Mode], Faults);
+    expect(Faults == CPA_PAUTH_FAULT_COUNT);
+#endif
+#if defined(CPA_GENERATED_STACK_MEMORY)
+    __asm__ volatile(CPA_WRITE_SCTLR
+                     :
+                     : CPA_REGISTER_INPUT(SavedSCTLR)
+                     : CPA_MEMORY_CLOBBER);
+#endif
+#endif
+  }
+  finish();
+}

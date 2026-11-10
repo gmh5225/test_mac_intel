@@ -1,0 +1,177 @@
+{
+  "scope": "Model qualification of valid AAPCS64 integer authenticated calls (IA/IB, zero/dynamic modifier, one/ten arguments) and one raw BLR control. Every invalid signature must fault synchronously before the callback. C O0 auth-and-resign diagnostics are counted separately; exact original fault syndrome is not qualified for those routes at PAuth/FPAC. No authenticated FP/HFA/aggregate/variadic ABI, whole images, dyld storage, Darwin signed unwind, native Apple CPA2, or exact fault PC qualification.",
+  "output_directory": "cpta-authenticated-calls",
+  "compiler": "clang-18",
+  "linker": "ld.lld-18",
+  "objcopy": "llvm-objcopy-18",
+  "symbol": "authenticated_dispatch",
+  "renamed_symbol": "projected_{index}",
+  "test_report_cases": [
+    "AArch64AuthenticatedCall.BothKeysAndZeroModifiersRemainOnTheCall",
+    "AArch64AuthenticatedCall.OrdinaryRawCallsAcquireNoDefaultAuthentication",
+    "AArch64AuthenticatedCall.ObservableValuesAndInterveningEffectsStayExplicit",
+    "AArch64AuthenticatedCall.MalformedBundlesRejectBeforeOutput",
+    "AArch64AuthenticatedCall.OriginalLinkRegisterOperandsSurviveTheNewLink"
+  ],
+  "artifact_property": "authenticated_call_artifact_dir",
+  "export_count": 2,
+  "revision_length": 40,
+  "revision_digits": "0123456789abcdef",
+  "cases": [
+    {
+      "directory": "0-false-1",
+      "key": 0,
+      "zero": false,
+      "arguments": 1,
+      "raw": false,
+      "index": 0
+    },
+    {
+      "directory": "0-false-10",
+      "key": 0,
+      "zero": false,
+      "arguments": 10,
+      "raw": false,
+      "index": 1
+    },
+    {
+      "directory": "0-true-1",
+      "key": 0,
+      "zero": true,
+      "arguments": 1,
+      "raw": false,
+      "index": 2
+    },
+    {
+      "directory": "0-true-10",
+      "key": 0,
+      "zero": true,
+      "arguments": 10,
+      "raw": false,
+      "index": 3
+    },
+    {
+      "directory": "1-false-1",
+      "key": 1,
+      "zero": false,
+      "arguments": 1,
+      "raw": false,
+      "index": 4
+    },
+    {
+      "directory": "1-false-10",
+      "key": 1,
+      "zero": false,
+      "arguments": 10,
+      "raw": false,
+      "index": 5
+    },
+    {
+      "directory": "1-true-1",
+      "key": 1,
+      "zero": true,
+      "arguments": 1,
+      "raw": false,
+      "index": 6
+    },
+    {
+      "directory": "1-true-10",
+      "key": 1,
+      "zero": true,
+      "arguments": 10,
+      "raw": false,
+      "index": 7
+    },
+    {
+      "directory": "raw-1",
+      "key": 0,
+      "zero": true,
+      "arguments": 1,
+      "raw": true,
+      "index": 8
+    }
+  ],
+  "routes": [
+    "native",
+    "high-O0",
+    "high-O2",
+    "llvm-O0",
+    "llvm-O2"
+  ],
+  "source_files": [
+    "high.c",
+    "llvm.c",
+    "native.ll",
+    "high-O0.ll",
+    "high-O2.ll",
+    "llvm-O0.ll",
+    "llvm-O2.ll"
+  ],
+  "features": [
+    {
+      "parameter": 0,
+      "level": 1
+    },
+    {
+      "parameter": 2,
+      "level": 4
+    },
+    {
+      "parameter": 3,
+      "level": 5
+    }
+  ],
+  "feature_parameter": "cluster0.enhanced_pac2_level",
+  "guest_flags": [
+    "-march=armv8.3-a+pauth",
+    "-DCPA_GENERATED_MEMORY=1",
+    "-DCPA_GENERATED_PAUTH_FAULTS=1",
+    "-DCPA_GENERATED_AUTHENTICATED_CALLS=1",
+    "-DCPA_PAUTH_FAULT_COUNT=24"
+  ],
+  "level_flag": "-DCALL_PAUTH_LEVEL={level}",
+  "source_flag": "-DCALL_C_PROJECTION=1",
+  "el0_flag": "-DCPA_GENERATED_EL0_MEMORY=1",
+  "fixtures": [
+    {
+      "file": "CptaAuthenticatedCallHarness.def",
+      "language": "c"
+    },
+    {
+      "file": "CptaAuthenticatedCallOriginal.def",
+      "language": "assembler-with-cpp"
+    }
+  ],
+  "required_gates": {
+    "call-key-readback": 1,
+    "call-controls": 3221225472,
+    "neverd-memory-samples": 9
+  },
+  "modes": [
+    "off",
+    "on",
+    "cpta0-only",
+    "both"
+  ],
+  "faults_per_mode": 24,
+  "el1_checks": 86,
+  "el0_checks": 90,
+  "level_record": "call-pauth-level",
+  "memory_record": "neverd-memory-{mode}",
+  "fault_record": "neverd-pauth-faults-{mode}",
+  "difference_record": "call-differences-{mode}",
+  "alternate_routes": [
+    "high-O0",
+    "llvm-O0"
+  ],
+  "alternate_levels": [
+    1,
+    4
+  ],
+  "qualification_key": "integer_authenticated_call_abi_qualified",
+  "errors": {
+    "input": "All five named call tests and their two matching artifact exports must complete",
+    "revision": "A full lowercase NeverD commit is required",
+    "matrix": "The complete authenticated call matrix did not pass"
+  }
+}

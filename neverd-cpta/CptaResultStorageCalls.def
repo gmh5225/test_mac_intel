@@ -1,0 +1,48 @@
+{
+  "scope": "Controlled PAC qualification of unchanged original-x8 call exports: aliased input/result bytes, original buffer identity, guards, callee x8 clobber, IA/IB, zero/dynamic modifiers and raw BLR. Five native/HighC/LLVMC routes at EL0/EL1 with PAuth, FPAC and FPACCOMBINE; wrong key, wrong modifier and corrupted signatures must fault before the callback. This small storage fixture does not qualify every stack/FP/variadic storage shape, whole images, native Apple PAC, signed unwind or fault-PC identity.",
+  "output_directory": "cpta-result-storage-calls",
+  "qualification_key": "original_x8_authenticated_call_qualified",
+  "directory": "result-storage-{key}-{zero}-{raw}",
+  "test_report_cases": [
+    "AArch64AuthenticatedCall.IndirectResultsKeepOriginalStorageAndPAC"
+  ],
+  "export_count": 1,
+  "alternate_routes": [],
+  "alternate_levels": [],
+  "input_error": "The original-x8 test and its single artifact export must complete",
+  "fixtures": [
+    {
+      "file": "storage-harness.c",
+      "language": "c",
+      "generated": true
+    },
+    {
+      "file": "storage-original.S",
+      "language": "assembler-with-cpp",
+      "generated": true
+    }
+  ],
+  "harness_template": "CptaResultStorageCallHarness.def",
+  "original_template": "CptaResultStorageCallOriginal.def",
+  "templates": {
+    "declaration": "extern uint64_t {symbol}(uint64_t, uint64_t, uint64_t, uint64_t);\nstatic unsigned __int128 invoke_{symbol}(uint64_t Unused) {{ (void)Unused; return checkStorage({symbol}); }}\n",
+    "case": "  {{invoke_{projected}, invoke_{original}, (uint64_t)storage_target, {key}, {zero}, {raw}}},\n",
+    "original": ".global {symbol}\n{symbol}:\n  stp x29, x30, [sp, #-16]!\n  mov x29, sp\n  mov x16, x0\n  mov x17, x1\n  mov x0, x2\n  mov x8, x3\n  {branch}\n  mov x0, #0\n  ldp x29, x30, [sp], #16\n  ret\n",
+    "raw_call": "blr x16",
+    "calls": [
+      "blraa x16, x17",
+      "blrab x16, x17"
+    ],
+    "zero_calls": [
+      "blraaz x16",
+      "blrabz x16"
+    ]
+  },
+  "routes": [
+    "native-macho",
+    "high-O0",
+    "high-O2",
+    "llvm-O0",
+    "llvm-O2"
+  ]
+}
