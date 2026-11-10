@@ -1,0 +1,64 @@
+name: Temporary LLVM fork Darwin CFI control
+
+on:
+  push:
+    branches: [codex/neverd-generated-image]
+    paths:
+      - neverd-arm64e-cfi-control/**
+      - .github/workflows/neverd-arm64e-cfi-control.yml
+
+permissions:
+  # Draft release assets are visible only to repository writers.
+  contents: write
+
+jobs:
+  policy:
+    runs-on: ubuntu-24.04
+    outputs:
+      repository: ${{ steps.policy.outputs.repository }}
+      revision: ${{ steps.policy.outputs.revision }}
+      runners: ${{ steps.policy.outputs.runners }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: policy
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          policy = json.loads(Path('neverd-arm64e-cfi-control/Control.def').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              print('repository=' + policy['source_repository'], file=out)
+              print('revision=' + policy['source_revision'], file=out)
+              print('runners=' + json.dumps(policy['runners']), file=out)
+          PY
+  native:
+    needs: policy
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.policy.outputs.runners) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ${{ needs.policy.outputs.repository }}
+          ref: ${{ needs.policy.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+      - name: Link and execute exact fixed-fork objects
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 neverd-arm64e-cfi-control/run.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: llvm-cfi-control-${{ matrix.runner }}
+          path: cfi-control-evidence/
+          if-no-files-found: error
+          retention-days: 14
