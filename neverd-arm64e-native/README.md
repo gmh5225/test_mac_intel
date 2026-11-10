@@ -42,7 +42,7 @@ loading uses a separate explicit userspace-fixup prerequisite. The controller ru
 SDK-derived process sandbox denies `map_with_linking_np`, causing dyld to apply
 fixups in userspace; all four PAC keys retain their valid/corrupt controls. The
 report binds both prerequisites and native publication to the same source SHA.
-Default system startup still fails and is not reported as qualified.
+An unchanged compiler-original main with B-key chains remains a separate failing control; it is not silently retried or counted as qualified.
 
 After the twenty dylib cases, `run-executable` requires four additional
 O0/O2 compact/DWARF publication cases. Each runs its original main executable,
@@ -50,8 +50,12 @@ then the signed published main through the retained startup entry, including
 new authenticated providers, RELRO, catches and cleanup. This stage re-derives
 the SDK sandbox profile and requires the exact successful startup report.
 The controller binds its result to that report's hash and the pinned source.
-Only this separate result grants `native_executable_publication_qualified`;
-general lifted-image publication remains unqualified.
+The separate `run-default-executable` stage then runs the same four publication
+cases directly, using the successful system PAC/dylib control report. NeverD
+prepares B-key chain pages before signing so default dyld can apply every key.
+The controller requires `native_default_executable_publication_qualified`, the
+system loader identity and the exact preflight hash. A userspace-profile result
+cannot satisfy this gate. General lifted-image publication remains unqualified.
 
 A separate macOS 15 producer compiles the four original threaded dylibs with its
 real `ld-classic`. It does not execute arm64e. The native jobs download those
