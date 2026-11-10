@@ -1,6 +1,6 @@
 {
   "source_repository": "NeverSight/NeverD",
-  "source_revision": "f8c7a979e1cc365599685317bbd4d52fb2ef8720",
+  "source_revision": "eabb96c44b7abaac2f628851968c05a090de5b5d",
   "runners": [
     "macos-26",
     "xcode-27"
@@ -29,7 +29,8 @@
     "startup": "Native startup did not qualify the explicit userspace fixup profile",
     "executable": "Native executable publication requires successful same-source tests bound to the startup probe",
     "default_executable": "Default system executable publication requires same-source PAC/unwind controls and a complete unsandboxed publication result",
-    "generated": "Generated native publication requires exact source and system preflight identities, compiler provenance and a complete runtime matrix"
+    "generated": "Generated native publication requires exact source and system preflight identities, compiler provenance and a complete runtime matrix",
+    "llvm_revision": "LLVM source does not match the pinned Darwin signed-return CFI producer"
   },
   "stages": [
     {
@@ -86,7 +87,34 @@
         "third_party/simdutf",
         "third_party/simdjson",
         "third_party/mimalloc",
-        "third_party/oneTBB"
+        "third_party/oneTBB",
+        "third_party/llvm-project"
+      ]
+    },
+    {
+      "name": "llvm-fetch",
+      "timeout": 1200,
+      "argv": [
+        "git",
+        "-C",
+        "third_party/llvm-project",
+        "fetch",
+        "--depth",
+        "1",
+        "origin",
+        "{llvm_revision}"
+      ]
+    },
+    {
+      "name": "llvm-source",
+      "timeout": 300,
+      "argv": [
+        "git",
+        "-C",
+        "third_party/llvm-project",
+        "checkout",
+        "--detach",
+        "{llvm_revision}"
       ]
     },
     {
@@ -103,12 +131,12 @@
         "-DCMAKE_BUILD_TYPE=Release",
         "-DBUILD_TESTING=ON",
         "-DNEVERD_BUILD_GUI=OFF",
-        "-DNEVERD_LLVM_PREBUILT=ON"
+        "-DNEVERD_LLVM_PREBUILT=OFF"
       ]
     },
     {
       "name": "build",
-      "timeout": 3000,
+      "timeout": 9000,
       "argv": [
         "python3",
         "scripts/build.py",
@@ -228,7 +256,7 @@
   "startup_fixup_loader": "userspace",
   "startup_fixup_loader_key": "startup_fixup_loader",
   "startup_qualification_hash_key": "startup_qualification_sha256",
-  "native_timeout_minutes": 75,
+  "native_timeout_minutes": 180,
   "executable_report": "executable/report.json",
   "executable_qualification_key": "native_executable_publication_qualified",
   "executable_qualification_hash_key": "executable_qualification_sha256",
@@ -253,5 +281,8 @@
       "path": "generated-executable/report.json",
       "key": "native_generated_executable_publication_qualified"
     }
-  ]
+  ],
+  "llvm_revision": "5676029e378c9e37adc16c8216a8e8453ffafcae",
+  "llvm_directory": "third_party/llvm-project",
+  "llvm_source_stage": "llvm-source"
 }

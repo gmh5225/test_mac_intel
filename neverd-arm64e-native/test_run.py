@@ -23,6 +23,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         self.output = self.root / CASES["output_directory"]
         self.policy = copy.deepcopy(run.POLICY)
         self.policy["source_revision"] = CASES["revision"]
+        self.policy["llvm_revision"] = CASES["revision"]
         self.build = self.source / self.policy["build_directory"]
         patch = mock.patch.object(run.subprocess, "check_output", return_value=CASES["revision"])
         patch.start()
@@ -42,6 +43,19 @@ class NativeEnvironmentTests(unittest.TestCase):
             run.execute(self.source, self.output, self.policy)
         stage.assert_not_called()
         self.assertFalse(self.output.exists())
+
+    def test_wrong_llvm_revision_stops_before_configuration_and_publication(self):
+        self.policy["llvm_revision"] = CASES["wrong_revision"]
+        with mock.patch.object(run, "stage", return_value=0) as stage, \
+                self.assertRaisesRegex(ValueError, self.policy["errors"]["llvm_revision"]):
+            run.execute(self.source, self.output, self.policy)
+        self.assertEqual(stage.call_count, next(
+            index for index, item in enumerate(self.policy["stages"], 1)
+            if item["name"] == self.policy["llvm_source_stage"]))
+        result = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["llvm_revision"], CASES["revision"])
+        self.assertFalse(self.build.exists())
 
     def test_failed_startup_stops_before_tools_dependencies_and_build(self):
         with mock.patch.object(run, "stage", side_effect=[0, CASES["stage_failure"]]) as stage:
@@ -136,6 +150,7 @@ class NativeEnvironmentTests(unittest.TestCase):
         with mock.patch.object(run, "stage", side_effect=self.complete_reports()):
             self.assertEqual(run.execute(self.source, self.output, self.policy), 0)
         result = json.loads((self.output / self.policy["report_name"]).read_text())
+        self.assertEqual(result["llvm_revision"], self.policy["llvm_revision"])
         self.assertTrue(result[self.policy["startup_qualification_key"]])
         self.assertTrue(result[self.policy["publication_qualification_key"]])
         self.assertTrue(result[self.policy["executable_qualification_key"]])

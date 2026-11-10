@@ -47,7 +47,8 @@ def execute(source, output, policy=POLICY):
               policy["default_executable_qualification_key"]: False,
               "whole_image_publication_qualified": False, "stages": []}
     report.update({item["key"]: False for item in policy["generated_reports"]})
-    variables = {"source": str(source), "output": str(output), "build": str(build)}
+    variables = {"source": str(source), "output": str(output), "build": str(build),
+                 "llvm_revision": policy["llvm_revision"]}
     previous = signal.getsignal(signal.SIGTERM)
 
     def terminate(signum, frame):
@@ -70,6 +71,13 @@ def execute(source, output, policy=POLICY):
                                           item["timeout"])
             if record["returncode"]:
                 return record["returncode"]
+            if item["name"] == policy["llvm_source_stage"]:
+                llvm_revision = subprocess.check_output(
+                    policy["revision_command"], cwd=source / policy["llvm_directory"],
+                    text=True).strip()
+                report["llvm_revision"] = llvm_revision
+                if llvm_revision != policy["llvm_revision"]:
+                    raise ValueError(policy["errors"]["llvm_revision"])
         startup = output / policy["startup_report"]
         control = json.loads(startup.read_text())
         if (not control.get(policy["startup_qualification_key"]) or
