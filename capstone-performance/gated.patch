@@ -1,0 +1,38 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..2a21c760 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -635,7 +635,12 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	int ret;
+ 	bool result;
+ 
+-	InternalInstruction insn = { 0 };
++	/* The decoder assigns the header and ID before reading them. Prefix
++	 * defaults and optional operand state must still start at zero. */
++	InternalInstruction insn;
++	memset(&insn, 0, offsetof(InternalInstruction, code));
++	memset((char *)&insn + offsetof(InternalInstruction, vvvv), 0,
++	       sizeof(insn) - offsetof(InternalInstruction, vvvv));
+ 	if (extension_opcode == 0x62)
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+@@ -699,11 +704,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			if (insn.hasLockPrefix)
+ 				Flags |= X86_IP_HAS_LOCK;
+ 
+-			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+-				if (insn.operands[i].encoding ==
+-				    ENCODING_WRITEMASK) {
+-					Flags |= X86_IP_HAS_EVEX_OPMASK;
+-					break;
++			/* A decoded writemask operand is only valid with EVEX. */
++			if (insn.vectorExtensionType == TYPE_EVEX) {
++				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
++					if (insn.operands[i].encoding ==
++					    ENCODING_WRITEMASK) {
++						Flags |= X86_IP_HAS_EVEX_OPMASK;
++						break;
++					}
+ 				}
+ 			}
+ 
