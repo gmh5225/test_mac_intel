@@ -1,9 +1,9 @@
-name: Capstone shared instruction metadata performance
+name: Capstone assembly output whitespace performance
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-common-id-and-detail]
+    branches: [codex/capstone-trim-for-observer]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-common-id-and-detail
+  group: capstone-trim-for-observer
   cancel-in-progress: false
 
 jobs:
@@ -45,7 +45,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-common-id-and-detail-${{ matrix.host }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-trim-for-observer-${{ matrix.host }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

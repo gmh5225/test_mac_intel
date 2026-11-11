@@ -179,16 +179,21 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-callback', 'check-metadata']:
+    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-callback']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit in ('check-hint', 'check-metadata') else
+        extra = ([libraries['base']] if unit == 'check-hint' else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
+    finalizer = WORK / 'finalizer-state'
+    command(['clang', '-O3', '-DNDEBUG', *defs, *includes, SOURCE / 'finalizer-state.c',
+             WORK / 'new-build/libcapstone.a', *(['-ldl','-lm'] if platform.system() == 'Linux' else []),
+             '-o', finalizer], 'compile-finalizer-state')
+    command([finalizer], 'verify-finalizer-state')
     option_test=WORK/'option-state'
     command(['clang++','-std=c++17','-O3','-I',WORK/'new/include',SOURCE/'option-state.cpp',
              *(['-ldl'] if platform.system()=='Linux' else []), '-o',option_test], 'option-test-build')
@@ -212,8 +217,7 @@ panic = "abort"
     write('objects.json', objects)
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
-    allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['Mapping.c', 'arch/AArch64/AArch64Mapping.c', 'arch/ARC/ARCMapping.c', 'arch/ARM/ARMMapping.c', 'arch/Alpha/AlphaMapping.c', 'arch/LoongArch/LoongArchMapping.c', 'arch/Mips/MipsMapping.c', 'arch/PowerPC/PPCMapping.c', 'arch/Sparc/SparcMapping.c', 'arch/SystemZ/SystemZMapping.c', 'arch/TriCore/TriCoreMapping.c', 'arch/Xtensa/XtensaMapping.c']}
+    allowed = {'CMakeFiles/capstone.dir/cs.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
