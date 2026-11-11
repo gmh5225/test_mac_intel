@@ -2,7 +2,7 @@ name: PE64 runtime function comparison
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-scoped-alias-functions]
+    branches: [codex/capstone-isolated-alias-functions]
 permissions:
   contents: read
 jobs:
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scoped-alias-functions-${{ matrix.crt }}
+          name: isolated-alias-functions-${{ matrix.crt }}
           path: capstone-evidence/
           retention-days: 14
