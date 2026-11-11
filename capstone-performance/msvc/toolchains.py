@@ -10,16 +10,13 @@ import subprocess
 import run as perf
 
 source, work = perf.source, perf.work
-ref = '556dbb5719b6886c0b927fdb537669c8d986dac4'
+ref = 'c3fd1f110810201fa4d82a2d057ed82f5b08d5b1'
 
 def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
     trees = {'msvc':base}
-    baseline=source/'qualified.patch'
-    assert perf.digest(baseline.read_bytes())=='d6cc1c672df8857378bffb28f91f9dbd53030887869a0c13f8ed4186df5d0471'
-    perf.run(['git','apply',baseline],'qualified-native-scan-and-detail',base)
-    for name, expected in {'profiles': '93177511a5f77f07a29344952ecd14c83430653b0cba2b7c85a7b066f0f0f196'}.items():
+    for name, expected in {'profiles': '4dac9de16eab2738dd8edf56c97394d452596bd6343155ea15aed839b5c22417'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -49,7 +46,7 @@ opt-level = 3
     for name,src in trees.items():
         build=work/(name+'-build')
         perf.run(['cmake','-S',src,'-B',build,*opts,
-                  '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON',
+                  '-DCAPSTONE_ARCHITECTURE_DEFAULT=ON','-DCAPSTONE_X86_SUPPORT=ON',
                   '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if perf.crt=='MT' else 'OFF'),
                   '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],name+'-configure')
         perf.run(['cmake','--build',build,'--config','Release','--parallel','4','--target','capstone_static'],name+'-build')
@@ -126,7 +123,7 @@ def measure(progs,cases):
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '93177511a5f77f07a29344952ecd14c83430653b0cba2b7c85a7b066f0f0f196'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '4dac9de16eab2738dd8edf56c97394d452596bd6343155ea15aed839b5c22417'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
