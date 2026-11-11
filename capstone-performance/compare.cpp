@@ -77,6 +77,8 @@ static void text_value(Result &r, const char *s) {
   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
 }
 
+extern "C" void observe_public(const void *, const void *, const void *, const void *);
+static bool opaque_observer;
 static bool collect_work;
 
 static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
@@ -137,6 +139,18 @@ static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
       }
       if (!insn->size)
         throw std::runtime_error("zero instruction length");
+      if (opaque_observer) {
+        if (mode == 2) {
+          cs_regs read, written;
+          uint8_t nr = 0, nw = 0;
+          if (cs_regs_access(handle, insn, read, &nr, written, &nw) != CS_ERR_OK)
+            throw std::runtime_error("cs_regs_access");
+          observe_public(insn, insn->mnemonic, read, written);
+        } else {
+          observe_public(insn, insn->mnemonic, nullptr, nullptr);
+        }
+        continue;
+      }
       result.values += insn->id;
       if (mode) {
         text_value(result, insn->mnemonic);
@@ -194,7 +208,8 @@ int main(int argc, char **argv) {
                                std::istreambuf_iterator<char>()};
     if (bytes.empty())
       throw std::runtime_error("empty or unreadable input");
-    void *iced = iced_create(bits, mode);
+    opaque_observer = std::getenv("MATCHED_OBSERVER") != nullptr;
+    void *iced = iced_create(bits, mode + (opaque_observer ? 4 : 0));
     auto run = [&](unsigned n) {
       if (library == "capstone")
         return capstone_run(bytes.data(), bytes.size(), bits, mode, n);

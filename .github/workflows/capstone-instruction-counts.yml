@@ -1,7 +1,7 @@
 name: Public decoder and formatter instruction counts
 on:
   push:
-    branches: [codex/capstone-public-instruction-counts]
+    branches: [codex/capstone-matched-public-observers]
     paths: [capstone-performance/**, .github/workflows/capstone-instruction-counts.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
           echo "VALGRIND_LIB=$vg_lib" >> "$GITHUB_ENV"
           echo "CPLUS_INCLUDE_PATH=$tools_dir/usr/include" >> "$GITHUB_ENV"
           VALGRIND_LIB="$vg_lib" "$tools_dir/usr/bin/valgrind" --tool=callgrind --callgrind-out-file="$tools_dir/smoke" /bin/true
-      - name: Count the warmed public decode loops
+      - name: Count the regular and opaque observers while both libraries build all requested results
         run: python3 capstone-performance/instruction_counts.py
       - name: Remove simulator files
         if: always()
@@ -38,7 +38,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: public-instruction-counts-${{ github.run_id }}-${{ github.run_attempt }}
+          name: matched-public-observers-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14

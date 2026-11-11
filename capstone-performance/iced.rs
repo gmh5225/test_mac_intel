@@ -11,7 +11,13 @@ pub struct Result {
     values: u64,
 }
 
+extern "C" {
+    fn observe_public(instruction: *const std::ffi::c_void, text: *const std::ffi::c_void,
+                      reads: *const std::ffi::c_void, writes: *const std::ffi::c_void);
+}
+
 struct State {
+    opaque: bool,
     bits: u32,
     mode: u32,
     formatter: IntelFormatter,
@@ -23,7 +29,8 @@ struct State {
 pub extern "C" fn iced_create(bits: u32, mode: u32) -> *mut std::ffi::c_void {
     Box::into_raw(Box::new(State {
         bits,
-        mode,
+        opaque: mode & 4 != 0,
+        mode: mode & 3,
         formatter: IntelFormatter::new(),
         factory: InstructionInfoFactory::new(),
         text: String::with_capacity(512),
@@ -70,6 +77,20 @@ pub unsafe extern "C" fn iced_run(
                 continue;
             }
             result.instructions += 1;
+            if state.opaque {
+                if state.mode != 0 {
+                    state.text.clear();
+                    state.formatter.format(&instruction, &mut state.text);
+                }
+                let (regs, memory) = if state.mode == 2 {
+                    let info = state.factory.info(&instruction);
+                    (info.used_registers().as_ptr().cast(), info.used_memory().as_ptr().cast())
+                } else {
+                    (std::ptr::null(), std::ptr::null())
+                };
+                observe_public((&instruction as *const Instruction).cast(), state.text.as_ptr().cast(), regs, memory);
+                continue;
+            }
             result.values = result.values.wrapping_add(instruction.code() as u64);
             if state.mode != 0 {
                 state.text.clear();
