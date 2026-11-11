@@ -1,9 +1,9 @@
-name: Capstone independent Intel performance
+name: Capstone Intel short-window and operand access verification
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-intel-performance]
+    branches: [codex/capstone-native-intel-followup]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-performance.yml
@@ -12,16 +12,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-independent-intel
+  group: capstone-native-intel-followup
   cancel-in-progress: false
 
 jobs:
   measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { probe: shared, revision: 0481c17073351eb48b429c65ec065caca766c091 }
+          - { probe: operand-access, revision: dfa560b51e89aa33691f6831b003453931da22f2 }
     runs-on: macos-15-intel
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          ref: ${{ matrix.revision }}
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Require native Intel and validate harness
@@ -41,7 +48,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-intel-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-intel-${{ matrix.probe }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
