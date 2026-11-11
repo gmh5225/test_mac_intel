@@ -1,8 +1,8 @@
-name: Same-consumer MSVC and clang-cl decode comparison
+name: Compiler-specific Capstone runtime object identity
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-isolated-entry-identity]
+    branches: [codex/capstone-native-dense-object-identity]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -11,8 +11,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD, MT]
-    runs-on: windows-2022
+        include:
+          - { host: windows-2022, flavor: MD }
+          - { host: windows-2022, flavor: MT }
+          - { host: ubuntu-24.04, flavor: gcc }
+          - { host: ubuntu-24.04, flavor: clang }
+          - { host: macos-15, flavor: clang }
+          - { host: macos-15-intel, flavor: clang }
+    runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -20,11 +26,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/scope.py ${{ matrix.crt }}
+        run: python capstone-performance/scope.py ${{ matrix.flavor }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-entry-identity-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: native-dense-identity-${{ matrix.host }}-${{ matrix.flavor }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
