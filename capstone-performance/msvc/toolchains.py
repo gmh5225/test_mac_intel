@@ -18,7 +18,7 @@ def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
     trees = {'msvc':base}
-    for name, expected in {'profiles': 'b95a4f5ae293109afb0c0e89c5cd8cedb5d998de86127032ec607f1a223431b1'}.items():
+    for name, expected in {'profiles': '3058507c7a9832f87118764d723c1e9d5e4a9dc409b2e7bbbf23a40153442bae'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -48,7 +48,7 @@ opt-level = 3
     for name,src in trees.items():
         build=work/(name+'-build')
         perf.run(['cmake','-S',src,'-B',build,*opts,
-                  '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MSVC_NATIVE_DECODER='+('ON' if name=='profiles' else 'OFF'),'-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON',
+                  '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MSVC_NATIVE_DECODER='+('ON' if name=='profiles' else 'OFF'),'-DCAPSTONE_X86_SUPPORT=ON',
                   '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if perf.crt=='MT' else 'OFF'),
                   '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],name+'-configure')
         perf.run(['cmake','--build',build,'--config','Release','--parallel','4','--target','capstone_static'],name+'-build')
@@ -125,7 +125,7 @@ def measure(progs,cases):
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': 'b95a4f5ae293109afb0c0e89c5cd8cedb5d998de86127032ec607f1a223431b1'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '3058507c7a9832f87118764d723c1e9d5e4a9dc409b2e7bbbf23a40153442bae'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
