@@ -1,0 +1,47 @@
+name: Capstone independent Intel performance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/capstone-intel-performance]
+    paths:
+      - capstone-performance/**
+      - .github/workflows/capstone-performance.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capstone-independent-intel
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: macos-15-intel
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Require native Intel and validate harness
+        run: |
+          test "$(uname -m)" = x86_64
+          python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
+      - name: Build immutable sources and verify outputs
+        timeout-minutes: 20
+        run: python3 capstone-performance/run.py prepare
+      - name: Measure A/A stability then paired workloads
+        timeout-minutes: 27
+        run: python3 capstone-performance/run.py measure
+      - name: Retire disposable products and summarize evidence
+        if: always()
+        run: python3 capstone-performance/run.py finish
+      - name: Preserve raw evidence including failed attempts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: capstone-intel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: error
+          retention-days: 14
