@@ -160,22 +160,22 @@ index 4e1ab1d5..4a73c829 100644
  	int opcodeResult = readOpcode(&insn, true, true);
  	if (opcodeResult)
 diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
-index ae3428b5..e8700009 100644
+index ae3428b5..808e3824 100644
 --- a/arch/X86/X86DisassemblerDecoder.h
 +++ b/arch/X86/X86DisassemblerDecoder.h
-@@ -20,6 +20,12 @@
+@@ -19,6 +19,12 @@
+ #ifndef CS_X86_DISASSEMBLERDECODER_H
  #define CS_X86_DISASSEMBLERDECODER_H
  
- #if defined(CAPSTONE_HAS_OSXKERNEL)
 +/* Native MSVC with the DLL runtime benefits from reading public lengths
 + * directly and initializing only the live parts of the full decoder. */
 +#if defined(_MSC_VER) && !defined(__clang__) && defined(_DLL)
 +#define X86_NATIVE_SCAN_EXTENT
 +#endif
 +
+ #if defined(CAPSTONE_HAS_OSXKERNEL)
  #include <libkern/libkern.h>
  #else
- #include <stdio.h>
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
 index 5627f249..531b8dbb 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc
