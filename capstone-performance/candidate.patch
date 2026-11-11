@@ -1,130 +1,28 @@
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 4e1ab1d5..2ef959cc 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1910,82 +1910,58 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 1b1c2032..9c0a348c 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10246,9 +10246,6 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 	    X86_mapFeatureExtension(insn, id, h->mode))
+ 		return;
  
- 	case 4:
- 	case 8: {
--		EABase eaBaseBase =
--			(insn->addressSize == 4 ? EA_BASE_EAX : EA_BASE_RAX);
-+		if (mod == 3) {
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = (EABase)(insn->eaRegBase + rm + evexrm);
-+			return 0;
-+		}
- 
--		switch (mod) {
--		default:
--			break;
--		case 0x0:
--			insn->eaDisplacement =
--				EA_DISP_NONE; /* readSIB may override this */
--			// In determining whether RIP-relative mode is used (rm=5),
--			// or whether a SIB byte is present (rm=4),
--			// the extension bits (REX.b and EVEX.x) are ignored.
--			switch (rm & 7) {
--			case 0x4: // SIB byte is present
--				if (materialize) {
--					insn->eaBase = (insn->addressSize == 4 ?
--								EA_BASE_sib :
--								EA_BASE_sib64);
--				}
--				if (readSIB(insn, materialize) ||
--				    readDisplacement(insn, materialize))
--					return -1;
--				break;
--			case 0x5: // RIP-relative
--				if (materialize) {
--					insn->eaBase = EA_BASE_NONE;
--				}
--				insn->eaDisplacement = EA_DISP_32;
--				if (readDisplacement(insn, materialize))
--					return -1;
--				break;
--			default:
--				if (materialize) {
--					insn->eaBase =
--						(EABase)(eaBaseBase + rm);
--				}
--				break;
--			}
-+		const EABase base = insn->addressSize == 4 ? EA_BASE_EAX : EA_BASE_RAX;
-+		/* Only mod and the low three r/m bits select a memory form.
-+		 * Extended register bits participate in its base register. */
-+		switch ((mod << 3) | (rm & 7)) {
-+		case 0x00: case 0x01: case 0x02: case 0x03: case 0x06: case 0x07:
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = (EABase)(base + rm);
-+			return 0;
-+		case 0x04:
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = insn->addressSize == 4 ?
-+						       EA_BASE_sib : EA_BASE_sib64;
- 			break;
--		case 0x1:
-+		case 0x05:
-+			insn->eaDisplacement = EA_DISP_32;
-+			if (materialize)
-+				insn->eaBase = EA_BASE_NONE;
-+			return readDisplacement(insn, materialize);
-+		case 0x0c:
-+			insn->eaDisplacement = EA_DISP_8;
- 			if (materialize) {
-+				insn->eaBase = EA_BASE_sib;
- 				insn->displacementSize = 1;
- 			}
--			/* FALLTHROUGH */
--		case 0x2:
--			insn->eaDisplacement =
--				(mod == 0x1 ? EA_DISP_8 : EA_DISP_32);
--			switch (rm & 7) {
--			case 0x4: // SIB byte is present
--				if (materialize) {
--					insn->eaBase = EA_BASE_sib;
--				}
--				if (readSIB(insn, materialize) ||
--				    readDisplacement(insn, materialize))
--					return -1;
--				break;
--			default:
--				if (materialize) {
--					insn->eaBase =
--						(EABase)(eaBaseBase + rm);
--				}
--				if (readDisplacement(insn, materialize))
--					return -1;
--				break;
--			}
- 			break;
--		case 0x3:
--			insn->eaDisplacement = EA_DISP_NONE;
-+		case 0x14:
-+			insn->eaDisplacement = EA_DISP_32;
-+			if (materialize)
-+				insn->eaBase = EA_BASE_sib;
-+			break;
-+		default:
-+			/* The remaining forms have a base and an 8- or 32-bit displacement. */
-+			insn->eaDisplacement = mod == 1 ? EA_DISP_8 : EA_DISP_32;
- 			if (materialize) {
--				insn->eaBase =
--					(EABase)(insn->eaRegBase + rm + evexrm);
-+				insn->eaBase = (EABase)(base + rm);
-+				if (mod == 1)
-+					insn->displacementSize = 1;
- 			}
--			break;
-+			return readDisplacement(insn, materialize);
- 		}
+-	if (X86_get_insn_id_no_detail(h, insn, id))
+-		return;
 -
--		break;
-+		if (readSIB(insn, materialize))
-+			return -1;
-+		return readDisplacement(insn, materialize);
- 	}
- 	} /* switch (insn->addressSize) */
- 
+ 	i = find_insn_h(h, id);
+ 	if (i != -1) {
+ 		insn->id = insns[i].mapid;
+diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
+index faade264..d3ae72d6 100644
+--- a/tests/unit/x86_encoding_accuracy.c
++++ b/tests/unit/x86_encoding_accuracy.c
+@@ -175,7 +175,8 @@ static bool check_id_cache(void)
+ 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
+ 		cs_insn cached = { 0 }, fallback = { 0 };
+ 		cached.id = fallback.id = UINT32_MAX;
+-		X86_get_insn_id(arch, &cached, id);
++		if (!X86_get_insn_id_no_detail(arch, &cached, id))
++			X86_get_insn_id(arch, &cached, id);
+ 		arch->x86_insn_lut = NULL;
+ 		X86_get_insn_id(arch, &fallback, id);
+ 		arch->x86_insn_lut = cache;
