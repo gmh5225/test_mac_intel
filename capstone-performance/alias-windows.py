@@ -57,12 +57,9 @@ def main():
     WORK.mkdir(); EVIDENCE.mkdir()
     command(['git','config','--global','core.autocrlf','false'],'lf')
     base = fetch('base','https://github.com/NeverSight/capstone.git',manifest['capstone_revision'])
-    baseline = SOURCE/'alias-baseline.patch'
-    assert digest(baseline.read_bytes()) == manifest['source_lineage'][baseline.name]['sha256']
     assert digest((SOURCE/'msvc-alias.patch').read_bytes()) == manifest['source_lineage']['msvc-alias.patch']['sha256']
     new = WORK/'new'
     command(['git','worktree','add','--detach',new,'HEAD'],'worktree',base)
-    for tree in (base, new): command(['git','apply',baseline], 'integrated-'+tree.name, tree)
     command(['git','apply',SOURCE/'msvc-alias.patch'],'apply',new)
     write('inputs.json',dict(ref=manifest['capstone_revision'],crt=crt,patch=digest((SOURCE/'msvc-alias.patch').read_bytes()),image=os.environ['ImageVersion']))
     programs = {}

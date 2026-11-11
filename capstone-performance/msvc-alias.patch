@@ -18,3 +18,70 @@ index 49e34d76..28ebdbd0 100644
  		assert(ss && s);
  		if (ss->is_closed || len == 0)
  			return;
+diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
+index cb880c40..bddcd8fa 100644
+--- a/arch/X86/X86DisassemblerTranslator.h
++++ b/arch/X86/X86DisassemblerTranslator.h
+@@ -1404,11 +1404,14 @@ X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
+ 	if (beginTranslation(mcInst, insn))
+ 		return true;
+ 
+-	/* UD1 has a runtime operand override; other selected sets use
+-	 * the same translators with constant descriptors, including duplicates. */
++#if !defined(_MSC_VER) || defined(__clang__)
++	/* MSVC expands both generated switches into a stack-probed frame.
++	 * Its descriptor loop below uses the same operand translators.
++	 * UD1 always uses that loop for its runtime operand override. */
+ 	if (insn->instructionID != X86_UD1) {
+ #include "X86GenOperandTranslate.inc"
+ 	}
++#endif
+ 
+ 	for (index = 0; index < X86_MAX_OPERANDS &&
+ 			insn->operands[index].encoding != ENCODING_NONE;
+diff --git a/cs.c b/cs.c
+index 55aab304..aef26571 100644
+--- a/cs.c
++++ b/cs.c
+@@ -491,6 +491,13 @@ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
+ #ifdef _MSC_VER
+ /* The UCRT can give its inline vsnprintf a separate address in each C file. */
+ cs_vsnprintf_t const cs_default_vsnprintf = vsnprintf;
++#ifdef _DLL
++/* Imported functions can have distinct thunk and IAT addresses. Load
++ * the same stored pointer representation as the original allocator hooks. */
++const volatile cs_opt_mem cs_initial_memory_hooks = {
++	malloc, calloc, realloc, free, vsnprintf
++};
++#endif
+ #endif
+ #endif // defined(_WIN32_WCE)
+ 
+@@ -930,10 +937,7 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ #include "cs_disasm_internal.h"
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */
+-#if defined(__GNUC__)
+-__attribute__((always_inline))
+-#endif
+-static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
++CS_DECODE_INLINE void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 			     SStream *OS, MCInst *mci,
+ 			     PostPrinter_t postprinter, const uint8_t *code,
+ 			     bool stream_length_valid)
+diff --git a/cs_priv.h b/cs_priv.h
+index 05a71d2a..903415e8 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -169,6 +169,11 @@ extern cs_free_t cs_mem_free;
+ extern cs_vsnprintf_t cs_vsnprintf;
+ #ifdef _MSC_VER
+ extern cs_vsnprintf_t const cs_default_vsnprintf;
++#if defined(_DLL) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++extern const volatile cs_opt_mem cs_initial_memory_hooks;
++#endif
+ #else
+ #define cs_default_vsnprintf vsnprintf
+ #endif
