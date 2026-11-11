@@ -23,7 +23,7 @@ def sample(binary, case, mode, repeats):
 
 def main(root):
     run.WORK = root
-    revision = "5b9cbe48b46842e70a4ce8dcfafcb3f35c2f34cd"
+    revision = "7df25602218df78564679139cca7813b65ecf0a5"
     source = run.fetch("capstone", "https://github.com/NeverSight/capstone.git", revision)
     cases = corpus.prepare(SOURCE, root, run.EVIDENCE, run.command)
     arch_for = {"arm64":"AARCH64","ppc64el":"PPC","mips64el":"MIPS","sparc64":"SPARC"}
@@ -60,6 +60,7 @@ def main(root):
         run.command(["clang++",root/"consumer.o",build/"libcapstone.a","-o",exe],"link-"+variant)
         bins[variant] = exe
     bins["control"] = bins["base"]
+    bins["trie-control"] = bins["trie"]
     if linux:
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     run.write("inputs.json", dict(revision=revision,patch=run.sha(SOURCE/"alias-trie.patch"),
@@ -70,13 +71,13 @@ def main(root):
         for mode in (("scan","format","detail") if case["selector"] >= 16 else ("format","detail")):
             first = [sample(exe,case,mode,1) for exe in (bins["base"],bins["trie"])]
             assert first[0]["first"] == first[1]["first"], (case["name"],mode,first)
-            repeats = max(1,min(12000,math.ceil(50e6/max(1,min(v["cpu_ns"] for v in first)))))
+            repeats = max(1,min(12000,math.ceil(160e6/max(1,min(v["cpu_ns"] for v in first)))))
             cycles = []
             variants = list(bins)
             expected = None
-            for i in range(6):
-                order = variants[i%3:] + variants[:i%3]
-                if i>=3:
+            for i in range(12):
+                order = variants[i%4:] + variants[:i%4]
+                if (i//4)%2:
                     order.reverse()
                 cycle = {}
                 for v in order:
@@ -89,10 +90,10 @@ def main(root):
                 with (run.EVIDENCE/"cycles.jsonl").open("a") as output:
                     output.write(json.dumps(dict(case=case["name"],mode=mode,cycle=i,samples=cycle))+"\n")
             def ratio(which):
-                return statistics.median((c["base"]["cpu_ns"] + c["control"]["cpu_ns"])/2/c[which]["cpu_ns"]
+                return statistics.median((c["base"]["cpu_ns"] + c["control"]["cpu_ns"])/(c["trie"]["cpu_ns"] + c["trie-control"]["cpu_ns"])
                                          if which == "trie" else c["base"]["cpu_ns"]/c["control"]["cpu_ns"]
                                          for c in cycles)
-            results.append(dict(case=case["name"],mode=mode,ratio=ratio("trie"),control=ratio("control"),first=first[0]["first"]))
+            results.append(dict(case=case["name"],mode=mode,ratio=ratio("trie"),control=ratio("control"),trie_control=statistics.median(c["trie"]["cpu_ns"]/c["trie-control"]["cpu_ns"] for c in cycles),first=first[0]["first"]))
             run.write("measurements.json",results)
 
 

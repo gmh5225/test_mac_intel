@@ -23,20 +23,20 @@ index fdd48518..f4e9d481 100644
  option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
  option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
 diff --git a/Makefile b/Makefile
-index 9dff4522..7d5f03de 100644
+index 9dff4522..97727960 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -119,6 +119,10 @@ LIBNAME = capstone
- DEP_ARM =
- DEP_ARM += $(wildcard arch/ARM/ARM*.inc)
+@@ -116,6 +116,10 @@ INSTALL_LIB ?= $(INSTALL_BIN) -m0755
+ LIBNAME = capstone
+ 
  
 +ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
 +CFLAGS += -DCAPSTONE_USE_ALIAS_TRIE
 +endif
 +
- LIBOBJ_ARM =
- ifneq (,$(findstring arm,$(CAPSTONE_ARCHS)))
- 	CFLAGS += -DCAPSTONE_HAS_ARM
+ DEP_ARM =
+ DEP_ARM += $(wildcard arch/ARM/ARM*.inc)
+ 
 diff --git a/Mapping.c b/Mapping.c
 index 2332dac8..b2be73de 100644
 --- a/Mapping.c
@@ -825,23 +825,32 @@ index 00000000..31af9184
 +	{ 0, 0, 0 },
 +	{ 0, 663, AARCH64_INS_ALIAS_LDAPURSW },
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index 81b5e334..75f3f734 100644
+index 81b5e334..0d9018a8 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
-@@ -163,6 +163,12 @@ static const name_map insn_alias_mnem_map[] = {
- 	{ AARCH64_INS_ALIAS_END, NULL },
+@@ -140,6 +140,7 @@ const insn_map aarch64_insns[] = {
+ #include "AArch64GenCSMappingInsn.inc"
  };
  
++#if !defined(CAPSTONE_DIET) || !defined(CAPSTONE_USE_ALIAS_TRIE)
+ static const name_map insn_alias_mnem_map[] = {
+ #include "AArch64GenCSAliasMnemMap.inc"
+ 	{ AARCH64_INS_ALIAS_CFP, "cfp" },
+@@ -162,6 +163,13 @@ static const name_map insn_alias_mnem_map[] = {
+ 	{ AARCH64_INS_ALIAS_BFXIL, "bfxil" },
+ 	{ AARCH64_INS_ALIAS_END, NULL },
+ };
++#endif
++
 +#ifdef CAPSTONE_USE_ALIAS_TRIE
 +static const alias_trie_node alias_trie[] = {
 +#include "AArch64GenAliasTrie.inc"
 +};
 +#endif
-+
+ 
  static const char *get_custom_reg_alias(unsigned reg)
  {
- 	switch (reg) {
-@@ -991,8 +997,8 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -991,8 +999,8 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	}
  	AArch64_check_updates_flags(MI);
  	AArch64_add_sysreg_alias_access(MI);
@@ -3173,7 +3182,7 @@ index abe9be7a..d4e2f344 100644
  #endif
  }
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 850fa787..91debe74 100644
+index 850fa787..8b703760 100644
 --- a/suite/auto-sync/README.md
 +++ b/suite/auto-sync/README.md
 @@ -222,4 +222,8 @@ Documentation about the `.inc` file generation is in the [llvm-capstone](https:/
@@ -3184,8 +3193,8 @@ index 850fa787..91debe74 100644
 +
 +After updating an AArch64, Mips, PowerPC or Sparc alias mnemonic map, run
 +`python3 suite/synctools/alias_mnemonic_trie.py` to regenerate the recognition
-+table for the final printed name in builds containing only these backends. The first map row for each spelling supplies
-+its public alias ID.
++table used in builds containing only these backends. The first map row for each
++spelling supplies its public alias ID.
 diff --git a/suite/synctools/alias_mnemonic_trie.py b/suite/synctools/alias_mnemonic_trie.py
 new file mode 100644
 index 00000000..438bd32e
@@ -3293,3 +3302,69 @@ index b6a40374..c29d1903 100644
  if(CAPSTONE_MIPS_SUPPORT)
      list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
  endif()
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index e6f3e5cb..7f588c14 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #include "../../Mapping.h"
++#include "../../utils.h"
+ #include <limits.h>
+ #include <stdio.h>
+ #include <string.h>
+@@ -189,6 +190,42 @@ static bool test_alias_lookup(void)
+ 	return true;
+ }
+ 
++#ifdef CAPSTONE_USE_ALIAS_TRIE
++static bool test_generated_alias_lookup(void)
++{
++	static const alias_trie_node trie[] = {
++#include "../../arch/AArch64/AArch64GenAliasTrie.inc"
++	};
++	static const struct {
++		const char *text;
++		unsigned int expected;
++	} cases[] = {
++		{ " \tmov.16b v1, v2", AARCH64_INS_ALIAS_MOV },
++		{ "bfxil\tx0, x1", AARCH64_INS_ALIAS_BFXIL },
++		{ "cmp", AARCH64_INS_ALIAS_CMP },
++		{ "cm", 0 }, { "mov_suffix", 0 }, { "\200", 0 }, { "", 0 },
++	};
++	cs_struct handle = { 0 };
++	cs_insn insn = { 0 };
++	MCInst mi = { 0 };
++	SStream stream = { 0 };
++	handle.arch = CS_ARCH_AARCH64;
++	mi.csh = &handle;
++	mi.flat_insn = &insn;
++	mi.isAliasInstr = true;
++	for (size_t i = 0; i < ARR_SIZE(cases); ++i) {
++		strcpy(stream.buffer, cases[i].text);
++		map_set_alias_id_trie(&mi, &stream, trie, ARR_SIZE(trie));
++		if (insn.alias_id != cases[i].expected)
++			return false;
++	}
++	mi.isAliasInstr = false;
++	insn.alias_id = 99;
++	map_set_alias_id_trie(&mi, NULL, NULL, 0);
++	return insn.alias_id == 0;
++}
++#endif
++
+ static bool test_full_group_map(void)
+ {
+ #ifndef CAPSTONE_DIET
+@@ -220,6 +257,10 @@ static bool test_full_group_map(void)
+ 
+ int main(void)
+ {
++#ifdef CAPSTONE_USE_ALIAS_TRIE
++	if (!test_generated_alias_lookup())
++		return 1;
++#endif
+ 	bool found = true;
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)

@@ -1,7 +1,7 @@
 name: Real files on dedicated alias backends
 on:
   push:
-    branches: [codex/capstone-dedicated-alias-tries]
+    branches: [codex/capstone-dedicated-alias-intel-repeat]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -12,12 +12,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {host: ubuntu-24.04, plan: AARCH64}
-          - {host: ubuntu-24.04, plan: MIPS}
-          - {host: ubuntu-24.04, plan: PPC}
-          - {host: ubuntu-24.04, plan: SPARC}
-          - {host: ubuntu-24.04, plan: "AARCH64,MIPS,PPC,SPARC"}
-          - {host: macos-15, plan: "AARCH64,MIPS,PPC,SPARC"}
           - {host: macos-15-intel, plan: "AARCH64,MIPS,PPC,SPARC"}
     env:
       ARCH_PLAN: ${{ matrix.plan }}
@@ -33,7 +27,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-${{ matrix.host }}-${{ matrix.plan }}-${{ github.run_attempt }}
+          name: repeat-${{ matrix.host }}-${{ matrix.plan }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
