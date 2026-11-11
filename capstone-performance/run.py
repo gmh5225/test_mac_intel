@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='dispatch 32/64-bit memory addresses by ModR/M mod and r/m'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='dispatch generated full legacy shapes through a compiler switch'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
