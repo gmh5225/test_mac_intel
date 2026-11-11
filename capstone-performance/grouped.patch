@@ -1,0 +1,258 @@
+diff --git a/Mapping.c b/Mapping.c
+index f6dc6007..2332dac8 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -249,16 +249,23 @@ void map_groups(MCInst *MI, const insn_map *imap)
+ 
+ 	cs_detail *detail = MI->flat_insn->detail;
+ 	unsigned Opcode = MCInst_getOpcode(MI);
+-	unsigned i = 0;
+-	uint16_t group = imap[Opcode].groups[i];
+-	while (group != 0) {
+-		if (detail->groups_count >= MAX_NUM_GROUPS) {
+-			printf("ERROR: Too many groups defined in instruction mapping.\n");
+-			return;
+-		}
+-		detail->groups[detail->groups_count++] = group;
+-		group = imap[Opcode].groups[++i];
++	const unsigned char *groups = imap[Opcode].groups;
++	unsigned start = detail->groups_count;
++	unsigned count = start;
++
++	while (count < MAX_NUM_GROUPS) {
++		unsigned char group = groups[count - start];
++		if (!group)
++			break;
++		detail->groups[count++] = group;
+ 	}
++	detail->groups_count = count;
++
++	/* A full source row has no trailing zero. Only inspect the next
++	 * source entry when existing destination groups limited the copy. */
++	if (count >= MAX_NUM_GROUPS && count - start < MAX_NUM_GROUPS &&
++	    groups[count - start])
++		printf("ERROR: Too many groups defined in instruction mapping.\n");
+ #endif // CAPSTONE_DIET
+ }
+ 
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..532ad0fb 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -635,7 +635,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	int ret;
+ 	bool result;
+ 
+-	InternalInstruction insn = { 0 };
++	InternalInstruction insn;
++	memset(&insn, 0, offsetof(InternalInstruction, code));
+ 	if (extension_opcode == 0x62)
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..66b2a335 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -539,7 +539,7 @@ struct InstructionSpecifier {
+  * The x86 internal instruction, which is produced by the decoder.
+  */
+ typedef struct InternalInstruction {
+-	// from here, all members must be initialized to ZERO to work properly
++	/* Prefix and optional operand state starts at zero. */
+ 	uint8_t operandSize;
+ 	uint8_t prefix0, prefix1, prefix2, prefix3;
+ 	/* The value of the REX prefix, if present */
+@@ -596,48 +596,6 @@ typedef struct InternalInstruction {
+ 	uint8_t immediateOffset;
+ 	uint8_t modRMOffset;
+ 
+-	// end-of-zero-members
+-
+-	/* Input bytes; no padding or alignment is required. */
+-	const uint8_t *code;
+-	size_t codeSize;
+-	/* The offset of the next byte within code. */
+-	size_t readerCursor;
+-
+-	/* General instruction information */
+-
+-	/* The mode to disassemble for (64-bit, protected, real) */
+-	DisassemblerMode mode;
+-	/* The length of the instruction, in bytes */
+-	size_t length;
+-
+-	/* Prefix state */
+-
+-	/* The type of the vector extension prefix */
+-	VectorExtensionType vectorExtensionType;
+-
+-	/* Sizes of various critical pieces of data, in bytes */
+-	uint8_t registerSize;
+-	uint8_t addressSize;
+-	uint8_t displacementSize;
+-	uint8_t immediateSize;
+-
+-	uint8_t immSize; // immediate size for X86_OP_IMM operand
+-
+-	/* opcode state */
+-
+-	/* The last byte of the opcode, not counting any ModR/M extension */
+-	uint8_t opcode;
+-
+-	/* decode state */
+-
+-	/* The type of opcode, used for indexing into the array of decode tables */
+-	OpcodeType opcodeType;
+-	/* The instruction ID, extracted from the decode table */
+-	uint16_t instructionID;
+-	/* The specifier for the instruction, from the instruction info table */
+-	const struct InstructionSpecifier *spec;
+-
+ 	/* state for additional bytes, consumed during operand decode.  Pattern:
+      consumed___ indicates that the byte was already consumed and does not
+      need to be consumed again */
+@@ -678,6 +636,47 @@ typedef struct InternalInstruction {
+ 	Reg reg;
+ 
+ 	const struct OperandSpecifier *operands;
++
++	/* The input header and selected instruction are assigned by the decoder. */
++	/* Input bytes; no padding or alignment is required. */
++	const uint8_t *code;
++	size_t codeSize;
++	/* The offset of the next byte within code. */
++	size_t readerCursor;
++
++	/* General instruction information */
++
++	/* The mode to disassemble for (64-bit, protected, real) */
++	DisassemblerMode mode;
++	/* The length of the instruction, in bytes */
++	size_t length;
++
++	/* Prefix state */
++
++	/* The type of the vector extension prefix */
++	VectorExtensionType vectorExtensionType;
++
++	/* Sizes of various critical pieces of data, in bytes */
++	uint8_t registerSize;
++	uint8_t addressSize;
++	uint8_t displacementSize;
++	uint8_t immediateSize;
++
++	uint8_t immSize; // immediate size for X86_OP_IMM operand
++
++	/* opcode state */
++
++	/* The last byte of the opcode, not counting any ModR/M extension */
++	uint8_t opcode;
++
++	/* decode state */
++
++	/* The type of opcode, used for indexing into the array of decode tables */
++	OpcodeType opcodeType;
++	/* The instruction ID, extracted from the decode table */
++	uint16_t instructionID;
++	/* The specifier for the instruction, from the instruction info table */
++	const struct InstructionSpecifier *spec;
+ } InternalInstruction;
+ 
+ /* decodeInstruction - Decode one instruction and store the decoding results in
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index d3b47d6a..457485ab 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -306,7 +306,7 @@ static void printRegName(SStream *OS, unsigned RegNo)
+ 			NULL;
+ 
+ 	if (extension_name)
+-		SStream_concat0(OS, extension_name);
++		(SStream_concat0)(OS, extension_name);
+ 	else
+ 		SStream_concat0_small(OS, getRegisterName(RegNo),
+ 				      getRegisterNameLength(RegNo));
+diff --git a/arch/X86/X86IntelInstPrinterPrechecked.c b/arch/X86/X86IntelInstPrinterPrechecked.c
+index 696352a3..b851e421 100644
+--- a/arch/X86/X86IntelInstPrinterPrechecked.c
++++ b/arch/X86/X86IntelInstPrinterPrechecked.c
+@@ -11,5 +11,23 @@
+ #define CAPSTONE_SSTREAM_PRECHECKED
+ #include "X86InstPrinter.h"
+ #define SStream_concat_hex64 X86_Intel_printHexPrechecked
++#if defined(_MSC_VER) && !defined(__clang__)
++#include "../../SStream.h"
++/* The fixed tokens in this bounded printer include their terminating NUL.
++ * The register-extension name uses the ordinary dynamic writer. */
++static __forceinline void appendPrinterLiteral(SStream *ss, const char *text,
++					       size_t extent)
++{
++	assert(!ss->is_closed && !ss->markup_stream && !ss->prefixed_by_markup);
++	assert(extent <= SSTREAM_BUF_LEN &&
++	       ss->index <= SSTREAM_BUF_LEN - extent);
++	if (extent > 1) {
++		memcpy(ss->buffer + ss->index, text, extent);
++		ss->index += extent - 1;
++	}
++}
++#define SStream_concat0(ss, literal) \
++	appendPrinterLiteral((ss), "" literal, sizeof("" literal))
++#endif
+ #include "X86IntelInstPrinter.c"
+ #endif
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 1dd3f85b..e6f3e5cb 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -3,6 +3,7 @@
+ #include "../../Mapping.h"
+ #include <limits.h>
+ #include <stdio.h>
++#include <string.h>
+ 
+ static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
+ 			 unsigned expected)
+@@ -188,13 +189,42 @@ static bool test_alias_lookup(void)
+ 	return true;
+ }
+ 
++static bool test_full_group_map(void)
++{
++#ifndef CAPSTONE_DIET
++	insn_map row = { 0 };
++	cs_detail detail = { 0 };
++	cs_insn insn = { 0 };
++	MCInst mi = { 0 };
++	mi.flat_insn = &insn;
++	insn.detail = &detail;
++	row.branch = true;
++	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i)
++		row.groups[i] = i + 1;
++
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS ||
++	    memcmp(detail.groups, row.groups, sizeof(row.groups)))
++		return false;
++
++	/* Preserve the existing group and append as many entries as fit. */
++	detail.groups_count = 1;
++	detail.groups[0] = 99;
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS || detail.groups[0] != 99 ||
++	    memcmp(detail.groups + 1, row.groups, MAX_NUM_GROUPS - 1))
++		return false;
++#endif
++	return true;
++}
++
+ int main(void)
+ {
+ 	bool found = true;
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_name_lookup() && test_alias_lookup() &&
++	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&

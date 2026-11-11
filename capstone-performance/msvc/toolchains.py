@@ -17,9 +17,9 @@ def libraries_and_driver():
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
     trees = {'msvc':base}
     baseline=source/'qualified.patch'
-    assert perf.digest(baseline.read_bytes())=='a6d822a90b67d13297f10bbe4c2222b63234296dfa0bed81aa1bb07eaa730dcd'
-    perf.run(['git','apply',baseline],'baseline-scan-and-printer',base)
-    for name, expected in {'early': 'c96d12dfe0b347d6afb4b748c4a7bd697f5f797e03b1295cee528ccd1c8c15e2', 'full': 'af34afa8b6a084c6ed12437f599a65153f069cb3163fa8348df267a4a7be9bb2'}.items():
+    assert perf.digest(baseline.read_bytes())=='4232d1508318ffb7e9153e08d9da3b5ae1193025b2c5e1615b8edb119c91c1bc'
+    perf.run(['git','apply',baseline],'baseline-printer-and-bounded-groups',base)
+    for name, expected in {'grouped': 'd993fea082d495182146c60772cfde81dd75828b234f9bf2ca79e3cedc515c81', 'compact': '57f9afad9ba941af68c343e04dac65eae38d7291edd2706cf6f59cc472e166c7'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -56,7 +56,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','early','full']
+    names=['msvc','grouped','compact']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -107,12 +107,12 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','early','full','iced','full','early','msvc'],['full','msvc','early','iced','early','msvc','full'],['early','full','msvc','iced','msvc','full','early']]
+    orders=[['msvc','grouped','compact','iced','compact','grouped','msvc'],['compact','msvc','grouped','iced','grouped','msvc','compact'],['grouped','compact','msvc','iced','msvc','compact','grouped']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
             while (probe:=sample('msvc',c,mode,n))['wall_ns']<10000000: n*=4
-            repeats=max(1,math.ceil(n*120000000/probe['wall_ns']))
+            repeats=max(1,math.ceil(n*80000000/probe['wall_ns']))
             pairs=[]
             for round_id in range(6):
                 raw=[(k,sample(k,c,mode,repeats)) for k in orders[round_id%3]]
@@ -120,13 +120,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','early','full','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','grouped','compact','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'early': 'c96d12dfe0b347d6afb4b748c4a7bd697f5f797e03b1295cee528ccd1c8c15e2', 'full': 'af34afa8b6a084c6ed12437f599a65153f069cb3163fa8348df267a4a7be9bb2'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'grouped': 'd993fea082d495182146c60772cfde81dd75828b234f9bf2ca79e3cedc515c81', 'compact': '57f9afad9ba941af68c343e04dac65eae38d7291edd2706cf6f59cc472e166c7'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
