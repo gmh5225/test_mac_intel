@@ -1,0 +1,19 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..4bcd7f7c 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3080,7 +3080,13 @@ enum { X86_SCAN_NOT_HANDLED = 3 };
+ 
+ /* Only the compact readers see this state. Generic/raw decoding starts its
+  * own state if the generated table has no terminal for this header. */
+-X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
++#if defined(_MSC_VER) && !defined(__clang__)
++/* Keep the compact scanner in one MSVC frame across bitness and call sites. */
++static __declspec(noinline)
++#else
++X86_DECODE_INLINE
++#endif
++int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ 					  cs_mode mode, uint8_t opcode,
+ 					  size_t opcodeOffset,
+ 					  unsigned *instructionID,

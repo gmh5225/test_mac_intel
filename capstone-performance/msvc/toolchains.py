@@ -10,15 +10,15 @@ import subprocess
 import run as perf
 
 source, work = perf.source, perf.work
-ref = '7b209eb13c8e0f9915307320016e8a1cecd12253'
+ref = '3b4aeea8566a118cca94ef00fb4f16c39c53a29a'
 
 def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
-    assert perf.digest((source/'common.patch').read_bytes())=='fa4a02edfd99bda300c030295c099e2606a25cc4d9321b7fe72c935072da8cf7'
+    assert perf.digest((source/'common.patch').read_bytes())=='173f413bad6b6351bd19cc98c9e48e6898fe3c911c832a37e9f2d69080a1fe6d'
     perf.run(['git','apply',source/'common.patch'],'common-base',base)
     trees = {'msvc':base}
-    for name, expected in {'byte': '17227f626991ca538e951ed5605b64f7d849db83b534260a1dedc3eebe581f9e', 'header': 'a516d7b554797535e39244a62b7e78a5c8ed55f98a4248eb69d4d99be6c2aeca'}.items():
+    for name, expected in {'compact': 'ac3d071e35dfedf9530f4595f4905aa35726e4b5ba96939607471ccdd5b36842', 'fallback': 'a12e067aa6b2b8cae0b26d78deacd602d2690b172f41f0193b251d9c16c555ee'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -56,7 +56,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','byte','header']
+    names=['msvc','compact','fallback']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -75,7 +75,7 @@ opt-level = 3
 
 def record_codegen(name,build):
     tool=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
-    interesting={'fill_insn','cs_decode_full_insn','cs_disasm_iter','X86_getInstruction','X86_Intel_printInst','X86_reg_access','decodeInstructionFull','readModRM','translateFullOperands','validateScanOperands','translateOperand','translateRMMemoryFull','readOperandsScan','X86_scanBatch','X86_getInstructionScanResult','consumeByte','lookAtByte','decodeGenericScan'}
+    interesting={'fill_insn','cs_decode_full_insn','cs_disasm_iter','X86_getInstruction','X86_Intel_printInst','X86_reg_access','decodeInstructionFull','readModRM','translateFullOperands','validateScanOperands','translateOperand','translateRMMemoryFull','readOperandsScan','X86_scanBatch','X86_getInstructionScanResult','consumeByte','lookAtByte','decodeGenericScan','trySimpleLegacyScan','getInstructionScanResultAfterInitial'}
     found={}
     for stem in ('cs','X86DisassemblerDecoder','X86Disassembler','X86IntelInstPrinter','X86Mapping'):
         obj,=build.rglob(stem+'.obj')
@@ -90,7 +90,9 @@ def record_codegen(name,build):
                 if title: found[title]=[]
             elif title and line.strip():
                 found[title].append(line)
-    perf.write(name+'-assembly.json',found)
+    perf.write(name+'-prologues.json',{k:v[:55] for k,v in found.items()})
+    from collections import Counter
+    perf.write(name+'-relocations.json',{k:dict(Counter(line.split()[-1] for line in v if 'IMAGE_REL_AMD64_REL32' in line).most_common(40)) for k,v in found.items()})
     perf.write(name+'-instructions.json',{k:len([z for z in v if re.match(r'^\s*[0-9a-f]+:\s+[a-z]',z)]) for k,v in found.items()})
     flags={}
     for q in build.rglob('*.command.1.tlog'):
@@ -105,7 +107,7 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','byte','header','iced','header','byte','msvc'],['header','msvc','byte','iced','byte','msvc','header'],['byte','header','msvc','iced','msvc','header','byte']]
+    orders=[['msvc','compact','fallback','iced','fallback','compact','msvc'],['fallback','msvc','compact','iced','compact','msvc','fallback'],['compact','fallback','msvc','iced','msvc','fallback','compact']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
@@ -118,13 +120,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','byte','header','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','compact','fallback','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'byte': '17227f626991ca538e951ed5605b64f7d849db83b534260a1dedc3eebe581f9e', 'header': 'a516d7b554797535e39244a62b7e78a5c8ed55f98a4248eb69d4d99be6c2aeca'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'compact': 'ac3d071e35dfedf9530f4595f4905aa35726e4b5ba96939607471ccdd5b36842', 'fallback': 'a12e067aa6b2b8cae0b26d78deacd602d2690b172f41f0193b251d9c16c555ee'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))

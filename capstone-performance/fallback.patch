@@ -1,0 +1,19 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..0db281e9 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3555,7 +3555,13 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 	return initial;
+ }
+ 
+-X86_DECODE_INLINE bool
++#if defined(_MSC_VER) && !defined(__clang__)
++/* Keep the uncommon extension and prefix paths out of the initial scanner frame. */
++static __declspec(noinline)
++#else
++X86_DECODE_INLINE
++#endif
++bool
+ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 				     size_t code_len, cs_insn *insn,
+ 				     X86ScanResult *result, bool readerFlags)
