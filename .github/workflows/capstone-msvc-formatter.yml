@@ -1,8 +1,8 @@
-name: Same-consumer MSVC and clang-cl decode comparison
+name: MSVC decoder and formatter CPU profiles
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-scan-frames]
+    branches: [codex/capstone-native-leaf-profile]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD, MT]
+        crt: [MD]
     runs-on: windows-2022
     timeout-minutes: 55
     steps:
@@ -19,12 +19,12 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/toolchains.py ${{ matrix.crt }}
+      - name: Sample the decoder thread and resolve optimized instructions using PDBs
+        run: python capstone-performance/msvc/profile.py ${{ matrix.crt }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: msvc-scan-frames-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: native-pc-profile-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
