@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
           }
         }
         if (std::getenv("CUSTOM_NAMES") && config.arch == CS_ARCH_ARM) {
-          const unsigned ids[] = {ARM_INS_ADD, ARM_INS_MOV, ARM_INS_NOP, ARM_INS_POP, ARM_INS_BL};
+          const unsigned ids[] = {ARM_INS_ADD, ARM_INS_MOV, ARM_INS_HINT, ARM_INS_POP, ARM_INS_BL};
           for (unsigned id : ids) for (unsigned side=0; side<2; ++side) {
             cs_opt_mnem value = {id, "custom|mnemonic with spaces and a long truncating suffix"};
             if (api[side].option(handles[side], CS_OPT_MNEMONIC, (size_t)&value) != CS_ERR_OK) throw std::runtime_error("custom mnemonic option");
