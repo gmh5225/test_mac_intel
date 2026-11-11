@@ -1,8 +1,8 @@
 diff --git a/Mapping.c b/Mapping.c
-index 2332dac8..e0ca772c 100644
+index 2332dac8..f06165a9 100644
 --- a/Mapping.c
 +++ b/Mapping.c
-@@ -477,38 +477,48 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
+@@ -477,36 +477,45 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
  	}
  }
  
@@ -74,11 +74,8 @@ index 2332dac8..e0ca772c 100644
 +	MI->flat_insn->alias_id = id < 0 ? 0 : id;
  }
  
-+
  /// Does a binary search over the given map and searches for @id.
- /// If @id exists in @map, it sets @found to true and returns
- /// the value for the @id.
-@@ -555,3 +565,27 @@ uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
+@@ -555,3 +564,27 @@ uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
  	*found = false;
  	return UINT64_MAX;
  }
@@ -221,6 +218,79 @@ index 81b5e334..eb4438b5 100644
 -			 ARR_SIZE(insn_alias_mnem_map) - 1);
 +	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
 +				 ARR_SIZE(alias_index) - 1);
+ 	int syntax_opt = MI->csh->syntax;
+ 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
+ 		patch_cs_reg_alias(O->buffer);
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 30e28897..a81e2292 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -175,8 +175,6 @@ static void patch_cs_reg_alias(char *asm_str)
+ /// are considered of group RETURN.
+ static void check_pop_return(MCInst *MI)
+ {
+-	if (!MI->flat_insn->detail)
+-		return;
+ 	if (MI->flat_insn->id != ARM_INS_POP &&
+ 	    MI->flat_insn->alias_id != ARM_INS_ALIAS_POP) {
+ 		return;
+@@ -194,8 +192,6 @@ static void check_pop_return(MCInst *MI)
+ /// are considered of group BRANCH.
+ static void check_writes_to_pc(MCInst *MI)
+ {
+-	if (!MI->flat_insn->detail)
+-		return;
+ 	for (size_t i = 0; i < ARM_get_detail(MI)->op_count; ++i) {
+ 		cs_arm_op *op = &ARM_get_detail(MI)->operands[i];
+ 		if (op->type == ARM_OP_REG && op->reg == ARM_REG_PC &&
+@@ -209,8 +205,6 @@ static void check_writes_to_pc(MCInst *MI)
+ /// Adds group to the instruction which are not defined in LLVM.
+ static void ARM_add_cs_groups(MCInst *MI)
+ {
+-	if (!MI->flat_insn->detail)
+-		return;
+ 	check_pop_return(MI);
+ 	check_writes_to_pc(MI);
+ 	unsigned Opcode = MI->flat_insn->id;
+@@ -318,9 +312,6 @@ static void add_alias_details(MCInst *MI)
+ /// Here we add those oprands to detail.
+ static void ARM_add_not_defined_ops(MCInst *MI)
+ {
+-	if (!detail_is_set(MI))
+-		return;
+-
+ 	if (MI->flat_insn->is_alias && MI->flat_insn->usesAliasDetails) {
+ 		add_alias_details(MI);
+ 		return;
+@@ -638,7 +629,7 @@ void ARM_add_vector_size(MCInst *MI, unsigned size)
+ /// the disponent/index reg.
+ static void ARM_post_index_detection(MCInst *MI)
+ {
+-	if (!detail_is_set(MI) || ARM_get_detail(MI)->post_index)
++	if (ARM_get_detail(MI)->post_index)
+ 		return;
+ 
+ 	int i = 0;
+@@ -698,13 +689,17 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
+ 	MI->flat_insn->alias_id = 0;
+ 	ARM_LLVM_printInstruction(MI, O, info);
+-	if (!MI->flat_insn->alias_id)
++	if (MCInst_isAlias(MI) && !MI->flat_insn->alias_id)
+ 		map_set_alias_id(MI, O, insn_alias_mnem_map,
+ 				 ARR_SIZE(insn_alias_mnem_map) - 1);
+-	ARM_add_not_defined_ops(MI);
+-	ARM_post_index_detection(MI);
+-	ARM_check_mem_access_validity(MI);
+-	ARM_add_cs_groups(MI);
++	if (MI->flat_insn->detail) {
++		if (detail_is_set(MI)) {
++			ARM_add_not_defined_ops(MI);
++			ARM_post_index_detection(MI);
++			ARM_check_mem_access_validity(MI);
++		}
++		ARM_add_cs_groups(MI);
++	}
  	int syntax_opt = MI->csh->syntax;
  	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
  		patch_cs_reg_alias(O->buffer);
@@ -532,14 +602,14 @@ index abe9be7a..5364bdea 100644
  #endif
  }
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..52b0b591 100644
+index 8c3dea2e..b8bb724d 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
 @@ -635,7 +635,16 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
  	int ret;
  	bool result;
  
-+#if defined(_MSC_VER) && !defined(__clang__)
++#ifdef X86_NATIVE_SCAN_EXTENT
 +	/* The decoder assigns the header and ID before reading them. Prefix
 +	 * defaults and optional operand state must still start at zero. */
 +	InternalInstruction insn;
@@ -561,7 +631,7 @@ index 8c3dea2e..52b0b591 100644
 -				    ENCODING_WRITEMASK) {
 -					Flags |= X86_IP_HAS_EVEX_OPMASK;
 -					break;
-+#if defined(_MSC_VER) && !defined(__clang__)
++#ifdef X86_NATIVE_SCAN_EXTENT
 +			/* Only EVEX descriptors can contain a writemask. */
 +			if (insn.vectorExtensionType == TYPE_EVEX)
 +#endif
@@ -576,7 +646,7 @@ index 8c3dea2e..52b0b591 100644
  			}
  
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 952b6025..3c78ef02 100644
+index 952b6025..4a73c829 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -949,12 +949,14 @@ legacyOpcode:
@@ -602,18 +672,7 @@ index 952b6025..3c78ef02 100644
  			if (readModRM(insn))
  				return -1;
  
-@@ -2939,6 +2942,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
- 	return 0;
- }
- 
-+/* Native MSVC otherwise materializes the raw scan state at this entry. */
-+#if defined(_MSC_VER) && !defined(__clang__)
-+#define X86_NATIVE_SCAN_EXTENT
-+#endif
- #include "X86GenLegacyTerminal.inc"
- #include "X86GenVexScan.inc"
- 
-@@ -3078,6 +3085,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+@@ -3078,6 +3081,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
  
  enum { X86_SCAN_NOT_HANDLED = 3 };
  
@@ -676,7 +735,7 @@ index 952b6025..3c78ef02 100644
  /* Only the compact readers see this state. Generic/raw decoding starts its
   * own state if the generated table has no terminal for this header. */
  X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
-@@ -3089,7 +3152,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3089,7 +3148,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  {
  	if (opcodeOffset >= 2)
  		return X86_SCAN_NOT_HANDLED;
@@ -692,7 +751,7 @@ index 952b6025..3c78ef02 100644
  	initializeInstructionHeader(&insn, code, codeSize, mode);
  	const uint8_t prefixMask =
  		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
-@@ -3097,6 +3168,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3097,6 +3164,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  	if ((feature_prefix_flags[opcode] & prefixMask) ||
  	    (opcodeOffset && !isREX(&insn, code[0])))
  		return X86_SCAN_NOT_HANDLED;
@@ -726,6 +785,23 @@ index 952b6025..3c78ef02 100644
  	readSimpleLegacyPrefix(&insn, opcodeOffset);
  	int opcodeResult = readOpcode(&insn, true, true);
  	if (opcodeResult)
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..808e3824 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -19,6 +19,12 @@
+ #ifndef CS_X86_DISASSEMBLERDECODER_H
+ #define CS_X86_DISASSEMBLERDECODER_H
+ 
++/* Native MSVC with the DLL runtime benefits from reading public lengths
++ * directly and initializing only the live parts of the full decoder. */
++#if defined(_MSC_VER) && !defined(__clang__) && defined(_DLL)
++#define X86_NATIVE_SCAN_EXTENT
++#endif
++
+ #if defined(CAPSTONE_HAS_OSXKERNEL)
+ #include <libkern/libkern.h>
+ #else
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
 index 5627f249..531b8dbb 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc
