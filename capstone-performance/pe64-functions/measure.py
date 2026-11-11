@@ -34,6 +34,8 @@ def main(w):
     run(['git','worktree','add','-q','--detach',other,'HEAD'],'candidate-tree',cs)
     patch=s/'windows-formatter.patch';h=sha(patch.read_bytes());assert h==manifest['source_lineage'][patch.name]['sha256']
     run(['git','apply',patch],'candidate-patch',other)
+    common=s/'reference-escaped.patch';assert sha(common.read_bytes())=='953456d5b15eedb7d81528004ad6430aae6a91211eb40b77be58de771d34ce47'
+    run(['git','apply',common],'common-legacy-opcode-detail',cs)
     ad=w/'adapter';ad.mkdir();shutil.copyfile(s/'Cargo.lock',ad/'Cargo.lock')
     rust=(s/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
     assert 'ip: u64,' in rust
