@@ -1,7 +1,7 @@
 name: Capstone source qualification
 on:
   push:
-    branches: [codex/capstone-integrated-qualification]
+    branches: [codex/capstone-cstest-multiconfig]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-qualification.yml
@@ -14,11 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, candidate: combined, preset: sanitized }
-          - { host: macos-15-intel, candidate: combined, preset: intel-release }
-          - { host: windows-2022, candidate: combined, preset: windows-release }
-          - { host: ubuntu-24.04, candidate: combined, preset: diet }
-          - { host: ubuntu-24.04, candidate: combined, preset: reduced }
+          - { host: ubuntu-24.04, generator: Ninja Multi-Config }
+          - { host: windows-2022, generator: Visual Studio 17 2022 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 65
     steps:
@@ -27,11 +24,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build frozen source and run upstream tests
-        run: python3 capstone-performance/qualify.py "${{ matrix.candidate }}" "${{ matrix.preset }}"
+        run: python3 capstone-performance/verify_cstest.py "${{ matrix.generator }}"
       - name: Keep test records
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: tests-${{ matrix.candidate }}-${{ matrix.preset }}-${{ github.run_attempt }}
+          name: external-archives-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
