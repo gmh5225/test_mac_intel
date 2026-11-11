@@ -24,7 +24,7 @@ def tests(source, label, preset, selection=None):
     if preset=='user-alloc':
         subset = True
         flags.extend(['-DCAPSTONE_USE_DEFAULT_ALLOC=OFF', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON'])
-        units = ['x86_mapping_counts']
+        units = ['x86_mapping_counts', 'x86_encoding_accuracy']
     if preset=='static-crt':
         subset=True
         units=['x86_scan_batch','x86_printer_prechecked','x86_mapping_counts','x86_encoding_accuracy','sstream']
