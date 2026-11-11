@@ -25,6 +25,10 @@ def tests(source, label, preset, selection=None):
         subset = True
         flags.extend(['-DCAPSTONE_USE_DEFAULT_ALLOC=OFF', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON'])
         units = ['x86_mapping_counts']
+    if preset=='static-crt':
+        subset=True
+        units=['x86_mapping_counts','x86_encoding_accuracy']
+        flags.extend(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON'])
     if preset=='sanitized':
         flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
                       '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
@@ -60,7 +64,7 @@ def tests(source, label, preset, selection=None):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('candidate',choices=['combined'])
-    parser.add_argument('preset',choices=['sanitized','windows-release','intel-release','diet','reduced','user-alloc'])
+    parser.add_argument('preset',choices=['sanitized','windows-release','static-crt','intel-release','diet','reduced','user-alloc'])
     args=parser.parse_args()
     assert not WORK.exists() and not EVIDENCE.exists()
     EVIDENCE.mkdir();WORK.mkdir()

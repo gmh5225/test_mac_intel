@@ -1,7 +1,7 @@
 name: Capstone shared metadata source qualification
 on:
   push:
-    branches: [codex/capstone-shared-metadata-qualification]
+    branches: [codex/capstone-lookup-crt-qualification]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-qualification.yml
@@ -17,6 +17,7 @@ jobs:
           - { host: ubuntu-24.04, candidate: combined, preset: sanitized }
           - { host: macos-15-intel, candidate: combined, preset: intel-release }
           - { host: windows-2022, candidate: combined, preset: windows-release }
+          - { host: windows-2022, candidate: combined, preset: static-crt }
           - { host: ubuntu-24.04, candidate: combined, preset: user-alloc }
           - { host: ubuntu-24.04, candidate: combined, preset: diet }
           - { host: ubuntu-24.04, candidate: combined, preset: reduced }
