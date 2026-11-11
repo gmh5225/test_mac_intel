@@ -78,7 +78,7 @@ opt-level = 3
         build = work / (label + '-build')
         with (src / 'CMakeLists.txt').open('a') as f:
             f.write('\n' + (source / 'msvc' / 'targets.cmake').read_text())
-        run(['cmake', '-S', src, '-B', build, '-G', 'Visual Studio 17 2022', '-A', 'x64',
+        run(['cmake', '-S', src, '-B', build, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-DCMAKE_C_FLAGS=/MP4',
              '-DEVIDENCE_SOURCE=' + source.as_posix(),
              '-DICED_ADAPTER=' + (work / 'cargo-target/release/iced_compare.lib').as_posix(),
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON',
@@ -215,7 +215,7 @@ try:
     write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
           image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
           iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
-    assert digest((source / 'windows-formatter.patch').read_bytes()) == 'ff64cf2ff15660cdf44225609cb41752704ff7180d5eca2f8b562f28b329fde4'
+    assert digest((source / 'windows-formatter.patch').read_bytes()) == 'cf8980ee851ef43751b436135a104c8e60730c1e9a1940973d02f46fc08f84c6'
     programs = make_programs()
     cases = get_cases()
     snapshot(programs, cases)
