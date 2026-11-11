@@ -1,24 +1,14 @@
-name: Compiler-specific Capstone runtime object identity
+name: Compare the linked native MSVC dynamic CRT image
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-static-runtime-identity]
+    branches: [codex/capstone-dynamic-crt-image]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
 jobs:
   measure:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { host: windows-2022, flavor: MD }
-          - { host: windows-2022, flavor: MT }
-          - { host: ubuntu-24.04, flavor: gcc }
-          - { host: ubuntu-24.04, flavor: clang }
-          - { host: macos-15, flavor: clang }
-          - { host: macos-15-intel, flavor: clang }
-    runs-on: ${{ matrix.host }}
+    runs-on: windows-2022
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -26,11 +16,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/scope.py ${{ matrix.flavor }}
+        run: python capstone-performance/linked_image.py
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: static-runtime-identity-${{ matrix.host }}-${{ matrix.flavor }}-${{ github.run_attempt }}
+          name: dynamic-crt-image-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
