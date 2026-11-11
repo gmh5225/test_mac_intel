@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 952b6025..e7fac4b2 100644
+index 952b6025..ff945731 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2939,6 +2939,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -76,12 +76,28 @@ index 952b6025..e7fac4b2 100644
  /* Only the compact readers see this state. Generic/raw decoding starts its
   * own state if the generated table has no terminal for this header. */
  X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
-@@ -3097,6 +3157,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3089,7 +3149,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ {
+ 	if (opcodeOffset >= 2)
+ 		return X86_SCAN_NOT_HANDLED;
++#ifdef X86_NATIVE_SCAN_EXTENT
++	/* The extent reader initializes its header and never reads raw operands. */
++	const bool scanExtent = publicID && !x86_has_feature(mode, CS_MODE_16);
++	InternalInstruction insn;
++	if (!scanExtent)
++		memset(&insn, 0, sizeof(insn));
++#else
+ 	InternalInstruction insn = { 0 };
++#endif
+ 	initializeInstructionHeader(&insn, code, codeSize, mode);
+ 	const uint8_t prefixMask =
+ 		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
+@@ -3097,6 +3165,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  	if ((feature_prefix_flags[opcode] & prefixMask) ||
  	    (opcodeOffset && !isREX(&insn, code[0])))
  		return X86_SCAN_NOT_HANDLED;
 +#ifdef X86_NATIVE_SCAN_EXTENT
-+	if (publicID && (insn.mode == MODE_32BIT || insn.mode == MODE_64BIT)) {
++	if (scanExtent) {
 +		if (opcodeOffset >= codeSize)
 +			return X86_SCAN_INVALID;
 +		size_t cursor = opcodeOffset + 1;

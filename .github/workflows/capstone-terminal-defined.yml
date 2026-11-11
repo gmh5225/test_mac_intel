@@ -1,7 +1,7 @@
 name: x86 compact scanner defined-state comparisons
 on:
   push:
-    branches: [codex/capstone-native-scalar-and-printer-defined]
+    branches: [codex/capstone-scan-lifetime-defined]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,6 +22,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-scalar-and-printer-states-${{ matrix.reduce }}
+          name: scan-lifetime-states-${{ matrix.reduce }}
           path: capstone-evidence/
           retention-days: 14
