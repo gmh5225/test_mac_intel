@@ -1,45 +1,162 @@
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..5eae75d4 100644
+index 8c3dea2e..a866d11d 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -699,13 +699,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (insn.hasLockPrefix)
- 				Flags |= X86_IP_HAS_LOCK;
+@@ -626,7 +626,8 @@ bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
+ X86_BACKEND_INLINE bool
+ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			      MCInst *instr, uint16_t *size,
+-			      uint8_t extension_opcode, bool scanOnly)
++			      uint8_t extension_opcode, size_t opcodeOffset,
++			      bool scanOnly)
+ {
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+ 	bool scalar_compare_p2_normalized = false;
+@@ -647,8 +648,9 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			return ret == X86_SCAN_COMPLETE;
+ 		ret = 0;
+ 	} else {
+-		ret = decodeInstructionFull(&insn, code, code_len, handle->mode,
+-					    instr, size);
++		ret = decodeInstructionFullAfterProbe(&insn, code, code_len,
++						      handle->mode, instr, size,
++						      opcodeOffset);
+ 		if (ret == X86_DECODE_OPERANDS_READY) {
+ 			operands_ready = true;
+ 			ret = 0;
+@@ -721,6 +723,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ {
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+ 	uint8_t extension_opcode;
++	size_t opcodeOffset;
+ 	x86_feature_decode_result extension_result;
  
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
--				}
--			}
-+			if (insn.hasWritemask)
-+				Flags |= X86_IP_HAS_EVEX_OPMASK;
+ 	if (instr->flat_insn->detail) {
+@@ -743,9 +746,9 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 	}
  
- 			instr->flags = Flags;
- 		}
+ 	extension_result = X86_FEATURE_NOT_HANDLED;
+-	if (X86_mayDecodeFeatureExtension(code, code_len,
+-					  (handle->mode & CS_MODE_64) != 0,
+-					  &extension_opcode))
++	if (X86_mayDecodeFeatureExtensionImpl(code, code_len,
++					      (handle->mode & CS_MODE_64) != 0,
++					      &extension_opcode, &opcodeOffset))
+ 		extension_result = X86_decodeFeatureExtension(
+ 			ud, code, code_len, instr, size, extension_opcode);
+ 	if (extension_result == X86_FEATURE_DECODED) {
+@@ -755,7 +758,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 		return false;
+ 
+ 	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
+-					     extension_opcode, false);
++					     extension_opcode, opcodeOffset, false);
+ }
+ 
+ bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+@@ -763,7 +766,7 @@ bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+ 				       uint16_t *size, uint8_t extension_opcode)
+ {
+ 	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
+-					     extension_opcode, true);
++					     extension_opcode, SIZE_MAX, true);
+ }
+ 
+ #undef X86_BACKEND_INLINE
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 952b6025..04d4e0b3 100644
+index 952b6025..06912ad2 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2271,6 +2271,7 @@ static int readMaskRegister(struct InternalInstruction *insn)
+@@ -2893,10 +2893,23 @@ initializeInstructionHeader(struct InternalInstruction *insn,
  
- 	insn->writemask =
- 		(Reg)(aaaFromEVEX4of4(insn->vectorExtensionPrefix[3]));
-+	insn->hasWritemask = true;
+ X86_DECODE_INLINE PrefixReadStatus
+ readInstructionHeader(struct InternalInstruction *insn, const uint8_t *code,
+-		      size_t codeSize, cs_mode mode)
++		      size_t codeSize, cs_mode mode, size_t opcodeOffset)
+ {
+ 	initializeInstructionHeader(insn, code, codeSize, mode);
  
- 	return 0;
++	/* The extension probe already walked these bytes. An ordinary
++	 * one-byte opcode after zero or one REX prefix needs no second walk. */
++	if (opcodeOffset < 2 && (!opcodeOffset || isREX(insn, code[0]))) {
++		uint8_t opcode = code[opcodeOffset];
++		if (feature_prefix_flags[opcode] == 0) {
++			readSimpleLegacyPrefix(insn, opcodeOffset);
++			++insn->readerCursor;
++			insn->firstByte = opcode;
++			insn->opcode = opcode;
++			insn->opcodeType = ONEBYTE;
++			return PREFIX_READ_SIMPLE_LEGACY;
++		}
++	}
+ 	const PrefixReadStatus prefixResult = readPrefixes(insn);
+ 	if (prefixResult == PREFIX_READ_INVALID)
+ 		return -1;
+@@ -3024,10 +3037,11 @@ enum { X86_SCAN_UID_READY = 2 };
+ X86_DECODE_INLINE int
+ decodeInstructionImpl(struct InternalInstruction *insn, const uint8_t *code,
+ 		      size_t codeSize, cs_mode mode, MCInst *mcInst,
+-		      uint16_t *size, bool directTerminal, MCInst *fullMCInst)
++		      uint16_t *size, bool directTerminal, MCInst *fullMCInst,
++		      size_t opcodeOffset)
+ {
+ 	const PrefixReadStatus prefixResult =
+-		readInstructionHeader(insn, code, codeSize, mode);
++		readInstructionHeader(insn, code, codeSize, mode, opcodeOffset);
+ 	if (prefixResult == PREFIX_READ_INVALID)
+ 		return X86_SCAN_INVALID;
+ 	/* getIDForMode restores incoming size flags for absolute moves even
+@@ -3065,15 +3079,24 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+ 			  uint16_t *size)
+ {
+ 	return decodeInstructionImpl(insn, code, codeSize, mode, mcInst, size,
+-				     false, NULL);
++				     false, NULL, SIZE_MAX);
  }
+ 
+ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+ 			  size_t codeSize, cs_mode mode, MCInst *mcInst,
+ 			  uint16_t *size)
++{
++	return decodeInstructionFullAfterProbe(insn, code, codeSize, mode, mcInst,
++					       size, SIZE_MAX);
++}
++
++int decodeInstructionFullAfterProbe(struct InternalInstruction *insn,
++				    const uint8_t *code, size_t codeSize,
++				    cs_mode mode, MCInst *mcInst,
++				    uint16_t *size, size_t opcodeOffset)
+ {
+ 	return decodeInstructionImpl(insn, code, codeSize, mode, NULL, size,
+-				     false, mcInst);
++				     false, mcInst, opcodeOffset);
+ }
+ 
+ enum { X86_SCAN_NOT_HANDLED = 3 };
+@@ -3125,7 +3148,7 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
+ {
+ 	InternalInstruction insn = { 0 };
+ 	int ret = decodeInstructionImpl(&insn, code, code_len, mode, instr,
+-					size, true, NULL);
++					size, true, NULL, SIZE_MAX);
+ 	if (ret == X86_SCAN_UID_READY) {
+ 		MCInst_clear(instr);
+ 		MCInst_setOpcode(instr, insn.instructionID);
 diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
-index ae3428b5..29eead48 100644
+index ae3428b5..8f695a3d 100644
 --- a/arch/X86/X86DisassemblerDecoder.h
 +++ b/arch/X86/X86DisassemblerDecoder.h
-@@ -551,6 +551,8 @@ typedef struct InternalInstruction {
- 	bool apxEvexB4;
- 	bool apxEvexX4;
- 	bool apxEvexGprIndex;
-+	/* A write-mask descriptor can select k0. */
-+	bool hasWritemask;
- 	/* The segment override type */
- 	SegmentOverride segmentOverride;
- 	bool consumedModRM;
+@@ -722,6 +722,13 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+ 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+ 			  uint16_t *size);
+ 
++/* opcodeOffset is the byte selected by X86_mayDecodeFeatureExtensionImpl,
++ * or SIZE_MAX when there is no classified opcode. */
++int decodeInstructionFullAfterProbe(struct InternalInstruction *insn,
++				    const uint8_t *code, size_t codeSize,
++				    cs_mode mode, struct MCInst *mcInst,
++				    uint16_t *size, size_t opcodeOffset);
++
+ //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
+ 
+ #endif

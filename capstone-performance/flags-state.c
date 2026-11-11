@@ -39,8 +39,31 @@ static void check(Api *a, Api *b, const uint8_t *code, size_t length) {
  }
  ++compared;
 }
+static void check_prefixes(Api *a, Api *b) {
+ const cs_mode modes[] = {CS_MODE_16,CS_MODE_32,CS_MODE_64,
+                          0,CS_MODE_16|CS_MODE_64,CS_MODE_32|CS_MODE_64,
+                          CS_MODE_16|CS_MODE_32};
+ for (unsigned m=0;m<sizeof(modes)/sizeof(modes[0]);++m) {
+  cs_err ea=a->open(CS_ARCH_X86,modes[m],&a->handle);
+  cs_err eb=b->open(CS_ARCH_X86,modes[m],&b->handle);
+  if(ea!=eb)exit(3);
+  if(ea!=CS_ERR_OK)continue;
+  for(unsigned detail=0;detail<2;++detail) {
+   a->option(a->handle,CS_OPT_DETAIL,detail?CS_OPT_ON:CS_OPT_OFF);
+   b->option(b->handle,CS_OPT_DETAIL,detail?CS_OPT_ON:CS_OPT_OFF);
+   for(unsigned prefix=0;prefix<32;++prefix)for(unsigned op=0;op<256;++op) {
+    uint8_t code[16]={0};unsigned i=0;
+    if(prefix>=16)code[i++]=prefix&1?0x66:0x67;
+    code[i++]=0x40+(prefix&15);code[i++]=op;code[i++]=0x44;
+    code[i++]=0x24;code[i++]=0x81;code[i++]=0x80;
+    for(unsigned n=0;n<sizeof(code);++n)check(a,b,code,n);
+   }
+  }
+  a->close(&a->handle);b->close(&b->handle);
+ }
+}
 int main(int argc,char **argv) {
- if(argc!=3)return 2;Api a={0},b={0};load(&a,argv[1]);load(&b,argv[2]);
+ if(argc!=3)return 2;Api a={0},b={0};load(&a,argv[1]);load(&b,argv[2]);check_prefixes(&a,&b);
  const cs_mode modes[]={CS_MODE_16,CS_MODE_32,CS_MODE_64};
  const uint8_t p0[]={0xf1,0xf2,0xf3,0x01,0x02,0x03,0x91,0xd1,0x61};
  const uint8_t p1[]={0x7c,0x7d,0x7e,0x7f,0xfd,0x6d,0xed,0x75};
@@ -65,6 +88,6 @@ int main(int argc,char **argv) {
   }
   if(a.close(&a.handle)||b.close(&b.handle))return 2;
  }
- printf("%llu complete private decoder states matched, including flags, failed decodes, poison tails and EVEX aaa=0..7\n",(unsigned long long)compared);
+ printf("%llu complete private decoder states matched, including zero through fifteen remaining bytes, mixed modes, repeated prefixes, EVEX masks and poison tails\n",(unsigned long long)compared);
  dlclose(a.lib);dlclose(b.lib);return 0;
 }
