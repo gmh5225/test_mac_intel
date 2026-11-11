@@ -247,7 +247,7 @@ index 00000000..f4e51f31
 +	{ 127, 222, ARM_INS_ALIAS_VRMLALVH },
 +	{ 0, 223, ARM_INS_ALIAS_VRMLALVHA },
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..137da6fb 100644
+index 30e28897..2925b543 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -26,6 +26,7 @@
@@ -272,12 +272,15 @@ index 30e28897..137da6fb 100644
  
  static const char *get_custom_reg_alias(unsigned reg)
  {
-@@ -699,8 +707,8 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -698,9 +706,10 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
  	MI->flat_insn->alias_id = 0;
  	ARM_LLVM_printInstruction(MI, O, info);
- 	if (!MI->flat_insn->alias_id)
+-	if (!MI->flat_insn->alias_id)
 -		map_set_alias_id(MI, O, insn_alias_mnem_map,
 -				 ARR_SIZE(insn_alias_mnem_map) - 1);
++	/* The printer initialized alias_id to zero before dispatch. */
++	if (MCInst_isAlias(MI) && !MI->flat_insn->alias_id)
 +		MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
 +				 ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
  	ARM_add_not_defined_ops(MI);

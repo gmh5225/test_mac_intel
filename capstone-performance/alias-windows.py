@@ -89,8 +89,8 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         compiled[label]=digest(timed.read_bytes())
         programs[label]=timed
     write('binaries.json',compiled)
-    selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm-ls','arm-cp','arm-sort','putty-32-0.85')}
-    assert len(selected)==4
+    selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm-ls','arm-cp','arm-sort','thumb-ls','thumb-cp','thumb-sort','putty-32-0.85')}
+    assert len(selected)==7
     cache={};cases=[fixture(r,cache) for r in selected.values()]
     write('cases.json',cases)
     snapshots=[]; measurements=[]
