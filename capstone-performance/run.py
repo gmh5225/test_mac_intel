@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='native isolated scanner, four indexed alias maps, guarded ARM details and four-byte x86 records'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='dense mapping and common embedded-register operand publication'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -238,7 +238,7 @@ panic = "abort"
     prefix = 'CMakeFiles/capstone.dir/'
     backends = {'AArch64':'AArch64','Mips':'Mips','PowerPC':'PPC','Sparc':'Sparc','ARM':'ARM'}
     allowed = {prefix+'arch/'+arch+'/'+stem+'Mapping.c.o' for arch,stem in backends.items()}
-    allowed.update(prefix+x for x in ('Mapping.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86Mapping.c.o'))
+    allowed.update(prefix+x for x in ('Mapping.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86Mapping.c.o','arch/X86/X86ATTInstPrinter.c.o','arch/X86/X86IntelInstPrinter.c.o'))
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
