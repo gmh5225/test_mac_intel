@@ -1,7 +1,7 @@
-name: Qualify x87 register aliases on the published Capstone base
+name: Verify native Windows decoder tables and public output across build configurations
 on:
   push:
-    branches: [codex/capstone-x87-table-release]
+    branches: [codex/capstone-native-decoder-qualification]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-qualification.yml
@@ -21,6 +21,10 @@ jobs:
           - { host: ubuntu-24.04, candidate: combined, preset: user-alloc }
           - { host: ubuntu-24.04, candidate: combined, preset: diet }
           - { host: ubuntu-24.04, candidate: combined, preset: reduced }
+          - { host: windows-2022, candidate: combined, preset: four }
+          - { host: windows-2022, candidate: combined, preset: reduced }
+          - { host: windows-2022, candidate: combined, preset: diet }
+          - { host: windows-2022, candidate: combined, preset: user-alloc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 65
     steps:
@@ -34,6 +38,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: tests-${{ matrix.candidate }}-${{ matrix.preset }}-${{ github.run_attempt }}
+          name: native-qa-${{ matrix.host }}-${{ matrix.preset }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

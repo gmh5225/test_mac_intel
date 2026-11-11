@@ -29,6 +29,12 @@ def tests(source, label, preset, selection=None):
         subset=True
         units=['x86_scan_batch','x86_printer_prechecked','x86_mapping_counts','x86_encoding_accuracy','sstream']
         flags.extend(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON'])
+    if preset=='four':
+        subset=True
+        flags.extend(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', *['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ('X86','ARM','AARCH64','MIPS')]])
+        units=['api','mapping','sstream','arm_post_index','aarch64_postprocess','mips16e2','x86_scan_batch','x86_mapping_counts','x86_encoding_accuracy','x86_reg_access','x86_printer_prechecked']
+    if platform.system() == 'Windows' and label=='candidate':
+        flags.append('-DCAPSTONE_MSVC_NATIVE_DECODER=ON')
     if preset=='sanitized':
         flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
                       '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
@@ -64,7 +70,7 @@ def tests(source, label, preset, selection=None):
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('candidate',choices=['combined'])
-    parser.add_argument('preset',choices=['sanitized','windows-release','static-crt','intel-release','diet','reduced','user-alloc'])
+    parser.add_argument('preset',choices=['sanitized','windows-release','static-crt','intel-release','diet','reduced','user-alloc','four'])
     args=parser.parse_args()
     assert not WORK.exists() and not EVIDENCE.exists()
     EVIDENCE.mkdir();WORK.mkdir()
@@ -72,6 +78,7 @@ def main():
     source=fetch('candidate','https://github.com/NeverSight/capstone.git',ref)
     patches=['combined-product.patch']
     for i,f in enumerate(patches):
+        assert sha(SOURCE/f) == json.loads((SOURCE/'manifest.json').read_text())['source_lineage'][f]['sha256']
         command(['git','apply','--check',SOURCE/f],f'check-{i}',source)
         command(['git','apply',SOURCE/f],f'patch-{i}',source)
     command(['git','diff','--check'],'source-diff',source)

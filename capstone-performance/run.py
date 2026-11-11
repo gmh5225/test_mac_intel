@@ -42,6 +42,7 @@ def command(args, label, cwd=None):
 def fetch(name, url, revision):
     path = WORK / name
     command(['git', 'init', path], name + '-init')
+    command(['git','config','core.autocrlf','false'], name+'-lf', path)
     command(['git', 'remote', 'add', 'origin', url], name + '-remote', path)
     command(['git', 'fetch', '--depth', '1', 'origin', revision], name + '-fetch', path)
     command(['git', 'checkout', '--detach', 'FETCH_HEAD'], name + '-checkout', path)
