@@ -2,7 +2,7 @@ name: Same-consumer MSVC and clang-cl decode comparison
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-windows-toolchain-split]
+    branches: [codex/capstone-msvc-translator-frame]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: msvc-toolchains-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: msvc-frames-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

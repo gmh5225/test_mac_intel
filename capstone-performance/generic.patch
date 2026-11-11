@@ -1,0 +1,16 @@
+diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
+index cb880c40..c3cb3402 100644
+--- a/arch/X86/X86DisassemblerTranslator.h
++++ b/arch/X86/X86DisassemblerTranslator.h
+@@ -1406,9 +1406,11 @@ X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
+ 
+ 	/* UD1 has a runtime operand override; other selected sets use
+ 	 * the same translators with constant descriptors, including duplicates. */
++#if !defined(_MSC_VER) || defined(__clang__)
+ 	if (insn->instructionID != X86_UD1) {
+ #include "X86GenOperandTranslate.inc"
+ 	}
++#endif
+ 
+ 	for (index = 0; index < X86_MAX_OPERANDS &&
+ 			insn->operands[index].encoding != ENCODING_NONE;

@@ -1,0 +1,48 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..f6f855ba 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -608,11 +608,30 @@ static void prepareTranslation(InternalInstruction *insn)
+ #endif
+ }
+ 
++#if defined(_MSC_VER) && !defined(__clang__)
++/* Keep the generated translation cases out of the common decoder frame.
++ * Separate entries preserve the constant emitOperands in each case. */
++static __declspec(noinline) bool
++translateFullOperands(MCInst *instr, InternalInstruction *insn)
++{
++	return translateInstruction(instr, insn, true);
++}
++
++static __declspec(noinline) bool
++validateScanOperands(MCInst *instr, InternalInstruction *insn)
++{
++	return translateInstruction(instr, insn, false);
++}
++#else
++#define translateFullOperands(instr, insn) translateInstruction(instr, insn, true)
++#define validateScanOperands(instr, insn) translateInstruction(instr, insn, false)
++#endif
++
+ bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
+ {
+ 	*size = (uint16_t)insn->length;
+ 	prepareTranslation(insn);
+-	return !translateInstruction(instr, insn, false);
++	return !validateScanOperands(instr, insn);
+ }
+ 
+ #if defined(_MSC_VER)
+@@ -662,9 +681,9 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 
+ 		prepareTranslation(&insn);
+ 		if (scanOnly || (handle->no_text && !handle->detail_opt))
+-			return !translateInstruction(instr, &insn, false);
++			return !validateScanOperands(instr, &insn);
+ 		result = operands_ready ||
+-			 !translateInstruction(instr, &insn, true);
++			 !translateFullOperands(instr, &insn);
+ 		if (result) {
+ 			unsigned Flags = X86_IP_NO_PREFIX;
+ 			if (scalar_compare_p2_normalized)

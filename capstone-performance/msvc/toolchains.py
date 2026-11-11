@@ -10,14 +10,18 @@ import subprocess
 import run as perf
 
 source, work = perf.source, perf.work
-ref = 'a0a484309d86a7a8ff33c45285787c2c6e97bc54'
+ref = 'e9a8b79bf71d80e5c032267bd3c253899b3de965'
 
 def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
-    candidate = work/'candidate'
-    perf.run(['git','worktree','add','--detach',candidate,'HEAD'],'candidate-worktree',base)
-    perf.run(['git','apply', source/'msvc-split.patch'],'candidate-apply',candidate)
+    trees = {'msvc':base}
+    for name, expected in {'outlined': 'c95e146edeb1721885d35fe43f0f6c8fc07a1d4299f742654d63cdf4dfb64d39', 'generic': '5562d0f0d8faf9a4db48b4b86ce2194ed66647d41682a2c01cd3212d8e905a48'}.items():
+        trees[name]=work/name
+        patch=source/(name+'.patch')
+        assert perf.digest(patch.read_bytes())==expected
+        perf.run(['git','worktree','add','--detach',trees[name],'HEAD'],name+'-worktree',base)
+        perf.run(['git','apply',patch],name+'-apply',trees[name])
     adapter = work/'adapter'
     adapter.mkdir()
     for name in ('Cargo.lock','iced.rs'):
@@ -39,9 +43,9 @@ opt-level = 3
     abi = '-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded' + ('DLL' if perf.crt=='MD' else '')
     opts=['-G','Visual Studio 17 2022','-A','x64',abi]
     lib_paths={}
-    for name,src,extra in [('msvc',base,[]),('split',candidate,[]),('llvm',base,['-T','ClangCL'])]:
+    for name,src in trees.items():
         build=work/(name+'-build')
-        perf.run(['cmake','-S',src,'-B',build,*opts,*extra,
+        perf.run(['cmake','-S',src,'-B',build,*opts,
                   '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON',
                   '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if perf.crt=='MT' else 'OFF'),
                   '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],name+'-configure')
@@ -49,7 +53,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','split','llvm']
+    names=['msvc','outlined','generic']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -68,7 +72,7 @@ opt-level = 3
 
 def record_codegen(name,build):
     tool=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
-    interesting={'fill_insn','cs_decode_full_insn','cs_disasm_iter','X86_getInstruction','X86_Intel_printInst','X86_reg_access','decodeInstructionFull','readModRM'}
+    interesting={'fill_insn','cs_decode_full_insn','cs_disasm_iter','X86_getInstruction','X86_Intel_printInst','X86_reg_access','decodeInstructionFull','readModRM','translateFullOperands','validateScanOperands','translateOperand','translateRMMemoryFull','readOperandsScan'}
     found={}
     for stem in ('cs','X86DisassemblerDecoder','X86Disassembler','X86IntelInstPrinter','X86Mapping'):
         obj,=build.rglob(stem+'.obj')
@@ -97,7 +101,7 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','split','llvm','iced','llvm','split','msvc'],['llvm','msvc','split','iced','split','msvc','llvm'],['split','llvm','msvc','iced','msvc','llvm','split']]
+    orders=[['msvc','outlined','generic','iced','generic','outlined','msvc'],['generic','msvc','outlined','iced','outlined','msvc','generic'],['outlined','generic','msvc','iced','msvc','generic','outlined']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
@@ -110,14 +114,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','split','llvm','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','outlined','generic','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patch=perf.digest((source/'msvc-split.patch').read_bytes())))
-    assert perf.digest((source/'msvc-split.patch').read_bytes()) == 'a086b6e246c2400ee3b6e2473efd877f0679949e207d7cbbe9fe9e32de25f3c7'
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'outlined': 'c95e146edeb1721885d35fe43f0f6c8fc07a1d4299f742654d63cdf4dfb64d39', 'generic': '5562d0f0d8faf9a4db48b4b86ce2194ed66647d41682a2c01cd3212d8e905a48'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
