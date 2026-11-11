@@ -1,27 +1,142 @@
-diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index 96760766..ebe301e2 100644
---- a/arch/ARM/ARMInstPrinter.c
-+++ b/arch/ARM/ARMInstPrinter.c
-@@ -108,8 +108,22 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
+diff --git a/MCInstPrinter.c b/MCInstPrinter.c
+index 97d26582..72b1d7a2 100644
+--- a/MCInstPrinter.c
++++ b/MCInstPrinter.c
+@@ -220,6 +220,23 @@ const char *markup(const char *s)
+ 		return no_markup;
+ }
  
- static void printRegName(SStream *OS, unsigned RegNo)
- {
++void printMarkedRegName(SStream *OS, const char *name)
++{
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+	const char *name = getRegisterName(RegNo, ARM_NoRegAltName);
-+	/* With markup disabled the two empty tags contribute no bytes. The
-+	 * generic formatter still owns custom callbacks and full streams. */
++	/* Preserve the formatter callback and full-stream behavior of the
++	 * translated markup expression. */
 +	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
 +	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
 +		SStream_concat0(OS, name);
 +		return;
 +	}
-+	SStream_concat2(OS, markup("<reg:"), name);
-+#else
- 	SStream_concat2(OS, markup("<reg:"),
- 			getRegisterName(RegNo, ARM_NoRegAltName));
 +#endif
- 	SStream_concat0(OS, markup(">"));
++	SStream_concat2(OS, markup("<reg:"), name);
++	SStream_concat0(OS, markup(">"));
++}
++
+ // binary search for encoding in IndexType array
+ // return -1 if not found, or index if found
+ unsigned int binsearch_IndexTypeEncoding(const struct IndexType *index,
+diff --git a/MCInstPrinter.h b/MCInstPrinter.h
+index 3813729e..040aa0e6 100644
+--- a/MCInstPrinter.h
++++ b/MCInstPrinter.h
+@@ -5,6 +5,7 @@
+ #define CS_MCINSTPRINTER_H
+ 
+ #include "MCInst.h"
++#include "SStream.h"
+ #include <assert.h>
+ #include <capstone/platform.h>
+ 
+@@ -66,6 +67,7 @@ typedef struct {
+ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M);
+ bool getUseMarkup(void);
+ const char *markup(const char *s);
++void printMarkedRegName(SStream *OS, const char *name);
+ 
+ struct IndexType {
+ 	uint16_t encoding;
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index bffb617f..48f61bd0 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -80,15 +80,12 @@ DECLARE_printComplexRotationOp(90, 0);
+ 
+ void printRegName(SStream *OS, unsigned Reg)
+ {
+-	SStream_concat2(OS, markup("<reg:"),
+-			getRegisterName(Reg, AArch64_NoRegAltName));
+-	SStream_concat0(OS, markup(">"));
++	printMarkedRegName(OS, getRegisterName(Reg, AArch64_NoRegAltName));
  }
  
+ void printRegNameAlt(SStream *OS, unsigned Reg, unsigned AltIdx)
+ {
+-	SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg, AltIdx));
+-	SStream_concat0(OS, markup(">"));
++	printMarkedRegName(OS, getRegisterName(Reg, AltIdx));
+ }
+ 
+ const char *getRegName(unsigned Reg)
+diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
+index ebe301e2..d6972f46 100644
+--- a/arch/ARM/ARMInstPrinter.c
++++ b/arch/ARM/ARMInstPrinter.c
+@@ -108,23 +108,7 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
+ 
+ static void printRegName(SStream *OS, unsigned RegNo)
+ {
+-#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+-	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+-	!defined(_WIN32_WCE)
+-	const char *name = getRegisterName(RegNo, ARM_NoRegAltName);
+-	/* With markup disabled the two empty tags contribute no bytes. The
+-	 * generic formatter still owns custom callbacks and full streams. */
+-	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
+-	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
+-		SStream_concat0(OS, name);
+-		return;
+-	}
+-	SStream_concat2(OS, markup("<reg:"), name);
+-#else
+-	SStream_concat2(OS, markup("<reg:"),
+-			getRegisterName(RegNo, ARM_NoRegAltName));
+-#endif
+-	SStream_concat0(OS, markup(">"));
++	printMarkedRegName(OS, getRegisterName(RegNo, ARM_NoRegAltName));
+ }
+ 
+ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+index c74ca4e1..96e83e45 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+@@ -639,7 +639,15 @@ public:
+         for syntax, expected in [
+             (
+                 b'{ OS << markup("<reg:") << getRegisterName(Reg) << markup(">"); }',
+-                b'SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg));\n'
++                b"printMarkedRegName(OS, getRegisterName(Reg));",
++            ),
++            (
++                b'if (enabled) OS << markup("<reg:") << getRegisterName(Reg, AltIdx) << markup(">");',
++                b"printMarkedRegName(OS, getRegisterName(Reg, AltIdx));",
++            ),
++            (
++                b'{ OS << markup("<reg:") << otherName(Reg) << markup(">"); }',
++                b'SStream_concat2(OS, markup("<reg:"), otherName(Reg));\n'
+                 b'SStream_concat0(OS, markup(">"));',
+             ),
+             (
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+index e507eae0..6139f9ff 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+@@ -57,6 +57,17 @@ class StreamOperations(Patch):
+         # We reversing it so the left most operand comes first.
+         ops.reverse()
+ 
++        if (
++            len(ops) == 3
++            and get_text_from_node(src, ops[0]) == b'markup("<reg:")'
++            and get_text_from_node(src, ops[2]) == b'markup(">")'
++            and ops[1].type == "call_expression"
++            and get_text_from_node(src, ops[1].child_by_field_name("function"))
++            == b"getRegisterName"
++        ):
++            name = get_text_from_node(src, ops[1])
++            return b"printMarkedRegName(" + s_name + b", " + name + b");"
++
+         res = b""
+         # Capstone uses the following functions to copy the strings to a buffer:
+         # SStream_concat  - Copies multiple strings.

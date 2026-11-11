@@ -23,10 +23,10 @@ def sample(binary, case, mode, repeats):
 
 def main(root):
     run.WORK = root
-    revision = "34d9185433e1b0c1e038f874fc95b25edbac6795"
+    revision = "8cc7c945ad66d65aa4fcd4451ad85416c9e5a028"
     source = run.fetch("capstone", "https://github.com/NeverSight/capstone.git", revision)
     cases = corpus.prepare(SOURCE, root, run.EVIDENCE, run.command)
-    arch_for = {"arm":"ARM","thumb":"ARM"}
+    arch_for = {"arm64":"AARCH64","arm":"ARM","thumb":"ARM"}
     plan = os.environ["ARCH_PLAN"].split(",")
     cases = [c for c in cases if arch_for.get(c["name"].split("-")[0]) in plan]
     assert {arch_for[c["name"].split("-")[0]] for c in cases} == set(plan)
@@ -53,7 +53,7 @@ def main(root):
             run.command(["git","apply","--check",patch],"check",source)
             run.command(["git","apply",patch],"apply",source)
             changed = sp.check_output(["git", "diff", "--name-only", "HEAD"], cwd=source, text=True).splitlines()
-            assert changed == ["arch/ARM/ARMInstPrinter.c"], changed
+            assert changed == ['MCInstPrinter.c', 'MCInstPrinter.h', 'arch/AArch64/AArch64InstPrinter.c', 'arch/ARM/ARMInstPrinter.c', 'suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py', 'suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py'], changed
         run.command(["cmake","--build",build,"--target","capstone_static","--parallel","4"],"build-"+variant)
         exe = root / ("bench-"+variant)
         run.command(["clang++",root/"consumer.o",build/"libcapstone.a","-o",exe],"link-"+variant)

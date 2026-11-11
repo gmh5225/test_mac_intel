@@ -1,7 +1,7 @@
-name: Real files on dedicated alias backends
+name: Compare generated register formatting on nine ARM, Thumb and AArch64 programs
 on:
   push:
-    branches: [codex/capstone-plain-arm-register-posix]
+    branches: [codex/capstone-generated-register-markup]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -12,9 +12,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {host: ubuntu-24.04, plan: ARM}
-          - {host: macos-15, plan: ARM}
-          - {host: macos-15-intel, plan: ARM}
+          - {host: ubuntu-24.04, plan: "AARCH64,ARM"}
+          - {host: macos-15, plan: "AARCH64,ARM"}
+          - {host: macos-15-intel, plan: "AARCH64,ARM"}
     env:
       ARCH_PLAN: ${{ matrix.plan }}
     runs-on: ${{ matrix.host }}
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-arm-${{ matrix.host }}-${{ matrix.plan }}-${{ github.run_attempt }}
+          name: register-markup-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
