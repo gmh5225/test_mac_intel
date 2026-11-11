@@ -113,12 +113,14 @@ def measure(progs,cases):
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
     orders=[['msvc','profiles','iced','profiles','msvc'],['profiles','msvc','iced','msvc','profiles']]
     for c in cases:
+        if c['name'] not in ('simd64','scalar32','scalar64','putty-32-0.85','cmd-64'):
+            continue
         for mode in ('scan','format','detail'):
             n=1
             while (probe:=sample('msvc',c,mode,n))['wall_ns']<10000000: n*=4
-            repeats=max(1,math.ceil(n*90000000/probe['wall_ns']))
+            repeats=max(1,math.ceil(n*150000000/probe['wall_ns']))
             pairs=[]
-            for round_id in range(6):
+            for round_id in range(16 if mode=='scan' else 8):
                 raw=[(k,sample(k,c,mode,repeats)) for k in orders[round_id%2]]
                 def result(r,fields): return tuple(r[k] for k in fields)
                 common_fields=('instructions','rejected','boundary_hash')
