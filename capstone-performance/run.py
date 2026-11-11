@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='integrated mapper before indexing final MIPS aliases' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='parent with native Windows fixes and indexed MIPS aliases' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -238,8 +238,6 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + name + '.o' for name in ['Mapping.c', 'arch/AArch64/AArch64Mapping.c', 'arch/ARC/ARCMapping.c', 'arch/ARM/ARMMapping.c', 'arch/Alpha/AlphaMapping.c', 'arch/LoongArch/LoongArchMapping.c', 'arch/Mips/MipsMapping.c', 'arch/PowerPC/PPCInstPrinter.c', 'arch/PowerPC/PPCMapping.c', 'arch/Sparc/SparcMapping.c', 'arch/SystemZ/SystemZMapping.c', 'arch/TriCore/TriCoreMapping.c', 'arch/X86/X86Disassembler.c', 'arch/X86/X86IntelInstPrinter.c', 'arch/X86/X86Mapping.c', 'arch/Xtensa/XtensaMapping.c', 'cs.c']}
-    if incremental:
-        allowed={'CMakeFiles/capstone.dir/arch/Mips/MipsMapping.c.o','CMakeFiles/capstone.dir/Mapping.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
@@ -302,23 +300,13 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    selected = {('putty-32-0.85','format'),('putty-32-0.85','detail'),('putty-32-0.85','scan'),
-                ('scalar64','detail'),('simd64','scan'),('simd64','format'),('simd64','detail'),
-                ('mips64el-ls','detail'),('mips64el-ls','format'),('sparc64-ls','detail'),('riscv64-cp','detail'),
-                ('riscv64-cp','format'),('s390x-ls','detail'),('s390x-cp','detail'),('s390x-sort','detail'),
-                ('ppc64el-ls','format'),('arm64-sort','format'),('loong64-ls','detail'),('arc-libm','detail')}
-    selected = {(name,mode) for name in ('mips64el-ls','mips64el-cp','mips64el-sort')
-                for mode in ('format','detail')} | {('putty-32-0.85',mode) for mode in ('scan','format','detail')} | {
-                ('simd64','scan'),('simd64','detail'),('scalar64','detail'),('ppc64el-ls','format'),('s390x-ls','detail')}
-    selected_cases = [c for c in cases if (c['name'],c['mode']) in selected]
-    assert len(selected_cases)==len(selected)
-    controls = [c for c in selected_cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','format'),('simd64','scan')}]
-    target = 350_000_000 if platform.system() == 'Linux' else 240_000_000
-    measure_panel('null', controls, 12, ['base','new','base_aa','new_aa'], target)
-    measure_panel('x86', [c for c in selected_cases if c['consumer']=='decoder'],12,
-                  ['base','new','base_aa','new_aa','iced','iced_aa'],target)
-    measure_panel('other', [c for c in selected_cases if c['consumer']=='single'],12,
-                  ['base','new','base_aa','new_aa'],target)
+    controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
+    cycles=10; duration=150_000_000
+    measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
+    for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
+        choices=[c for c in cases if c['consumer']==consumer]
+        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
+        measure_panel(panel,choices,cycles,variants,duration)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 

@@ -11,7 +11,7 @@ index 641480ed..fba4fc98 100644
  	// These flags could be used to pass some info from one target subcomponent
  	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/Mapping.c b/Mapping.c
-index 11b3e619..ce1aa8f8 100644
+index 11b3e619..49cf386b 100644
 --- a/Mapping.c
 +++ b/Mapping.c
 @@ -249,16 +249,17 @@ void map_groups(MCInst *MI, const insn_map *imap)
@@ -133,6 +133,18 @@ index 11b3e619..ce1aa8f8 100644
  
  /// Does a binary search over the given map and searches for @id.
  /// If @id exists in @map, it sets @found to true and returns
+@@ -511,6 +551,11 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
+ uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
+ 			     const char *id, bool *found)
+ {
++	if (map_len == 0) {
++		*found = false;
++		return UINT64_MAX;
++	}
++
+ 	size_t l = 0;
+ 	size_t r = map_len;
+ 	size_t id_len = strlen(id);
 diff --git a/Mapping.h b/Mapping.h
 index 9f69f881..588b4797 100644
 --- a/Mapping.h
@@ -193,18 +205,19 @@ index 9f69f881..588b4797 100644
 +
  #endif // CS_MAPPING_H
 diff --git a/SStream.c b/SStream.c
-index 49e34d76..28ebdbd0 100644
+index 49e34d76..f1fd1246 100644
 --- a/SStream.c
 +++ b/SStream.c
-@@ -260,7 +260,14 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
+@@ -260,7 +260,15 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
  {
  #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
 -	if (cs_mem_malloc == malloc && cs_mem_free == free) {
 +#if defined(_MSC_VER) && defined(_DLL) && !defined(_WIN32_WCE)
 +	bool default_allocator =
-+		cs_mem_malloc == cs_initial_memory_hooks.malloc &&
-+		cs_mem_free == cs_initial_memory_hooks.free;
++		(cs_mem_malloc == cs_initial_memory_hooks.malloc &&
++		 cs_mem_free == cs_initial_memory_hooks.free) ||
++		(cs_mem_malloc == malloc && cs_mem_free == free);
 +#else
 +	bool default_allocator = cs_mem_malloc == malloc && cs_mem_free == free;
 +#endif
@@ -10669,7 +10682,7 @@ index dbb25f26..e112c2a1 100644
      generated = [(path, generated_output(emit)) for path, emit in outputs]
      for path, output in generated:
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 8ed9ee00..1ee22af2 100644
+index 8ed9ee00..35745479 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
 @@ -4,7 +4,7 @@ enable_testing()
@@ -10681,14 +10694,10 @@ index 8ed9ee00..1ee22af2 100644
      find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
      if(Python3_Interpreter_FOUND)
          add_test(NAME unit_mapping_diet_types_generator
-@@ -17,6 +17,20 @@ if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
+@@ -17,7 +17,21 @@ if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
     OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
      list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
  endif()
-+if(CAPSTONE_MIPS_SUPPORT AND Python3_Interpreter_FOUND)
-+    add_test(NAME unit_mips_alias_index_generator
-+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/mips_alias_index.py" --check)
-+endif()
 +if(CAPSTONE_PPC_SUPPORT AND Python3_Interpreter_FOUND)
 +    add_test(NAME unit_ppc_alias_hints_generator
 +        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/ppc_alias_hints.py" --check)
@@ -10700,10 +10709,15 @@ index 8ed9ee00..1ee22af2 100644
 +        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/dense_mapping_ids.py" --check)
 +endif()
  if(CAPSTONE_MIPS_SUPPORT)
++    if(Python3_Interpreter_FOUND)
++        add_test(NAME unit_mips_alias_index_generator
++            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/mips_alias_index.py" --check)
++    endif()
      list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
  endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
 diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
-index 6b15c4fe..cf87b126 100644
+index 6b15c4fe..767a4a02 100644
 --- a/tests/unit/mapping.c
 +++ b/tests/unit/mapping.c
 @@ -1,8 +1,10 @@
@@ -10717,7 +10731,7 @@ index 6b15c4fe..cf87b126 100644
  
  static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
  			 unsigned expected)
-@@ -188,11 +190,73 @@ static bool test_alias_lookup(void)
+@@ -188,11 +190,77 @@ static bool test_alias_lookup(void)
  	return true;
  }
  
@@ -10784,6 +10798,10 @@ index 6b15c4fe..cf87b126 100644
 +
  int main(void)
  {
++	bool found = true;
++	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
++	    found)
++		return 1;
  	return test_name_lookup() && test_alias_lookup() &&
  			       test_dense_and_sparse() &&
 -			       test_duplicate_selection() &&
