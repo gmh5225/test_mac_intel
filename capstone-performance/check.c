@@ -29,8 +29,49 @@ static void check_legacy(const uint8_t *bytes, size_t size, size_t offset,
 	}
 }
 
+#if defined(__unix__) || defined(__APPLE__)
+#include <sys/mman.h>
+#include <unistd.h>
+/* Real page boundary after the last valid byte. Exercise every ModR/M/SIB,
+ * both default address widths, the indexed group and an immediate tail. */
+static void check_guarded_addresses(void)
+{
+    const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+    uint8_t *mapping = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (mapping == MAP_FAILED || mprotect(mapping + page, page, PROT_NONE))
+        abort();
+    const uint8_t opcodes[] = { 0x8b, 0x83, 0xff };
+    uint8_t raw[15] = { 0x49 };
+    for (unsigned op = 0; op < sizeof(opcodes); ++op) {
+        for (unsigned m = 0; m < 256; ++m) {
+            for (unsigned sib = 0; sib < 256; ++sib) {
+                raw[1] = opcodes[op]; raw[2] = (uint8_t)m; raw[3] = (uint8_t)sib;
+                size_t cut = 2 + (m + sib + op) % 10;
+                uint8_t *end = mapping + page;
+                memcpy(end - cut, raw, cut);
+                check_legacy(end-cut, cut, 1, CS_MODE_64, false);
+                check_legacy(end-cut+1, cut-1, 0, CS_MODE_32, false);
+                /* For every SIB form at mod 0..2 exercise every truncated length. */
+                if ((m & 7) == 4 && m < 0xc0 && ((m >> 3) & 7) == 0) {
+                    for (size_t n = 2; n <= sizeof(raw); ++n) {
+                        memcpy(end-n,raw,n);
+                        check_legacy(end-n,n,1,CS_MODE_64,false);
+                        check_legacy(end-n+1,n-1,0,CS_MODE_32,false);
+                    }
+                }
+            }
+        }
+    }
+    if (munmap(mapping, 2 * page)) abort();
+}
+#endif
+
 int test_terminal_states(void)
 {
+#if defined(__unix__) || defined(__APPLE__)
+	check_guarded_addresses();
+#endif
 	static const cs_mode modes[] = {
 		CS_MODE_16, CS_MODE_32, CS_MODE_64,
 		CS_MODE_16 | CS_MODE_32, CS_MODE_32 | CS_MODE_64

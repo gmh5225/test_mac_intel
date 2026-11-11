@@ -15,20 +15,18 @@ def run(argv,cwd):
 def verify(w):
     src=w/'source';src.mkdir()
     run(['git','init','-q'],src)
-    run(['git','fetch','-q','--depth=1','https://github.com/NeverSight/capstone','3b4aeea8566a118cca94ef00fb4f16c39c53a29a'],src)
+    run(['git','fetch','-q','--depth=1','https://github.com/NeverSight/capstone','a60be2e71f73739659fd895009263e0f276e9d22'],src)
     run(['git','checkout','-q','--detach','FETCH_HEAD'],src)
-    for f in ('common.patch','fields.patch','prefix.patch'):
+    for f in ('span.patch','header.patch'):
         assert hashlib.sha256((d/f).read_bytes()).hexdigest() == (d/(f+'.sha256')).read_text().strip()
-    run(['git','apply',d/'common.patch'],src)
-    original=(src/x).read_bytes()
     (w/'main.c').write_text('int test_terminal_states(void);\nint main(void) { return test_terminal_states(); }\n')
     with (src/'CMakeLists.txt').open('a') as f:
         f.write('\nadd_executable(terminal_states "'+str(w/'main.c')+'")\ntarget_link_libraries(terminal_states PRIVATE capstone_static)\n')
     b=w/'build'
     run(['cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_BUILD_TYPE=RelWithDebInfo','-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O1 -gline-tables-only -DNDEBUG','-DCMAKE_C_FLAGS=-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fPIE','-DCMAKE_EXE_LINKER_FLAGS=-pie -fsanitize=memory','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_X86_REDUCE='+sys.argv[1]],w)
     reference=None
-    for name in ('base','prefix','fields'):
-        (src/x).write_bytes(original)
+    for name in ('base','span','header'):
+        run(['git','restore','--source=HEAD','--',x,'arch/X86/X86GenLegacyTerminal.inc','suite/synctools/x86_operand_specializations.py'],src)
         if name!='base':run(['git','apply',d/(name+'.patch')],src)
         with (src/x).open('a') as f:f.write('\n#include "'+str(d/'check.c')+'"\n')
         run(['cmake','--build',b,'--parallel','4','--target','terminal_states'],w)
