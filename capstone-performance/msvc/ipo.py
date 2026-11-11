@@ -63,7 +63,7 @@ opt-level=3
     tool.run(['cmake','-S',d,'-B',b,*opts],'driver-config');tool.run(['cmake','--build',b,'--config','Release','--parallel','2'],'driver-build')
     obj,=b.rglob('compare.obj');tool.write('products.json',dict(consumer=tool.digest(obj.read_bytes()),libraries={n:tool.digest(f.read_bytes()) for n,f in cpp.items()}))
     labels=[*cpp,'iced']
-    programs={name:b/'Release'/(name+'.exe') for name in labels}
+    programs={name:b/'Release'/(name+'.exe') for name in cpp}
     assembly={}
     for name,exe in programs.items():
         linker_map,=b.rglob(name+'.map')

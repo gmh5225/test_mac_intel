@@ -38,7 +38,7 @@ def inspect(executable, map_file, evidence):
             continue
         name=sorted(names)[0];seen.update(names)
         end=end_for.get(address,min(starts[i+1],address+32768))
-        listing=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(address),'--stop-address='+hex(end),executable],text=True,errors='replace')
+        listing=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(address),'--stop-address='+hex(min(end,address+320)),executable],text=True,errors='replace')
         lines=[];calls={}
         for line in listing.splitlines():
             match=re.match(r'^\s*([\da-f]+):\s+([a-z][a-z0-9]*)\s*(.*)$',line)
@@ -52,6 +52,6 @@ def inspect(executable, map_file, evidence):
             lines.append(hex(int(match[1],16)-address)+' '+asm)
         assert lines, (name,hex(address),hex(end))
         listing_hash=hashlib.sha256('\n'.join(lines).encode()).hexdigest()
-        result[name]=dict(start=hex(address),span=end-address,decoded=len(lines),unwind_extent=address in end_for,sha256=listing_hash,calls=calls,entry=lines[:35])
+        result[name]=dict(start=hex(address),span=end-address,decoded_prefix_instructions=len(lines),unwind_extent=address in end_for,sha256=listing_hash,calls=calls,entry=lines[:35])
     assert 'cs_disasm_iter' in seen, seen
     return result
