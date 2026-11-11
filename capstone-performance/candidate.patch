@@ -1,55 +1,210 @@
-diff --git a/SStream.c b/SStream.c
-index 0c1ef65e..7d234a88 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -63,13 +63,7 @@ static void SStream_close_markup(SStream *ss)
- 
- void SStream_Init(SStream *ss)
- {
--	assert(ss);
--	ss->index = 0;
--	memset(ss->buffer, 0, sizeof(ss->buffer));
--	ss->is_closed = false;
--	ss->markup_stream = false;
--	ss->prefixed_by_markup = false;
--	ss->unsigned_num = false;
-+	SStream_init_options(ss, false);
+diff --git a/Mapping.c b/Mapping.c
+index 11b3e619..a9c9bfec 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -334,6 +334,19 @@ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size)
+ 	return;
  }
  
- void SStream_opt_unum(SStream *ss, bool print_unsigned_numbers)
-diff --git a/SStream.h b/SStream.h
-index 2c9bc2c3..0260d05e 100644
---- a/SStream.h
-+++ b/SStream.h
-@@ -33,6 +33,17 @@ typedef struct SStream {
- 			return; \
- 	} while (0)
- 
-+static inline void SStream_init_options(SStream *ss, bool unsigned_num)
++// The common mapping order appends to any detail already produced by decoding.
++void map_insn_metadata(MCInst *MI, const insn_map *imap, unsigned int imap_size)
 +{
-+	assert(ss);
-+	ss->index = 0;
-+	memset(ss->buffer, 0, sizeof(ss->buffer));
-+	ss->is_closed = false;
-+	ss->markup_stream = false;
-+	ss->prefixed_by_markup = false;
-+	ss->unsigned_num = unsigned_num;
++	map_cs_id(MI, imap, imap_size);
++#ifndef CAPSTONE_DIET
++	if (MI->flat_insn->detail) {
++		map_implicit_reads(MI, imap);
++		map_implicit_writes(MI, imap);
++		map_groups(MI, imap);
++	}
++#endif
 +}
 +
- void SStream_Init(SStream *ss);
- void SStream_opt_unum(SStream *ss, bool print_unsigned_numbers);
+ /// Returns the operand type information from the
+ /// mapping table for instruction operands.
+ /// Only usable by `auto-sync` archs!
+diff --git a/Mapping.h b/Mapping.h
+index 9f69f881..9f914591 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -124,6 +124,8 @@ void add_group(MCInst *MI, unsigned /* arch_group */ group);
+ void map_groups(MCInst *MI, const insn_map *imap);
  
-diff --git a/cs.c b/cs.c
-index 0a91fe20..76252bdc 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1075,8 +1075,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		} else
+ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size);
++CAPSTONE_INTERNAL void map_insn_metadata(MCInst *MI, const insn_map *imap,
++					 unsigned int imap_size);
+ 
+ const void *map_get_suppl_info(MCInst *MI, const insn_map *imap);
+ 
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index 81b5e334..8f0f8576 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -859,10 +859,7 @@ static void AArch64_add_not_defined_ops(MCInst *MI, const SStream *OS)
+ 
+ void AArch64_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+-	map_implicit_reads(MI, aarch64_insns);
+-	map_implicit_writes(MI, aarch64_insns);
+-	map_groups(MI, aarch64_insns);
++	map_insn_metadata(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+ }
+ 
+ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
+index a4627cb9..a21db021 100644
+--- a/arch/ARC/ARCMapping.c
++++ b/arch/ARC/ARCMapping.c
+@@ -135,10 +135,7 @@ const insn_map arc_insns[] = {
+ 
+ void ARC_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, arc_insns, ARR_SIZE(arc_insns));
+-	map_implicit_reads(MI, arc_insns);
+-	map_implicit_writes(MI, arc_insns);
+-	map_groups(MI, arc_insns);
++	map_insn_metadata(MI, arc_insns, ARR_SIZE(arc_insns));
+ }
+ 
+ bool ARC_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 8f2a2961..85fe7685 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -836,6 +836,8 @@ void ARM_check_updates_flags(MCInst *MI)
+ void ARM_set_instr_map_data(MCInst *MI)
+ {
+ 	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, arm_insns);
+ 	map_implicit_writes(MI, arm_insns);
+ 	ARM_check_updates_flags(MI);
+diff --git a/arch/Alpha/AlphaMapping.c b/arch/Alpha/AlphaMapping.c
+index a2d5d133..2a497252 100644
+--- a/arch/Alpha/AlphaMapping.c
++++ b/arch/Alpha/AlphaMapping.c
+@@ -171,10 +171,7 @@ void Alpha_printInst(MCInst *MI, SStream *O, void *Info)
+ 
+ void Alpha_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, insns, ARR_SIZE(insns));
+-	map_implicit_reads(MI, insns);
+-	map_implicit_writes(MI, insns);
+-	map_groups(MI, insns);
++	map_insn_metadata(MI, insns, ARR_SIZE(insns));
+ }
+ 
+ bool Alpha_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
+index 52c46bbf..7b21b009 100644
+--- a/arch/LoongArch/LoongArchMapping.c
++++ b/arch/LoongArch/LoongArchMapping.c
+@@ -376,10 +376,7 @@ void LoongArch_rewrite_address_operand(MCInst *MI)
+ 
+ void LoongArch_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
+-	map_implicit_reads(MI, loongarch_insns);
+-	map_implicit_writes(MI, loongarch_insns);
+-	map_groups(MI, loongarch_insns);
++	map_insn_metadata(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
+ 	const loongarch_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, loongarch_insns);
+ 	if (suppl_info) {
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 57d3b638..dd5bd6c2 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -252,10 +252,7 @@ void Mips_set_instr_map_data(MCInst *MI)
+ 		}
+ 	}
+ 
+-	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
+-	map_implicit_reads(MI, mips_insns);
+-	map_implicit_writes(MI, mips_insns);
+-	map_groups(MI, mips_insns);
++	map_insn_metadata(MI, mips_insns, ARR_SIZE(mips_insns));
+ #ifndef CAPSTONE_DIET
+ 	if ((MI->csh->mode & CS_MODE_MIPS16) && detail_is_set(MI)) {
+ 		cs_detail *detail = get_detail(MI);
+diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
+index fd26a73a..1a495f35 100644
+--- a/arch/PowerPC/PPCMapping.c
++++ b/arch/PowerPC/PPCMapping.c
+@@ -290,10 +290,7 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
+ 
+ void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
+ {
+-	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
+-	map_implicit_reads(MI, ppc_insns);
+-	map_implicit_writes(MI, ppc_insns);
+-	map_groups(MI, ppc_insns);
++	map_insn_metadata(MI, ppc_insns, ARR_SIZE(ppc_insns));
+ 	PPC_add_branch_predicates(MI, Bytes, BytesLen);
+ 	PPC_check_updates_cr0(MI);
+ 	const ppc_suppl_info *suppl_info = map_get_suppl_info(MI, ppc_insns);
+diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
+index 6c945c17..6b7abe94 100644
+--- a/arch/Sparc/SparcMapping.c
++++ b/arch/Sparc/SparcMapping.c
+@@ -33,10 +33,7 @@ const insn_map sparc_insns[] = {
+ 
+ void Sparc_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
+-	map_implicit_reads(MI, sparc_insns);
+-	map_implicit_writes(MI, sparc_insns);
+-	map_groups(MI, sparc_insns);
++	map_insn_metadata(MI, sparc_insns, ARR_SIZE(sparc_insns));
+ 	const sparc_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, sparc_insns);
+ 	if (suppl_info) {
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 0e42613c..8d488d93 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -42,10 +42,7 @@ const insn_map systemz_insns[] = {
+ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 				size_t BytesLen)
+ {
+-	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
+-	map_implicit_reads(MI, systemz_insns);
+-	map_implicit_writes(MI, systemz_insns);
+-	map_groups(MI, systemz_insns);
++	map_insn_metadata(MI, systemz_insns, ARR_SIZE(systemz_insns));
+ 	const systemz_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, systemz_insns);
+ 	if (suppl_info) {
+diff --git a/arch/TriCore/TriCoreMapping.c b/arch/TriCore/TriCoreMapping.c
+index 223b44d7..3e919403 100644
+--- a/arch/TriCore/TriCoreMapping.c
++++ b/arch/TriCore/TriCoreMapping.c
+@@ -67,10 +67,7 @@ static inline void check_updates_flags(MCInst *MI)
+ static void set_instr_map_data(MCInst *MI)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_cs_id(MI, mapping_insns, ARR_SIZE(mapping_insns));
+-	map_implicit_reads(MI, mapping_insns);
+-	map_implicit_writes(MI, mapping_insns);
+-	map_groups(MI, mapping_insns);
++	map_insn_metadata(MI, mapping_insns, ARR_SIZE(mapping_insns));
+ 	check_updates_flags(MI);
  #endif
- 		{
--			SStream_Init(&ss);
--			SStream_opt_unum(&ss, handle->imm_unsigned);
-+			SStream_init_options(&ss, handle->imm_unsigned);
- 			handle->printer(&mci, &ss, handle->printer_info);
- 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
- 				  code, false);
+ }
+diff --git a/arch/Xtensa/XtensaMapping.c b/arch/Xtensa/XtensaMapping.c
+index 8a0055ff..f52c4341 100644
+--- a/arch/Xtensa/XtensaMapping.c
++++ b/arch/Xtensa/XtensaMapping.c
+@@ -55,10 +55,7 @@ void Xtensa_printer(MCInst *MI, SStream *OS, void *info)
+ static void set_instr_map_data(MCInst *MI)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_cs_id(MI, mapping_insns, ARR_SIZE(mapping_insns));
+-	map_implicit_reads(MI, mapping_insns);
+-	map_implicit_writes(MI, mapping_insns);
+-	map_groups(MI, mapping_insns);
++	map_insn_metadata(MI, mapping_insns, ARR_SIZE(mapping_insns));
+ 
+ 	const xtensa_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, mapping_insns);
