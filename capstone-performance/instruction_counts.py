@@ -14,8 +14,8 @@ from run import command, fetch, sha
 
 SOURCE = Path(__file__).resolve().parent
 EVIDENCE = SOURCE.parent / 'capstone-evidence'
-MODES = ('scan', 'format', 'detail')
-LIBS = ('capstone', 'iced')
+MODES = ('format', 'detail')
+LIBS = ('base', 'pairs', 'switch', 'iced')
 RESULT_FIELDS = ('instructions', 'rejected', 'boundary_hash', 'value_hash')
 
 
@@ -58,9 +58,20 @@ panic = "abort"
 ''')
     command(['cargo', 'build', '--locked', '--release', '--manifest-path', adapter / 'Cargo.toml'], 'build-iced')
     binary = root / 'compare'
-    command(['clang++', '-O3', '-gline-tables-only', '-DNDEBUG', '-std=c++17',
-             '-I', capstone / 'include', SOURCE / 'compare.cpp', build / 'libcapstone.a',
-             adapter / 'target/release/libiced_compare.a', '-lpthread', '-ldl', '-lm', '-o', binary], 'consumer')
+    obj = root/'consumer.o'
+    command(['clang++','-O3','-gline-tables-only','-DNDEBUG','-std=c++17','-I',capstone/'include','-c',SOURCE/'compare.cpp','-o',obj], 'consumer-object')
+    programs={}
+    for label in ('base','pairs','switch'):
+        if label!='base':
+            patch=SOURCE/(label+'.patch')
+            assert sha(patch)==manifest['controlled_patches'][label]
+            command(['git','apply',patch],label+'-apply',capstone)
+        command(['cmake','--build',build,'--target','capstone_static','--parallel','4'],label+'-build')
+        command(['clang++',obj,build/'libcapstone.a',adapter/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',binary],label+'-link')
+        programs[label]=root/('compare-'+label);shutil.copyfile(binary,programs[label]);programs[label].chmod(0o755)
+        if label!='base':command(['git','apply','-R',patch],label+'-restore',capstone)
+    programs['iced']=programs['base']
+    write('code.json',dict(patches=manifest['controlled_patches'],consumer=sha(obj),binaries={k:sha(v) for k,v in programs.items()}))
     selected = ('putty-32-0.85', 'putty-64-0.85', 'amd64-ls')
     inputs = root / 'inputs'
     inputs.mkdir()
@@ -81,12 +92,13 @@ panic = "abort"
                               iced=manifest['iced_revision'], binary_sha256=sha(binary), cases=cases))
     results = []
     for case in cases:
+        if case["name"] not in ("putty-32-0.85","putty64-common-functions","amd64-ls","scalar32","simd64"): continue
         for mode in MODES:
             common = []
             for library in LIBS:
                 label = f"{case['name']}-{mode}-{library}"
                 def args(n):
-                    return [str(binary), library, mode, str(case['selector']), str(n), case['path']]
+                    return [str(programs[library]), "iced" if library == "iced" else "capstone", mode, str(case['selector']), str(n), case['path']]
                 first = json.loads(sp.check_output(args(1)))
                 # The repeat count is fixed by input size and equal for both adapters.
                 repeats = max(1, math.ceil(90000 / Path(case['path']).stat().st_size))
@@ -117,11 +129,14 @@ panic = "abort"
                                     native=plain, events=dict(zip(events, totals))))
                 write('counts.json', results)
                 print(label, seen['instructions'], totals[events.index('Ir')], flush=True)
-            agrees = common[0] == common[1]
-            for row in results[-2:]:
+            group=results[-len(LIBS):]
+            assert all(tuple(row['output'][key] for key in RESULT_FIELDS)==tuple(group[0]['output'][key] for key in RESULT_FIELDS) for row in group[:-1])
+            assert common[0]==common[1]==common[2]
+            agrees=common[0]==common[-1]
+            for row in group:
                 row['same_boundaries'] = agrees
             write('counts.json', results)
-    assert len(results) == 42
+    assert len(results) == 40
 
 if __name__ == '__main__':
     assert platform.system() == 'Linux' and platform.machine() == 'x86_64'

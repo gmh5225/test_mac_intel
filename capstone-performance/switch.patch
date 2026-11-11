@@ -1,0 +1,579 @@
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5627f249..67ecf08a 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -2512,90 +2512,176 @@ static int decodeLegacyFullShape81(struct InternalInstruction *insn, MCInst *mcI
+ 		return X86_SCAN_INVALID;
+ 	return X86_DECODE_OPERANDS_READY;
+ }
+-static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {
+-	NULL,
+-	decodeLegacyFullShape1,
+-	decodeLegacyFullShape2,
+-	decodeLegacyFullShape3,
+-	decodeLegacyFullShape4,
+-	decodeLegacyFullShape5,
+-	decodeLegacyFullShape6,
+-	decodeLegacyFullShape7,
+-	decodeLegacyFullShape8,
+-	decodeLegacyFullShape9,
+-	decodeLegacyFullShape10,
+-	decodeLegacyFullShape11,
+-	decodeLegacyFullShape12,
+-	decodeLegacyFullShape13,
+-	decodeLegacyFullShape14,
+-	decodeLegacyFullShape15,
+-	decodeLegacyFullShape16,
+-	decodeLegacyFullShape17,
+-	decodeLegacyFullShape18,
+-	decodeLegacyFullShape19,
+-	decodeLegacyFullShape20,
+-	decodeLegacyFullShape21,
+-	decodeLegacyFullShape22,
+-	decodeLegacyFullShape23,
+-	decodeLegacyFullShape24,
+-	decodeLegacyFullShape25,
+-	decodeLegacyFullShape26,
+-	decodeLegacyFullShape27,
+-	decodeLegacyFullShape28,
+-	decodeLegacyFullShape29,
+-	decodeLegacyFullShape30,
+-	decodeLegacyFullShape31,
+-	decodeLegacyFullShape32,
+-	decodeLegacyFullShape33,
+-	decodeLegacyFullShape34,
+-	decodeLegacyFullShape35,
+-	decodeLegacyFullShape36,
+-	decodeLegacyFullShape37,
+-	decodeLegacyFullShape38,
+-	decodeLegacyFullShape39,
+-	decodeLegacyFullShape40,
+-	decodeLegacyFullShape41,
+-	decodeLegacyFullShape42,
+-	decodeLegacyFullShape43,
+-	decodeLegacyFullShape44,
+-	decodeLegacyFullShape45,
+-	decodeLegacyFullShape46,
+-	decodeLegacyFullShape47,
+-	decodeLegacyFullShape48,
+-	decodeLegacyFullShape49,
+-	decodeLegacyFullShape50,
+-	decodeLegacyFullShape51,
+-	decodeLegacyFullShape52,
+-	decodeLegacyFullShape53,
+-	decodeLegacyFullShape54,
+-	decodeLegacyFullShape55,
+-	decodeLegacyFullShape56,
+-	decodeLegacyFullShape57,
+-	decodeLegacyFullShape58,
+-	decodeLegacyFullShape59,
+-	decodeLegacyFullShape60,
+-	decodeLegacyFullShape61,
+-	decodeLegacyFullShape62,
+-	decodeLegacyFullShape63,
+-	decodeLegacyFullShape64,
+-	decodeLegacyFullShape65,
+-	decodeLegacyFullShape66,
+-	decodeLegacyFullShape67,
+-	decodeLegacyFullShape68,
+-	decodeLegacyFullShape69,
+-	decodeLegacyFullShape70,
+-	decodeLegacyFullShape71,
+-	decodeLegacyFullShape72,
+-	decodeLegacyFullShape73,
+-	decodeLegacyFullShape74,
+-	decodeLegacyFullShape75,
+-	decodeLegacyFullShape76,
+-	decodeLegacyFullShape77,
+-	decodeLegacyFullShape78,
+-	decodeLegacyFullShape79,
+-	decodeLegacyFullShape80,
+-	decodeLegacyFullShape81,
+-};
++static int decodeLegacyFullOperands(struct InternalInstruction *insn,
++		MCInst *mcInst, uint16_t *size, unsigned handler)
++{
++	switch (handler) {
++	case 1:
++		return decodeLegacyFullShape1(insn, mcInst, size);
++	case 2:
++		return decodeLegacyFullShape2(insn, mcInst, size);
++	case 3:
++		return decodeLegacyFullShape3(insn, mcInst, size);
++	case 4:
++		return decodeLegacyFullShape4(insn, mcInst, size);
++	case 5:
++		return decodeLegacyFullShape5(insn, mcInst, size);
++	case 6:
++		return decodeLegacyFullShape6(insn, mcInst, size);
++	case 7:
++		return decodeLegacyFullShape7(insn, mcInst, size);
++	case 8:
++		return decodeLegacyFullShape8(insn, mcInst, size);
++	case 9:
++		return decodeLegacyFullShape9(insn, mcInst, size);
++	case 10:
++		return decodeLegacyFullShape10(insn, mcInst, size);
++	case 11:
++		return decodeLegacyFullShape11(insn, mcInst, size);
++	case 12:
++		return decodeLegacyFullShape12(insn, mcInst, size);
++	case 13:
++		return decodeLegacyFullShape13(insn, mcInst, size);
++	case 14:
++		return decodeLegacyFullShape14(insn, mcInst, size);
++	case 15:
++		return decodeLegacyFullShape15(insn, mcInst, size);
++	case 16:
++		return decodeLegacyFullShape16(insn, mcInst, size);
++	case 17:
++		return decodeLegacyFullShape17(insn, mcInst, size);
++	case 18:
++		return decodeLegacyFullShape18(insn, mcInst, size);
++	case 19:
++		return decodeLegacyFullShape19(insn, mcInst, size);
++	case 20:
++		return decodeLegacyFullShape20(insn, mcInst, size);
++	case 21:
++		return decodeLegacyFullShape21(insn, mcInst, size);
++	case 22:
++		return decodeLegacyFullShape22(insn, mcInst, size);
++	case 23:
++		return decodeLegacyFullShape23(insn, mcInst, size);
++	case 24:
++		return decodeLegacyFullShape24(insn, mcInst, size);
++	case 25:
++		return decodeLegacyFullShape25(insn, mcInst, size);
++	case 26:
++		return decodeLegacyFullShape26(insn, mcInst, size);
++	case 27:
++		return decodeLegacyFullShape27(insn, mcInst, size);
++	case 28:
++		return decodeLegacyFullShape28(insn, mcInst, size);
++	case 29:
++		return decodeLegacyFullShape29(insn, mcInst, size);
++	case 30:
++		return decodeLegacyFullShape30(insn, mcInst, size);
++	case 31:
++		return decodeLegacyFullShape31(insn, mcInst, size);
++	case 32:
++		return decodeLegacyFullShape32(insn, mcInst, size);
++	case 33:
++		return decodeLegacyFullShape33(insn, mcInst, size);
++	case 34:
++		return decodeLegacyFullShape34(insn, mcInst, size);
++	case 35:
++		return decodeLegacyFullShape35(insn, mcInst, size);
++	case 36:
++		return decodeLegacyFullShape36(insn, mcInst, size);
++	case 37:
++		return decodeLegacyFullShape37(insn, mcInst, size);
++	case 38:
++		return decodeLegacyFullShape38(insn, mcInst, size);
++	case 39:
++		return decodeLegacyFullShape39(insn, mcInst, size);
++	case 40:
++		return decodeLegacyFullShape40(insn, mcInst, size);
++	case 41:
++		return decodeLegacyFullShape41(insn, mcInst, size);
++	case 42:
++		return decodeLegacyFullShape42(insn, mcInst, size);
++	case 43:
++		return decodeLegacyFullShape43(insn, mcInst, size);
++	case 44:
++		return decodeLegacyFullShape44(insn, mcInst, size);
++	case 45:
++		return decodeLegacyFullShape45(insn, mcInst, size);
++	case 46:
++		return decodeLegacyFullShape46(insn, mcInst, size);
++	case 47:
++		return decodeLegacyFullShape47(insn, mcInst, size);
++	case 48:
++		return decodeLegacyFullShape48(insn, mcInst, size);
++	case 49:
++		return decodeLegacyFullShape49(insn, mcInst, size);
++	case 50:
++		return decodeLegacyFullShape50(insn, mcInst, size);
++	case 51:
++		return decodeLegacyFullShape51(insn, mcInst, size);
++	case 52:
++		return decodeLegacyFullShape52(insn, mcInst, size);
++	case 53:
++		return decodeLegacyFullShape53(insn, mcInst, size);
++	case 54:
++		return decodeLegacyFullShape54(insn, mcInst, size);
++	case 55:
++		return decodeLegacyFullShape55(insn, mcInst, size);
++	case 56:
++		return decodeLegacyFullShape56(insn, mcInst, size);
++	case 57:
++		return decodeLegacyFullShape57(insn, mcInst, size);
++	case 58:
++		return decodeLegacyFullShape58(insn, mcInst, size);
++	case 59:
++		return decodeLegacyFullShape59(insn, mcInst, size);
++	case 60:
++		return decodeLegacyFullShape60(insn, mcInst, size);
++	case 61:
++		return decodeLegacyFullShape61(insn, mcInst, size);
++	case 62:
++		return decodeLegacyFullShape62(insn, mcInst, size);
++	case 63:
++		return decodeLegacyFullShape63(insn, mcInst, size);
++	case 64:
++		return decodeLegacyFullShape64(insn, mcInst, size);
++	case 65:
++		return decodeLegacyFullShape65(insn, mcInst, size);
++	case 66:
++		return decodeLegacyFullShape66(insn, mcInst, size);
++	case 67:
++		return decodeLegacyFullShape67(insn, mcInst, size);
++	case 68:
++		return decodeLegacyFullShape68(insn, mcInst, size);
++	case 69:
++		return decodeLegacyFullShape69(insn, mcInst, size);
++	case 70:
++		return decodeLegacyFullShape70(insn, mcInst, size);
++	case 71:
++		return decodeLegacyFullShape71(insn, mcInst, size);
++	case 72:
++		return decodeLegacyFullShape72(insn, mcInst, size);
++	case 73:
++		return decodeLegacyFullShape73(insn, mcInst, size);
++	case 74:
++		return decodeLegacyFullShape74(insn, mcInst, size);
++	case 75:
++		return decodeLegacyFullShape75(insn, mcInst, size);
++	case 76:
++		return decodeLegacyFullShape76(insn, mcInst, size);
++	case 77:
++		return decodeLegacyFullShape77(insn, mcInst, size);
++	case 78:
++		return decodeLegacyFullShape78(insn, mcInst, size);
++	case 79:
++		return decodeLegacyFullShape79(insn, mcInst, size);
++	case 80:
++		return decodeLegacyFullShape80(insn, mcInst, size);
++	case 81:
++		return decodeLegacyFullShape81(insn, mcInst, size);
++	default:
++		return X86_SCAN_INVALID;
++	}
++}
+ 
+ X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 		uint16_t *size, unsigned int handler)
+@@ -7126,7 +7212,7 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+ 	if (mcInst)
+-		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
++		return decodeLegacyFullOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
+ }
+ #else
+@@ -9639,90 +9725,176 @@ static int decodeLegacyFullShape81(struct InternalInstruction *insn, MCInst *mcI
+ 		return X86_SCAN_INVALID;
+ 	return X86_DECODE_OPERANDS_READY;
+ }
+-static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {
+-	NULL,
+-	decodeLegacyFullShape1,
+-	decodeLegacyFullShape2,
+-	decodeLegacyFullShape3,
+-	decodeLegacyFullShape4,
+-	decodeLegacyFullShape5,
+-	decodeLegacyFullShape6,
+-	decodeLegacyFullShape7,
+-	decodeLegacyFullShape8,
+-	decodeLegacyFullShape9,
+-	decodeLegacyFullShape10,
+-	decodeLegacyFullShape11,
+-	decodeLegacyFullShape12,
+-	decodeLegacyFullShape13,
+-	decodeLegacyFullShape14,
+-	decodeLegacyFullShape15,
+-	decodeLegacyFullShape16,
+-	decodeLegacyFullShape17,
+-	decodeLegacyFullShape18,
+-	decodeLegacyFullShape19,
+-	decodeLegacyFullShape20,
+-	decodeLegacyFullShape21,
+-	decodeLegacyFullShape22,
+-	decodeLegacyFullShape23,
+-	decodeLegacyFullShape24,
+-	decodeLegacyFullShape25,
+-	decodeLegacyFullShape26,
+-	decodeLegacyFullShape27,
+-	decodeLegacyFullShape28,
+-	decodeLegacyFullShape29,
+-	decodeLegacyFullShape30,
+-	decodeLegacyFullShape31,
+-	decodeLegacyFullShape32,
+-	decodeLegacyFullShape33,
+-	decodeLegacyFullShape34,
+-	decodeLegacyFullShape35,
+-	decodeLegacyFullShape36,
+-	decodeLegacyFullShape37,
+-	decodeLegacyFullShape38,
+-	decodeLegacyFullShape39,
+-	decodeLegacyFullShape40,
+-	decodeLegacyFullShape41,
+-	decodeLegacyFullShape42,
+-	decodeLegacyFullShape43,
+-	decodeLegacyFullShape44,
+-	decodeLegacyFullShape45,
+-	decodeLegacyFullShape46,
+-	decodeLegacyFullShape47,
+-	decodeLegacyFullShape48,
+-	decodeLegacyFullShape49,
+-	decodeLegacyFullShape50,
+-	decodeLegacyFullShape51,
+-	decodeLegacyFullShape52,
+-	decodeLegacyFullShape53,
+-	decodeLegacyFullShape54,
+-	decodeLegacyFullShape55,
+-	decodeLegacyFullShape56,
+-	decodeLegacyFullShape57,
+-	decodeLegacyFullShape58,
+-	decodeLegacyFullShape59,
+-	decodeLegacyFullShape60,
+-	decodeLegacyFullShape61,
+-	decodeLegacyFullShape62,
+-	decodeLegacyFullShape63,
+-	decodeLegacyFullShape64,
+-	decodeLegacyFullShape65,
+-	decodeLegacyFullShape66,
+-	decodeLegacyFullShape67,
+-	decodeLegacyFullShape68,
+-	decodeLegacyFullShape69,
+-	decodeLegacyFullShape70,
+-	decodeLegacyFullShape71,
+-	decodeLegacyFullShape72,
+-	decodeLegacyFullShape73,
+-	decodeLegacyFullShape74,
+-	decodeLegacyFullShape75,
+-	decodeLegacyFullShape76,
+-	decodeLegacyFullShape77,
+-	decodeLegacyFullShape78,
+-	decodeLegacyFullShape79,
+-	decodeLegacyFullShape80,
+-	decodeLegacyFullShape81,
+-};
++static int decodeLegacyFullOperands(struct InternalInstruction *insn,
++		MCInst *mcInst, uint16_t *size, unsigned handler)
++{
++	switch (handler) {
++	case 1:
++		return decodeLegacyFullShape1(insn, mcInst, size);
++	case 2:
++		return decodeLegacyFullShape2(insn, mcInst, size);
++	case 3:
++		return decodeLegacyFullShape3(insn, mcInst, size);
++	case 4:
++		return decodeLegacyFullShape4(insn, mcInst, size);
++	case 5:
++		return decodeLegacyFullShape5(insn, mcInst, size);
++	case 6:
++		return decodeLegacyFullShape6(insn, mcInst, size);
++	case 7:
++		return decodeLegacyFullShape7(insn, mcInst, size);
++	case 8:
++		return decodeLegacyFullShape8(insn, mcInst, size);
++	case 9:
++		return decodeLegacyFullShape9(insn, mcInst, size);
++	case 10:
++		return decodeLegacyFullShape10(insn, mcInst, size);
++	case 11:
++		return decodeLegacyFullShape11(insn, mcInst, size);
++	case 12:
++		return decodeLegacyFullShape12(insn, mcInst, size);
++	case 13:
++		return decodeLegacyFullShape13(insn, mcInst, size);
++	case 14:
++		return decodeLegacyFullShape14(insn, mcInst, size);
++	case 15:
++		return decodeLegacyFullShape15(insn, mcInst, size);
++	case 16:
++		return decodeLegacyFullShape16(insn, mcInst, size);
++	case 17:
++		return decodeLegacyFullShape17(insn, mcInst, size);
++	case 18:
++		return decodeLegacyFullShape18(insn, mcInst, size);
++	case 19:
++		return decodeLegacyFullShape19(insn, mcInst, size);
++	case 20:
++		return decodeLegacyFullShape20(insn, mcInst, size);
++	case 21:
++		return decodeLegacyFullShape21(insn, mcInst, size);
++	case 22:
++		return decodeLegacyFullShape22(insn, mcInst, size);
++	case 23:
++		return decodeLegacyFullShape23(insn, mcInst, size);
++	case 24:
++		return decodeLegacyFullShape24(insn, mcInst, size);
++	case 25:
++		return decodeLegacyFullShape25(insn, mcInst, size);
++	case 26:
++		return decodeLegacyFullShape26(insn, mcInst, size);
++	case 27:
++		return decodeLegacyFullShape27(insn, mcInst, size);
++	case 28:
++		return decodeLegacyFullShape28(insn, mcInst, size);
++	case 29:
++		return decodeLegacyFullShape29(insn, mcInst, size);
++	case 30:
++		return decodeLegacyFullShape30(insn, mcInst, size);
++	case 31:
++		return decodeLegacyFullShape31(insn, mcInst, size);
++	case 32:
++		return decodeLegacyFullShape32(insn, mcInst, size);
++	case 33:
++		return decodeLegacyFullShape33(insn, mcInst, size);
++	case 34:
++		return decodeLegacyFullShape34(insn, mcInst, size);
++	case 35:
++		return decodeLegacyFullShape35(insn, mcInst, size);
++	case 36:
++		return decodeLegacyFullShape36(insn, mcInst, size);
++	case 37:
++		return decodeLegacyFullShape37(insn, mcInst, size);
++	case 38:
++		return decodeLegacyFullShape38(insn, mcInst, size);
++	case 39:
++		return decodeLegacyFullShape39(insn, mcInst, size);
++	case 40:
++		return decodeLegacyFullShape40(insn, mcInst, size);
++	case 41:
++		return decodeLegacyFullShape41(insn, mcInst, size);
++	case 42:
++		return decodeLegacyFullShape42(insn, mcInst, size);
++	case 43:
++		return decodeLegacyFullShape43(insn, mcInst, size);
++	case 44:
++		return decodeLegacyFullShape44(insn, mcInst, size);
++	case 45:
++		return decodeLegacyFullShape45(insn, mcInst, size);
++	case 46:
++		return decodeLegacyFullShape46(insn, mcInst, size);
++	case 47:
++		return decodeLegacyFullShape47(insn, mcInst, size);
++	case 48:
++		return decodeLegacyFullShape48(insn, mcInst, size);
++	case 49:
++		return decodeLegacyFullShape49(insn, mcInst, size);
++	case 50:
++		return decodeLegacyFullShape50(insn, mcInst, size);
++	case 51:
++		return decodeLegacyFullShape51(insn, mcInst, size);
++	case 52:
++		return decodeLegacyFullShape52(insn, mcInst, size);
++	case 53:
++		return decodeLegacyFullShape53(insn, mcInst, size);
++	case 54:
++		return decodeLegacyFullShape54(insn, mcInst, size);
++	case 55:
++		return decodeLegacyFullShape55(insn, mcInst, size);
++	case 56:
++		return decodeLegacyFullShape56(insn, mcInst, size);
++	case 57:
++		return decodeLegacyFullShape57(insn, mcInst, size);
++	case 58:
++		return decodeLegacyFullShape58(insn, mcInst, size);
++	case 59:
++		return decodeLegacyFullShape59(insn, mcInst, size);
++	case 60:
++		return decodeLegacyFullShape60(insn, mcInst, size);
++	case 61:
++		return decodeLegacyFullShape61(insn, mcInst, size);
++	case 62:
++		return decodeLegacyFullShape62(insn, mcInst, size);
++	case 63:
++		return decodeLegacyFullShape63(insn, mcInst, size);
++	case 64:
++		return decodeLegacyFullShape64(insn, mcInst, size);
++	case 65:
++		return decodeLegacyFullShape65(insn, mcInst, size);
++	case 66:
++		return decodeLegacyFullShape66(insn, mcInst, size);
++	case 67:
++		return decodeLegacyFullShape67(insn, mcInst, size);
++	case 68:
++		return decodeLegacyFullShape68(insn, mcInst, size);
++	case 69:
++		return decodeLegacyFullShape69(insn, mcInst, size);
++	case 70:
++		return decodeLegacyFullShape70(insn, mcInst, size);
++	case 71:
++		return decodeLegacyFullShape71(insn, mcInst, size);
++	case 72:
++		return decodeLegacyFullShape72(insn, mcInst, size);
++	case 73:
++		return decodeLegacyFullShape73(insn, mcInst, size);
++	case 74:
++		return decodeLegacyFullShape74(insn, mcInst, size);
++	case 75:
++		return decodeLegacyFullShape75(insn, mcInst, size);
++	case 76:
++		return decodeLegacyFullShape76(insn, mcInst, size);
++	case 77:
++		return decodeLegacyFullShape77(insn, mcInst, size);
++	case 78:
++		return decodeLegacyFullShape78(insn, mcInst, size);
++	case 79:
++		return decodeLegacyFullShape79(insn, mcInst, size);
++	case 80:
++		return decodeLegacyFullShape80(insn, mcInst, size);
++	case 81:
++		return decodeLegacyFullShape81(insn, mcInst, size);
++	default:
++		return X86_SCAN_INVALID;
++	}
++}
+ 
+ X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 		uint16_t *size, unsigned int handler)
+@@ -14457,7 +14629,7 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+ 	if (mcInst)
+-		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
++		return decodeLegacyFullOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
+ }
+ #endif
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index dbb25f26..f4fefe06 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -859,11 +859,17 @@ def emit_full_legacy_handlers(groups):
+         )
+         lines += ["\treturn X86_DECODE_OPERANDS_READY;", "}"]
+     lines += [
+-        "static int (*const x86LegacyFullHandlers[])(struct InternalInstruction *, MCInst *, uint16_t *) = {",
+-        "\tNULL,",
++        "static int decodeLegacyFullOperands(struct InternalInstruction *insn,",
++        "\t\tMCInst *mcInst, uint16_t *size, unsigned handler)",
++        "{",
++        "\tswitch (handler) {",
+     ]
+-    lines += [f"\tdecodeLegacyFullShape{handler}," for handler in groups.values()]
+-    lines += ["};", ""]
++    for handler in groups.values():
++        lines += [
++            f"\tcase {handler}:",
++            f"\t\treturn decodeLegacyFullShape{handler}(insn, mcInst, size);",
++        ]
++    lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}", ""]
+     return lines
+ 
+ 
+@@ -974,7 +980,7 @@ def emit_terminal(suffix):
+         "\t\treturn scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+         "\tinsn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];",
+         "\tif (mcInst)",
+-        "\t\treturn x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);",
++        "\t\treturn decodeLegacyFullOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+         "\treturn x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);",
+         "}",
+     ]
