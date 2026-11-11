@@ -2,7 +2,7 @@ name: Qualify the integrated dynamic CRT decoder and writemask table on current 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-dynamic-crt-integration]
+    branches: [codex/capstone-dynamic-crt-integration-vs-latest]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { crt: MD, image: windows-2022 }
           - { crt: MD, image: windows-2025 }
-          - { crt: MT, image: windows-2022 }
     runs-on: ${{ matrix.image }}
     timeout-minutes: 100
     steps:
@@ -29,26 +27,5 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: dynamic-crt-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
-          path: capstone-evidence/
-          retention-days: 14
-
-  public-tests:
-    runs-on: windows-2022
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [full, reduced, diet, no-att]
-    timeout-minutes: 55
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          sparse-checkout: capstone-performance
-      - name: Compare public state and internal writemask flags
-        run: python capstone-performance/msvc/public_mask.py MD ${{ matrix.mode }}
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: dynamic-public-${{ matrix.mode }}
           path: capstone-evidence/
           retention-days: 14

@@ -30,7 +30,7 @@ opt-level=3
         tool.run(['cargo','build','--release','--locked','--target-dir',dest,'--manifest-path',adapter/'Cargo.toml'],'rust-'+name)
         rs[name]=dest/'release/iced_compare.lib'
     cpp={}
-    opts=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'+('DLL' if tool.crt=='MD' else '')]
+    opts=['-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'+('DLL' if tool.crt=='MD' else '')]
     def apply(name, reverse=False):
         path=s/name
         assert hashlib.sha256(path.read_bytes()).hexdigest()==tool.manifest['source_lineage'][name]['sha256']
