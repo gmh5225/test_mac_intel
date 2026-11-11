@@ -92,8 +92,15 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         programs[label]=keep
         if label=='new':
             # Restore only the public iterator entry from the exact published base.
-            shutil.copy2(base/'cs_disasm_internal.h',tree/'cs_disasm_internal.h')
+            restored_header = (base/'cs_disasm_internal.h').read_bytes()
+            target_header = tree/'cs_disasm_internal.h'
+            assert target_header.read_bytes() != restored_header
+            object_dir = build/'capstone.dir'/'Release'
+            cs_obj, = object_dir.rglob('cs.obj')
+            before = digest(cs_obj.read_bytes())
+            target_header.write_bytes(restored_header)
             build_targets('-original-iterator','native_single')
+            assert digest(cs_obj.read_bytes()) != before
             restored=WORK/'restored.exe'
             shutil.copy2(timed,restored)
             compiled['restored']=digest(restored.read_bytes());programs['restored']=restored
