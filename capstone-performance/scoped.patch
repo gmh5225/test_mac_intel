@@ -18019,7 +18019,7 @@ index c5f2c531..c619e116 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..92250544 100644
+index df60fd3f..aab4c774 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10163,19 +10163,30 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -18060,7 +18060,7 @@ index df60fd3f..92250544 100644
  
  #ifndef CAPSTONE_DIET
  // in arr, replace r1 = r2
-@@ -10192,17 +10203,32 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
+@@ -10192,17 +10203,36 @@ static void arr_replace(uint16_t *arr, uint8_t max, x86_reg r1, x86_reg r2)
  }
  #endif
  
@@ -18068,9 +18068,12 @@ index df60fd3f..92250544 100644
 -// return -1 if not found
 +/* Dense tables encode their internal IDs in the row order. Sparse tables
 + * keep that search key separate from the public ID and detail index. */
++#if !CS_NATIVE_MSVC
++#define mapping_opcode(index) (insns[(index)].id)
++#else
 +static inline unsigned int mapping_opcode(unsigned int index)
 +{
-+#if !CS_NATIVE_MSVC || defined(CAPSTONE_DIET)
++#ifdef CAPSTONE_DIET
 +	return insns[index].id;
 +#elif defined(X86_FIRST_DENSE_MAPPING)
 +	return X86_FIRST_DENSE_MAPPING + index;
@@ -18078,6 +18081,7 @@ index df60fd3f..92250544 100644
 +	return x86_mapping_ids[index];
 +#endif
 +}
++#endif
 +
  unsigned int find_insn(unsigned int id)
  {
@@ -18096,7 +18100,7 @@ index df60fd3f..92250544 100644
  		// not found
  		return -1;
  
-@@ -10210,11 +10236,11 @@ unsigned int find_insn(unsigned int id)
+@@ -10210,11 +10240,11 @@ unsigned int find_insn(unsigned int id)
  
  	while (left <= right) {
  		m = (left + right) / 2;
@@ -18110,7 +18114,7 @@ index df60fd3f..92250544 100644
  			right = m - 1;
  		else
  			left = m + 1;
-@@ -10223,6 +10249,7 @@ unsigned int find_insn(unsigned int id)
+@@ -10223,6 +10253,7 @@ unsigned int find_insn(unsigned int id)
  	// not found
  	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
  	return -1;
@@ -18118,7 +18122,7 @@ index df60fd3f..92250544 100644
  }
  
  static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
-@@ -10233,8 +10260,18 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+@@ -10233,8 +10264,18 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  	return find_insn(id);
  }
  
@@ -18138,7 +18142,7 @@ index df60fd3f..92250544 100644
  #endif
  
  // given internal insn id, return public instruction info
-@@ -10249,34 +10286,50 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10249,34 +10290,50 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  	if (X86_get_insn_id_no_detail(h, insn, id))
  		return;
  
@@ -18199,7 +18203,7 @@ index df60fd3f..92250544 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10289,10 +10342,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10289,10 +10346,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_RDTSCP:
  				if (mode == CS_MODE_64) {
  					memcpy(insn->detail->regs_write,
@@ -18213,7 +18217,7 @@ index df60fd3f..92250544 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10306,7 +10359,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10306,7 +10363,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  				break;
  			}
  			/* The generator derives eligibility from the switches below. */
@@ -18222,7 +18226,7 @@ index df60fd3f..92250544 100644
  			      X86_MAPPING_IMPLICIT_REPAIR))
  				goto implicit_registers_done;
  
-@@ -10735,12 +10788,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10735,12 +10792,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			}
  
  implicit_registers_done:
@@ -18239,7 +18243,7 @@ index df60fd3f..92250544 100644
  				// this insn also belongs to JUMP group. add JUMP group
  				insn->detail
  					->groups[insn->detail->groups_count] =
-@@ -10773,7 +10826,7 @@ implicit_registers_done:
+@@ -10773,7 +10830,7 @@ implicit_registers_done:
  				}
  			}
  
@@ -18248,7 +18252,7 @@ index df60fd3f..92250544 100644
  			case X86_OUT8ir:
  			case X86_OUT16ir:
  			case X86_OUT32ir:
-@@ -11176,15 +11229,21 @@ void X86_build_lookup_tables(cs_struct *h)
+@@ -11176,15 +11233,21 @@ void X86_build_lookup_tables(cs_struct *h)
  	CS_ASSERT_RET(h && !h->x86_insn_lut);
  	CS_ASSERT_RET(max <= INT16_MAX && X86_INS_ENDING < UINT16_MAX);
  
@@ -18406,14 +18410,14 @@ index 0a4c959f..4c0d654f 100644
 +#undef CS_DECODE_NATIVE_ITER_SCAN
  #endif
 diff --git a/cs_priv.h b/cs_priv.h
-index 903415e8..fdb2d0a1 100644
+index 903415e8..42ef3a3d 100644
 --- a/cs_priv.h
 +++ b/cs_priv.h
 @@ -22,6 +22,13 @@
  #define CS_PRESERVE_MOST
  #endif
  
-+/* Native MSVC has dedicated scan and mapping paths in Release builds. */
++/* Native MSVC uses dedicated decoder and mapping implementations. */
 +#if defined(_MSC_VER) && !defined(__clang__)
 +#define CS_NATIVE_MSVC 1
 +#else
