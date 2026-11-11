@@ -15,23 +15,21 @@ def main(tmp):
     hashes={}
     for label in ('reference','scoped'):
         if label=='scoped':
-            run(['git','restore','--source=HEAD','--','arch','suite'],source)
+            run(['git','restore','--source=HEAD','--','arch','suite','cs_disasm_internal.h'],source)
         f=d/(label+'.patch')
         h=digest(f.read_bytes());assert h==(d/(f.name+'.sha256')).read_text().strip()
-        if label=='scoped' or crt=='MD':run(['git','apply',f],source)
+        run(['git','apply',f],source)
         run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],tmp,env)
         tool=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
         records={}
         # Include machine code, relocation annotations and read-only data.
         for obj in (b/'capstone.dir/Release').rglob('*.obj'):
-            dump=s.check_output([tool,'-s','-dr',obj],text=True,errors='replace')
-            lines=[ln for ln in dump.splitlines() if 'file format' not in ln]
-            records[obj.name]=dict(code_data_relocations=digest('\n'.join(lines).encode()),object=digest(obj.read_bytes()))
+            records[obj.name]=digest(obj.read_bytes())
         assert 'X86Disassembler.obj'in records and 'cs.obj' in records
         hashes[label]=records
     write('objects.json',hashes)
     assert hashes['reference'].keys()==hashes['scoped'].keys()
-    differing=[k for k,v in hashes['reference'].items() if v['code_data_relocations'] != hashes['scoped'][k]['code_data_relocations']]
+    differing=[k for k,v in hashes['reference'].items() if v != hashes['scoped'][k]]
     write('comparison.json',dict(crt=crt,differing=differing,objects=len(hashes['reference'])))
     assert not differing,differing
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as work:
