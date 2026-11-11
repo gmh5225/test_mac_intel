@@ -1,0 +1,39 @@
+name: Real files on dedicated alias backends
+on:
+  push:
+    branches: [codex/capstone-dedicated-alias-tries]
+    paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {host: ubuntu-24.04, plan: AARCH64}
+          - {host: ubuntu-24.04, plan: MIPS}
+          - {host: ubuntu-24.04, plan: PPC}
+          - {host: ubuntu-24.04, plan: SPARC}
+          - {host: ubuntu-24.04, plan: "AARCH64,MIPS,PPC,SPARC"}
+          - {host: macos-15, plan: "AARCH64,MIPS,PPC,SPARC"}
+          - {host: macos-15-intel, plan: "AARCH64,MIPS,PPC,SPARC"}
+    env:
+      ARCH_PLAN: ${{ matrix.plan }}
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Compare real output, paired throughput and executed instructions
+        run: python3 capstone-performance/alias_workload.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: dedicated-${{ matrix.host }}-${{ matrix.plan }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: warn
+          retention-days: 14

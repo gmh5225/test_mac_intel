@@ -26,6 +26,11 @@ def main(root):
     revision = "5b9cbe48b46842e70a4ce8dcfafcb3f35c2f34cd"
     source = run.fetch("capstone", "https://github.com/NeverSight/capstone.git", revision)
     cases = corpus.prepare(SOURCE, root, run.EVIDENCE, run.command)
+    arch_for = {"arm64":"AARCH64","ppc64el":"PPC","mips64el":"MIPS","sparc64":"SPARC"}
+    plan = os.environ["ARCH_PLAN"].split(",")
+    cases = [c for c in cases if arch_for.get(c["name"].split("-")[0]) in plan]
+    assert {arch_for[c["name"].split("-")[0]] for c in cases} == set(plan)
+    flags = ["-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF", *["-DCAPSTONE_"+a+"_SUPPORT=ON" for a in plan]]
     run.command(["clang", "--version"], "compiler")
     linux = platform.system() == "Linux"
     run.command(["lscpu", "--json"] if linux else ["sysctl","machdep.cpu.brand_string","hw.ncpu"], "cpu")
@@ -37,7 +42,7 @@ def main(root):
     (root / "consumer.cpp").write_text(consumer)
     run.command(["clang++","-std=c++17","-O3","-DNDEBUG","-I",source/"include","-c",root/"consumer.cpp","-o",root/"consumer.o"], "consumer")
     build = root/"build"
-    run.command(["cmake","-S",source,"-B",build,"-G","Ninja","-DCMAKE_BUILD_TYPE=Release","-DCMAKE_C_COMPILER=clang",
+    run.command(["cmake","-S",source,"-B",build,"-G","Ninja",*flags,"-DCMAKE_BUILD_TYPE=Release","-DCMAKE_C_COMPILER=clang",
                  "-DCAPSTONE_BUILD_MACOS_THIN=ON","-DCAPSTONE_BUILD_CSTOOL=OFF","-DCAPSTONE_BUILD_LEGACY_TESTS=OFF",
                  "-DCAPSTONE_BUILD_SHARED_LIBS=OFF"],"configure")
     bins = {}
@@ -49,6 +54,8 @@ def main(root):
             run.command(["git","apply",patch],"apply",source)
             run.command(["python3",source/"suite/synctools/alias_mnemonic_trie.py","--check"],"generated")
         run.command(["cmake","--build",build,"--target","capstone_static","--parallel","4"],"build-"+variant)
+        commands = sp.check_output(["ninja","-C",build,"-t","commands","capstone_static"],text=True)
+        assert ("-DCAPSTONE_USE_ALIAS_TRIE" in commands) == (variant == "trie")
         exe = root / ("bench-"+variant)
         run.command(["clang++",root/"consumer.o",build/"libcapstone.a","-o",exe],"link-"+variant)
         bins[variant] = exe
@@ -87,23 +94,6 @@ def main(root):
                                          for c in cycles)
             results.append(dict(case=case["name"],mode=mode,ratio=ratio("trie"),control=ratio("control"),first=first[0]["first"]))
             run.write("measurements.json",results)
-    counts = []
-    if linux:
-        for case in cases:
-            if case["name"] not in CASES_FOR_COUNTS:
-                continue
-            for variant in ("base","trie"):
-                label = case["name"]+"-"+variant
-                path = root/"callgrind.out"
-                run.command(["valgrind","--tool=callgrind","--branch-sim=yes","--callgrind-out-file="+str(path),
-                            bins[variant],case["selector"],2,case["path"],1],label)
-                data = path.read_text()
-                events = next(l for l in data.splitlines() if l.startswith("events:")).split()[1:]
-                totals = next(l for l in data.splitlines() if l.startswith("totals:")).split()[1:]
-                counts.append(dict(case=case["name"],variant=variant,events=dict(zip(events,map(int,totals)))))
-                run.command(["callgrind_annotate","--auto=no","--threshold=99",path],label+"-functions")
-                path.unlink()
-        run.write("counts.json",counts)
 
 
 if __name__ == "__main__":
