@@ -10,7 +10,7 @@ import subprocess
 import run as perf
 
 source, work = perf.source, perf.work
-ref = 'f2f50b8fab856b374daf0e76dc3054f25de65ac9'
+ref = perf.manifest['capstone_revision']
 
 def libraries_and_driver():
     import json
@@ -18,7 +18,7 @@ def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
     trees = {'msvc':base}
-    for name, expected in {'profiles': '93ab9abb561ceb06ce0df76f42010d3d1b386e81d59e22a72d9d9c9020d101cc'}.items():
+    for name, expected in {'profiles': '7fe59695cc436dc0c8e275ff6b3ace0236ee35ee95ed350461a2394778fa3666'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -125,7 +125,7 @@ def measure(progs,cases):
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '93ab9abb561ceb06ce0df76f42010d3d1b386e81d59e22a72d9d9c9020d101cc'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '7fe59695cc436dc0c8e275ff6b3ace0236ee35ee95ed350461a2394778fa3666'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))

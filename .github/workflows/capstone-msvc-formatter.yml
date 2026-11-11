@@ -2,7 +2,7 @@ name: Four-backend native dynamic CRT against iced
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-msvc-cold-scan-entry]
+    branches: [codex/capstone-msvc-mask-descriptors]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: msvc-cold-scan-entry-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: msvc-mask-descriptors-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
