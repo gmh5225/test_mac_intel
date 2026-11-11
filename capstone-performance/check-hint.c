@@ -1,52 +1,77 @@
+#include "arch/X86/X86Mapping.h"
+#include "cs_priv.h"
 #include <dlfcn.h>
-#include <limits.h>
 #include <stdio.h>
-#include "arch/X86/X86Mapping.c"
+#include <stdlib.h>
+#include <string.h>
 
 #ifndef RTLD_FIRST
 #define RTLD_FIRST 0
 #endif
 
-typedef unsigned (*reference_find)(unsigned);
-
-static int check_id(cs_struct *h, reference_find find, unsigned id)
+typedef cs_err (*open_fn)(cs_arch, cs_mode, csh *);
+typedef cs_err (*close_fn)(csh *);
+typedef cs_err (*option_fn)(csh, cs_opt_type, size_t);
+static struct { char kind; size_t items, width; } events[64];
+static unsigned event_count, fail, length;
+static void *trace_malloc(size_t n)
 {
-	unsigned expected = find(id);
-	if (find_insn_h(h, id) != expected || find_insn_h(NULL, id) != expected) {
-		fprintf(stderr, "row mismatch for %u, expected %u\n", id, expected);
-		return 1;
-	}
-	return 0;
+	events[event_count].kind='m'; events[event_count++].width=n;
+	return fail==1 && n==length*sizeof(uint32_t) ? NULL : malloc(n);
 }
-
+static void *trace_calloc(size_t n, size_t size)
+{
+	events[event_count].kind='c'; events[event_count].items=n; events[event_count++].width=size;
+	return fail==2 && n==length && size==sizeof(uint32_t) ? NULL : calloc(n,size);
+}
+static void trace_free(void *p)
+{
+	events[event_count].kind='f'; events[event_count++].width=p!=NULL;
+	free(p);
+}
 int main(int argc, char **argv)
 {
-	if (argc != 2)
-		return 2;
-	void *base = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL | RTLD_FIRST);
-	if (!base)
-		return 3;
-	reference_find find = (reference_find)dlsym(base, "find_insn");
-	if (!find)
-		return 4;
-	csh handle = 0;
-	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
-		return 5;
-	cs_struct *h = (cs_struct *)(uintptr_t)handle;
-	uint32_t *cache = h->x86_insn_lut;
-	if (!cache)
-		return 6;
-	for (unsigned cached = 0; cached < 2; ++cached) {
-		h->x86_insn_lut = cached ? cache : NULL;
-		for (unsigned id = 0; id <= UINT16_MAX; ++id)
-			if (check_id(h, find, id))
-				return 7;
-		if (check_id(h, find, UINT_MAX) || check_id(h, find, UINT_MAX - 1))
-			return 8;
+	if(argc!=2) return 2;
+	void *dll=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL|RTLD_FIRST);
+	if(!dll) return 3;
+	open_fn openers[] = {(open_fn)dlsym(dll,"cs_open"),cs_open};
+	close_fn closers[] = {(close_fn)dlsym(dll,"cs_close"),cs_close};
+	option_fn options[] = {(option_fn)dlsym(dll,"cs_option"),cs_option};
+	if(!openers[0] || !closers[0] || !options[0]) return 4;
+	cs_opt_mem hooks={trace_malloc,trace_calloc,realloc,trace_free,vsnprintf};
+	const cs_mode modes[]={CS_MODE_16,CS_MODE_32,CS_MODE_64};
+	unsigned checks=0;
+	for(unsigned mode=0; mode<3; ++mode) for(fail=0;fail<=2;++fail) {
+		csh handles[2]={0}; cs_struct *h[2];
+		unsigned count=0; unsigned char saved[sizeof(events)];
+		for(unsigned v=0;v<2;++v){
+			if(options[v](0,CS_OPT_MEM,(size_t)&hooks)!=CS_ERR_OK) return 5;
+			memset(events,0,sizeof(events)); event_count=0;
+			if(openers[v](CS_ARCH_X86,modes[mode],&handles[v])!=CS_ERR_OK) return 6;
+			if(v==0){count=event_count; memcpy(saved,events,sizeof(events));}
+			else if(count!=event_count || memcmp(saved,events,sizeof(events))) return 7;
+			h[v]=(cs_struct *)handles[v];
+		}
+		if(h[0]->x86_insn_lut_max!=h[1]->x86_insn_lut_max) return 8;
+		length=h[0]->x86_insn_lut_max+1;
+		if(!!h[0]->x86_insn_lut!=!!h[1]->x86_insn_lut ||
+		   !!h[0]->x86_insn_reg_lut!=!!h[1]->x86_insn_reg_lut) return 9;
+		if(h[0]->x86_insn_lut) {
+			for(unsigned id=0;id<length;++id) {
+				unsigned row=find_insn(id);
+				uint32_t expected=row==(unsigned)-1 ? UINT32_MAX : ((uint32_t)insns[row].mapid<<16)|row;
+				if(h[0]->x86_insn_lut[id]!=expected || h[1]->x86_insn_lut[id]!=expected) return 10;
+				++checks;
+			}
+		}
+		if(h[0]->x86_insn_reg_lut && memcmp(h[0]->x86_insn_reg_lut,h[1]->x86_insn_reg_lut,length*sizeof(uint32_t)))return 11;
+		for(unsigned v=0;v<2;++v){
+			memset(events,0,sizeof(events));event_count=0;
+			if(closers[v](&handles[v])!=CS_ERR_OK || handles[v])return 12;
+			if(v==0){count=event_count;memcpy(saved,events,sizeof(events));}
+			else if(count!=event_count||memcmp(saved,events,sizeof(events)))return 13;
+		}
 	}
-	h->x86_insn_lut = cache;
-	cs_close(&handle);
-	dlclose(base);
-	printf("Compared 262152 cached, uncached and NULL-handle row selections\n");
+	printf("Verified %u packed words and nine allocation/free traces including both failure paths\n",checks);
 	return 0;
 }

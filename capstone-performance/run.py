@@ -95,7 +95,10 @@ def invoke(case, variant, repeats):
     label = 'new' if variant.startswith('new') else 'base'
     library = 'iced' if variant.startswith('iced') else 'capstone'
     binary = WORK / f'{case["consumer"]}-{label}'
-    if case['consumer'] == 'decoder':
+    if case['consumer'] in ('window', 'open'):
+        args = [WORK / ('windows-' + label), library, str(case['selector']), str(repeats),
+                case['mode'], case['path'], case['span_manifest']]
+    elif case['consumer'] == 'decoder':
         args = [binary, library, case['mode'], str(case['selector']), str(repeats), case['path']]
     else:
         args = [binary, str(case['selector']), str(MODES[case['mode']]), case['path'], str(repeats)]
@@ -173,6 +176,11 @@ panic = "abort"
                      *([iced_library] if consumer == 'decoder' else []), '-lpthread',
                      *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                      '-o', WORK / (consumer + '-' + label)], consumer + '-' + label + '-link')
+    for label in ['base', 'new']:
+        command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
+                 SOURCE / 'windows.cpp', WORK / (label + '-build/libcapstone.a'),
+                 iced_library, '-lpthread', '-ldl', '-lm', '-o', WORK / ('windows-' + label)],
+                'windows-' + label + '-link')
     commands = json.loads((WORK / 'new-build/compile_commands.json').read_text())
     args = shlex.split(next(c['command'] for c in commands if c['file'].endswith('/Mapping.c')))
     defs = [arg for arg in args if arg.startswith('-D')]
@@ -192,10 +200,27 @@ panic = "abort"
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
+    windows = []
+    for item in inputs:
+        if item['name'] not in ('putty-32-0.85','amd64-ls','amd64-cp','amd64-sort'):
+            continue
+        for width in (1,16,128):
+            filename = f"{item['name']}-{width}.tsv"
+            spans = EVIDENCE / filename
+            command([WORK / 'windows-base','spans',item['path'],item['selector'],width,spans],
+                    'spans-' + filename)
+            windows.append(dict(item,name=item['name'] + '-' + str(width), window_width=width,
+                                mode='detail', consumer='window',span_manifest=str(spans)))
+        if item['name'] in ('putty-32-0.85','amd64-ls'):
+            windows.append(dict(item,name='open-' + str(item['selector']),mode='open',
+                                consumer='open',span_manifest=str(spans)))
+    if len(windows)!=14:
+        raise RuntimeError('Incomplete short-window corpus')
+    cases.extend(windows)
     write('cases.json', cases)
     checks = []
     for case in cases:
-        variants = ['base', 'new', 'iced'] if case['consumer'] == 'decoder' else ['base', 'new']
+        variants = ['base', 'new', 'iced'] if case['consumer'] in ('decoder', 'window') else ['base', 'new']
         rows = [invoke(case, variant, 1) for variant in variants]
         agree = check_outputs(rows, case)
         checks.append(dict(name=case['name'], mode=case['mode'], rows=rows, cross_decoder_boundaries_agree=agree))
@@ -283,6 +308,10 @@ def measure():
                   ['base', 'new', 'base_aa', 'new_aa', 'iced', 'iced_aa'], screen_ns)
     measure_panel('other', [c for c in cases if c['consumer'] == 'single'], 4,
                   ['base', 'new', 'base_aa', 'new_aa'], screen_ns)
+    measure_panel('window', [c for c in cases if c['consumer'] == 'window'], 6,
+                  ['base', 'new', 'base_aa', 'new_aa', 'iced', 'iced_aa'], screen_ns)
+    measure_panel('open', [c for c in cases if c['consumer'] == 'open'], 6,
+                  ['base','new','base_aa','new_aa'], screen_ns)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
@@ -302,7 +331,7 @@ def summarize_panel(name):
         for cycle in sorted({r['cycle'] for r in selected}):
             values = {r['variant']: r for r in selected if r['cycle'] == cycle}
             required = {'base', 'base_aa', 'new', 'new_aa'}
-            if not required <= values.keys() or (name == 'x86' and not {'iced', 'iced_aa'} <= values.keys()):
+            if not required <= values.keys() or (name in ('x86','window') and not {'iced', 'iced_aa'} <= values.keys()):
                 continue  # Raw incomplete cycles remain; never report them as complete pairs.
             pair = dict(cycle=cycle)
             for timer in ['cpu_ns', 'wall_ns']:
@@ -330,11 +359,11 @@ def summarize_panel(name):
 
 def finish():
     EVIDENCE.mkdir(exist_ok=True)
-    panels = {name: summarize_panel(name) for name in ['null', 'x86', 'other']}
+    panels = {name: summarize_panel(name) for name in ['null', 'x86', 'other', 'window', 'open']}
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
-                              prior_m4_rejection_remains=True))
-    lines = ['# x86 dense mapping rows', '',
+                              profile="full streams and short windows"))
+    lines = ['# x86 handle initialization and full-stream controls', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
@@ -346,7 +375,7 @@ def finish():
                          f'{fmt("cpu_ns_base_over_iced")} | {fmt("cpu_ns_new_over_iced")} | '
                          f'{row["positive_cycles"]}/{len(row["pairs"])} | {row["aa_cpu_outside_2pct"]} |')
     lines += ['', 'Raw samples, including incomplete cycles or failed attempts, remain in this artifact.',
-              'Dense row selection is measured against the same Capstone revision.']
+              'Short detail workloads include open, format, details, register access and close for both libraries. Every executable contributes 32 deterministic, non-overlapping instruction-aligned windows at each width. The open-only panel measures Capstone open and close. Full-stream and lifecycle measurements are reported separately.']
     report = '\n'.join(lines) + '\n'
     (EVIDENCE / 'report.md').write_text(report)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
