@@ -1,0 +1,152 @@
+diff --git a/docs/architecture.md b/docs/architecture.md
+index b975a04c17..25b943d8ed 100644
+--- a/docs/architecture.md
++++ b/docs/architecture.md
+@@ -15933,6 +15933,11 @@ encodings fail decoding even when strict lifting is disabled. UD1 remains an
+ explicit invalid-opcode intrinsic; its encoded operands do not imply an
+ ordinary memory access.
+ 
++For an x86 function-discovery scan with operand detail disabled, the decoder
++resolves a near CALL from the exact bytes of the classified instruction. The
++Capstone query uses the same relative-target arithmetic as the operand printers.
++The scan admits the result only for an executable code owner.
++
+ With text and detail disabled, Capstone's native iterator uses generated
+ operand terminals that share the full decoder's bounded readers and legality
+ checks. Its prefix classifier and terminal selection avoid repeated dispatch;
+diff --git a/include/neverd/decode/Decoder.h b/include/neverd/decode/Decoder.h
+index c6ea2313ad..392b89434c 100644
+--- a/include/neverd/decode/Decoder.h
++++ b/include/neverd/decode/Decoder.h
+@@ -296,6 +296,10 @@ public:
+   /// not a direct call.  Dispatches to the active architecture lifter.
+   va_t directCallTarget(const DecodedInsn &Insn) const;
+ 
++  /// Resolve one complete x86 near CALL without touching the borrowed decode.
++  /// Returns InvalidVA for indirect calls, incomplete or surplus bytes.
++  va_t directX86CallTarget(llvm::ArrayRef<uint8_t> Bytes, va_t Addr) const;
++
+   /// Encoded return-pop immediate, including an explicitly encoded zero.
+   /// Empty for ordinary returns and non-x86 instructions.
+   std::optional<uint64_t> returnImmediate(const DecodedInsn &Insn) const;
+diff --git a/lib/decode/CMakeLists.txt b/lib/decode/CMakeLists.txt
+index 54c71c41ec..ab2fc00492 100644
+--- a/lib/decode/CMakeLists.txt
++++ b/lib/decode/CMakeLists.txt
+@@ -21,6 +21,10 @@ add_neverd_component_library(NeverDDecode
+   Lift
+ )
+ 
++# The private x86 scan interface belongs to our statically linked Capstone fork.
++target_include_directories(NeverDDecode PRIVATE
++  "$<TARGET_PROPERTY:capstone_static,SOURCE_DIR>/arch/X86")
++
+ # AArch64/AArch64Decoder.cpp contains the native operand decode hot path. Keep
+ # it explicitly optimized in non-Debug configurations, but let Debug retain the
+ # toolchain's unoptimized flags for reliable stepping, local inspection, and
+diff --git a/lib/decode/X86/X86Decoder.cpp b/lib/decode/X86/X86Decoder.cpp
+index a271b3a3c8..f58e909443 100644
+--- a/lib/decode/X86/X86Decoder.cpp
++++ b/lib/decode/X86/X86Decoder.cpp
+@@ -18,6 +18,7 @@
+ #include "neverd/lift/X86/X86Lifter.h"
+ #include "neverd/support/BinaryEncoding.h"
+ 
++#include "X86ScanAdapter.h"
+ #include "capstone/capstone.h"
+ 
+ #include <cstddef>
+@@ -106,6 +107,14 @@ bool isX86AlignmentNop(const DecodedInsn &Insn) {
+ 
+ } // namespace decoder_detail
+ 
++va_t Decoder::directX86CallTarget(llvm::ArrayRef<uint8_t> Bytes,
++                                 va_t Addr) const {
++  va_t Target;
++  const uint16_t Length =
++      X86_scanCallTarget(Handle, Bytes.data(), Bytes.size(), Addr, &Target);
++  return Length && Length == Bytes.size() ? Target : InvalidVA;
++}
++
+ void Decoder::configureX86For(const BinaryImage &Img) {
+   if (!X86)
+     return;
+diff --git a/lib/ir/low/X86/FuncDetectorX86.cpp b/lib/ir/low/X86/FuncDetectorX86.cpp
+index 9214a03e8a..9bfdd3d122 100644
+--- a/lib/ir/low/X86/FuncDetectorX86.cpp
++++ b/lib/ir/low/X86/FuncDetectorX86.cpp
+@@ -226,22 +226,12 @@ std::optional<CallScanStep> stepCallsX86(const BinaryImage &Img, Decoder &Dec,
+     }
+     return Step;
+   }
+-  // Sizes and ids do not depend on operand detail or printed text. Only
+-  // calls need a detailed re-decode.
+-  if (!Dec.detailEnabled()) {
+-    if (DI.Id != X86_INS_CALL)
+-      return Step;
+-    const bool PreviousText = Dec.textEnabled();
+-    Dec.setText(true);
+-    Dec.setDetail(true);
+-    const int Again =
+-        Dec.decodeOneLight(Seg->Data.data() + Off, Remain, Cur, DI);
+-    Dec.setDetail(false);
+-    Dec.setText(PreviousText);
+-    if (Again != Sz)
+-      return Step;
+-  }
+-  const va_t Tgt = Dec.directCallTarget(DI);
++  if (DI.Id != X86_INS_CALL)
++    return Step;
++  const va_t Tgt = Dec.detailEnabled()
++                       ? Dec.directCallTarget(DI)
++                       : Dec.directX86CallTarget({Seg->Data.data() + Off,
++                                                  static_cast<size_t>(Sz)}, Cur);
+   if (Tgt != InvalidVA && Img.hasExecutableCodeOwnerAt(Tgt))
+     Step.Target = Tgt;
+   return Step;
+diff --git a/unittests/FunctionAdmissionTests.cpp b/unittests/FunctionAdmissionTests.cpp
+index a52c6571bf..cc880d004b 100644
+--- a/unittests/FunctionAdmissionTests.cpp
++++ b/unittests/FunctionAdmissionTests.cpp
+@@ -12,6 +12,7 @@
+ 
+ #include "gtest/gtest.h"
+ 
++#include "neverd/decode/Decoder.h"
+ #include "neverd/loader/BinaryImage.h"
+ #include "neverd/loader/ExceptionInfo.h"
+ #include "neverd/pipeline/Pipeline.h"
+@@ -43,6 +44,33 @@ BinaryImage makeCodeFixture(va_t Entry, std::vector<uint8_t> Bytes) {
+   return Img;
+ }
+ 
++TEST(FunctionAdmission, CompactCallQueryUsesOnlyTheExactInstruction) {
++  const uint8_t Call[] = {0xe8, 0xfb, 0xff, 0xff, 0xff, 0x90};
++  const uint8_t Indirect[] = {0xff, 0xd0};
++  constexpr va_t Address = 0xfffffffd;
++  Decoder Dec;
++  for (Arch A : {Arch::X86, Arch::X64}) {
++    ASSERT_TRUE(Dec.init(A));
++    DecodedInsn Original;
++    ASSERT_EQ(Dec.decodeOneLight(Call, sizeof(Call), Address, Original), 5);
++    const va_t Target = Dec.directCallTarget(Original);
++    ASSERT_EQ(Target, Address);
++    for (bool Detail : {false, true}) {
++      Dec.setDetail(Detail);
++      for (bool Text : {false, true}) {
++        Dec.setText(Text);
++        for (size_t Size = 0; Size <= sizeof(Call); ++Size)
++          EXPECT_EQ(Dec.directX86CallTarget({Call, Size}, Address),
++                    Size == 5 ? Target : InvalidVA);
++        EXPECT_EQ(Dec.directX86CallTarget(Indirect, Address), InvalidVA);
++        EXPECT_EQ(Dec.detailEnabled(), Detail);
++        EXPECT_EQ(Dec.textEnabled(), Text);
++        EXPECT_EQ(Dec.directCallTarget(Original), Target);
++      }
++    }
++  }
++}
++
+ TEST(FunctionAdmission, UnwindlessNonLeafCandidateRemainsAFunction) {
+   // An exception directory need not describe every executable entry. Neither
+   // a stack adjustment nor a call disproves a candidate outside its records.

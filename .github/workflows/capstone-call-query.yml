@@ -1,28 +1,47 @@
-name: Capstone x86 direct CALL resolution on real binaries
+name: NeverD x86 direct CALL discovery from current fork sources
 on:
   push:
-    branches: [codex/capstone-x86-call-reader]
-    paths: [capstone-call-query/**, .github/workflows/capstone-call-query.yml, .gitattributes]
+    branches: [codex/capstone-call-discovery]
+    paths: [capstone-call-query/**, .github/workflows/capstone-call-query.yml]
 permissions:
   contents: read
 jobs:
-  call:
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-24.04, macos-15, windows-2022]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 75
+  product:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 235
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          persist-credentials: false
           sparse-checkout: capstone-call-query
-      - name: Compare old operand reconstruction and both native queries
-        run: python capstone-call-query/measure.py
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          path: neverd
+          ref: 8c71f206f3df87deaf8169e01f1b5c6020dfb815
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/llvm-project
+          ref: main
+          path: neverd/third_party/llvm-project
+          sparse-checkout: |
+            llvm
+            cmake
+            libc
+            third-party
+          persist-credentials: false
+      - name: Initialize source dependencies
+        working-directory: neverd
+        run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
+      - name: Build and test the proposed NeverD dev change and time the production scan
+        env:
+          CC: clang
+          CXX: clang++
+        run: python3 capstone-call-query/full-integration.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: call-query-${{ matrix.runner }}
-          path: call-evidence/
+          name: neverd-call-discovery
+          path: product-evidence/
           retention-days: 14
