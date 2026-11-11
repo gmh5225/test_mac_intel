@@ -1,175 +1,77 @@
-diff --git a/arch/X86/X86GenPrinterQuick.inc b/arch/X86/X86GenPrinterQuick.inc
-index aa9fc2c1..a20bcdea 100644
---- a/arch/X86/X86GenPrinterQuick.inc
-+++ b/arch/X86/X86GenPrinterQuick.inc
-@@ -32774,6 +32774,24 @@ static void printInstruction(MCInst *MI, SStream *O)
-   SStream_concat0_n(O, AsmStrs + (record & 16383) - 1, (size_t)((record >> 14) & 31));
-   X86RecipeHandlers[recipe](MI, O);
+diff --git a/Mapping.c b/Mapping.c
+index 11b3e619..732aeac7 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -249,15 +249,15 @@ void map_groups(MCInst *MI, const insn_map *imap)
+ 
+ 	cs_detail *detail = MI->flat_insn->detail;
+ 	unsigned Opcode = MCInst_getOpcode(MI);
+-	unsigned i = 0;
+-	uint16_t group = imap[Opcode].groups[i];
+-	while (group != 0) {
++	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i) {
++		unsigned char group = imap[Opcode].groups[i];
++		if (!group)
++			break;
+ 		if (detail->groups_count >= MAX_NUM_GROUPS) {
+ 			printf("ERROR: Too many groups defined in instruction mapping.\n");
+ 			return;
+ 		}
+ 		detail->groups[detail->groups_count++] = group;
+-		group = imap[Opcode].groups[++i];
+ 	}
+ #endif // CAPSTONE_DIET
  }
-+
-+bool X86_Intel_printPublicRegisterPair(MCInst *MI, const uint8_t *code)
-+{
-+  unsigned opcode = MCInst_getOpcode(MI);
-+  if (opcode >= ARR_SIZE(X86RecipeRecords) || MI->assembly[0] || MI->OpcodePub ||
-+      MI->popcode_adjust || MI->xAcquireRelease || MI->x86Lock || MI->x86_prefix[0] || MI->x86_prefix[1])
-+    return false;
-+  uint32_t record = X86RecipeRecords[opcode];
-+  unsigned first, second;
-+  switch (record >> 19) {
-+  case 4: first = 1; second = 2; break;
-+  case 5: first = 0; second = 2; break;
-+  case 18: first = 0; second = 1; break;
-+  default: return false;
-+  }
-+  return writePublicRegisterPair(MI, code, AsmStrs + (record & 16383) - 1,
-+                                 ((record >> 14) & 31) - 1, first, second);
-+}
- #else
-   switch (QuickRecipe[opcode]) {
-   default: break;
-diff --git a/arch/X86/X86InstPrinter.h b/arch/X86/X86InstPrinter.h
-index 04cfcd38..f52ea0ec 100644
---- a/arch/X86/X86InstPrinter.h
-+++ b/arch/X86/X86InstPrinter.h
-@@ -27,6 +27,8 @@ void X86_Intel_printInst(MCInst *MI, SStream *OS, void *Info);
- 	!defined(_WIN32_WCE)
- #define CAPSTONE_X86_PRECHECKED_PRINTER
- void X86_Intel_printInstructionPrechecked(MCInst *MI, SStream *OS);
-+__attribute__((visibility("hidden"))) bool
-+X86_Intel_printPublicRegisterPair(MCInst *MI, const uint8_t *code);
- __attribute__((visibility("hidden"))) void
- X86_Intel_printInstructionGeneral(MCInst *MI, SStream *OS);
- __attribute__((visibility("hidden"), noinline)) void
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index aae2c545..38cf362a 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -312,6 +312,34 @@ static void printRegName(SStream *OS, unsigned RegNo)
- 				      getRegisterNameLength(RegNo));
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 6b15c4fe..9a17376f 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -3,6 +3,7 @@
+ #include "../../Mapping.h"
+ #include <limits.h>
+ #include <stdio.h>
++#include <string.h>
+ 
+ static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
+ 			 unsigned expected)
+@@ -188,9 +189,39 @@ static bool test_alias_lookup(void)
+ 	return true;
  }
  
-+#ifdef CAPSTONE_SSTREAM_PRECHECKED
-+/* The generated caller proves the mnemonic extent and both operand slots.
-+ * Commit output only after proving that both decoded operands are registers. */
-+static bool writePublicRegisterPair(MCInst *MI, const uint8_t *code,
-+				    const char *mnemonic, size_t mnemonic_len,
-+				    unsigned first, unsigned second)
++static bool test_full_group_map(void)
 +{
-+	MCOperand *a = MCInst_getOperand(MI, first);
-+	MCOperand *b = MCInst_getOperand(MI, second);
-+	if (!MCOperand_isReg(a) || !MCOperand_isReg(b))
-+		return false;
-+	unsigned ra = MCOperand_getReg(a), rb = MCOperand_getReg(b);
-+	if (!ra || !rb || ra >= X86_NUM_TARGET_REGS || rb >= X86_NUM_TARGET_REGS)
++#ifndef CAPSTONE_DIET
++	insn_map row = { 0 };
++	cs_detail detail = { 0 };
++	cs_insn insn = { 0 };
++	MCInst mi = { 0 };
++	mi.flat_insn = &insn;
++	insn.detail = &detail;
++	row.branch = true;
++	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i)
++		row.groups[i] = i + 1;
++
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS ||
++	    memcmp(detail.groups, row.groups, sizeof(row.groups)))
 +		return false;
 +
-+	cs_insn *insn = MI->flat_insn;
-+	fill_insn_without_text(insn, 0, code, false);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->mnemonic, mnemonic, mnemonic_len);
-+	size_t alen = getRegisterNameLength(ra);
-+	memcpy(insn->op_str, getRegisterName(ra), alen);
-+	memcpy(insn->op_str + alen, ", ", 2);
-+	memcpy(insn->op_str + alen + 2, getRegisterName(rb), getRegisterNameLength(rb));
++	/* Preserve the existing group and append as many entries as fit. */
++	detail.groups_count = 1;
++	detail.groups[0] = 99;
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS || detail.groups[0] != 99 ||
++	    memcmp(detail.groups + 1, row.groups, MAX_NUM_GROUPS - 1))
++		return false;
++#endif
 +	return true;
 +}
-+#endif
 +
- // for MASM syntax, 0x123 = 123h, 0xA123 = 0A123h
- // this function tell us if we need to have prefix 0 in front of a number
- static bool need_zero_prefix(uint64_t imm)
-diff --git a/arch/X86/X86IntelInstPrinterPrechecked.c b/arch/X86/X86IntelInstPrinterPrechecked.c
-index 53a53dd3..463030f7 100644
---- a/arch/X86/X86IntelInstPrinterPrechecked.c
-+++ b/arch/X86/X86IntelInstPrinterPrechecked.c
-@@ -10,6 +10,7 @@
- // generated path's extent and stream state before calling this instantiation.
- #define CAPSTONE_SSTREAM_PRECHECKED
- #include "X86InstPrinter.h"
-+#include "../../cs_disasm_internal.h"
- #define SStream_concat_hex64 X86_Intel_printHexPrechecked
- #include "X86IntelInstPrinter.c"
- #endif
-diff --git a/cs.c b/cs.c
-index 0a91fe20..62f0a50e 100644
---- a/cs.c
-+++ b/cs.c
-@@ -79,6 +79,7 @@
- #ifdef CAPSTONE_HAS_X86
- #include "arch/X86/X86Mapping.h"
- #include "arch/X86/X86Disassembler.h"
-+#include "arch/X86/X86InstPrinter.h"
- #endif
- #include "arch/X86/X86Module.h"
- #include "arch/XCore/XCoreModule.h"
-@@ -1059,6 +1060,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		/* Choose before printing: a custom formatter can restore vsnprintf
- 		 * while returning a count inconsistent with its first NUL. */
- 		if (handle->arch == CS_ARCH_X86 && cs_vsnprintf == vsnprintf) {
-+#ifdef CAPSTONE_X86_PRECHECKED_PRINTER
-+			if (!handle->detail_opt && !insn->detail && !handle->mnem_list &&
-+			    handle->printer == X86_Intel_printInst &&
-+			    handle->post_printer == X86_postprinter &&
-+			    insn->id != X86_INS_VPCMP &&
-+			    X86_Intel_printPublicRegisterPair(&mci, code))
-+				return true;
-+#endif
- 			/* Only this private stream can leave the unused tail untouched. */
- 			ss.buffer[0] = '\0';
- 			ss.index = 0;
-diff --git a/suite/synctools/x86_printer_dispatch.py b/suite/synctools/x86_printer_dispatch.py
-index 04556c44..91c5227e 100644
---- a/suite/synctools/x86_printer_dispatch.py
-+++ b/suite/synctools/x86_printer_dispatch.py
-@@ -178,6 +178,42 @@ def path_extent(path, prefix_length):
-     return length
- 
- 
-+def public_register_pair_writer(quick, paths, values, strings, sized, recipe_shift):
-+    """Select only two calls to printOperand separated by the literal comma."""
-+    offset_mask, length_shift, length_mask = map(int, sized.groups())
-+    cases = []
-+    for recipe, path in enumerate(quick, 1):
-+        if len(path) != 4 or path[1] != 'SStream_concat0(O, ", ");' or path[3] != "return;":
-+            continue
-+        slots = [re.fullmatch(r"printOperand\(MI, (\d+), O\);", path[i]) for i in (0, 2)]
-+        if not all(slots):
-+            continue
-+        # All rows sharing this handler must have a simple mnemonic followed
-+        # by a single tab, with no literal part of an operand in the prefix.
-+        rows = (value for value, row_path in zip(values, paths) if row_path == path)
-+        for value in rows:
-+            start = (value & offset_mask) - 1
-+            length = (value >> length_shift) & length_mask
-+            if start < 0 or not re.fullmatch(rb"[A-Za-z0-9_.]{1,31}\t", strings[start:start + length]):
-+                break
-+        else:
-+            cases.append(f"  case {recipe}: first = {slots[0][1]}; second = {slots[1][1]}; break;")
-+    require(cases, "No register-pair printer recipes")
-+    return (
-+        "\nbool X86_Intel_printPublicRegisterPair(MCInst *MI, const uint8_t *code)\n{\n"
-+        "  unsigned opcode = MCInst_getOpcode(MI);\n"
-+        "  if (opcode >= ARR_SIZE(X86RecipeRecords) || MI->assembly[0] || MI->OpcodePub ||\n"
-+        "      MI->popcode_adjust || MI->xAcquireRelease || MI->x86Lock || MI->x86_prefix[0] || MI->x86_prefix[1])\n"
-+        "    return false;\n"
-+        "  uint32_t record = X86RecipeRecords[opcode];\n"
-+        "  unsigned first, second;\n"
-+        f"  switch (record >> {recipe_shift}) {{\n"
-+        + "\n".join(cases) + "\n  default: return false;\n  }\n"
-+        + f"  return writePublicRegisterPair(MI, code, AsmStrs + (record & {offset_mask}) - 1,\n"
-+        + f"                                 ((record >> {offset_mask.bit_length()}) & {length_mask}) - 1, first, second);\n}}\n"
-+    )
-+
-+
- def prechecked_writer(text, names, values, paths, quick, indices, sized):
-     """Keep the bounded prefix append before a frameless recipe tail transfer."""
-     signature = "static void printInstruction(MCInst *MI, SStream *O)\n{\n"
-@@ -237,6 +273,7 @@ def prechecked_writer(text, names, values, paths, quick, indices, sized):
-         f"(size_t)((record >> {offset_bits}) & {length_mask}));\n"
-     )
-     result += "  X86RecipeHandlers[recipe](MI, O);\n}\n"
-+    result += public_register_pair_writer(quick, paths, values, mnemonic.string_bytes(text), sized, recipe_shift)
-     return result
- 
- 
+ int main(void)
+ {
+-	return test_name_lookup() && test_alias_lookup() &&
++	return test_full_group_map() && test_name_lookup() &&
++			       test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
