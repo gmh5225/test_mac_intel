@@ -27,7 +27,7 @@ def tests(source, label, preset, selection=None):
         units = ['x86_mapping_counts']
     if preset=='static-crt':
         subset=True
-        units=['x86_printer_prechecked','x86_mapping_counts','x86_encoding_accuracy','sstream']
+        units=['x86_scan_batch','x86_printer_prechecked','x86_mapping_counts','x86_encoding_accuracy','sstream']
         flags.extend(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON'])
     if preset=='sanitized':
         flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
