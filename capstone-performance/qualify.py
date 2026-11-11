@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -19,10 +20,12 @@ def tests(source, label, preset, selection=None):
                       '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined'])
         os.environ['ASAN_OPTIONS']='halt_on_error=1:detect_leaks=1'
         os.environ['UBSAN_OPTIONS']='halt_on_error=1:print_stacktrace=1'
-    command(['cmake','-S',source,'-B',d,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release',
-             '-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCAPSTONE_BUILD_MACOS_THIN=ON',*flags],label+'-config')
-    command(['cmake','--build',d,'--parallel','3'],label+'-build')
-    args=['ctest','--test-dir',d,'--parallel','2','--output-on-failure','--no-tests=error',
+    generator = ['-G','Visual Studio 17 2022','-A','x64'] if platform.system()=='Windows' else [
+        '-G','Ninja','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++']
+    command(['cmake','-S',source,'-B',d,*generator,'-DCMAKE_BUILD_TYPE=Release',
+             '-DCAPSTONE_BUILD_MACOS_THIN=ON',*flags],label+'-config')
+    command(['cmake','--build',d,'--config','Release','--parallel','3'],label+'-build')
+    args=['ctest','--test-dir',d,'-C','Release','--parallel','2','--output-on-failure','--no-tests=error',
           '--output-junit',str(EVIDENCE/(label+'-ctest.xml'))]
     if selection:
         names=EVIDENCE/'failed-names.txt';names.write_text('\n'.join(selection)+'\n')
@@ -41,18 +44,14 @@ def tests(source, label, preset, selection=None):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('candidate',choices=['combined','x86'])
-    parser.add_argument('preset',choices=['sanitized','intel-release'])
+    parser.add_argument('candidate',choices=['shared','access'])
+    parser.add_argument('preset',choices=['sanitized','windows-release'])
     args=parser.parse_args()
     assert not WORK.exists() and not EVIDENCE.exists()
     EVIDENCE.mkdir();WORK.mkdir()
     ref=json.loads((SOURCE/'manifest.json').read_text())['capstone_revision']
     source=fetch('candidate','https://github.com/NeverSight/capstone.git',ref)
-    patches=['candidate.patch' if args.candidate=='combined' else 'x86-lookup.patch','x86-qualification.patch']
-    if args.candidate=='combined':
-        patches+=['ppc-qualification.patch']
-        for f,target in [('ppc_alias_hints.py','suite/synctools'),('test_ppc_alias_hints.py','tests/unit')]:
-            shutil.copy2(SOURCE/f,source/target/f)
+    patches=[args.candidate+'-runtime.patch',args.candidate+'-qualification.patch']
     for i,f in enumerate(patches):
         command(['git','apply','--check',SOURCE/f],f'check-{i}',source)
         command(['git','apply',SOURCE/f],f'patch-{i}',source)

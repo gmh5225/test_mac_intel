@@ -1,0 +1,216 @@
+--- a/arch/X86/X86MappingInsnOp.inc
++++ b/arch/X86/X86MappingInsnOp.inc
+@@ -1330,12 +1330,12 @@
+ 
+ {	/* X86_BOUNDS16rm, X86_INS_BOUND: bound */
+ 	0,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_BOUNDS32rm, X86_INS_BOUND: bound */
+ 	0,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_BSF16rm, X86_INS_BSF: bsf */
+@@ -2790,52 +2790,52 @@
+ 
+ {	/* X86_CMPXCHG16B, X86_INS_CMPXCHG16B: cmpxchg16b */
+ 	X86_EFLAGS_MODIFY_ZF,
+-	{ CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG16rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG16rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG32rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG32rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG64rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG64rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG8B, X86_INS_CMPXCHG8B: cmpxchg8b */
+ 	X86_EFLAGS_MODIFY_ZF,
+-	{ CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG8rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG8rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_COMISDrm, X86_INS_COMISD: comisd */
+--- a/arch/X86/X86MappingInsnOp_reduce.inc
++++ b/arch/X86/X86MappingInsnOp_reduce.inc
+@@ -875,12 +875,12 @@
+ 
+ {	/* X86_BOUNDS16rm, X86_INS_BOUND: bound */
+ 	0,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_BOUNDS32rm, X86_INS_BOUND: bound */
+ 	0,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_BSF16rm, X86_INS_BSF: bsf */
+@@ -2050,52 +2050,52 @@
+ 
+ {	/* X86_CMPXCHG16B, X86_INS_CMPXCHG16B: cmpxchg16b */
+ 	X86_EFLAGS_MODIFY_ZF,
+-	{ CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG16rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG16rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG32rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG32rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG64rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG64rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG8B, X86_INS_CMPXCHG8B: cmpxchg8b */
+ 	X86_EFLAGS_MODIFY_ZF,
+-	{ CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG8rm, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_READ, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CMPXCHG8rr, X86_INS_CMPXCHG: cmpxchg */
+ 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
++	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_CPUID, X86_INS_CPUID: cpuid */
+@@ -7110,7 +7110,7 @@
+ 
+ {	/* X86_UD1, X86_INS_UD1: ud1 */
+ 	0,
+-	{ 0 }
++	{ CS_AC_READ, CS_AC_READ, 0 }
+ },
+ 
+ {	/* X86_UD2, X86_INS_UD2: ud2 */
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11883,39 +11883,12 @@
+ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 				 uint64_t *eflags)
+ {
+-	/* Match the explicit UD1 descriptor in readOperands, including reduce
+-	 * builds whose generated access table has no operands for UD1. */
+-	static const uint8_t ud1_access[] = { CS_AC_READ, CS_AC_READ, 0 };
+-	if (id == X86_UD1) {
+-		*eflags = 0;
+-		return ud1_access;
+-	}
+ 	unsigned int i = find_insn_h(h, id);
+-	if (i != -1) {
+-		*eflags = insn_ops[i].flags;
+-		/* Compare-exchange reads and conditionally replaces its destination;
+-		 * memory destinations receive a write cycle even on mismatch. */
+-		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
+-							  CS_AC_READ, 0 };
+-		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
+-		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
+-		switch (insns[i].mapid) {
+-		case X86_INS_BOUND:
+-			/* BOUND compares the index without modifying it or EFLAGS. */
+-			*eflags = 0;
+-			return bound_access;
+-		case X86_INS_CMPXCHG:
+-			return compare_access;
+-		case X86_INS_CMPXCHG8B:
+-		case X86_INS_CMPXCHG16B:
+-			return pair_access;
+-		default:
+-			break;
+-		}
+-		return insn_ops[i].access;
+-	}
+-
+-	return NULL;
++	if (i == (unsigned int)-1)
++		return NULL;
++
++	*eflags = insn_ops[i].flags;
++	return insn_ops[i].access;
+ }
+ 
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,

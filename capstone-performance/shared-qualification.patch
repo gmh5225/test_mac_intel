@@ -1,0 +1,94 @@
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -9,6 +9,7 @@
+ import re
+ 
+ import x86_disassembler_tables as tables
++import x86_mapping_counts
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ X86 = ROOT / "arch" / "X86"
+@@ -479,10 +480,9 @@
+         )
+     }
+     mapping = {}
+-    source = tables.uncomment((X86 / f"X86MappingInsn{suffix}.inc").read_text())
+-    for name, public_name in re.findall(
+-        r"\{\s*(X86_\w+)\s*,\s*(X86_INS_\w+)\s*,", source
+-    ):
++    source = (X86 / f"X86MappingInsn{suffix}.inc").read_text()
++    for row in x86_mapping_counts.entries(source):
++        name, public_name = row.group(1, 2)
+         uid, mapid = internal[name], public[public_name]
+         tables.require(uid not in mapping, "Duplicate mapped instruction ID")
+         tables.require(
+@@ -502,7 +502,8 @@
+         words[opcode] = (mapping[opcode] << 16) | row
+     lines = ["static const uint32_t x86_initial_insn_lut[] = {"]
+     for start in range(0, len(words), 8):
+-        lines.append("\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ",")
++        values = ", ".join(f"0x{word:08x}u" for word in words[start : start + 8])
++        lines.append(f"\t{values},")
+     return "\n".join(lines + ["};"])
+ 
+ 
+--- a/tests/unit/x86_mapping_counts.c
++++ b/tests/unit/x86_mapping_counts.c
+@@ -6,6 +6,32 @@
+ #ifndef CAPSTONE_DIET
+ #include "../../arch/X86/X86GenMappingCounts.inc"
+ #endif
++
++/* Validate the cache against the canonical instruction map, including holes
++ * and the unallocated suffix of the 16-bit opcode space. */
++static int check_lookup(void)
++{
++	csh handle;
++	cs_arch_register_x86();
++	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
++		return 1;
++	const cs_struct *h = (const cs_struct *)handle;
++	int status = 0;
++	for (unsigned int id = 0; id <= UINT16_MAX; ++id) {
++		unsigned int row = find_insn(id);
++		uint32_t expected = row == (unsigned int)-1 ?
++			UINT32_MAX : ((uint32_t)insns[row].mapid << 16) | row;
++		uint32_t actual = h->x86_insn_lut && id <= h->x86_insn_lut_max ?
++			h->x86_insn_lut[id] : UINT32_MAX;
++		if (actual != expected) {
++			fprintf(stderr, "Instruction lookup mismatch for opcode %u\n", id);
++			status = 1;
++			break;
++		}
++	}
++	cs_close(&handle);
++	return status;
++}
+ 
+ int main(void)
+ {
+@@ -22,5 +48,5 @@
+ 		}
+ 	}
+ #endif
+-	return 0;
++	return check_lookup();
+ }
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -619,6 +619,15 @@
+ Its `--check` mode and unit checks validate the full/reduced projection and reject
+ statements that cannot be skipped under this guard.
+ 
++Ordinary x86 handles share immutable instruction and implicit-register lookup
++tables. Full and reduced builds project their own opcode numbers from the
++canonical maps. Custom memory hooks receive private copies in the original
++allocation order and can use the existing fallback if either allocation
++fails. After changing the mapping rows, the register lists or their enums,
++run `python3 suite/synctools/x86_operand_specializations.py` and its
++`--check` mode. The mapping unit compares every 16-bit opcode with the
++canonical instruction map.
++
+ The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
+ unused high bits of their existing opcode records. The string bytes and operand
+ fragment masks remain authoritative. After updating `X86GenAsmWriter*.inc`, run

@@ -1,0 +1,66 @@
+--- a/tests/unit/x86_mapping_counts.c
++++ b/tests/unit/x86_mapping_counts.c
+@@ -7,16 +7,46 @@
+ #include "../../arch/X86/X86GenMappingCounts.inc"
+ #endif
+ 
++#ifndef CAPSTONE_DIET
++static bool check_access_row(size_t i)
++{
++	uint8_t first = CS_AC_READ;
++	uint8_t second = CS_AC_READ;
++	bool preserve_flags = false;
++	switch (insns[i].mapid) {
++	case X86_INS_BOUND:
++	case X86_INS_UD1:
++		preserve_flags = true;
++		break;
++	case X86_INS_CMPXCHG:
++		first = CS_AC_READ_WRITE;
++		break;
++	case X86_INS_CMPXCHG8B:
++	case X86_INS_CMPXCHG16B:
++		first = CS_AC_READ_WRITE;
++		second = 0;
++		break;
++	default:
++		return true;
++	}
++
++	uint64_t flags = UINT64_MAX;
++	const uint8_t *access = X86_get_op_access(NULL, insns[i].id, &flags);
++	return access && access[0] == first && access[1] == second &&
++	       (!second || !access[2]) && (!preserve_flags || flags == 0);
++}
++#endif
++
+ int main(void)
+ {
+ #ifndef CAPSTONE_DIET
+ 	for (size_t i = 0; i < ARR_SIZE(x86_mapping_counts); ++i) {
+ 		unsigned counts = x86_mapping_counts[i];
+-		if ((counts & 31) != count_positive(insns[i].regs_use) ||
++		if (!check_access_row(i) || (counts & 31) != count_positive(insns[i].regs_use) ||
+ 		    ((counts >> 5) & 31) != count_positive(insns[i].regs_mod) ||
+ 		    ((counts >> 10) & 15) != count_positive8(insns[i].groups)) {
+ 			fprintf(stderr,
+-				"Mapping count mismatch at row %zu, opcode %u\n",
++				"Mapping metadata mismatch at row %zu, opcode %u\n",
+ 				i, insns[i].id);
+ 			return 1;
+ 		}
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -619,6 +619,12 @@
+ Its `--check` mode and unit checks validate the full/reduced projection and reject
+ statements that cannot be skipped under this guard.
+ 
++The full and reduced operand tables supply flags and access masks from the
++same row. BOUND and UD1 expose two read operands and leave flags unchanged.
++CMPXCHG reads its source and both reads and writes its destination.
++CMPXCHG8B and CMPXCHG16B expose a read/write memory operand. The mapping
++unit checks every corresponding opcode after table updates.
++
+ The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
+ unused high bits of their existing opcode records. The string bytes and operand
+ fragment masks remain authoritative. After updating `X86GenAsmWriter*.inc`, run
