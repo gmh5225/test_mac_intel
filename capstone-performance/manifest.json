@@ -11,8 +11,8 @@
       "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
     },
     "candidate.patch": {
-      "experiment": "round367-integrated-mapped-details/runtime.patch",
-      "sha256": "bb343d37f40af2e8704a2f8ef1775b378817bfb49e51d71800c9c4a0a9b74d80"
+      "experiment": "round373-shared-mapping-qualification/product.patch",
+      "sha256": "976bf6c86b167b1bc007c02094fd1f504ea76ffe59df4dbca8d482a1c36dd05b"
     },
     "check-hint.c": {
       "experiment": "round357-x86-handle-lookup/check-lookup.c",
@@ -61,6 +61,10 @@
     "check-final.c": {
       "experiment": "round364-intel-mapped-details/check-final.c",
       "sha256": "a014b34ab5e305ceab3349477234f84ac0fe91cb524ee976c55e420f652db6f0"
+    },
+    "check-metadata.c": {
+      "experiment": "round370-common-mapping/check-metadata.c",
+      "sha256": "46393d66f8c87504616920db397c3ce5cf61613f9fd059ec339ae3bf34c186ef"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
@@ -150,8 +154,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
       "package_sha256": "1299ab6f9389a288eb2f5f3dd222c26cc777b9a2d5ecb6ee4cbd340cebcdada2",
       "kind": "deb",
-      "command": "ls",
-      "text_sha256": "d11b2e2ed06752ae32d98df7a21ab3a007d32f8677c3694dd9e8990eb143b15b"
+      "command": "ls"
     },
     {
       "name": "amd64-cp",
@@ -159,8 +162,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
       "package_sha256": "1299ab6f9389a288eb2f5f3dd222c26cc777b9a2d5ecb6ee4cbd340cebcdada2",
       "kind": "deb",
-      "command": "cp",
-      "text_sha256": "bff4557594748a43c11ca2d44ba2323904f175037b83859c0e951dcbaea74072"
+      "command": "cp"
     },
     {
       "name": "amd64-sort",
@@ -168,8 +170,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
       "package_sha256": "1299ab6f9389a288eb2f5f3dd222c26cc777b9a2d5ecb6ee4cbd340cebcdada2",
       "kind": "deb",
-      "command": "sort",
-      "text_sha256": "3cabbc65081ac7c0c5c4abeb2dce4ad2f0e78a8c27f501c50a7d1cd4a449948d"
+      "command": "sort"
     },
     {
       "name": "arm64-ls",
@@ -186,8 +187,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
       "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
       "kind": "deb",
-      "command": "cp",
-      "text_sha256": "82569bcb320c864a08cf37798b610396d1e1066f68758826e3294e561987d393"
+      "command": "cp"
     },
     {
       "name": "arm-sort",
@@ -195,8 +195,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
       "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
       "kind": "deb",
-      "command": "sort",
-      "text_sha256": "76987581cc48d7187eb2ad76293be2b89414d7277c22ad6093ce9b770169a824"
+      "command": "sort"
     },
     {
       "name": "arm64-cp",
@@ -204,8 +203,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
       "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
       "kind": "deb",
-      "command": "cp",
-      "text_sha256": "1a666908633014a2da302c3b6ff3dafceb512889485efec3dc79fc0e0461fe23"
+      "command": "cp"
     },
     {
       "name": "arm64-sort",
@@ -213,8 +211,7 @@
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
       "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
       "kind": "deb",
-      "command": "sort",
-      "text_sha256": "dc294089d4cfe7b832bb045015981f02a8f85e7de744883756a6deb6b672d73b"
+      "command": "sort"
     },
     {
       "name": "arc-ld-linux-arc",
@@ -278,6 +275,60 @@
       "kind": "deb",
       "command": "sort",
       "text_sha256": "c591f3113374726c163b6448964bb5f8e7bbcb7a9fd480efac27f5aa339690dc"
+    },
+    {
+      "name": "s390x-ls",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "46819752e9b45e34a3402b173ffa4099c4a2a249647062c92de2c8f99606db08"
+    },
+    {
+      "name": "s390x-sort",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "3423b7a3b4c97f02d0b9f41d3cd95917f1415c934f9ae64f946c8de6a8b2f881"
+    },
+    {
+      "name": "s390x-cp",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "8233e8f281a6961b61d5ed52224317097681dc05a86c0b21d73a8376547f915d"
+    },
+    {
+      "name": "sparc64-ls",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "c3cab47f209f053de272d4c9b6fc28d5a457d8cb2c8569fcbd5e7e453010511a"
+    },
+    {
+      "name": "sparc64-sort",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "124d1ade2c7c2b3d5cc4d11487a45c85d7d711ae57678e9af3f97a9c61da128c"
+    },
+    {
+      "name": "sparc64-cp",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "440f5a0e2465f1ca824c7faac73c4eea33d917a9b6832c2d95b2353f63679fd4"
     }
   ]
 }

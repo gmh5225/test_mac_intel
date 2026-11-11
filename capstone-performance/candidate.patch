@@ -10,8 +10,47 @@ index 641480ed..fba4fc98 100644
  
  	// These flags could be used to pass some info from one target subcomponent
  	// to another, for example, from disassembler to asm printer. The values of
+diff --git a/Mapping.c b/Mapping.c
+index 11b3e619..d479c9a9 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -334,6 +334,18 @@ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size)
+ 	return;
+ }
+ 
++void map_insn_metadata(MCInst *MI, const insn_map *imap, unsigned int imap_size)
++{
++	map_cs_id(MI, imap, imap_size);
++#ifndef CAPSTONE_DIET
++	if (MI->flat_insn->detail) {
++		map_implicit_reads(MI, imap);
++		map_implicit_writes(MI, imap);
++		map_groups(MI, imap);
++	}
++#endif
++}
++
+ /// Returns the operand type information from the
+ /// mapping table for instruction operands.
+ /// Only usable by `auto-sync` archs!
+diff --git a/Mapping.h b/Mapping.h
+index 9f69f881..ebae2b48 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -125,6 +125,11 @@ void map_groups(MCInst *MI, const insn_map *imap);
+ 
+ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size);
+ 
++// Set the public ID and append implicit reads, writes and groups when a detail
++// buffer is present. Registers and groups already added by decoding are kept.
++CAPSTONE_INTERNAL void map_insn_metadata(MCInst *MI, const insn_map *imap,
++					 unsigned int imap_size);
++
+ const void *map_get_suppl_info(MCInst *MI, const insn_map *imap);
+ 
+ #define DECL_get_detail_op(arch, ARCH) \
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index 81b5e334..fa08c665 100644
+index 81b5e334..667c73f6 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
 @@ -285,23 +285,37 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
@@ -63,11 +102,35 @@ index 81b5e334..fa08c665 100644
  }
  
  static void AArch64_check_updates_flags(MCInst *MI)
+@@ -859,10 +873,7 @@ static void AArch64_add_not_defined_ops(MCInst *MI, const SStream *OS)
+ 
+ void AArch64_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+-	map_implicit_reads(MI, aarch64_insns);
+-	map_implicit_writes(MI, aarch64_insns);
+-	map_groups(MI, aarch64_insns);
++	map_insn_metadata(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+ }
+ 
+ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
-index a4627cb9..30f42ab7 100644
+index a4627cb9..e0dd8c89 100644
 --- a/arch/ARC/ARCMapping.c
 +++ b/arch/ARC/ARCMapping.c
-@@ -173,15 +173,14 @@ void ARC_setup_op(cs_arc_op *op)
+@@ -135,10 +135,7 @@ const insn_map arc_insns[] = {
+ 
+ void ARC_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, arc_insns, ARR_SIZE(arc_insns));
+-	map_implicit_reads(MI, arc_insns);
+-	map_implicit_writes(MI, arc_insns);
+-	map_groups(MI, arc_insns);
++	map_insn_metadata(MI, arc_insns, ARR_SIZE(arc_insns));
+ }
+ 
+ bool ARC_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -173,15 +170,14 @@ void ARC_setup_op(cs_arc_op *op)
  
  void ARC_init_cs_detail(MCInst *MI)
  {
@@ -90,10 +153,19 @@ index a4627cb9..30f42ab7 100644
  
  #ifndef CAPSTONE_DIET
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 8f2a2961..bf096bfc 100644
+index 8f2a2961..5885a10c 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -939,27 +939,39 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -836,6 +836,8 @@ void ARM_check_updates_flags(MCInst *MI)
+ void ARM_set_instr_map_data(MCInst *MI)
+ {
+ 	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, arm_insns);
+ 	map_implicit_writes(MI, arm_insns);
+ 	ARM_check_updates_flags(MI);
+@@ -939,27 +941,39 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -146,11 +218,39 @@ index 8f2a2961..bf096bfc 100644
  }
  
  static uint64_t t_add_pc(MCInst *MI, uint64_t v)
+diff --git a/arch/Alpha/AlphaMapping.c b/arch/Alpha/AlphaMapping.c
+index a2d5d133..2a497252 100644
+--- a/arch/Alpha/AlphaMapping.c
++++ b/arch/Alpha/AlphaMapping.c
+@@ -171,10 +171,7 @@ void Alpha_printInst(MCInst *MI, SStream *O, void *Info)
+ 
+ void Alpha_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, insns, ARR_SIZE(insns));
+-	map_implicit_reads(MI, insns);
+-	map_implicit_writes(MI, insns);
+-	map_groups(MI, insns);
++	map_insn_metadata(MI, insns, ARR_SIZE(insns));
+ }
+ 
+ bool Alpha_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
-index 52c46bbf..94d7b76a 100644
+index 52c46bbf..ab8c0ef9 100644
 --- a/arch/LoongArch/LoongArchMapping.c
 +++ b/arch/LoongArch/LoongArchMapping.c
-@@ -500,16 +500,16 @@ void LoongArch_setup_op(cs_loongarch_op *op)
+@@ -376,10 +376,7 @@ void LoongArch_rewrite_address_operand(MCInst *MI)
+ 
+ void LoongArch_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
+-	map_implicit_reads(MI, loongarch_insns);
+-	map_implicit_writes(MI, loongarch_insns);
+-	map_groups(MI, loongarch_insns);
++	map_insn_metadata(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
+ 	const loongarch_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, loongarch_insns);
+ 	if (suppl_info) {
+@@ -500,16 +497,16 @@ void LoongArch_setup_op(cs_loongarch_op *op)
  
  void LoongArch_init_cs_detail(MCInst *MI)
  {
@@ -177,6 +277,22 @@ index 52c46bbf..94d7b76a 100644
  	}
  }
  
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 57d3b638..dd5bd6c2 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -252,10 +252,7 @@ void Mips_set_instr_map_data(MCInst *MI)
+ 		}
+ 	}
+ 
+-	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
+-	map_implicit_reads(MI, mips_insns);
+-	map_implicit_writes(MI, mips_insns);
+-	map_groups(MI, mips_insns);
++	map_insn_metadata(MI, mips_insns, ARR_SIZE(mips_insns));
+ #ifndef CAPSTONE_DIET
+ 	if ((MI->csh->mode & CS_MODE_MIPS16) && detail_is_set(MI)) {
+ 		cs_detail *detail = get_detail(MI);
 diff --git a/arch/PowerPC/PPCGenAsmWriter.inc b/arch/PowerPC/PPCGenAsmWriter.inc
 index e0991b10..dcbe984b 100644
 --- a/arch/PowerPC/PPCGenAsmWriter.inc
@@ -423,10 +539,22 @@ index 9b0463a3..96722ec6 100644
  
  #endif // CS_PPC_LINKAGE_H
 diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index fd26a73a..bc3ce76e 100644
+index fd26a73a..c4383f86 100644
 --- a/arch/PowerPC/PPCMapping.c
 +++ b/arch/PowerPC/PPCMapping.c
-@@ -323,8 +323,17 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -290,10 +290,7 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
+ 
+ void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
+ {
+-	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
+-	map_implicit_reads(MI, ppc_insns);
+-	map_implicit_writes(MI, ppc_insns);
+-	map_groups(MI, ppc_insns);
++	map_insn_metadata(MI, ppc_insns, ARR_SIZE(ppc_insns));
+ 	PPC_add_branch_predicates(MI, Bytes, BytesLen);
+ 	PPC_check_updates_cr0(MI);
+ 	const ppc_suppl_info *suppl_info = map_get_suppl_info(MI, ppc_insns);
+@@ -323,8 +320,17 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	MI->MRI = (MCRegisterInfo *)info;
  	MI->fillDetailOps = detail_is_set(MI);
  	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
@@ -446,6 +574,54 @@ index fd26a73a..bc3ce76e 100644
  	map_set_alias_id(MI, O, insn_alias_mnem_map,
  			 ARR_SIZE(insn_alias_mnem_map));
  #endif
+diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
+index 6c945c17..6b7abe94 100644
+--- a/arch/Sparc/SparcMapping.c
++++ b/arch/Sparc/SparcMapping.c
+@@ -33,10 +33,7 @@ const insn_map sparc_insns[] = {
+ 
+ void Sparc_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
+-	map_implicit_reads(MI, sparc_insns);
+-	map_implicit_writes(MI, sparc_insns);
+-	map_groups(MI, sparc_insns);
++	map_insn_metadata(MI, sparc_insns, ARR_SIZE(sparc_insns));
+ 	const sparc_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, sparc_insns);
+ 	if (suppl_info) {
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 0e42613c..8d488d93 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -42,10 +42,7 @@ const insn_map systemz_insns[] = {
+ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 				size_t BytesLen)
+ {
+-	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
+-	map_implicit_reads(MI, systemz_insns);
+-	map_implicit_writes(MI, systemz_insns);
+-	map_groups(MI, systemz_insns);
++	map_insn_metadata(MI, systemz_insns, ARR_SIZE(systemz_insns));
+ 	const systemz_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, systemz_insns);
+ 	if (suppl_info) {
+diff --git a/arch/TriCore/TriCoreMapping.c b/arch/TriCore/TriCoreMapping.c
+index 223b44d7..3e919403 100644
+--- a/arch/TriCore/TriCoreMapping.c
++++ b/arch/TriCore/TriCoreMapping.c
+@@ -67,10 +67,7 @@ static inline void check_updates_flags(MCInst *MI)
+ static void set_instr_map_data(MCInst *MI)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_cs_id(MI, mapping_insns, ARR_SIZE(mapping_insns));
+-	map_implicit_reads(MI, mapping_insns);
+-	map_implicit_writes(MI, mapping_insns);
+-	map_groups(MI, mapping_insns);
++	map_insn_metadata(MI, mapping_insns, ARR_SIZE(mapping_insns));
+ 	check_updates_flags(MI);
+ #endif
+ }
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
 index 8c3dea2e..c5a118f8 100644
 --- a/arch/X86/X86Disassembler.c
@@ -3116,7 +3292,7 @@ index aae2c545..e89322c3 100644
  
  #endif // CAPSTONE_SSTREAM_PRECHECKED
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..91ee7c9a 100644
+index df60fd3f..d7af5899 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10810,11 +10810,8 @@ struct insn_reg2 {
@@ -3133,7 +3309,7 @@ index df60fd3f..91ee7c9a 100644
  
  static inline x86_reg unpack_insn_reg(uint16_t value, enum cs_ac_type *access)
  {
-@@ -11167,71 +11164,44 @@ static int binary_search2(const struct insn_reg2 *insns, unsigned int max,
+@@ -11167,71 +11164,42 @@ static int binary_search2(const struct insn_reg2 *insns, unsigned int max,
  	return -1;
  }
  
@@ -3168,9 +3344,7 @@ index df60fd3f..91ee7c9a 100644
 -	if (!h->x86_insn_reg_lut)
 +#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	if (cs_mem_malloc == malloc && cs_mem_calloc == calloc &&
-+	    cs_mem_realloc == realloc && cs_mem_free == free &&
-+	    cs_vsnprintf == vsnprintf) {
++	if (cs_mem_uses_system_defaults()) {
 +		h->x86_insn_lut = x86_initial_insn_lut;
 +		h->x86_insn_reg_lut = x86_initial_reg_lut;
 +		h->x86_uses_shared_luts = true;
@@ -3230,7 +3404,7 @@ index df60fd3f..91ee7c9a 100644
  }
  
  // return register of given instruction id
-@@ -11986,6 +11956,49 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -11986,6 +11954,49 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -3293,8 +3467,24 @@ index a2677cb8..8b191696 100644
  // return register of given instruction id
  // return 0 if not found
  // this is to handle instructions embedding accumulate registers into AsmStrs[]
+diff --git a/arch/Xtensa/XtensaMapping.c b/arch/Xtensa/XtensaMapping.c
+index 8a0055ff..f52c4341 100644
+--- a/arch/Xtensa/XtensaMapping.c
++++ b/arch/Xtensa/XtensaMapping.c
+@@ -55,10 +55,7 @@ void Xtensa_printer(MCInst *MI, SStream *OS, void *info)
+ static void set_instr_map_data(MCInst *MI)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_cs_id(MI, mapping_insns, ARR_SIZE(mapping_insns));
+-	map_implicit_reads(MI, mapping_insns);
+-	map_implicit_writes(MI, mapping_insns);
+-	map_groups(MI, mapping_insns);
++	map_insn_metadata(MI, mapping_insns, ARR_SIZE(mapping_insns));
+ 
+ 	const xtensa_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, mapping_insns);
 diff --git a/cs.c b/cs.c
-index 0a91fe20..fae500f9 100644
+index 0a91fe20..d99ecea5 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -78,6 +78,7 @@
@@ -3305,7 +3495,25 @@ index 0a91fe20..fae500f9 100644
  #include "arch/X86/X86Disassembler.h"
  #endif
  #include "arch/X86/X86Module.h"
-@@ -885,8 +886,10 @@ cs_err CAPSTONE_API cs_close(csh *handle)
+@@ -488,6 +489,17 @@ cs_free_t cs_mem_free = free;
+ cs_vsnprintf_t cs_vsnprintf = _vsnprintf;
+ #else
+ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
++
++#ifdef CAPSTONE_HAS_X86
++/* Compare with the same CRT functions used to initialize the hooks above.
++ * A CRT inline wrapper can have different addresses in different C files. */
++bool cs_mem_uses_system_defaults(void)
++{
++	return cs_mem_malloc == malloc && cs_mem_calloc == calloc &&
++	       cs_mem_realloc == realloc && cs_mem_free == free &&
++	       cs_vsnprintf == vsnprintf;
++}
++#endif
+ #endif // defined(_WIN32_WCE)
+ 
+ #elif defined(_KERNEL_MODE)
+@@ -885,8 +897,10 @@ cs_err CAPSTONE_API cs_close(csh *handle)
  	}
  
  	cs_mem_free(ud->insn_cache);
@@ -3318,7 +3526,7 @@ index 0a91fe20..fae500f9 100644
  
  	memset(ud, 0, sizeof(*ud));
  	cs_mem_free(ud);
-@@ -945,7 +948,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -945,7 +959,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  		insn->id = MCInst_getOpcodePub(mci);
  
  	// post printer handles some corner cases (hacky)
@@ -3328,7 +3536,7 @@ index 0a91fe20..fae500f9 100644
  		postprinter((csh)handle, insn, OS, mci);
  
  #ifndef CAPSTONE_DIET
-@@ -1065,13 +1069,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1065,13 +1080,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  			ss.is_closed = false;
  			ss.markup_stream = false;
  			ss.prefixed_by_markup = false;
@@ -3353,7 +3561,7 @@ index 0a91fe20..fae500f9 100644
  #endif
  		{
 diff --git a/cs_priv.h b/cs_priv.h
-index aacedd8d..c0be7ba7 100644
+index aacedd8d..ca12a636 100644
 --- a/cs_priv.h
 +++ b/cs_priv.h
 @@ -122,9 +122,10 @@ struct cs_struct {
@@ -3369,3 +3577,766 @@ index aacedd8d..c0be7ba7 100644
  	unsigned int x86_insn_lut_max;
  	// A mapping of LLVM instruction IDs to capstone instruction IDs, with
  	// some supplementary information, sorted in ascending order by LLVM
+@@ -167,6 +168,7 @@ extern cs_calloc_t cs_mem_calloc;
+ extern cs_realloc_t cs_mem_realloc;
+ extern cs_free_t cs_mem_free;
+ extern cs_vsnprintf_t cs_vsnprintf;
++CAPSTONE_INTERNAL bool cs_mem_uses_system_defaults(void);
+ 
+ static inline bool cs_mem_is_setup()
+ {
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index f8d6b926..1bd0b7c4 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -619,6 +619,22 @@ Run the generator after changing either mapping table or the repair switches.
+ Its `--check` mode and unit checks validate the full/reduced projection and reject
+ statements that cannot be skipped under this guard.
+ 
++Ordinary x86 handles share immutable instruction and implicit-register lookup
++tables. Full and reduced builds project their own opcode numbers from the
++canonical maps. Custom memory hooks receive private copies in the original
++allocation order and can use the existing fallback if either allocation
++fails. After changing the mapping rows, the register lists or their enums,
++run `python3 suite/synctools/x86_operand_specializations.py` and its
++`--check` mode. The mapping unit compares every 16-bit opcode with the
++canonical instruction map.
++
++The Intel printer can finish ordinary one-byte instructions directly when it
++controls the output stream. Encoding classification uses the existing detail
++decode. RCL, x87 and extension encodings retain post-print repairs. A custom
++formatter can insert decorators into scalar text, so its output still passes
++through the post-printer. With detail disabled, the built-in post-printer can
++still resolve VPCMP public IDs.
++
+ The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
+ unused high bits of their existing opcode records. The string bytes and operand
+ fragment masks remain authoritative. After updating `X86GenAsmWriter*.inc`, run
+diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
+index 850fa787..ff49d43e 100644
+--- a/suite/auto-sync/README.md
++++ b/suite/auto-sync/README.md
+@@ -118,6 +118,11 @@ SystemZ's shared 64-bit input for all three instruction lengths. Xtensa's
+ table calls share the generated 64-bit `_3` helper; the translator preserves
+ that choice instead of inferring a helper suffix from the encoded width.
+ 
++After updating the PowerPC assembly writer or alias mnemonic map, run
++`python3 suite/synctools/ppc_alias_hints.py` and verify with `--check`.
++The generated hint identifies a candidate row. The printer validates the
++emitted mnemonic against that row and searches the full map on a miss.
++
+ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+ `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+ The generated immediate-size lookup preserves the original metadata and uses
+diff --git a/suite/synctools/ppc_alias_hints.py b/suite/synctools/ppc_alias_hints.py
+new file mode 100644
+index 00000000..5a827de3
+--- /dev/null
++++ b/suite/synctools/ppc_alias_hints.py
+@@ -0,0 +1,229 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: BSD-3-Clause
++"""Project PPC alias-map hints from the original alias strings and name map.
++
++The final printer still validates the resulting mnemonic. A hint identifies the
++first map row with that name; zero requests the original lookup.
++"""
++
++import argparse
++import ast
++from pathlib import Path
++import re
++
++ROOT = Path(__file__).resolve().parents[2]
++BEGIN = "  /* Alias map hints: ppc_alias_hints.py. */\n"
++END = "  /* End alias map hints. */\n"
++
++
++def require(condition, message):
++    if not condition:
++        raise ValueError(message)
++
++
++def projection(strings, entries):
++    """All offsets must identify complete, contiguous NUL-terminated strings."""
++    require(strings and entries, "Missing alias strings or map entries")
++    expected = 0
++    for offset, value in strings:
++        require(
++            offset == expected and value.endswith(b"\0"), "Invalid alias string extent"
++        )
++        require(b"\0" not in value[:-1], "Embedded alias string terminator")
++        expected += len(value)
++    first = {}
++    for row, name in enumerate(entries, 1):
++        require(row < 65536, "Alias map exceeds hint width")
++        first.setdefault(name, row)
++    shift = 0
++    while shift < strings[-1][0].bit_length() and len(
++        {offset >> (shift + 1) for offset, _ in strings}
++    ) == len(strings):
++        shift += 1
++    slots = [0] * ((strings[-1][0] >> shift) + 1)
++    for offset, value in strings:
++        name = re.split(rb"[ \t$\x00]", value, maxsplit=1)[0]
++        if value[len(name) : len(name) + 1] == b"$" or len(name) > 15:
++            continue
++        slots[offset >> shift] = first.get(name, 0)
++    return shift, slots
++
++
++def original_writer(text):
++    require(text.count(BEGIN) == text.count(END) <= 1, "Incomplete hint table")
++    if BEGIN in text:
++        a = text.index(BEGIN)
++        b = text.index(END, a) + len(END)
++        text = text[:a] + text[b:]
++        assignment = re.compile(
++            r"  \*AliasHint = AliasMapHints\[\(AsmString - AsmStrings\) >> \d+\];\n"
++        )
++        text, count = assignment.subn("", text)
++        require(count == 1, "Missing alias hint assignment")
++        require(
++            text.count("SStream *OS, unsigned *AliasHint) {") == 1,
++            "Changed alias printer signature",
++        )
++        text = text.replace("SStream *OS, unsigned *AliasHint) {", "SStream *OS) {")
++    require(
++        "AliasMapHints" not in text and "AliasHint" not in text,
++        "Unrecognized alias hint integration",
++    )
++    return text
++
++
++def generate_writer(text, map_text):
++    text = original_writer(text)
++    start = text.index("static bool printAliasInstr(")
++    end = text.index("\n#endif // CAPSTONE_DIET\n}", start)
++    alias = text[start:end]
++    a = alias.index("static const char AsmStrings[] =")
++    b = alias.index(";", a)
++    strings = [
++        (int(offset), ast.literal_eval('b"' + raw + '"'))
++        for offset, raw in re.findall(r'/\* (\d+) \*/ "((?:\\.|[^"\\])*)"', alias[a:b])
++    ]
++    pattern_body = alias.split("static const AliasPattern Patterns[] = {", 1)[1].split(
++        "};", 1
++    )[0]
++    # LLVM emits a terminal zero record after the actual alias patterns.
++    pattern_body, sentinels = re.subn(r"\{\s*0\s*\},?\s*$", "", pattern_body)
++    require(sentinels == 1, "Missing terminal alias pattern")
++    offsets = [
++        int(x) for x in re.findall(r"\{(\d+),\s*\d+,\s*\d+,\s*\d+\s*\}", pattern_body)
++    ]
++    require(len(offsets) == pattern_body.count("{"), "Unknown alias pattern row")
++    require(
++        offsets and set(offsets) <= {offset for offset, _ in strings},
++        "Alias pattern does not reference a complete string",
++    )
++    rows = re.findall(r'\{ (PPC_INS_ALIAS_\w+), "([^"\n]+)" \}', map_text)
++    meaningful = re.sub(r"/\*.*?\*/|//[^\n]*", "", map_text, flags=re.S)
++    require(len(rows) == meaningful.count("{"), "Unknown alias name-map row")
++    shift, slots = projection(strings, [name.encode("ascii") for _, name in rows])
++    table = BEGIN + "  static const uint16_t AliasMapHints[] = {\n"
++    for i in range(0, len(slots), 16):
++        table += "    " + ", ".join(map(str, slots[i : i + 16])) + ",\n"
++    table += "  };\n" + END
++    require(alias.count("SStream *OS) {") == 1, "Changed alias printer signature")
++    alias = alias.replace("SStream *OS) {", "SStream *OS, unsigned *AliasHint) {", 1)
++    marker = "  unsigned I = 0;"
++    require(alias.count(marker) == 1, "Changed alias text traversal")
++    alias = alias.replace(marker, table + marker)
++    marker = "  return true;"
++    require(alias.count(marker) == 1, "Changed alias success boundary")
++    alias = alias.replace(
++        marker,
++        f"  *AliasHint = AliasMapHints[(AsmString - AsmStrings) >> {shift}];\n"
++        + marker,
++    )
++    return text[:start] + alias + text[end:]
++
++
++def integrate_printer(text):
++    """Return the local hint only after operand construction has completed."""
++    signature = re.search(r"static (?:void|unsigned) printInst\(", text)
++    require(signature is not None, "Missing PPC printInst")
++    a = signature.start()
++    b = text.index("\nconst char *PPC_LLVM_getRegisterName", a)
++    body = text[a:b]
++    if "unsigned aliasHint = 0;" in body:
++        require(
++            body.count("unsigned aliasHint = 0;") == 1
++            and body.count("return aliasHint;") == 1
++            and body.count("printAliasInstr(MI, Address, O, &aliasHint)") == 1,
++            "Incomplete local alias hint integration",
++        )
++        body = body.replace("static unsigned printInst(", "static void printInst(", 1)
++        body = body.replace("\tunsigned aliasHint = 0;\n", "")
++        body = body.replace("\treturn aliasHint;\n", "")
++        body = body.replace(
++            "printAliasInstr(MI, Address, O, &aliasHint)",
++            "printAliasInstr(MI, Address, O)",
++        )
++        body = body.replace("\treturn 0;", "\treturn;")
++        body = body.replace(
++            'CS_ASSERT_RET_VAL(0 && "Expressions not supported.", 0);',
++            'CS_ASSERT_RET(0 && "Expressions not supported.");',
++        )
++    require(
++        body.startswith("static void printInst(") and body.endswith("}\n"),
++        "Changed PPC printer boundary",
++    )
++    require(
++        body.count("\tbool isAlias = false;") == 1
++        and body.count("printAliasInstr(MI, Address, O)") == 1,
++        "Changed PPC alias control flow",
++    )
++    body = body.replace("static void printInst(", "static unsigned printInst(", 1)
++    body = body.replace(
++        "\tbool isAlias = false;", "\tunsigned aliasHint = 0;\n\tbool isAlias = false;"
++    )
++    body = body.replace(
++        "printAliasInstr(MI, Address, O)", "printAliasInstr(MI, Address, O, &aliasHint)"
++    )
++    body = body.replace("\treturn;", "\treturn 0;")
++    body = body.replace(
++        'CS_ASSERT_RET(0 && "Expressions not supported.");',
++        'CS_ASSERT_RET_VAL(0 && "Expressions not supported.", 0);',
++    )
++    require("CS_ASSERT_RET(" not in body, "New void assertion in PPC printer")
++    body = body[:-2] + "\treturn aliasHint;\n}\n"
++    text = text[:a] + body + text[b:]
++    text = integrate_linkage(text)
++    require(
++        text.count("\tprintInst(MI, Address, Annot, O);")
++        + text.count("\treturn printInst(MI, Address, Annot, O);")
++        == 1,
++        "Changed PPC forwarding call",
++    )
++    return text.replace(
++        "\tprintInst(MI, Address, Annot, O);",
++        "\treturn printInst(MI, Address, Annot, O);",
++    )
++
++
++def integrate_linkage(text):
++    require(
++        len(re.findall(r"(?:void|unsigned) PPC_LLVM_printInst\(", text)) == 1,
++        "Changed PPC private printer declaration",
++    )
++    return text.replace("void PPC_LLVM_printInst(", "unsigned PPC_LLVM_printInst(")
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--check", action="store_true")
++    parser.add_argument("--root", type=Path, default=ROOT)
++    args = parser.parse_args()
++    arch = args.root / "arch/PowerPC"
++    writer = arch / "PPCGenAsmWriter.inc"
++    printer = arch / "PPCInstPrinter.c"
++    linkage = arch / "PPCLinkage.h"
++    outputs = {
++        writer: generate_writer(
++            writer.read_text(), (arch / "PPCGenCSAliasMnemMap.inc").read_text()
++        ),
++        printer: integrate_printer(printer.read_text()),
++        linkage: integrate_linkage(linkage.read_text()),
++    }
++    require(
++        generate_writer(
++            outputs[writer], (arch / "PPCGenCSAliasMnemMap.inc").read_text()
++        )
++        == outputs[writer],
++        "Non-idempotent alias table projection",
++    )
++    require(
++        integrate_printer(outputs[printer]) == outputs[printer],
++        "Non-idempotent printer integration",
++    )
++    for path, expected in outputs.items():
++        if args.check:
++            require(path.read_text() == expected, "Regenerate " + str(path))
++        elif path.read_text() != expected:
++            path.write_text(expected)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index dbb25f26..e112c2a1 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -9,6 +9,7 @@ from pathlib import Path
+ import re
+ 
+ import x86_disassembler_tables as tables
++import x86_mapping_counts
+ 
+ ROOT = Path(__file__).resolve().parents[2]
+ X86 = ROOT / "arch" / "X86"
+@@ -454,6 +455,19 @@ def packed_terminal_decision(first, kind, words, kinds):
+     return TERMINAL_INDEXED | (kinds[kind] << tables.TYPE_SHIFT) | first
+ 
+ 
++def internal_instruction_ids(suffix):
++    source = (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
++    body = source.split("enum {", 1)[1].split("};", 1)[0]
++    return {
++        name: int(value)
++        for name, value in tables.scan_entries(
++            tables.uncomment(body),
++            re.compile(r"\s*(X86_\w+)\s*=\s*(\d+)\s*(?:,|$)"),
++            "internal instruction ID",
++        )
++    }
++
++
+ def public_instruction_ids(suffix):
+     header = (ROOT / "include/capstone/x86.h").read_text()
+     body = header.split("typedef enum x86_insn {", 1)[1].split("} x86_insn;", 1)[0]
+@@ -468,21 +482,11 @@ def public_instruction_ids(suffix):
+         tables.require(name not in public, "Duplicate public instruction ID")
+         public[name] = value
+     tables.require(public["X86_INS_INVALID"] == 0, "Invalid public ID changed")
+-    source = (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+-    body = source.split("enum {", 1)[1].split("};", 1)[0]
+-    internal = {
+-        name: int(value)
+-        for name, value in tables.scan_entries(
+-            tables.uncomment(body),
+-            re.compile(r"\s*(X86_\w+)\s*=\s*(\d+)\s*(?:,|$)"),
+-            "internal instruction ID",
+-        )
+-    }
++    internal = internal_instruction_ids(suffix)
+     mapping = {}
+-    source = tables.uncomment((X86 / f"X86MappingInsn{suffix}.inc").read_text())
+-    for name, public_name in re.findall(
+-        r"\{\s*(X86_\w+)\s*,\s*(X86_INS_\w+)\s*,", source
+-    ):
++    source = (X86 / f"X86MappingInsn{suffix}.inc").read_text()
++    for row in x86_mapping_counts.entries(source):
++        name, public_name = row.group(1, 2)
+         uid, mapid = internal[name], public[public_name]
+         tables.require(uid not in mapping, "Duplicate mapped instruction ID")
+         tables.require(
+@@ -492,6 +496,69 @@ def public_instruction_ids(suffix):
+     return mapping
+ 
+ 
++def emit_insn_lookup(suffix):
++    mapping = public_instruction_ids(suffix)
++    opcodes = list(mapping)
++    tables.require(opcodes == sorted(opcodes), "Mapping rows must be ordered by opcode")
++    tables.require(len(opcodes) <= 0x7FFF, "Mapping row exceeds signed index storage")
++    words = [0xFFFFFFFF] * (opcodes[-1] + 1)
++    for row, opcode in enumerate(opcodes):
++        words[opcode] = (mapping[opcode] << 16) | row
++    lines = ["static const uint32_t x86_initial_insn_lut[] = {"]
++    for start in range(0, len(words), 8):
++        values = ", ".join(f"0x{word:08x}u" for word in words[start : start + 8])
++        lines.append(f"\t{values},")
++    return "\n".join(lines + ["};"])
++
++
++def emit_reg_lookup(suffix):
++    source = tables.uncomment((X86 / "X86Mapping.c").read_text())
++    ids = internal_instruction_ids(suffix)
++    maximum = max(public_instruction_ids(suffix))
++    packed = {}
++    for shift, syntax in ((0, "intel"), (16, "att")):
++        rows = {}
++        for extra in ("", "_extra"):
++            table = f"insn_regs_{syntax}{extra}"
++            body = re.search(
++                r"static const struct insn_reg " + table + r"\[\] = \{(.*?)\n\};",
++                source,
++                re.S,
++            )
++            tables.require(body is not None, f"Missing {table}")
++            text = re.sub(
++                r"#ifndef CAPSTONE_X86_REDUCE\s+(.*?)\s*#endif",
++                "" if suffix else r"\1",
++                body[1],
++                flags=re.S,
++            )
++            row_pattern = re.compile(
++                r"\s*\{\s*(X86_\w+|0)\s*,\s*(X86_REG_\w+|0)\s*(?:,\s*(0|CS_AC_\w+(?:\s*\|\s*CS_AC_\w+)*))?\s*\}\s*,"
++            )
++            for opcode, reg, access in tables.scan_entries(text, row_pattern, table):
++                access = access or "0"
++                if opcode == "0":
++                    tables.require(
++                        extra and reg == access == "0",
++                        f"Unexpected sentinel in {table}",
++                    )
++                    continue
++                tables.require(
++                    reg != "0" and access != "0", f"Empty register entry in {table}"
++                )
++                if ids[opcode] > maximum or (extra and opcode in rows):
++                    continue
++                rows[opcode] = f"X86_PACK_INSN_REG({reg}, {access})"
++        for opcode, word in rows.items():
++            packed.setdefault(opcode, []).append(f"({word} << 16)" if shift else word)
++    lines = [
++        "static const uint32_t x86_initial_reg_lut[ARR_SIZE(x86_initial_insn_lut)] = {"
++    ]
++    for opcode in sorted(packed, key=ids.__getitem__):
++        lines.append(f"\t[{opcode}] = " + " | ".join(packed[opcode]) + ",")
++    return "\n".join(lines + ["};"])
++
++
+ def emit_terminal_tables(name, words, rows, kinds):
+     alignment = " X86_DECODE_ALIGN" if name == "LegacyPublic" else ""
+     lines = [f"static const uint32_t x86{name}Terminals[]{alignment} = {{"]
+@@ -1260,6 +1327,8 @@ def main():
+         (SCAN_OUTPUT, emit_scan),
+         (TERMINAL_OUTPUT, emit_terminal),
+         (X86 / "X86GenVexScan.inc", emit_vex_scan),
++        (X86 / "X86GenInsnLookup.inc", emit_insn_lookup),
++        (X86 / "X86GenImplicitRegLookup.inc", emit_reg_lookup),
+     ]
+     generated = [(path, generated_output(emit)) for path, emit in outputs]
+     for path, output in generated:
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 53f84ba9..3fe14bd8 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -13,6 +13,12 @@ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
+             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_mapping_diet_types.py")
+     endif()
+ endif()
++if(CAPSTONE_PPC_SUPPORT AND Python3_Interpreter_FOUND)
++    add_test(NAME unit_ppc_alias_hints_generator
++        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/ppc_alias_hints.py" --check)
++    add_test(NAME unit_ppc_alias_hints_parser
++        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_ppc_alias_hints.py")
++endif()
+ if(CAPSTONE_MIPS_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 6b15c4fe..16018279 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -188,11 +188,43 @@ static bool test_alias_lookup(void)
+ 	return true;
+ }
+ 
++static bool test_insn_metadata(void)
++{
++	insn_map table[2] = { 0 };
++	table[1].id = 1;
++	table[1].mapid = 41;
++	cs_insn insn = { 0 };
++	MCInst MI = { 0 };
++	MI.Opcode = 1;
++	MI.flat_insn = &insn;
++	map_insn_metadata(&MI, table, ARR_SIZE(table));
++	if (insn.id != 41)
++		return false;
++#ifndef CAPSTONE_DIET
++	cs_detail detail = { 0 };
++	insn.detail = &detail;
++	detail.regs_read[detail.regs_read_count++] = 1;
++	detail.regs_write[detail.regs_write_count++] = 2;
++	detail.groups[detail.groups_count++] = 3;
++	table[1].regs_use[0] = 4;
++	table[1].regs_mod[0] = 5;
++	table[1].groups[0] = 6;
++	map_insn_metadata(&MI, table, ARR_SIZE(table));
++	return detail.regs_read_count == 2 && detail.regs_read[0] == 1 &&
++	       detail.regs_read[1] == 4 && detail.regs_write_count == 2 &&
++	       detail.regs_write[0] == 2 && detail.regs_write[1] == 5 &&
++	       detail.groups_count == 2 && detail.groups[0] == 3 &&
++	       detail.groups[1] == 6;
++#else
++	return true;
++#endif
++}
++
+ int main(void)
+ {
+ 	return test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+-			       test_duplicate_selection() &&
++			       test_duplicate_selection() && test_insn_metadata() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
+ 			       find_cs_id(UINT_MAX, NULL, 0) == UINT_MAX ?
+ 		       0 :
+diff --git a/tests/unit/test_ppc_alias_hints.py b/tests/unit/test_ppc_alias_hints.py
+new file mode 100644
+index 00000000..50554822
+--- /dev/null
++++ b/tests/unit/test_ppc_alias_hints.py
+@@ -0,0 +1,99 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: BSD-3-Clause
++
++import importlib.util
++from pathlib import Path
++import re
++import unittest
++
++ROOT = Path(__file__).resolve().parents[2]
++SPEC = importlib.util.spec_from_file_location(
++    "ppc_alias_hints", ROOT / "suite/synctools/ppc_alias_hints.py"
++)
++GENERATOR = importlib.util.module_from_spec(SPEC)
++SPEC.loader.exec_module(GENERATOR)
++
++
++class AliasHintGeneration(unittest.TestCase):
++    @staticmethod
++    def strings(values):
++        offset = 0
++        result = []
++        for value in values:
++            result.append((offset, value))
++            offset += len(value)
++        return result
++
++    def test_first_row_unknown_dynamic_and_limit(self):
++        strings = self.strings(
++            [
++                b"move $\x01\0",
++                b"move.w $\x01\0",
++                b"absent\0",
++                b"move$\x01\0",
++                b"123456789abcdef r0\0",
++                b"123456789abcdefg r0\0",
++            ]
++        )
++        entries = [b"move", b"move.w", b"move", b"123456789abcdef", b"123456789abcdefg"]
++        shift, slots = GENERATOR.projection(strings, entries)
++        self.assertEqual(
++            [slots[offset >> shift] for offset, _ in strings], [1, 2, 0, 0, 4, 0]
++        )
++        self.assertEqual(len({offset >> shift for offset, _ in strings}), len(strings))
++
++    def test_bad_extent_and_width(self):
++        cases = [
++            [],
++            [(1, b"move\0")],
++            [(0, b"move")],
++            [(0, b"mo\0ve\0")],
++            [(0, b"a\0"), (1, b"b\0")],
++        ]
++        for strings in cases:
++            with self.subTest(strings=strings), self.assertRaises(ValueError):
++                GENERATOR.projection(strings, [b"move"])
++        with self.assertRaises(ValueError):
++            GENERATOR.projection([(0, b"move\0")], [b"move"] * 65536)
++
++    def test_checkout_idempotence_and_regeneration(self):
++        arch = ROOT / "arch/PowerPC"
++        source = (arch / "PPCGenAsmWriter.inc").read_text()
++        names = (arch / "PPCGenCSAliasMnemMap.inc").read_text()
++        original = GENERATOR.original_writer(source)
++        generated = GENERATOR.generate_writer(original, names)
++        self.assertEqual(GENERATOR.original_writer(generated), original)
++        self.assertEqual(GENERATOR.generate_writer(generated, names), generated)
++        printer = (arch / "PPCInstPrinter.c").read_text()
++        integrated = GENERATOR.integrate_printer(printer)
++        self.assertEqual(GENERATOR.integrate_printer(integrated), integrated)
++
++    def test_incomplete_projection_rejected(self):
++        arch = ROOT / "arch/PowerPC"
++        generated = GENERATOR.generate_writer(
++            (arch / "PPCGenAsmWriter.inc").read_text(),
++            (arch / "PPCGenCSAliasMnemMap.inc").read_text(),
++        )
++        with self.assertRaises(ValueError):
++            GENERATOR.original_writer(generated.replace(GENERATOR.END, ""))
++        with self.assertRaises(ValueError):
++            GENERATOR.original_writer(
++                generated.replace("*AliasHint =", "*ChangedHint =")
++            )
++
++    def test_unknown_pattern_offset_rejected(self):
++        arch = ROOT / "arch/PowerPC"
++        source = GENERATOR.original_writer((arch / "PPCGenAsmWriter.inc").read_text())
++        names = (arch / "PPCGenCSAliasMnemMap.inc").read_text()
++        at = source.index("static const AliasPattern Patterns[] = {")
++        for offset in ["99999999", "0x10"]:
++            changed, count = re.subn(
++                r"\{\d+,", "{" + offset + ",", source[at:], count=1
++            )
++            self.assertEqual(count, 1)
++            with self.subTest(offset=offset), self.assertRaises(ValueError):
++                GENERATOR.generate_writer(source[:at] + changed, names)
++
++
++if __name__ == "__main__":
++    unittest.main()
+diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
+index 6d4e493b..3715c145 100644
+--- a/tests/unit/x86_encoding_accuracy.c
++++ b/tests/unit/x86_encoding_accuracy.c
+@@ -140,7 +140,7 @@ static bool check_id_cache(void)
+ 	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+ 		return false;
+ 	cs_struct *arch = (cs_struct *)(uintptr_t)handle;
+-	uint32_t *cache = arch->x86_insn_lut;
++	const uint32_t *cache = arch->x86_insn_lut;
+ 	bool ok = cache != NULL;
+ 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
+ 		cs_insn cached = { 0 }, fallback = { 0 };
+@@ -331,7 +331,7 @@ static bool check_public_id_cache(csh handle, cs_mode mode)
+ 	if (mode != CS_MODE_64)
+ 		return true;
+ 	cs_struct *arch = (cs_struct *)(uintptr_t)handle;
+-	uint32_t *cache = arch->x86_insn_lut;
++	const uint32_t *cache = arch->x86_insn_lut;
+ 	bool ok = cache != NULL;
+ 	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+ 		if (cases[c].full_only && cs_support(CS_SUPPORT_X86_REDUCE))
+@@ -746,6 +746,44 @@ static int inspect_operand_access(char *text, size_t size, const char *format,
+ 	return access_callback.formatter(text, size, format, args);
+ }
+ 
++static int write_broadcast(char *text, size_t size, const char *format,
++			   va_list args)
++{
++	(void)format;
++	(void)args;
++	return snprintf(text, size, "{1to8}");
++}
++
++/* Even a scalar memory operand can acquire a broadcast through a custom
++ * formatter. Its actual output must reach the post-printer. */
++static bool check_formatter_broadcast(void)
++{
++	if (cs_support(CS_SUPPORT_DIET))
++		return true;
++	const uint8_t bytes[] = { 0x83, 0x40, 0x20, 1 }; // add [eax+0x20], 1
++	cs_opt_mem original = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
++				cs_mem_free, cs_vsnprintf };
++	cs_opt_mem hooks = original;
++	hooks.vsnprintf = write_broadcast;
++	csh handle = 0;
++	cs_insn *insn = NULL;
++	bool ok = cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) == CS_ERR_OK &&
++		  cs_open(CS_ARCH_X86, CS_MODE_32, &handle) == CS_ERR_OK &&
++		  cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK &&
++		  cs_disasm(handle, bytes, sizeof(bytes), 0, 1, &insn) == 1;
++	if (ok) {
++		const cs_x86 *x86 = &insn->detail->x86;
++		ok = strstr(insn->op_str, "{1to8}") && x86->op_count == 2 &&
++		     x86->operands[0].type == X86_OP_MEM &&
++		     x86->operands[0].avx_bcast == X86_AVX_BCAST_8;
++		cs_free(insn, 1);
++	}
++	if (handle)
++		cs_close(&handle);
++	return cs_option(0, CS_OPT_MEM, (uintptr_t)&original) == CS_ERR_OK &&
++	       ok;
++}
++
+ /* A formatter observes the stream's unwritten tail and preceding detail, and
+  * can change the options used by the remainder of this decode. */
+ static bool check_operand_access_callback(void)
+@@ -1373,7 +1411,7 @@ int main(void)
+ 		  check_inherited_moffs_size() &&
+ 		  check_inherited_three_operand_size() && check_id_cache() &&
+ 		  check_instruction_names() && check_intel_operand_access() &&
+-		  check_operand_access_callback();
++		  check_operand_access_callback() && check_formatter_broadcast();
+ 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
+ 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
+ 		     ++s)
+diff --git a/tests/unit/x86_mapping_counts.c b/tests/unit/x86_mapping_counts.c
+index f0be5f3c..d18a53a4 100644
+--- a/tests/unit/x86_mapping_counts.c
++++ b/tests/unit/x86_mapping_counts.c
+@@ -1,5 +1,6 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ #include <stdio.h>
++#include <stdlib.h>
+ #include "../../arch/X86/X86Mapping.h"
+ #include "../../utils.h"
+ 
+@@ -7,6 +8,74 @@
+ #include "../../arch/X86/X86GenMappingCounts.inc"
+ #endif
+ 
++/* Validate the cache against the canonical instruction map, including holes
++ * and the unallocated suffix of the 16-bit opcode space. */
++static int check_lookup(void)
++{
++	csh handle, second;
++	cs_arch_register_x86();
++	if (!cs_mem_is_setup()) {
++		cs_opt_mem hooks = { malloc, calloc, realloc, free, vsnprintf };
++		if (cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) != CS_ERR_OK)
++			return 1;
++	}
++	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
++		return 1;
++	cs_struct *h = (cs_struct *)handle;
++	if (cs_open(CS_ARCH_X86, CS_MODE_32, &second) != CS_ERR_OK) {
++		cs_close(&handle);
++		return 1;
++	}
++	cs_struct *h2 = (cs_struct *)second;
++	bool expect_shared = false;
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++	expect_shared = true;
++#endif
++	bool shared_ids = h->x86_insn_lut == h2->x86_insn_lut;
++	bool shared_regs = h->x86_insn_reg_lut == h2->x86_insn_reg_lut;
++	cs_close(&second);
++	if (shared_ids != expect_shared || shared_regs != expect_shared) {
++		fprintf(stderr, "Unexpected x86 lookup table ownership\n");
++		cs_close(&handle);
++		return 1;
++	}
++	int status = 0;
++	for (unsigned int id = 0; id <= UINT16_MAX; ++id) {
++		unsigned int row = find_insn(id);
++		uint32_t expected = row == (unsigned int)-1 ?
++					    UINT32_MAX :
++					    ((uint32_t)insns[row].mapid << 16) |
++						    row;
++		uint32_t actual = h->x86_insn_lut && id <= h->x86_insn_lut_max ?
++					  h->x86_insn_lut[id] :
++					  UINT32_MAX;
++		enum cs_ac_type intel_cached = 0, intel_fallback = 0;
++		enum cs_ac_type att_cached = 0, att_fallback = 0;
++		x86_reg intel = X86_insn_reg_intel_h(h, id, &intel_cached);
++		x86_reg att = X86_insn_reg_att_h(h, id, &att_cached);
++		if (intel != X86_insn_reg_intel(id, &intel_fallback) ||
++		    att != X86_insn_reg_att(id, &att_fallback) ||
++		    intel_cached != intel_fallback ||
++		    att_cached != att_fallback) {
++			fprintf(stderr,
++				"Implicit register lookup mismatch for opcode %u\n",
++				id);
++			status = 1;
++			break;
++		}
++		if (actual != expected) {
++			fprintf(stderr,
++				"Instruction lookup mismatch for opcode %u\n",
++				id);
++			status = 1;
++			break;
++		}
++	}
++	cs_close(&handle);
++	return status;
++}
++
+ int main(void)
+ {
+ #ifndef CAPSTONE_DIET
+@@ -22,5 +91,5 @@ int main(void)
+ 		}
+ 	}
+ #endif
+-	return 0;
++	return check_lookup();
+ }
