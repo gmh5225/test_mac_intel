@@ -1,3 +1,4 @@
+#include "utils.h"
 #include "arch/X86/X86Mapping.h"
 #include "arch/X86/X86InstPrinterCommon.h"
 #include <dlfcn.h>
