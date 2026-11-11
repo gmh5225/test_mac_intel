@@ -1,7 +1,7 @@
-name: Compare generated register formatting on nine ARM, Thumb and AArch64 programs
+name: Compare both register writers inside one process with reversed library loading
 on:
   push:
-    branches: [codex/capstone-local-register-writers]
+    branches: [codex/capstone-local-register-writers-process]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -25,12 +25,12 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Compare real output, paired throughput and executed instructions
-        run: python3 capstone-performance/alias_workload.py
+      - name: Compare bounded outputs and paired CPU time with both libraries on the same thread
+        run: python3 capstone-performance/process-benchmark.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: local-register-writers-${{ matrix.host }}-${{ github.run_attempt }}
+          name: register-pair-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
