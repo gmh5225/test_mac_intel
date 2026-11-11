@@ -1,41 +1,8 @@
 diff --git a/Mapping.c b/Mapping.c
-index f6dc6007..0d4b9dee 100644
+index 2332dac8..e0ca772c 100644
 --- a/Mapping.c
 +++ b/Mapping.c
-@@ -249,16 +249,23 @@ void map_groups(MCInst *MI, const insn_map *imap)
- 
- 	cs_detail *detail = MI->flat_insn->detail;
- 	unsigned Opcode = MCInst_getOpcode(MI);
--	unsigned i = 0;
--	uint16_t group = imap[Opcode].groups[i];
--	while (group != 0) {
--		if (detail->groups_count >= MAX_NUM_GROUPS) {
--			printf("ERROR: Too many groups defined in instruction mapping.\n");
--			return;
--		}
--		detail->groups[detail->groups_count++] = group;
--		group = imap[Opcode].groups[++i];
-+	const unsigned char *groups = imap[Opcode].groups;
-+	unsigned start = detail->groups_count;
-+	unsigned count = start;
-+
-+	while (count < MAX_NUM_GROUPS) {
-+		unsigned char group = groups[count - start];
-+		if (!group)
-+			break;
-+		detail->groups[count++] = group;
- 	}
-+	detail->groups_count = count;
-+
-+	/* A full source row has no trailing zero. Only inspect the next
-+	 * source entry when existing destination groups limited the copy. */
-+	if (count >= MAX_NUM_GROUPS && count - start < MAX_NUM_GROUPS &&
-+	    groups[count - start])
-+		printf("ERROR: Too many groups defined in instruction mapping.\n");
- #endif // CAPSTONE_DIET
- }
- 
-@@ -470,37 +477,58 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
+@@ -477,38 +477,48 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
  	}
  }
  
@@ -45,33 +12,76 @@ index f6dc6007..0d4b9dee 100644
 -void map_set_alias_id(MCInst *MI, const SStream *O,
 -		      const name_map *alias_mnem_id_map, int map_size)
 +/* Use the same final stream and mnemonic delimiters for both lookup forms. */
-+static const char *alias_mnemonic(const MCInst *MI, const SStream *O,
-+				  size_t *length)
++#if defined(_MSC_VER)
++static __forceinline
++#elif defined(__GNUC__)
++static inline __attribute__((always_inline))
++#else
++static inline
++#endif
++const char *alias_mnemonic(const MCInst *MI, const SStream *O, size_t *length,
++			   uint32_t *hash)
  {
 -	if (!MCInst_isAlias(MI)) {
 -		MI->flat_insn->alias_id = 0;
+-		return;
+-	}
+-
+-	int i = 0, j = 0;
+-	const char *asm_str_buf = O->buffer;
+-	// Skip spaces and tabs
+-	while (is_blank_char(asm_str_buf[i])) {
+-		if (!asm_str_buf[i]) {
+-			MI->flat_insn->alias_id = 0;
+-			return;
+-		}
+-		++i;
+-	}
+-	const char *alias_mnem = asm_str_buf + i;
+-	// Retain the existing 15-byte mnemonic limit.
+-	for (; j < 15; ++j, ++i) {
+-		if (char_ends_mnem(asm_str_buf[i], MI->csh->arch))
+-			break;
 +	if (!MCInst_isAlias(MI))
 +		return NULL;
 +	const char *name = O->buffer;
 +	while (is_blank_char(*name))
 +		++name;
 +
-+	/* Match the existing 15-byte mnemonic limit and architecture delimiters. */
++	/* The indexed reader hashes exactly the bytes consumed by the linear
++	 * reader, including the architecture's delimiter and length rules. */
++	uint32_t value = 2166136261u;
 +	size_t n = 0;
-+	while (n < 15 && !char_ends_mnem(name[n], MI->csh->arch))
++	while (n < 15 && !char_ends_mnem(name[n], MI->csh->arch)) {
++		if (hash)
++			value = (value ^ (unsigned char)name[n]) * 16777619u;
 +		++n;
+ 	}
 +	*length = n;
++	if (hash)
++		*hash = value;
 +	return name;
 +}
-+
+ 
+-	int alias_id = name2id_n(alias_mnem_id_map, map_size, alias_mnem, j);
+-	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
 +void map_set_alias_id(MCInst *MI, const SStream *O, const name_map *map,
 +		      int map_size)
 +{
 +	size_t length;
-+	const char *name = alias_mnemonic(MI, O, &length);
++	const char *name = alias_mnemonic(MI, O, &length, NULL);
 +	int id = name ? name2id_n(map, map_size, name, length) : -1;
 +	MI->flat_insn->alias_id = id < 0 ? 0 : id;
-+}
+ }
+ 
++
+ /// Does a binary search over the given map and searches for @id.
+ /// If @id exists in @map, it sets @found to true and returns
+ /// the value for the @id.
+@@ -555,3 +565,27 @@ uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
+ 	*found = false;
+ 	return UINT64_MAX;
+ }
 +
 +#if defined(CAPSTONE_HAS_AARCH64) || \
 +	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_POWERPC) || \
@@ -80,44 +90,22 @@ index f6dc6007..0d4b9dee 100644
 +			      const uint16_t *rows, unsigned mask)
 +{
 +	size_t length;
-+	const char *name = alias_mnemonic(MI, O, &length);
++	uint32_t hash;
++	const char *name = alias_mnemonic(MI, O, &length, &hash);
 +	MI->flat_insn->alias_id = 0;
 +	if (!name)
- 		return;
--	}
- 
--	int i = 0, j = 0;
--	const char *asm_str_buf = O->buffer;
--	// Skip spaces and tabs
--	while (is_blank_char(asm_str_buf[i])) {
--		if (!asm_str_buf[i]) {
--			MI->flat_insn->alias_id = 0;
-+	uint32_t hash = 2166136261u;
-+	for (size_t i = 0; i < length; ++i)
-+		hash = (hash ^ (unsigned char)name[i]) * 16777619u;
++		return;
++
 +	for (unsigned slot = hash & mask; rows[slot]; slot = (slot + 1) & mask) {
 +		const name_map *entry = &map[rows[slot] - 1];
 +		if (strncmp(entry->name, name, length) == 0 &&
 +		    entry->name[length] == '\0') {
 +			MI->flat_insn->alias_id = entry->id;
- 			return;
- 		}
--		++i;
--	}
--	const char *alias_mnem = asm_str_buf + i;
--	// Retain the existing 15-byte mnemonic limit.
--	for (; j < 15; ++j, ++i) {
--		if (char_ends_mnem(asm_str_buf[i], MI->csh->arch))
--			break;
- 	}
--
--	int alias_id = name2id_n(alias_mnem_id_map, map_size, alias_mnem, j);
--	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
- }
++			return;
++		}
++	}
++}
 +#endif
- 
- /// Does a binary search over the given map and searches for @id.
- /// If @id exists in @map, it sets @found to true and returns
 diff --git a/Mapping.h b/Mapping.h
 index 9f69f881..4edef994 100644
 --- a/Mapping.h
@@ -543,47 +531,260 @@ index abe9be7a..5364bdea 100644
  	Sparc_correct_details(MI);
  #endif
  }
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index d3b47d6a..457485ab 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -306,7 +306,7 @@ static void printRegName(SStream *OS, unsigned RegNo)
- 			NULL;
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..52b0b591 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -635,7 +635,16 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	int ret;
+ 	bool result;
  
- 	if (extension_name)
--		SStream_concat0(OS, extension_name);
-+		(SStream_concat0)(OS, extension_name);
- 	else
- 		SStream_concat0_small(OS, getRegisterName(RegNo),
- 				      getRegisterNameLength(RegNo));
-diff --git a/arch/X86/X86IntelInstPrinterPrechecked.c b/arch/X86/X86IntelInstPrinterPrechecked.c
-index 696352a3..b851e421 100644
---- a/arch/X86/X86IntelInstPrinterPrechecked.c
-+++ b/arch/X86/X86IntelInstPrinterPrechecked.c
-@@ -11,5 +11,23 @@
- #define CAPSTONE_SSTREAM_PRECHECKED
- #include "X86InstPrinter.h"
- #define SStream_concat_hex64 X86_Intel_printHexPrechecked
 +#if defined(_MSC_VER) && !defined(__clang__)
-+#include "../../SStream.h"
-+/* The fixed tokens in this bounded printer include their terminating NUL.
-+ * The register-extension name uses the ordinary dynamic writer. */
-+static __forceinline void appendPrinterLiteral(SStream *ss, const char *text,
-+					       size_t extent)
++	/* The decoder assigns the header and ID before reading them. Prefix
++	 * defaults and optional operand state must still start at zero. */
++	InternalInstruction insn;
++	memset(&insn, 0, offsetof(InternalInstruction, code));
++	memset((char *)&insn + offsetof(InternalInstruction, vvvv), 0,
++	       sizeof(insn) - offsetof(InternalInstruction, vvvv));
++#else
+ 	InternalInstruction insn = { 0 };
++#endif
+ 	if (extension_opcode == 0x62)
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+@@ -699,11 +708,17 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			if (insn.hasLockPrefix)
+ 				Flags |= X86_IP_HAS_LOCK;
+ 
+-			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+-				if (insn.operands[i].encoding ==
+-				    ENCODING_WRITEMASK) {
+-					Flags |= X86_IP_HAS_EVEX_OPMASK;
+-					break;
++#if defined(_MSC_VER) && !defined(__clang__)
++			/* Only EVEX descriptors can contain a writemask. */
++			if (insn.vectorExtensionType == TYPE_EVEX)
++#endif
++			{
++				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
++					if (insn.operands[i].encoding ==
++					    ENCODING_WRITEMASK) {
++						Flags |= X86_IP_HAS_EVEX_OPMASK;
++						break;
++					}
+ 				}
+ 			}
+ 
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 4e1ab1d5..3c78ef02 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2942,6 +2942,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+ 	return 0;
+ }
+ 
++/* Native MSVC otherwise materializes the raw scan state at this entry. */
++#if defined(_MSC_VER) && !defined(__clang__)
++#define X86_NATIVE_SCAN_EXTENT
++#endif
+ #include "X86GenLegacyTerminal.inc"
+ #include "X86GenVexScan.inc"
+ 
+@@ -3081,6 +3085,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+ 
+ enum { X86_SCAN_NOT_HANDLED = 3 };
+ 
++#ifdef X86_NATIVE_SCAN_EXTENT
++/* For an admitted plain 32/64-bit public terminal, only the ID and the
++ * total byte extent escape. Inspect only the bytes which determine either.
++ * The generated tail widths come from the ordered operand readers. */
++X86_DECODE_INLINE int scanSimplePublicExtent(const InternalInstruction *insn,
++					     uint64_t decision, unsigned *id,
++					     uint16_t *size)
 +{
-+	assert(!ss->is_closed && !ss->markup_stream && !ss->prefixed_by_markup);
-+	assert(extent <= SSTREAM_BUF_LEN &&
-+	       ss->index <= SSTREAM_BUF_LEN - extent);
-+	if (extent > 1) {
-+		memcpy(ss->buffer + ss->index, text, extent);
-+		ss->index += extent - 1;
++	const uint8_t *code = insn->code;
++	size_t cursor = insn->readerCursor;
++	uint8_t modrm = 0;
++	const bool decisionModRM =
++		(decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
++	if (decisionModRM) {
++		if (cursor >= insn->codeSize)
++			return X86_SCAN_INVALID;
++		modrm = code[cursor];
++	}
++	const uint32_t terminal = lookupPublicLegacyTerminal(decision, modrm);
++	const unsigned publicID = terminal & X86_TERMINAL_UID_MASK;
++	if (!publicID)
++		return X86_SCAN_INVALID;
++	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) &
++				 X86_TERMINAL_OPERAND_MASK;
++	if (decisionModRM || (pattern & 1)) {
++		if (!decisionModRM) {
++			if (cursor >= insn->codeSize)
++				return X86_SCAN_INVALID;
++			modrm = code[cursor];
++		}
++		++cursor;
++		const unsigned mod = modFromModRM(modrm);
++		if (mod != 3) {
++			unsigned base = rmFromModRM(modrm);
++			if (base == 4) {
++				if (cursor >= insn->codeSize)
++					return X86_SCAN_INVALID;
++				base = baseFromSIB(code[cursor]);
++				++cursor;
++			}
++			if (mod == 1)
++				++cursor;
++			else if (mod == 2 || base == 5)
++				cursor += 4;
++		}
++	}
++	cursor +=
++		x86SimplePublicTailBytes[insn->mode == MODE_64BIT][pattern >> 1];
++	if (cursor > insn->codeSize || cursor > 15)
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)cursor;
++	*id = publicID;
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
+ /* Only the compact readers see this state. Generic/raw decoding starts its
+  * own state if the generated table has no terminal for this header. */
+ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3092,7 +3152,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ {
+ 	if (opcodeOffset >= 2)
+ 		return X86_SCAN_NOT_HANDLED;
++#ifdef X86_NATIVE_SCAN_EXTENT
++	/* The extent reader initializes its header and never reads raw operands. */
++	const bool scanExtent = publicID && !x86_has_feature(mode, CS_MODE_16);
++	InternalInstruction insn;
++	if (!scanExtent)
++		memset(&insn, 0, sizeof(insn));
++#else
+ 	InternalInstruction insn = { 0 };
++#endif
+ 	initializeInstructionHeader(&insn, code, codeSize, mode);
+ 	const uint8_t prefixMask =
+ 		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
+@@ -3100,6 +3168,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ 	if ((feature_prefix_flags[opcode] & prefixMask) ||
+ 	    (opcodeOffset && !isREX(&insn, code[0])))
+ 		return X86_SCAN_NOT_HANDLED;
++#ifdef X86_NATIVE_SCAN_EXTENT
++	if (scanExtent) {
++		if (opcodeOffset >= codeSize)
++			return X86_SCAN_INVALID;
++		size_t cursor = opcodeOffset + 1;
++		uint8_t current = code[opcodeOffset];
++		insn.opcodeType = ONEBYTE;
++		if (current == 0x0f) {
++			if (cursor >= codeSize)
++				return X86_SCAN_INVALID;
++			current = code[cursor++];
++			if (current == 0x0f || current == 0x38 ||
++			    current == 0x3a)
++				return X86_SCAN_NOT_HANDLED;
++			insn.opcodeType = TWOBYTE;
++		}
++		insn.opcode = current;
++		insn.rexPrefix = opcodeOffset ? code[0] : 0;
++		insn.readerCursor = cursor;
++		const uint64_t direct =
++			legacyTerminalDecision(&insn, false, true);
++		if (!direct)
++			return X86_SCAN_NOT_HANDLED;
++		return scanSimplePublicExtent(&insn, direct, instructionID,
++					      size);
++	}
++#endif
+ 	readSimpleLegacyPrefix(&insn, opcodeOffset);
+ 	int opcodeResult = readOpcode(&insn, true, true);
+ 	if (opcodeResult)
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5627f249..531b8dbb 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -7069,6 +7069,38 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ },
+ };
+ 
++#ifdef X86_NATIVE_SCAN_EXTENT
++static const uint8_t x86SimplePublicTailBytes[2][10] = {
++	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
++	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++};
++
++X86_DECODE_INLINE uint32_t lookupPublicLegacyTerminal(uint64_t decision, uint8_t modrm)
++{
++	if (decision & X86_TERMINAL_INDEXED) {
++		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
++		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
++		case MODRM_SPLITREG:
++			index += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);
++			break;
++		case MODRM_SPLITMISC:
++			index += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);
++			break;
++		case MODRM_FULL:
++			index += modrm;
++			break;
++		default:
++			return 0;
++		}
++		return x86LegacyPublicTerminals[index];
++	} else {
++		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?
++			X86_TERMINAL_REGISTER_SHIFT : 0;
++		return (decision >> shift) & X86_TERMINAL_MASK;
 +	}
 +}
-+#define SStream_concat0(ss, literal) \
-+	appendPrinterLiteral((ss), "" literal, sizeof("" literal))
 +#endif
- #include "X86IntelInstPrinter.c"
- #endif
++
+ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
+ {
+@@ -14400,6 +14432,38 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ },
+ };
+ 
++#ifdef X86_NATIVE_SCAN_EXTENT
++static const uint8_t x86SimplePublicTailBytes[2][10] = {
++	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
++	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++};
++
++X86_DECODE_INLINE uint32_t lookupPublicLegacyTerminal(uint64_t decision, uint8_t modrm)
++{
++	if (decision & X86_TERMINAL_INDEXED) {
++		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
++		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
++		case MODRM_SPLITREG:
++			index += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);
++			break;
++		case MODRM_SPLITMISC:
++			index += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);
++			break;
++		case MODRM_FULL:
++			index += modrm;
++			break;
++		default:
++			return 0;
++		}
++		return x86LegacyPublicTerminals[index];
++	} else {
++		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?
++			X86_TERMINAL_REGISTER_SHIFT : 0;
++		return (decision >> shift) & X86_TERMINAL_MASK;
++	}
++}
++#endif
++
+ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
+ {
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
 index 850fa787..457de8ff 100644
 --- a/suite/auto-sync/README.md
@@ -676,6 +877,117 @@ index 00000000..c8129c82
 +                raise SystemExit(f"Regenerate {target.name}")
 +        else:
 +            target.write_text(content)
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index dbb25f26..d5fbc1c2 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -867,6 +867,52 @@ def emit_full_legacy_handlers(groups):
+     return lines
+ 
+ 
++def simple_public_tail_size(calls, address_size):
++    # A plain 32/64-bit legacy header starts with a 4-byte immediate width.
++    # Evaluate the same ordered readers used by the generic public scan.
++    width = 4
++    length = 0
++    tables.require(len(calls) <= 2, "Too many immediate operands")
++    for call in calls:
++        if call == "readMemoryOffset(insn, false)":
++            length += address_size
++            width = 0
++        else:
++            match = re.fullmatch(r"readImmediateImpl\(insn, (1|2|4|8|insn->immediateSize), false\)", call)
++            tables.require(match is not None, "Unexpected immediate reader")
++            if match[1] != "insn->immediateSize":
++                width = int(match[1])
++            tables.require(width in (1, 2, 4, 8), "Unknown immediate width")
++            length += width
++    return length
++
++
++def terminal_selection(modrm, assign, invalid, table):
++    return [
++        "\tif (decision & X86_TERMINAL_INDEXED) {",
++        "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
++        "\t\tswitch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {",
++        "\t\tcase MODRM_SPLITREG:",
++        f"\t\t\tindex += regFromModRM({modrm}) + ({modrm} >= 0xc0 ? 8 : 0);",
++        "\t\t\tbreak;",
++        "\t\tcase MODRM_SPLITMISC:",
++        f"\t\t\tindex += {modrm} >= 0xc0 ? ({modrm} & 0x3f) + 8 : regFromModRM({modrm});",
++        "\t\t\tbreak;",
++        "\t\tcase MODRM_FULL:",
++        f"\t\t\tindex += {modrm};",
++        "\t\t\tbreak;",
++        "\t\tdefault:",
++        f"\t\t\treturn {invalid};",
++        "\t\t}",
++        f"\t\t{assign}{table};",
++        "\t} else {",
++        f"\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && {modrm} >= 0xc0 ?",
++        "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
++        f"\t\t{assign}(decision >> shift) & X86_TERMINAL_MASK;",
++        "\t}",
++    ]
++
++
+ def emit_terminal(suffix):
+     groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
+         suffix
+@@ -916,6 +962,21 @@ def emit_terminal(suffix):
+     # Both projections retain the same decision kind, invalid entries and readers.
+     lines += emit_terminal_tables("Legacy", words, rows, kinds)
+     lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
++    lines.append("#ifdef X86_NATIVE_SCAN_EXTENT")
++    lines.append(f"static const uint8_t x86SimplePublicTailBytes[2][{len(public_tails)}] = {{")
++    for address_size in (4, 8):
++        widths = [str(simple_public_tail_size(tail, address_size)) for tail in public_tails]
++        lines.append("\t{ " + ", ".join(widths) + " },")
++    lines += [
++        "};",
++        "",
++        "X86_DECODE_INLINE uint32_t lookupPublicLegacyTerminal(uint64_t decision, uint8_t modrm)",
++        "{",
++        *terminal_selection("modrm", "return ", "0", "x86LegacyPublicTerminals[index]"),
++        "}",
++        "#endif",
++        "",
++    ]
+     lines += [
+         "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
+         "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
+@@ -931,27 +992,10 @@ def emit_terminal(suffix):
+         "\t\t\treturn X86_SCAN_INVALID;",
+         "\t\t}",
+         "\t}",
+-        "\tif (decision & X86_TERMINAL_INDEXED) {",
+-        "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
+-        "\t\tswitch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {",
+-        "\t\tcase MODRM_SPLITREG:",
+-        "\t\t\tindex += regFromModRM(insn->modRM) + (insn->modRM >= 0xc0 ? 8 : 0);",
+-        "\t\t\tbreak;",
+-        "\t\tcase MODRM_SPLITMISC:",
+-        "\t\t\tindex += insn->modRM >= 0xc0 ? (insn->modRM & 0x3f) + 8 : regFromModRM(insn->modRM);",
+-        "\t\t\tbreak;",
+-        "\t\tcase MODRM_FULL:",
+-        "\t\t\tindex += insn->modRM;",
+-        "\t\t\tbreak;",
+-        "\t\tdefault:",
+-        "\t\t\treturn X86_SCAN_INVALID;",
+-        "\t\t}",
+-        "\t\tterminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];",
+-        "\t} else {",
+-        "\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?",
+-        "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
+-        "\t\tterminal = (decision >> shift) & X86_TERMINAL_MASK;",
+-        "\t}",
++        *terminal_selection(
++            "insn->modRM", "terminal = ", "X86_SCAN_INVALID",
++            "publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index]",
++        ),
+         "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
+         "\tif (publicID) {",
+         "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index b6a40374..2655c7a4 100644
 --- a/tests/unit/CMakeLists.txt
@@ -691,59 +1003,3 @@ index b6a40374..2655c7a4 100644
          add_test(NAME unit_fixed_len_decoder
              COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/fixed_len_decoder.py" --check)
          add_test(NAME unit_fixed_len_decoder_newlines
-diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
-index 1dd3f85b..e6f3e5cb 100644
---- a/tests/unit/mapping.c
-+++ b/tests/unit/mapping.c
-@@ -3,6 +3,7 @@
- #include "../../Mapping.h"
- #include <limits.h>
- #include <stdio.h>
-+#include <string.h>
- 
- static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
- 			 unsigned expected)
-@@ -188,13 +189,42 @@ static bool test_alias_lookup(void)
- 	return true;
- }
- 
-+static bool test_full_group_map(void)
-+{
-+#ifndef CAPSTONE_DIET
-+	insn_map row = { 0 };
-+	cs_detail detail = { 0 };
-+	cs_insn insn = { 0 };
-+	MCInst mi = { 0 };
-+	mi.flat_insn = &insn;
-+	insn.detail = &detail;
-+	row.branch = true;
-+	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i)
-+		row.groups[i] = i + 1;
-+
-+	map_groups(&mi, &row);
-+	if (detail.groups_count != MAX_NUM_GROUPS ||
-+	    memcmp(detail.groups, row.groups, sizeof(row.groups)))
-+		return false;
-+
-+	/* Preserve the existing group and append as many entries as fit. */
-+	detail.groups_count = 1;
-+	detail.groups[0] = 99;
-+	map_groups(&mi, &row);
-+	if (detail.groups_count != MAX_NUM_GROUPS || detail.groups[0] != 99 ||
-+	    memcmp(detail.groups + 1, row.groups, MAX_NUM_GROUPS - 1))
-+		return false;
-+#endif
-+	return true;
-+}
-+
- int main(void)
- {
- 	bool found = true;
- 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
- 	    found)
- 		return 1;
--	return test_name_lookup() && test_alias_lookup() &&
-+	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
- 			       test_dense_and_sparse() &&
- 			       test_duplicate_selection() &&
- 			       find_cs_id(0, NULL, 0) == UINT_MAX &&

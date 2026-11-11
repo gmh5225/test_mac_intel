@@ -145,10 +145,8 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
-    incremental = os.environ.get('COMPARE_BASE') == 'combined'
-    if incremental:
-        command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='native Intel printer and bounded instruction groups' if incremental else 'published next'))
+    incremental = True
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='native live state and four indexed alias maps'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
