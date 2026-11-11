@@ -2,7 +2,7 @@ name: Native MSVC generated Intel printer
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-native-printer-literals]
+    branches: [codex/capstone-literal-same-image]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -12,11 +12,8 @@ jobs:
       fail-fast: false
       matrix:
         crt: [MD, MT]
-        variant: [known, fixed]
     runs-on: windows-2022
     timeout-minutes: 45
-    env:
-      LITERAL_VARIANT: ${{ matrix.variant }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -28,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-printer-literals-${{ matrix.variant }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: native-literal-same-image-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

@@ -48,14 +48,29 @@ def fetch(name, repo, rev):
     return target
 
 
-variant = os.environ['LITERAL_VARIANT']
-patch = source / ('printer-' + variant + '.patch')
 def make_programs():
     base = fetch('base', 'capstone', manifest['capstone_revision'])
     fetch('iced', 'iced', manifest['iced_revision'])
-    new = work / 'new'
-    run(['git', 'worktree', 'add', '--detach', new, 'HEAD'], 'new-worktree', base)
-    run(['git', '-c', 'core.autocrlf=false', 'apply', patch], 'new-patch', new)
+    path='arch/X86/X86IntelInstPrinterPrechecked.c'
+    body='arch/X86/X86IntelInstPrinter.c'
+    original=(base/path).read_text()
+    for variant in ('known','fixed'):
+        patch=source/('printer-'+variant+'.patch')
+        assert digest(patch.read_bytes())==manifest['source_lineage'][patch.name]['sha256']
+        run(['git','apply',patch],variant+'-apply',base)
+        candidate=(base/path).read_text()
+        name='X86_Intel_printInstruction'+variant
+        dest=base/'arch/X86'/('Bench'+variant.title()+'.c')
+        dest.write_text('#define X86_Intel_printInstructionPrechecked '+name+'\n'+candidate)
+        run(['git','restore','--',path,body],variant+'-restore',base)
+    f=base/body
+    text=f.read_text().replace('SStream_concat0(OS, extension_name);','(SStream_concat0)(OS, extension_name);')
+    k='void X86_Intel_printInstructionGeneral(MCInst *MI, SStream *O)'
+    assert text.count(k)==1
+    text=text.replace(k,'void X86_Intel_printInstructionknown(MCInst *, SStream *);\nvoid X86_Intel_printInstructionfixed(MCInst *, SStream *);\nstatic void (*bench_printer)(MCInst *,SStream *)=X86_Intel_printInstructionPrechecked;\nvoid bench_select_printer(unsigned mode) { bench_printer=mode==2 ? X86_Intel_printInstructionfixed : mode==1 ? X86_Intel_printInstructionknown : X86_Intel_printInstructionPrechecked; }\n'+k)
+    k='X86_Intel_printInstructionPrechecked(MI, O);'
+    assert text.count(k)==1
+    f.write_text(text.replace(k,'bench_printer(MI, O);'))
     adapter = work / 'adapter'
     adapter.mkdir()
     for name in ['Cargo.lock', 'iced.rs']:
@@ -74,54 +89,26 @@ panic = "abort"
 opt-level = 3
 """)
     run(['cargo', 'build', '--release', '--locked', '--manifest-path', adapter / 'Cargo.toml'], 'cargo-build')
-    executables = {}
-    probes = {}
-    for label, src in [('base', base), ('new', new)]:
-        build = work / (label + '-build')
-        with (src / 'CMakeLists.txt').open('a') as f:
-            f.write('\n' + (source / 'msvc' / 'targets.cmake').read_text())
-        run(['cmake', '-S', src, '-B', build, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-DCMAKE_C_FLAGS=/MP4',
-             '-DEVIDENCE_SOURCE=' + source.as_posix(),
-             '-DICED_ADAPTER=' + (work / 'cargo-target/release/iced_compare.lib').as_posix(),
-             '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON',
-             '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=' + ('ON' if crt == 'MT' else 'OFF'),
-             '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-config')
-        def build_targets(targets, step):
-            run(['cmake', '--build', build, '--config', 'Release', '--parallel', '4',
-                 '--target', *targets], label + '-' + step)
-        build_targets(['native_compare', 'native_snapshot', 'native_sstream'], 'build')
-        programs = {n: build / 'Release' / ('native_' + n + '.exe') for n in ('compare', 'snapshot', 'sstream')}
-        executables[label] = programs
-        run([programs['sstream']], label + '-sstream')
-        if label == 'new':
-            build_targets(['native_checked'], 'build-printer-test')
-            outcome = run([build / 'Release/native_checked.exe'], 'full-printer-state')
-            assert 'complete printer' in outcome
-        # Instrument the two owners after links above. Timed executables stay byte-identical.
-        hashes = {key: digest(p.read_bytes()) for key, p in programs.items()}
-        for file, func in [('SStream.c', 'stream_hooks'), ('arch/X86/X86Mapping.c', 'mapping_hooks')]:
-            fmt = 'cs_default_vsnprintf' if label == 'new' else 'vsnprintf'
-            with (src / file).open('a') as f:
-                f.write('''
-#include <stdlib.h>
-#include <stdio.h>
-unsigned ''' + func + '''(void){
- return (cs_mem_malloc == malloc) | ((cs_mem_calloc == calloc) << 1) |
-        ((cs_mem_realloc == realloc) << 2) | ((cs_mem_free == free) << 3) |
-        ((cs_vsnprintf == vsnprintf) << 4) | ((cs_vsnprintf == ''' + fmt + ''') << 5);
-}
-''')
-        build_targets(['native_hooks'], 'instrumented-build')
-        probes[label] = json.loads(run([build / 'Release/native_hooks.exe'], label + '-probe'))
-        assert hashes == {key: digest(p.read_bytes()) for key, p in programs.items()}
-        write(label + '-programs.json', hashes)
-    write('hooks.json', dict(bit_names=['malloc', 'calloc', 'realloc', 'free', 'local_vsnprintf',
-          'selected_default_vsnprintf'], probes=probes))
-    assert probes['new']['stream'] & 32 and probes['new']['mapping'] & 32
-    assert not probes['new']['custom'] & 32
-    assert probes['new']['restored'] == probes['new']['stream']
-    return executables
-
+    driver=work/'same.cpp'
+    text=(source/'msvc/compare.cpp').read_text()
+    key='int main(int argc, char **argv) {'
+    assert text.count(key)==1
+    driver.write_text(text.replace(key,'#include <cstdlib>\nextern "C" void bench_select_printer(unsigned);\n'+key+'\n  bench_select_printer(static_cast<unsigned>(std::atoi(std::getenv("CAPSTONE_BENCH_PRINTER"))));'))
+    with (base/'CMakeLists.txt').open('a') as f:
+        f.write('\ntarget_sources(capstone PRIVATE arch/X86/BenchKnown.c arch/X86/BenchFixed.c)\nadd_executable(same "'+driver.as_posix()+'")\ntarget_compile_features(same PRIVATE cxx_std_17)\ntarget_link_libraries(same PRIVATE capstone_static "'+(work/'cargo-target/release/iced_compare.lib').as_posix()+'" advapi32 bcrypt ntdll userenv ws2_32)\n')
+    build=work/'build'
+    run(['cmake','-S',base,'-B',build,'-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF'),'-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'config')
+    run(['cmake','--build',build,'--config','Release','--parallel','4','--target','same'],'build')
+    exe=build/'Release/same.exe'
+    objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
+    import re
+    code={}
+    for key in ('X86IntelInstPrinterPrechecked','BenchKnown','BenchFixed'):
+        obj,=build.rglob(key+'.obj')
+        dump=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
+        code[key]=dict(object_bytes=obj.stat().st_size,concat0_relocations=sum(line.split()[-1:] == ['SStream_concat0'] for line in dump.splitlines()),instructions=sum(bool(re.match(r'^\s*[0-9a-f]+:\s+\w+',line))for line in dump.splitlines()))
+    write('native-code.json',code)
+    return exe
 
 def get_cases():
     cases = []
@@ -158,71 +145,30 @@ def get_cases():
     return cases
 
 
-def snapshot(programs, cases):
-    results = []
-    for case in cases:
-        for att in (0, 1):
-            for text, detail in [(0, 0), (1, 0), (1, 1), (0, 1)]:
-                hashes = []
-                for exe in programs.values():
-                    cmd = [str(exe['snapshot']), str(case['bits']), str(att), str(text), str(detail), '0', case['path']]
-                    with subprocess.Popen(cmd, stdout=subprocess.PIPE) as proc:
-                        h = hashlib.sha256()
-                        while block := proc.stdout.read(256 * 1024):
-                            h.update(block)
-                        if proc.wait():
-                            raise RuntimeError(cmd)
-                    hashes.append(h.hexdigest())
-                results.append([case['name'], att, text, detail, hashes])
-                write('snapshot.json', results)
-                assert hashes[0] == hashes[1], results[-1]
-
-
-def measure(programs, cases):
-    design = [('base','new','iced','new','base'), ('new','base','iced','base','new')]
-    rows = []
-    def sample(label, case, mode, repeats):
-        exe = programs['base' if label == 'iced' else label]['compare']
-        args = [str(exe), 'iced' if label == 'iced' else 'capstone', mode,
-                str(case['bits']), str(repeats), case['path']]
-        return json.loads(subprocess.check_output(args))
-    for case in cases:
+def measure(exe):
+    labels=('stock','known','fixed')
+    def sample(case,mode,label,n):
+        env=dict(os.environ,CAPSTONE_BENCH_PRINTER=str(labels.index(label)))
+        return json.loads(subprocess.check_output([exe,'capstone',mode,str(case['bits']),str(n),case['path']],env=env))
+    rows=[]
+    for case in get_cases():
         for mode in ('scan','format','detail'):
-            repeats = 1
-            while True:
-                probe = sample('base', case, mode, repeats)
-                if probe['wall_ns'] >= 12000000:
-                    break
-                repeats *= 4
-            repeats = max(1, math.ceil(repeats * 220000000 / probe['wall_ns']))
-            pairs = []
-            for cycle in range(6):
-                raw = [(l, sample(l, case, mode, repeats)) for l in design[cycle % 2]]
-                cs = [r for l, r in raw if l != 'iced']
-                assert len({tuple(r[k] for k in ('instructions','rejected','boundary_hash','value_hash')) for r in cs}) == 1
-                common = len({tuple(r[k] for k in ('instructions','rejected','boundary_hash')) for l,r in raw}) == 1
-                def times(label):
-                    return [r['thread_cycles'] for l,r in raw if l == label]
-                a, b, i = times('base'), times('new'), times('iced')[0]
-                pairs.append(dict(raw=raw, base_aa=a[0]/a[1], new_aa=b[0]/b[1],
-                                  gain=statistics.mean(a)/statistics.mean(b),
-                                  vs_iced=i/statistics.mean(b) if common else None))
-            rows.append(dict(name=case['name'], mode=mode, repeats=repeats, pairs=pairs,
-                             gain=statistics.median(p['gain'] for p in pairs),
-                             vs_iced=statistics.median(p['vs_iced'] for p in pairs) if common else None))
-            write('measurement.json', rows)
-
-
+            n=1
+            while (probe:=sample(case,mode,'stock',n))['wall_ns']<12_000_000:n*=4
+            n=max(1,math.ceil(n*110_000_000/probe['wall_ns']))
+            pairs=[]
+            for i in range(6):
+                order=labels[i%3:]+labels[:i%3]
+                raw=[(label,sample(case,mode,label,n))for label in order+order[::-1]]
+                assert len({tuple(x[k]for k in ('instructions','rejected','boundary_hash','value_hash'))for _,x in raw})==1
+                times={l:statistics.geometric_mean(row['thread_cycles']for label,row in raw if label==l)for l in labels}
+                pairs.append(dict(raw=raw,gain={l:times['stock']/times[l]for l in labels}))
+            rows.append(dict(case=case['name'],mode=mode,pairs=pairs));write('measurement.json',rows)
 try:
-    write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
-          image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
-          iced=manifest['iced_revision'], patch=digest((patch).read_bytes())))
-    assert digest((patch).read_bytes()) == {'known': '32d1f21df8b65c6d7dfcf9f955bf362b1ae0015639be9c1815b40c2be9ade9b8', 'fixed': '385d794e8b2672229f75dc9ed0730df9729ba107e56cc3fb78b191867c58eb3b'}[variant]
-    programs = make_programs()
-    cases = get_cases()
-    snapshot(programs, cases)
-    measure(programs, cases)
-    write('completed.json', dict(success=True))
+    exe=make_programs()
+    write('inputs.json',dict(capstone=manifest['capstone_revision'],crt=crt,image=digest(exe.read_bytes()),system=os.environ.get('ImageVersion')))
+    measure(exe)
+    write('completed.json',{'success':True})
 finally:
     before = sum(p.stat().st_size for p in work.rglob('*') if p.is_file())
     def writable(func, path, exc):
