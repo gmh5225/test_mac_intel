@@ -1,0 +1,27 @@
+name: PE64 runtime function comparison
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/capstone-pe64-runtime-functions]
+permissions:
+  contents: read
+jobs:
+  functions:
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, windows-2022]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - run: python capstone-performance/pe64-functions/measure.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pe64-functions-${{ matrix.host }}
+          path: capstone-evidence/
+          retention-days: 14
