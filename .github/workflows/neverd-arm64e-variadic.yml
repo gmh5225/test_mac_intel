@@ -1,0 +1,33 @@
+name: NeverD Darwin variadic stack and image publication
+on:
+  push:
+    branches: [codex/neverd-variadic-stack-publication]
+    paths: [neverd-arm64e-variadic/**, .github/workflows/neverd-arm64e-variadic.yml]
+permissions:
+  contents: write
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Verify and execute the source-bound Release test host
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          brew list --versions zstd || brew install zstd
+          ulimit -c 0
+          python3 neverd-arm64e-variadic/run.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: variadic-${{ matrix.runner }}
+          path: variadic-evidence/
+          retention-days: 7
+          if-no-files-found: error
