@@ -14,7 +14,7 @@ t=t.replace('cs_close(&handle);','trial_end(handle); cs_close(&handle);')
 cpp=root/'storage.cpp';cpp.write_text(t)
 obj=root/'storage.o'
 bench.command(['clang++','-O3','-DNDEBUG','-std=c++17','-I',root/'base/include','-c',cpp,'-o',obj],'storage-driver')
-iced = adapter / 'target/release/libiced_compare.a'
+iced = root/'adapter/target/release/libiced_compare.a'
 progs={}
 for label in ['base','new']:
     build=root/(label+'-build');source=root/label
