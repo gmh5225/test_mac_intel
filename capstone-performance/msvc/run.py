@@ -148,7 +148,9 @@ def measure(exe):
         return json.loads(subprocess.check_output([exe,'capstone',mode,str(case['bits']),str(n),case['path']],env=env))
     rows=[]
     for case in get_cases():
-        for mode in ('scan','format','detail'):
+        if case['name'] not in ('putty-32-0.85','putty-64-0.85','kernel32-64','simd64'):
+            continue
+        for mode in ('format','detail'):
             n=1
             while (probe:=sample(case,mode,'stock',n))['wall_ns']<12_000_000:n*=4
             n=max(1,math.ceil(n*75_000_000/probe['wall_ns']))
