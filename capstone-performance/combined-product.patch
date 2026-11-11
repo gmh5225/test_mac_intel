@@ -646,19 +646,74 @@ index 8c3dea2e..52b0b591 100644
  			}
  
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 4e1ab1d5..38675d70 100644
+index 4e1ab1d5..be42e66e 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1067,7 +1067,7 @@ static bool is64Bit(uint16_t id)
- {
- 	unsigned int i = find_insn(id);
- 	if (i != -1) {
+@@ -1058,22 +1058,6 @@ static bool is16BitEquivalent(unsigned orig, unsigned equiv)
+ 	return false;
+ }
+ 
+-/*
+- * is64Bit - Determines whether this instruction is a 64-bit instruction.
+- *
+- * @param name - The instruction that is not 16-bit
+- */
+-static bool is64Bit(uint16_t id)
+-{
+-	unsigned int i = find_insn(id);
+-	if (i != -1) {
 -		return insns[i].is64bit;
-+		return (insns[i].properties & 1) != 0;
+-	}
+-
+-	// not found??
+-	return false;
+-}
+-
+ typedef enum {
+ 	DO_NOT_RESOLVE = 0,
+ 	IGNORE_REP = 1,
+@@ -1266,6 +1250,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	uint16_t attrMask;
+ 	uint16_t instructionID;
+ 	bool rexWOverridesOpSize;
++	const bool legacyVector = decoderMode != MODE_64BIT &&
++				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
+ 
+ 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
+ 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
+@@ -1429,8 +1415,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
  	}
  
- 	// not found??
-@@ -2942,6 +2942,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+ 	/* The following clauses compensate for limitations of the tables. */
+-	if (decoderMode != MODE_64BIT &&
+-	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
++	if (legacyVector) {
+ 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
+ 			return -1;
+ 		}
+@@ -1455,7 +1440,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 			}
+ 
+ 			// If not a 64-bit instruction. Switch the opcode.
+-			if (!is64Bit(instructionIDWithREXW)) {
++			if (!X86_is_64bit_only(instructionIDWithREXW)) {
+ 				insn->instructionID = instructionIDWithREXW;
+ 				insn->spec =
+ 					specifierForUID(instructionIDWithREXW);
+@@ -1501,9 +1486,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 
+ 		return 0;
+ 	}
+-	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
++	/* A legacy-mode vector already resolved the unmodified mask before
++	 * checking whether W selected an alternative opcode. */
++	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
+ 		return -1;
+-	}
+ 
+ 	if ((decoderMode == MODE_16BIT ||
+ 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
+@@ -2942,6 +2928,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	return 0;
  }
  
@@ -669,7 +724,7 @@ index 4e1ab1d5..38675d70 100644
  #include "X86GenLegacyTerminal.inc"
  #include "X86GenVexScan.inc"
  
-@@ -3081,6 +3085,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+@@ -3081,6 +3071,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
  
  enum { X86_SCAN_NOT_HANDLED = 3 };
  
@@ -732,7 +787,7 @@ index 4e1ab1d5..38675d70 100644
  /* Only the compact readers see this state. Generic/raw decoding starts its
   * own state if the generated table has no terminal for this header. */
  X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
-@@ -3092,7 +3152,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3092,7 +3138,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  {
  	if (opcodeOffset >= 2)
  		return X86_SCAN_NOT_HANDLED;
@@ -748,7 +803,7 @@ index 4e1ab1d5..38675d70 100644
  	initializeInstructionHeader(&insn, code, codeSize, mode);
  	const uint8_t prefixMask =
  		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
-@@ -3100,6 +3168,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3100,6 +3154,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  	if ((feature_prefix_flags[opcode] & prefixMask) ||
  	    (opcodeOffset && !isREX(&insn, code[0])))
  		return X86_SCAN_NOT_HANDLED;
@@ -34689,7 +34744,7 @@ index c5f2c531..4c2d9d01 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..c509b6aa 100644
+index df60fd3f..3a43d46e 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10163,19 +10163,30 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -34780,15 +34835,21 @@ index df60fd3f..c509b6aa 100644
  			right = m - 1;
  		else
  			left = m + 1;
-@@ -10223,6 +10249,7 @@ unsigned int find_insn(unsigned int id)
+@@ -10223,6 +10249,13 @@ unsigned int find_insn(unsigned int id)
  	// not found
  	// printf("NOT FOUNDDDDDDDDDDDDDDD id = %u\n", id);
  	return -1;
 +#endif
++}
++
++bool X86_is_64bit_only(uint16_t id)
++{
++	const unsigned int index = find_insn(id);
++	return index < ARR_SIZE(insns) && (insns[index].properties & 1) != 0;
  }
  
  static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
-@@ -10233,10 +10260,6 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+@@ -10233,10 +10266,6 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  	return find_insn(id);
  }
  
@@ -34799,7 +34860,7 @@ index df60fd3f..c509b6aa 100644
  // given internal insn id, return public instruction info
  void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  {
-@@ -10249,34 +10272,42 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10249,34 +10278,42 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  	if (X86_get_insn_id_no_detail(h, insn, id))
  		return;
  
@@ -34852,7 +34913,7 @@ index df60fd3f..c509b6aa 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10289,10 +10320,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10289,10 +10326,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_RDTSCP:
  				if (mode == CS_MODE_64) {
  					memcpy(insn->detail->regs_write,
@@ -34866,7 +34927,7 @@ index df60fd3f..c509b6aa 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10306,7 +10337,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10306,7 +10343,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  				break;
  			}
  			/* The generator derives eligibility from the switches below. */
@@ -34875,7 +34936,7 @@ index df60fd3f..c509b6aa 100644
  			      X86_MAPPING_IMPLICIT_REPAIR))
  				goto implicit_registers_done;
  
-@@ -10735,12 +10766,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10735,12 +10772,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			}
  
  implicit_registers_done:
@@ -34892,7 +34953,7 @@ index df60fd3f..c509b6aa 100644
  				// this insn also belongs to JUMP group. add JUMP group
  				insn->detail
  					->groups[insn->detail->groups_count] =
-@@ -10773,7 +10804,7 @@ implicit_registers_done:
+@@ -10773,7 +10810,7 @@ implicit_registers_done:
  				}
  			}
  
@@ -34901,7 +34962,7 @@ index df60fd3f..c509b6aa 100644
  			case X86_OUT8ir:
  			case X86_OUT16ir:
  			case X86_OUT32ir:
-@@ -11176,15 +11207,21 @@ void X86_build_lookup_tables(cs_struct *h)
+@@ -11176,15 +11213,21 @@ void X86_build_lookup_tables(cs_struct *h)
  	CS_ASSERT_RET(h && !h->x86_insn_lut);
  	CS_ASSERT_RET(max <= INT16_MAX && X86_INS_ENDING < UINT16_MAX);
  
@@ -34926,7 +34987,7 @@ index df60fd3f..c509b6aa 100644
  
  	h->x86_insn_reg_lut =
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..cddf38a1 100644
+index a2677cb8..ce66fbc4 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
 @@ -7,21 +7,25 @@
@@ -34966,6 +35027,14 @@ index a2677cb8..cddf38a1 100644
  extern const insn_map_x86 insns[];
  
  // map sib_base to x86_reg
+@@ -117,6 +121,7 @@ uint8_t X86_immediate_size(unsigned int id, uint8_t *enc_size);
+ unsigned short X86_register_map(unsigned short id);
+ 
+ unsigned int find_insn(unsigned int id);
++bool X86_is_64bit_only(uint16_t id);
+ 
+ void X86_build_lookup_tables(cs_struct *h);
+ 
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
 index 0a4c959f..4c0d654f 100644
 --- a/cs_disasm_internal.h
@@ -35458,10 +35527,10 @@ index 0ba7e8e6..6336ed0d 100644
  if __name__ == "__main__":
      unittest.main()
 diff --git a/tests/unit/x86_mapping_counts.c b/tests/unit/x86_mapping_counts.c
-index f0be5f3c..10c60033 100644
+index f0be5f3c..c18846a4 100644
 --- a/tests/unit/x86_mapping_counts.c
 +++ b/tests/unit/x86_mapping_counts.c
-@@ -1,26 +1,76 @@
+@@ -1,26 +1,78 @@
  /* SPDX-License-Identifier: BSD-3-Clause */
  #include <stdio.h>
 +#include <string.h>
@@ -35504,10 +35573,12 @@ index f0be5f3c..10c60033 100644
 +	if (find_insn(reference[0].id - 1) != (unsigned int)-1 ||
 +	    find_insn(reference[ARR_SIZE(reference) - 1].id + 1) != (unsigned int)-1)
 +		return 1;
++	if (X86_is_64bit_only(0) || X86_is_64bit_only(UINT16_MAX))
++		return 1;
 +	for (size_t i = 0; i < ARR_SIZE(reference); ++i) {
 +		bool ok = find_insn(reference[i].id) == i &&
 +			  insns[i].mapid == reference[i].mapid &&
-+			  (insns[i].properties & 1) == reference[i].is64bit;
++			  X86_is_64bit_only(reference[i].id) == reference[i].is64bit;
  #ifndef CAPSTONE_DIET
 -	for (size_t i = 0; i < ARR_SIZE(x86_mapping_counts); ++i) {
 -		unsigned counts = x86_mapping_counts[i];
