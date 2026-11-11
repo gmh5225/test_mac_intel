@@ -36,10 +36,12 @@ def iced(label, flags):
     return build / 'release/libiced_compare.a'
 
 
-def link(consumer, label, cap, rust=None, cap_instrumented=False):
+def link(consumer, label, cap, rust=None, cap_instrumented=False, rust_profiler=None):
     args = ['clang++', WORK / (consumer + '.o'), cap]
     if rust:
         args.append(rust)
+    if rust_profiler:
+        args.extend(['-Wl,-u,__llvm_profile_runtime', rust_profiler])
     if cap_instrumented:
         args.append('-fprofile-generate')
     binary = WORK / (consumer + '-' + label)
@@ -151,7 +153,9 @@ def prepare():
     rust_gen = iced('train', '-Cprofile-generate=' + str(WORK / 'rust-instrumentation-output'))
     link('single', 'train-capstone', cap_gen, cap_instrumented=True)
     link('decoder', 'train-capstone', cap_gen, rust_base, True)
-    link('decoder', 'train-iced', cap_base, rust_gen)
+    rust_libdir = Path(subprocess.check_output(['rustc', '--print', 'target-libdir'], text=True).strip())
+    profiler, = rust_libdir.glob('libprofiler_builtins-*.rlib')
+    link('decoder', 'train-iced', cap_base, rust_gen, rust_profiler=profiler)
     cap_profile = train('capstone', training, clang_prof)
     rust_profile = train('iced', training, rust_prof)
     write('profiles.json', {'capstone':sha(cap_profile), 'iced':sha(rust_profile)})
