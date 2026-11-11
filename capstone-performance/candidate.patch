@@ -3155,20 +3155,38 @@ index fd26a73a..bc3ce76e 100644
  	// to another, for example, from disassembler to asm printer. The values of
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -679,6 +679,13 @@
- 			instr->x86_prefix[3] = insn.prefix3;
- 			instr->xAcquireRelease = insn.xAcquireRelease;
+@@ -150,8 +150,9 @@
+ #endif
+ 
+ // copy x86 detail information from internal structure to public structure
+-static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
+-{
++static void update_pub_insn(MCInst *mi, InternalInstruction *inter)
++{
++	cs_insn *pub = mi->flat_insn;
+ 	if (inter->hasRex2) {
+ 		/* REX2.M0 selects the generated map internally; 0F is not present
+ 		 * in the architectural encoding. */
+@@ -174,6 +175,10 @@
+ 			}
+ 		} else {
+ 			pub->detail->x86.opcode[0] = inter->opcode;
++			/* Classic one-byte opcodes have no mask or broadcast.
++			 * Keep RCL (C0/C1, D0-D3) and x87 on the repair path. */
++			mi->x86_plain_onebyte = inter->opcodeType == ONEBYTE &&
++				(inter->opcode & 0xfe) != 0xc0 && (inter->opcode & 0xf0) != 0xd0;
+ 		}
+ 	}
+ 
+@@ -681,7 +686,7 @@
  			instr->x86Lock = insn.hasLockPrefix;
-+			/* The classic one-byte map has no vector mask or broadcast.
-+			 * Leave the C0/C1 shifts, D0-D3 shifts and x87 range
-+			 * to the postprinter for RCL and x87 environment repairs. */
-+			instr->x86_plain_onebyte =
-+				insn.opcodeType == ONEBYTE && !insn.vectorExtensionType &&
-+				!insn.hasRex2 && (insn.opcode & 0xfe) != 0xc0 &&
-+				(insn.opcode & 0xf0) != 0xd0;
  
  			if (handle->detail_opt) {
- 				update_pub_insn(instr->flat_insn, &insn);
+-				update_pub_insn(instr->flat_insn, &insn);
++				update_pub_insn(instr, &insn);
+ 			}
+ 
+ 			if (insn.hasAdSize)
 --- a/cs.c
 +++ b/cs.c
 @@ -78,6 +78,7 @@
@@ -3179,19 +3197,33 @@ index fd26a73a..bc3ce76e 100644
  #include "arch/X86/X86Disassembler.h"
  #endif
  #include "arch/X86/X86Module.h"
-@@ -1069,11 +1070,13 @@
+@@ -947,7 +948,8 @@
+ 		insn->id = MCInst_getOpcodePub(mci);
+ 
+ 	// post printer handles some corner cases (hacky)
+-	if (postprinter)
++	if (postprinter &&
++	    (!stream_length_valid || insn->detail || insn->id == X86_INS_VPCMP))
+ 		postprinter((csh)handle, insn, OS, mci);
+ 
+ #ifndef CAPSTONE_DIET
+@@ -1067,13 +1069,14 @@
+ 			ss.is_closed = false;
+ 			ss.markup_stream = false;
  			ss.prefixed_by_markup = false;
- 			ss.unsigned_num = false;
- 			SStream_opt_unum(&ss, handle->imm_unsigned);
-+			bool intel = handle->printer == X86_Intel_printInst;
- 			handle->printer(&mci, &ss, handle->printer_info);
+-			ss.unsigned_num = false;
+-			SStream_opt_unum(&ss, handle->imm_unsigned);
+-			handle->printer(&mci, &ss, handle->printer_info);
 -			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
 -				  code,
 -				  !mci.assembly[0] && handle->post_printer ==
 -							      X86_postprinter);
++			ss.unsigned_num = handle->imm_unsigned;
++			Printer_t printer = handle->printer;
++			printer(&mci, &ss, handle->printer_info);
 +			PostPrinter_t post = handle->post_printer;
 +			bool exact = !mci.assembly[0] && post == X86_postprinter;
-+			if (exact && intel && mci.x86_plain_onebyte)
++			if (exact && mci.x86_plain_onebyte && printer == X86_Intel_printInst)
 +				post = NULL;
 +			fill_insn(handle, insn, &ss, &mci, post, code, exact);
  		} else

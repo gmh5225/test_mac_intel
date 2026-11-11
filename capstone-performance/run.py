@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='shared integrated candidate' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='unconditional one-byte classification' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
