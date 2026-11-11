@@ -143,12 +143,14 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
-    command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
-    command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
-    incremental = os.environ.get('COMPARE_BASE') == 'combined'
-    if incremental:
-        command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='same four alias indices, before grouping the ARM printer detail repairs' if incremental else 'published next'))
+    variant = os.environ['SCAN_VARIANT']
+    if variant not in ('span','header'):
+        raise ValueError(variant)
+    patch = SOURCE / (variant + '.patch')
+    assert sha(patch) == manifest['source_lineage'][patch.name]['sha256']
+    command(['git','apply','--check',patch], 'patch-check',WORK/'new')
+    command(['git','apply',patch], 'patch-apply',WORK/'new')
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate=variant))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -191,7 +193,7 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','check-mips-alias']:
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index','x86_scan_batch','x86_encoding_accuracy','x86_reg_access']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
@@ -237,11 +239,7 @@ panic = "abort"
     write('objects.json', objects)
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
-    prefix = 'CMakeFiles/capstone.dir/'
-    allowed = {prefix+'arch/'+arch+'/'+arch+'Mapping.c.o' for arch in ('ARM','AArch64','Mips','Sparc')}
-    allowed.add(prefix+'Mapping.c.o')
-    if incremental:
-        allowed = {prefix+'arch/ARM/ARMMapping.c.o'}
+    allowed = {'CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

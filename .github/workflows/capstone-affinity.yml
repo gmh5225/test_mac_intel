@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-isolated-alias-lookups]
+    branches: [codex/capstone-scalar-extent-hosts]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -21,12 +21,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: published }
-          - { host: ubuntu-24.04, baseline: combined }
-          - { host: macos-15, baseline: published }
-          - { host: macos-15-intel, baseline: published }
+          - { host: ubuntu-24.04, variant: header }
+          - { host: ubuntu-24.04, variant: span }
+          - { host: macos-15, variant: header }
+          - { host: macos-15-intel, variant: header }
     env:
-      COMPARE_BASE: ${{ matrix.baseline }}
+      SCAN_VARIANT: ${{ matrix.variant }}
     runs-on: ${{ matrix.host }}
     timeout-minutes: 52
     steps:
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-multiarch-alias-indices-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-multiarch-alias-indices-${{ matrix.host }}-${{ matrix.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
