@@ -17,6 +17,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - id: source
+        name: Read the immutable source revision
+        run: python3 -c 'import json; print("revision=" + json.load(open("neverd-arm64e-variadic/Replay.def"))["revision"])' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ steps.source.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            unittests/lift/format
+      - name: Exercise the compiler-original four-key PAC and signed exception controls
+        run: |
+          ulimit -c 0
+          python3 neverd/scripts/verify_arm64e_native.py probe --output "$GITHUB_WORKSPACE/variadic-evidence/original-controls"
       - name: Verify and execute the source-bound Release test host
         env:
           GH_TOKEN: ${{ github.token }}

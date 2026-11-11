@@ -1,7 +1,7 @@
 {
-  "revision": "ba19b21847c9c3ebd2d062978ecbedab51b55cf9",
+  "revision": "f833ef1519e50143339bc77d322480548d318084",
   "package": "neverd-llvm-v23.0.0-r6",
-  "tag": "neverd-variadic-r6-ba19b21847",
+  "tag": "neverd-variadic-r6-f833ef1519",
   "host": "NeverDArm64eLiftedImageTests",
   "asset": "neverd-variadic-host.tgz",
   "run_env": {
@@ -12,7 +12,8 @@
     "OptimizedCalleeWalksTheNativeArgumentArea": 3,
     "UnoptimizedCalleeHomesItsNativeArgumentCursor": 3,
     "FramelessStackLoadsSurviveImagePublication": 2,
-    "CompactLeavesElideOnlyTheUnusedStackReservation": 2
+    "CompactLeavesElideOnlyTheUnusedStackReservation": 2,
+    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2
   },
   "environment": {
     "hardware": [
@@ -38,9 +39,29 @@
       "--version"
     ]
   },
-  "archive_sha256": "cfd0d5d8c6bd35a5133aa808a12b69daa9ae07ea6705ae23003adb05d3fc4eca",
-  "host_sha256": "e2e0218fb5371d5f0ab50c618fd78a7866cf0ffd123ea981f7d11f5346f341b8",
+  "archive_sha256": "cef7240c85b082408acb012352ff84aa419a8e0d974fded4db7b90b4d7ff74dc",
+  "host_sha256": "948d239fc03cf85ffccc997355ff0b9ff8b9181186529ca6eb0edfc1adaad37a",
   "xml": "results.xml",
   "log": "runtime.log",
-  "image_count": "executed_native_images"
+  "image_count": "executed_native_images",
+  "installation": {
+    "host": "NeverDArm64eAnalysisTests",
+    "host_sha256": "7570f577aca09ee302a99a86b2cdd1c4eeacbaadbe94e29a927915eb4cc261e2",
+    "fixtures": {
+      "legacy/report.json": "55edce60885e35ca328ed041981274efd8af6ee7460d49628b40f1638b784168",
+      "legacy/-O0-compact.dylib": "7f8e48c767108dbfd484e9b8c86540f2188c41adbc82a86b0b7be2488396d7d5",
+      "legacy/-O0-dwarf.dylib": "1347c83757ea3e3d37758421299a496511e8ad11a2a6f9a9f4d4c547f7918f3a",
+      "legacy/-O2-compact.dylib": "6ac6bd6ab0b8278ce3a07859b25bd6be57c866bbd8b9f08361c0112f6a7fbd8e",
+      "legacy/-O2-dwarf.dylib": "158c6491440d9d86f30691a568574b246a7077d53ad2fe001fdc75f9914db944"
+    },
+    "legacy": "legacy",
+    "build": "ctest",
+    "driver": "neverd/scripts/verify_arm64e_native.py",
+    "probe": "original-controls/report.json",
+    "report": "report.json",
+    "modes": {
+      "run": 20,
+      "run-default-executable": 4
+    }
+  }
 }
