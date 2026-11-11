@@ -2,7 +2,7 @@ name: PE64 runtime function comparison
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-isolated-alias-functions]
+    branches: [codex/capstone-dense-records-functions]
 permissions:
   contents: read
 jobs:
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-alias-functions-${{ matrix.crt }}
+          name: dense-records-functions-${{ matrix.crt }}
           path: capstone-evidence/
           retention-days: 14
