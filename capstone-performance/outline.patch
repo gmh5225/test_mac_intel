@@ -1,0 +1,82 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..e9ae3f81 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3078,6 +3078,19 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+ 
+ enum { X86_SCAN_NOT_HANDLED = 3 };
+ 
++/* Compact terminals return an ID and length. The generic fallback starts
++ * with its own fully initialized raw instruction. */
++X86_DECODE_INLINE void initializeTerminalScan(InternalInstruction *insn,
++					      const uint8_t *code, size_t size,
++					      cs_mode mode)
++{
++	memset(insn, 0, offsetof(InternalInstruction, code));
++	/* The 16-bit register form calls the displacement reader with the
++	 * initial EA_DISP_NONE. */
++	insn->eaDisplacement = EA_DISP_NONE;
++	initializeInstructionHeader(insn, code, size, mode);
++}
++
+ /* Only the compact readers see this state. Generic/raw decoding starts its
+  * own state if the generated table has no terminal for this header. */
+ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3089,8 +3102,8 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ {
+ 	if (opcodeOffset >= 2)
+ 		return X86_SCAN_NOT_HANDLED;
+-	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, codeSize, mode);
++	InternalInstruction insn;
++	initializeTerminalScan(&insn, code, codeSize, mode);
+ 	const uint8_t prefixMask =
+ 		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
+ 		(insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
+@@ -3141,9 +3154,9 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 		      unsigned *instructionID, uint16_t *size, bool publicID,
+ 		      bool guardExtensions, bool readerFlags)
+ {
+-	InternalInstruction insn = { 0 };
++	InternalInstruction insn;
+ 	/* Retain the decoder's bitness priority for mixed mode flags. */
+-	initializeInstructionHeader(&insn, code, code_len, mode);
++	initializeTerminalScan(&insn, code, code_len, mode);
+ 	size_t offset = 0;
+ 	/* Keep the 16-bit size-prefix loop small; other prefixes use the full reader. */
+ 	while (offset < code_len && (insn.mode == MODE_16BIT || offset < 15)) {
+@@ -3415,8 +3428,8 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 					 uint8_t prefix, X86ScanResult *result)
+ {
+-	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	InternalInstruction insn;
++	initializeTerminalScan(&insn, code, code_len, CS_MODE_64);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3630,7 +3643,13 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
+ 					false);
+ }
+ 
+-X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
++#if defined(_MSC_VER) && !defined(__clang__)
++#define X86_ITER_SCAN_INLINE static __declspec(noinline)
++#else
++#define X86_ITER_SCAN_INLINE X86_DECODE_INLINE
++#endif
++
++X86_ITER_SCAN_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  const uint8_t *code, size_t size,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+@@ -3642,7 +3661,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ /* Keep the admitted terminal's public ID and zero alias adjustment visible
+  * through output completion. Cold helpers can take the fallback result's
+  * address without forcing terminal output through that escaped object. */
+-X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
++X86_ITER_SCAN_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  const uint8_t *code, size_t size,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch)

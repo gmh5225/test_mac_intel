@@ -10,20 +10,17 @@ import subprocess
 import run as perf
 
 source, work = perf.source, perf.work
-ref = '3b4aeea8566a118cca94ef00fb4f16c39c53a29a'
+ref = 'a60be2e71f73739659fd895009263e0f276e9d22'
 
 def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
-    assert perf.digest((source/'common.patch').read_bytes())=='4f8a9bc418985bf67a4f68adc827fc83bb0bb338913e1978fed3fc05167132ad'
-    perf.run(['git','apply',source/'common.patch'],'common-base',base)
     trees = {'msvc':base}
-    for name, expected in {'stringop': '7293b93266218174a62e97b63c738c972be42fcad37d5af5dc9c91d3ad2c0d9d', 'vector': '0157194627655be13c21d4700a25c55b33ae12225fd181f5b57f94d2239979b1'}.items():
+    for name, expected in {'outline': '84edee6149fc19eff37effd58b993828d6bd35c4418bd519e3755eefc297450a', 'route': 'c3e7fd36d8c45f0a288118eabe8a076954e0f8799f8f65fc6ad1552e43012832'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
         perf.run(['git','worktree','add','--detach',trees[name],'HEAD'],name+'-worktree',base)
-        perf.run(['git','apply',source/'common.patch'],name+'-common',trees[name])
         perf.run(['git','apply',patch],name+'-apply',trees[name])
     adapter = work/'adapter'
     adapter.mkdir()
@@ -56,7 +53,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','stringop','vector']
+    names=['msvc','outline','route']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -107,7 +104,7 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','stringop','vector','iced','vector','stringop','msvc'],['vector','msvc','stringop','iced','stringop','msvc','vector'],['stringop','vector','msvc','iced','msvc','vector','stringop']]
+    orders=[['msvc','outline','route','iced','route','outline','msvc'],['route','msvc','outline','iced','outline','msvc','route'],['outline','route','msvc','iced','msvc','route','outline']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
@@ -120,13 +117,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','stringop','vector','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','outline','route','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'stringop': '7293b93266218174a62e97b63c738c972be42fcad37d5af5dc9c91d3ad2c0d9d', 'vector': '0157194627655be13c21d4700a25c55b33ae12225fd181f5b57f94d2239979b1'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'outline': '84edee6149fc19eff37effd58b993828d6bd35c4418bd519e3755eefc297450a', 'route': 'c3e7fd36d8c45f0a288118eabe8a076954e0f8799f8f65fc6ad1552e43012832'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
