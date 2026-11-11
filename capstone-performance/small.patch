@@ -1,0 +1,58 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 1b1c2032..7d08795f 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11918,6 +11918,22 @@ const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
+ 	return NULL;
+ }
+ 
++/* Register-access queries usually start with just the implicit registers. */
++static inline bool x86_access_contains(uint16_t *regs, uint8_t count,
++				       unsigned int reg)
++{
++	switch (count) {
++	case 0:
++		return false;
++	case 1:
++		return regs[0] == reg;
++	case 2:
++		return regs[0] == reg || regs[1] == reg;
++	default:
++		return arr_exist_inline(regs, count, reg);
++	}
++}
++
+ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+@@ -11947,12 +11963,12 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		switch ((int)op->type) {
+ 		case X86_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&
+-			    !arr_exist_inline(regs_read, read_count, op->reg)) {
++			    !x86_access_contains(regs_read, read_count, op->reg)) {
+ 				regs_read[read_count] = op->reg;
+ 				read_count++;
+ 			}
+ 			if ((op->access & CS_AC_WRITE) &&
+-			    !arr_exist_inline(regs_write, write_count,
++			    !x86_access_contains(regs_write, write_count,
+ 					      op->reg)) {
+ 				regs_write[write_count] = op->reg;
+ 				write_count++;
+@@ -11965,13 +11981,13 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 				read_count++;
+ 			}
+ 			if ((op->mem.base != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !x86_access_contains(regs_read, read_count,
+ 					      op->mem.base)) {
+ 				regs_read[read_count] = op->mem.base;
+ 				read_count++;
+ 			}
+ 			if ((op->mem.index != X86_REG_INVALID) &&
+-			    !arr_exist_inline(regs_read, read_count,
++			    !x86_access_contains(regs_read, read_count,
+ 					      op->mem.index)) {
+ 				regs_read[read_count] = op->mem.index;
+ 				read_count++;

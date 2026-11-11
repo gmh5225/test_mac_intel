@@ -1,0 +1,53 @@
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5627f249..7080e0d8 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -7125,8 +7125,12 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 	if (scan)
+ 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+-	if (mcInst)
+-		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
++	if (mcInst) {
++		unsigned int handler = terminal >> X86_TERMINAL_HANDLER_SHIFT;
++		if (handler == 11)
++			return decodeLegacyFullShape11(insn, mcInst, size);
++		return x86LegacyFullHandlers[handler](insn, mcInst, size);
++	}
+ 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
+ }
+ #else
+@@ -14456,8 +14460,12 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 	if (scan)
+ 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+-	if (mcInst)
+-		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
++	if (mcInst) {
++		unsigned int handler = terminal >> X86_TERMINAL_HANDLER_SHIFT;
++		if (handler == 11)
++			return decodeLegacyFullShape11(insn, mcInst, size);
++		return x86LegacyFullHandlers[handler](insn, mcInst, size);
++	}
+ 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
+ }
+ #endif
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index dbb25f26..fddc508c 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -973,8 +973,12 @@ def emit_terminal(suffix):
+         "\tif (scan)",
+         "\t\treturn scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+         "\tinsn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];",
+-        "\tif (mcInst)",
+-        "\t\treturn x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);",
++        "\tif (mcInst) {",
++        "\t\tunsigned int handler = terminal >> X86_TERMINAL_HANDLER_SHIFT;",
++        f"\t\tif (handler == {groups[((), ())]})",
++        f"\t\t\treturn decodeLegacyFullShape{groups[((), ())]}(insn, mcInst, size);",
++        "\t\treturn x86LegacyFullHandlers[handler](insn, mcInst, size);",
++        "\t}",
+         "\treturn x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);",
+         "}",
+     ]
