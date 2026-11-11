@@ -37,11 +37,11 @@ opt-level=3
         args=['git','-C',c,'apply']+(['-R'] if reverse else [])
         sp.run([*args,'--check',path],check=True);sp.run([*args,path],check=True)
     tool.write('processor.json',json.loads(sp.check_output(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'],text=True)))
-    variants=[('regular','ON',''),('mask','ON',''),('both','ON','arch/X86/X86DisassemblerDecoder.c'),('fixed','ON','arch/X86/X86DisassemblerDecoder.c')]
+    decoder='arch/X86/X86DisassemblerDecoder.c'
+    variants=[('regular','OFF',''),('regular_new','OFF',decoder),('ipo','ON',decoder if tool.crt=='MT' else ''),('ipo_new','ON',decoder)]
     for name,on,ordinary in variants:
-        if name=='mask':apply('writemask.patch')
-        elif name=='both':apply('native-decoder-ipo.patch')
-        elif name=='fixed':apply('writemask.patch',reverse=True)
+        if name in ('regular_new','ipo_new'):apply('profiles.patch')
+        elif name=='ipo':apply('profiles.patch',reverse=True)
         b=w/('regular-build' if on=='OFF' else 'mixed-build')
         args=['-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+on,'-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('X86','ARM','AARCH64','MIPS')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if tool.crt=='MT' else 'OFF')]
         tool.run(['cmake','-S',c,'-B',b,*opts,*args],'configure-'+name)
@@ -81,6 +81,11 @@ opt-level=3
                 return hashlib.sha256(data[raw:raw+size]).hexdigest()
         raise RuntimeError('missing PE code section')
     tool.write('code-sections.json',{k:code_digest(v)for k,v in programs.items()})
+    if tool.crt=='MT':
+        digests={k:code_digest(v)for k,v in programs.items()}
+        assert digests['regular']==digests['regular_new'] and digests['ipo']==digests['ipo_new'],digests
+        tool.write('complete.json',dict(complete=True,static_control=digests))
+        return
     results=[]
     for case in tool.get_cases():
         for mode in ('scan','format','detail'):
