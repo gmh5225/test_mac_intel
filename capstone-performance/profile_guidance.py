@@ -205,7 +205,10 @@ panic = "abort"
     gen_cap = build_capstone(root, cap, "generate", "-fprofile-generate")
     gen_iced = build_iced(root, host, "generate", "-Cprofile-generate=" + str(root / "raw-iced"))
     cap_train = link(root, "train-c", gen_cap, normal_iced, ["-fprofile-generate"])
-    iced_train = link(root, "train-rs", normal_cap, gen_iced)
+    rust_libdir = Path(sp.check_output(["rustc", "--print", "target-libdir", "--target", host], text=True).strip())
+    rust_runtime, = rust_libdir.glob("libprofiler_builtins-*.rlib")
+    # The C++ driver has to link the runtime matching the instrumented Rust archive.
+    iced_train = link(root, "train-rs", normal_cap, gen_iced, ["-Wl,-u,__llvm_profile_runtime", rust_runtime])
     for row in train:
         for mode in (MODES if row["selector"] >= 16 else MODES[1:]):
             libs = ("capstone", "iced") if row["selector"] >= 16 else ("capstone",)
