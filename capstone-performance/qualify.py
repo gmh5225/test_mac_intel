@@ -35,7 +35,7 @@ def tests(source, label, preset, selection=None):
                       '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined'])
         os.environ['ASAN_OPTIONS']='halt_on_error=1:detect_leaks=1'
         os.environ['UBSAN_OPTIONS']='halt_on_error=1:print_stacktrace=1'
-    generator = ['-G','Visual Studio 17 2022','-A','x64'] if platform.system()=='Windows' else [
+    generator = ['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4'] if platform.system()=='Windows' else [
         '-G','Ninja','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++']
     command(['cmake','-S',source,'-B',d,*generator,'-DCMAKE_BUILD_TYPE=Release',
              '-DCAPSTONE_BUILD_MACOS_THIN=ON',*flags],label+'-config')
