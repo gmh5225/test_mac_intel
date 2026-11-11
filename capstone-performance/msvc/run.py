@@ -215,7 +215,7 @@ try:
     write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
           image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
           iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
-    assert digest((source / 'windows-formatter.patch').read_bytes()) == '0768aa7dd2bd07429e4724f2ad6d29363008781dca406cb35608994941b8bd62'
+    assert digest((source / 'windows-formatter.patch').read_bytes()) == 'aa647ee0f032b603e2d1fdd1db16844765694dc45888aa429cf4317d3392abaf'
     programs = make_programs()
     cases = get_cases()
     snapshot(programs, cases)
