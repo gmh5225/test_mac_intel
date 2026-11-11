@@ -1,12 +1,12 @@
 diff --git a/Mapping.c b/Mapping.c
-index 2332dac8..45b44ca3 100644
+index 2332dac8..8bf1f111 100644
 --- a/Mapping.c
 +++ b/Mapping.c
 @@ -477,6 +477,49 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
  	}
  }
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +/* Use the same final stream and mnemonic delimiters for both lookup forms. */
 +#if defined(_MSC_VER)
 +static __forceinline
@@ -66,7 +66,7 @@ index 2332dac8..45b44ca3 100644
  	return UINT64_MAX;
  }
 +
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +#if defined(CAPSTONE_HAS_AARCH64) || \
 +	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_POWERPC) || \
 +	  defined(CAPSTONE_HAS_SPARC)) && !defined(CAPSTONE_DIET))
@@ -92,14 +92,14 @@ index 2332dac8..45b44ca3 100644
 +#endif
 +#endif
 diff --git a/Mapping.h b/Mapping.h
-index 9f69f881..15b5fe3f 100644
+index 9f69f881..c66f95dc 100644
 --- a/Mapping.h
 +++ b/Mapping.h
 @@ -296,6 +296,23 @@ bool map_use_alias_details(const MCInst *MI);
  void map_set_alias_id(MCInst *MI, const SStream *O,
  		      const name_map *alias_mnem_id_map, int map_size);
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +#if defined(CAPSTONE_HAS_AARCH64) || \
 +	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_POWERPC) || \
 +	  defined(CAPSTONE_HAS_SPARC)) && !defined(CAPSTONE_DIET))
@@ -191,14 +191,14 @@ index 00000000..e263a416
 +	0, 0, 0, 254, 264, 0, 0, 0, 0, 0, 0, 0, 0, 56, 68, 0,
 +	0, 0, 0, 0, 0, 69, 22, 0, 0, 0, 0, 352, 0, 0, 0, 0,
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index 81b5e334..dd240dea 100644
+index 81b5e334..bddb91e1 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
 @@ -163,6 +163,12 @@ static const name_map insn_alias_mnem_map[] = {
  	{ AARCH64_INS_ALIAS_END, NULL },
  };
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +static const uint16_t alias_index[] = {
 +#include "AArch64GenAliasIndex.inc"
 +};
@@ -219,79 +219,94 @@ index 81b5e334..dd240dea 100644
  	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
  		patch_cs_reg_alias(O->buffer);
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..4653eabe 100644
+index 30e28897..dfbe4d89 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -173,9 +173,10 @@ static void patch_cs_reg_alias(char *asm_str)
+@@ -173,10 +173,13 @@ static void patch_cs_reg_alias(char *asm_str)
  
  /// Check if PC is updated from stack. Those POP instructions
  /// are considered of group RETURN.
 +/* Native MSVC checks the detail pointer once in ARM_printer. */
  static void check_pop_return(MCInst *MI)
  {
--	if (!MI->flat_insn->detail)
-+	if (!CS_NATIVE_MSVC_X64 && !MI->flat_insn->detail)
++#if !CS_MSVC_X64_STATIC_RUNTIME
+ 	if (!MI->flat_insn->detail)
  		return;
++#endif
  	if (MI->flat_insn->id != ARM_INS_POP &&
  	    MI->flat_insn->alias_id != ARM_INS_ALIAS_POP) {
-@@ -194,7 +195,7 @@ static void check_pop_return(MCInst *MI)
+ 		return;
+@@ -194,8 +197,10 @@ static void check_pop_return(MCInst *MI)
  /// are considered of group BRANCH.
  static void check_writes_to_pc(MCInst *MI)
  {
--	if (!MI->flat_insn->detail)
-+	if (!CS_NATIVE_MSVC_X64 && !MI->flat_insn->detail)
++#if !CS_MSVC_X64_STATIC_RUNTIME
+ 	if (!MI->flat_insn->detail)
  		return;
++#endif
  	for (size_t i = 0; i < ARM_get_detail(MI)->op_count; ++i) {
  		cs_arm_op *op = &ARM_get_detail(MI)->operands[i];
-@@ -209,7 +210,7 @@ static void check_writes_to_pc(MCInst *MI)
+ 		if (op->type == ARM_OP_REG && op->reg == ARM_REG_PC &&
+@@ -209,8 +214,10 @@ static void check_writes_to_pc(MCInst *MI)
  /// Adds group to the instruction which are not defined in LLVM.
  static void ARM_add_cs_groups(MCInst *MI)
  {
--	if (!MI->flat_insn->detail)
-+	if (!CS_NATIVE_MSVC_X64 && !MI->flat_insn->detail)
++#if !CS_MSVC_X64_STATIC_RUNTIME
+ 	if (!MI->flat_insn->detail)
  		return;
++#endif
  	check_pop_return(MI);
  	check_writes_to_pc(MI);
-@@ -318,9 +319,8 @@ static void add_alias_details(MCInst *MI)
+ 	unsigned Opcode = MI->flat_insn->id;
+@@ -318,9 +325,10 @@ static void add_alias_details(MCInst *MI)
  /// Here we add those oprands to detail.
  static void ARM_add_not_defined_ops(MCInst *MI)
  {
--	if (!detail_is_set(MI))
-+	if (!CS_NATIVE_MSVC_X64 && !detail_is_set(MI))
++#if !CS_MSVC_X64_STATIC_RUNTIME
+ 	if (!detail_is_set(MI))
  		return;
 -
++#endif
  	if (MI->flat_insn->is_alias && MI->flat_insn->usesAliasDetails) {
  		add_alias_details(MI);
  		return;
-@@ -638,7 +638,7 @@ void ARM_add_vector_size(MCInst *MI, unsigned size)
+@@ -638,7 +646,11 @@ void ARM_add_vector_size(MCInst *MI, unsigned size)
  /// the disponent/index reg.
  static void ARM_post_index_detection(MCInst *MI)
  {
--	if (!detail_is_set(MI) || ARM_get_detail(MI)->post_index)
-+	if ((!CS_NATIVE_MSVC_X64 && !detail_is_set(MI)) || ARM_get_detail(MI)->post_index)
++#if CS_MSVC_X64_STATIC_RUNTIME
++	if (ARM_get_detail(MI)->post_index)
++#else
+ 	if (!detail_is_set(MI) || ARM_get_detail(MI)->post_index)
++#endif
  		return;
  
  	int i = 0;
-@@ -698,13 +698,17 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -698,6 +710,19 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
  	MI->flat_insn->alias_id = 0;
  	ARM_LLVM_printInstruction(MI, O, info);
--	if (!MI->flat_insn->alias_id)
-+	if ((!CS_NATIVE_MSVC_X64 || MCInst_isAlias(MI)) && !MI->flat_insn->alias_id)
- 		map_set_alias_id(MI, O, insn_alias_mnem_map,
- 				 ARR_SIZE(insn_alias_mnem_map) - 1);
--	ARM_add_not_defined_ops(MI);
--	ARM_post_index_detection(MI);
--	ARM_check_mem_access_validity(MI);
--	ARM_add_cs_groups(MI);
-+	if (!CS_NATIVE_MSVC_X64 || MI->flat_insn->detail) {
-+		if (!CS_NATIVE_MSVC_X64 || detail_is_set(MI)) {
++#if CS_MSVC_X64_STATIC_RUNTIME
++	if (MCInst_isAlias(MI) && !MI->flat_insn->alias_id)
++		map_set_alias_id(MI, O, insn_alias_mnem_map,
++				 ARR_SIZE(insn_alias_mnem_map) - 1);
++	if (MI->flat_insn->detail) {
++		if (detail_is_set(MI)) {
 +			ARM_add_not_defined_ops(MI);
 +			ARM_post_index_detection(MI);
 +			ARM_check_mem_access_validity(MI);
 +		}
 +		ARM_add_cs_groups(MI);
 +	}
++#else
+ 	if (!MI->flat_insn->alias_id)
+ 		map_set_alias_id(MI, O, insn_alias_mnem_map,
+ 				 ARR_SIZE(insn_alias_mnem_map) - 1);
+@@ -705,6 +730,7 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	ARM_post_index_detection(MI);
+ 	ARM_check_mem_access_validity(MI);
+ 	ARM_add_cs_groups(MI);
++#endif
  	int syntax_opt = MI->csh->syntax;
  	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
  		patch_cs_reg_alias(O->buffer);
@@ -319,7 +334,7 @@ index 00000000..a1c93d3c
 +	10, 99, 104, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 20, 92,
 +	0, 41, 0, 53, 67, 55, 0, 48, 0, 21, 0, 0, 0, 38, 0, 0,
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 20e28fba..d7f14fd7 100644
+index 20e28fba..23950fb8 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
 @@ -83,6 +83,12 @@ static const name_map insn_alias_mnem_map[] = {
@@ -327,7 +342,7 @@ index 20e28fba..d7f14fd7 100644
  	{ MIPS_INS_ALIAS_END, NULL },
  };
 +
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +static const uint16_t mips_alias_index[] = {
 +#include "MipsGenAliasIndex.inc"
 +};
@@ -482,14 +497,14 @@ index 00000000..1c5bf8e2
 +	0, 15, 0, 0, 0, 169, 0, 226, 332, 186, 0, 0, 266, 116, 0, 0,
 +	347, 0, 0, 0, 0, 0, 518, 0, 0, 0, 0, 441, 0, 0, 305, 0,
 diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index fd26a73a..4780ac26 100644
+index fd26a73a..a32697bf 100644
 --- a/arch/PowerPC/PPCMapping.c
 +++ b/arch/PowerPC/PPCMapping.c
 @@ -153,6 +153,12 @@ static const name_map insn_alias_mnem_map[] = {
  	{ PPC_INS_ALIAS_END, NULL },
  };
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +static const uint16_t alias_index[] = {
 +#include "PPCGenAliasIndex.inc"
 +};
@@ -581,7 +596,7 @@ index 00000000..4d8fa955
 +	0, 0, 101, 0, 0, 0, 107, 151, 236, 0, 0, 0, 0, 0, 0, 191,
 +	0, 29, 0, 0, 0, 53, 327, 0, 0, 83, 0, 0, 344, 10, 0, 203,
 diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
-index abe9be7a..31928754 100644
+index abe9be7a..ca17a996 100644
 --- a/arch/Sparc/SparcMapping.c
 +++ b/arch/Sparc/SparcMapping.c
 @@ -211,6 +211,12 @@ static const name_map insn_alias_mnem_map[] = {
@@ -589,7 +604,7 @@ index abe9be7a..31928754 100644
  	{ SPARC_INS_ALIAS_END, NULL },
  };
 +
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +static const uint16_t alias_index[] = {
 +#include "SparcGenAliasIndex.inc"
 +};
@@ -609,14 +624,14 @@ index abe9be7a..31928754 100644
  #endif
  }
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..08b0d900 100644
+index 8c3dea2e..d6ac08ae 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
 @@ -635,7 +635,16 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
  	int ret;
  	bool result;
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +	/* The decoder assigns the header and ID before reading them. Prefix
 +	 * defaults and optional operand state must still start at zero. */
 +	InternalInstruction insn;
@@ -638,7 +653,7 @@ index 8c3dea2e..08b0d900 100644
 -				    ENCODING_WRITEMASK) {
 -					Flags |= X86_IP_HAS_EVEX_OPMASK;
 -					break;
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +			/* Only EVEX descriptors can contain a writemask. */
 +			if (insn.vectorExtensionType == TYPE_EVEX)
 +#endif
@@ -653,14 +668,14 @@ index 8c3dea2e..08b0d900 100644
  			}
  
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 4e1ab1d5..a2039cbe 100644
+index 4e1ab1d5..1fd8d14e 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -1067,7 +1067,11 @@ static bool is64Bit(uint16_t id)
  {
  	unsigned int i = find_insn(id);
  	if (i != -1) {
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +		return (insns[i].properties & 1) != 0;
 +#else
  		return insns[i].is64bit;
@@ -673,7 +688,7 @@ index 4e1ab1d5..a2039cbe 100644
  }
  
 +/* Native MSVC otherwise materializes the raw scan state at this entry. */
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +#define X86_NATIVE_SCAN_EXTENT
 +#endif
  #include "X86GenLegacyTerminal.inc"
@@ -18019,7 +18034,7 @@ index c5f2c531..c619e116 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..bd0441e3 100644
+index df60fd3f..2a5c8357 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10163,19 +10163,30 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -18035,7 +18050,7 @@ index df60fd3f..bd0441e3 100644
  #include "X86GenInstrInfo.inc"
 +#endif
 +
-+#if CS_NATIVE_MSVC_X64 && !defined(CAPSTONE_DIET)
++#if CS_MSVC_X64_STATIC_RUNTIME && !defined(CAPSTONE_DIET)
 +#define GET_X86_MAPPING_IDS
 +#include "X86GenMappingCounts.inc"
 +#undef GET_X86_MAPPING_IDS
@@ -18048,7 +18063,7 @@ index df60fd3f..bd0441e3 100644
  
 -/// full x86 instructions
  const insn_map_x86 insns[] = {
-+#if CS_NATIVE_MSVC_X64 && !defined(CAPSTONE_DIET)
++#if CS_MSVC_X64_STATIC_RUNTIME && !defined(CAPSTONE_DIET)
 +#include "X86GenMappingCounts.inc"
 +#elif defined(CAPSTONE_X86_REDUCE)
 +#include "X86MappingInsn_reduce.inc"
@@ -18068,7 +18083,7 @@ index df60fd3f..bd0441e3 100644
 -// return -1 if not found
 +/* Dense tables encode their internal IDs in the row order. Sparse tables
 + * keep that search key separate from the public ID and detail index. */
-+#if !CS_NATIVE_MSVC_X64
++#if !CS_MSVC_X64_STATIC_RUNTIME
 +#define mapping_opcode(index) (insns[(index)].id)
 +#else
 +static inline unsigned int mapping_opcode(unsigned int index)
@@ -18127,13 +18142,13 @@ index df60fd3f..bd0441e3 100644
  }
  
 -#ifndef CAPSTONE_DIET
-+#if !CS_NATIVE_MSVC_X64 && !defined(CAPSTONE_DIET)
++#if !CS_MSVC_X64_STATIC_RUNTIME && !defined(CAPSTONE_DIET)
 +#define GET_X86_MAPPING_COUNTS
  #include "X86GenMappingCounts.inc"
 +#undef GET_X86_MAPPING_COUNTS
 +#endif
 +
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +#define X86_DETAIL_ARRAY(i, row, field) ((row)->field)
 +#define X86_DETAIL_COUNTS(i, row) ((row)->counts)
 +#define X86_DETAIL_JUMPS(i, row) ((row)->jump)
@@ -18155,7 +18170,7 @@ index df60fd3f..bd0441e3 100644
 +#else
  	i = find_insn_h(h, id);
 +#endif
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +	if (i < ARR_SIZE(insns)) {
 +#else
  	if (i != -1) {
@@ -18167,7 +18182,7 @@ index df60fd3f..bd0441e3 100644
  			cs_mode mode = x86_get_bit_mode(h->mode);
 -			memcpy(insn->detail->regs_read, insns[i].regs_use,
 -			       sizeof(insns[i].regs_use));
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +			const x86_mapping_detail *mapping =
 +				&x86_mapping_details[insns[i].properties >> 1];
 +#endif
@@ -18246,7 +18261,7 @@ index df60fd3f..bd0441e3 100644
  				}
  			}
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +			switch (id) {
 +#else
  			switch (insns[i].id) {
@@ -18279,14 +18294,14 @@ index df60fd3f..bd0441e3 100644
  
  	h->x86_insn_reg_lut =
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..c371404f 100644
+index a2677cb8..21c427c8 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
 @@ -7,6 +7,27 @@
  #include "capstone/capstone.h"
  #include "../../cs_priv.h"
  
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +/* The low bit records 64-bit-only instructions. The remaining bits
 + * index the mode-independent data shared by public detail construction. */
 +typedef struct insn_map_x86 {
@@ -18320,14 +18335,14 @@ index a2677cb8..c371404f 100644
  
  // map sib_base to x86_reg
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..2a360346 100644
+index 0a4c959f..6b21a18e 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -163,16 +163,23 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
  }
  #undef CS_DECODE_SCAN
  
-+#if defined(CS_DECODE_SCAN_IMPL) && CS_NATIVE_MSVC_X64
++#if defined(CS_DECODE_SCAN_IMPL) && CS_MSVC_X64_STATIC_RUNTIME
 +#define CS_DECODE_NATIVE_ITER_SCAN
 +#endif
 +
@@ -18412,26 +18427,26 @@ index 0a4c959f..2a360346 100644
 +#undef CS_DECODE_NATIVE_ITER_SCAN
  #endif
 diff --git a/cs_priv.h b/cs_priv.h
-index 903415e8..6cdf84cd 100644
+index 903415e8..9d907591 100644
 --- a/cs_priv.h
 +++ b/cs_priv.h
 @@ -22,6 +22,14 @@
  #define CS_PRESERVE_MOST
  #endif
  
-+/* The native x64 MSVC build uses dedicated scan and mapping paths. */
++/* Native x64 MSVC uses dedicated scan and mapping paths with the static CRT. */
 +#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_X64) && \
-+	!defined(_M_ARM64EC)
-+#define CS_NATIVE_MSVC_X64 1
++	!defined(_M_ARM64EC) && !defined(_DLL)
++#define CS_MSVC_X64_STATIC_RUNTIME 1
 +#else
-+#define CS_NATIVE_MSVC_X64 0
++#define CS_MSVC_X64_STATIC_RUNTIME 0
 +#endif
 +
  #include "cs_assert.h"
  #include <capstone/capstone.h>
  
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index f8d6b926..0702641e 100644
+index f8d6b926..83f8bde4 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
 @@ -608,16 +608,16 @@ This check runs in the unit suite when Python is available. Edit the original
@@ -18450,11 +18465,11 @@ index f8d6b926..0702641e 100644
 -statements that cannot be skipped under this guard.
 +The x86 mapper derives its register and group counts from the canonical
 +`X86MappingInsn*.inc` tables with `suite/synctools/x86_mapping_counts.py`.
-+Full native x64 MSVC builds store a four-byte public ID and property record per
-+opcode. The property word holds the 64-bit flag and the index of the shared
++Native x64 MSVC builds with the static CRT store a four-byte public ID and
++property record per opcode in full builds. The property word holds the 64-bit flag and the index of the shared
 +implicit register and group data. Contiguous internal IDs use a checked
-+offset from the first ID. Sparse IDs retain a sorted lookup. Other compilers
-+read the canonical rows and their generated counts. The mapper copies the
++offset from the first ID. Sparse IDs retain a sorted lookup. The other configurations read
++the canonical rows and their generated counts. The mapper copies the
 +full register and group arrays, including entries after the first zero. Bit
 +14 of the count word selects the implicit-register repairs. DIET derives
 +its compact records directly from the canonical tables.
@@ -18838,7 +18853,7 @@ index 0ba7e8e6..50283e73 100644
  if __name__ == "__main__":
      unittest.main()
 diff --git a/tests/unit/x86_mapping_counts.c b/tests/unit/x86_mapping_counts.c
-index f0be5f3c..2f8012cf 100644
+index f0be5f3c..bed8c6f1 100644
 --- a/tests/unit/x86_mapping_counts.c
 +++ b/tests/unit/x86_mapping_counts.c
 @@ -1,26 +1,92 @@
@@ -18871,7 +18886,7 @@ index f0be5f3c..2f8012cf 100644
 +#include "../../arch/X86/X86MappingInsn.inc"
 +#endif
 +};
-+#if CS_NATIVE_MSVC_X64 && !defined(CAPSTONE_DIET)
++#if CS_MSVC_X64_STATIC_RUNTIME && !defined(CAPSTONE_DIET)
 +#define GET_X86_MAPPING_DETAILS
 +static const x86_mapping_detail details[] = {
 +#include "../../arch/X86/X86GenMappingCounts.inc"
@@ -18889,7 +18904,7 @@ index f0be5f3c..2f8012cf 100644
 +	    find_insn(reference[ARR_SIZE(reference) - 1].id + 1) != (unsigned int)-1)
 +		return 1;
 +	for (size_t i = 0; i < ARR_SIZE(reference); ++i) {
-+#if CS_NATIVE_MSVC_X64
++#if CS_MSVC_X64_STATIC_RUNTIME
 +		bool ok = find_insn(reference[i].id) == i &&
 +			  insns[i].mapid == reference[i].mapid &&
 +			  (insns[i].properties & 1) == reference[i].is64bit;
