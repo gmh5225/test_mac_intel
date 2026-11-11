@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 import os
+import struct
+import hashlib
 
 def inspect(executable, map_file, evidence):
     symbols = {}
@@ -11,6 +13,20 @@ def inspect(executable, map_file, evidence):
         label = re.match(r'^\s*[0-9A-Fa-f]{4}:[0-9A-Fa-f]{8}\s+(\S+)\s+([0-9A-Fa-f]{12,16})\s+',line)
         if label:
             symbols.setdefault(int(label[2], 16), []).append(label[1])
+    pe=executable.read_bytes();nt=struct.unpack_from('<I',pe,60)[0];opt=nt+24
+    assert struct.unpack_from('<H',pe,opt)[0]==0x20b
+    imagebase=struct.unpack_from('<Q',pe,opt+24)[0]
+    ex_rva,ex_len=struct.unpack_from('<II',pe,opt+112+3*8)
+    section=opt+struct.unpack_from('<H',pe,nt+20)[0];sections=struct.unpack_from('<H',pe,nt+6)[0]
+    end_for={}
+    for off in range(section,section+sections*40,40):
+        virt,rva,length,raw=struct.unpack_from('<IIII',pe,off+8)
+        if rva<=ex_rva and ex_rva+ex_len<=rva+length:
+            assert ex_len%12==0
+            at=raw+(ex_rva-rva)
+            for first,last,unwind in struct.iter_unpack('<III',pe[at:at+ex_len]):
+                if first and last>first:end_for[imagebase+first]=imagebase+last
+    assert end_for
     starts = sorted(symbols)
     selected = {'cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull'}
     seen = set()
@@ -21,7 +37,7 @@ def inspect(executable, map_file, evidence):
         if not names:
             continue
         name=sorted(names)[0];seen.update(names)
-        end=starts[i+1]
+        end=end_for.get(address,min(starts[i+1],address+32768))
         listing=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(address),'--stop-address='+hex(end),executable],text=True,errors='replace')
         lines=[];calls={}
         for line in listing.splitlines():
@@ -35,7 +51,7 @@ def inspect(executable, map_file, evidence):
                     if match[2].startswith('call'):calls[target_name]=calls.get(target_name,0)+1
             lines.append(hex(int(match[1],16)-address)+' '+asm)
         assert lines, (name,hex(address),hex(end))
-        (evidence/(executable.stem+'-'+name+'.asm')).write_text('\n'.join(lines)+'\n')
-        result[name]=dict(start=hex(address),span=end-address,decoded=len(lines),calls=calls,entry=lines[:18])
+        listing_hash=hashlib.sha256('\n'.join(lines).encode()).hexdigest()
+        result[name]=dict(start=hex(address),span=end-address,decoded=len(lines),unwind_extent=address in end_for,sha256=listing_hash,calls=calls,entry=lines[:35])
     assert 'cs_disasm_iter' in seen, seen
     return result

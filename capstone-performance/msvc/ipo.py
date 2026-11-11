@@ -71,7 +71,7 @@ opt-level=3
                 label='iced' if k.startswith('iced') else 'capstone'
                 return json.loads(sp.check_output([programs[k],label,mode,str(case['bits']),str(n),case['path']]))
             n=1
-            while (probe:=sample('base',n))['wall_ns']<10000000:n*=3
+            while (probe:=sample('regular',n))['wall_ns']<10000000:n*=3
             n=max(1,math.ceil(n*120000000/probe['wall_ns']))
             cycles=[]
             for i in range(10):
