@@ -36,7 +36,6 @@ opt-level=3
         assert hashlib.sha256(path.read_bytes()).hexdigest()==tool.manifest['source_lineage'][name]['sha256']
         args=['git','-C',c,'apply']+(['-R'] if reverse else [])
         sp.run([*args,'--check',path],check=True);sp.run([*args,path],check=True)
-    apply('arm-baseline.patch')
     variants=[('regular','OFF',''),('ipo','ON',''),('fixed','ON','arch/X86/X86DisassemblerDecoder.c'),('fixed_regular','OFF','arch/X86/X86DisassemblerDecoder.c')]
     for name,on,ordinary in variants:
         if name=='fixed': apply('native-decoder-ipo.patch')
