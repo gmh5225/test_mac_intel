@@ -275,6 +275,89 @@ index 5627f249..531b8dbb 100644
  X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
  				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
  {
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index 0a4c959f..326237bb 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -165,14 +165,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+-					  uint64_t *address, cs_insn *insn)
++					  uint64_t *address, cs_insn *insn,
++					  bool scan)
+ {
+ 	uint16_t insn_size;
+ 	bool r;
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
+-	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+@@ -193,17 +193,14 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 	return true;
+ }
+ 
+-CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+-					  size_t *size, uint64_t *address,
+-					  cs_insn *insn)
++CS_DECODE_INLINE bool cs_disasm_iter_validated(cs_struct *handle,
++					       const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn, bool scan)
+ {
+-	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+ 	cs_detail *detail;
+ 	bool r;
+ 
+-	if (*size == 0 || !handle)
+-		return false;
+-
+ 	// An instruction cs_malloc() allocated while detail was on keeps its
+ 	// detail after detail is turned off.  Much of the decoder tests only
+ 	// whether that pointer is set, so a decode without detail hides it, as
+@@ -211,9 +208,38 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	detail = insn->detail;
+ 	if (CS_DECODE_LIKELY(!handle->detail_opt))
+ 		insn->detail = NULL;
+-	r = cs_disasm_iter_body(handle, code, size, address, insn);
++	r = cs_disasm_iter_body(handle, code, size, address, insn, scan);
+ 	insn->detail = detail;
+ 	return r;
+ }
+ 
++#if defined(CS_DECODE_SCAN_IMPL) && defined(_MSC_VER) && !defined(__clang__)
++/* Keep the scanner's addressing temporaries off the stack of a full decode.
++ * Both entries use the same iterator, including skipdata and detail policy. */
++__declspec(noinline) static bool
++cs_disasm_iter_native_scan(cs_struct *handle, const uint8_t **code,
++			   size_t *size, uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_validated(handle, code, size, address, insn,
++					true);
++}
++#endif
++
++CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
++{
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	if (*size == 0 || !handle)
++		return false;
++	const bool scan = use_x86_scan(handle);
++#if defined(CS_DECODE_SCAN_IMPL) && defined(_MSC_VER) && !defined(__clang__)
++	if (scan)
++		return cs_disasm_iter_native_scan(handle, code, size, address,
++						  insn);
++#endif
++	return cs_disasm_iter_validated(handle, code, size, address, insn,
++					scan);
++}
++
+ #endif
 diff --git a/docs/cs_v6_release_guide.md b/docs/cs_v6_release_guide.md
 index b8a9c5f2..4d93ac23 100644
 --- a/docs/cs_v6_release_guide.md
