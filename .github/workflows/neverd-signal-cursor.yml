@@ -1,0 +1,34 @@
+name: Darwin arm64e system cursor across interrupted frames
+on:
+  push:
+    branches: [codex/neverd-arm64e-signal-cursor]
+    paths: [neverd-signal-cursor/**, .github/workflows/neverd-signal-cursor.yml]
+permissions:
+  contents: read
+jobs:
+  interrupt:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: c0f4eba035850956356962daaeace0b255966d9e
+          path: neverd
+          persist-credentials: false
+      - name: Walk across interrupted compiler-original frames with system libunwind
+        run: |
+          ulimit -c 0
+          python3 neverd-signal-cursor/probe.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: signal-cursor-${{ matrix.runner }}
+          path: signal-cursor.json
+          if-no-files-found: error
