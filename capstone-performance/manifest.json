@@ -3,20 +3,20 @@
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "source_lineage": {
     "single.cpp": {
-      "experiment": "round179-x86-metadata/static-source/single.cpp",
-      "sha256": "496612dfc02979b21e2a0d42f8074a444237884ed2247906d9a5e4adf9fef69b"
+      "experiment": "round363-arc-loongarch-detail/single.cpp",
+      "sha256": "bfe697a0b2388f0ff1a195986b3b2c48b907fbb4d7ae0292e33a8c0ec852f87f"
     },
     "iced.rs": {
       "experiment": "round145-current-x86-check/iced-source/iced.rs",
       "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
     },
     "candidate.patch": {
-      "experiment": "round356-arm-detail-defaults/runtime.patch",
-      "sha256": "5107bc7bda2aad5fa7b079dd3020444e6f90bf3059372f40d19a6dfbf3aeb40e"
+      "experiment": "round363-arc-loongarch-detail/candidate.patch",
+      "sha256": "67fe2cd749abec11931938585170f3a140d89cbf7fa9ec58429c44b541052cf2"
     },
     "check-hint.c": {
-      "experiment": "round356-arm-detail-defaults/check-defaults.c",
-      "sha256": "8b3f83492871103aaaf874cdcb1d31af21574b5b9260c42e123659797790d4dd"
+      "experiment": "round363-arc-loongarch-detail/check-hint.c",
+      "sha256": "f056d344b12fe597b82bd081ef14d164eeec933f9e2b380c7af1e2ff5f17d49d"
     },
     "check-callback.c": {
       "experiment": "round348-ppc-hint-owner/check-callback.c",
@@ -176,6 +176,69 @@
       "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
       "kind": "deb",
       "command": "sort"
+    },
+    {
+      "name": "arc-ld-linux-arc",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/ld-linux-arc.so.2",
+      "text_sha256": "a863c07ded182d06db715a130cc348a858a1bc4b9a339aaee9f20c53b23bb46b"
+    },
+    {
+      "name": "arc-libc",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/libc.so.6",
+      "text_sha256": "6a32e5c56081cfc19692c86cda2d860c5e15c21d512dd32d9a2df322db0bde3e"
+    },
+    {
+      "name": "arc-libm",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/libm.so.6",
+      "text_sha256": "5ee7ed7d8855be92c9a9bf8aa15e96e02bf4a260af2399c552d37f409eef3142"
+    },
+    {
+      "name": "arc-libresolv",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/libresolv.so.2",
+      "text_sha256": "47316751fdf0ca88f3fc6a1b50a8f08fc4c11a52b0976b198e1c798f3ff9bef7"
+    },
+    {
+      "name": "loong64-ls",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "79aee1454bea976cd0a7216849ce9852efabe3dbb7aaea15f2ddc8bb92eb3e7b"
+    },
+    {
+      "name": "loong64-cp",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "d630e3eeedfa80897a78b980135a7d156e90f6efc9cc82c4980a0e0c96a8f16d"
+    },
+    {
+      "name": "loong64-sort",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "c591f3113374726c163b6448964bb5f8e7bbcb7a9fd480efac27f5aa339690dc"
     }
   ]
 }

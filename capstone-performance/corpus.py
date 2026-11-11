@@ -67,7 +67,7 @@ def pe_text(data):
     return matches[0]
 
 
-def deb_binary(package, name):
+def deb_binary(package, name, member=None):
     members = subprocess.check_output(['ar', 't', str(package)], text=True).splitlines()
     payloads = [member for member in members if member.startswith('data.tar')]
     if len(payloads) != 1:
@@ -75,7 +75,7 @@ def deb_binary(package, name):
     payload = subprocess.check_output(['ar', 'p', str(package), payloads[0]])
     with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as archive:
         matches = [m for m in archive.getmembers()
-                   if m.name.lstrip('./') in ('usr/bin/' + name, 'bin/' + name)]
+                   if m.name.lstrip('./') in ((member,) if member else ('usr/bin/' + name, 'bin/' + name))]
         if len(matches) != 1 or not matches[0].isfile():
             raise ValueError('expected one ordinary binary member: ' + name)
         return archive.extractfile(matches[0]).read()
@@ -98,7 +98,7 @@ def prepare(source, scratch, evidence, command):
             packages[sha] = package
         package = packages[sha]
         if row['kind'] == 'deb':
-            binary = deb_binary(package, row['command'])
+            binary = deb_binary(package, row.get('command', ''),row.get('member'))
             text = elf_text(binary)
         else:
             binary = package.read_bytes()
