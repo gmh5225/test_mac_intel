@@ -1,16 +1,17 @@
 diff --git a/SStream.c b/SStream.c
-index 49e34d76..28ebdbd0 100644
+index 49e34d76..f1fd1246 100644
 --- a/SStream.c
 +++ b/SStream.c
-@@ -260,7 +260,14 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
+@@ -260,7 +260,15 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
  {
  #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
 -	if (cs_mem_malloc == malloc && cs_mem_free == free) {
 +#if defined(_MSC_VER) && defined(_DLL) && !defined(_WIN32_WCE)
 +	bool default_allocator =
-+		cs_mem_malloc == cs_initial_memory_hooks.malloc &&
-+		cs_mem_free == cs_initial_memory_hooks.free;
++		(cs_mem_malloc == cs_initial_memory_hooks.malloc &&
++		 cs_mem_free == cs_initial_memory_hooks.free) ||
++		(cs_mem_malloc == malloc && cs_mem_free == free);
 +#else
 +	bool default_allocator = cs_mem_malloc == malloc && cs_mem_free == free;
 +#endif
@@ -18,27 +19,6 @@ index 49e34d76..28ebdbd0 100644
  		assert(ss && s);
  		if (ss->is_closed || len == 0)
  			return;
-diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
-index cb880c40..bddcd8fa 100644
---- a/arch/X86/X86DisassemblerTranslator.h
-+++ b/arch/X86/X86DisassemblerTranslator.h
-@@ -1404,11 +1404,14 @@ X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
- 	if (beginTranslation(mcInst, insn))
- 		return true;
- 
--	/* UD1 has a runtime operand override; other selected sets use
--	 * the same translators with constant descriptors, including duplicates. */
-+#if !defined(_MSC_VER) || defined(__clang__)
-+	/* MSVC expands both generated switches into a stack-probed frame.
-+	 * Its descriptor loop below uses the same operand translators.
-+	 * UD1 always uses that loop for its runtime operand override. */
- 	if (insn->instructionID != X86_UD1) {
- #include "X86GenOperandTranslate.inc"
- 	}
-+#endif
- 
- 	for (index = 0; index < X86_MAX_OPERANDS &&
- 			insn->operands[index].encoding != ENCODING_NONE;
 diff --git a/cs.c b/cs.c
 index 55aab304..aef26571 100644
 --- a/cs.c
