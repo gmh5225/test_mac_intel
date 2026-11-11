@@ -1,0 +1,47 @@
+name: Capstone fixed CPU performance control
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/capstone-linux-affinity]
+    paths:
+      - capstone-performance/**
+      - .github/workflows/capstone-affinity.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capstone-fixed-cpu
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Validate protocol and native host
+        run: |
+          test "$(uname -m)" = x86_64
+          python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
+      - name: Build immutable sources and verify outputs
+        timeout-minutes: 17
+        run: python3 capstone-performance/run.py prepare
+      - name: Measure fixed CPU A/A and paired workloads
+        timeout-minutes: 24
+        run: python3 capstone-performance/run.py measure
+      - name: Retire disposable products and summarize evidence
+        if: always()
+        run: python3 capstone-performance/run.py finish
+      - name: Preserve raw evidence including failed attempts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: capstone-affinity-${{ github.run_id }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: error
+          retention-days: 14

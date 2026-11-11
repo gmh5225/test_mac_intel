@@ -1,5 +1,16 @@
 # Independent Intel decoder measurements
 
+The `Capstone fixed CPU performance control` workflow is a second environment
+control on x86-64 Linux. It pins the measurement parent and all child processes
+to the first CPU in the job's allowed CPU set, recording the original and effective
+affinity. Its fixed A/A panel targets 500 ms CPU per observation, and the screen
+targets 200 ms. It tests whether an affinity-constrained environment gives more
+stable observations; it does not replace or discard the first Intel macOS run.
+The first Intel macOS run did not establish stable A/A measurements.
+The Linux port only guards Darwin QoS setup, selects ELF shared-library names,
+and treats unavailable `RTLD_FIRST` as zero. The measured decoder loops and the
+iced adapter are unchanged. Compilation is outside the pinned measurement phase.
+
 Run the `Capstone independent Intel performance` workflow. It builds the pinned
 NeverSight Capstone and iced forks from source on a native Intel macOS runner.
 The experimental PPC patch is **not a qualified product change**: it passed local

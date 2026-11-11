@@ -5,6 +5,10 @@
 #include "Mapping.h"
 #include "utils.h"
 
+#ifndef RTLD_FIRST
+#define RTLD_FIRST 0
+#endif
+
 static const name_map ppc[] = {
 #include "arch/PowerPC/PPCGenCSAliasMnemMap.inc"
     {PPC_INS_ALIAS_SLWI, "slwi"},

@@ -5,7 +5,9 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#ifdef __APPLE__
 #include <pthread/qos.h>
+#endif
 #include <dlfcn.h>
 #include <fstream>
 #include <iterator>
@@ -146,8 +148,10 @@ static bool equal(const Result&a,const Result&b){return a.instructions==b.instru
 int main(int argc, char **argv) {
   try {
     if (argc != 5) throw std::runtime_error("selector mode corpus repeats");
+#ifdef __APPLE__
     if (pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0))
       throw std::runtime_error("QoS");
+#endif
     const unsigned selector = std::stoul(argv[1]);
     const unsigned mode = std::stoul(argv[2]);
     const unsigned repeats = std::stoul(argv[4]);

@@ -17,7 +17,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#ifdef __APPLE__
 #include <pthread/qos.h>
+#endif
 #ifdef USE_BATCH
 #include "arch/X86/X86ScanAdapter.h"
 #endif
@@ -167,7 +169,9 @@ static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
 }
 
 int main(int argc, char **argv) {
+#ifdef __APPLE__
   if (pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)) return 2;
+#endif
   try {
     if (argc != 6)
       throw std::runtime_error("usage: compare capstone|iced "

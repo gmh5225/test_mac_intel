@@ -29,6 +29,7 @@ def write(name, value):
 
 def command(args, label, cwd=None):
     args = list(map(str, args))
+    print('Running', label, flush=True)
     with (EVIDENCE / 'commands.jsonl').open('a') as out:
         out.write(json.dumps(dict(args=args, cwd=str(cwd or ROOT), label=label)) + '\n')
     with (EVIDENCE / (label + '.log')).open('w') as log:
@@ -59,6 +60,7 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
+             '-DCMAKE_C_COMPILER=clang',
              '-DCMAKE_OSX_ARCHITECTURES=x86_64', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
@@ -111,17 +113,21 @@ def invoke(case, variant, repeats):
 
 
 def prepare():
-    if platform.machine() != 'x86_64' or platform.system() != 'Darwin':
-        raise RuntimeError('this experiment requires native Intel macOS')
+    if platform.machine() != 'x86_64' or platform.system() not in ('Darwin', 'Linux'):
+        raise RuntimeError('this experiment requires native x86-64 macOS or Linux')
     if WORK.exists() or EVIDENCE.exists():
         raise RuntimeError('existing work/evidence must be retained under a separate attempt')
     WORK.mkdir()
     EVIDENCE.mkdir()
     manifest = json.loads((SOURCE / 'manifest.json').read_text())
     write('inputs.json', manifest)
-    command(['sw_vers'], 'os')
-    command(['sysctl', 'machdep.cpu.brand_string', 'hw.ncpu', 'hw.memsize',
-             'kern.osrelease'], 'host')
+    if platform.system() == 'Darwin':
+        command(['sw_vers'], 'os')
+        command(['sysctl', 'machdep.cpu.brand_string', 'hw.ncpu', 'hw.memsize',
+                 'kern.osrelease'], 'host')
+    else:
+        command(['uname', '-a'], 'os')
+        command(['lscpu', '--json'], 'host')
     for tool in ['clang', 'clang++', 'rustc', 'cargo', 'cmake', 'ninja']:
         command([tool, '--version'], 'version-' + tool.replace('+', 'p'))
     write('environment.json', dict(uname=list(platform.uname()),
@@ -165,17 +171,21 @@ panic = "abort"
         for label in ['base', 'new']:
             command(['clang++', obj, WORK / (label + '-build/libcapstone.a'),
                      *([iced_library] if consumer == 'decoder' else []), '-lpthread',
+                     *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                      '-o', WORK / (consumer + '-' + label)], consumer + '-' + label + '-link')
     commands = json.loads((WORK / 'new-build/compile_commands.json').read_text())
     args = shlex.split(next(c['command'] for c in commands if c['file'].endswith('/Mapping.c')))
     defs = [arg for arg in args if arg.startswith('-D')]
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
-    libraries = {label: WORK / (label + '-build/libcapstone.6.0.0.dylib') for label in ['base', 'new']}
+    library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
+    libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
     for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-callback']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
-                 WORK / 'new-build/libcapstone.a', '-o', target], 'compile-' + unit)
+                 WORK / 'new-build/libcapstone.a',
+                 *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
+                 '-o', target], 'compile-' + unit)
         extra = ([libraries['base']] if unit == 'check-hint' else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
@@ -253,16 +263,26 @@ def measure():
         if sha(WORK / path) != expected:
             raise RuntimeError('binary changed since verification: ' + path)
     cases = json.loads((EVIDENCE / 'cases.json').read_text())
+    if platform.system() == 'Linux':
+        allowed = sorted(os.sched_getaffinity(0))
+        os.sched_setaffinity(0, {allowed[0]})
+        actual = sorted(os.sched_getaffinity(0))
+        if actual != [allowed[0]]:
+            raise RuntimeError('CPU affinity did not take effect')
+        write('affinity.json', dict(original=allowed, selected=actual,
+                                   scope='measurement parent and every inherited child'))
     anchors = {('scalar32', 'format'), ('putty-32-0.85', 'detail'), ('putty-64-0.85', 'format'),
                ('ppc64el-ls', 'format'), ('riscv64-cp', 'format'), ('mips64el-ls', 'detail'), ('arm-ls', 'format')}
     null_cases = [c for c in cases if (c['name'], c['mode']) in anchors]
     if len(null_cases) != len(anchors):
         raise RuntimeError('null panel is incomplete')
-    measure_panel('null', null_cases, 8, ['base', 'new', 'base_aa', 'new_aa'], 150_000_000)
+    null_ns = 500_000_000 if platform.system() == 'Linux' else 150_000_000
+    screen_ns = 200_000_000 if platform.system() == 'Linux' else 150_000_000
+    measure_panel('null', null_cases, 8, ['base', 'new', 'base_aa', 'new_aa'], null_ns)
     measure_panel('x86', [c for c in cases if c['consumer'] == 'decoder'], 6,
-                  ['base', 'new', 'base_aa', 'new_aa', 'iced', 'iced_aa'], 150_000_000)
+                  ['base', 'new', 'base_aa', 'new_aa', 'iced', 'iced_aa'], screen_ns)
     measure_panel('other', [c for c in cases if c['consumer'] == 'single'], 4,
-                  ['base', 'new', 'base_aa', 'new_aa'], 150_000_000)
+                  ['base', 'new', 'base_aa', 'new_aa'], screen_ns)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
@@ -316,7 +336,7 @@ def finish():
                               prior_m4_rejection_remains=True))
     lines = ['# Independent Intel decoder experiment', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
-             '| Panel | Case | Mode | Base/new CPU | Base/iced CPU | New/iced CPU | Positive cycles | A/A outside 2% |',
+             '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
     for panel, rows in panels.items():
         for row in rows:
