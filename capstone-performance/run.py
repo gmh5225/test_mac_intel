@@ -144,7 +144,7 @@ def prepare():
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
     variant = os.environ['SCAN_VARIANT']
-    if variant not in ('span','header'):
+    if variant not in ('guard','embedded'):
         raise ValueError(variant)
     patch = SOURCE / (variant + '.patch')
     assert sha(patch) == manifest['source_lineage'][patch.name]['sha256']
