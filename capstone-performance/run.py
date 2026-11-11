@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='same four alias indices, before grouping the ARM printer detail repairs' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='four alias indices and ARM detail gate' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -238,10 +238,11 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    allowed = {prefix+'arch/'+arch+'/'+arch+'Mapping.c.o' for arch in ('ARM','AArch64','Mips','Sparc')}
+    backends = {'ARM':'ARM','RISCV':'RISCV','SystemZ':'SystemZ','LoongArch':'LoongArch','PowerPC':'PPC'}
+    if not incremental:
+        backends.update(AArch64='AArch64',Mips='Mips',Sparc='Sparc')
+    allowed = {prefix+'arch/'+arch+'/'+stem+'Mapping.c.o' for arch,stem in backends.items()}
     allowed.add(prefix+'Mapping.c.o')
-    if incremental:
-        allowed = {prefix+'arch/ARM/ARMMapping.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

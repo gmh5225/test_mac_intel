@@ -63,6 +63,36 @@ static const name_map names_Sparc[] = {
 static const uint16_t slots_Sparc[] = {
 #include "arch/Sparc/SparcGenAliasIndex.inc"
 };
+static const name_map names_PowerPC[] = {
+#include "arch/PowerPC/PPCGenCSAliasMnemMap.inc"
+	{ PPC_INS_ALIAS_SLWI, "slwi" },
+	{ PPC_INS_ALIAS_SRWI, "srwi" },
+	{ PPC_INS_ALIAS_SLDI, "sldi" },
+	{ PPC_INS_ALIAS_END, NULL },
+};
+static const uint16_t slots_PowerPC[] = {
+#include "arch/PowerPC/PPCGenAliasIndex.inc"
+};
+static const name_map names_LoongArch[] = {
+#include "arch/LoongArch/LoongArchGenCSAliasMnemMap.inc"
+	{ LOONGARCH_INS_ALIAS_END, NULL },
+};
+static const uint16_t slots_LoongArch[] = {
+#include "arch/LoongArch/LoongArchGenAliasIndex.inc"
+};
+static const name_map names_RISCV[] = {
+#include "arch/RISCV/RISCVGenCSAliasMnemMap.inc"
+};
+static const uint16_t slots_RISCV[] = {
+#include "arch/RISCV/RISCVGenAliasIndex.inc"
+};
+static const name_map names_SystemZ[] = {
+#include "arch/SystemZ/SystemZGenCSAliasMnemMap.inc"
+	{ SYSTEMZ_INS_ALIAS_END, NULL },
+};
+static const uint16_t slots_SystemZ[] = {
+#include "arch/SystemZ/SystemZGenAliasIndex.inc"
+};
 static unsigned long cases;
 static int check(const name_map *names, unsigned count, const uint16_t *index, unsigned mask, cs_arch arch, const char *text) {
     cs_struct handle = {0}; cs_insn a = {0}, b = {0}; MCInst mi = {0}; SStream ss = {0};
@@ -74,7 +104,7 @@ static int check(const name_map *names, unsigned count, const uint16_t *index, u
     return 0;
 }
 static int fixture(const name_map *names, unsigned count, const uint16_t *index, unsigned mask) {
-    const cs_arch arches[] = {CS_ARCH_MIPS,CS_ARCH_PPC,CS_ARCH_AARCH64,CS_ARCH_RISCV,CS_ARCH_SPARC,CS_ARCH_ARM};
+    const cs_arch arches[] = {CS_ARCH_MIPS,CS_ARCH_PPC,CS_ARCH_AARCH64,CS_ARCH_RISCV,CS_ARCH_SPARC,CS_ARCH_ARM,CS_ARCH_LOONGARCH,CS_ARCH_SYSTEMZ};
     const char *suffixes[] = {"", " r0", "\tr0", ".suffix", ",pt r0", "_suffix"};
     char text[512];
     for (unsigned a=0;a<sizeof(arches)/sizeof(arches[0]);++a) {
@@ -107,5 +137,9 @@ int main(int argc,char **argv) {
  if(fixture(names_ARM,ARR_SIZE(names_ARM),slots_ARM,ARR_SIZE(slots_ARM)-1)) return 1;
  if(fixture(names_AArch64,ARR_SIZE(names_AArch64),slots_AArch64,ARR_SIZE(slots_AArch64)-1)) return 1;
  if(fixture(names_Sparc,ARR_SIZE(names_Sparc),slots_Sparc,ARR_SIZE(slots_Sparc)-1)) return 1;
- printf("Verified %lu complete ARM/AArch64/MIPS/SPARC indexed alias states against the reference library\n",cases);return 0;
+ if(fixture(names_PowerPC,ARR_SIZE(names_PowerPC),slots_PowerPC,ARR_SIZE(slots_PowerPC)-1)) return 1;
+ if(fixture(names_LoongArch,ARR_SIZE(names_LoongArch),slots_LoongArch,ARR_SIZE(slots_LoongArch)-1)) return 1;
+ if(fixture(names_RISCV,ARR_SIZE(names_RISCV),slots_RISCV,ARR_SIZE(slots_RISCV)-1)) return 1;
+ if(fixture(names_SystemZ,ARR_SIZE(names_SystemZ),slots_SystemZ,ARR_SIZE(slots_SystemZ)-1)) return 1;
+ printf("Verified %lu complete eight-backend indexed alias states against the reference library\n",cases);return 0;
 }
