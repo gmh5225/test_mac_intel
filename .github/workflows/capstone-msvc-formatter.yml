@@ -1,34 +1,12 @@
-name: Qualify MSVC native x64 IPO and regular releases against iced
+name: Validate the static-CRT LTCG setting against the measured native MSVC projects
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-native-ipo-decoder]
+    branches: [codex/capstone-static-ipo-decoder]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
 jobs:
-  measure:
-    strategy:
-      fail-fast: false
-      matrix:
-        crt: [MD, MT]
-    runs-on: windows-2022
-    timeout-minutes: 100
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          persist-credentials: false
-          sparse-checkout: capstone-performance
-      - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/ipo.py ${{ matrix.crt }}
-      - name: Retain exact inputs, control measurements and cleanup receipt
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: native-decoder-ipo-${{ matrix.crt }}-${{ github.run_attempt }}
-          path: capstone-evidence/
-          retention-days: 14
-
   public-tests:
     runs-on: windows-2022
     strategy:
@@ -43,3 +21,9 @@ jobs:
           sparse-checkout: capstone-performance
       - name: Exercise bounded input, public details and batched scanning with LTCG
         run: python capstone-performance/msvc/decoder_ipo_tests.py ${{ matrix.mode }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: static-ipo-${{ matrix.mode }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          retention-days: 14
