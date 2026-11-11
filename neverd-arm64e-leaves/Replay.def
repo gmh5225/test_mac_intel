@@ -1,0 +1,217 @@
+{
+  "source_repository": "NeverSight/NeverD",
+  "runners": [
+    "macos-26",
+    "xcode-27"
+  ],
+  "timeout_minutes": 32,
+  "source": "neverd",
+  "repository": "gmh5225/test_mac_intel",
+  "download": [
+    "gh",
+    "release",
+    "download",
+    "{release}",
+    "--repo",
+    "{repository}",
+    "--pattern",
+    "{asset}"
+  ],
+  "manifest": "manifest.json",
+  "probe": "probe",
+  "report": "delivery-report.json",
+  "llvm_revision": "5676029e378c9e37adc16c8216a8e8453ffafcae",
+  "runtime_command": [
+    "brew",
+    "install",
+    "zstd",
+    "llvm@22"
+  ],
+  "runtime_timeout": 600,
+  "evidence": "leaf-replay-evidence",
+  "host": "NeverDArm64eLiftedImageTests",
+  "probe_args": [
+    "scripts/verify_arm64e_native.py",
+    "probe",
+    "--output"
+  ],
+  "probe_report": "report.json",
+  "filter": "--gtest_filter=AArch64LiftedImage.*:AArch64AsyncUnwind.*:AArch64DarwinEntry.*:AArch64LiftedMemory.*:AArch64DarwinExecutable.*",
+  "test_xml": "leaf.xml",
+  "xml_option": "--gtest_output=xml:",
+  "test_output": "leaf-test.log",
+  "test_timeout": 180,
+  "execute_env": {
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1",
+    "NEVERD_ARM64E_ASYNC_NATIVE": "1"
+  },
+  "image_count": 2,
+  "entry_count": 2,
+  "errors": {
+    "source": "The checked-out source differs from the pinned entry implementation",
+    "archive": "The delivered entry test archive hash differs",
+    "identity": "The delivered entry test host/source identity differs",
+    "probe": "Compiler-original PAC and signed unwinding are not qualified",
+    "case": "The authenticated caller did not complete the original and published lifted leaf images",
+    "async": "The captured hardware return state, frame or caller authentication disagrees at an interrupted PC",
+    "system": "The two system-copy executions did not preserve their expected status or entry identity.",
+    "installation": "At least one required installation matrix case failed or skipped on the native runner.",
+    "oracle": "A required PAC projection failed, skipped or did not run.",
+    "swift_error": "Compiler control lacks the Swift error register"
+  },
+  "source_revision": "5636b41fd1c5a3f485fbf894df7560888f4fd104",
+  "asset": "arm64e-programs-host.tar.gz",
+  "asset_sha256": "c402fc649f35bbe03b806766d04d2f2c7ecb71745142009dad4c17e6ab8677e1",
+  "release": "neverd-arm64e-programs-5636b41fd",
+  "async_case": "PublishedFrameRecoversCallerAtFiveSignalInterruptions",
+  "async_count": 10,
+  "expected_samples": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      16,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "alignment": 4,
+  "leaf_cases": [
+    "VerifiedLeafBodiesUseTheNormalPatchPipeline",
+    "SwiftContextSurvivesNativeLeafPublication",
+    "ScalarFPParametersAndResultsSurvivePublication",
+    "SignedLeafUsesTheIncomingSPAtItsNewAddress",
+    "BaseAndDisplacementRetainLoadAndStoreEffects",
+    "SwiftAsyncContextSurvivesNativeLeafPublication",
+    "EquivalentWAndXZeroingPreservesTheWholeRegister",
+    "DirectTailTransferPreservesItsInstalledCallee"
+  ],
+  "parent_count_property": "native_authenticated_parent_frames",
+  "system_cases": {
+    "PublishesDarwinTrue": 0,
+    "PublishesDarwinFalse": 1
+  },
+  "analysis_host": "NeverDArm64eAnalysisTests",
+  "analysis_cases": [
+    "AppleClang/MachOArm64eNativeObjectInstallation.AuthenticatedCallsAndSignedUnwindExecute/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.AuthenticatedCallsAndSignedUnwindExecute/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.AuthenticatedCallsAndSignedUnwindExecute/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.AuthenticatedCallsAndSignedUnwindExecute/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedExecutableStarts/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedExecutableStarts/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedExecutableStarts/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedExecutableStarts/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedIREntriesExecute/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedIREntriesExecute/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedIREntriesExecute/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.GeneratedIREntriesExecute/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.NativeDwarfLanguageCallsAndCleanup/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.NativeDwarfLanguageCallsAndCleanup/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.NativeDwarfLanguageCallsAndCleanup/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.NativeDwarfLanguageCallsAndCleanup/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedEntriesExecute/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedEntriesExecute/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedEntriesExecute/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedEntriesExecute/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedExecutableStarts/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedExecutableStarts/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedExecutableStarts/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedExecutableStarts/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedThreadedEntriesExecute/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedThreadedEntriesExecute/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedThreadedEntriesExecute/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishedThreadedEntriesExecute/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedExecutable/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedExecutable/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedExecutable/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedExecutable/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedIR/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedIR/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedIR/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.PublishesGeneratedIR/3",
+    "AppleClang/MachOArm64eNativeObjectInstallation.RelocatedSignedLanguageFramesExecute/0",
+    "AppleClang/MachOArm64eNativeObjectInstallation.RelocatedSignedLanguageFramesExecute/1",
+    "AppleClang/MachOArm64eNativeObjectInstallation.RelocatedSignedLanguageFramesExecute/2",
+    "AppleClang/MachOArm64eNativeObjectInstallation.RelocatedSignedLanguageFramesExecute/3"
+  ],
+  "analysis_env": {
+    "NEVERD_ARM64E_EXECUTABLE_PROFILE": "1"
+  },
+  "legacy_env": "NEVERD_ARM64E_LEGACY_FIXTURES",
+  "legacy_directory": "legacy",
+  "analysis_xml": "installation.xml",
+  "analysis_log": "installation.log",
+  "analysis_timeout": 900,
+  "startup_args": [
+    "scripts/verify_arm64e_native.py",
+    "probe-startup",
+    "--startup-fixups",
+    "system",
+    "--output"
+  ],
+  "startup_directory": "system-startup",
+  "ir_compiler_env": "NEVERD_ARM64E_IR_COMPILER",
+  "ir_compiler_prefix_command": [
+    "brew",
+    "--prefix",
+    "llvm@22"
+  ],
+  "ir_compiler_relative": "bin/clang++",
+  "ir_version_option": "--version",
+  "tail_case": "DirectTailTransferPreservesItsInstalledCallee",
+  "tail_property": "native_reordered_tail",
+  "pac_fixture_environment": "NEVERD_ARM64E_PAUTH_FIXTURES",
+  "pac_fixture_directory": "unittests/lift/fixtures/arm64e",
+  "required_oracles": [
+    "AArch64PAuthSemantics.NativeKeysAgreeWithBothCProjections",
+    "AArch64PAuthSemantics.NativeGenericSignaturesAgreeWithBothCProjections"
+  ],
+  "feature_oracles": [
+    "AArch64PAuthLRSemantics.NativeTwoModifierKeysAgreeWithBothCProjections",
+    "AArch64PACMSemantics.NativePrefixModesAgreeWithBothCProjections",
+    "AArch64OrderedMemoryNative.SIMDFamiliesExecuteBothSourcesAndLLVM"
+  ],
+  "oracle_xml": "pointer-oracles.xml",
+  "oracle_log": "pointer-oracles.log",
+  "swift_error_control": {
+    "definition": "#define SWIFT __attribute__((swiftcall))\n#define SELF __attribute__((swift_context))\n#define ERROR __attribute__((swift_error_result))\nSWIFT void *read_error(void * SELF context, void ** ERROR error) { return *error; }\nSWIFT void *replace_error(void *new_error, void * SELF context, void ** ERROR error) { void *old=*error; *error=new_error; return old; }\n",
+    "caller": "#define SWIFT __attribute__((swiftcall))\n#define SELF __attribute__((swift_context))\n#define ERROR __attribute__((swift_error_result))\nextern SWIFT void *read_error(void * SELF context, void ** ERROR error);\nextern SWIFT void *replace_error(void *next, void * SELF context, void ** ERROR error);\nint main(void) {\n  unsigned first = 73, second = 97;\n  void *error = &first;\n  if (read_error(&second, &error) != &first || error != &first) return 1;\n  if (replace_error(&second, &first, &error) != &first || error != &second) return 2;\n  if (replace_error(0, &first, &error) != &second || error) return 3;\n  return read_error(&first, &error) != 0 || error != 0;\n}\n",
+    "compiler": "/usr/bin/clang",
+    "target": "arm64e-apple-macosx15.0",
+    "target_option": "-target",
+    "optimizations": [
+      "-O0",
+      "-O2"
+    ],
+    "compile_options": [
+      "-Werror",
+      "-fomit-frame-pointer"
+    ],
+    "output_option": "-o",
+    "caller_name": "error-caller.c",
+    "definition_name": "error-callee.c",
+    "binary_name": "error-control",
+    "disassembly": [
+      "/usr/bin/otool",
+      "-tvV"
+    ],
+    "error_register": "x21"
+  }
+}
