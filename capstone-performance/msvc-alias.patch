@@ -1,0 +1,54 @@
+diff --git a/SStream.c b/SStream.c
+index 0c1ef65e..8d92e007 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -260,7 +260,14 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
+ {
+ #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
+-	if (cs_mem_malloc == malloc && cs_mem_free == free) {
++#if defined(_MSC_VER) && !defined(_WIN32_WCE)
++	bool default_allocator =
++		cs_mem_malloc == cs_initial_memory_hooks.malloc &&
++		cs_mem_free == cs_initial_memory_hooks.free;
++#else
++	bool default_allocator = cs_mem_malloc == malloc && cs_mem_free == free;
++#endif
++	if (default_allocator) {
+ 		assert(ss && s);
+ 		if (ss->is_closed || len == 0)
+ 			return;
+diff --git a/cs.c b/cs.c
+index 0a91fe20..4df12966 100644
+--- a/cs.c
++++ b/cs.c
+@@ -488,6 +488,13 @@ cs_free_t cs_mem_free = free;
+ cs_vsnprintf_t cs_vsnprintf = _vsnprintf;
+ #else
+ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
++#ifdef _MSC_VER
++/* Data initializers can point to import thunks while a function expression
++ * resolves through the IAT. Compare the stored addresses of the hooks. */
++const volatile cs_opt_mem cs_initial_memory_hooks = {
++	malloc, calloc, realloc, free, vsnprintf
++};
++#endif
+ #endif // defined(_WIN32_WCE)
+ 
+ #elif defined(_KERNEL_MODE)
+diff --git a/cs_priv.h b/cs_priv.h
+index aacedd8d..984c46e3 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -167,6 +167,11 @@ extern cs_calloc_t cs_mem_calloc;
+ extern cs_realloc_t cs_mem_realloc;
+ extern cs_free_t cs_mem_free;
+ extern cs_vsnprintf_t cs_vsnprintf;
++#if defined(_MSC_VER) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++extern const volatile cs_opt_mem cs_initial_memory_hooks;
++#endif
+ 
+ static inline bool cs_mem_is_setup()
+ {
