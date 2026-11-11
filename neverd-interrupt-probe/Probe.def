@@ -1,0 +1,70 @@
+{
+  "fixture": "Fixtures.def",
+  "source_pattern": "{key}, R\"(asm|c)\\((.*?)\\)\\1\"",
+  "sources": {
+    "kAssembly": "stages.S",
+    "kOriginalCompanion": "old.S",
+    "kCaller": "caller.S",
+    "kObserver": "driver.c"
+  },
+  "original": [
+    "/usr/bin/clang",
+    "-target",
+    "arm64e-apple-macosx15.0",
+    "-O2",
+    "-dynamiclib",
+    "-Wl,-headerpad,0",
+    "stages.S",
+    "old.S",
+    "-o",
+    "original.dylib"
+  ],
+  "driver": [
+    "/usr/bin/clang",
+    "-target",
+    "arm64e-apple-macosx15.0",
+    "-O2",
+    "driver.c",
+    "caller.S",
+    "-o",
+    "driver"
+  ],
+  "execute": [
+    "./driver",
+    "./original.dylib",
+    "3",
+    "samples.txt"
+  ],
+  "samples": "samples.txt",
+  "alignment": 4,
+  "expected": [
+    [
+      0,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      1,
+      16,
+      1
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0
+    ]
+  ],
+  "invalid": "Interrupted return signing or stack state disagrees with the original assembly",
+  "timeout": 30,
+  "report": "interrupt-probe.json"
+}
