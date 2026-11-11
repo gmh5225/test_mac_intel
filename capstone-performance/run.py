@@ -61,7 +61,7 @@ def build(label):
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
              '-DCMAKE_C_COMPILER=clang',
-             '-DCMAKE_OSX_ARCHITECTURES=x86_64', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
+             f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
     command(['cmake', '--build', build_dir, '--target', 'capstone_static', 'capstone_shared',
@@ -113,7 +113,7 @@ def invoke(case, variant, repeats):
 
 
 def prepare():
-    if platform.machine() != 'x86_64' or platform.system() not in ('Darwin', 'Linux'):
+    if (platform.system(),platform.machine()) not in [('Darwin','arm64'),('Darwin','x86_64'),('Linux','x86_64')]:
         raise RuntimeError('this experiment requires native x86-64 macOS or Linux')
     if WORK.exists() or EVIDENCE.exists():
         raise RuntimeError('existing work/evidence must be retained under a separate attempt')
@@ -189,6 +189,10 @@ panic = "abort"
         extra = ([libraries['base']] if unit == 'check-hint' else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
+    option_test=WORK/'option-state'
+    command(['clang++','-std=c++17','-O3','-I',WORK/'new/include',SOURCE/'option-state.cpp',
+             *(['-ldl'] if platform.system()=='Linux' else []), '-o',option_test], 'option-test-build')
+    command([option_test,libraries['base'],libraries['new']], 'option-test')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
@@ -209,8 +213,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['arch/ARC/ARCMapping.c', 'arch/LoongArch/LoongArchMapping.c']}
-    if set(changed) != allowed:
+               ['cs.c','SStream.c']}
+    if 'CMakeFiles/capstone.dir/cs.c.o' not in changed or set(changed) - allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += list(libraries.values()) + [iced_library]

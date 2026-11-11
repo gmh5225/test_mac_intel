@@ -1,52 +1,55 @@
---- a/arch/ARC/ARCMapping.c
-+++ b/arch/ARC/ARCMapping.c
-@@ -173,15 +173,14 @@
+diff --git a/SStream.c b/SStream.c
+index 0c1ef65e..7d234a88 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -63,13 +63,7 @@ static void SStream_close_markup(SStream *ss)
  
- void ARC_init_cs_detail(MCInst *MI)
+ void SStream_Init(SStream *ss)
  {
--	if (!detail_is_set(MI)) {
--		return;
--	}
--	unsigned int i;
--
--	memset(get_detail(MI), 0, offsetof(cs_detail, arc) + sizeof(cs_arc));
--
--	for (i = 0; i < ARR_SIZE(ARC_get_detail(MI)->operands); i++)
--		ARC_setup_op(&ARC_get_detail(MI)->operands[i]);
-+	if (!detail_is_set(MI))
-+		return;
-+	cs_detail *detail = get_detail(MI);
-+	memset(detail, 0, offsetof(cs_detail, arc) + sizeof(cs_arc));
-+	if (ARC_OP_INVALID != 0) {
-+		for (unsigned i = 0; i < ARR_SIZE(detail->arc.operands); ++i)
-+			detail->arc.operands[i].type = ARC_OP_INVALID;
-+	}
+-	assert(ss);
+-	ss->index = 0;
+-	memset(ss->buffer, 0, sizeof(ss->buffer));
+-	ss->is_closed = false;
+-	ss->markup_stream = false;
+-	ss->prefixed_by_markup = false;
+-	ss->unsigned_num = false;
++	SStream_init_options(ss, false);
  }
  
- #ifndef CAPSTONE_DIET
---- a/arch/LoongArch/LoongArchMapping.c
-+++ b/arch/LoongArch/LoongArchMapping.c
-@@ -500,16 +500,13 @@
+ void SStream_opt_unum(SStream *ss, bool print_unsigned_numbers)
+diff --git a/SStream.h b/SStream.h
+index 2c9bc2c3..0260d05e 100644
+--- a/SStream.h
++++ b/SStream.h
+@@ -33,6 +33,17 @@ typedef struct SStream {
+ 			return; \
+ 	} while (0)
  
- void LoongArch_init_cs_detail(MCInst *MI)
- {
--	if (detail_is_set(MI)) {
--		unsigned int i;
--
--		memset(get_detail(MI), 0,
--		       offsetof(cs_detail, loongarch) + sizeof(cs_loongarch));
--
--		for (i = 0; i < ARR_SIZE(LoongArch_get_detail(MI)->operands);
--		     i++)
--			LoongArch_setup_op(
--				&LoongArch_get_detail(MI)->operands[i]);
-+	if (!detail_is_set(MI))
-+		return;
-+	cs_detail *detail = get_detail(MI);
-+	memset(detail, 0, offsetof(cs_detail, loongarch) + sizeof(cs_loongarch));
-+	if (LOONGARCH_OP_INVALID != 0) {
-+		for (unsigned i = 0; i < ARR_SIZE(detail->loongarch.operands); ++i)
-+			detail->loongarch.operands[i].type = LOONGARCH_OP_INVALID;
- 	}
- }
++static inline void SStream_init_options(SStream *ss, bool unsigned_num)
++{
++	assert(ss);
++	ss->index = 0;
++	memset(ss->buffer, 0, sizeof(ss->buffer));
++	ss->is_closed = false;
++	ss->markup_stream = false;
++	ss->prefixed_by_markup = false;
++	ss->unsigned_num = unsigned_num;
++}
++
+ void SStream_Init(SStream *ss);
+ void SStream_opt_unum(SStream *ss, bool print_unsigned_numbers);
  
+diff --git a/cs.c b/cs.c
+index 0a91fe20..76252bdc 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1075,8 +1075,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else
+ #endif
+ 		{
+-			SStream_Init(&ss);
+-			SStream_opt_unum(&ss, handle->imm_unsigned);
++			SStream_init_options(&ss, handle->imm_unsigned);
+ 			handle->printer(&mci, &ss, handle->printer_info);
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+ 				  code, false);
