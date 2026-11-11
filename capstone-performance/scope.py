@@ -23,7 +23,7 @@ def main(tmp,flavor):
         args+=['-G','Ninja','-DCAPSTONE_BUILD_MACOS_THIN=ON']
     hashes={};ref=tmp/'reference';ref.mkdir()
     for kind in ('reference','candidate'):
-        name=('reference.patch' if win else None) if kind=='reference' else 'scoped.patch'
+        name=('reference.patch' if win and flavor=='MT' else None) if kind=='reference' else 'scoped.patch'
         if name:
             patch=d/name
             assert sha(patch.read_bytes())==(d/(name+'.sha256')).read_text().strip()
@@ -39,7 +39,7 @@ def main(tmp,flavor):
             run(['git','reset','--hard','-q',base],src);run(['git','clean','-fdq'],src);shutil.rmtree(build)
     write('objects',hashes);assert hashes['reference'].keys()==hashes['candidate'].keys()
     differing=[k for k,v in hashes['candidate'].items() if v!=hashes['reference'][k]]
-    write('comparison',dict(flavor=flavor,objects=len(objs),changed=differing,reference='R446' if win else base,host=platform.platform()))
+    write('comparison',dict(flavor=flavor,objects=len(objs),changed=differing,reference='R446' if win and flavor=='MT' else base,host=platform.platform()))
     tool=(shutil.which('llvm-objdump') or shutil.which('objdump') or (str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe') if win else None))
     for i,k in enumerate(differing[:12]):
         if tool:
