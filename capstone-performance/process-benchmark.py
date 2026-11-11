@@ -4,8 +4,9 @@ import run,corpus
 src=run.SOURCE
 def main(root):
  run.WORK=root;man=json.loads((src/'manifest.json').read_text());w=run.fetch('capstone','https://github.com/NeverSight/capstone.git',man['capstone_revision'])
- cases=corpus.prepare(src,root,run.EVIDENCE,run.command)
- assert len(cases)==10
+ inputs={row['name'] for row in man['inputs']}
+ cases=[row for row in corpus.prepare(src,root,run.EVIDENCE,run.command) if row['name'] in inputs]
+ assert len(cases)==len(inputs)==10 and {row['name'] for row in cases}==inputs
  f=src/'alias-trie.patch';assert run.sha(f)==(src/'alias-trie.sha256').read_text().strip()
  cpp=(src/'single.cpp').read_text();a=cpp.index('  API() {');z=cpp.index('\n  }',a)
  names=['cs_open','cs_option','cs_malloc','cs_disasm_iter','cs_regs_access','cs_free','cs_close']
