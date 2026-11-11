@@ -1,0 +1,13 @@
+add_executable(native_compare "${EVIDENCE_SOURCE}/msvc/compare.cpp")
+target_compile_features(native_compare PRIVATE cxx_std_17)
+target_link_libraries(native_compare PRIVATE capstone_static "${ICED_ADAPTER}"
+  advapi32 bcrypt ntdll userenv ws2_32)
+add_executable(native_snapshot "${EVIDENCE_SOURCE}/snapshot.cpp")
+target_compile_features(native_snapshot PRIVATE cxx_std_17)
+target_link_libraries(native_snapshot PRIVATE capstone_static)
+add_executable(native_hooks "${EVIDENCE_SOURCE}/msvc/hooks.c")
+target_include_directories(native_hooks PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(native_hooks PRIVATE capstone_static)
+add_executable(native_sstream "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/sstream.c")
+target_include_directories(native_sstream PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/include")
+target_link_libraries(native_sstream PRIVATE capstone_static)
