@@ -102,7 +102,9 @@ def invoke(case, variant, repeats):
         args = [binary, library, case['mode'], str(case['selector']), str(repeats), case['path']]
     else:
         args = [binary, str(case['selector']), str(MODES[case['mode']]), case['path'], str(repeats)]
-    completed = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if case['consumer']=='decoder':
+        args[0]=WORK/'mapping-variants'
+    completed = subprocess.run(args, env=dict(os.environ,CAPSTONE_MAPPING_VARIANT=label),text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if completed.returncode:
         failure = dict(args=list(map(str, args)), stdout=completed.stdout, stderr=completed.stderr,
                        returncode=completed.returncode, case=case)
@@ -189,6 +191,23 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
+    mapping=WORK/'new-build/CMakeFiles/capstone.dir/arch/X86/X86Mapping.c.o'
+    names=subprocess.check_output(['nm','-g','--defined-only','-P',mapping],text=True).splitlines()
+    exports=[line.split()[0] for line in names]
+    assert 'X86_get_insn_id' in exports
+    symbols=WORK/'mapper-symbols'
+    symbols.write_text(''.join(k+' dense_'+k+'\n' for k in exports))
+    command(['objcopy','--redefine-syms='+str(symbols),mapping,WORK/'dense-mapper.o'],'rename-mapper')
+    command(['clang','-O3','-DNDEBUG',*defs,'-I',base,'-I',base/'include','-c',SOURCE/'mapper-selector.c','-o',WORK/'selector.o'],'build-selector')
+    probe=(SOURCE/'compare.cpp').read_text()
+    probe=probe.replace('static Result capstone_run(', 'extern "C" void choose_mapping();\nextern "C" void bind_mapping(csh);\nstatic Result capstone_run(')
+    probe=probe.replace('  if (cs_option(handle, CS_OPT_DETAIL','  bind_mapping(handle);\n  if (cs_option(handle, CS_OPT_DETAIL')
+    probe=probe.replace('    Result warm = run(1);','    choose_mapping();\n    Result warm = run(1);')
+    assert probe.count('bind_mapping(handle);')==1 and probe.count('choose_mapping();')==2
+    source=WORK/'mapping-compare.cpp';source.write_text(probe)
+    command(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',source,WORK/'selector.o',WORK/'dense-mapper.o',WORK/'base-build/libcapstone.a',iced_library,'-lpthread','-ldl','-lm','-o',WORK/'mapping-variants'],'link-shared-mappers')
+    symbol_lines=subprocess.check_output(['nm','-n','-S',WORK/'mapping-variants'],text=True).splitlines()
+    write('mapper-code.json',dict(renamed=exports,executable=sha(WORK/'mapping-variants'),addresses=[a for a in symbol_lines if a.endswith('X86_get_insn_id')]))
     for unit in ['mapping','api','sstream','detail_option','arm_post_index','check-mips-alias']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
@@ -243,7 +262,7 @@ panic = "abort"
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
-    binaries += list(libraries.values()) + [iced_library]
+    binaries += list(libraries.values()) + [iced_library, WORK/'mapping-variants']
     write('binaries.json', {str(p.relative_to(WORK)): sha(p) for p in binaries})
     write('ready.json', dict(semantic_checks='native tests and traversal checks passed; not full qualification',
                              cases=len(cases), runtime_objects_changed=changed))
@@ -301,13 +320,12 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
-    cycles=10; duration=150_000_000
-    measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
-    for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
-        choices=[c for c in cases if c['consumer']==consumer]
-        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
-        measure_panel(panel,choices,cycles,variants,duration)
+    cells=[c for c in cases if c['consumer']=='decoder']
+    duration=150_000_000;rotations=['base','new','base_aa','new_aa','iced','iced_aa']
+    controls=[c for c in cells if (c['name'],c['mode']) in [('putty-32-0.85','detail'),('simd64','detail')]]
+    measure_panel('null',controls,10,['base','new','base_aa','new_aa'],duration)
+    selected=[c for c in cells if c['mode']=='detail' or (c['name']=='putty-32-0.85' and c['mode']=='format')]
+    measure_panel('x86',selected,12,rotations,duration)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
@@ -359,7 +377,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Shared x86 lookup tables, guarded ARM detail and validated PPC aliases', '',
+    lines = ['# One executable and downstream decoder with two x86 implicit-detail mappers', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
