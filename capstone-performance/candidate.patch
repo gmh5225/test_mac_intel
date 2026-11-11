@@ -1,130 +1,65 @@
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 4e1ab1d5..2ef959cc 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1910,82 +1910,58 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
- 
- 	case 4:
- 	case 8: {
--		EABase eaBaseBase =
--			(insn->addressSize == 4 ? EA_BASE_EAX : EA_BASE_RAX);
-+		if (mod == 3) {
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = (EABase)(insn->eaRegBase + rm + evexrm);
-+			return 0;
-+		}
- 
--		switch (mod) {
--		default:
--			break;
--		case 0x0:
--			insn->eaDisplacement =
--				EA_DISP_NONE; /* readSIB may override this */
--			// In determining whether RIP-relative mode is used (rm=5),
--			// or whether a SIB byte is present (rm=4),
--			// the extension bits (REX.b and EVEX.x) are ignored.
--			switch (rm & 7) {
--			case 0x4: // SIB byte is present
--				if (materialize) {
--					insn->eaBase = (insn->addressSize == 4 ?
--								EA_BASE_sib :
--								EA_BASE_sib64);
--				}
--				if (readSIB(insn, materialize) ||
--				    readDisplacement(insn, materialize))
--					return -1;
--				break;
--			case 0x5: // RIP-relative
--				if (materialize) {
--					insn->eaBase = EA_BASE_NONE;
--				}
--				insn->eaDisplacement = EA_DISP_32;
--				if (readDisplacement(insn, materialize))
--					return -1;
--				break;
--			default:
--				if (materialize) {
--					insn->eaBase =
--						(EABase)(eaBaseBase + rm);
--				}
--				break;
--			}
-+		const EABase base = insn->addressSize == 4 ? EA_BASE_EAX : EA_BASE_RAX;
-+		/* Only mod and the low three r/m bits select a memory form.
-+		 * Extended register bits participate in its base register. */
-+		switch ((mod << 3) | (rm & 7)) {
-+		case 0x00: case 0x01: case 0x02: case 0x03: case 0x06: case 0x07:
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = (EABase)(base + rm);
-+			return 0;
-+		case 0x04:
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = insn->addressSize == 4 ?
-+						       EA_BASE_sib : EA_BASE_sib64;
- 			break;
--		case 0x1:
-+		case 0x05:
-+			insn->eaDisplacement = EA_DISP_32;
-+			if (materialize)
-+				insn->eaBase = EA_BASE_NONE;
-+			return readDisplacement(insn, materialize);
-+		case 0x0c:
-+			insn->eaDisplacement = EA_DISP_8;
- 			if (materialize) {
-+				insn->eaBase = EA_BASE_sib;
- 				insn->displacementSize = 1;
- 			}
--			/* FALLTHROUGH */
--		case 0x2:
--			insn->eaDisplacement =
--				(mod == 0x1 ? EA_DISP_8 : EA_DISP_32);
--			switch (rm & 7) {
--			case 0x4: // SIB byte is present
--				if (materialize) {
--					insn->eaBase = EA_BASE_sib;
--				}
--				if (readSIB(insn, materialize) ||
--				    readDisplacement(insn, materialize))
--					return -1;
--				break;
--			default:
--				if (materialize) {
--					insn->eaBase =
--						(EABase)(eaBaseBase + rm);
--				}
--				if (readDisplacement(insn, materialize))
--					return -1;
--				break;
--			}
- 			break;
--		case 0x3:
--			insn->eaDisplacement = EA_DISP_NONE;
-+		case 0x14:
-+			insn->eaDisplacement = EA_DISP_32;
-+			if (materialize)
-+				insn->eaBase = EA_BASE_sib;
-+			break;
-+		default:
-+			/* The remaining forms have a base and an 8- or 32-bit displacement. */
-+			insn->eaDisplacement = mod == 1 ? EA_DISP_8 : EA_DISP_32;
- 			if (materialize) {
--				insn->eaBase =
--					(EABase)(insn->eaRegBase + rm + evexrm);
-+				insn->eaBase = (EABase)(base + rm);
-+				if (mod == 1)
-+					insn->displacementSize = 1;
- 			}
--			break;
-+			return readDisplacement(insn, materialize);
- 		}
+diff --git a/arch/X86/X86IntelInstPrinterNumbers.c b/arch/X86/X86IntelInstPrinterNumbers.c
+index 2d0665a0..90d5f9be 100644
+--- a/arch/X86/X86IntelInstPrinterNumbers.c
++++ b/arch/X86/X86IntelInstPrinterNumbers.c
+@@ -10,20 +10,49 @@
+ // spelling needs at most 19 bytes, already included in that generated bound.
+ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
+ {
+-	const unsigned digits =
+-		value ? (64U - CountLeadingZeros_64(value) + 3U) / 4U : 1U;
++	static const char digits[] = "0123456789abcdef";
++	static const char pairs[] =
++		"000102030405060708090a0b0c0d0e0f"
++		"101112131415161718191a1b1c1d1e1f"
++		"202122232425262728292a2b2c2d2e2f"
++		"303132333435363738393a3b3c3d3e3f"
++		"404142434445464748494a4b4c4d4e4f"
++		"505152535455565758595a5b5c5d5e5f"
++		"606162636465666768696a6b6c6d6e6f"
++		"707172737475767778797a7b7c7d7e7f"
++		"808182838485868788898a8b8c8d8e8f"
++		"909192939495969798999a9b9c9d9e9f"
++		"a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
++		"b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
++		"c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
++		"d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
++		"e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
++		"f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
+ 	char *out = OS->buffer + OS->index;
+-	OS->index += digits + (negative ? 3U : 2U);
+-	char *end = OS->buffer + OS->index;
+ 	if (negative)
+ 		*out++ = '-';
+ 	*out++ = '0';
+-	*out = 'x';
+-	*end = '\0';
 -
--		break;
-+		if (readSIB(insn, materialize))
-+			return -1;
-+		return readDisplacement(insn, materialize);
- 	}
- 	} /* switch (insn->addressSize) */
- 
+-	do {
+-		*--end = "0123456789abcdef"[value & 15];
+-		value >>= 4;
+-	} while (value);
++	*out++ = 'x';
++	if (value < 16) {
++		*out++ = digits[value];
++	} else if (value < 256) {
++		memcpy(out, pairs + 2 * value, 2);
++		out += 2;
++	} else {
++		const unsigned length =
++			(64U - CountLeadingZeros_64(value) + 3U) / 4U;
++		char *first = out;
++		out += length;
++		char *p = out;
++		while (p - first >= 2) {
++			p -= 2;
++			memcpy(p, pairs + 2 * (uint8_t)value, 2);
++			value >>= 8;
++		}
++		if (p != first)
++			*first = digits[value];
++	}
++	*out = '\0';
++	OS->index = (size_t)(out - OS->buffer);
+ }
+ #endif
