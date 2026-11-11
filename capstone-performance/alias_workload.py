@@ -23,7 +23,7 @@ def sample(binary, case, mode, repeats):
 
 def main(root):
     run.WORK = root
-    revision = "f2f50b8fab856b374daf0e76dc3054f25de65ac9"
+    revision = "34d9185433e1b0c1e038f874fc95b25edbac6795"
     source = run.fetch("capstone", "https://github.com/NeverSight/capstone.git", revision)
     cases = corpus.prepare(SOURCE, root, run.EVIDENCE, run.command)
     arch_for = {"arm":"ARM","thumb":"ARM"}
@@ -52,13 +52,13 @@ def main(root):
             assert run.sha(patch) == (SOURCE/"alias-trie.sha256").read_text().strip()
             run.command(["git","apply","--check",patch],"check",source)
             run.command(["git","apply",patch],"apply",source)
-            run.command(["python3",source/"suite/synctools/alias_mnemonic_trie.py","--check"],"generated")
+            changed = sp.check_output(["git", "diff", "--name-only", "HEAD"], cwd=source, text=True).splitlines()
+            assert changed == ["arch/ARM/ARMInstPrinter.c"], changed
         run.command(["cmake","--build",build,"--target","capstone_static","--parallel","4"],"build-"+variant)
-        commands = sp.check_output(["ninja","-C",build,"-t","commands","capstone_static"],text=True)
-        assert ("-DCAPSTONE_USE_ALIAS_TRIE" in commands) == (variant == "trie")
         exe = root / ("bench-"+variant)
         run.command(["clang++",root/"consumer.o",build/"libcapstone.a","-o",exe],"link-"+variant)
         bins[variant] = exe
+    assert run.sha(bins["base"]) != run.sha(bins["trie"])
     bins["control"] = bins["base"]
     bins["trie-control"] = bins["trie"]
     if linux:
