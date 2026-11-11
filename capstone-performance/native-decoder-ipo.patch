@@ -1,0 +1,16 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f4e9d481..1a218a89 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -425,6 +425,11 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86Mapping.c
+         arch/X86/X86Module.c
+     )
++    # With native MSVC x64 LTCG the inlined x86 decoder gives the public
++    # iterator a large probed stack frame, even on its compact scan path.
++    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
++        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
++    endif()
+     set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
+     set(HEADERS_X86
+         arch/X86/X86BaseInfo.h

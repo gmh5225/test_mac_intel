@@ -1,28 +1,35 @@
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..866041e7 100644
+index 8c3dea2e..1877f580 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -96,6 +96,7 @@
+@@ -96,6 +96,11 @@
  #include "../../cs_priv.h"
  
  #include "X86BaseInfo.h"
++#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_X64) && \
++	!defined(_M_ARM64EC)
++#define X86_USE_WRITEMASK_TABLE
 +#include "X86GenWritemask.inc"
++#endif
  #include "X86Disassembler.h"
  #include "X86DisassemblerDecoderCommon.h"
  #include "X86DisassemblerDecoder.h"
-@@ -699,13 +700,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+@@ -699,6 +704,10 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
  			if (insn.hasLockPrefix)
  				Flags |= X86_IP_HAS_LOCK;
  
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
--				}
--			}
++#ifdef X86_USE_WRITEMASK_TABLE
 +			if (x86HasWritemaskOperand(insn.instructionID))
 +				Flags |= X86_IP_HAS_EVEX_OPMASK;
++#else
+ 			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+ 				if (insn.operands[i].encoding ==
+ 				    ENCODING_WRITEMASK) {
+@@ -706,6 +715,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 					break;
+ 				}
+ 			}
++#endif
  
  			instr->flags = Flags;
  		}
@@ -172,10 +179,51 @@ index 00000000..30ec95c8
 +}
 +#endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index dbb25f26..f9613139 100644
+index dbb25f26..83b8d3d8 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
-@@ -1237,6 +1237,33 @@ def emit_vex_scan(suffix):
+@@ -380,6 +380,14 @@ def emit_scan(suffix):
+     return "\n".join(lines)
+ 
+ 
++def ud1_opcode(suffix):
++    return int(
++        re.search(
++            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
++        )[1]
++    )
++
++
+ def instruction_specifiers(source):
+     matches = re.findall(
+         r"static const struct InstructionSpecifier x86DisassemblerInstrSpecifiers"
+@@ -591,11 +599,7 @@ def legacy_terminal_model(suffix, *, public=False):
+             for i, shape in selected.items()
+             if tuple(read_operand_calls(shape[0], materialize=False)) in existing_reads
+         }
+-    ud1 = int(
+-        re.search(
+-            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+-        )[1]
+-    )
++    ud1 = ud1_opcode(suffix)
+     groups = {}
+     public_reader_shapes = {}
+     terminals = [(0, 0, 0)]
+@@ -1195,11 +1199,7 @@ def emit_vex_scan(suffix):
+             | (int(has_vvvv) << 3)
+             | (patterns[immediates] << 4)
+         )
+-    ud1 = int(
+-        re.search(
+-            r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text()
+-        )[1]
+-    )
++    ud1 = ud1_opcode(suffix)
+     flags[ud1] = 0
+     tables.require(all(0 <= f <= 255 for f in flags), "VEX scan flags exceed a byte")
+     mapping = public_instruction_ids(suffix)
+@@ -1237,6 +1237,43 @@ def emit_vex_scan(suffix):
      return "\n".join(emit_vex_scan_rows(suffix) + lines)
  
  
@@ -183,12 +231,17 @@ index dbb25f26..f9613139 100644
 +    source = X86 / f"X86GenDisassemblerTables{suffix}.inc"
 +    sets = read_sets(source)
 +    specifiers = instruction_specifiers(source.read_text())
-+    masked = [any(e == "ENCODING_WRITEMASK" for e, _ in sets[i]) for i in specifiers]
-+    # UD1's hand-written register and memory operands override its descriptor.
-+    ud1 = int(re.search(r"X86_UD1\s*=\s*(\d+)", (X86 / f"X86GenInstrInfo{suffix}.inc").read_text())[1])
-+    masked[ud1] = False
++    masked = [
++        any(encoding == "ENCODING_WRITEMASK" for encoding, _ in sets[index])
++        for index in specifiers
++    ]
++    # UD1 uses hand-written operands instead of its generated descriptor.
++    masked[ud1_opcode(suffix)] = False
 +    if not any(masked):
-+        return "static inline bool x86HasWritemaskOperand(unsigned opcode)\n{\n\t(void)opcode;\n\treturn false;\n}"
++        return (
++            "static inline bool x86HasWritemaskOperand(unsigned opcode)\n"
++            "{\n\t(void)opcode;\n\treturn false;\n}"
++        )
 +    bits = bytearray((len(masked) + 7) // 8)
 +    for opcode, flag in enumerate(masked):
 +        if flag:
@@ -197,19 +250,24 @@ index dbb25f26..f9613139 100644
 +        "\t" + ", ".join(f"0x{value:02x}" for value in bits[i : i + 16]) + ","
 +        for i in range(0, len(bits), 16)
 +    ]
-+    return "\n".join([
-+        "static const uint8_t x86WritemaskOpcodes[] = {",
-+        *rows, "};", "",
-+        "static inline bool x86HasWritemaskOperand(unsigned opcode)", "{",
-+        "\treturn (x86WritemaskOpcodes[opcode >> 3] >> (opcode & 7)) & 1;",
-+        "}",
-+    ])
++    return "\n".join(
++        [
++            "static const uint8_t x86WritemaskOpcodes[] = {",
++            *rows,
++            "};",
++            "",
++            "static inline bool x86HasWritemaskOperand(unsigned opcode)",
++            "{",
++            "\treturn (x86WritemaskOpcodes[opcode >> 3] >> (opcode & 7)) & 1;",
++            "}",
++        ]
++    )
 +
 +
  def generated_output(emit):
      return (
          "/* Capstone Disassembly Engine */\n"
-@@ -1260,6 +1287,7 @@ def main():
+@@ -1260,6 +1297,7 @@ def main():
          (SCAN_OUTPUT, emit_scan),
          (TERMINAL_OUTPUT, emit_terminal),
          (X86 / "X86GenVexScan.inc", emit_vex_scan),

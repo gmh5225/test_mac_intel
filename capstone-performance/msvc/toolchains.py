@@ -18,7 +18,7 @@ def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
     trees = {'msvc':base}
-    for name, expected in {'profiles': '7fe59695cc436dc0c8e275ff6b3ace0236ee35ee95ed350461a2394778fa3666'}.items():
+    for name, expected in {'profiles': '371586e585a9d565661af80fe42604935da82ee3b24d7a655bb1f2e1cc77157d'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -46,14 +46,19 @@ opt-level = 3
     opts=['-G','Visual Studio 17 2022','-A','x64',abi,'-DCMAKE_C_FLAGS=/MP4']
     lib_paths={}
     for name,src in trees.items():
+        ipo=os.environ['MEASURE_IPO']=='ON'
+        if ipo:
+            patch=source/'native-decoder-ipo.patch'
+            assert perf.digest(patch.read_bytes())==perf.manifest['source_lineage'][patch.name]['sha256']
+            perf.run(['git','apply',patch],name+'-decoder-ipo',src)
         build=work/(name+'-build')
-        perf.run(['cmake','-S',src,'-B',build,*opts,
+        perf.run(['cmake','-S',src,'-B',build,*opts,'-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+os.environ['MEASURE_IPO'],
                   '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON',
                   '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if perf.crt=='MT' else 'OFF'),
                   '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],name+'-configure')
         perf.run(['cmake','--build',build,'--config','Release','--parallel','4','--target','capstone_static'],name+'-build')
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
-        record_codegen(name,build)
+        if not ipo: record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
     names=['msvc','profiles']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
@@ -125,7 +130,7 @@ def measure(progs,cases):
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '7fe59695cc436dc0c8e275ff6b3ace0236ee35ee95ed350461a2394778fa3666'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '371586e585a9d565661af80fe42604935da82ee3b24d7a655bb1f2e1cc77157d'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
