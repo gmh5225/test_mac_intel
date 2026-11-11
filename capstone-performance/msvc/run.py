@@ -211,20 +211,21 @@ def measure(programs, cases):
             write('measurement.json', rows)
 
 
-try:
-    write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
-          image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
-          iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
-    assert digest((source / 'windows-formatter.patch').read_bytes()) == '0768aa7dd2bd07429e4724f2ad6d29363008781dca406cb35608994941b8bd62'
-    programs = make_programs()
-    cases = get_cases()
-    snapshot(programs, cases)
-    measure(programs, cases)
-    write('completed.json', dict(success=True))
-finally:
-    before = sum(p.stat().st_size for p in work.rglob('*') if p.is_file())
-    def writable(func, path, exc):
-        os.chmod(path, 0o700)
-        func(path)
-    shutil.rmtree(work, onerror=writable)
-    write('cleanup.json', dict(logical_bytes=before, removed=not work.exists()))
+if __name__ == '__main__':
+    try:
+        write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
+              image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
+              iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
+        assert digest((source / 'windows-formatter.patch').read_bytes()) == '0768aa7dd2bd07429e4724f2ad6d29363008781dca406cb35608994941b8bd62'
+        programs = make_programs()
+        cases = get_cases()
+        snapshot(programs, cases)
+        measure(programs, cases)
+        write('completed.json', dict(success=True))
+    finally:
+        before = sum(p.stat().st_size for p in work.rglob('*') if p.is_file())
+        def writable(func, path, exc):
+            os.chmod(path, 0o700)
+            func(path)
+        shutil.rmtree(work, onerror=writable)
+        write('cleanup.json', dict(logical_bytes=before, removed=not work.exists()))
