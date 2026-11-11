@@ -20,7 +20,7 @@ index 49e34d76..f1fd1246 100644
  		if (ss->is_closed || len == 0)
  			return;
 diff --git a/cs.c b/cs.c
-index 55aab304..aef26571 100644
+index 55aab304..ea7b0e42 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -491,6 +491,13 @@ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
@@ -37,18 +37,6 @@ index 55aab304..aef26571 100644
  #endif
  #endif // defined(_WIN32_WCE)
  
-@@ -930,10 +937,7 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
- #include "cs_disasm_internal.h"
- 
- /* Keep the generic copy specialized without the private x86 length checks. */
--#if defined(__GNUC__)
--__attribute__((always_inline))
--#endif
--static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
-+CS_DECODE_INLINE void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 			     SStream *OS, MCInst *mci,
- 			     PostPrinter_t postprinter, const uint8_t *code,
- 			     bool stream_length_valid)
 diff --git a/cs_priv.h b/cs_priv.h
 index 05a71d2a..903415e8 100644
 --- a/cs_priv.h

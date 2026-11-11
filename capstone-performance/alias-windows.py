@@ -62,7 +62,7 @@ def main():
     command(['git','worktree','add','--detach',new,'HEAD'],'worktree',base)
     command(['git','apply',SOURCE/'msvc-alias.patch'],'apply',new)
     write('inputs.json',dict(ref=manifest['capstone_revision'],crt=crt,patch=digest((SOURCE/'msvc-alias.patch').read_bytes()),image=os.environ['ImageVersion']))
-    programs = {}
+    programs = {}; compiled = {}
     for label,tree in [('base',base),('new',new)]:
         build = WORK/(label+'-build')
         targets = '''
@@ -83,6 +83,14 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         def build_targets(step,*names):
             command(['cmake','--build',build,'--config','Release','--parallel','4','--target',*names],label+step)
         build_targets('-timed','native_single','native_sstream')
+        objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
+        compiled[label]={}
+        for stem in ('cs','SStream'):
+            obj,=build.rglob(stem+'.obj')
+            listing=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
+            contents='\n'.join(line for line in listing.splitlines() if 'file format' not in line and line.strip()).encode()
+            compiled[label][stem]=digest(contents)
+        write('release-code.json',compiled)
         timed=build/'Release/native_single.exe'
         before = digest(timed.read_bytes())
         command([build/'Release/native_sstream.exe'],label+'-sstream')
