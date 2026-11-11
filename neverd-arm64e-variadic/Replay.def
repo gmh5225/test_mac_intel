@@ -1,19 +1,42 @@
 {
   "revision": "c8ebcd7dbf2189adccb11461e1b853beeaea98b5",
-  "package": "neverd-llvm-v23.0.0-r6",
-  "tag": "neverd-structured-r6-c8ebcd7dbf",
+  "package": "source LLVM 5676029e378c9e37adc16c8216a8e8453ffafcae",
+  "tag": "neverd-structured-source-c8ebcd7dbf",
   "host": "NeverDArm64eLiftedImageTests",
   "asset": "neverd-variadic-host.tgz",
   "run_env": {
-    "NEVERD_ARM64E_LIFTED_NATIVE": "1"
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1",
+    "NEVERD_ARM64E_ASYNC_NATIVE": "1"
   },
-  "filter": "AArch64DarwinVariadic.*",
+  "filter": "*",
   "tests": {
+    "PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
+      "native_interrupted_frames": 10,
+      "native_authenticated_parent_frames": 10
+    },
     "OptimizedCalleeWalksTheNativeArgumentArea": 4,
     "UnoptimizedCalleeHomesItsNativeArgumentCursor": 4,
     "FramelessStackLoadsSurviveImagePublication": 2,
     "CompactLeavesElideOnlyTheUnusedStackReservation": 2,
-    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2
+    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2,
+    "PublishesDarwinTrue": 2,
+    "PublishesDarwinFalse": 2,
+    "VerifiedLeafBodiesUseTheNormalPatchPipeline": 2,
+    "DirectTailTransferPreservesItsInstalledCallee": 2,
+    "EquivalentWAndXZeroingPreservesTheWholeRegister": 2,
+    "OriginalGlobalAndAuthenticatedImportSurvivePublication": 2,
+    "SignedFrameCallsImportBeforeReadingOriginalGlobal": 2,
+    "SwiftErrorReturnsBothTheOldValueAndTheUpdatedRegister": 2,
+    "SwiftErrorCanClearTheRegisterWithoutReadingIt": 2,
+    "TailCallForwardsTheWritableSwiftErrorRegister": 2,
+    "SignedCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn": 2,
+    "SwiftContextSurvivesNativeLeafPublication": 2,
+    "SwiftAsyncContextSurvivesNativeLeafPublication": 2,
+    "ScalarFPParametersAndResultsSurvivePublication": 2,
+    "SignedLeafUsesTheIncomingSPAtItsNewAddress": 2,
+    "BaseAndDisplacementRetainLoadAndStoreEffects": 2
   },
   "environment": {
     "hardware": [
@@ -39,29 +62,9 @@
       "--version"
     ]
   },
-  "archive_sha256": "6939ab33571c716f31fff93676b43dceee4889e69530ae579ae588b890f68003",
-  "host_sha256": "d758b84ba90f4d77a44a6b859321349d55929a0448906352c59721d6a2f97d2b",
+  "archive_sha256": "acbc7af86b14cfcdbc13dcdc0f72d1d8a1c92ccb00658daea5d45e4e1c306169",
+  "host_sha256": "14a8d8f60f2efb7aca6d4a489e2d059113ef5d20fd96240746728dd7953695b5",
   "xml": "results.xml",
   "log": "runtime.log",
-  "image_count": "executed_native_images",
-  "installation": {
-    "host": "NeverDArm64eAnalysisTests",
-    "host_sha256": "7f4aef594ff25db544ef6b2acede70be9afa89cd90e1b3fec2c1202cb29ffb6e",
-    "fixtures": {
-      "legacy/report.json": "8ec1a7c5ce74ac6bf3e5a8a1abc0de58b983873087cabce577efa42a29c0b361",
-      "legacy/-O0-compact.dylib": "12c5533841c05f1973e27ca90806fa1f15a51d24594060a49eba9493545bb1ff",
-      "legacy/-O0-dwarf.dylib": "b8cacdeff46e5aa12815823a441463c781ba247f56f9cf6a8978c9149695d8b2",
-      "legacy/-O2-compact.dylib": "ff6d4909cd303159b0bafe3a710db67b8d60b7d10505f2a722f2446807168b88",
-      "legacy/-O2-dwarf.dylib": "eced87d5eccf65db2905459dd8704dda1ce3ba958b14513aee6accac3c4267d3"
-    },
-    "legacy": "legacy",
-    "build": "ctest",
-    "driver": "neverd/scripts/verify_arm64e_native.py",
-    "probe": "original-controls/report.json",
-    "report": "report.json",
-    "modes": {
-      "run": 20,
-      "run-default-executable": 4
-    }
-  }
+  "image_count": "executed_native_images"
 }
