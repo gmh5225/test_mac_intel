@@ -101,6 +101,26 @@ index 9f69f881..481c4834 100644
 +#endif
 +
  #endif // CS_MAPPING_H
+diff --git a/SStream.c b/SStream.c
+index 49e34d76..28ebdbd0 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -260,7 +260,14 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
+ {
+ #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
+-	if (cs_mem_malloc == malloc && cs_mem_free == free) {
++#if defined(_MSC_VER) && defined(_DLL) && !defined(_WIN32_WCE)
++	bool default_allocator =
++		cs_mem_malloc == cs_initial_memory_hooks.malloc &&
++		cs_mem_free == cs_initial_memory_hooks.free;
++#else
++	bool default_allocator = cs_mem_malloc == malloc && cs_mem_free == free;
++#endif
++	if (default_allocator) {
+ 		assert(ss && s);
+ 		if (ss->is_closed || len == 0)
+ 			return;
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
 index 81b5e334..667c73f6 100644
 --- a/arch/AArch64/AArch64Mapping.c
@@ -9836,7 +9856,7 @@ index 8a0055ff..f52c4341 100644
  	const xtensa_suppl_info *suppl_info =
  		map_get_suppl_info(MI, mapping_insns);
 diff --git a/cs.c b/cs.c
-index 55aab304..eeeb5f45 100644
+index 55aab304..e4cccd89 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -78,6 +78,7 @@
@@ -9872,7 +9892,19 @@ index 55aab304..eeeb5f45 100644
  
  	memset(ud, 0, sizeof(*ud));
  	cs_mem_free(ud);
-@@ -949,7 +957,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -930,10 +938,7 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ #include "cs_disasm_internal.h"
+ 
+ /* Keep the generic copy specialized without the private x86 length checks. */
+-#if defined(__GNUC__)
+-__attribute__((always_inline))
+-#endif
+-static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
++CS_DECODE_INLINE void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 			     SStream *OS, MCInst *mci,
+ 			     PostPrinter_t postprinter, const uint8_t *code,
+ 			     bool stream_length_valid)
+@@ -949,7 +954,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  		insn->id = MCInst_getOpcodePub(mci);
  
  	// post printer handles some corner cases (hacky)
@@ -9882,7 +9914,7 @@ index 55aab304..eeeb5f45 100644
  		postprinter((csh)handle, insn, OS, mci);
  
  #ifndef CAPSTONE_DIET
-@@ -1069,13 +1078,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1069,13 +1075,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  			ss.is_closed = false;
  			ss.markup_stream = false;
  			ss.prefixed_by_markup = false;
@@ -10432,7 +10464,7 @@ index dbb25f26..e112c2a1 100644
      generated = [(path, generated_output(emit)) for path, emit in outputs]
      for path, output in generated:
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 53f84ba9..c6d9860e 100644
+index 7512709f..9c0a6c93 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
 @@ -4,7 +4,7 @@ enable_testing()
