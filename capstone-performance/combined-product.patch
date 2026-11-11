@@ -10,8 +10,47 @@ index 641480ed..fba4fc98 100644
  
  	// These flags could be used to pass some info from one target subcomponent
  	// to another, for example, from disassembler to asm printer. The values of
+diff --git a/Mapping.c b/Mapping.c
+index 11b3e619..d479c9a9 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -334,6 +334,18 @@ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size)
+ 	return;
+ }
+ 
++void map_insn_metadata(MCInst *MI, const insn_map *imap, unsigned int imap_size)
++{
++	map_cs_id(MI, imap, imap_size);
++#ifndef CAPSTONE_DIET
++	if (MI->flat_insn->detail) {
++		map_implicit_reads(MI, imap);
++		map_implicit_writes(MI, imap);
++		map_groups(MI, imap);
++	}
++#endif
++}
++
+ /// Returns the operand type information from the
+ /// mapping table for instruction operands.
+ /// Only usable by `auto-sync` archs!
+diff --git a/Mapping.h b/Mapping.h
+index 9f69f881..ebae2b48 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -125,6 +125,11 @@ void map_groups(MCInst *MI, const insn_map *imap);
+ 
+ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size);
+ 
++// Set the public ID and append implicit reads, writes and groups when a detail
++// buffer is present. Registers and groups already added by decoding are kept.
++CAPSTONE_INTERNAL void map_insn_metadata(MCInst *MI, const insn_map *imap,
++					 unsigned int imap_size);
++
+ const void *map_get_suppl_info(MCInst *MI, const insn_map *imap);
+ 
+ #define DECL_get_detail_op(arch, ARCH) \
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index 81b5e334..fa08c665 100644
+index 81b5e334..667c73f6 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
 @@ -285,23 +285,37 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
@@ -63,11 +102,35 @@ index 81b5e334..fa08c665 100644
  }
  
  static void AArch64_check_updates_flags(MCInst *MI)
+@@ -859,10 +873,7 @@ static void AArch64_add_not_defined_ops(MCInst *MI, const SStream *OS)
+ 
+ void AArch64_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+-	map_implicit_reads(MI, aarch64_insns);
+-	map_implicit_writes(MI, aarch64_insns);
+-	map_groups(MI, aarch64_insns);
++	map_insn_metadata(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
+ }
+ 
+ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
-index a4627cb9..30f42ab7 100644
+index a4627cb9..e0dd8c89 100644
 --- a/arch/ARC/ARCMapping.c
 +++ b/arch/ARC/ARCMapping.c
-@@ -173,15 +173,14 @@ void ARC_setup_op(cs_arc_op *op)
+@@ -135,10 +135,7 @@ const insn_map arc_insns[] = {
+ 
+ void ARC_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, arc_insns, ARR_SIZE(arc_insns));
+-	map_implicit_reads(MI, arc_insns);
+-	map_implicit_writes(MI, arc_insns);
+-	map_groups(MI, arc_insns);
++	map_insn_metadata(MI, arc_insns, ARR_SIZE(arc_insns));
+ }
+ 
+ bool ARC_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -173,15 +170,14 @@ void ARC_setup_op(cs_arc_op *op)
  
  void ARC_init_cs_detail(MCInst *MI)
  {
@@ -90,10 +153,19 @@ index a4627cb9..30f42ab7 100644
  
  #ifndef CAPSTONE_DIET
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 8f2a2961..bf096bfc 100644
+index 8f2a2961..5885a10c 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -939,27 +939,39 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -836,6 +836,8 @@ void ARM_check_updates_flags(MCInst *MI)
+ void ARM_set_instr_map_data(MCInst *MI)
+ {
+ 	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, arm_insns);
+ 	map_implicit_writes(MI, arm_insns);
+ 	ARM_check_updates_flags(MI);
+@@ -939,27 +941,39 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -146,11 +218,39 @@ index 8f2a2961..bf096bfc 100644
  }
  
  static uint64_t t_add_pc(MCInst *MI, uint64_t v)
+diff --git a/arch/Alpha/AlphaMapping.c b/arch/Alpha/AlphaMapping.c
+index a2d5d133..2a497252 100644
+--- a/arch/Alpha/AlphaMapping.c
++++ b/arch/Alpha/AlphaMapping.c
+@@ -171,10 +171,7 @@ void Alpha_printInst(MCInst *MI, SStream *O, void *Info)
+ 
+ void Alpha_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, insns, ARR_SIZE(insns));
+-	map_implicit_reads(MI, insns);
+-	map_implicit_writes(MI, insns);
+-	map_groups(MI, insns);
++	map_insn_metadata(MI, insns, ARR_SIZE(insns));
+ }
+ 
+ bool Alpha_getInstruction(csh handle, const uint8_t *code, size_t code_len,
 diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
-index 52c46bbf..94d7b76a 100644
+index 52c46bbf..ab8c0ef9 100644
 --- a/arch/LoongArch/LoongArchMapping.c
 +++ b/arch/LoongArch/LoongArchMapping.c
-@@ -500,16 +500,16 @@ void LoongArch_setup_op(cs_loongarch_op *op)
+@@ -376,10 +376,7 @@ void LoongArch_rewrite_address_operand(MCInst *MI)
+ 
+ void LoongArch_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
+-	map_implicit_reads(MI, loongarch_insns);
+-	map_implicit_writes(MI, loongarch_insns);
+-	map_groups(MI, loongarch_insns);
++	map_insn_metadata(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
+ 	const loongarch_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, loongarch_insns);
+ 	if (suppl_info) {
+@@ -500,16 +497,16 @@ void LoongArch_setup_op(cs_loongarch_op *op)
  
  void LoongArch_init_cs_detail(MCInst *MI)
  {
@@ -177,6 +277,22 @@ index 52c46bbf..94d7b76a 100644
  	}
  }
  
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 57d3b638..dd5bd6c2 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -252,10 +252,7 @@ void Mips_set_instr_map_data(MCInst *MI)
+ 		}
+ 	}
+ 
+-	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
+-	map_implicit_reads(MI, mips_insns);
+-	map_implicit_writes(MI, mips_insns);
+-	map_groups(MI, mips_insns);
++	map_insn_metadata(MI, mips_insns, ARR_SIZE(mips_insns));
+ #ifndef CAPSTONE_DIET
+ 	if ((MI->csh->mode & CS_MODE_MIPS16) && detail_is_set(MI)) {
+ 		cs_detail *detail = get_detail(MI);
 diff --git a/arch/PowerPC/PPCGenAsmWriter.inc b/arch/PowerPC/PPCGenAsmWriter.inc
 index e0991b10..dcbe984b 100644
 --- a/arch/PowerPC/PPCGenAsmWriter.inc
@@ -423,10 +539,22 @@ index 9b0463a3..96722ec6 100644
  
  #endif // CS_PPC_LINKAGE_H
 diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index fd26a73a..bc3ce76e 100644
+index fd26a73a..c4383f86 100644
 --- a/arch/PowerPC/PPCMapping.c
 +++ b/arch/PowerPC/PPCMapping.c
-@@ -323,8 +323,17 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -290,10 +290,7 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
+ 
+ void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
+ {
+-	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
+-	map_implicit_reads(MI, ppc_insns);
+-	map_implicit_writes(MI, ppc_insns);
+-	map_groups(MI, ppc_insns);
++	map_insn_metadata(MI, ppc_insns, ARR_SIZE(ppc_insns));
+ 	PPC_add_branch_predicates(MI, Bytes, BytesLen);
+ 	PPC_check_updates_cr0(MI);
+ 	const ppc_suppl_info *suppl_info = map_get_suppl_info(MI, ppc_insns);
+@@ -323,8 +320,17 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	MI->MRI = (MCRegisterInfo *)info;
  	MI->fillDetailOps = detail_is_set(MI);
  	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
@@ -446,6 +574,54 @@ index fd26a73a..bc3ce76e 100644
  	map_set_alias_id(MI, O, insn_alias_mnem_map,
  			 ARR_SIZE(insn_alias_mnem_map));
  #endif
+diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
+index 6c945c17..6b7abe94 100644
+--- a/arch/Sparc/SparcMapping.c
++++ b/arch/Sparc/SparcMapping.c
+@@ -33,10 +33,7 @@ const insn_map sparc_insns[] = {
+ 
+ void Sparc_set_instr_map_data(MCInst *MI)
+ {
+-	map_cs_id(MI, sparc_insns, ARR_SIZE(sparc_insns));
+-	map_implicit_reads(MI, sparc_insns);
+-	map_implicit_writes(MI, sparc_insns);
+-	map_groups(MI, sparc_insns);
++	map_insn_metadata(MI, sparc_insns, ARR_SIZE(sparc_insns));
+ 	const sparc_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, sparc_insns);
+ 	if (suppl_info) {
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 0e42613c..8d488d93 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -42,10 +42,7 @@ const insn_map systemz_insns[] = {
+ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 				size_t BytesLen)
+ {
+-	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
+-	map_implicit_reads(MI, systemz_insns);
+-	map_implicit_writes(MI, systemz_insns);
+-	map_groups(MI, systemz_insns);
++	map_insn_metadata(MI, systemz_insns, ARR_SIZE(systemz_insns));
+ 	const systemz_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, systemz_insns);
+ 	if (suppl_info) {
+diff --git a/arch/TriCore/TriCoreMapping.c b/arch/TriCore/TriCoreMapping.c
+index 223b44d7..3e919403 100644
+--- a/arch/TriCore/TriCoreMapping.c
++++ b/arch/TriCore/TriCoreMapping.c
+@@ -67,10 +67,7 @@ static inline void check_updates_flags(MCInst *MI)
+ static void set_instr_map_data(MCInst *MI)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_cs_id(MI, mapping_insns, ARR_SIZE(mapping_insns));
+-	map_implicit_reads(MI, mapping_insns);
+-	map_implicit_writes(MI, mapping_insns);
+-	map_groups(MI, mapping_insns);
++	map_insn_metadata(MI, mapping_insns, ARR_SIZE(mapping_insns));
+ 	check_updates_flags(MI);
+ #endif
+ }
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
 index 8c3dea2e..c5a118f8 100644
 --- a/arch/X86/X86Disassembler.c
@@ -3116,7 +3292,7 @@ index aae2c545..e89322c3 100644
  
  #endif // CAPSTONE_SSTREAM_PRECHECKED
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..91ee7c9a 100644
+index df60fd3f..d7af5899 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10810,11 +10810,8 @@ struct insn_reg2 {
@@ -3133,7 +3309,7 @@ index df60fd3f..91ee7c9a 100644
  
  static inline x86_reg unpack_insn_reg(uint16_t value, enum cs_ac_type *access)
  {
-@@ -11167,71 +11164,44 @@ static int binary_search2(const struct insn_reg2 *insns, unsigned int max,
+@@ -11167,71 +11164,42 @@ static int binary_search2(const struct insn_reg2 *insns, unsigned int max,
  	return -1;
  }
  
@@ -3168,9 +3344,7 @@ index df60fd3f..91ee7c9a 100644
 -	if (!h->x86_insn_reg_lut)
 +#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
 +	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+	if (cs_mem_malloc == malloc && cs_mem_calloc == calloc &&
-+	    cs_mem_realloc == realloc && cs_mem_free == free &&
-+	    cs_vsnprintf == vsnprintf) {
++	if (cs_mem_uses_system_defaults()) {
 +		h->x86_insn_lut = x86_initial_insn_lut;
 +		h->x86_insn_reg_lut = x86_initial_reg_lut;
 +		h->x86_uses_shared_luts = true;
@@ -3230,7 +3404,7 @@ index df60fd3f..91ee7c9a 100644
  }
  
  // return register of given instruction id
-@@ -11986,6 +11956,49 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -11986,6 +11954,49 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -3293,8 +3467,24 @@ index a2677cb8..8b191696 100644
  // return register of given instruction id
  // return 0 if not found
  // this is to handle instructions embedding accumulate registers into AsmStrs[]
+diff --git a/arch/Xtensa/XtensaMapping.c b/arch/Xtensa/XtensaMapping.c
+index 8a0055ff..f52c4341 100644
+--- a/arch/Xtensa/XtensaMapping.c
++++ b/arch/Xtensa/XtensaMapping.c
+@@ -55,10 +55,7 @@ void Xtensa_printer(MCInst *MI, SStream *OS, void *info)
+ static void set_instr_map_data(MCInst *MI)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_cs_id(MI, mapping_insns, ARR_SIZE(mapping_insns));
+-	map_implicit_reads(MI, mapping_insns);
+-	map_implicit_writes(MI, mapping_insns);
+-	map_groups(MI, mapping_insns);
++	map_insn_metadata(MI, mapping_insns, ARR_SIZE(mapping_insns));
+ 
+ 	const xtensa_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, mapping_insns);
 diff --git a/cs.c b/cs.c
-index 0a91fe20..fae500f9 100644
+index 0a91fe20..d99ecea5 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -78,6 +78,7 @@
@@ -3305,7 +3495,25 @@ index 0a91fe20..fae500f9 100644
  #include "arch/X86/X86Disassembler.h"
  #endif
  #include "arch/X86/X86Module.h"
-@@ -885,8 +886,10 @@ cs_err CAPSTONE_API cs_close(csh *handle)
+@@ -488,6 +489,17 @@ cs_free_t cs_mem_free = free;
+ cs_vsnprintf_t cs_vsnprintf = _vsnprintf;
+ #else
+ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
++
++#ifdef CAPSTONE_HAS_X86
++/* Compare with the same CRT functions used to initialize the hooks above.
++ * A CRT inline wrapper can have different addresses in different C files. */
++bool cs_mem_uses_system_defaults(void)
++{
++	return cs_mem_malloc == malloc && cs_mem_calloc == calloc &&
++	       cs_mem_realloc == realloc && cs_mem_free == free &&
++	       cs_vsnprintf == vsnprintf;
++}
++#endif
+ #endif // defined(_WIN32_WCE)
+ 
+ #elif defined(_KERNEL_MODE)
+@@ -885,8 +897,10 @@ cs_err CAPSTONE_API cs_close(csh *handle)
  	}
  
  	cs_mem_free(ud->insn_cache);
@@ -3318,7 +3526,7 @@ index 0a91fe20..fae500f9 100644
  
  	memset(ud, 0, sizeof(*ud));
  	cs_mem_free(ud);
-@@ -945,7 +948,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+@@ -945,7 +959,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
  		insn->id = MCInst_getOpcodePub(mci);
  
  	// post printer handles some corner cases (hacky)
@@ -3328,7 +3536,7 @@ index 0a91fe20..fae500f9 100644
  		postprinter((csh)handle, insn, OS, mci);
  
  #ifndef CAPSTONE_DIET
-@@ -1065,13 +1069,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1065,13 +1080,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  			ss.is_closed = false;
  			ss.markup_stream = false;
  			ss.prefixed_by_markup = false;
@@ -3353,7 +3561,7 @@ index 0a91fe20..fae500f9 100644
  #endif
  		{
 diff --git a/cs_priv.h b/cs_priv.h
-index aacedd8d..c0be7ba7 100644
+index aacedd8d..ca12a636 100644
 --- a/cs_priv.h
 +++ b/cs_priv.h
 @@ -122,9 +122,10 @@ struct cs_struct {
@@ -3369,6 +3577,14 @@ index aacedd8d..c0be7ba7 100644
  	unsigned int x86_insn_lut_max;
  	// A mapping of LLVM instruction IDs to capstone instruction IDs, with
  	// some supplementary information, sorted in ascending order by LLVM
+@@ -167,6 +168,7 @@ extern cs_calloc_t cs_mem_calloc;
+ extern cs_realloc_t cs_mem_realloc;
+ extern cs_free_t cs_mem_free;
+ extern cs_vsnprintf_t cs_vsnprintf;
++CAPSTONE_INTERNAL bool cs_mem_uses_system_defaults(void);
+ 
+ static inline bool cs_mem_is_setup()
+ {
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
 index f8d6b926..1bd0b7c4 100644
 --- a/docs/ARCHITECTURE.md
@@ -3801,6 +4017,55 @@ index 53f84ba9..3fe14bd8 100644
  if(CAPSTONE_MIPS_SUPPORT)
      list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
  endif()
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 6b15c4fe..16018279 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -188,11 +188,43 @@ static bool test_alias_lookup(void)
+ 	return true;
+ }
+ 
++static bool test_insn_metadata(void)
++{
++	insn_map table[2] = { 0 };
++	table[1].id = 1;
++	table[1].mapid = 41;
++	cs_insn insn = { 0 };
++	MCInst MI = { 0 };
++	MI.Opcode = 1;
++	MI.flat_insn = &insn;
++	map_insn_metadata(&MI, table, ARR_SIZE(table));
++	if (insn.id != 41)
++		return false;
++#ifndef CAPSTONE_DIET
++	cs_detail detail = { 0 };
++	insn.detail = &detail;
++	detail.regs_read[detail.regs_read_count++] = 1;
++	detail.regs_write[detail.regs_write_count++] = 2;
++	detail.groups[detail.groups_count++] = 3;
++	table[1].regs_use[0] = 4;
++	table[1].regs_mod[0] = 5;
++	table[1].groups[0] = 6;
++	map_insn_metadata(&MI, table, ARR_SIZE(table));
++	return detail.regs_read_count == 2 && detail.regs_read[0] == 1 &&
++	       detail.regs_read[1] == 4 && detail.regs_write_count == 2 &&
++	       detail.regs_write[0] == 2 && detail.regs_write[1] == 5 &&
++	       detail.groups_count == 2 && detail.groups[0] == 3 &&
++	       detail.groups[1] == 6;
++#else
++	return true;
++#endif
++}
++
+ int main(void)
+ {
+ 	return test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+-			       test_duplicate_selection() &&
++			       test_duplicate_selection() && test_insn_metadata() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
+ 			       find_cs_id(UINT_MAX, NULL, 0) == UINT_MAX ?
+ 		       0 :
 diff --git a/tests/unit/test_ppc_alias_hints.py b/tests/unit/test_ppc_alias_hints.py
 new file mode 100644
 index 00000000..50554822
