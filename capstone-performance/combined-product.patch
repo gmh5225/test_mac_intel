@@ -1,3 +1,15 @@
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..fba4fc98 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -154,6 +154,7 @@ struct MCInst {
+ 	uint64_t address; // address of this insn
+ 	cs_struct *csh; // save the main csh
+ 	uint8_t x86opsize; // opsize for [mem] operand
++	bool x86_plain_onebyte;
+ 
+ 	// These flags could be used to pass some info from one target subcomponent
+ 	// to another, for example, from disassembler to asm printer. The values of
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
 index 81b5e334..fa08c665 100644
 --- a/arch/AArch64/AArch64Mapping.c
@@ -377,6 +389,43 @@ index fd26a73a..bc3ce76e 100644
  	map_set_alias_id(MI, O, insn_alias_mnem_map,
  			 ARR_SIZE(insn_alias_mnem_map));
  #endif
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..c5a118f8 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -150,8 +150,9 @@ static bool gfniAffineBroadcastNeedsDisp8Scale(
+ #endif
+ 
+ // copy x86 detail information from internal structure to public structure
+-static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
++static void update_pub_insn(MCInst *mi, InternalInstruction *inter)
+ {
++	cs_insn *pub = mi->flat_insn;
+ 	if (inter->hasRex2) {
+ 		/* REX2.M0 selects the generated map internally; 0F is not present
+ 		 * in the architectural encoding. */
+@@ -174,6 +175,12 @@ static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
+ 			}
+ 		} else {
+ 			pub->detail->x86.opcode[0] = inter->opcode;
++			/* Classic one-byte opcodes have no mask or broadcast.
++			 * Keep RCL (C0/C1, D0-D3) and x87 on the repair path. */
++			mi->x86_plain_onebyte = inter->opcodeType == ONEBYTE &&
++						(inter->opcode & 0xfe) !=
++							0xc0 &&
++						(inter->opcode & 0xf0) != 0xd0;
+ 		}
+ 	}
+ 
+@@ -681,7 +688,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			instr->x86Lock = insn.hasLockPrefix;
+ 
+ 			if (handle->detail_opt) {
+-				update_pub_insn(instr->flat_insn, &insn);
++				update_pub_insn(instr, &insn);
+ 			}
+ 
+ 			if (insn.hasAdSize)
 diff --git a/arch/X86/X86GenImplicitRegLookup.inc b/arch/X86/X86GenImplicitRegLookup.inc
 new file mode 100644
 index 00000000..06b2f260
@@ -3040,10 +3089,18 @@ index df60fd3f..ecded087 100644
  
  // return register of given instruction id
 diff --git a/cs.c b/cs.c
-index 0a91fe20..adc3331b 100644
+index 0a91fe20..fae500f9 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -885,8 +885,10 @@ cs_err CAPSTONE_API cs_close(csh *handle)
+@@ -78,6 +78,7 @@
+ #include "arch/WASM/WASMModule.h"
+ #ifdef CAPSTONE_HAS_X86
+ #include "arch/X86/X86Mapping.h"
++#include "arch/X86/X86InstPrinter.h"
+ #include "arch/X86/X86Disassembler.h"
+ #endif
+ #include "arch/X86/X86Module.h"
+@@ -885,8 +886,10 @@ cs_err CAPSTONE_API cs_close(csh *handle)
  	}
  
  	cs_mem_free(ud->insn_cache);
@@ -3056,6 +3113,40 @@ index 0a91fe20..adc3331b 100644
  
  	memset(ud, 0, sizeof(*ud));
  	cs_mem_free(ud);
+@@ -945,7 +948,8 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 		insn->id = MCInst_getOpcodePub(mci);
+ 
+ 	// post printer handles some corner cases (hacky)
+-	if (postprinter)
++	if (postprinter &&
++	    (!stream_length_valid || insn->detail || insn->id == X86_INS_VPCMP))
+ 		postprinter((csh)handle, insn, OS, mci);
+ 
+ #ifndef CAPSTONE_DIET
+@@ -1065,13 +1069,16 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			ss.is_closed = false;
+ 			ss.markup_stream = false;
+ 			ss.prefixed_by_markup = false;
+-			ss.unsigned_num = false;
+-			SStream_opt_unum(&ss, handle->imm_unsigned);
+-			handle->printer(&mci, &ss, handle->printer_info);
+-			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+-				  code,
+-				  !mci.assembly[0] && handle->post_printer ==
+-							      X86_postprinter);
++			ss.unsigned_num = handle->imm_unsigned;
++			Printer_t printer = handle->printer;
++			printer(&mci, &ss, handle->printer_info);
++			PostPrinter_t post = handle->post_printer;
++			bool exact = !mci.assembly[0] &&
++				     post == X86_postprinter;
++			if (exact && mci.x86_plain_onebyte &&
++			    printer == X86_Intel_printInst)
++				post = NULL;
++			fill_insn(handle, insn, &ss, &mci, post, code, exact);
+ 		} else
+ #endif
+ 		{
 diff --git a/cs_priv.h b/cs_priv.h
 index aacedd8d..c0be7ba7 100644
 --- a/cs_priv.h
@@ -3074,10 +3165,10 @@ index aacedd8d..c0be7ba7 100644
  	// A mapping of LLVM instruction IDs to capstone instruction IDs, with
  	// some supplementary information, sorted in ascending order by LLVM
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index f8d6b926..0a48ef99 100644
+index f8d6b926..1bd0b7c4 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
-@@ -619,6 +619,15 @@ Run the generator after changing either mapping table or the repair switches.
+@@ -619,6 +619,22 @@ Run the generator after changing either mapping table or the repair switches.
  Its `--check` mode and unit checks validate the full/reduced projection and reject
  statements that cannot be skipped under this guard.
  
@@ -3090,14 +3181,21 @@ index f8d6b926..0a48ef99 100644
 +`--check` mode. The mapping unit compares every 16-bit opcode with the
 +canonical instruction map.
 +
++The Intel printer can finish ordinary one-byte instructions directly when it
++controls the output stream. Encoding classification uses the existing detail
++decode. RCL, x87 and extension encodings retain post-print repairs. A custom
++formatter can insert decorators into scalar text, so its output still passes
++through the post-printer. With detail disabled, the built-in post-printer can
++still resolve VPCMP public IDs.
++
  The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
  unused high bits of their existing opcode records. The string bytes and operand
  fragment masks remain authoritative. After updating `X86GenAsmWriter*.inc`, run
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 6a6d61ac..1a8e3763 100644
+index 850fa787..ff49d43e 100644
 --- a/suite/auto-sync/README.md
 +++ b/suite/auto-sync/README.md
-@@ -113,6 +113,11 @@ SystemZ's shared 64-bit input for all three instruction lengths. Xtensa's
+@@ -118,6 +118,11 @@ SystemZ's shared 64-bit input for all three instruction lengths. Xtensa's
  table calls share the generated 64-bit `_3` helper; the translator preserves
  that choice instead of inferring a helper suffix from the encoded width.
  
@@ -3482,7 +3580,7 @@ index dbb25f26..e112c2a1 100644
      generated = [(path, generated_output(emit)) for path, emit in outputs]
      for path, output in generated:
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 6bb835ad..2274e535 100644
+index 53f84ba9..3fe14bd8 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
 @@ -13,6 +13,12 @@ if(CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_ARM_SUPPORT OR CAPSTONE_ALPHA_SUPPORT
@@ -3496,7 +3594,7 @@ index 6bb835ad..2274e535 100644
 +        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_ppc_alias_hints.py")
 +endif()
  if(CAPSTONE_MIPS_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
  endif()
 diff --git a/tests/unit/test_ppc_alias_hints.py b/tests/unit/test_ppc_alias_hints.py
 new file mode 100644
@@ -3604,7 +3702,7 @@ index 00000000..50554822
 +if __name__ == "__main__":
 +    unittest.main()
 diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
-index 6d4e493b..270d6024 100644
+index 6d4e493b..3715c145 100644
 --- a/tests/unit/x86_encoding_accuracy.c
 +++ b/tests/unit/x86_encoding_accuracy.c
 @@ -140,7 +140,7 @@ static bool check_id_cache(void)
@@ -3625,11 +3723,72 @@ index 6d4e493b..270d6024 100644
  	bool ok = cache != NULL;
  	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
  		if (cases[c].full_only && cs_support(CS_SUPPORT_X86_REDUCE))
+@@ -746,6 +746,44 @@ static int inspect_operand_access(char *text, size_t size, const char *format,
+ 	return access_callback.formatter(text, size, format, args);
+ }
+ 
++static int write_broadcast(char *text, size_t size, const char *format,
++			   va_list args)
++{
++	(void)format;
++	(void)args;
++	return snprintf(text, size, "{1to8}");
++}
++
++/* Even a scalar memory operand can acquire a broadcast through a custom
++ * formatter. Its actual output must reach the post-printer. */
++static bool check_formatter_broadcast(void)
++{
++	if (cs_support(CS_SUPPORT_DIET))
++		return true;
++	const uint8_t bytes[] = { 0x83, 0x40, 0x20, 1 }; // add [eax+0x20], 1
++	cs_opt_mem original = { cs_mem_malloc, cs_mem_calloc, cs_mem_realloc,
++				cs_mem_free, cs_vsnprintf };
++	cs_opt_mem hooks = original;
++	hooks.vsnprintf = write_broadcast;
++	csh handle = 0;
++	cs_insn *insn = NULL;
++	bool ok = cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) == CS_ERR_OK &&
++		  cs_open(CS_ARCH_X86, CS_MODE_32, &handle) == CS_ERR_OK &&
++		  cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK &&
++		  cs_disasm(handle, bytes, sizeof(bytes), 0, 1, &insn) == 1;
++	if (ok) {
++		const cs_x86 *x86 = &insn->detail->x86;
++		ok = strstr(insn->op_str, "{1to8}") && x86->op_count == 2 &&
++		     x86->operands[0].type == X86_OP_MEM &&
++		     x86->operands[0].avx_bcast == X86_AVX_BCAST_8;
++		cs_free(insn, 1);
++	}
++	if (handle)
++		cs_close(&handle);
++	return cs_option(0, CS_OPT_MEM, (uintptr_t)&original) == CS_ERR_OK &&
++	       ok;
++}
++
+ /* A formatter observes the stream's unwritten tail and preceding detail, and
+  * can change the options used by the remainder of this decode. */
+ static bool check_operand_access_callback(void)
+@@ -1373,7 +1411,7 @@ int main(void)
+ 		  check_inherited_moffs_size() &&
+ 		  check_inherited_three_operand_size() && check_id_cache() &&
+ 		  check_instruction_names() && check_intel_operand_access() &&
+-		  check_operand_access_callback();
++		  check_operand_access_callback() && check_formatter_broadcast();
+ 	for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); ++m)
+ 		for (size_t s = 0; s < sizeof(syntaxes) / sizeof(syntaxes[0]);
+ 		     ++s)
 diff --git a/tests/unit/x86_mapping_counts.c b/tests/unit/x86_mapping_counts.c
-index f0be5f3c..972c57fc 100644
+index f0be5f3c..d18a53a4 100644
 --- a/tests/unit/x86_mapping_counts.c
 +++ b/tests/unit/x86_mapping_counts.c
-@@ -7,6 +7,51 @@
+@@ -1,5 +1,6 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ #include <stdio.h>
++#include <stdlib.h>
+ #include "../../arch/X86/X86Mapping.h"
+ #include "../../utils.h"
+ 
+@@ -7,6 +8,74 @@
  #include "../../arch/X86/X86GenMappingCounts.inc"
  #endif
  
@@ -3637,11 +3796,34 @@ index f0be5f3c..972c57fc 100644
 + * and the unallocated suffix of the 16-bit opcode space. */
 +static int check_lookup(void)
 +{
-+	csh handle;
++	csh handle, second;
 +	cs_arch_register_x86();
++	if (!cs_mem_is_setup()) {
++		cs_opt_mem hooks = { malloc, calloc, realloc, free, vsnprintf };
++		if (cs_option(0, CS_OPT_MEM, (uintptr_t)&hooks) != CS_ERR_OK)
++			return 1;
++	}
 +	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
 +		return 1;
 +	cs_struct *h = (cs_struct *)handle;
++	if (cs_open(CS_ARCH_X86, CS_MODE_32, &second) != CS_ERR_OK) {
++		cs_close(&handle);
++		return 1;
++	}
++	cs_struct *h2 = (cs_struct *)second;
++	bool expect_shared = false;
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++	expect_shared = true;
++#endif
++	bool shared_ids = h->x86_insn_lut == h2->x86_insn_lut;
++	bool shared_regs = h->x86_insn_reg_lut == h2->x86_insn_reg_lut;
++	cs_close(&second);
++	if (shared_ids != expect_shared || shared_regs != expect_shared) {
++		fprintf(stderr, "Unexpected x86 lookup table ownership\n");
++		cs_close(&handle);
++		return 1;
++	}
 +	int status = 0;
 +	for (unsigned int id = 0; id <= UINT16_MAX; ++id) {
 +		unsigned int row = find_insn(id);
@@ -3681,7 +3863,7 @@ index f0be5f3c..972c57fc 100644
  int main(void)
  {
  #ifndef CAPSTONE_DIET
-@@ -22,5 +67,5 @@ int main(void)
+@@ -22,5 +91,5 @@ int main(void)
  		}
  	}
  #endif
