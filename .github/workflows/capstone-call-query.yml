@@ -1,0 +1,28 @@
+name: Capstone x86 direct CALL resolution on real binaries
+on:
+  push:
+    branches: [codex/capstone-x86-call-reader]
+    paths: [capstone-call-query/**, .github/workflows/capstone-call-query.yml, .gitattributes]
+permissions:
+  contents: read
+jobs:
+  call:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15, windows-2022]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-call-query
+      - name: Compare old operand reconstruction and both native queries
+        run: python capstone-call-query/measure.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: call-query-${{ matrix.runner }}
+          path: call-evidence/
+          retention-days: 14
