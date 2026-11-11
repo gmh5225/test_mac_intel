@@ -1,0 +1,60 @@
+{
+  "source_repository": "NeverSight/NeverD",
+  "runners": [
+    "macos-26",
+    "xcode-27"
+  ],
+  "timeout_minutes": 20,
+  "source": "neverd",
+  "repository": "gmh5225/test_mac_intel",
+  "download": [
+    "gh",
+    "release",
+    "download",
+    "{release}",
+    "--repo",
+    "{repository}",
+    "--pattern",
+    "{asset}"
+  ],
+  "manifest": "manifest.json",
+  "probe": "probe",
+  "report": "delivery-report.json",
+  "llvm_revision": "5676029e378c9e37adc16c8216a8e8453ffafcae",
+  "runtime_command": [
+    "brew",
+    "install",
+    "zstd"
+  ],
+  "runtime_timeout": 600,
+  "evidence": "leaf-replay-evidence",
+  "host": "NeverDArm64eLiftedImageTests",
+  "probe_args": [
+    "scripts/verify_arm64e_native.py",
+    "probe",
+    "--output"
+  ],
+  "probe_report": "report.json",
+  "filter": "--gtest_filter=AArch64LiftedImage.VerifiedLeafBodiesUseTheNormalPatchPipeline",
+  "test_name": "VerifiedLeafBodiesUseTheNormalPatchPipeline",
+  "test_xml": "leaf.xml",
+  "xml_option": "--gtest_output=xml:",
+  "test_output": "leaf-test.log",
+  "test_timeout": 180,
+  "execute_env": {
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1"
+  },
+  "image_count": 2,
+  "entry_count": 2,
+  "errors": {
+    "source": "The checked-out source differs from the pinned entry implementation",
+    "archive": "The delivered entry test archive hash differs",
+    "identity": "The delivered entry test host/source identity differs",
+    "probe": "Compiler-original PAC and signed unwinding are not qualified",
+    "case": "The authenticated caller did not complete the original and published lifted leaf images"
+  },
+  "source_revision": "ead18fa395dd95122fec9814ba94a9a481229104",
+  "asset": "arm64e-leaves-host.tar.gz",
+  "asset_sha256": "a07f09210195e15487501a589265c2e6d2fb5d580f10e2f9eb492326cde15658",
+  "release": "neverd-arm64e-leaves-ead18fa"
+}
