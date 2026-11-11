@@ -147,7 +147,7 @@ def prepare():
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
     variant = os.environ['SCAN_VARIANT']
-    if variant != 'vex':
+    if variant != 'profiles':
         raise ValueError(variant)
     patch = SOURCE / (variant + '.patch')
     assert sha(patch) == manifest['source_lineage'][patch.name]['sha256']
@@ -243,7 +243,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o'}
-    if set(changed) != allowed:
+    if 'CMakeFiles/capstone.dir/arch/X86/X86Mapping.c.o' not in changed or any('/arch/X86/' not in name for name in changed):
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]

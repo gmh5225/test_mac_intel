@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-vex-extent-hosts]
+    branches: [codex/capstone-implicit-profiles-hosts]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-vex-extent-hosts
+  group: capstone-implicit-profiles-hosts
   cancel-in-progress: false
 
 jobs:
@@ -21,9 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, variant: vex }
-          - { host: macos-15, variant: vex }
-          - { host: macos-15-intel, variant: vex }
+          - { host: ubuntu-24.04, variant: profiles }
+          - { host: macos-15, variant: profiles }
+          - { host: macos-15-intel, variant: profiles }
     env:
       SCAN_VARIANT: ${{ matrix.variant }}
     runs-on: ${{ matrix.host }}
@@ -50,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-vex-extent-hosts-${{ matrix.host }}-${{ matrix.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-implicit-profiles-hosts-${{ matrix.host }}-${{ matrix.variant }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
