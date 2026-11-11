@@ -1,10 +1,12 @@
 """Replay a source-bound local entry test host on a native Apple runner."""
 
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tarfile
+from xml.etree import ElementTree
 
 POLICY = json.loads(Path(__file__).with_name("Replay.def").read_text())
 sys.path.insert(0, str(Path(POLICY["source"]) / "scripts"))
@@ -50,6 +52,7 @@ def main():
     output.mkdir()
     archive = Path(POLICY["asset"])
     binary = output / POLICY["host"]
+    leaves = output / POLICY["lifted_host"]
     report = {"source_revision": POLICY["source_revision"], "passed": False,
               "cold_source_build": False, "source_llvm_backend": True}
     try:
@@ -70,6 +73,7 @@ def main():
         manifest = json.loads(manifest_path.read_text())
         if (manifest["source_revision"] != POLICY["source_revision"] or
                 manifest["binary_sha256"] != native.digest(binary) or
+                manifest[POLICY["lifted_hash_field"]] != native.digest(leaves) or
                 any(native.digest(native.ROOT / name) != value
                     for name, value in manifest["source_sha256"].items())):
             raise ValueError(POLICY["errors"]["identity"])
@@ -107,6 +111,30 @@ def main():
                           producer=entry.POLICY["backend_producer"], publish=True, zero_base=True)
         if not tight["reconstructed_entry_publication_qualified"]:
             raise ValueError(POLICY["errors"]["backend"])
+        dense = output / POLICY["dense"]
+        dense.mkdir()
+        same = entry.run(dense, binary, compiler, probe / native.POLICY["report_name"],
+                         producer=entry.POLICY["backend_producer"], publish=True, zero_base=True,
+                         match_original_optimization=True)
+        if not same["reconstructed_entry_publication_qualified"]:
+            raise ValueError(POLICY["errors"]["backend"])
+        report[POLICY["dense_hash_field"]] = native.digest(dense / entry.POLICY["report_name"])
+        xml = output / POLICY["lifted_xml"]
+        with (output / POLICY["lifted_log"]).open("w") as log:
+            subprocess.run([leaves, POLICY["lifted_filter"], POLICY["xml_option"] + str(xml)],
+                           env={**os.environ, **POLICY["lifted_environment"]},
+                           timeout=POLICY["lifted_timeout"], stdout=log, stderr=subprocess.STDOUT,
+                           check=True)
+        cases = ElementTree.parse(xml).findall(".//testcase")
+        if ({case.get("name") for case in cases} != set(POLICY["lifted_cases"]) or
+                any(case.find(tag) is not None for case in cases for tag in POLICY["xml_failures"])):
+            raise ValueError(POLICY["errors"]["lifted"])
+        for case in cases:
+            if case.get("name") in POLICY["new_lifted_cases"]:
+                props = {p.get("name"): p.get("value") for p in case.findall("properties/property")}
+                if int(props[POLICY["executed_images_field"]]) != POLICY["executed_images"]:
+                    raise ValueError(POLICY["errors"]["lifted"])
+        report[POLICY["lifted_hash_field"]] = native.digest(xml)
         report["zero_base_report_sha256"] = native.digest(packed / entry.POLICY["report_name"])
         report["publication_report_sha256"] = native.digest(publication / entry.POLICY["report_name"])
         unwind_control(output, compiler, result["sdk_path"])
@@ -114,8 +142,9 @@ def main():
         report["passed"] = True
     finally:
         binary.unlink(missing_ok=True)
+        leaves.unlink(missing_ok=True)
         archive.unlink(missing_ok=True)
-        report["owned_host_removed"] = not binary.exists()
+        report["owned_host_removed"] = not binary.exists() and not leaves.exists()
         native.save(output / POLICY["report"], report)
 
 
