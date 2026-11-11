@@ -60,13 +60,22 @@ opt-level=3
     loop=t[i:j].replace('  for (unsigned repeat = 0; repeat < repeats; ++repeat) {','  {').replace('uint64_t ip = 0x100000;','uint64_t ip = start_ip;')
     (w/'functions.cpp').write_text(head+'static Result cs_span(const uint8_t *bytes,size_t count,csh handle,cs_insn *insn,uint64_t start_ip,unsigned mode) {\n  Result result;\n'+loop+'  return result;\n}\n'+(d/'driver.inc').read_text())
     executables={}
+    code={}
     for name,tree in [('base',cs),('candidate',other)]:
         with (tree/'CMakeLists.txt').open('a') as f:
             f.write('\nadd_executable(functions "'+(w/'functions.cpp').as_posix()+'")\ntarget_compile_features(functions PRIVATE cxx_std_17)\ntarget_link_libraries(functions PRIVATE capstone_static "'+lib.as_posix()+'" '+('advapi32 bcrypt ntdll userenv ws2_32' if win else 'dl m pthread')+')\n')
         b=w/(name+'-build');opts=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4'] if win else ['-G','Ninja','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++']
-        run(['cmake','-S',tree,'-B',b,*opts,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],name+'-configure',w)
+        run(['cmake','-S',tree,'-B',b,*opts,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if os.environ['CRT']=='MT' else 'OFF'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=ON','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],name+'-configure',w)
         run(['cmake','--build',b,'--config','Release','--target','functions','--parallel','4'],name+'-build',w)
         executables[name]=b/('Release/functions.exe' if win else 'functions')
+        objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
+        code[name]={}
+        for stem in ('cs','SStream','Mapping','X86Disassembler','X86DisassemblerDecoder','X86IntelInstPrinter','X86IntelInstPrinterPrechecked'):
+            obj,=b.rglob(stem+'.obj')
+            listing=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
+            code[name][stem]=sha('\n'.join(line for line in listing.splitlines() if 'file format' not in line and line.strip()).encode())
+        save('native-code.json',code)
+
     row=next(r for r in manifest['inputs'] if r['name']=='putty-64-0.85')
     binary=w/'putty.exe'
     run(['curl','-fsSL','--retry','3',row['url'],'-o',binary],'putty-download',w)

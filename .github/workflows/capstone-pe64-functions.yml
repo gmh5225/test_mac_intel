@@ -2,17 +2,19 @@ name: PE64 runtime function comparison
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-pe64-runtime-functions]
+    branches: [codex/capstone-native-literal-pe-funcs]
 permissions:
   contents: read
 jobs:
   functions:
-    runs-on: ${{ matrix.host }}
-    timeout-minutes: 40
+    runs-on: windows-2022
+    env:
+      CRT: ${{ matrix.crt }}
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
-        host: [ubuntu-24.04, windows-2022]
+        crt: [MD, MT]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -22,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pe64-functions-${{ matrix.host }}
+          name: native-literal-pe-functions-${{ matrix.crt }}
           path: capstone-evidence/
           retention-days: 14
