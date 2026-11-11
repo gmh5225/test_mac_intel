@@ -10,17 +10,20 @@ import subprocess
 import run as perf
 
 source, work = perf.source, perf.work
-ref = 'e9a8b79bf71d80e5c032267bd3c253899b3de965'
+ref = '7b209eb13c8e0f9915307320016e8a1cecd12253'
 
 def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
+    assert perf.digest((source/'common.patch').read_bytes())=='fa4a02edfd99bda300c030295c099e2606a25cc4d9321b7fe72c935072da8cf7'
+    perf.run(['git','apply',source/'common.patch'],'common-base',base)
     trees = {'msvc':base}
-    for name, expected in {'outlined': 'c95e146edeb1721885d35fe43f0f6c8fc07a1d4299f742654d63cdf4dfb64d39', 'generic': '5562d0f0d8faf9a4db48b4b86ce2194ed66647d41682a2c01cd3212d8e905a48'}.items():
+    for name, expected in {'byte': '17227f626991ca538e951ed5605b64f7d849db83b534260a1dedc3eebe581f9e', 'header': 'a516d7b554797535e39244a62b7e78a5c8ed55f98a4248eb69d4d99be6c2aeca'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
         perf.run(['git','worktree','add','--detach',trees[name],'HEAD'],name+'-worktree',base)
+        perf.run(['git','apply',source/'common.patch'],name+'-common',trees[name])
         perf.run(['git','apply',patch],name+'-apply',trees[name])
     adapter = work/'adapter'
     adapter.mkdir()
@@ -53,7 +56,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','outlined','generic']
+    names=['msvc','byte','header']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -72,7 +75,7 @@ opt-level = 3
 
 def record_codegen(name,build):
     tool=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
-    interesting={'fill_insn','cs_decode_full_insn','cs_disasm_iter','X86_getInstruction','X86_Intel_printInst','X86_reg_access','decodeInstructionFull','readModRM','translateFullOperands','validateScanOperands','translateOperand','translateRMMemoryFull','readOperandsScan'}
+    interesting={'fill_insn','cs_decode_full_insn','cs_disasm_iter','X86_getInstruction','X86_Intel_printInst','X86_reg_access','decodeInstructionFull','readModRM','translateFullOperands','validateScanOperands','translateOperand','translateRMMemoryFull','readOperandsScan','X86_scanBatch','X86_getInstructionScanResult','consumeByte','lookAtByte','decodeGenericScan'}
     found={}
     for stem in ('cs','X86DisassemblerDecoder','X86Disassembler','X86IntelInstPrinter','X86Mapping'):
         obj,=build.rglob(stem+'.obj')
@@ -82,6 +85,7 @@ def record_codegen(name,build):
             symbol=re.match(r'^[0-9a-fA-F]+ <(.+)>:$',line)
             if symbol:
                 label=symbol[1]
+                if label.startswith(('$LN','$LL','$LNLL')): continue
                 title=label if label in interesting else None
                 if title: found[title]=[]
             elif title and line.strip():
@@ -101,12 +105,12 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','outlined','generic','iced','generic','outlined','msvc'],['generic','msvc','outlined','iced','outlined','msvc','generic'],['outlined','generic','msvc','iced','msvc','generic','outlined']]
+    orders=[['msvc','byte','header','iced','header','byte','msvc'],['header','msvc','byte','iced','byte','msvc','header'],['byte','header','msvc','iced','msvc','header','byte']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
             while (probe:=sample('msvc',c,mode,n))['wall_ns']<10000000: n*=4
-            repeats=max(1,math.ceil(n*140000000/probe['wall_ns']))
+            repeats=max(1,math.ceil(n*120000000/probe['wall_ns']))
             pairs=[]
             for round_id in range(6):
                 raw=[(k,sample(k,c,mode,repeats)) for k in orders[round_id%3]]
@@ -114,13 +118,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','outlined','generic','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','byte','header','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'outlined': 'c95e146edeb1721885d35fe43f0f6c8fc07a1d4299f742654d63cdf4dfb64d39', 'generic': '5562d0f0d8faf9a4db48b4b86ce2194ed66647d41682a2c01cd3212d8e905a48'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'byte': '17227f626991ca538e951ed5605b64f7d849db83b534260a1dedc3eebe581f9e', 'header': 'a516d7b554797535e39244a62b7e78a5c8ed55f98a4248eb69d4d99be6c2aeca'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))

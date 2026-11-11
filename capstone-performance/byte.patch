@@ -1,0 +1,22 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..c77350b3 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -202,7 +202,7 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
+  *                with the data read.
+  * @return      - 0 if the read was successful; nonzero otherwise.
+  */
+-static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
++X86_DECODE_INLINE int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
+ {
+ 	size_t offset = insn->readerCursor;
+ 	if (offset >= insn->codeSize)
+@@ -219,7 +219,7 @@ static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
+  * @param byte  - See consumeByte().
+  * @return      - See consumeByte().
+  */
+-static int lookAtByte(struct InternalInstruction *insn, uint8_t *byte)
++X86_DECODE_INLINE int lookAtByte(struct InternalInstruction *insn, uint8_t *byte)
+ {
+ 	size_t offset = insn->readerCursor;
+ 	if (offset >= insn->codeSize)

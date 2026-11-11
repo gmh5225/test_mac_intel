@@ -1,0 +1,152 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..739faf46 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -832,6 +832,64 @@ X86_DECODE_INLINE bool isRex2Map0PrefixByte(uint8_t byte)
+  */
+ enum { OPCODE_READ_GENERIC = 1 };
+ 
++X86_DECODE_INLINE int finishLegacyOpcode(struct InternalInstruction *insn,
++				       uint8_t current, bool terminalOnly)
++{
++	insn->opcodeType = ONEBYTE;
++	// save this first byte for MOVcr, MOVdr, MOVrc, MOVrd
++	insn->firstByte = current;
++
++	if (current == 0x0f) {
++		// dbgprintf(insn, "Found a two-byte escape prefix (0x%hhx)", current);
++		insn->twoByteEscape = current;
++
++		if (consumeByte(insn, &current))
++			return -1;
++
++		/* Terminal tables contain only the one- and two-byte maps. Keep
++         * operand-bearing 3DNow headers out of compact-only local state. */
++		if (terminalOnly &&
++		    (current == 0x38 || current == 0x3a || current == 0x0f))
++			return OPCODE_READ_GENERIC;
++
++		if (current == 0x38) {
++			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
++			if (consumeByte(insn, &current))
++				return -1;
++
++			insn->opcodeType = THREEBYTE_38;
++		} else if (current == 0x3a) {
++			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
++			if (consumeByte(insn, &current))
++				return -1;
++
++			insn->opcodeType = THREEBYTE_3A;
++		} else if (current == 0x0f) {
++			// dbgprintf(insn, "Found a 3dnow escape prefix (0x%hhx)", current);
++			// Consume operands before the opcode to comply with the 3DNow encoding
++			if (readModRM(insn))
++				return -1;
++
++			if (consumeByte(insn, &current))
++				return -1;
++
++			insn->opcodeType = THREEDNOW_MAP;
++		} else {
++			// dbgprintf(insn, "Didn't find a three-byte escape prefix");
++			insn->opcodeType = TWOBYTE;
++		}
++	}
++
++	/*
++	 * At this point we have consumed the full opcode.
++	 * Anything we consume from here on must be unconsumed.
++	 */
++
++	insn->opcode = current;
++
++	return 0;
++}
++
+ X86_DECODE_INLINE int readOpcode(struct InternalInstruction *insn,
+ 				 bool simpleLegacy, bool terminalOnly)
+ {
+@@ -931,58 +989,7 @@ legacyOpcode:
+ 	if (consumeByte(insn, &current))
+ 		return -1;
+ 
+-	// save this first byte for MOVcr, MOVdr, MOVrc, MOVrd
+-	insn->firstByte = current;
+-
+-	if (current == 0x0f) {
+-		// dbgprintf(insn, "Found a two-byte escape prefix (0x%hhx)", current);
+-		insn->twoByteEscape = current;
+-
+-		if (consumeByte(insn, &current))
+-			return -1;
+-
+-		/* Terminal tables contain only the one- and two-byte maps. Keep
+-         * operand-bearing 3DNow headers out of compact-only local state. */
+-		if (terminalOnly &&
+-		    (current == 0x38 || current == 0x3a || current == 0x0f))
+-			return OPCODE_READ_GENERIC;
+-
+-		if (current == 0x38) {
+-			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
+-			if (consumeByte(insn, &current))
+-				return -1;
+-
+-			insn->opcodeType = THREEBYTE_38;
+-		} else if (current == 0x3a) {
+-			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
+-			if (consumeByte(insn, &current))
+-				return -1;
+-
+-			insn->opcodeType = THREEBYTE_3A;
+-		} else if (current == 0x0f) {
+-			// dbgprintf(insn, "Found a 3dnow escape prefix (0x%hhx)", current);
+-			// Consume operands before the opcode to comply with the 3DNow encoding
+-			if (readModRM(insn))
+-				return -1;
+-
+-			if (consumeByte(insn, &current))
+-				return -1;
+-
+-			insn->opcodeType = THREEDNOW_MAP;
+-		} else {
+-			// dbgprintf(insn, "Didn't find a three-byte escape prefix");
+-			insn->opcodeType = TWOBYTE;
+-		}
+-	}
+-
+-	/*
+-	 * At this point we have consumed the full opcode.
+-	 * Anything we consume from here on must be unconsumed.
+-	 */
+-
+-	insn->opcode = current;
+-
+-	return 0;
++	return finishLegacyOpcode(insn, current, terminalOnly);
+ }
+ 
+ /*
+@@ -3098,7 +3105,8 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ 	    (opcodeOffset && !isREX(&insn, code[0])))
+ 		return X86_SCAN_NOT_HANDLED;
+ 	readSimpleLegacyPrefix(&insn, opcodeOffset);
+-	int opcodeResult = readOpcode(&insn, true, true);
++	insn.readerCursor = opcodeOffset + 1;
++	int opcodeResult = finishLegacyOpcode(&insn, opcode, true);
+ 	if (opcodeResult)
+ 		return opcodeResult == OPCODE_READ_GENERIC ?
+ 			       X86_SCAN_NOT_HANDLED :
+@@ -3174,10 +3182,10 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 	    may_be_0f_feature_extension(code + offset + 1,
+ 					code_len - offset - 1))
+ 		return X86_SCAN_NOT_HANDLED;
+-	insn.readerCursor = offset;
++	insn.readerCursor = offset + 1;
+ 	insn.vectorExtensionType = TYPE_NO_VEX_XOP;
+ 	setInstructionSizes(&insn, insn.hasOpSize, insn.hasAdSize);
+-	int opcodeResult = readOpcode(&insn, true, true);
++	int opcodeResult = finishLegacyOpcode(&insn, opcode, true);
+ 	if (opcodeResult == OPCODE_READ_GENERIC)
+ 		return X86_SCAN_NOT_HANDLED;
+ 	if (opcodeResult)
