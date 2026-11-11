@@ -26,7 +26,14 @@ with TemporaryDirectory(dir=os.environ['RUNNER_TEMP'],ignore_cleanup_errors=True
             if active:run('git','apply',active,where=src)
             try:
                 run('cmake','-S',src,'-B',b,'-G','Visual Studio 17 2022','-A','x64','-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF'),*flags)
-                return (b/'capstone.vcxproj').read_bytes()
+                import xml.etree.ElementTree as ET
+                xml=ET.parse(b/'capstone.vcxproj')
+                # First-time CMake compiler discovery has extra inputs to the
+                # CMake regeneration command. Compare every compiler, linker,
+                # project property and ordered C translation-unit input.
+                nodes=[node for node in xml.iter() if node.tag.split('}')[-1] in ('PropertyGroup','ItemDefinitionGroup') or (node.tag.endswith('}ClCompile') and node.get('Include'))]
+                assert any('X86DisassemblerDecoder.c' in node.get('Include','') for node in nodes)
+                return b'\n'.join(ET.tostring(node,encoding='utf-8')for node in nodes)
             finally:
                 if active:run('git','apply','-R',active,where=src)
         baseline=project(expected);candidate=project(scoped)
@@ -34,7 +41,7 @@ with TemporaryDirectory(dir=os.environ['RUNNER_TEMP'],ignore_cleanup_errors=True
             import difflib
             print(''.join(difflib.unified_diff(baseline.decode('utf-8-sig').splitlines(True),candidate.decode('utf-8-sig').splitlines(True)))[:8000],flush=True)
             raise ValueError('generated compiler configuration differs for '+crt)
-        record[crt]={'vs_project_sha256':hashlib.sha256(candidate).hexdigest(),'matches':'fixed' if crt=='MT' else 'ipo'}
+        record[crt]={'vs_compiler_settings_sha256':hashlib.sha256(candidate).hexdigest(),'matches':'fixed' if crt=='MT' else 'ipo'}
     (evidence/'projects.json').write_text(json.dumps(record,indent=2))
     run('git','apply',scoped,where=src)
     tests=['x86_call_target','x86_scan_batch']
