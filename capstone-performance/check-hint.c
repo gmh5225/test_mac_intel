@@ -1,134 +1,74 @@
-#include <limits.h>
+#include "Mapping.h"
 #include <dlfcn.h>
+#include <stdio.h>
+#include <string.h>
+
 #ifndef RTLD_FIRST
 #define RTLD_FIRST 0
 #endif
-#include <stdio.h>
-#include <string.h>
-#include "Mapping.h"
-#include "utils.h"
 
-static const name_map ppc[] = {
-#include "arch/PowerPC/PPCGenCSAliasMnemMap.inc"
-    {PPC_INS_ALIAS_SLWI, "slwi"},
-    {PPC_INS_ALIAS_SRWI, "srwi"},
-    {PPC_INS_ALIAS_SLDI, "sldi"},
-    {PPC_INS_ALIAS_END, NULL},
-};
-static const name_map custom[] = {
-    {17, "move"}, {23, "move.w"}, {29, "move,pt"},
-    {31, "123456789abcdef"}, {0, "zero"}, {UINT_MAX, "negative"},
-    {41, ""}, {43, "move"}, {47, "longerthan15characters"},
-    {49, NULL}, {51, "unreachable"},
-};
-static unsigned long observations;
-static void (*reference_alias)(MCInst *, const SStream *, const name_map *, int);
+void ARM_init_cs_detail(MCInst *);
+void AArch64_init_cs_detail(MCInst *);
+void ARM_setup_op(cs_arm_op *);
+void AArch64_setup_op(cs_aarch64_op *);
 
-static void check_candidate(MCInst *MI, const SStream *O, const name_map *names, unsigned count, unsigned alias_hint)
-{
-	if (alias_hint) {
-		map_set_alias_id(MI, O, &names[alias_hint - 1], 1);
-		if (MI->flat_insn->alias_id)
-			return;
-	}
-	map_set_alias_id(MI, O, names,
-			 count);
-}
-
-static unsigned first_hint(const name_map *names, unsigned count,
-                           const char *name)
-{
-    for (unsigned i = 0; i < count && names[i].name; ++i)
-        if (!strcmp(names[i].name, name))
-            return i + 1;
-    return 0;
-}
-
-static int check(const name_map *names, unsigned count, unsigned hint,
-                 cs_arch arch, const char *text, bool is_alias)
-{
-    cs_struct handle = {0};
-    cs_insn original = {0}, candidate = {0};
-    MCInst mi = {0};
-    SStream ss = {0};
-    handle.arch = arch;
-    mi.csh = &handle;
-    mi.flat_insn = &original;
-    mi.isAliasInstr = is_alias;
-    original.alias_id = candidate.alias_id = 77;
-    strcpy(ss.buffer, text);
-    reference_alias(&mi, &ss, names, count);
-    mi.flat_insn = &candidate;
-    check_candidate(&mi, &ss, names, count, hint);
-    ++observations;
-    if (original.alias_id != candidate.alias_id) {
-        fprintf(stderr, "hint mismatch arch=%u hint=%u alias=%u text=%s old=%llu new=%llu\n",
-                arch, hint, is_alias, text, (unsigned long long)original.alias_id,
-                (unsigned long long)candidate.alias_id);
-        return 1;
-    }
-    return 0;
-}
-
-static int fixture(const name_map *names, unsigned count)
-{
-    const cs_arch archs[] = {CS_ARCH_PPC, CS_ARCH_AARCH64, CS_ARCH_RISCV,
-                             CS_ARCH_SPARC, CS_ARCH_ARM};
-    const char *suffixes[] = {"", " r0", "\tr0", ".suffix", ",pt r0", "_suffix"};
-    char text[512];
-    for (unsigned a = 0; a < ARR_SIZE(archs); ++a) {
-        for (unsigned i = 0; i < count; ++i) {
-            if (!names[i].name)
-                continue;
-            unsigned hint = first_hint(names, count, names[i].name);
-            for (unsigned s = 0; s < ARR_SIZE(suffixes); ++s) {
-                snprintf(text, sizeof(text), " \t%s%s", names[i].name, suffixes[s]);
-                if (check(names, count, hint, archs[a], text, true) ||
-                    check(names, count, hint, archs[a], text, false) ||
-                    check(names, count, 0, archs[a], text, true) ||
-                    check(names, count, 1, archs[a], text, true))
-                    return 1;
-            }
-            size_t length = strlen(names[i].name);
-            for (size_t j = 0; j < length; ++j) {
-                strcpy(text, names[i].name);
-                text[j] = 0;
-                if (check(names, count, hint, archs[a], text, true))
-                    return 1;
-                for (unsigned c = 1; c < 256; ++c) {
-                    strcpy(text, names[i].name);
-                    text[j] = (char)c;
-                    if (check(names, count, hint, archs[a], text, true))
-                        return 1;
-                }
-            }
-        }
-    }
-    return 0;
-}
+typedef void (*detail_init)(MCInst *);
 
 int main(int argc, char **argv)
 {
-    if (argc != 2)
-        return 2;
-    void *library = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL | RTLD_FIRST);
-    if (!library)
-        return 3;
-    reference_alias = (void (*)(MCInst *, const SStream *, const name_map *, int))
-        dlsym(library, "map_set_alias_id");
-    if (!reference_alias)
-        return 4;
-    if (fixture(ppc, ARR_SIZE(ppc)) || fixture(custom, ARR_SIZE(custom)))
-        return 1;
-    /* With no alias, the hint path must not inspect stream/map/architecture. */
-    MCInst mi = {0};
-    cs_insn insn = {0};
-    mi.flat_insn = &insn;
-    insn.alias_id = 77;
-    check_candidate(&mi, NULL, ppc, ARR_SIZE(ppc), 1);
-    if (insn.alias_id != 0)
-        return 1;
-    printf("Validated %lu hinted/original alias observations\n", observations);
-    dlclose(library);
-    return 0;
+	if (argc != 2)
+		return 2;
+	void *base = dlopen(argv[1], RTLD_LOCAL | RTLD_NOW | RTLD_FIRST);
+	if (!base)
+		return 3;
+	detail_init current[] = { ARM_init_cs_detail, AArch64_init_cs_detail };
+	detail_init reference[] = {
+		(detail_init)dlsym(base, "ARM_init_cs_detail"),
+		(detail_init)dlsym(base, "AArch64_init_cs_detail"),
+	};
+	void (*arm_op)(cs_arm_op *) = (void (*)(cs_arm_op *))dlsym(base, "ARM_setup_op");
+	void (*a64_op)(cs_aarch64_op *) = (void (*)(cs_aarch64_op *))dlsym(base, "AArch64_setup_op");
+	if (!reference[0] || !reference[1] || !arm_op || !a64_op)
+		return 4;
+	unsigned checked = 0;
+	for (unsigned byte = 0; byte < 256; ++byte) {
+		cs_arm_op a[2];
+		cs_aarch64_op b[2];
+		memset(a, byte, sizeof(a));
+		memset(b, byte, sizeof(b));
+		arm_op(&a[0]);
+		ARM_setup_op(&a[1]);
+		a64_op(&b[0]);
+		AArch64_setup_op(&b[1]);
+		if (memcmp(&a[0], &a[1], sizeof(a[0])) || memcmp(&b[0], &b[1], sizeof(b[0])))
+			return 5;
+		checked += 2;
+		for (unsigned arch = 0; arch < 2; ++arch) {
+			cs_struct h = { 0 };
+			h.arch = arch ? CS_ARCH_AARCH64 : CS_ARCH_ARM;
+			for (unsigned flags = 0; flags < 16; ++flags) {
+				h.detail_opt = flags;
+				for (unsigned present = 0; present < 2; ++present) {
+					cs_insn insn = { 0 };
+					MCInst mi = { 0 };
+					cs_detail detail[2];
+					memset(detail, byte, sizeof(detail));
+					mi.csh = &h;
+					mi.flat_insn = &insn;
+					insn.detail = present ? &detail[0] : NULL;
+					reference[arch](&mi);
+					insn.detail = present ? &detail[1] : NULL;
+					current[arch](&mi);
+					if (memcmp(&detail[0], &detail[1], sizeof(cs_detail))) {
+						fprintf(stderr, "mismatch arch %u flags %u byte %u present %u\n",arch,flags,byte,present);
+						return 6;
+					}
+					++checked;
+				}
+			}
+		}
+	}
+	printf("Verified %u complete storage comparisons\n",checked);
+	dlclose(base);
+	return 0;
 }
