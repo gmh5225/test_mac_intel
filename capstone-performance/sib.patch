@@ -1,0 +1,192 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 3c78ef02..e28e01ff 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1637,94 +1637,6 @@ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+  * terminals use a constant false materialization policy after the generator
+  * proves their operand classes and ModR/M forms. Other callers retain every
+  * raw field, including state left by failed reads. */
+-/*
+- * readSIB - Consumes the SIB byte to determine addressing information for an
+- *   instruction.
+- *
+- * @param insn  - The instruction whose SIB byte is to be read.
+- * @return      - 0 if the SIB byte was successfully read; nonzero otherwise.
+- */
+-X86_DECODE_INLINE int readSIB(struct InternalInstruction *insn,
+-			      bool materialize)
+-{
+-	SIBBase sibBaseBase = SIB_BASE_NONE;
+-	uint8_t index, base;
+-
+-	// dbgprintf(insn, "readSIB()");
+-
+-	if (materialize && insn->consumedSIB)
+-		return 0;
+-
+-	if (materialize)
+-		insn->consumedSIB = true;
+-
+-	switch (insn->addressSize) {
+-	case 2:
+-		// dbgprintf(insn, "SIB-based addressing doesn't work in 16-bit mode");
+-		return -1;
+-	case 4:
+-		if (materialize)
+-			insn->sibIndexBase = SIB_INDEX_EAX;
+-		sibBaseBase = SIB_BASE_EAX;
+-		break;
+-	case 8:
+-		if (materialize)
+-			insn->sibIndexBase = SIB_INDEX_RAX;
+-		sibBaseBase = SIB_BASE_RAX;
+-		break;
+-	}
+-
+-	if (consumeByte(insn, &insn->sib))
+-		return -1;
+-
+-	if (materialize) {
+-		index = indexFromSIB(insn->sib) |
+-			(xFromREX(insn->rexPrefix) << 3);
+-
+-		if (index == 0x4) {
+-			insn->sibIndex = SIB_INDEX_NONE;
+-		} else {
+-			insn->sibIndex = (SIBIndex)(insn->sibIndexBase + index);
+-		}
+-
+-		insn->sibScale = 1 << scaleFromSIB(insn->sib);
+-	}
+-
+-	base = baseFromSIB(insn->sib) | (bFromREX(insn->rexPrefix) << 3);
+-
+-	switch (base) {
+-	case 0x5:
+-	case 0xd:
+-		switch (modFromModRM(insn->modRM)) {
+-		case 0x0:
+-			insn->eaDisplacement = EA_DISP_32;
+-			if (materialize)
+-				insn->sibBase = SIB_BASE_NONE;
+-			break;
+-		case 0x1:
+-			insn->eaDisplacement = EA_DISP_8;
+-			if (materialize)
+-				insn->sibBase = (SIBBase)(sibBaseBase + base);
+-			break;
+-		case 0x2:
+-			insn->eaDisplacement = EA_DISP_32;
+-			if (materialize)
+-				insn->sibBase = (SIBBase)(sibBaseBase + base);
+-			break;
+-		case 0x3:
+-			// debug("Cannot have Mod = 0b11 and a SIB byte");
+-			return -1;
+-		}
+-		break;
+-	default:
+-		if (materialize)
+-			insn->sibBase = (SIBBase)(sibBaseBase + base);
+-		break;
+-	}
+-
+-	return 0;
+-}
+-
+ /*
+  * readDisplacement - Consumes the displacement of an instruction.
+  *
+@@ -1783,6 +1695,63 @@ X86_DECODE_INLINE int readDisplacement(struct InternalInstruction *insn,
+ 	return 0;
+ }
+ 
++/* The caller has classified a 32- or 64-bit SIB address and selected its
++ * displacement width. Only mod=0 with SIB base 5 changes that width. */
++X86_DECODE_INLINE int readSIBAndDisplacement(struct InternalInstruction *insn,
++					     bool materialize, uint8_t mod)
++{
++	if (materialize && insn->consumedSIB)
++		return readDisplacement(insn, materialize);
++	if (materialize) {
++		insn->consumedSIB = true;
++		insn->sibIndexBase = insn->addressSize == 4 ? SIB_INDEX_EAX :
++							      SIB_INDEX_RAX;
++	}
++
++	/* A complete SIB + disp8 can be consumed with one bounds check. If
++	 * only the SIB is present, leave the cursor and raw fields exactly
++	 * where the ordered byte and displacement readers would leave them. */
++	uint16_t pair;
++	bool have_pair = mod == 1 &&
++			 !(materialize && insn->consumedDisplacement) &&
++			 consumeUInt16(insn, &pair) == 0;
++	if (have_pair)
++		insn->sib = (uint8_t)pair;
++	else if (consumeByte(insn, &insn->sib))
++		return -1;
++
++	if (materialize) {
++		uint8_t index = indexFromSIB(insn->sib) |
++				(xFromREX(insn->rexPrefix) << 3);
++		insn->sibIndex = index == 4 ?
++					 SIB_INDEX_NONE :
++					 (SIBIndex)(insn->sibIndexBase + index);
++		insn->sibScale = 1 << scaleFromSIB(insn->sib);
++	}
++
++	uint8_t base = baseFromSIB(insn->sib);
++	if (mod == 0 && base == 5) {
++		insn->eaDisplacement = EA_DISP_32;
++		if (materialize)
++			insn->sibBase = SIB_BASE_NONE;
++	} else if (materialize) {
++		SIBBase first = insn->addressSize == 4 ? SIB_BASE_EAX :
++							 SIB_BASE_RAX;
++		base |= bFromREX(insn->rexPrefix) << 3;
++		insn->sibBase = (SIBBase)(first + base);
++	}
++
++	if (!have_pair)
++		return readDisplacement(insn, materialize);
++	if (materialize) {
++		insn->consumedDisplacement = true;
++		insn->displacementOffset = insn->readerCursor - 1;
++		insn->displacementSize = 1;
++		insn->displacement = (int8_t)(pair >> 8);
++	}
++	return 0;
++}
++
+ /*
+  * readModRM - Consumes all addressing information (ModR/M byte, SIB byte, and
+  *   displacement) for an instruction and interprets it.
+@@ -1918,7 +1887,7 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+ 			break;
+ 		case 0x0:
+ 			insn->eaDisplacement =
+-				EA_DISP_NONE; /* readSIB may override this */
++				EA_DISP_NONE; /* SIB base 5 may override this */
+ 			// In determining whether RIP-relative mode is used (rm=5),
+ 			// or whether a SIB byte is present (rm=4),
+ 			// the extension bits (REX.b and EVEX.x) are ignored.
+@@ -1929,8 +1898,7 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+ 								EA_BASE_sib :
+ 								EA_BASE_sib64);
+ 				}
+-				if (readSIB(insn, materialize) ||
+-				    readDisplacement(insn, materialize))
++				if (readSIBAndDisplacement(insn, materialize, 0))
+ 					return -1;
+ 				break;
+ 			case 0x5: // RIP-relative
+@@ -1962,8 +1930,7 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+ 				if (materialize) {
+ 					insn->eaBase = EA_BASE_sib;
+ 				}
+-				if (readSIB(insn, materialize) ||
+-				    readDisplacement(insn, materialize))
++				if (readSIBAndDisplacement(insn, materialize, mod))
+ 					return -1;
+ 				break;
+ 			default:
