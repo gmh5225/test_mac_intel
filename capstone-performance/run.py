@@ -145,10 +145,11 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
-    incremental = os.environ.get('COMPARE_BASE') == 'combined'
-    if incremental:
-        command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='same four alias indices, before grouping the ARM printer detail repairs' if incremental else 'published next'))
+    indexed = os.environ['COMPARE_BASE'] == 'indexed'
+    if indexed:
+        for label in ('base','new'):
+            command(['git','apply',SOURCE/'prior-combined.patch'],label+'-alias-patch',WORK/label)
+    write('comparison.json',dict(baseline='four alias indices' if indexed else 'published next',candidate='bound group copies'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -191,14 +192,14 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','check-mips-alias']:
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
+        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz') else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
@@ -237,11 +238,7 @@ panic = "abort"
     write('objects.json', objects)
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
-    prefix = 'CMakeFiles/capstone.dir/'
-    allowed = {prefix+'arch/'+arch+'/'+arch+'Mapping.c.o' for arch in ('ARM','AArch64','Mips','Sparc')}
-    allowed.add(prefix+'Mapping.c.o')
-    if incremental:
-        allowed = {prefix+'arch/ARM/ARMMapping.c.o'}
+    allowed = {'CMakeFiles/capstone.dir/Mapping.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

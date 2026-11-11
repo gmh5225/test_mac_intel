@@ -214,7 +214,7 @@ index 00000000..feaa1147
 +	0, 27, 19, 15, 0, 16, 0, 40, 0, 0, 0, 0, 0, 36, 38, 0,
 +	10, 21, 29, 34, 42, 9, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..b5ecf52b 100644
+index 30e28897..4c7a1360 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -37,6 +37,10 @@ static const name_map insn_alias_mnem_map[] = {
@@ -228,17 +228,27 @@ index 30e28897..b5ecf52b 100644
  static const char *get_custom_reg_alias(unsigned reg)
  {
  	switch (reg) {
-@@ -699,8 +703,8 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -699,12 +703,14 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	MI->flat_insn->alias_id = 0;
  	ARM_LLVM_printInstruction(MI, O, info);
  	if (!MI->flat_insn->alias_id)
 -		map_set_alias_id(MI, O, insn_alias_mnem_map,
 -				 ARR_SIZE(insn_alias_mnem_map) - 1);
+-	ARM_add_not_defined_ops(MI);
+-	ARM_post_index_detection(MI);
+-	ARM_check_mem_access_validity(MI);
+-	ARM_add_cs_groups(MI);
 +		map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
 +				 ARR_SIZE(alias_index) - 1);
- 	ARM_add_not_defined_ops(MI);
- 	ARM_post_index_detection(MI);
- 	ARM_check_mem_access_validity(MI);
++	if (MI->flat_insn->detail) {
++		ARM_add_not_defined_ops(MI);
++		ARM_post_index_detection(MI);
++		ARM_check_mem_access_validity(MI);
++		ARM_add_cs_groups(MI);
++	}
+ 	int syntax_opt = MI->csh->syntax;
+ 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
+ 		patch_cs_reg_alias(O->buffer);
 diff --git a/arch/Mips/MipsGenAliasIndex.inc b/arch/Mips/MipsGenAliasIndex.inc
 new file mode 100644
 index 00000000..a1c93d3c
