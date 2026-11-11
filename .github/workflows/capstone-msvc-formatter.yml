@@ -2,7 +2,7 @@ name: Native public iterators sharing one full decoder and printer
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-iterator-same-image-static-full]
+    branches: [codex/capstone-static-full-serial]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
       matrix:
         crt: [MT]
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-static-full-iterator-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: native-static-serial-iterator-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

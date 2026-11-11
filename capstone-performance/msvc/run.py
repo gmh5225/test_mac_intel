@@ -92,8 +92,8 @@ opt-level = 3
     with (base/'CMakeLists.txt').open('a') as f:
         f.write('\ntarget_sources(capstone PRIVATE arch/X86/BenchExtent.c arch/X86/BenchEarly.c)\nadd_executable(same "'+driver.as_posix()+'")\ntarget_compile_features(same PRIVATE cxx_std_17)\ntarget_link_libraries(same PRIVATE capstone_static "'+(work/'cargo-target/release/iced_compare.lib').as_posix()+'" advapi32 bcrypt ntdll userenv ws2_32)\n')
     build=work/'build'
-    run(['cmake','-S',base,'-B',build,'-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF'),'-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'config')
-    run(['cmake','--build',build,'--config','Release','--parallel','4','--target','same'],'build')
+    run(['cmake','-S',base,'-B',build,'-G','Visual Studio 17 2022','-A','x64','-T','host=x64','-DCMAKE_C_FLAGS=/MP1','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF'),'-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'config')
+    run(['cmake','--build',build,'--config','Release','--parallel','1','--target','same'],'build')
     exe=build/'Release/same.exe'
     objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
     import re
