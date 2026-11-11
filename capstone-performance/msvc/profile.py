@@ -59,11 +59,18 @@ target_link_libraries(sample_decode PRIVATE capstone_static "${ICED_ADAPTER}" ad
     exe = build/'Release/sample_decode.exe'
     p.write('inputs.json',dict(capstone=ref,patch=p.digest(patch.read_bytes()),iced=p.manifest['iced_revision'],
                                executable=p.digest(exe.read_bytes()),compiler='MSVC Release /Z7',image=os.environ['ImageVersion']))
+    import bisect,re
+    objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
+    headers=subprocess.check_output([objdump,'-p',exe],text=True,errors='replace')
+    base=int(re.search(r'^ImageBase\s+([a-fA-F0-9]+)',headers,re.M)[1],16)
+    disasm=subprocess.check_output([objdump,'-d','--x86-asm-syntax=intel',exe],text=True,errors='replace')
+    excerpt=[(int(m[1],16)-base,line.strip()) for line in disasm.splitlines() if (m:=re.match(r'^\s*([a-fA-F0-9]+):\s+',line))]
+    ips=[i for i,_ in excerpt]
     summaries = []
     for case in p.get_cases():
         if case['name'] not in ('putty-32-0.85','kernel32-64','scalar64','simd64'): continue
         for mode in ('scan','format','detail'):
-            for library in ('capstone','iced'):
+            for library in ('capstone',):
                 def args(n):
                     return [exe,library,mode,str(case['bits']),str(n),case['path']]
                 n = 1
@@ -73,15 +80,22 @@ target_link_libraries(sample_decode PRIVATE capstone_static "${ICED_ADAPTER}" ad
                 env = dict(os.environ,CAPSTONE_PC_SAMPLES=str(pcs))
                 row = json.loads(subprocess.check_output(args(repeats),env=env,timeout=55))
                 assert row['instructions']*n == probe['instructions']*repeats
-                total=0;symbols=Counter();lines=Counter();locations=Counter()
+                total=0;symbols=Counter();lines=Counter();locations=Counter();edges=Counter()
                 with pcs.open(newline='') as f:
                     for sample in csv.DictReader(f,delimiter='\t'):
                         count=int(sample['count']);total+=count
                         symbols[sample['module']+'!'+sample['symbol']]+=count
                         lines[Path(sample['file']).name+':'+sample['line']]+=count
                         locations[(sample['module'],sample['rva'])]+=count
+                        if sample['module'].lower() in ('vcruntime140','ucrtbase') or sample['symbol'] in ('memcpy','memset','memmove','consumeByte'):
+                            edges[(sample['symbol'],sample['caller_module'],sample['caller_rva'],sample['caller_symbol'])]+=count
                 assert sum(c for s,c in symbols.items() if 'sample_decode!' in s.lower() and not s.endswith('!?')) > total * .20,(total,symbols.most_common(8))
-                summaries.append(dict(case=case['name'],mode=mode,library=library,samples=total,
+                calls=[]
+                for (callee,module,addr,name),count in edges.most_common(40):
+                    i=bisect.bisect_left(ips,int(addr,16))
+                    asm=[l for _,l in excerpt[max(0,i-7):i+3]] if module.lower()=='sample_decode' else []
+                    calls.append(dict(callee=callee,caller=name,next_rva=addr,samples=count,asm=asm))
+                summaries.append(dict(calls=calls,case=case['name'],mode=mode,library=library,samples=total,
                                       symbols=symbols.most_common(35),lines=lines.most_common(35),pcs=locations.most_common(12)))
                 p.write('samples.json', summaries)
                 print(case['name'],mode,library,total,symbols.most_common(3),flush=True)
