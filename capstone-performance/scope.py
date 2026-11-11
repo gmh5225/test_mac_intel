@@ -12,7 +12,7 @@ def short_diff(f1,f2,tool):
         return out[2:]
     a,b=dump(f1),dump(f2);return '\n'.join(line for i,line in zip(range(500),difflib.unified_diff(a,b,n=2)))
 def main(tmp,flavor):
-    win=os.name=='nt';src=tmp/'capstone';build=tmp/'build';base='5b9cbe48b46842e70a4ce8dcfafcb3f35c2f34cd'
+    win=os.name=='nt';src=tmp/'capstone';build=tmp/'build';base='f2f50b8fab856b374daf0e76dc3054f25de65ac9'
     src.mkdir();run(['git','init','-q'],src);run(['git','config','core.autocrlf','false'],src);run(['git','remote','add','origin','https://github.com/NeverSight/capstone.git'],src);run(['git','fetch','-q','--depth=1','origin',base],src);run(['git','checkout','-q','--detach','FETCH_HEAD'],src)
     args=['cmake','-S',src,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     env=dict(os.environ);env.pop('CFLAGS',None)
@@ -21,17 +21,25 @@ def main(tmp,flavor):
     else:
         env['CC']=flavor;env['CXX']='g++' if flavor=='gcc' else 'clang++'
         args+=['-G','Ninja','-DCAPSTONE_BUILD_MACOS_THIN=ON']
+    plan=sys.argv[2]
+    if plan!='all':
+        archs=['X86','ARM','AARCH64','MIPS'] if plan=='four' else ['X86']
+        args+=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in archs]]
+    if plan=='disabled':args+=['-DCAPSTONE_MSVC_NATIVE_DECODER=OFF']
+    if plan=='diet':args+=['-DCAPSTONE_BUILD_DIET=ON']
+    if plan=='reduced':args+=['-DCAPSTONE_X86_REDUCE=ON']
     hashes={};ref=tmp/'reference';ref.mkdir()
     for kind in ('reference','candidate'):
-        name=None if kind=='reference' else 'scoped.patch'
+        name=('explicit.patch' if plan=='active' else None) if kind=='reference' else 'scoped.patch'
         if name:
             patch=d/name
             assert sha(patch.read_bytes())==(d/(name+'.sha256')).read_text().strip()
             run(['git','apply','--check',patch],src);run(['git','apply','--whitespace=nowarn',patch],src)
-        run(args,tmp,env);run(['cmake','--build',build,'--config','Release','--target','capstone_static','--parallel',('2' if win else '4')],tmp,env)
+        applied=args+(['-DCAPSTONE_MSVC_NATIVE_DECODER=ON'] if kind=='reference' and plan=='active' else [])
+        run(applied,tmp,env);run(['cmake','--build',build,'--config','Release','--target','capstone_static','--parallel',('2' if win else '4')],tmp,env)
         objdir=build/('capstone.dir/Release' if win else 'CMakeFiles/capstone.dir')
         objs={str(f.relative_to(objdir)):f for f in objdir.rglob('*.obj' if win else '*.o')}
-        assert len(objs)>80, (len(objs),objdir)
+        assert len(objs)>(80 if plan=='all' else 12), (len(objs),objdir)
         hashes[kind]={key:sha(a.read_bytes()) for key,a in objs.items()}
         if kind=='reference':
             for key,a in objs.items():
@@ -39,7 +47,7 @@ def main(tmp,flavor):
             run(['git','reset','--hard','-q',base],src);run(['git','clean','-fdq'],src);shutil.rmtree(build)
     write('objects',hashes);assert hashes['reference'].keys()==hashes['candidate'].keys()
     differing=[k for k,v in hashes['candidate'].items() if v!=hashes['reference'][k]]
-    write('comparison',dict(flavor=flavor,objects=len(objs),changed=differing,reference=base,host=platform.platform()))
+    write('comparison',dict(plan=plan,flavor=flavor,objects=len(objs),changed=differing,reference=base,host=platform.platform()))
     tool=(shutil.which('llvm-objdump') or shutil.which('objdump') or (str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe') if win else None))
     for i,k in enumerate(differing[:12]):
         if tool:

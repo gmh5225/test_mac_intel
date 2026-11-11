@@ -2,7 +2,7 @@ name: Compiler-specific Capstone runtime object identity
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-mixed-alias-identity]
+    branches: [codex/capstone-dedicated-x86-release-scope]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -12,12 +12,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, flavor: MD }
-          - { host: windows-2022, flavor: MT }
-          - { host: ubuntu-24.04, flavor: gcc }
-          - { host: ubuntu-24.04, flavor: clang }
-          - { host: macos-15, flavor: clang }
-          - { host: macos-15-intel, flavor: clang }
+          - { host: windows-2022, flavor: MD, plan: active }
+          - { host: windows-2022, flavor: MD, plan: disabled }
+          - { host: windows-2022, flavor: MD, plan: four }
+          - { host: windows-2022, flavor: MD, plan: diet }
+          - { host: windows-2022, flavor: MD, plan: reduced }
+          - { host: windows-2022, flavor: MT, plan: x86 }
+          - { host: ubuntu-24.04, flavor: clang, plan: all }
+          - { host: ubuntu-24.04, flavor: gcc, plan: four }
+          - { host: macos-15, flavor: clang, plan: four }
+          - { host: macos-15-intel, flavor: clang, plan: x86 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     steps:
@@ -26,11 +30,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/scope.py ${{ matrix.flavor }}
+        run: python capstone-performance/scope.py ${{ matrix.flavor }} ${{ matrix.plan }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-alias-identity-${{ matrix.host }}-${{ matrix.flavor }}-${{ github.run_attempt }}
+          name: dedicated-x86-release-scope-${{ matrix.host }}-${{ matrix.flavor }}-${{ matrix.plan }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
