@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-mips-alias-release]
+    branches: [codex/capstone-mips-alias-layout]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-mips-alias-release
+  group: capstone-mips-alias-layout
   cancel-in-progress: false
 
 jobs:
@@ -22,8 +22,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, baseline: published }
-          - { host: macos-15, baseline: published }
-          - { host: macos-15-intel, baseline: published }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -39,18 +37,20 @@ jobs:
           python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
       - name: Build immutable sources and verify outputs
         timeout-minutes: 17
-        run: python3 capstone-performance/run.py prepare
+        run: |
+          python3 capstone-performance/run.py prepare
+          python3 capstone-performance/placement.py prepare
       - name: Measure fixed CPU A/A and paired workloads
         timeout-minutes: 30
-        run: python3 capstone-performance/run.py measure
+        run: python3 capstone-performance/placement.py measure
       - name: Retire disposable products and summarize evidence
         if: always()
-        run: python3 capstone-performance/run.py finish
+        run: python3 capstone-performance/placement.py finish
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-mips-alias-release-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-mips-alias-layout-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

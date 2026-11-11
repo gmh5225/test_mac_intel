@@ -1,4 +1,4 @@
-"""Isolate PPC behavior and the linked addresses of unmodified backends on ELF."""
+"""Isolate MIPS behavior and the linked addresses of unmodified backends on ELF."""
 import argparse
 import json
 import math
@@ -13,19 +13,17 @@ import subprocess
 from run import EVIDENCE, MODES, SOURCE, WORK, command, sha, signature, write
 
 
-OBJECTS = ('Mapping.c.o', 'PPCMapping.c.o', 'PPCInstPrinter.c.o')
-VARIANTS = ('base', 'new', 'text-base', 'text-new', 'both-base', 'both-new', 'fallback', 'base-aa')
-ORDER = (0, 1, 7, 2, 6, 3, 5, 4)
-ANCHORS = {
-    ('ppc64el-ls', 'detail'), ('ppc64el-ls', 'format'),
-    ('arm-ls', 'detail'), ('riscv64-cp', 'format'),
-    ('putty-32-0.85', 'scan'), ('putty-32-0.85', 'format'),
-}
+OBJECTS = ('Mapping.c.o','MipsMapping.c.o')
+VARIANTS = ('base','new','text-base','text-new','both-base','both-new','same-on','same-off','base-aa')
+ORDER = (0,1,8,2,7,3,6,4,5)
+ANCHORS = {('mips64el-ls','detail'),('mips64el-ls','format'),('mips64el-sort','detail'),
+           ('mips64el-cp','format'),('s390x-ls','detail'),('ppc64el-ls','format'),
+           ('putty-32-0.85','scan'),('putty-32-0.85','format')}
 SYMBOLS = ('cs_disasm_iter', 'cs_decode_full_insn', 'cs_regs_access',
            'X86_getInstruction', 'X86_reg_access', 'X86_get_insn_id', 'X86_postprinter',
            'decodeInstructionFull', 'readModRM', 'X86_Intel_printInst',
            'X86_Intel_printInstructionPrechecked', 'map_set_alias_id',
-           'map_try_alias_id_hint', 'PPC_printer', 'PPC_LLVM_printInst',
+           'map_set_alias_id_indexed','Mips_printer','Mips_LLVM_printInst',
            'x86_mapping_counts', 'reg_map')
 
 
@@ -178,8 +176,6 @@ def archive(label, pair, matched):
 def prepare():
     if platform.system() != 'Linux' or platform.machine() != 'x86_64':
         raise RuntimeError('the experiment requires Linux x86-64')
-    command(['cc', '-O2', '-Wall', '-Werror', '-shared', '-fPIC', SOURCE / 'placement_hook.c',
-             '-ldl', '-o', WORK / 'placement-hook.so'], 'placement-hook')
     metadata = {}
     for pair, matched in [('text', ['.text']), ('both', ['.text', '.rodata'])]:
         for side in ['base', 'new']:
@@ -191,23 +187,26 @@ def prepare():
                 command(['clang++', WORK / (consumer + '.o'), lib, *extra, '-lpthread', '-ldl',
                          '-lm', '-o', output], output.name + '-link')
     write('placement-sections.json', metadata)
-    # Reconstruct the failed first attempt on one object to check the tool's relocation behavior.
-    change = next(c for c in metadata['text-base'] if c['before'] < c['after'])
-    obj = objects('base')[change['object']]
-    before = obj.read_bytes()
-    entry = sections(before)['.text']
-    payload = WORK / 'objcopy-diagnostic.bin'
-    payload.write_bytes(before[entry['offset']:entry['offset'] + entry['length']] +
-                        bytes(change['after'] - change['before']))
-    old_path = WORK / 'objcopy-diagnostic.o'
-    command(['objcopy', '--update-section', '.text=' + str(payload), obj, old_path],
-            'objcopy-diagnostic')
-    write('objcopy-relocations.json', {k: {n: len(v) for n, v in relocation_inventory(data).items()}
-          for k, data in [('original', before), ('objcopy', old_path.read_bytes()),
-                          ('preserved', (WORK / 'text-base' / obj.name).read_bytes())]})
+    import shlex
+    tree=WORK/'new'
+    q=tree/'arch/Mips/MipsMapping.c';old=q.read_text()
+    key='map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, mips_alias_index,'
+    assert old.count(key)==1
+    mod=old.replace('void Mips_printer(', '#include <stdlib.h>\nstatic int force_linear;\n__attribute__((constructor)) static void mode(void) {force_linear = getenv("CAPSTONE_LINEAR_ALIAS") != NULL;}\nvoid Mips_printer(')
+    mod=mod.replace(key,'if (force_linear) map_set_alias_id(MI,O,insn_alias_mnem_map,ARR_SIZE(insn_alias_mnem_map)); else '+key)
+    c=next(row for row in json.loads((WORK/'new-build/compile_commands.json').read_text()) if row['file'].endswith('/MipsMapping.c'))
+    out=WORK/'same';out.mkdir();a=shlex.split(c['command']);obj=out/'MipsMapping.c.o';a[a.index('-o')+1]=str(obj)
+    try:
+        q.write_text(mod);command(a,'compile-same-image',Path(c['directory']))
+    finally:
+        q.write_text(old)
+    lib=out/'libcapstone.a';shutil.copyfile(WORK/'new-build/libcapstone.a',lib);command(['ar','rDs',lib,obj],'same-archive')
+    for consumer in ('decoder','single'):
+        extra=[WORK/'adapter/target/release/libiced_compare.a'] if consumer=='decoder' else []
+        command(['clang++',WORK/(consumer+'.o'),lib,*extra,'-lpthread','-ldl','-lm','-o',WORK/(consumer+'-same')],consumer+'-same-link')
     lookup = {}
     for consumer in ['single', 'decoder']:
-        for variant in VARIANTS[:-2]:
+        for variant in (*VARIANTS[:6],'same'):
             name = consumer + '-' + variant
             lookup[name] = read_symbols(WORK / name)
     write('placement-symbols.json', lookup)
@@ -229,14 +228,10 @@ def cases():
 
 
 def observe(case, variant, repeats, lookup):
-    label = {'fallback':'new', 'base-aa':'base'}.get(variant, variant)
-    name = case['consumer'] + '-' + label
-    hook = 'map_set_alias_id' if label.endswith('base') else 'map_try_alias_id_hint'
-    entry, = lookup[name]['symbols'][hook]
-    first = bytes.fromhex(entry['first'])
-    setting = ':'.join([format(entry['address'], 'x'), *(format(b, 'x') for b in first),
-                        str(int(variant == 'fallback'))])
-    env = dict(os.environ, LD_PRELOAD=str(WORK / 'placement-hook.so'), CAPSTONE_PROBE_ENTRY=setting)
+    label={'same-on':'same','same-off':'same','base-aa':'base'}.get(variant,variant)
+    name=case['consumer']+'-'+label
+    env=dict(os.environ)
+    if variant=='same-off':env['CAPSTONE_LINEAR_ALIAS']='1'
     args = (['capstone', case['mode'], str(case['selector']), str(repeats), case['path']]
             if case['consumer'] == 'decoder' else
             [str(case['selector']), str(MODES[case['mode']]), case['path'], str(repeats)])
@@ -260,17 +255,17 @@ def measure():
         a = observe(c, 'base', 1, lookup)
         n = max(1, round(25_000_000 / a['cpu_ns']))
         b = observe(c, 'base', n, lookup)
-        calibration.append(dict(first=a, warm=b, repeats=max(1, round(n * 250_000_000 / b['cpu_ns']))))
+        calibration.append(dict(first=a, warm=b, repeats=max(1, round(n * 160_000_000 / b['cpu_ns']))))
     write('placement-plan.json', dict(allowed=allowed, selected=selected, cases=rows, calibration=calibration,
-          variants=VARIANTS, order=ORDER, cycles=8, rotation=3, target_cpu_ms=250))
+          variants=VARIANTS, order=ORDER, cycles=9, rotation=3, target_cpu_ms=160))
     with (EVIDENCE / 'placement-raw.jsonl').open('x') as out:
-        for cycle in range(8):
+        for cycle in range(9):
             for pos in range(len(rows)):
                 i = (pos + 3 * cycle) % len(rows)
                 case = rows[i]
                 expected = None
                 for slot, idx in enumerate(ORDER):
-                    variant = VARIANTS[(idx + cycle) % 8]
+                    variant = VARIANTS[(idx + cycle) % len(VARIANTS)]
                     row = observe(case, variant, calibration[i]['repeats'], lookup)
                     row.update(case=case['name'], mode=case['mode'], variant=variant, cycle=cycle, slot=slot)
                     out.write(json.dumps(row) + '\n')
@@ -279,8 +274,8 @@ def measure():
                     if expected is not None and expected != actual:
                         raise ValueError(f'measured output mismatch {case["name"]} {variant}')
                     expected = actual
-            print('Placement cycle', cycle + 1, 'of 8 complete.', flush=True)
-    write('placement-complete.json', dict(complete=True, cases=len(rows), samples=len(rows)*64))
+            print('Placement cycle', cycle + 1, 'of 9 complete.', flush=True)
+    write('placement-complete.json', dict(complete=True, cases=len(rows), samples=len(rows)*81))
 
 
 def finish():
