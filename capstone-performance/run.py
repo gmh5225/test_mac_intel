@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='dense mapping records with one legacy vector opcode resolution'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='record writemask presence with a non-encodable initial value'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -189,15 +189,15 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','check-mips-alias']:
-        source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index','flags-state']:
+        source = SOURCE / (unit + '.c') if (unit.startswith('check-') or unit == 'flags-state') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
-                 [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
+                 [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
@@ -236,9 +236,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    backends = {'AArch64':'AArch64','Mips':'Mips','PowerPC':'PPC','Sparc':'Sparc','ARM':'ARM'}
-    allowed = {prefix+'arch/'+arch+'/'+stem+'Mapping.c.o' for arch,stem in backends.items()}
-    allowed.update(prefix+x for x in ('Mapping.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86Mapping.c.o'))
+    allowed = {prefix+'arch/X86/X86Disassembler.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
