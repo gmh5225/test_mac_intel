@@ -48,12 +48,14 @@ def fetch(name, repo, rev):
     return target
 
 
+variant = os.environ['LITERAL_VARIANT']
+patch = source / ('printer-' + variant + '.patch')
 def make_programs():
     base = fetch('base', 'capstone', manifest['capstone_revision'])
     fetch('iced', 'iced', manifest['iced_revision'])
     new = work / 'new'
     run(['git', 'worktree', 'add', '--detach', new, 'HEAD'], 'new-worktree', base)
-    run(['git', '-c', 'core.autocrlf=false', 'apply', source / 'windows-formatter.patch'], 'new-patch', new)
+    run(['git', '-c', 'core.autocrlf=false', 'apply', patch], 'new-patch', new)
     adapter = work / 'adapter'
     adapter.mkdir()
     for name in ['Cargo.lock', 'iced.rs']:
@@ -214,8 +216,8 @@ def measure(programs, cases):
 try:
     write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
           image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
-          iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
-    assert digest((source / 'windows-formatter.patch').read_bytes()) == 'cf8980ee851ef43751b436135a104c8e60730c1e9a1940973d02f46fc08f84c6'
+          iced=manifest['iced_revision'], patch=digest((patch).read_bytes())))
+    assert digest((patch).read_bytes()) == {'known': '32d1f21df8b65c6d7dfcf9f955bf362b1ae0015639be9c1815b40c2be9ade9b8', 'fixed': '385d794e8b2672229f75dc9ed0730df9729ba107e56cc3fb78b191867c58eb3b'}[variant]
     programs = make_programs()
     cases = get_cases()
     snapshot(programs, cases)

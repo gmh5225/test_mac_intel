@@ -1,0 +1,30 @@
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index d3b47d6a..457485ab 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -306,7 +306,7 @@ static void printRegName(SStream *OS, unsigned RegNo)
+ 			NULL;
+ 
+ 	if (extension_name)
+-		SStream_concat0(OS, extension_name);
++		(SStream_concat0)(OS, extension_name);
+ 	else
+ 		SStream_concat0_small(OS, getRegisterName(RegNo),
+ 				      getRegisterNameLength(RegNo));
+diff --git a/arch/X86/X86IntelInstPrinterPrechecked.c b/arch/X86/X86IntelInstPrinterPrechecked.c
+index 696352a3..0552871e 100644
+--- a/arch/X86/X86IntelInstPrinterPrechecked.c
++++ b/arch/X86/X86IntelInstPrinterPrechecked.c
+@@ -11,5 +11,12 @@
+ #define CAPSTONE_SSTREAM_PRECHECKED
+ #include "X86InstPrinter.h"
+ #define SStream_concat_hex64 X86_Intel_printHexPrechecked
++#if defined(_MSC_VER) && !defined(__clang__)
++#include "../../SStream.h"
++/* The fixed tokens in this bounded printer include their terminating NUL.
++ * The register-extension name uses the ordinary dynamic writer. */
++#define SStream_concat0(ss, literal) \
++	SStream_concat0_n((ss), "" literal, sizeof("" literal) - 1)
++#endif
+ #include "X86IntelInstPrinter.c"
+ #endif
