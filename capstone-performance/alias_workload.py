@@ -23,10 +23,10 @@ def sample(binary, case, mode, repeats):
 
 def main(root):
     run.WORK = root
-    revision = "7df25602218df78564679139cca7813b65ecf0a5"
+    revision = "f2f50b8fab856b374daf0e76dc3054f25de65ac9"
     source = run.fetch("capstone", "https://github.com/NeverSight/capstone.git", revision)
     cases = corpus.prepare(SOURCE, root, run.EVIDENCE, run.command)
-    arch_for = {"arm64":"AARCH64","ppc64el":"PPC","mips64el":"MIPS","sparc64":"SPARC"}
+    arch_for = {"arm":"ARM","thumb":"ARM"}
     plan = os.environ["ARCH_PLAN"].split(",")
     cases = [c for c in cases if arch_for.get(c["name"].split("-")[0]) in plan]
     assert {arch_for[c["name"].split("-")[0]] for c in cases} == set(plan)
