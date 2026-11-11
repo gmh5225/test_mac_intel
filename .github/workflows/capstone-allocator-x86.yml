@@ -1,0 +1,35 @@
+name: Exercise x86 encoding assertions with caller-provided allocation
+on:
+  push:
+    branches: [codex/capstone-allocator-x86-check]
+    paths: [capstone-performance/**, .github/workflows/capstone-allocator-x86.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: ubuntu-24.04, config: full }
+          - { host: ubuntu-24.04, config: reduced }
+          - { host: ubuntu-24.04, config: diet }
+          - { host: windows-2022, config: full }
+          - { host: macos-15-intel, config: full }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Reproduce the failed assertion executable and test the repair
+        run: python3 capstone-performance/allocator.py ${{ matrix.config }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: allocator-x86-${{ matrix.host }}-${{ matrix.config }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: warn
+          retention-days: 14
