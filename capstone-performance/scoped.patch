@@ -18019,7 +18019,7 @@ index c5f2c531..c619e116 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..12df64e6 100644
+index df60fd3f..bd0441e3 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10163,19 +10163,30 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -18122,7 +18122,7 @@ index df60fd3f..12df64e6 100644
  }
  
  static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
-@@ -10233,8 +10264,18 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
+@@ -10233,8 +10264,20 @@ static inline unsigned int find_insn_h(cs_struct *h, unsigned int id)
  	return find_insn(id);
  }
  
@@ -18134,15 +18134,17 @@ index df60fd3f..12df64e6 100644
 +#endif
 +
 +#if CS_NATIVE_MSVC_X64
++#define X86_DETAIL_ARRAY(i, row, field) ((row)->field)
 +#define X86_DETAIL_COUNTS(i, row) ((row)->counts)
-+#define X86_DETAIL_JUMPS(row) ((row)->jump)
++#define X86_DETAIL_JUMPS(i, row) ((row)->jump)
 +#else
-+#define X86_DETAIL_COUNTS(i, row) (x86_mapping_counts[i])
-+#define X86_DETAIL_JUMPS(row) ((row)->branch || (row)->indirect_branch)
++#define X86_DETAIL_ARRAY(i, row, field) insns[(i)].field
++#define X86_DETAIL_COUNTS(i, row) x86_mapping_counts[(i)]
++#define X86_DETAIL_JUMPS(i, row) (insns[(i)].branch || insns[(i)].indirect_branch)
  #endif
  
  // given internal insn id, return public instruction info
-@@ -10249,34 +10290,50 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10249,34 +10292,48 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  	if (X86_get_insn_id_no_detail(h, insn, id))
  		return;
  
@@ -18152,12 +18154,11 @@ index df60fd3f..12df64e6 100644
 +	i = id - X86_FIRST_DENSE_MAPPING;
 +#else
  	i = find_insn_h(h, id);
--	if (i != -1) {
 +#endif
 +#if CS_NATIVE_MSVC_X64
 +	if (i < ARR_SIZE(insns)) {
 +#else
-+	if (i != (unsigned)-1) {
+ 	if (i != -1) {
 +#endif
  		insn->id = insns[i].mapid;
  
@@ -18169,11 +18170,9 @@ index df60fd3f..12df64e6 100644
 +#if CS_NATIVE_MSVC_X64
 +			const x86_mapping_detail *mapping =
 +				&x86_mapping_details[insns[i].properties >> 1];
-+#else
-+			const insn_map_x86 *mapping = &insns[i];
 +#endif
-+			memcpy(insn->detail->regs_read, mapping->regs_use,
-+			       sizeof(mapping->regs_use));
++			memcpy(insn->detail->regs_read, X86_DETAIL_ARRAY(i, mapping, regs_use),
++			       sizeof(X86_DETAIL_ARRAY(i, mapping, regs_use)));
  			insn->detail->regs_read_count =
 -				(x86_mapping_counts[i] & 31);
 +				(X86_DETAIL_COUNTS(i, mapping) & 31);
@@ -18184,8 +18183,8 @@ index df60fd3f..12df64e6 100644
  				memcpy(insn->detail->regs_write,
 -				       insns[i].regs_mod,
 -				       sizeof(insns[i].regs_mod));
-+				       mapping->regs_mod,
-+				       sizeof(mapping->regs_mod));
++				       X86_DETAIL_ARRAY(i, mapping, regs_mod),
++				       sizeof(X86_DETAIL_ARRAY(i, mapping, regs_mod)));
  				insn->detail->regs_write_count =
 -					((x86_mapping_counts[i] >> 5) & 31);
 +					((X86_DETAIL_COUNTS(i, mapping) >> 5) & 31);
@@ -18195,8 +18194,8 @@ index df60fd3f..12df64e6 100644
  					memcpy(insn->detail->regs_write,
 -					       insns[i].regs_mod,
 -					       sizeof(insns[i].regs_mod));
-+					       mapping->regs_mod,
-+					       sizeof(mapping->regs_mod));
++					       X86_DETAIL_ARRAY(i, mapping, regs_mod),
++					       sizeof(X86_DETAIL_ARRAY(i, mapping, regs_mod)));
  					insn->detail->regs_write_count =
 -						((x86_mapping_counts[i] >> 5) &
 +						((X86_DETAIL_COUNTS(i, mapping) >> 5) &
@@ -18209,8 +18208,8 @@ index df60fd3f..12df64e6 100644
  					memcpy(insn->detail->regs_write,
 -					       insns[i].regs_mod,
 -					       sizeof(insns[i].regs_mod));
-+					       mapping->regs_mod,
-+					       sizeof(mapping->regs_mod));
++					       X86_DETAIL_ARRAY(i, mapping, regs_mod),
++					       sizeof(X86_DETAIL_ARRAY(i, mapping, regs_mod)));
  					insn->detail->regs_write_count =
 -						((x86_mapping_counts[i] >> 5) &
 +						((X86_DETAIL_COUNTS(i, mapping) >> 5) &
@@ -18232,27 +18231,30 @@ index df60fd3f..12df64e6 100644
  implicit_registers_done:
 -			memcpy(insn->detail->groups, insns[i].groups,
 -			       sizeof(insns[i].groups));
-+			memcpy(insn->detail->groups, mapping->groups,
-+			       sizeof(mapping->groups));
++			memcpy(insn->detail->groups, X86_DETAIL_ARRAY(i, mapping, groups),
++			       sizeof(X86_DETAIL_ARRAY(i, mapping, groups)));
  			insn->detail->groups_count =
 -				((x86_mapping_counts[i] >> 10) & 15);
 +				((X86_DETAIL_COUNTS(i, mapping) >> 10) & 15);
  
 -			if (insns[i].branch || insns[i].indirect_branch) {
-+			if (X86_DETAIL_JUMPS(mapping)) {
++			if (X86_DETAIL_JUMPS(i, mapping)) {
  				// this insn also belongs to JUMP group. add JUMP group
  				insn->detail
  					->groups[insn->detail->groups_count] =
-@@ -10773,7 +10830,7 @@ implicit_registers_done:
+@@ -10773,7 +10830,11 @@ implicit_registers_done:
  				}
  			}
  
--			switch (insns[i].id) {
-+			switch (CS_NATIVE_MSVC_X64 ? id : mapping_opcode(i)) {
++#if CS_NATIVE_MSVC_X64
++			switch (id) {
++#else
+ 			switch (insns[i].id) {
++#endif
  			case X86_OUT8ir:
  			case X86_OUT16ir:
  			case X86_OUT32ir:
-@@ -11176,15 +11233,21 @@ void X86_build_lookup_tables(cs_struct *h)
+@@ -11176,15 +11237,21 @@ void X86_build_lookup_tables(cs_struct *h)
  	CS_ASSERT_RET(h && !h->x86_insn_lut);
  	CS_ASSERT_RET(max <= INT16_MAX && X86_INS_ENDING < UINT16_MAX);
  
