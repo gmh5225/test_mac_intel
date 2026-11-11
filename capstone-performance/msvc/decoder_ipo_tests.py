@@ -29,7 +29,11 @@ with TemporaryDirectory(dir=os.environ['RUNNER_TEMP'],ignore_cleanup_errors=True
                 return (b/'capstone.vcxproj').read_bytes()
             finally:
                 if active:run('git','apply','-R',active,where=src)
-        baseline=project(expected);candidate=project(scoped);assert baseline==candidate
+        baseline=project(expected);candidate=project(scoped)
+        if baseline!=candidate:
+            import difflib
+            print(''.join(difflib.unified_diff(baseline.decode('utf-8-sig').splitlines(True),candidate.decode('utf-8-sig').splitlines(True)))[:8000],flush=True)
+            raise ValueError('generated compiler configuration differs for '+crt)
         record[crt]={'vs_project_sha256':hashlib.sha256(candidate).hexdigest(),'matches':'fixed' if crt=='MT' else 'ipo'}
     (evidence/'projects.json').write_text(json.dumps(record,indent=2))
     run('git','apply',scoped,where=src)
