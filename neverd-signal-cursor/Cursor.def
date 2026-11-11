@@ -3,8 +3,22 @@
   "fixture": "unittests/lift/aarch64/AArch64AsyncUnwindFixtures.def",
   "report": "signal-cursor.json",
   "compiler": "/usr/bin/clang",
-  "flags": ["-target", "arm64e-apple-macosx15.0", "-O2", "-fno-omit-frame-pointer", "-fno-optimize-sibling-calls"],
+  "flags": [
+    "-target",
+    "arm64e-apple-macosx15.0",
+    "-O2",
+    "-fno-omit-frame-pointer",
+    "-fno-optimize-sibling-calls"
+  ],
   "unwind": "cursor.inc",
-  "stages": [1, 2, 3, 4, 5],
-  "native_timeout": 25
+  "stages": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "native_timeout": 25,
+  "outer": "outer.inc",
+  "chain": "chain.inc"
 }
