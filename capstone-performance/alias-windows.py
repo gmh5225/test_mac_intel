@@ -86,8 +86,18 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         build_targets('-timed','native_single','native_sstream')
         timed=build/'Release/native_single.exe'
         command([build/'Release/native_sstream.exe'],label+'-sstream')
-        compiled[label]=digest(timed.read_bytes())
-        programs[label]=timed
+        keep=WORK/(label+'.exe')
+        shutil.copy2(timed,keep)
+        compiled[label]=digest(keep.read_bytes())
+        programs[label]=keep
+        if label=='new':
+            # Restore only the public iterator entry from the exact published base.
+            shutil.copy2(base/'cs_disasm_internal.h',tree/'cs_disasm_internal.h')
+            build_targets('-original-iterator','native_single')
+            restored=WORK/'restored.exe'
+            shutil.copy2(timed,restored)
+            compiled['restored']=digest(restored.read_bytes());programs['restored']=restored
+    assert len(set(compiled.values()))==3
     write('binaries.json',compiled)
     selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm-ls','arm-cp','arm-sort','putty-32-0.85')}
     assert len(selected)==4
@@ -103,13 +113,19 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
             while (probe:=sample('base',n))['wall_ns'] < 10000000: n *= 4
             repeats=max(1,math.ceil(n*220000000/probe['wall_ns']))
             pairs=[]
+            labels=['base','new','restored']
             for cycle in range(15):
-                order=['base','new','new','base'] if cycle%2==(0 if sys.argv[2]=='first' else 1) else ['new','base','base','new']
-                rows=[(label,sample(label,repeats)) for label in order]
+                split=(cycle+(0 if sys.argv[2]=='first' else 1))%3
+                triplet=labels[split:]+labels[:split]
+                if cycle%2:triplet=list(reversed(triplet))
+                rows=[(label,sample(label,repeats)) for label in triplet+list(reversed(triplet))]
                 assert all(row['result']==rows[0][1]['result'] for _,row in rows)
-                a,b=([row['thread_cycles'] for label,row in rows if label==variant] for variant in ('base','new'))
-                pairs.append(dict(raw=rows,gain=statistics.mean(a)/statistics.mean(b),base_aa=a[0]/a[1],new_aa=b[0]/b[1]))
-            measurements.append(dict(case=case['name'],mode=mode,pairs=pairs,gain=statistics.median(p['gain'] for p in pairs)))
+                times={k:[row['thread_cycles'] for label,row in rows if label==k] for k in labels}
+                av={k:statistics.mean(v) for k,v in times.items()}
+                pairs.append(dict(raw=rows,new=av['base']/av['new'],restored=av['base']/av['restored'],
+                                  restored_over_new=av['new']/av['restored'],aa={k:v[0]/v[1] for k,v in times.items()}))
+            measurements.append(dict(case=case['name'],mode=mode,pairs=pairs,
+                    medians={k:statistics.median(x[k] for x in pairs) for k in ('new','restored','restored_over_new')}))
             write('measurement.json',measurements)
     write('complete.json',dict(complete=True))
 

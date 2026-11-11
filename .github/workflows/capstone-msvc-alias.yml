@@ -1,7 +1,7 @@
-name: Retest ARM32 output and PE32 controls on independent Windows runners
+name: Isolate the iterator entry using the same four-backend build and client
 on:
   push:
-    branches: [codex/capstone-native-arm32-controls]
+    branches: [codex/capstone-native-iterator-ablation]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -11,9 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         crt: [MD]
-        order: [first, second]
+        order: [first]
     runs-on: windows-2022
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-arm32-controls-${{ matrix.order }}
+          name: native-iterator-ablation-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14
