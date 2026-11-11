@@ -1,7 +1,7 @@
-name: NeverD x86 direct CALL discovery from current fork sources
+name: NeverD batched x86 CALL discovery from current fork sources
 on:
   push:
-    branches: [codex/capstone-call-discovery]
+    branches: [codex/capstone-batch-call-discovery]
     paths: [capstone-call-query/**, .github/workflows/capstone-call-query.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 8c71f206f3df87deaf8169e01f1b5c6020dfb815
+          ref: 8b46889707124368f56b535ece8d3067c6509cc4
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
