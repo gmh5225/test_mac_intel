@@ -1,0 +1,19 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 4e1ab1d5..6311dc1d 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3558,7 +3558,14 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 	return initial;
+ }
+ 
++/* Keep the second prefix walk and its mode-specific readers off the common
++ * iterator frame. Native MSVC otherwise expands both walks into the caller. */
++#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_X64) && \
++	!defined(_M_ARM64EC) && defined(_DLL)
++static __declspec(noinline) bool
++#else
+ X86_DECODE_INLINE bool
++#endif
+ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 				     size_t code_len, cs_insn *insn,
+ 				     X86ScanResult *result, bool readerFlags)

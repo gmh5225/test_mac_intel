@@ -31,11 +31,14 @@ opt-level=3
         rs[name]=dest/'release/iced_compare.lib'
     cpp={}
     opts=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL']
-    with (c/'CMakeLists.txt').open('a') as cm:
-        cm.write('\nif(TEST_SCAN_NOLTO)\n  set_source_files_properties(${TEST_SCAN_NOLTO} PROPERTIES COMPILE_OPTIONS /GL-)\nendif()\n')
-    variants=[('regular','OFF',''),('ipo','ON',''),('plain_decoder','ON','arch/X86/X86DisassemblerDecoder.c'),('plain_core','ON','cs.c'),('plain_backend','ON','arch/X86/X86Disassembler.c')]
+    patch=s/'scan-boundary.patch'
+    assert tool.digest(patch.read_bytes())==(s/'scan-boundary.sha256').read_text().strip()
+    variants=[('regular','OFF',''),('split','OFF',''),('ipo','ON',''),('split_ipo','ON','')]
     for name,on,ordinary in variants:
-        b=w/('regular-build' if on=='OFF' else 'mixed-build')
+        file='arch/X86/X86DisassemblerDecoder.c'
+        tool.run(['git','restore','--source=HEAD','--',file],name+'-restore',c)
+        if name.startswith('split'):tool.run(['git','apply',patch],name+'-apply',c)
+        b=w/(name+'-build')
         args=['-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+on,'-DCMAKE_C_FLAGS=/MP4','-DTEST_SCAN_NOLTO='+ordinary,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('X86','ARM','AARCH64','MIPS')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=OFF']
         tool.run(['cmake','-S',c,'-B',b,*opts,*args],'configure-'+name)
         tool.run(['cmake','--build',b,'--config','Release','--parallel','4','--target','capstone_static'],'build-'+name)
@@ -65,7 +68,7 @@ opt-level=3
         linker_map,=b.rglob(name+'.map')
         assembly[name]=inspect(exe,linker_map,tool.evidence);tool.write('linked-functions.json',assembly)
     results=[]
-    for case in [v for v in tool.get_cases() if v['name'] in ('putty-32-0.85','cmd-64','scalar32','simd64')]:
+    for case in [v for v in tool.get_cases() if v['name'] in ('putty-32-0.85','putty-64-0.85','kernel32-32','scalar32','simd64')]:
         for mode in ('scan','format','detail'):
             def sample(k,n):
                 label='iced' if k.startswith('iced') else 'capstone'

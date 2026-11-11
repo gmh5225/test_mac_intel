@@ -28,7 +28,7 @@ def inspect(executable, map_file, evidence):
                 if first and last>first:end_for[imagebase+first]=imagebase+last
     assert end_for
     starts = sorted(symbols)
-    selected = {'cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull'}
+    selected = {'cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull','getInstructionScanResultAfterInitial'}
     seen = set()
     result = {}
     objdump = shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
