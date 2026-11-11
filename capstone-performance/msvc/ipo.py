@@ -36,9 +36,12 @@ opt-level=3
         assert hashlib.sha256(path.read_bytes()).hexdigest()==tool.manifest['source_lineage'][name]['sha256']
         args=['git','-C',c,'apply']+(['-R'] if reverse else [])
         sp.run([*args,'--check',path],check=True);sp.run([*args,path],check=True)
-    variants=[('regular','OFF',''),('ipo','ON',''),('fixed','ON','arch/X86/X86DisassemblerDecoder.c'),('fixed_regular','OFF','arch/X86/X86DisassemblerDecoder.c')]
+    tool.write('processor.json',json.loads(sp.check_output(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'],text=True)))
+    variants=[('regular','ON',''),('mask','ON',''),('both','ON','arch/X86/X86DisassemblerDecoder.c'),('fixed','ON','arch/X86/X86DisassemblerDecoder.c')]
     for name,on,ordinary in variants:
-        if name=='fixed': apply('native-decoder-ipo.patch')
+        if name=='mask':apply('writemask.patch')
+        elif name=='both':apply('native-decoder-ipo.patch')
+        elif name=='fixed':apply('writemask.patch',reverse=True)
         b=w/('regular-build' if on=='OFF' else 'mixed-build')
         args=['-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+on,'-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('X86','ARM','AARCH64','MIPS')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if tool.crt=='MT' else 'OFF')]
         tool.run(['cmake','-S',c,'-B',b,*opts,*args],'configure-'+name)
@@ -88,7 +91,7 @@ opt-level=3
             while (probe:=sample('regular',n))['wall_ns']<10000000:n*=3
             n=max(1,math.ceil(n*100000000/probe['wall_ns']))
             cycles=[]
-            for i in range(6):
+            for i in range(10):
                 position=i%len(labels);order=labels[position:]+labels[:position]
                 if i%2:order.reverse()
                 raw=[(k,sample(k,n)) for k in order+order[::-1]]

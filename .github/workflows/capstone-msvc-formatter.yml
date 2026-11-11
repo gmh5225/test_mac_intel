@@ -1,8 +1,8 @@
-name: Qualify MSVC native x64 IPO and regular releases against iced
+name: Compare native dynamic CRT decoder isolation and operand metadata factorially
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-native-ipo-decoder-timing]
+    branches: [codex/capstone-dynamic-ltcg-descriptors]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -11,7 +11,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD, MT]
+        crt: [MD]
+        sample: [1, 2]
     runs-on: windows-2022
     timeout-minutes: 100
     steps:
@@ -25,6 +26,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-decoder-timing-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: dynamic-ltcg-${{ matrix.sample }}-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
