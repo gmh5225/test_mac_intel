@@ -2,7 +2,7 @@ name: Compiler-specific Capstone runtime object identity
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-static-runtime-identity]
+    branches: [codex/capstone-mixed-alias-identity]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -31,6 +31,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: static-runtime-identity-${{ matrix.host }}-${{ matrix.flavor }}-${{ github.run_attempt }}
+          name: mixed-alias-identity-${{ matrix.host }}-${{ matrix.flavor }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

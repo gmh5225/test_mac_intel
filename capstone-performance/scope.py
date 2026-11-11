@@ -12,7 +12,7 @@ def short_diff(f1,f2,tool):
         return out[2:]
     a,b=dump(f1),dump(f2);return '\n'.join(line for i,line in zip(range(500),difflib.unified_diff(a,b,n=2)))
 def main(tmp,flavor):
-    win=os.name=='nt';src=tmp/'capstone';build=tmp/'build';base='c3fd1f110810201fa4d82a2d057ed82f5b08d5b1'
+    win=os.name=='nt';src=tmp/'capstone';build=tmp/'build';base='5b9cbe48b46842e70a4ce8dcfafcb3f35c2f34cd'
     src.mkdir();run(['git','init','-q'],src);run(['git','config','core.autocrlf','false'],src);run(['git','remote','add','origin','https://github.com/NeverSight/capstone.git'],src);run(['git','fetch','-q','--depth=1','origin',base],src);run(['git','checkout','-q','--detach','FETCH_HEAD'],src)
     args=['cmake','-S',src,'-B',build,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     env=dict(os.environ);env.pop('CFLAGS',None)
@@ -23,7 +23,7 @@ def main(tmp,flavor):
         args+=['-G','Ninja','-DCAPSTONE_BUILD_MACOS_THIN=ON']
     hashes={};ref=tmp/'reference';ref.mkdir()
     for kind in ('reference','candidate'):
-        name=('reference.patch' if win and flavor=='MT' else None) if kind=='reference' else 'scoped.patch'
+        name=None if kind=='reference' else 'scoped.patch'
         if name:
             patch=d/name
             assert sha(patch.read_bytes())==(d/(name+'.sha256')).read_text().strip()
@@ -39,7 +39,7 @@ def main(tmp,flavor):
             run(['git','reset','--hard','-q',base],src);run(['git','clean','-fdq'],src);shutil.rmtree(build)
     write('objects',hashes);assert hashes['reference'].keys()==hashes['candidate'].keys()
     differing=[k for k,v in hashes['candidate'].items() if v!=hashes['reference'][k]]
-    write('comparison',dict(flavor=flavor,objects=len(objs),changed=differing,reference='R446' if win and flavor=='MT' else base,host=platform.platform()))
+    write('comparison',dict(flavor=flavor,objects=len(objs),changed=differing,reference=base,host=platform.platform()))
     tool=(shutil.which('llvm-objdump') or shutil.which('objdump') or (str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe') if win else None))
     for i,k in enumerate(differing[:12]):
         if tool:
