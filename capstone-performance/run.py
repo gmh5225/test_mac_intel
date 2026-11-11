@@ -116,7 +116,7 @@ def invoke(case, variant, repeats):
 
 
 def prepare():
-    if (platform.system(), platform.machine()) not in [('Linux','x86_64'),('Darwin','x86_64'),('Darwin','arm64')]:
+    if (platform.system(), platform.machine()) not in [('Linux','x86_64'),('Linux','aarch64'),('Darwin','x86_64'),('Darwin','arm64')]:
         raise RuntimeError('unsupported host for this release experiment')
     if WORK.exists() or EVIDENCE.exists():
         raise RuntimeError('existing work/evidence must be retained under a separate attempt')
@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='read generated writemask metadata at full instruction finalization'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='materialize complete unprefixed direct branches from terminal descriptors'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -236,7 +236,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    allowed = {prefix+'arch/X86/X86Disassembler.c.o'}
+    allowed = {prefix+'arch/X86/X86Disassembler.c.o',prefix+'arch/X86/X86DisassemblerDecoder.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
@@ -357,7 +357,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Generated x86 writemask metadata', '',
+    lines = ['# Full decoding of direct relative branches', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
