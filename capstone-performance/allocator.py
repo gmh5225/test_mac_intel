@@ -10,7 +10,8 @@ d=Path(__file__).resolve().parent
 e=d.parent/'capstone-evidence'
 e.mkdir(exist_ok=True)
 target=sys.argv[1]
-with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as tmp:
+workspace = tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP'])
+with workspace as tmp:
     root=Path(tmp)
     src=root/'source'
     build=root/'build'
@@ -44,5 +45,5 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as tmp:
         print((e/'after.log').read_text(),flush=True)
     finally:
         size=sum(f.stat().st_size for f in root.rglob('*') if f.is_file())
-        shutil.rmtree(root)
+        workspace.cleanup()
         (e/'cleanup.json').write_text(json.dumps(dict(bytes=size,removed=not root.exists()))+'\n')
