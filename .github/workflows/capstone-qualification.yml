@@ -1,7 +1,7 @@
 name: Compare exact native Windows public states on random and real instructions
 on:
   push:
-    branches: [codex/capstone-native-public-states]
+    branches: [codex/capstone-native-arm-public-states]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-qualification.yml
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        config: [full, diet, reduced]
+        config: [full, diet]
     runs-on: windows-2022
     timeout-minutes: 65
     steps:
@@ -21,11 +21,11 @@ jobs:
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
-      - name: Compare both DLLs on guarded tails, PE32 and PE64 text and arbitrary encodings
+      - name: Compare both DLLs on guarded tails, A32 and T32 coreutils text and arbitrary encodings
         run: python capstone-performance/public_windows.py ${{ matrix.config }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-native-${{ matrix.config }}
+          name: arm-public-${{ matrix.config }}
           path: capstone-evidence/
           retention-days: 14

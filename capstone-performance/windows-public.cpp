@@ -32,15 +32,12 @@ struct API {
 
 struct Config { cs_arch arch; cs_mode mode; int syntax; const char *name; const char *path; };
 const Config configs[] = {
-  {CS_ARCH_X86, CS_MODE_16, CS_OPT_SYNTAX_INTEL, "16-bit input INTEL", "putty-32-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_16, CS_OPT_SYNTAX_ATT, "16-bit input ATT", "putty-32-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_16, CS_OPT_SYNTAX_MASM, "16-bit input MASM", "putty-32-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_32, CS_OPT_SYNTAX_INTEL, "PE32 INTEL", "putty-32-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_32, CS_OPT_SYNTAX_ATT, "PE32 ATT", "putty-32-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_32, CS_OPT_SYNTAX_MASM, "PE32 MASM", "putty-32-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_64, CS_OPT_SYNTAX_INTEL, "PE64 INTEL", "putty-64-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_64, CS_OPT_SYNTAX_ATT, "PE64 ATT", "putty-64-0.85.text"},
-  {CS_ARCH_X86, CS_MODE_64, CS_OPT_SYNTAX_MASM, "PE64 MASM", "putty-64-0.85.text"},
+  {CS_ARCH_ARM, CS_MODE_ARM, CS_OPT_SYNTAX_DEFAULT, "armel-ls", "armel-ls.text"},
+  {CS_ARCH_ARM, CS_MODE_ARM, CS_OPT_SYNTAX_CS_REG_ALIAS, "armel-cp", "armel-cp.text"},
+  {CS_ARCH_ARM, CS_MODE_ARM, CS_OPT_SYNTAX_NOREGNAME, "armel-sort", "armel-sort.text"},
+  {CS_ARCH_ARM, CS_MODE_THUMB, CS_OPT_SYNTAX_DEFAULT, "armhf-ls", "armhf-ls.text"},
+  {CS_ARCH_ARM, CS_MODE_THUMB, CS_OPT_SYNTAX_CS_REG_ALIAS, "armhf-cp", "armhf-cp.text"},
+  {CS_ARCH_ARM, CS_MODE_THUMB, CS_OPT_SYNTAX_NOREGNAME, "armhf-sort", "armhf-sort.text"},
 };
 uint64_t rng = 0x91be8cd7c965a0f3ULL, compared = 0;
 uint64_t random_word() { rng ^= rng << 13; rng ^= rng >> 7; rng ^= rng << 17; return rng; }
@@ -76,8 +73,8 @@ int main(int argc, char **argv) {
             continue;
           }
         }
-        if (std::getenv("CUSTOM_NAMES") && config.arch == CS_ARCH_X86) {
-          const unsigned ids[] = {X86_INS_ADD, X86_INS_MOV, X86_INS_NOP, X86_INS_MOVSB, X86_INS_CALL};
+        if (std::getenv("CUSTOM_NAMES") && config.arch == CS_ARCH_ARM) {
+          const unsigned ids[] = {ARM_INS_ADD, ARM_INS_MOV, ARM_INS_NOP, ARM_INS_POP, ARM_INS_BL};
           for (unsigned id : ids) for (unsigned side=0; side<2; ++side) {
             cs_opt_mnem value = {id, "custom|mnemonic with spaces and a long truncating suffix"};
             if (api[side].option(handles[side], CS_OPT_MNEMONIC, (size_t)&value) != CS_ERR_OK) throw std::runtime_error("custom mnemonic option");

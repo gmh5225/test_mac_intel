@@ -12,16 +12,25 @@ def main():
     cand=WORK/'candidate';shutil.copytree(root,cand,ignore=shutil.ignore_patterns('.git'))
     command(['git','apply','--no-index',patch],'apply',cand)
     inputs=WORK/'corpus';inputs.mkdir()
-    for row in manifest['inputs']:
-        if row['name'] not in ('putty-32-0.85','putty-64-0.85'):continue
-        f=inputs/row['name']
-        command(['curl','-fLsS','--retry','2','--max-time','120',row['url'],'-o',f],'fetch-'+f.name)
-        binary=f.read_bytes();assert hashlib.sha256(binary).hexdigest()==row['package_sha256']
-        data=corpus.pe_text(binary);sha=hashlib.sha256(data).hexdigest()
-        assert 'text_sha256' not in row or sha==row['text_sha256']
-        (inputs/(f.name+'.text')).write_bytes(data)
-        write(f.name+'-input.json',dict(package=row['package_sha256'],text=sha,bytes=len(data)))
-    assert len(list(inputs.glob('*.text')))==2
+    import io, tarfile
+    for arch in ('armel','armhf'):
+        rows=[row for row in manifest['arm_fixtures'] if row['arch']==arch]
+        f=inputs/arch
+        command(['curl','-fLsS','--retry','3',rows[0]['url'],'-o',f],'fetch-'+arch)
+        data=f.read_bytes();assert hashlib.sha256(data).hexdigest()==rows[0]['package_sha256']
+        assert data[:8]==b'!<arch>\n';i=8
+        while i<len(data):
+            h=data[i:i+60];n=int(h[48:58]);i+=60
+            if h[:16].strip().startswith(b'data.tar'):break
+            i+=n+n%2
+        with tarfile.open(fileobj=io.BytesIO(data[i:i+n])) as archive:
+            for row in rows:
+                binary=archive.extractfile(row['member']).read()
+                text=corpus.elf_text(binary)
+                assert hashlib.sha256(text).hexdigest()==row['text_sha256']
+                assert int.from_bytes(binary[24:28],'little')==row['entry']
+                (inputs/(arch+'-'+row['cmd']+'.text')).write_bytes(text)
+    assert len(list(inputs.glob('*.text')))==6
     opts=['-G','Visual Studio 17 2022','-A','x64']
     dlls=[]
     for label,source in [('base',root),('candidate',cand)]:
@@ -41,11 +50,12 @@ def main():
     command(['cmake','--build',db,'--config','Release'],'driver-build')
     exe,=db.rglob('compare.exe')
     write('binaries.json',{f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in [exe,*dlls]})
-    for label in ('default','custom-mnemonics'):
+    for label in ('default','custom-mnemonics','real-alias-detail'):
         if label.startswith('custom'):os.environ['CUSTOM_NAMES']='1'
+        if label=='real-alias-detail':os.environ['DETAIL_FLAGS']='3'
         command([exe,*dlls,'65536',inputs],label)
         entries=[json.loads(line) for line in (EVIDENCE/(label+'.log')).read_text().splitlines() if line.startswith('{')]
-        assert entries and entries[-1]['compared_total']>2000000
+        assert entries and len(entries)==(6 if label=='real-alias-detail' else 24) and entries[-1]['compared_total']>390000
         write(label+'.json',dict(compared=entries[-1]['compared_total'],cases=len(entries)))
 if __name__=='__main__':
     try:main()
