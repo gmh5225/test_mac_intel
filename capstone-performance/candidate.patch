@@ -1,130 +1,53 @@
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 4e1ab1d5..2ef959cc 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1910,82 +1910,58 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
- 
- 	case 4:
- 	case 8: {
--		EABase eaBaseBase =
--			(insn->addressSize == 4 ? EA_BASE_EAX : EA_BASE_RAX);
-+		if (mod == 3) {
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = (EABase)(insn->eaRegBase + rm + evexrm);
-+			return 0;
-+		}
- 
--		switch (mod) {
--		default:
--			break;
--		case 0x0:
--			insn->eaDisplacement =
--				EA_DISP_NONE; /* readSIB may override this */
--			// In determining whether RIP-relative mode is used (rm=5),
--			// or whether a SIB byte is present (rm=4),
--			// the extension bits (REX.b and EVEX.x) are ignored.
--			switch (rm & 7) {
--			case 0x4: // SIB byte is present
--				if (materialize) {
--					insn->eaBase = (insn->addressSize == 4 ?
--								EA_BASE_sib :
--								EA_BASE_sib64);
--				}
--				if (readSIB(insn, materialize) ||
--				    readDisplacement(insn, materialize))
--					return -1;
--				break;
--			case 0x5: // RIP-relative
--				if (materialize) {
--					insn->eaBase = EA_BASE_NONE;
--				}
--				insn->eaDisplacement = EA_DISP_32;
--				if (readDisplacement(insn, materialize))
--					return -1;
--				break;
--			default:
--				if (materialize) {
--					insn->eaBase =
--						(EABase)(eaBaseBase + rm);
--				}
--				break;
--			}
-+		const EABase base = insn->addressSize == 4 ? EA_BASE_EAX : EA_BASE_RAX;
-+		/* Only mod and the low three r/m bits select a memory form.
-+		 * Extended register bits participate in its base register. */
-+		switch ((mod << 3) | (rm & 7)) {
-+		case 0x00: case 0x01: case 0x02: case 0x03: case 0x06: case 0x07:
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = (EABase)(base + rm);
-+			return 0;
-+		case 0x04:
-+			insn->eaDisplacement = EA_DISP_NONE;
-+			if (materialize)
-+				insn->eaBase = insn->addressSize == 4 ?
-+						       EA_BASE_sib : EA_BASE_sib64;
- 			break;
--		case 0x1:
-+		case 0x05:
-+			insn->eaDisplacement = EA_DISP_32;
-+			if (materialize)
-+				insn->eaBase = EA_BASE_NONE;
-+			return readDisplacement(insn, materialize);
-+		case 0x0c:
-+			insn->eaDisplacement = EA_DISP_8;
- 			if (materialize) {
-+				insn->eaBase = EA_BASE_sib;
- 				insn->displacementSize = 1;
- 			}
--			/* FALLTHROUGH */
--		case 0x2:
--			insn->eaDisplacement =
--				(mod == 0x1 ? EA_DISP_8 : EA_DISP_32);
--			switch (rm & 7) {
--			case 0x4: // SIB byte is present
--				if (materialize) {
--					insn->eaBase = EA_BASE_sib;
--				}
--				if (readSIB(insn, materialize) ||
--				    readDisplacement(insn, materialize))
--					return -1;
--				break;
--			default:
--				if (materialize) {
--					insn->eaBase =
--						(EABase)(eaBaseBase + rm);
--				}
--				if (readDisplacement(insn, materialize))
--					return -1;
--				break;
--			}
- 			break;
--		case 0x3:
--			insn->eaDisplacement = EA_DISP_NONE;
-+		case 0x14:
-+			insn->eaDisplacement = EA_DISP_32;
-+			if (materialize)
-+				insn->eaBase = EA_BASE_sib;
-+			break;
-+		default:
-+			/* The remaining forms have a base and an 8- or 32-bit displacement. */
-+			insn->eaDisplacement = mod == 1 ? EA_DISP_8 : EA_DISP_32;
- 			if (materialize) {
--				insn->eaBase =
--					(EABase)(insn->eaRegBase + rm + evexrm);
-+				insn->eaBase = (EABase)(base + rm);
-+				if (mod == 1)
-+					insn->displacementSize = 1;
- 			}
--			break;
-+			return readDisplacement(insn, materialize);
- 		}
--
--		break;
-+		if (readSIB(insn, materialize))
-+			return -1;
-+		return readDisplacement(insn, materialize);
- 	}
- 	} /* switch (insn->addressSize) */
- 
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5627f249..7080e0d8 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -7125,8 +7125,12 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 	if (scan)
+ 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+-	if (mcInst)
+-		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
++	if (mcInst) {
++		unsigned int handler = terminal >> X86_TERMINAL_HANDLER_SHIFT;
++		if (handler == 11)
++			return decodeLegacyFullShape11(insn, mcInst, size);
++		return x86LegacyFullHandlers[handler](insn, mcInst, size);
++	}
+ 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
+ }
+ #else
+@@ -14456,8 +14460,12 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 	if (scan)
+ 		return scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 	insn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];
+-	if (mcInst)
+-		return x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);
++	if (mcInst) {
++		unsigned int handler = terminal >> X86_TERMINAL_HANDLER_SHIFT;
++		if (handler == 11)
++			return decodeLegacyFullShape11(insn, mcInst, size);
++		return x86LegacyFullHandlers[handler](insn, mcInst, size);
++	}
+ 	return x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);
+ }
+ #endif
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index dbb25f26..fddc508c 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -973,8 +973,12 @@ def emit_terminal(suffix):
+         "\tif (scan)",
+         "\t\treturn scanLegacyOperands(insn, mcInst, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+         "\tinsn->operands = x86OperandSets[(terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK];",
+-        "\tif (mcInst)",
+-        "\t\treturn x86LegacyFullHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn, mcInst, size);",
++        "\tif (mcInst) {",
++        "\t\tunsigned int handler = terminal >> X86_TERMINAL_HANDLER_SHIFT;",
++        f"\t\tif (handler == {groups[((), ())]})",
++        f"\t\t\treturn decodeLegacyFullShape{groups[((), ())]}(insn, mcInst, size);",
++        "\t\treturn x86LegacyFullHandlers[handler](insn, mcInst, size);",
++        "\t}",
+         "\treturn x86LegacyHandlers[terminal >> X86_TERMINAL_HANDLER_SHIFT](insn);",
+         "}",
+     ]
