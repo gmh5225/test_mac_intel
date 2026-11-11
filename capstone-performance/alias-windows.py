@@ -61,6 +61,8 @@ def main():
     new = WORK/'new'
     command(['git','worktree','add','--detach',new,'HEAD'],'worktree',base)
     command(['git','apply',SOURCE/'msvc-alias.patch'],'apply',new)
+    common=SOURCE/'reference-escaped.patch';assert digest(common.read_bytes())=='953456d5b15eedb7d81528004ad6430aae6a91211eb40b77be58de771d34ce47'
+    command(['git','apply',common],'common-legacy-opcode-detail',base)
     write('inputs.json',dict(ref=manifest['capstone_revision'],crt=crt,patch=digest((SOURCE/'msvc-alias.patch').read_bytes()),image=os.environ['ImageVersion']))
     programs = {}; compiled = {}
     for label,tree in [('base',base),('new',new)]:
