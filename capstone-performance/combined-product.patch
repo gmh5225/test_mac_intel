@@ -1,12 +1,12 @@
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..52b0b591 100644
+index 8c3dea2e..b8bb724d 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
 @@ -635,7 +635,16 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
  	int ret;
  	bool result;
  
-+#if defined(_MSC_VER) && !defined(__clang__)
++#ifdef X86_NATIVE_SCAN_EXTENT
 +	/* The decoder assigns the header and ID before reading them. Prefix
 +	 * defaults and optional operand state must still start at zero. */
 +	InternalInstruction insn;
@@ -28,7 +28,7 @@ index 8c3dea2e..52b0b591 100644
 -				    ENCODING_WRITEMASK) {
 -					Flags |= X86_IP_HAS_EVEX_OPMASK;
 -					break;
-+#if defined(_MSC_VER) && !defined(__clang__)
++#ifdef X86_NATIVE_SCAN_EXTENT
 +			/* Only EVEX descriptors can contain a writemask. */
 +			if (insn.vectorExtensionType == TYPE_EVEX)
 +#endif
@@ -43,44 +43,10 @@ index 8c3dea2e..52b0b591 100644
  			}
  
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 952b6025..3c78ef02 100644
+index 4e1ab1d5..4a73c829 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -949,12 +949,14 @@ legacyOpcode:
- 
- 		if (current == 0x38) {
- 			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
-+			insn->threeByteEscape = current;
- 			if (consumeByte(insn, &current))
- 				return -1;
- 
- 			insn->opcodeType = THREEBYTE_38;
- 		} else if (current == 0x3a) {
- 			// dbgprintf(insn, "Found a three-byte escape prefix (0x%hhx)", current);
-+			insn->threeByteEscape = current;
- 			if (consumeByte(insn, &current))
- 				return -1;
- 
-@@ -962,6 +964,7 @@ legacyOpcode:
- 		} else if (current == 0x0f) {
- 			// dbgprintf(insn, "Found a 3dnow escape prefix (0x%hhx)", current);
- 			// Consume operands before the opcode to comply with the 3DNow encoding
-+			insn->threeByteEscape = current;
- 			if (readModRM(insn))
- 				return -1;
- 
-@@ -2939,6 +2942,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
- 	return 0;
- }
- 
-+/* Native MSVC otherwise materializes the raw scan state at this entry. */
-+#if defined(_MSC_VER) && !defined(__clang__)
-+#define X86_NATIVE_SCAN_EXTENT
-+#endif
- #include "X86GenLegacyTerminal.inc"
- #include "X86GenVexScan.inc"
- 
-@@ -3078,6 +3085,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+@@ -3081,6 +3081,62 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
  
  enum { X86_SCAN_NOT_HANDLED = 3 };
  
@@ -143,7 +109,7 @@ index 952b6025..3c78ef02 100644
  /* Only the compact readers see this state. Generic/raw decoding starts its
   * own state if the generated table has no terminal for this header. */
  X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
-@@ -3089,7 +3152,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3092,7 +3148,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  {
  	if (opcodeOffset >= 2)
  		return X86_SCAN_NOT_HANDLED;
@@ -159,7 +125,7 @@ index 952b6025..3c78ef02 100644
  	initializeInstructionHeader(&insn, code, codeSize, mode);
  	const uint8_t prefixMask =
  		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
-@@ -3097,6 +3168,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3100,6 +3164,33 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  	if ((feature_prefix_flags[opcode] & prefixMask) ||
  	    (opcodeOffset && !isREX(&insn, code[0])))
  		return X86_SCAN_NOT_HANDLED;
@@ -193,6 +159,23 @@ index 952b6025..3c78ef02 100644
  	readSimpleLegacyPrefix(&insn, opcodeOffset);
  	int opcodeResult = readOpcode(&insn, true, true);
  	if (opcodeResult)
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..e8700009 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -20,6 +20,12 @@
+ #define CS_X86_DISASSEMBLERDECODER_H
+ 
+ #if defined(CAPSTONE_HAS_OSXKERNEL)
++/* Native MSVC with the DLL runtime benefits from reading public lengths
++ * directly and initializing only the live parts of the full decoder. */
++#if defined(_MSC_VER) && !defined(__clang__) && defined(_DLL)
++#define X86_NATIVE_SCAN_EXTENT
++#endif
++
+ #include <libkern/libkern.h>
+ #else
+ #include <stdio.h>
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
 index 5627f249..531b8dbb 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc
@@ -275,24 +258,6 @@ index 5627f249..531b8dbb 100644
  X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
  				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
  {
-diff --git a/docs/cs_v6_release_guide.md b/docs/cs_v6_release_guide.md
-index b8a9c5f2..4d93ac23 100644
---- a/docs/cs_v6_release_guide.md
-+++ b/docs/cs_v6_release_guide.md
-@@ -795,6 +795,13 @@ Please note though, `writeback` registers are correctly added to the `regs_write
- 
- These issues will be addressed in the next releases. For a more detailed descriptions see: https://github.com/capstone-engine/capstone/issues/2472#issuecomment-2335226281 (starting at "eor and the others").
- 
-+## x86 legacy opcode bytes
-+
-+For the legacy three-byte maps, `cs_x86.opcode` contains the complete
-+`0F 38 xx` or `0F 3A xx` opcode. For 3DNow!, the array holds `0F 0F xx`,
-+where `xx` is the selector following the ModR/M and any address bytes.
-+For example, `66 0F 3A 0F C1 07` reports `{ 0x0f, 0x3a, 0x0f, 0 }`.
-+
- ## x86 legacy x87 environment details
- 
- `FLDENV` and `FNSTENV` report a 14- or 28-byte memory operand according to
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
 index dbb25f26..d5fbc1c2 100644
 --- a/suite/synctools/x86_operand_specializations.py
@@ -404,53 +369,3 @@ index dbb25f26..d5fbc1c2 100644
          "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
          "\tif (publicID) {",
          "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",
-diff --git a/tests/unit/x86_encoding_accuracy.c b/tests/unit/x86_encoding_accuracy.c
-index 6d4e493b..4698f691 100644
---- a/tests/unit/x86_encoding_accuracy.c
-+++ b/tests/unit/x86_encoding_accuracy.c
-@@ -103,6 +103,36 @@ static bool check_inherited_three_operand_size(void)
- 	return true;
- }
- 
-+static bool check_legacy_opcode_bytes(csh handle)
-+{
-+	static const struct {
-+		uint8_t bytes[6], length, opcode[4];
-+	} cases[] = {
-+		{ { 0x0f, 0x38, 0xf0, 0x08 }, 4, { 0x0f, 0x38, 0xf0 } },
-+#ifndef CAPSTONE_X86_REDUCE
-+		{ { 0x66, 0x0f, 0x38, 0x00, 0xc1 }, 5, { 0x0f, 0x38, 0x00 } },
-+		{ { 0x66, 0x0f, 0x3a, 0x0f, 0xc1, 7 }, 6, { 0x0f, 0x3a, 0x0f } },
-+		/* 3DNow! selects its operation with a byte after ModR/M. */
-+		{ { 0x0f, 0x0f, 0xc1, 0xbf }, 4, { 0x0f, 0x0f, 0xbf } },
-+#endif
-+	};
-+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
-+		cs_insn *insn = NULL;
-+		size_t count = cs_disasm(handle, cases[i].bytes, cases[i].length,
-+					 0, 1, &insn);
-+		bool ok = count == 1 && insn->size == cases[i].length &&
-+			  insn->detail &&
-+			  !memcmp(insn->detail->x86.opcode, cases[i].opcode,
-+				  sizeof(cases[i].opcode));
-+		cs_free(insn, count);
-+		if (!ok) {
-+			fprintf(stderr, "legacy opcode bytes case %zu\n", i);
-+			return false;
-+		}
-+	}
-+	return true;
-+}
-+
- static bool check_internal_scan_mode(void)
- {
- 	const uint8_t bytes[] = { 0x66, 0xb8, 0x34, 0x12, 0x90, 0x90 };
-@@ -1397,6 +1427,8 @@ int main(void)
- 							detail) == CS_ERR_OK;
- 					ok &= cs_option(handle, CS_OPT_TEXT,
- 							text) == CS_ERR_OK;
-+					if (detail)
-+						ok &= check_legacy_opcode_bytes(handle);
- 					ok &= check_public_id_cache(handle,
- 								    modes[m]);
- 					ok &= check_reader_bounds(
