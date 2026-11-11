@@ -45,7 +45,7 @@ def tests(source, label, preset, selection=None):
     args=['ctest','--test-dir',d,'-C','Release','--parallel','2','--output-on-failure','--no-tests=error',
           '--output-junit',str(EVIDENCE/(label+'-ctest.xml'))]
     if subset and not selection:
-        args += ['-R', '^unit_('+'|'.join(units+([] if preset=='user-alloc' else ['ppc_alias_hints_generator','ppc_alias_hints_parser']))+')$']
+        args += ['-R', '^unit_('+'|'.join(units+([] if preset=='user-alloc' else ['ppc_alias_hints_generator','ppc_alias_hints_parser','dense_mapping_ids_generator']))+')$']
     if selection:
         names=EVIDENCE/'failed-names.txt';names.write_text('\n'.join(selection)+'\n')
         args+=['--tests-from-file',str(names)]
