@@ -85,7 +85,7 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         build_targets('-timed','native_single','native_sstream')
         objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
         compiled[label]={}
-        for stem in ('cs','SStream','Mapping','AArch64Mapping','ARMMapping','MipsMapping','SparcMapping'):
+        for stem in ('cs','SStream','Mapping','AArch64Mapping','ARMMapping','MipsMapping','SparcMapping','PPCMapping','RISCVMapping','LoongArchMapping','SystemZMapping'):
             obj,=(build/'capstone.dir'/'Release').rglob(stem+'.obj')
             listing=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
             contents='\n'.join(line for line in listing.splitlines() if 'file format' not in line and line.strip()).encode()
