@@ -4018,10 +4018,18 @@ index 53f84ba9..3fe14bd8 100644
      list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
  endif()
 diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
-index 6b15c4fe..16018279 100644
+index 6b15c4fe..08026a12 100644
 --- a/tests/unit/mapping.c
 +++ b/tests/unit/mapping.c
-@@ -188,11 +188,43 @@ static bool test_alias_lookup(void)
+@@ -1,6 +1,7 @@
+ // SPDX-License-Identifier: BSD-3-Clause
+ 
+ #include "../../Mapping.h"
++#include "../../utils.h"
+ #include <limits.h>
+ #include <stdio.h>
+ 
+@@ -188,11 +189,43 @@ static bool test_alias_lookup(void)
  	return true;
  }
  
