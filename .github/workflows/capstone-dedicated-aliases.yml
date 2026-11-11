@@ -1,7 +1,7 @@
 name: Compare generated register formatting on nine ARM, Thumb and AArch64 programs
 on:
   push:
-    branches: [codex/capstone-generated-register-markup]
+    branches: [codex/capstone-inline-register-markup]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -13,6 +13,7 @@ jobs:
       matrix:
         include:
           - {host: ubuntu-24.04, plan: "AARCH64,ARM"}
+          - {host: ubuntu-24.04-arm, plan: "AARCH64,ARM"}
           - {host: macos-15, plan: "AARCH64,ARM"}
           - {host: macos-15-intel, plan: "AARCH64,ARM"}
     env:
@@ -29,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: register-markup-${{ matrix.host }}-${{ github.run_attempt }}
+          name: inline-register-markup-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14

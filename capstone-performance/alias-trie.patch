@@ -1,12 +1,20 @@
-diff --git a/MCInstPrinter.c b/MCInstPrinter.c
-index 97d26582..72b1d7a2 100644
---- a/MCInstPrinter.c
-+++ b/MCInstPrinter.c
-@@ -220,6 +220,23 @@ const char *markup(const char *s)
- 		return no_markup;
- }
+diff --git a/MCInstPrinter.h b/MCInstPrinter.h
+index 3813729e..757819f6 100644
+--- a/MCInstPrinter.h
++++ b/MCInstPrinter.h
+@@ -5,6 +5,7 @@
+ #define CS_MCINSTPRINTER_H
  
-+void printMarkedRegName(SStream *OS, const char *name)
+ #include "MCInst.h"
++#include "cs_priv.h"
+ #include <assert.h>
+ #include <capstone/platform.h>
+ 
+@@ -67,6 +68,23 @@ const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M);
+ bool getUseMarkup(void);
+ const char *markup(const char *s);
+ 
++static inline void printMarkedRegName(SStream *OS, const char *name)
 +{
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
@@ -23,29 +31,9 @@ index 97d26582..72b1d7a2 100644
 +	SStream_concat0(OS, markup(">"));
 +}
 +
- // binary search for encoding in IndexType array
- // return -1 if not found, or index if found
- unsigned int binsearch_IndexTypeEncoding(const struct IndexType *index,
-diff --git a/MCInstPrinter.h b/MCInstPrinter.h
-index 3813729e..040aa0e6 100644
---- a/MCInstPrinter.h
-+++ b/MCInstPrinter.h
-@@ -5,6 +5,7 @@
- #define CS_MCINSTPRINTER_H
- 
- #include "MCInst.h"
-+#include "SStream.h"
- #include <assert.h>
- #include <capstone/platform.h>
- 
-@@ -66,6 +67,7 @@ typedef struct {
- const char *matchAliasPatterns(MCInst *MI, const AliasMatchingData *M);
- bool getUseMarkup(void);
- const char *markup(const char *s);
-+void printMarkedRegName(SStream *OS, const char *name);
- 
  struct IndexType {
  	uint16_t encoding;
+ 	unsigned index;
 diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
 index bffb617f..48f61bd0 100644
 --- a/arch/AArch64/AArch64InstPrinter.c
