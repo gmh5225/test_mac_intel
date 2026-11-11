@@ -601,6 +601,75 @@ index abe9be7a..5364bdea 100644
  	Sparc_correct_details(MI);
  #endif
  }
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..05b9ed50 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -1041,8 +1041,6 @@ static void printRegName(SStream *OS, unsigned RegNo)
+ 
+ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ {
+-	x86_reg reg, reg2;
+-	enum cs_ac_type access1, access2;
+ 	int i;
+ 
+ 	if (X86_printFeatureExtension(MI, OS, true))
+@@ -1203,54 +1201,7 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 			MI->flat_insn->detail->x86.op_count++;
+ 		}
+ 
+-		// special instruction needs to supply register op
+-		// first op can be embedded in the asm by llvm.
+-		// so we have to add the missing register as the first operand
+-
+-		//printf(">>> opcode = %u\n", MCInst_getOpcode(MI));
+-
+-		reg = X86_insn_reg_att_h(MI->csh, MCInst_getOpcode(MI),
+-					 &access1);
+-		if (reg) {
+-			// shift all the ops right to leave 1st slot for this new register op
+-			memmove(&(MI->flat_insn->detail->x86.operands[1]),
+-				&(MI->flat_insn->detail->x86.operands[0]),
+-				sizeof(MI->flat_insn->detail->x86.operands[0]) *
+-					(ARR_SIZE(MI->flat_insn->detail->x86
+-							  .operands) -
+-					 1));
+-			memset(&(MI->flat_insn->detail->x86.operands[0]), 0,
+-			       sizeof(MI->flat_insn->detail->x86.operands[0]));
+-			MI->flat_insn->detail->x86.operands[0].type =
+-				X86_OP_REG;
+-			MI->flat_insn->detail->x86.operands[0].reg = reg;
+-			MI->flat_insn->detail->x86.operands[0].size =
+-				MI->csh->regsize_map[reg];
+-			MI->flat_insn->detail->x86.operands[0].access = access1;
+-
+-			MI->flat_insn->detail->x86.op_count++;
+-		} else {
+-			if (X86_insn_reg_att2(MCInst_getOpcode(MI), &reg,
+-					      &access1, &reg2, &access2)) {
+-				MI->flat_insn->detail->x86.operands[0].type =
+-					X86_OP_REG;
+-				MI->flat_insn->detail->x86.operands[0].reg =
+-					reg;
+-				MI->flat_insn->detail->x86.operands[0].size =
+-					MI->csh->regsize_map[reg];
+-				MI->flat_insn->detail->x86.operands[0].access =
+-					access1;
+-				MI->flat_insn->detail->x86.operands[1].type =
+-					X86_OP_REG;
+-				MI->flat_insn->detail->x86.operands[1].reg =
+-					reg2;
+-				MI->flat_insn->detail->x86.operands[1].size =
+-					MI->csh->regsize_map[reg2];
+-				MI->flat_insn->detail->x86.operands[1].access =
+-					access2;
+-				MI->flat_insn->detail->x86.op_count = 2;
+-			}
+-		}
++		X86_add_implicit_registers(MI, true);
+ 
+ #ifndef CAPSTONE_DIET
+ 		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
 index 8c3dea2e..52b0b591 100644
 --- a/arch/X86/X86Disassembler.c
@@ -34688,8 +34757,82 @@ index c5f2c531..4c2d9d01 100644
 +	{ X86_INS_MOVSXD, 133 },
 +#endif
  #endif
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..6cd9cab9 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -820,8 +820,6 @@ void X86_Intel_printInstructionGeneral(MCInst *MI, SStream *O)
+ 
+ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ {
+-	x86_reg reg = X86_REG_INVALID, reg2;
+-	enum cs_ac_type access1, access2;
+ 
+ 	if (X86_printFeatureExtension(MI, O, false))
+ 		return;
+@@ -861,49 +859,7 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ 		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE] = { 0 };
+ #endif
+ 
+-		// first op can be embedded in the asm by llvm.
+-		// so we have to add the missing register as the first operand
+-		reg = X86_insn_reg_intel_h(MI->csh, MCInst_getOpcode(MI),
+-					   &access1);
+-		if (reg) {
+-			// shift all the ops right to leave 1st slot for this new register op
+-			memmove(&(MI->flat_insn->detail->x86.operands[1]),
+-				&(MI->flat_insn->detail->x86.operands[0]),
+-				sizeof(MI->flat_insn->detail->x86.operands[0]) *
+-					(ARR_SIZE(MI->flat_insn->detail->x86
+-							  .operands) -
+-					 1));
+-			memset(&(MI->flat_insn->detail->x86.operands[0]), 0,
+-			       sizeof(MI->flat_insn->detail->x86.operands[0]));
+-			MI->flat_insn->detail->x86.operands[0].type =
+-				X86_OP_REG;
+-			MI->flat_insn->detail->x86.operands[0].reg = reg;
+-			MI->flat_insn->detail->x86.operands[0].size =
+-				MI->csh->regsize_map[reg];
+-			MI->flat_insn->detail->x86.operands[0].access = access1;
+-			MI->flat_insn->detail->x86.op_count++;
+-		} else {
+-			if (X86_insn_reg_intel2(MCInst_getOpcode(MI), &reg,
+-						&access1, &reg2, &access2)) {
+-				MI->flat_insn->detail->x86.operands[0].type =
+-					X86_OP_REG;
+-				MI->flat_insn->detail->x86.operands[0].reg =
+-					reg;
+-				MI->flat_insn->detail->x86.operands[0].size =
+-					MI->csh->regsize_map[reg];
+-				MI->flat_insn->detail->x86.operands[0].access =
+-					access1;
+-				MI->flat_insn->detail->x86.operands[1].type =
+-					X86_OP_REG;
+-				MI->flat_insn->detail->x86.operands[1].reg =
+-					reg2;
+-				MI->flat_insn->detail->x86.operands[1].size =
+-					MI->csh->regsize_map[reg2];
+-				MI->flat_insn->detail->x86.operands[1].access =
+-					access2;
+-				MI->flat_insn->detail->x86.op_count = 2;
+-			}
+-		}
++		X86_add_implicit_registers(MI, false);
+ 
+ #ifndef CAPSTONE_DIET
+ 		// Assign access once the implicit operands have their final positions.
+@@ -917,9 +873,6 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ 		}
+ #endif
+ 	}
+-
+-	if (MI->op1_size == 0 && reg)
+-		MI->op1_size = MI->csh->regsize_map[reg];
+ }
+ 
+ #endif // CAPSTONE_SSTREAM_PRECHECKED
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..c509b6aa 100644
+index df60fd3f..9ff678b7 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10163,19 +10163,30 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -34901,7 +35044,18 @@ index df60fd3f..c509b6aa 100644
  			case X86_OUT8ir:
  			case X86_OUT16ir:
  			case X86_OUT32ir:
-@@ -11176,15 +11207,21 @@ void X86_build_lookup_tables(cs_struct *h)
+@@ -10810,6 +10841,10 @@ struct insn_reg2 {
+ 	enum cs_ac_type access1, access2;
+ };
+ 
++/* Each syntax uses one 16-bit cache entry. Single registers use a 12-bit
++ * register and two access bits. A tagged entry indexes the shared pair table. */
++#define X86_REGISTER_PAIR 0x8000U
++
+ static inline uint16_t pack_insn_reg(x86_reg reg, enum cs_ac_type access)
+ {
+ 	return (uint16_t)(((unsigned int)access << 12) |
+@@ -11176,15 +11211,21 @@ void X86_build_lookup_tables(cs_struct *h)
  	CS_ASSERT_RET(h && !h->x86_insn_lut);
  	CS_ASSERT_RET(max <= INT16_MAX && X86_INS_ENDING < UINT16_MAX);
  
@@ -34925,8 +35079,109 @@ index df60fd3f..c509b6aa 100644
  			((uint32_t)insns[i].mapid << 16) | i;
  
  	h->x86_insn_reg_lut =
+@@ -11232,6 +11273,19 @@ void X86_build_lookup_tables(cs_struct *h)
+ 					 insn_regs_att_extra[i].access)
+ 				 << 16);
+ 	}
++	for (i = 0; i < ARR_SIZE(insn_regs_intel2); ++i) {
++		const unsigned id = insn_regs_intel2[i].insn;
++		if (id <= id_max) {
++			uint32_t entry = h->x86_insn_reg_lut[id];
++			const uint32_t pair = X86_REGISTER_PAIR | i;
++			/* A single embedded register takes precedence in its syntax. */
++			if (!(entry & 0xffff))
++				entry |= pair;
++			if (!(entry >> 16))
++				entry |= pair << 16;
++			h->x86_insn_reg_lut[id] = entry;
++		}
++	}
+ }
+ 
+ // return register of given instruction id
+@@ -11267,7 +11321,7 @@ x86_reg X86_insn_reg_intel_h(cs_struct *h, unsigned int id,
+ {
+ 	if (h && h->x86_insn_reg_lut && id <= h->x86_insn_lut_max) {
+ 		uint16_t value = (uint16_t)(h->x86_insn_reg_lut[id] & 0xffff);
+-		if (value)
++		if (value && !(value & X86_REGISTER_PAIR))
+ 			return unpack_insn_reg(value, access);
+ 		return 0;
+ 	}
+@@ -11323,7 +11377,7 @@ x86_reg X86_insn_reg_att_h(cs_struct *h, unsigned int id,
+ {
+ 	if (h && h->x86_insn_reg_lut && id <= h->x86_insn_lut_max) {
+ 		uint16_t value = (uint16_t)(h->x86_insn_reg_lut[id] >> 16);
+-		if (value)
++		if (value && !(value & X86_REGISTER_PAIR))
+ 			return unpack_insn_reg(value, access);
+ 		return 0;
+ 	}
+@@ -11351,6 +11405,62 @@ bool X86_insn_reg_att2(unsigned int id, x86_reg *reg1, enum cs_ac_type *access1,
+ 	return false;
+ }
+ 
++static inline void set_embedded_register(cs_x86_op *operand, x86_reg reg,
++					 cs_ac_type access, const uint8_t *sizes)
++{
++	operand->type = X86_OP_REG;
++	operand->reg = reg;
++	operand->size = sizes[reg];
++	operand->access = access;
++}
++
++static inline uint16_t embedded_register_entry(const cs_struct *h, unsigned id,
++					      bool att)
++{
++	if (h->x86_insn_reg_lut && id <= h->x86_insn_lut_max) {
++		const uint32_t entry = h->x86_insn_reg_lut[id];
++		return att ? (uint16_t)(entry >> 16) : (uint16_t)entry;
++	}
++
++	cs_ac_type access;
++	x86_reg reg = att ? X86_insn_reg_att(id, &access) :
++			    X86_insn_reg_intel(id, &access);
++	if (reg)
++		return pack_insn_reg(reg, access);
++	int index = binary_search2(insn_regs_intel2, ARR_SIZE(insn_regs_intel2),
++				   id);
++	return index < 0 ? 0 : (uint16_t)(X86_REGISTER_PAIR | (unsigned)index);
++}
++
++void X86_add_implicit_registers(MCInst *MI, bool att)
++{
++	const uint16_t entry =
++		embedded_register_entry(MI->csh, MCInst_getOpcode(MI), att);
++	if (!entry)
++		return;
++	cs_x86 *x86 = &MI->flat_insn->detail->x86;
++	const uint8_t *sizes = MI->csh->regsize_map;
++	if (entry & X86_REGISTER_PAIR) {
++		const struct insn_reg2 *pair =
++			&insn_regs_intel2[entry & ~X86_REGISTER_PAIR];
++		set_embedded_register(&x86->operands[att ? 1 : 0], pair->reg1,
++				      pair->access1, sizes);
++		set_embedded_register(&x86->operands[att ? 0 : 1], pair->reg2,
++				      pair->access2, sizes);
++		x86->op_count = 2;
++	} else {
++		cs_ac_type access;
++		const x86_reg reg = unpack_insn_reg(entry, &access);
++		memmove(&x86->operands[1], &x86->operands[0],
++			sizeof(x86->operands) - sizeof(x86->operands[0]));
++		memset(&x86->operands[0], 0, sizeof(x86->operands[0]));
++		set_embedded_register(&x86->operands[0], reg, access, sizes);
++		++x86->op_count;
++	}
++	if (!att && !MI->op1_size)
++		MI->op1_size = x86->operands[0].size;
++}
++
+ // given MCInst's id, find out if this insn is valid for REPNE prefix
+ static bool valid_repne(cs_struct *h, unsigned int opcode)
+ {
 diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..cddf38a1 100644
+index a2677cb8..052b0418 100644
 --- a/arch/X86/X86Mapping.h
 +++ b/arch/X86/X86Mapping.h
 @@ -7,21 +7,25 @@
@@ -34966,6 +35221,16 @@ index a2677cb8..cddf38a1 100644
  extern const insn_map_x86 insns[];
  
  // map sib_base to x86_reg
+@@ -60,6 +64,9 @@ const char *X86_insn_name(csh handle, unsigned int id);
+ // return group name, given group id
+ const char *X86_group_name(csh handle, unsigned int id);
+ 
++/* Publish register operands embedded in the assembly spelling. */
++void X86_add_implicit_registers(MCInst *MI, bool att);
++
+ // return register of given instruction id
+ // return 0 if not found
+ // this is to handle instructions embedding accumulate registers into AsmStrs[]
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
 index 0a4c959f..4c0d654f 100644
 --- a/cs_disasm_internal.h
