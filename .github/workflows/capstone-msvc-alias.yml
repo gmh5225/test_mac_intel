@@ -1,0 +1,28 @@
+name: MSVC native multi-architecture alias formatting
+on:
+  push:
+    branches: [codex/capstone-msvc-alias-allocation]
+    paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
+permissions:
+  contents: read
+jobs:
+  measure:
+    strategy:
+      fail-fast: false
+      matrix:
+        crt: [MD, MT]
+    runs-on: windows-2022
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-performance
+          persist-credentials: false
+      - name: Check real outputs, count allocations and compare throughputs
+        run: python capstone-performance/alias-windows.py ${{ matrix.crt }}
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: msvc-alias-${{ matrix.crt }}
+          path: capstone-evidence/
+          retention-days: 14
