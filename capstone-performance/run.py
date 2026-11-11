@@ -187,14 +187,14 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-callback']:
+    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-shared', 'check-callback']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit == 'check-hint' else
+        extra = ([libraries['base']] if unit in ('check-hint','check-shared') else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
@@ -234,10 +234,11 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['arch/X86/X86Mapping.c']}
+               ['cs.c','arch/X86/X86Mapping.c']}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
+    binaries += [WORK / ('windows-' + label) for label in ['base','new']]
     binaries += list(libraries.values()) + [iced_library]
     write('binaries.json', {str(p.relative_to(WORK)): sha(p) for p in binaries})
     write('ready.json', dict(semantic_checks='native tests and traversal checks passed; not full qualification',
@@ -363,7 +364,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# x86 handle initialization and full-stream controls', '',
+    lines = ['# Immutable x86 lookup tables and custom allocator compatibility', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']

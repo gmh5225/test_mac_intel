@@ -1,34 +1,212 @@
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -122,9 +122,10 @@
+ 	int syntax; // asm syntax for simple printer such as ARM, Mips & PPC
+ 	bool doing_mem; // handling memory operand in InstPrinter code
+ 	bool doing_SME_Index; // handling a SME instruction that has index
++	bool x86_uses_shared_luts;
+ 	unsigned short *insn_cache; // index caching for mapping.c
+-	uint32_t *x86_insn_lut; // x86 id -> public id (high 16) and insns[] index
+-	uint32_t *x86_insn_reg_lut; // x86 packed Intel/ATT implicit register entries
++	const uint32_t *x86_insn_lut; // x86 id -> public id (high 16) and insns[] index
++	const uint32_t *x86_insn_reg_lut; // x86 packed Intel/ATT implicit register entries
+ 	unsigned int x86_insn_lut_max;
+ 	// A mapping of LLVM instruction IDs to capstone instruction IDs, with
+ 	// some supplementary information, sorted in ascending order by LLVM
+--- a/cs.c
++++ b/cs.c
+@@ -885,8 +885,10 @@
+ 	}
+ 
+ 	cs_mem_free(ud->insn_cache);
+-	cs_mem_free(ud->x86_insn_lut);
+-	cs_mem_free(ud->x86_insn_reg_lut);
++	if (!ud->x86_uses_shared_luts) {
++		cs_mem_free((void *)ud->x86_insn_lut);
++		cs_mem_free((void *)ud->x86_insn_reg_lut);
++	}
+ 
+ 	memset(ud, 0, sizeof(*ud));
+ 	cs_mem_free(ud);
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -11167,6 +11167,8 @@
+@@ -10810,11 +10810,8 @@
+ 	enum cs_ac_type access1, access2;
+ };
+ 
+-static inline uint16_t pack_insn_reg(x86_reg reg, enum cs_ac_type access)
+-{
+-	return (uint16_t)(((unsigned int)access << 12) |
+-			  ((unsigned int)reg & 0x0fff));
+-}
++#define X86_PACK_INSN_REG(reg, access) \
++	(((uint32_t)(access) << 12) | ((uint32_t)(reg) & 0x0fff))
+ 
+ static inline x86_reg unpack_insn_reg(uint16_t value, enum cs_ac_type *access)
+ {
+@@ -11167,71 +11164,44 @@
  	return -1;
  }
  
 +#include "X86GenInsnLookup.inc"
++#include "X86GenImplicitRegLookup.inc"
 +
  void X86_build_lookup_tables(cs_struct *h)
  {
- 	unsigned int i;
-@@ -11176,16 +11178,14 @@
+-	unsigned int i;
++	uint32_t *lookup;
++	uint32_t *reg_lookup;
+ 	unsigned int max = ARR_SIZE(insns);
+ 	unsigned int id_max;
+ 
  	CS_ASSERT_RET(h && !h->x86_insn_lut);
  	CS_ASSERT_RET(max <= INT16_MAX && X86_INS_ENDING < UINT16_MAX);
  
 -	id_max = insns[max - 1].id;
 +	id_max = ARR_SIZE(x86_initial_insn_lut) - 1;
  	h->x86_insn_lut_max = id_max;
- 	h->x86_insn_lut =
- 		(uint32_t *)cs_mem_malloc((id_max + 1) * sizeof(uint32_t));
- 	CS_ASSERT_RET(h->x86_insn_lut);
- 
+-	h->x86_insn_lut =
+-		(uint32_t *)cs_mem_malloc((id_max + 1) * sizeof(uint32_t));
+-	CS_ASSERT_RET(h->x86_insn_lut);
+-
 -	memset(h->x86_insn_lut, 0xff, (id_max + 1) * sizeof(uint32_t));
 -	for (i = 0; i < max; i++)
 -		h->x86_insn_lut[insns[i].id] =
 -			((uint32_t)insns[i].mapid << 16) | i;
-+	memcpy(h->x86_insn_lut, x86_initial_insn_lut,
-+	       sizeof(x86_initial_insn_lut));
+-
+-	h->x86_insn_reg_lut =
+-		(uint32_t *)cs_mem_calloc(id_max + 1, sizeof(uint32_t));
+-	if (!h->x86_insn_reg_lut)
++#if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++	if (cs_mem_malloc == malloc && cs_mem_calloc == calloc &&
++	    cs_mem_realloc == realloc && cs_mem_free == free &&
++	    cs_vsnprintf == vsnprintf) {
++		h->x86_insn_lut = x86_initial_insn_lut;
++		h->x86_insn_reg_lut = x86_initial_reg_lut;
++		h->x86_uses_shared_luts = true;
+ 		return;
+-
+-	for (i = 0; i < ARR_SIZE(insn_regs_intel); i++) {
+-		unsigned int insn_id = insn_regs_intel[i].insn;
+-		if (insn_id <= id_max)
+-			h->x86_insn_reg_lut[insn_id] =
+-				(h->x86_insn_reg_lut[insn_id] & 0xffff0000) |
+-				pack_insn_reg(insn_regs_intel[i].reg,
+-					      insn_regs_intel[i].access);
+-	}
+-
+-	for (i = 0; i < ARR_SIZE(insn_regs_intel_extra); i++) {
+-		unsigned int insn_id = insn_regs_intel_extra[i].insn;
+-		if (insn_id && insn_id <= id_max &&
+-		    !(h->x86_insn_reg_lut[insn_id] & 0xffff))
+-			h->x86_insn_reg_lut[insn_id] =
+-				(h->x86_insn_reg_lut[insn_id] & 0xffff0000) |
+-				pack_insn_reg(insn_regs_intel_extra[i].reg,
+-					      insn_regs_intel_extra[i].access);
+-	}
+-
+-	for (i = 0; i < ARR_SIZE(insn_regs_att); i++) {
+-		unsigned int insn_id = insn_regs_att[i].insn;
+-		if (insn_id <= id_max)
+-			h->x86_insn_reg_lut[insn_id] =
+-				(h->x86_insn_reg_lut[insn_id] & 0x0000ffff) |
+-				((uint32_t)pack_insn_reg(insn_regs_att[i].reg,
+-							 insn_regs_att[i].access)
+-				 << 16);
+-	}
+-
+-	for (i = 0; i < ARR_SIZE(insn_regs_att_extra); i++) {
+-		unsigned int insn_id = insn_regs_att_extra[i].insn;
+-		if (insn_id && insn_id <= id_max &&
+-		    !(h->x86_insn_reg_lut[insn_id] >> 16))
+-			h->x86_insn_reg_lut[insn_id] =
+-				(h->x86_insn_reg_lut[insn_id] & 0x0000ffff) |
+-				((uint32_t)pack_insn_reg(
+-					 insn_regs_att_extra[i].reg,
+-					 insn_regs_att_extra[i].access)
+-				 << 16);
+-	}
++	}
++#endif
++
++	/* Custom hooks can observe both allocations and inspect the first
++	 * table when the second allocation is requested. */
++	lookup = (uint32_t *)cs_mem_malloc((id_max + 1) * sizeof(*lookup));
++	h->x86_insn_lut = lookup;
++	CS_ASSERT_RET(lookup);
++	memcpy(lookup, x86_initial_insn_lut, sizeof(x86_initial_insn_lut));
++
++	reg_lookup = (uint32_t *)cs_mem_calloc(id_max + 1, sizeof(*reg_lookup));
++	h->x86_insn_reg_lut = reg_lookup;
++	if (reg_lookup)
++		memcpy(reg_lookup, x86_initial_reg_lut, sizeof(x86_initial_reg_lut));
+ }
  
- 	h->x86_insn_reg_lut =
- 		(uint32_t *)cs_mem_calloc(id_max + 1, sizeof(uint32_t));
+ // return register of given instruction id
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -490,6 +490,51 @@
+         )
+         mapping[uid] = mapid
+     return mapping
++
++
++def emit_insn_lookup(suffix):
++    mapping = public_instruction_ids(suffix)
++    opcodes = list(mapping)
++    tables.require(opcodes == sorted(opcodes), "Mapping rows must be ordered by opcode")
++    tables.require(len(opcodes) <= 0x7FFF, "Mapping row exceeds signed index storage")
++    words = [0xFFFFFFFF] * (opcodes[-1] + 1)
++    for row, opcode in enumerate(opcodes):
++        words[opcode] = (mapping[opcode] << 16) | row
++    lines = ["static const uint32_t x86_initial_insn_lut[] = {"]
++    for start in range(0, len(words), 8):
++        lines.append("\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ",")
++    return "\n".join(lines + ["};"])
++
++
++def emit_reg_lookup(suffix):
++    source = tables.uncomment((X86 / "X86Mapping.c").read_text())
++    enum = (X86 / f"X86GenInstrInfo{suffix}.inc").read_text().split("enum {", 1)[1].split("};", 1)[0]
++    ids = {name: int(number) for name, number in re.findall(r"(X86_\w+)\s*=\s*(\d+)", enum)}
++    maximum = max(public_instruction_ids(suffix))
++    packed = {}
++    for shift, syntax in ((0, "intel"), (16, "att")):
++        rows = {}
++        for extra in ("", "_extra"):
++            table = f"insn_regs_{syntax}{extra}"
++            body = re.search(r"static const struct insn_reg " + table + r"\[\] = \{(.*?)\n\};", source, re.S)
++            tables.require(body is not None, f"Missing {table}")
++            text = re.sub(r"#ifndef CAPSTONE_X86_REDUCE\s+(.*?)\s*#endif", "" if suffix else r"\1", body[1], flags=re.S)
++            row_pattern = re.compile(r"\s*\{\s*(X86_\w+|0)\s*,\s*(X86_REG_\w+|0)\s*(?:,\s*(0|CS_AC_\w+(?:\s*\|\s*CS_AC_\w+)*))?\s*\}\s*,")
++            for opcode, reg, access in tables.scan_entries(text, row_pattern, table):
++                access = access or "0"
++                if opcode == "0":
++                    tables.require(extra and reg == access == "0", f"Unexpected sentinel in {table}")
++                    continue
++                tables.require(reg != "0" and access != "0", f"Empty register entry in {table}")
++                if ids[opcode] > maximum or (extra and opcode in rows):
++                    continue
++                rows[opcode] = f"X86_PACK_INSN_REG({reg}, {access})"
++        for opcode, word in rows.items():
++            packed.setdefault(opcode, []).append(f"({word} << 16)" if shift else word)
++    lines = ["static const uint32_t x86_initial_reg_lut[ARR_SIZE(x86_initial_insn_lut)] = {"]
++    for opcode in sorted(packed, key=ids.__getitem__):
++        lines.append(f"\t[{opcode}] = " + " | ".join(packed[opcode]) + ",")
++    return "\n".join(lines + ["};"])
+ 
+ 
+ def emit_terminal_tables(name, words, rows, kinds):
+@@ -1260,6 +1305,8 @@
+         (SCAN_OUTPUT, emit_scan),
+         (TERMINAL_OUTPUT, emit_terminal),
+         (X86 / "X86GenVexScan.inc", emit_vex_scan),
++        (X86 / "X86GenInsnLookup.inc", emit_insn_lookup),
++        (X86 / "X86GenImplicitRegLookup.inc", emit_reg_lookup),
+     ]
+     generated = [(path, generated_output(emit)) for path, emit in outputs]
+     for path, output in generated:
 --- /dev/null
 +++ b/arch/X86/X86GenInsnLookup.inc
 @@ -0,0 +1,2133 @@
@@ -2165,34 +2343,406 @@
 +	0x01ed3b26u,
 +};
 +#endif
---- a/suite/synctools/x86_operand_specializations.py
-+++ b/suite/synctools/x86_operand_specializations.py
-@@ -490,6 +490,20 @@
-         )
-         mapping[uid] = mapid
-     return mapping
+--- /dev/null
++++ b/arch/X86/X86GenImplicitRegLookup.inc
+@@ -0,0 +1,400 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
 +
-+
-+def emit_insn_lookup(suffix):
-+    mapping = public_instruction_ids(suffix)
-+    opcodes = list(mapping)
-+    tables.require(opcodes == sorted(opcodes), "Mapping rows must be ordered by opcode")
-+    tables.require(len(opcodes) <= 0x7FFF, "Mapping row exceeds signed index storage")
-+    words = [0xFFFFFFFF] * (opcodes[-1] + 1)
-+    for row, opcode in enumerate(opcodes):
-+        words[opcode] = (mapping[opcode] << 16) | row
-+    lines = ["static const uint32_t x86_initial_insn_lut[] = {"]
-+    for start in range(0, len(words), 8):
-+        lines.append("\t" + ", ".join(f"0x{word:08x}u" for word in words[start : start + 8]) + ",")
-+    return "\n".join(lines + ["};"])
- 
- 
- def emit_terminal_tables(name, words, rows, kinds):
-@@ -1260,6 +1274,7 @@
-         (SCAN_OUTPUT, emit_scan),
-         (TERMINAL_OUTPUT, emit_terminal),
-         (X86 / "X86GenVexScan.inc", emit_vex_scan),
-+        (X86 / "X86GenInsnLookup.inc", emit_insn_lookup),
-     ]
-     generated = [(path, generated_output(emit)) for path, emit in outputs]
-     for path, output in generated:
++#ifdef CAPSTONE_X86_REDUCE
++static const uint32_t x86_initial_reg_lut[ARR_SIZE(x86_initial_insn_lut)] = {
++	[X86_ADC16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADC32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADC64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADC8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_IN16ri] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_IN32ri] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_IN8ri] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_INSB] = (X86_PACK_INSN_REG(X86_REG_DX, CS_AC_READ) << 16),
++	[X86_INSL] = (X86_PACK_INSN_REG(X86_REG_DX, CS_AC_READ) << 16),
++	[X86_INSW] = (X86_PACK_INSN_REG(X86_REG_DX, CS_AC_READ) << 16),
++	[X86_LODSB] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_LODSL] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_LODSQ] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE),
++	[X86_LODSW] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16ao16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16ao32] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16ao64] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16o16a] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_MOV16o32a] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_MOV16o64a] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_MOV32ao16] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_MOV32ao32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_MOV32ao64] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_MOV32o16a] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_MOV32o32a] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_MOV32o64a] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_MOV64ao32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE),
++	[X86_MOV64ao64] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE),
++	[X86_MOV64o32a] = (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_MOV64o64a] = (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_MOV8ao16] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_MOV8ao32] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_MOV8ao64] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_MOV8o16a] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_MOV8o32a] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_MOV8o64a] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_OR16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_OR32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_OR64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_OR8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_OUT16ir] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_OUT32ir] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_OUT8ir] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_OUTSB] = X86_PACK_INSN_REG(X86_REG_DX, CS_AC_WRITE),
++	[X86_OUTSL] = X86_PACK_INSN_REG(X86_REG_DX, CS_AC_WRITE),
++	[X86_OUTSW] = X86_PACK_INSN_REG(X86_REG_DX, CS_AC_WRITE),
++	[X86_POPDS16] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) << 16),
++	[X86_POPDS32] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) << 16),
++	[X86_POPES16] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) << 16),
++	[X86_POPES32] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) << 16),
++	[X86_POPFS16] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) << 16),
++	[X86_POPFS32] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) << 16),
++	[X86_POPFS64] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) << 16),
++	[X86_POPGS16] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) << 16),
++	[X86_POPGS32] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) << 16),
++	[X86_POPGS64] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) << 16),
++	[X86_POPSS16] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) << 16),
++	[X86_POPSS32] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) << 16),
++	[X86_PUSHCS16] = X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) << 16),
++	[X86_PUSHCS32] = X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) << 16),
++	[X86_PUSHDS16] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) << 16),
++	[X86_PUSHDS32] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) << 16),
++	[X86_PUSHES16] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) << 16),
++	[X86_PUSHES32] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) << 16),
++	[X86_PUSHFS16] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) << 16),
++	[X86_PUSHFS32] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) << 16),
++	[X86_PUSHFS64] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) << 16),
++	[X86_PUSHGS16] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) << 16),
++	[X86_PUSHGS32] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) << 16),
++	[X86_PUSHGS64] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) << 16),
++	[X86_PUSHSS16] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) << 16),
++	[X86_PUSHSS32] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) << 16),
++	[X86_RCL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SBB16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SBB32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SBB64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SBB8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASB] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASL] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASQ] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASW] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SHL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD16mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD16rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD32mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD32rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD64mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD64rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD16mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD16rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD32mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD32rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD64mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD64rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SUB16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUB32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUB64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUB8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_XCHG16ar] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ) << 16),
++	[X86_XCHG32ar] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ) << 16),
++	[X86_XCHG64ar] = (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ) << 16),
++	[X86_XOR16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_XOR32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_XOR64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_XOR8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++};
++#else
++static const uint32_t x86_initial_reg_lut[ARR_SIZE(x86_initial_insn_lut)] = {
++	[X86_ADC16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADC32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADC64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADC8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_ADD_FrST0] = (X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_READ) << 16),
++	[X86_AND16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_AND8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMOVBE_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVB_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVE_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVNBE_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVNB_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVNE_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVNP_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMOVP_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_CMP16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_CMP8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_DIVR_FrST0] = (X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_READ) << 16),
++	[X86_DIV_FrST0] = (X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_READ) << 16),
++	[X86_FNSTSW16r] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_IN16ri] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_IN32ri] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_IN8ri] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_INSB] = (X86_PACK_INSN_REG(X86_REG_DX, CS_AC_READ) << 16),
++	[X86_INSL] = (X86_PACK_INSN_REG(X86_REG_DX, CS_AC_READ) << 16),
++	[X86_INSW] = (X86_PACK_INSN_REG(X86_REG_DX, CS_AC_READ) << 16),
++	[X86_LODSB] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_LODSL] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_LODSQ] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE),
++	[X86_LODSW] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16ao16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16ao32] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16ao64] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE),
++	[X86_MOV16o16a] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_MOV16o32a] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_MOV16o64a] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_MOV32ao16] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_MOV32ao32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_MOV32ao64] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE),
++	[X86_MOV32o16a] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_MOV32o32a] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_MOV32o64a] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_MOV64ao32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE),
++	[X86_MOV64ao64] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE),
++	[X86_MOV64o32a] = (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_MOV64o64a] = (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_MOV8ao16] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_MOV8ao32] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_MOV8ao64] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE),
++	[X86_MOV8o16a] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_MOV8o32a] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_MOV8o64a] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_MUL_FrST0] = (X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_READ) << 16),
++	[X86_OR16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_OR32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_OR64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_OR8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_OUT16ir] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_READ) << 16),
++	[X86_OUT32ir] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_OUT8ir] = (X86_PACK_INSN_REG(X86_REG_AL, CS_AC_READ) << 16),
++	[X86_OUTSB] = X86_PACK_INSN_REG(X86_REG_DX, CS_AC_WRITE),
++	[X86_OUTSL] = X86_PACK_INSN_REG(X86_REG_DX, CS_AC_WRITE),
++	[X86_OUTSW] = X86_PACK_INSN_REG(X86_REG_DX, CS_AC_WRITE),
++	[X86_POPDS16] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) << 16),
++	[X86_POPDS32] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_WRITE) << 16),
++	[X86_POPES16] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) << 16),
++	[X86_POPES32] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_WRITE) << 16),
++	[X86_POPFS16] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) << 16),
++	[X86_POPFS32] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) << 16),
++	[X86_POPFS64] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_WRITE) << 16),
++	[X86_POPGS16] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) << 16),
++	[X86_POPGS32] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) << 16),
++	[X86_POPGS64] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_WRITE) << 16),
++	[X86_POPSS16] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) << 16),
++	[X86_POPSS32] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_WRITE) << 16),
++	[X86_PUSHCS16] = X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) << 16),
++	[X86_PUSHCS32] = X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_CS, CS_AC_READ) << 16),
++	[X86_PUSHDS16] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) << 16),
++	[X86_PUSHDS32] = X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_DS, CS_AC_READ) << 16),
++	[X86_PUSHES16] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) << 16),
++	[X86_PUSHES32] = X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_ES, CS_AC_READ) << 16),
++	[X86_PUSHFS16] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) << 16),
++	[X86_PUSHFS32] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) << 16),
++	[X86_PUSHFS64] = X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_FS, CS_AC_READ) << 16),
++	[X86_PUSHGS16] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) << 16),
++	[X86_PUSHGS32] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) << 16),
++	[X86_PUSHGS64] = X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_GS, CS_AC_READ) << 16),
++	[X86_PUSHSS16] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) << 16),
++	[X86_PUSHSS32] = X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_SS, CS_AC_READ) << 16),
++	[X86_RCL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_RCR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_ROR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SAR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SBB16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SBB32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SBB64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SBB8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASB] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASL] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASQ] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SCASW] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SHL16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHL8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD16mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD16rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD32mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD32rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD64mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHLD64rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR16mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR16rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR32mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR32rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR64mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR64rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR8mCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHR8rCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD16mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD16rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD32mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD32rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD64mrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SHRD64rrCL] = (X86_PACK_INSN_REG(X86_REG_CL, CS_AC_READ) << 16),
++	[X86_SKINIT] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_SUB16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUB32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUB64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUB8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_SUBR_FrST0] = (X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_READ) << 16),
++	[X86_SUB_FrST0] = (X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_READ) << 16),
++	[X86_TEST16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_TEST8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++	[X86_VMLOAD32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_VMLOAD64] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_VMRUN32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_VMRUN64] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE) | (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_VMSAVE32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_READ) << 16),
++	[X86_VMSAVE64] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) | (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_READ) << 16),
++	[X86_XCHG16ar] = (X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ) << 16),
++	[X86_XCHG32ar] = (X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ) << 16),
++	[X86_XCHG64ar] = (X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ) << 16),
++	[X86_XCH_F] = X86_PACK_INSN_REG(X86_REG_ST0, CS_AC_WRITE),
++	[X86_XOR16i16] = X86_PACK_INSN_REG(X86_REG_AX, CS_AC_WRITE | CS_AC_READ),
++	[X86_XOR32i32] = X86_PACK_INSN_REG(X86_REG_EAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_XOR64i32] = X86_PACK_INSN_REG(X86_REG_RAX, CS_AC_WRITE | CS_AC_READ),
++	[X86_XOR8i8] = X86_PACK_INSN_REG(X86_REG_AL, CS_AC_WRITE | CS_AC_READ),
++};
++#endif
