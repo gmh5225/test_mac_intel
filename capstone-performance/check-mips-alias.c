@@ -1,5 +1,6 @@
 #include "Mapping.h"
 #include "cs_priv.h"
+#include "utils.h"
 #include <stdio.h>
 #include <string.h>
 #include <dlfcn.h>

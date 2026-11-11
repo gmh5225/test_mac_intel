@@ -240,6 +240,9 @@ panic = "abort"
     allowed = {'CMakeFiles/capstone.dir/' + name + '.o' for name in ['Mapping.c', 'arch/AArch64/AArch64Mapping.c', 'arch/ARC/ARCMapping.c', 'arch/ARM/ARMMapping.c', 'arch/Alpha/AlphaMapping.c', 'arch/LoongArch/LoongArchMapping.c', 'arch/Mips/MipsMapping.c', 'arch/PowerPC/PPCInstPrinter.c', 'arch/PowerPC/PPCMapping.c', 'arch/Sparc/SparcMapping.c', 'arch/SystemZ/SystemZMapping.c', 'arch/TriCore/TriCoreMapping.c', 'arch/X86/X86Disassembler.c', 'arch/X86/X86IntelInstPrinter.c', 'arch/X86/X86Mapping.c', 'arch/Xtensa/XtensaMapping.c', 'cs.c']}
     if incremental:
         allowed = {'CMakeFiles/capstone.dir/arch/'+arch+'/'+arch+'Mapping.c.o' for arch in ('ARM','AArch64','Sparc')}
+        shared_mapping = 'CMakeFiles/capstone.dir/Mapping.c.o'
+        if shared_mapping in changed:
+            allowed.add(shared_mapping)
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
