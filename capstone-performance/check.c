@@ -67,10 +67,65 @@ static void check_guarded_addresses(void)
 }
 #endif
 
+static void check_vex_extent(const uint8_t *bytes, size_t length)
+{
+	X86ScanResult result = {0x55555555, 0xaaaaaaaa, 0xf00d, 0x5a};
+	int status = tryVexTerminalScan(bytes, length, bytes[0], &result);
+	record((uint32_t)status);
+	record(result.opcode);
+	record(result.opcode_pub);
+	record(result.length);
+	record(result.popcode_adjust);
+	++states;
+}
+
+static void check_guarded_vex(void)
+{
+	const size_t page = (size_t)sysconf(_SC_PAGESIZE);
+	uint8_t *mapping = mmap(NULL, 2 * page, PROT_READ | PROT_WRITE,
+				MAP_PRIVATE | MAP_ANON, -1, 0);
+	if (mapping == MAP_FAILED || mprotect(mapping + page, page, PROT_NONE))
+		abort();
+	uint8_t *end = mapping + page;
+	uint8_t raw[17] = {0};
+	for (unsigned map = 0; map <= 32; ++map) {
+		const bool two = map == 32;
+		size_t head = two ? 3 : 4;
+		raw[0] = two ? 0xc5 : 0xc4;
+		for (unsigned op = 0; op < 256; ++op) {
+			for (unsigned p = 0; p < 256; ++p) {
+				if (!two) raw[1] = (uint8_t)(map | (op & 0xe0));
+				raw[head - 2] = (uint8_t)p;
+				raw[head - 1] = (uint8_t)op;
+				raw[head] = (uint8_t)(op * 37 + p * 53);
+				raw[head + 1] = (uint8_t)(op * 13 + p * 79);
+				/* All maps including reserved maps, all W/L/pp/vvvv
+				 * combinations, and every possible opcode. */
+				for (size_t n = 1; n <= 15; ++n) {
+					memcpy(end - n, raw, n);
+					check_vex_extent(end - n, n);
+				}
+			}
+		}
+	}
+	for (unsigned m = 0; m < 256; ++m)
+		for (unsigned sib = 0; sib < 256; ++sib) {
+			/* vaddps xmm, xmm, xmm/m128 includes register,
+			 * SIB, RIP-relative and both displacement widths. */
+			uint8_t vex[15] = {0xc5, 0xf0, 0x58, (uint8_t)m, (uint8_t)sib};
+			for (size_t n = 1; n <= sizeof(vex); ++n) {
+				memcpy(end-n, vex, n);
+				check_vex_extent(end-n, n);
+			}
+		}
+	if (munmap(mapping, 2 * page)) abort();
+}
+
 int test_terminal_states(void)
 {
 #if defined(__unix__) || defined(__APPLE__)
 	check_guarded_addresses();
+	check_guarded_vex();
 #endif
 	static const cs_mode modes[] = {
 		CS_MODE_16, CS_MODE_32, CS_MODE_64,
