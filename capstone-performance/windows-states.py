@@ -3,7 +3,7 @@ import subprocess as s,tempfile,json,hashlib,os,shutil,sys
 d=Path(__file__).resolve().parent;ev=Path('capstone-evidence').resolve();ev.mkdir(exist_ok=True)
 def run(a,cwd=None):s.run(a,check=True,cwd=cwd)
 def main(work):
- src=work/'src';ref='7b209eb13c8e0f9915307320016e8a1cecd12253'
+ src=work/'src';ref='3b4aeea8566a118cca94ef00fb4f16c39c53a29a'
  run(['git','-c','core.autocrlf=false','init',src]);run(['git','config','core.autocrlf','false'],src)
  run(['git','fetch','-q','--depth=1','https://github.com/NeverSight/capstone',ref],src);run(['git','checkout','--detach','-q','FETCH_HEAD'],src)
  patch=d/'windows-formatter.patch'
@@ -23,15 +23,16 @@ foreach(t path_states hook_pairs)
  endif()
 endforeach()
 """)
- sys.path.insert(0,str(src/'suite/synctools'))
- from x86_operand_specializations import translation_specializations,read_sets
- x=src/'arch/X86';fn=(x/'X86DisassemblerTranslator.h').read_text().split('X86_TRANSLATE_INLINE bool translateInstruction(',1)[1].split('#undef X86_TRANSLATE_INLINE')[0]
- for suffix in ('','_reduce'):
-  b=work/('build'+suffix);b.mkdir();table=x/('X86GenDisassemblerTables'+suffix+'.inc');enabled={i for i,_ in translation_specializations(suffix)}
-  n=len(read_sets(table,include_duplicates=True));(b/'descriptors.inc').write_text(table.read_text().split('static const uint8_t x86DisassemblerContexts',1)[0]+'\nstatic const unsigned char affected[] = {'+','.join('1' if i in enabled else '0' for i in range(n))+'};\n')
-  (b/'paths.inc').write_text('\n'.join('static bool '+name+'('+fn.replace('#if !defined(_MSC_VER) || defined(__clang__)','#if '+str(v)) for v,name in [(1,'generatedSwitch'),(0,'descriptorLoop')]))
-  run(['cmake','-S',src,'-B',b,'-G','Visual Studio 17 2022','-A','x64','-DEVIDENCE_SOURCE='+d.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_X86_REDUCE='+('ON' if suffix else 'OFF')])
-  run(['cmake','--build',b,'--config','Release','--parallel','4','--target','path_states','hook_pairs'])
-  for name in ('path_states','hook_pairs'):
-   out=s.check_output([b/('Release/'+name+'.exe')],text=True);(ev/(name+suffix+'.log')).write_text(out);print(out,flush=True)
+ for toolset in ('MSVC','ClangCL'):
+  b=work/toolset
+  cmake=['cmake','-S',src,'-B',b,'-G','Visual Studio 17 2022','-A','x64']
+  if toolset=='ClangCL':cmake+=['-T','ClangCL']
+  run(cmake+['-DEVIDENCE_SOURCE='+d.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON'])
+  run(['cmake','--build',b,'--config','Release','--parallel','4','--target','hook_pairs'])
+  out=s.check_output([b/'Release/hook_pairs.exe'],text=True);(ev/(toolset+'-hooks.log')).write_text(out);print(out,flush=True)
+  for line in out.splitlines():
+   if 'default-built-in' in line or 'built-in' in line or 'explicit CRT' in line:
+    assert 'direct 1 heap 0' in line, line
+   else:
+    assert 'direct 0 heap 1' in line,line
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP'],ignore_cleanup_errors=True) as tmp:main(Path(tmp))
