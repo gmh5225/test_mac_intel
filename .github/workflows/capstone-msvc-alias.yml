@@ -1,7 +1,7 @@
 name: Retest ARM32 output and PE32 controls on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-native-arm-alias-admission]
+    branches: [codex/capstone-native-arm-register-text]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         crt: [MD]
-        order: [first]
+        order: [first, second]
     runs-on: windows-2022
     timeout-minutes: 72
     steps:
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-arm-alias-admission-${{ matrix.order }}
+          name: native-arm-register-text-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14
