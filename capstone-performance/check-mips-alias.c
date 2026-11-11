@@ -17,19 +17,6 @@ static const name_map names_Mips[] = {
 static const uint16_t slots_Mips[] = {
 #include "arch/Mips/MipsGenAliasIndex.inc"
 };
-static const name_map names_ARM[] = {
-#include "arch/ARM/ARMGenCSAliasMnemMap.inc"
-	{ ARM_INS_ALIAS_ASR, "asr" },	   { ARM_INS_ALIAS_LSL, "lsl" },
-	{ ARM_INS_ALIAS_LSR, "lsr" },	   { ARM_INS_ALIAS_ROR, "ror" },
-	{ ARM_INS_ALIAS_RRX, "rrx" },	   { ARM_INS_ALIAS_UXTW, "uxtw" },
-	{ ARM_INS_ALIAS_LDM, "ldm" },	   { ARM_INS_ALIAS_POP, "pop" },
-	{ ARM_INS_ALIAS_PUSH, "push" },	   { ARM_INS_ALIAS_POPW, "pop.w" },
-	{ ARM_INS_ALIAS_PUSHW, "push.w" }, { ARM_INS_ALIAS_VPOP, "vpop" },
-	{ ARM_INS_ALIAS_VPUSH, "vpush" },  { ARM_INS_ALIAS_END, NULL }
-};
-static const uint16_t slots_ARM[] = {
-#include "arch/ARM/ARMGenAliasIndex.inc"
-};
 static const name_map names_AArch64[] = {
 #include "arch/AArch64/AArch64GenCSAliasMnemMap.inc"
 	{ AARCH64_INS_ALIAS_CFP, "cfp" },
@@ -73,26 +60,6 @@ static const name_map names_PowerPC[] = {
 static const uint16_t slots_PowerPC[] = {
 #include "arch/PowerPC/PPCGenAliasIndex.inc"
 };
-static const name_map names_LoongArch[] = {
-#include "arch/LoongArch/LoongArchGenCSAliasMnemMap.inc"
-	{ LOONGARCH_INS_ALIAS_END, NULL },
-};
-static const uint16_t slots_LoongArch[] = {
-#include "arch/LoongArch/LoongArchGenAliasIndex.inc"
-};
-static const name_map names_RISCV[] = {
-#include "arch/RISCV/RISCVGenCSAliasMnemMap.inc"
-};
-static const uint16_t slots_RISCV[] = {
-#include "arch/RISCV/RISCVGenAliasIndex.inc"
-};
-static const name_map names_SystemZ[] = {
-#include "arch/SystemZ/SystemZGenCSAliasMnemMap.inc"
-	{ SYSTEMZ_INS_ALIAS_END, NULL },
-};
-static const uint16_t slots_SystemZ[] = {
-#include "arch/SystemZ/SystemZGenAliasIndex.inc"
-};
 static unsigned long cases;
 static int check(const name_map *names, unsigned count, const uint16_t *index, unsigned mask, cs_arch arch, const char *text) {
     cs_struct handle = {0}; cs_insn a = {0}, b = {0}; MCInst mi = {0}; SStream ss = {0};
@@ -134,12 +101,8 @@ int main(int argc,char **argv) {
  void *lib=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL);
  if(!lib || !(baseline=(void (*)(MCInst *,const SStream *,const name_map *,int))dlsym(lib,"map_set_alias_id")))return 2;
  if(fixture(names_Mips,ARR_SIZE(names_Mips),slots_Mips,ARR_SIZE(slots_Mips)-1)) return 1;
- if(fixture(names_ARM,ARR_SIZE(names_ARM),slots_ARM,ARR_SIZE(slots_ARM)-1)) return 1;
  if(fixture(names_AArch64,ARR_SIZE(names_AArch64),slots_AArch64,ARR_SIZE(slots_AArch64)-1)) return 1;
  if(fixture(names_Sparc,ARR_SIZE(names_Sparc),slots_Sparc,ARR_SIZE(slots_Sparc)-1)) return 1;
  if(fixture(names_PowerPC,ARR_SIZE(names_PowerPC),slots_PowerPC,ARR_SIZE(slots_PowerPC)-1)) return 1;
- if(fixture(names_LoongArch,ARR_SIZE(names_LoongArch),slots_LoongArch,ARR_SIZE(slots_LoongArch)-1)) return 1;
- if(fixture(names_RISCV,ARR_SIZE(names_RISCV),slots_RISCV,ARR_SIZE(slots_RISCV)-1)) return 1;
- if(fixture(names_SystemZ,ARR_SIZE(names_SystemZ),slots_SystemZ,ARR_SIZE(slots_SystemZ)-1)) return 1;
- printf("Verified %lu complete eight-backend indexed alias states against the reference library\n",cases);return 0;
+ printf("Verified %lu complete four-backend indexed alias states against the reference library\n",cases);return 0;
 }

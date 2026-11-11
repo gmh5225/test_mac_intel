@@ -1,505 +1,134 @@
 diff --git a/Mapping.c b/Mapping.c
-index f6dc6007..eb922e52 100644
+index f6dc6007..2332dac8 100644
 --- a/Mapping.c
 +++ b/Mapping.c
-@@ -470,24 +470,18 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
- 	}
- }
+@@ -249,16 +249,23 @@ void map_groups(MCInst *MI, const insn_map *imap)
  
--/// Sets an alternative id for some instruction.
--/// Or -1 if it fails.
--/// You must add (<ARCH>_INS_ALIAS_BEGIN + 1) to the id to get the real id.
--void map_set_alias_id(MCInst *MI, const SStream *O,
--		      const name_map *alias_mnem_id_map, int map_size)
-+/* Use the same final stream and mnemonic delimiters for both lookup forms. */
-+static const char *alias_mnemonic(const MCInst *MI, const SStream *O,
-+				  size_t *length)
- {
--	if (!MCInst_isAlias(MI)) {
--		MI->flat_insn->alias_id = 0;
--		return;
--	}
--
-+	if (!MCInst_isAlias(MI))
-+		return NULL;
- 	int i = 0, j = 0;
- 	const char *asm_str_buf = O->buffer;
- 	// Skip spaces and tabs
- 	while (is_blank_char(asm_str_buf[i])) {
- 		if (!asm_str_buf[i]) {
--			MI->flat_insn->alias_id = 0;
+ 	cs_detail *detail = MI->flat_insn->detail;
+ 	unsigned Opcode = MCInst_getOpcode(MI);
+-	unsigned i = 0;
+-	uint16_t group = imap[Opcode].groups[i];
+-	while (group != 0) {
+-		if (detail->groups_count >= MAX_NUM_GROUPS) {
+-			printf("ERROR: Too many groups defined in instruction mapping.\n");
 -			return;
-+			return NULL;
- 		}
- 		++i;
+-		}
+-		detail->groups[detail->groups_count++] = group;
+-		group = imap[Opcode].groups[++i];
++	const unsigned char *groups = imap[Opcode].groups;
++	unsigned start = detail->groups_count;
++	unsigned count = start;
++
++	while (count < MAX_NUM_GROUPS) {
++		unsigned char group = groups[count - start];
++		if (!group)
++			break;
++		detail->groups[count++] = group;
  	}
-@@ -498,9 +492,44 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
- 			break;
- 	}
++	detail->groups_count = count;
++
++	/* A full source row has no trailing zero. Only inspect the next
++	 * source entry when existing destination groups limited the copy. */
++	if (count >= MAX_NUM_GROUPS && count - start < MAX_NUM_GROUPS &&
++	    groups[count - start])
++		printf("ERROR: Too many groups defined in instruction mapping.\n");
+ #endif // CAPSTONE_DIET
+ }
  
--	int alias_id = name2id_n(alias_mnem_id_map, map_size, alias_mnem, j);
--	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
-+	*length = j;
-+	return alias_mnem;
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index d3b47d6a..457485ab 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -306,7 +306,7 @@ static void printRegName(SStream *OS, unsigned RegNo)
+ 			NULL;
+ 
+ 	if (extension_name)
+-		SStream_concat0(OS, extension_name);
++		(SStream_concat0)(OS, extension_name);
+ 	else
+ 		SStream_concat0_small(OS, getRegisterName(RegNo),
+ 				      getRegisterNameLength(RegNo));
+diff --git a/arch/X86/X86IntelInstPrinterPrechecked.c b/arch/X86/X86IntelInstPrinterPrechecked.c
+index 696352a3..b851e421 100644
+--- a/arch/X86/X86IntelInstPrinterPrechecked.c
++++ b/arch/X86/X86IntelInstPrinterPrechecked.c
+@@ -11,5 +11,23 @@
+ #define CAPSTONE_SSTREAM_PRECHECKED
+ #include "X86InstPrinter.h"
+ #define SStream_concat_hex64 X86_Intel_printHexPrechecked
++#if defined(_MSC_VER) && !defined(__clang__)
++#include "../../SStream.h"
++/* The fixed tokens in this bounded printer include their terminating NUL.
++ * The register-extension name uses the ordinary dynamic writer. */
++static __forceinline void appendPrinterLiteral(SStream *ss, const char *text,
++					       size_t extent)
++{
++	assert(!ss->is_closed && !ss->markup_stream && !ss->prefixed_by_markup);
++	assert(extent <= SSTREAM_BUF_LEN &&
++	       ss->index <= SSTREAM_BUF_LEN - extent);
++	if (extent > 1) {
++		memcpy(ss->buffer + ss->index, text, extent);
++		ss->index += extent - 1;
++	}
++}
++#define SStream_concat0(ss, literal) \
++	appendPrinterLiteral((ss), "" literal, sizeof("" literal))
++#endif
+ #include "X86IntelInstPrinter.c"
+ #endif
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 1dd3f85b..e6f3e5cb 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -3,6 +3,7 @@
+ #include "../../Mapping.h"
+ #include <limits.h>
+ #include <stdio.h>
++#include <string.h>
+ 
+ static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
+ 			 unsigned expected)
+@@ -188,13 +189,42 @@ static bool test_alias_lookup(void)
+ 	return true;
+ }
+ 
++static bool test_full_group_map(void)
++{
++#ifndef CAPSTONE_DIET
++	insn_map row = { 0 };
++	cs_detail detail = { 0 };
++	cs_insn insn = { 0 };
++	MCInst mi = { 0 };
++	mi.flat_insn = &insn;
++	insn.detail = &detail;
++	row.branch = true;
++	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i)
++		row.groups[i] = i + 1;
++
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS ||
++	    memcmp(detail.groups, row.groups, sizeof(row.groups)))
++		return false;
++
++	/* Preserve the existing group and append as many entries as fit. */
++	detail.groups_count = 1;
++	detail.groups[0] = 99;
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS || detail.groups[0] != 99 ||
++	    memcmp(detail.groups + 1, row.groups, MAX_NUM_GROUPS - 1))
++		return false;
++#endif
++	return true;
 +}
 +
-+void map_set_alias_id(MCInst *MI, const SStream *O, const name_map *map,
-+		      int map_size)
-+{
-+	size_t length;
-+	const char *name = alias_mnemonic(MI, O, &length);
-+	int id = name ? name2id_n(map, map_size, name, length) : -1;
-+	MI->flat_insn->alias_id = id < 0 ? 0 : id;
-+}
-+
-+#if defined(CAPSTONE_HAS_ARM) || defined(CAPSTONE_HAS_AARCH64) || \
-+	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_SPARC)) && \
-+	 !defined(CAPSTONE_DIET))
-+void map_set_alias_id_indexed(MCInst *MI, const SStream *O, const name_map *map,
-+			      const uint16_t *rows, unsigned mask)
-+{
-+	size_t length;
-+	const char *name = alias_mnemonic(MI, O, &length);
-+	MI->flat_insn->alias_id = 0;
-+	if (!name)
-+		return;
-+
-+	uint32_t hash = 2166136261u;
-+	for (size_t i = 0; i < length; ++i)
-+		hash = (hash ^ (unsigned char)name[i]) * 16777619u;
-+	for (unsigned slot = hash & mask; rows[slot]; slot = (slot + 1) & mask) {
-+		const name_map *entry = &map[rows[slot] - 1];
-+		if (strncmp(entry->name, name, length) == 0 &&
-+		    entry->name[length] == '\0') {
-+			MI->flat_insn->alias_id = entry->id;
-+			return;
-+		}
-+	}
- }
-+#endif
- 
- /// Does a binary search over the given map and searches for @id.
- /// If @id exists in @map, it sets @found to true and returns
-diff --git a/Mapping.h b/Mapping.h
-index 9f69f881..53687e80 100644
---- a/Mapping.h
-+++ b/Mapping.h
-@@ -296,6 +296,16 @@ bool map_use_alias_details(const MCInst *MI);
- void map_set_alias_id(MCInst *MI, const SStream *O,
- 		      const name_map *alias_mnem_id_map, int map_size);
- 
-+#if defined(CAPSTONE_HAS_ARM) || defined(CAPSTONE_HAS_AARCH64) || \
-+	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_SPARC)) && \
-+	 !defined(CAPSTONE_DIET))
-+/* Power-of-two linear probing table with one-based rows and empty slot zero. */
-+CAPSTONE_INTERNAL void map_set_alias_id_indexed(MCInst *MI, const SStream *O,
-+						const name_map *map,
-+						const uint16_t *rows,
-+						unsigned mask);
-+#endif
-+
- /// Mapping from Capstone enumeration identifiers and their values.
- ///
- /// This map MUST BE sorted to allow binary searches.
-diff --git a/arch/AArch64/AArch64GenAliasIndex.inc b/arch/AArch64/AArch64GenAliasIndex.inc
-new file mode 100644
-index 00000000..e263a416
---- /dev/null
-+++ b/arch/AArch64/AArch64GenAliasIndex.inc
-@@ -0,0 +1,65 @@
-+/* Generated by suite/synctools/alias_mnemonic_index.py. */
-+	63, 0, 0, 0, 103, 177, 0, 0, 0, 279, 0, 0, 0, 353, 0, 0,
-+	0, 55, 0, 308, 0, 0, 0, 0, 0, 0, 0, 153, 0, 249, 0, 161,
-+	209, 53, 201, 218, 0, 340, 0, 0, 1, 165, 0, 0, 0, 0, 0, 290,
-+	0, 0, 189, 0, 0, 114, 0, 275, 0, 0, 0, 155, 0, 0, 0, 37,
-+	0, 100, 0, 0, 0, 0, 49, 294, 0, 210, 0, 0, 182, 0, 0, 72,
-+	270, 88, 0, 131, 295, 109, 0, 0, 137, 0, 0, 31, 0, 34, 358, 0,
-+	0, 0, 0, 110, 339, 0, 127, 0, 198, 257, 0, 0, 0, 0, 213, 0,
-+	0, 0, 225, 0, 0, 89, 0, 80, 0, 38, 0, 0, 87, 364, 0, 102,
-+	0, 0, 3, 47, 0, 149, 0, 0, 0, 0, 57, 351, 370, 93, 0, 83,
-+	0, 338, 0, 0, 0, 174, 280, 307, 326, 220, 0, 0, 267, 0, 8, 282,
-+	312, 0, 0, 0, 0, 0, 0, 228, 0, 191, 297, 0, 0, 21, 378, 43,
-+	212, 167, 272, 0, 371, 0, 59, 215, 0, 115, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 356, 0, 0, 0, 159, 0, 0, 235, 4, 373, 0, 0, 0,
-+	0, 0, 0, 341, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 0, 0,
-+	9, 130, 309, 0, 0, 0, 0, 0, 0, 0, 0, 152, 0, 207, 232, 23,
-+	243, 379, 0, 0, 0, 0, 0, 0, 0, 292, 143, 0, 0, 0, 219, 0,
-+	7, 96, 266, 0, 277, 16, 0, 0, 0, 0, 0, 0, 239, 0, 0, 303,
-+	0, 64, 186, 0, 0, 118, 156, 148, 203, 0, 0, 35, 0, 0, 0, 0,
-+	0, 199, 106, 129, 140, 300, 0, 0, 0, 355, 0, 0, 334, 0, 301, 208,
-+	240, 368, 138, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 346, 0, 0,
-+	221, 128, 91, 205, 261, 42, 5, 0, 0, 0, 0, 0, 322, 0, 0, 18,
-+	32, 0, 0, 273, 0, 328, 0, 0, 0, 0, 194, 0, 362, 0, 0, 0,
-+	0, 332, 101, 244, 99, 111, 0, 265, 24, 0, 0, 0, 0, 184, 105, 0,
-+	259, 58, 2, 304, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 226, 0,
-+	0, 123, 321, 0, 365, 317, 0, 98, 369, 0, 0, 0, 0, 78, 0, 0,
-+	20, 162, 262, 229, 285, 0, 0, 337, 0, 46, 0, 166, 0, 193, 0, 0,
-+	0, 0, 247, 330, 190, 0, 0, 0, 0, 0, 0, 175, 0, 286, 0, 0,
-+	0, 0, 0, 305, 231, 342, 224, 33, 327, 0, 0, 211, 0, 104, 0, 0,
-+	0, 0, 176, 61, 363, 0, 291, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	48, 12, 0, 163, 0, 0, 142, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 237, 0, 0, 0, 367, 0, 0, 74, 0, 0, 0, 0, 0, 0, 284,
-+	315, 0, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0, 314, 331, 374, 0,
-+	0, 0, 0, 0, 299, 0, 0, 278, 287, 178, 0, 26, 0, 222, 0, 73,
-+	125, 126, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 238, 0, 0, 0,
-+	281, 44, 0, 233, 0, 0, 0, 95, 204, 85, 310, 0, 196, 134, 172, 0,
-+	0, 0, 0, 0, 183, 0, 0, 0, 0, 151, 0, 0, 0, 0, 81, 51,
-+	0, 0, 54, 366, 0, 217, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	253, 0, 318, 0, 0, 0, 97, 0, 0, 50, 0, 0, 0, 132, 173, 0,
-+	0, 376, 192, 45, 0, 0, 0, 0, 0, 0, 372, 289, 181, 0, 0, 0,
-+	0, 269, 62, 348, 14, 359, 0, 0, 0, 15, 345, 296, 0, 0, 0, 0,
-+	0, 0, 0, 0, 185, 0, 0, 157, 0, 0, 250, 0, 0, 0, 0, 0,
-+	0, 0, 0, 116, 0, 0, 0, 112, 0, 0, 0, 245, 0, 0, 28, 86,
-+	117, 133, 94, 0, 139, 0, 17, 76, 0, 154, 164, 251, 325, 11, 82, 145,
-+	0, 0, 0, 271, 206, 248, 377, 41, 6, 0, 0, 0, 0, 241, 256, 0,
-+	0, 0, 0, 0, 0, 0, 234, 0, 0, 320, 0, 0, 0, 108, 0, 0,
-+	0, 0, 0, 0, 0, 0, 319, 0, 0, 0, 0, 84, 36, 0, 293, 0,
-+	0, 324, 0, 0, 0, 0, 263, 360, 344, 75, 0, 0, 0, 0, 0, 0,
-+	144, 0, 0, 0, 0, 0, 0, 0, 0, 0, 274, 187, 0, 169, 268, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 252, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 336, 113, 0, 0, 335, 0, 0, 0, 214, 90, 0,
-+	0, 0, 0, 70, 0, 0, 0, 0, 223, 0, 0, 0, 0, 0, 0, 0,
-+	0, 361, 146, 0, 0, 323, 0, 0, 288, 0, 0, 0, 0, 0, 0, 168,
-+	65, 121, 230, 354, 0, 0, 0, 170, 141, 347, 0, 0, 0, 0, 135, 0,
-+	0, 0, 107, 0, 0, 160, 0, 0, 242, 375, 306, 0, 0, 0, 180, 0,
-+	0, 0, 0, 79, 39, 313, 0, 77, 119, 0, 0, 0, 329, 0, 188, 0,
-+	0, 195, 0, 71, 0, 0, 0, 0, 0, 0, 66, 0, 0, 236, 0, 171,
-+	0, 0, 0, 0, 0, 0, 124, 276, 380, 0, 0, 0, 0, 0, 200, 13,
-+	92, 136, 67, 120, 333, 0, 0, 0, 0, 0, 25, 258, 0, 0, 0, 0,
-+	0, 0, 40, 0, 0, 29, 147, 202, 227, 0, 343, 150, 197, 30, 0, 0,
-+	0, 0, 0, 0, 0, 260, 122, 216, 349, 0, 0, 0, 283, 179, 302, 350,
-+	0, 0, 255, 0, 0, 0, 0, 0, 10, 0, 357, 52, 0, 0, 0, 0,
-+	0, 311, 0, 0, 0, 158, 0, 0, 0, 0, 0, 0, 316, 27, 246, 298,
-+	0, 0, 0, 254, 264, 0, 0, 0, 0, 0, 0, 0, 0, 56, 68, 0,
-+	0, 0, 0, 0, 0, 69, 22, 0, 0, 0, 0, 352, 0, 0, 0, 0,
-diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index 81b5e334..eb4438b5 100644
---- a/arch/AArch64/AArch64Mapping.c
-+++ b/arch/AArch64/AArch64Mapping.c
-@@ -163,6 +163,10 @@ static const name_map insn_alias_mnem_map[] = {
- 	{ AARCH64_INS_ALIAS_END, NULL },
- };
- 
-+static const uint16_t alias_index[] = {
-+#include "AArch64GenAliasIndex.inc"
-+};
-+
- static const char *get_custom_reg_alias(unsigned reg)
+ int main(void)
  {
- 	switch (reg) {
-@@ -991,8 +995,8 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	}
- 	AArch64_check_updates_flags(MI);
- 	AArch64_add_sysreg_alias_access(MI);
--	map_set_alias_id(MI, O, insn_alias_mnem_map,
--			 ARR_SIZE(insn_alias_mnem_map) - 1);
-+	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
-+				 ARR_SIZE(alias_index) - 1);
- 	int syntax_opt = MI->csh->syntax;
- 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
- 		patch_cs_reg_alias(O->buffer);
-diff --git a/arch/ARM/ARMGenAliasIndex.inc b/arch/ARM/ARMGenAliasIndex.inc
-new file mode 100644
-index 00000000..feaa1147
---- /dev/null
-+++ b/arch/ARM/ARMGenAliasIndex.inc
-@@ -0,0 +1,9 @@
-+/* Generated by suite/synctools/alias_mnemonic_index.py. */
-+	28, 0, 0, 0, 0, 0, 26, 35, 0, 0, 31, 0, 0, 0, 0, 4,
-+	0, 0, 0, 0, 0, 0, 0, 17, 0, 0, 24, 0, 0, 1, 12, 7,
-+	18, 0, 0, 0, 47, 0, 0, 0, 0, 6, 41, 48, 22, 0, 3, 0,
-+	0, 0, 33, 0, 39, 0, 0, 0, 0, 0, 0, 0, 0, 14, 2, 0,
-+	0, 0, 0, 25, 0, 0, 0, 0, 0, 0, 0, 13, 11, 37, 0, 0,
-+	43, 8, 0, 0, 0, 0, 32, 45, 0, 0, 20, 5, 46, 44, 0, 23,
-+	0, 27, 19, 15, 0, 16, 0, 40, 0, 0, 0, 0, 0, 36, 38, 0,
-+	10, 21, 29, 34, 42, 9, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0,
-diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..4c7a1360 100644
---- a/arch/ARM/ARMMapping.c
-+++ b/arch/ARM/ARMMapping.c
-@@ -37,6 +37,10 @@ static const name_map insn_alias_mnem_map[] = {
- 	{ ARM_INS_ALIAS_VPUSH, "vpush" },  { ARM_INS_ALIAS_END, NULL }
- };
- 
-+static const uint16_t alias_index[] = {
-+#include "ARMGenAliasIndex.inc"
-+};
-+
- static const char *get_custom_reg_alias(unsigned reg)
- {
- 	switch (reg) {
-@@ -699,12 +703,14 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	MI->flat_insn->alias_id = 0;
- 	ARM_LLVM_printInstruction(MI, O, info);
- 	if (!MI->flat_insn->alias_id)
--		map_set_alias_id(MI, O, insn_alias_mnem_map,
--				 ARR_SIZE(insn_alias_mnem_map) - 1);
--	ARM_add_not_defined_ops(MI);
--	ARM_post_index_detection(MI);
--	ARM_check_mem_access_validity(MI);
--	ARM_add_cs_groups(MI);
-+		map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
-+				 ARR_SIZE(alias_index) - 1);
-+	if (MI->flat_insn->detail) {
-+		ARM_add_not_defined_ops(MI);
-+		ARM_post_index_detection(MI);
-+		ARM_check_mem_access_validity(MI);
-+		ARM_add_cs_groups(MI);
-+	}
- 	int syntax_opt = MI->csh->syntax;
- 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
- 		patch_cs_reg_alias(O->buffer);
-diff --git a/arch/Mips/MipsGenAliasIndex.inc b/arch/Mips/MipsGenAliasIndex.inc
-new file mode 100644
-index 00000000..a1c93d3c
---- /dev/null
-+++ b/arch/Mips/MipsGenAliasIndex.inc
-@@ -0,0 +1,17 @@
-+/* Generated by suite/synctools/alias_mnemonic_index.py. */
-+	86, 66, 35, 61, 0, 0, 0, 34, 77, 11, 97, 24, 100, 0, 0, 0,
-+	0, 0, 69, 0, 9, 84, 0, 0, 31, 0, 15, 23, 72, 0, 52, 0,
-+	0, 0, 0, 0, 0, 60, 0, 0, 56, 88, 102, 39, 83, 2, 87, 0,
-+	0, 0, 0, 79, 0, 0, 0, 0, 4, 95, 57, 0, 0, 0, 14, 0,
-+	0, 12, 0, 0, 0, 0, 110, 0, 8, 76, 0, 0, 0, 49, 0, 0,
-+	42, 0, 30, 0, 0, 0, 0, 64, 0, 0, 25, 103, 62, 108, 0, 0,
-+	27, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
-+	93, 0, 36, 0, 0, 0, 0, 75, 18, 0, 70, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 106, 0, 5, 0, 0, 0, 1, 0,
-+	0, 0, 0, 68, 0, 16, 26, 58, 82, 44, 17, 29, 0, 71, 73, 0,
-+	80, 0, 0, 89, 0, 32, 45, 0, 0, 0, 0, 19, 78, 0, 98, 6,
-+	81, 90, 28, 43, 51, 59, 105, 0, 0, 0, 0, 0, 0, 101, 0, 0,
-+	37, 0, 33, 54, 0, 0, 0, 0, 96, 0, 94, 22, 65, 91, 46, 0,
-+	50, 7, 63, 109, 0, 85, 0, 0, 0, 0, 47, 74, 13, 0, 0, 0,
-+	10, 99, 104, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 20, 92,
-+	0, 41, 0, 53, 67, 55, 0, 48, 0, 21, 0, 0, 0, 38, 0, 0,
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 20e28fba..4b9aa7a6 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -83,6 +83,10 @@ static const name_map insn_alias_mnem_map[] = {
- 	{ MIPS_INS_ALIAS_LI, "li" }, // addiu
- 	{ MIPS_INS_ALIAS_END, NULL },
- };
-+
-+static const uint16_t mips_alias_index[] = {
-+#include "MipsGenAliasIndex.inc"
-+};
- #endif
- const char *Mips_insn_name(csh handle, unsigned int id)
- {
-@@ -388,8 +392,8 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	}
- #endif
- #ifndef CAPSTONE_DIET
--	map_set_alias_id(MI, O, insn_alias_mnem_map,
--			 ARR_SIZE(insn_alias_mnem_map));
-+	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, mips_alias_index,
-+				 ARR_SIZE(mips_alias_index) - 1);
- #endif
- }
- 
-diff --git a/arch/Sparc/SparcGenAliasIndex.inc b/arch/Sparc/SparcGenAliasIndex.inc
-new file mode 100644
-index 00000000..4d8fa955
---- /dev/null
-+++ b/arch/Sparc/SparcGenAliasIndex.inc
-@@ -0,0 +1,65 @@
-+/* Generated by suite/synctools/alias_mnemonic_index.py. */
-+	33, 0, 0, 204, 0, 0, 356, 352, 0, 0, 0, 0, 0, 0, 0, 124,
-+	164, 0, 0, 0, 56, 0, 172, 289, 237, 0, 0, 263, 288, 0, 0, 0,
-+	0, 338, 0, 0, 0, 0, 0, 0, 251, 0, 0, 0, 0, 0, 230, 0,
-+	0, 122, 0, 208, 0, 19, 34, 55, 175, 221, 281, 304, 199, 224, 326, 358,
-+	0, 0, 0, 0, 0, 303, 0, 0, 0, 0, 58, 0, 366, 254, 0, 0,
-+	96, 340, 0, 0, 0, 0, 0, 0, 0, 0, 143, 0, 0, 193, 163, 0,
-+	0, 135, 0, 0, 0, 0, 15, 0, 88, 103, 349, 0, 0, 275, 0, 0,
-+	0, 0, 0, 0, 192, 0, 0, 21, 81, 173, 274, 375, 0, 0, 0, 0,
-+	50, 0, 136, 255, 0, 0, 249, 0, 0, 70, 0, 0, 313, 329, 378, 283,
-+	0, 0, 0, 13, 0, 0, 0, 265, 0, 106, 150, 379, 296, 0, 0, 0,
-+	0, 161, 268, 0, 0, 0, 0, 223, 0, 382, 0, 350, 0, 0, 0, 0,
-+	0, 42, 0, 0, 114, 166, 294, 0, 0, 0, 0, 0, 35, 176, 293, 0,
-+	16, 260, 264, 297, 0, 195, 0, 301, 0, 52, 0, 0, 179, 322, 222, 0,
-+	123, 0, 0, 0, 285, 0, 0, 324, 0, 0, 177, 74, 0, 104, 206, 343,
-+	348, 0, 0, 0, 266, 0, 0, 64, 246, 351, 0, 0, 0, 200, 31, 0,
-+	241, 0, 0, 0, 0, 189, 0, 292, 0, 0, 0, 75, 115, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 132, 54, 0, 333, 0, 100,
-+	0, 0, 0, 269, 120, 243, 0, 0, 0, 0, 0, 0, 0, 0, 336, 139,
-+	0, 314, 0, 0, 69, 0, 0, 0, 0, 105, 149, 0, 0, 116, 0, 0,
-+	219, 220, 286, 325, 0, 0, 359, 225, 145, 0, 364, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 102, 234, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 91, 278, 319, 0, 0, 0, 0, 0, 235, 0, 111, 0, 0,
-+	80, 0, 0, 59, 0, 0, 183, 287, 376, 354, 0, 0, 0, 0, 0, 12,
-+	0, 0, 0, 0, 0, 0, 0, 0, 360, 0, 207, 330, 0, 0, 0, 185,
-+	0, 11, 0, 0, 345, 79, 0, 0, 0, 0, 0, 0, 0, 240, 0, 295,
-+	0, 213, 0, 0, 0, 0, 49, 320, 0, 0, 0, 46, 0, 0, 0, 0,
-+	32, 0, 239, 0, 0, 0, 0, 0, 82, 270, 0, 0, 279, 0, 267, 0,
-+	0, 0, 302, 0, 0, 0, 0, 38, 0, 0, 0, 0, 0, 0, 171, 63,
-+	0, 0, 0, 0, 0, 0, 86, 331, 1, 129, 196, 0, 0, 0, 0, 0,
-+	165, 28, 0, 0, 97, 0, 0, 0, 0, 0, 353, 0, 0, 22, 78, 43,
-+	315, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	45, 231, 0, 0, 0, 0, 85, 133, 0, 0, 0, 0, 190, 0, 3, 328,
-+	0, 0, 373, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 57, 47, 0,
-+	0, 0, 0, 138, 233, 0, 0, 0, 0, 137, 0, 0, 0, 0, 0, 36,
-+	0, 0, 169, 44, 318, 0, 0, 0, 0, 0, 73, 0, 0, 0, 0, 174,
-+	290, 0, 209, 0, 0, 117, 334, 0, 87, 76, 0, 0, 0, 258, 0, 0,
-+	0, 0, 211, 0, 0, 25, 66, 244, 298, 84, 26, 72, 370, 0, 0, 312,
-+	0, 0, 0, 0, 0, 0, 108, 152, 0, 77, 0, 245, 39, 306, 0, 248,
-+	0, 335, 0, 6, 170, 0, 0, 184, 134, 0, 0, 0, 0, 187, 62, 0,
-+	0, 0, 118, 284, 0, 0, 0, 0, 0, 0, 0, 308, 130, 0, 158, 0,
-+	0, 0, 229, 113, 0, 0, 372, 0, 109, 153, 355, 0, 0, 89, 30, 0,
-+	337, 202, 342, 212, 0, 0, 142, 0, 110, 154, 0, 0, 0, 0, 162, 0,
-+	5, 0, 194, 238, 311, 0, 90, 0, 201, 357, 307, 94, 0, 65, 0, 0,
-+	0, 4, 60, 276, 0, 0, 0, 0, 247, 232, 0, 0, 0, 0, 0, 180,
-+	0, 0, 0, 0, 226, 0, 0, 95, 0, 0, 305, 0, 8, 41, 121, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 140, 0, 0, 0, 253, 0, 98, 339,
-+	0, 160, 0, 0, 197, 205, 0, 68, 126, 0, 0, 363, 0, 155, 182, 0,
-+	0, 48, 0, 0, 0, 273, 341, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 210, 51, 0, 0, 0, 0, 17, 7, 0, 257, 0, 0, 0,
-+	0, 252, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 280, 0, 0,
-+	0, 0, 23, 0, 0, 0, 125, 131, 144, 332, 299, 374, 0, 0, 0, 128,
-+	0, 146, 99, 0, 0, 0, 0, 0, 0, 0, 67, 0, 198, 377, 291, 0,
-+	228, 215, 217, 127, 18, 181, 368, 0, 0, 148, 380, 20, 168, 0, 323, 371,
-+	0, 0, 147, 159, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 256,
-+	0, 282, 272, 0, 24, 0, 0, 365, 0, 316, 0, 0, 141, 0, 0, 0,
-+	0, 0, 0, 0, 321, 346, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 214, 0, 0, 92, 0, 0, 0, 0, 0, 0, 0, 71, 277, 37, 361,
-+	156, 0, 0, 0, 0, 0, 0, 0, 9, 0, 0, 227, 0, 250, 0, 0,
-+	0, 0, 0, 0, 0, 0, 61, 300, 0, 0, 188, 317, 367, 0, 0, 14,
-+	261, 0, 0, 0, 167, 362, 0, 347, 0, 242, 119, 309, 27, 0, 216, 218,
-+	0, 2, 381, 0, 0, 178, 186, 0, 0, 0, 0, 93, 0, 271, 0, 0,
-+	0, 369, 0, 262, 0, 0, 112, 0, 259, 310, 0, 157, 0, 0, 0, 0,
-+	0, 0, 101, 0, 0, 0, 107, 151, 236, 0, 0, 0, 0, 0, 0, 191,
-+	0, 29, 0, 0, 0, 53, 327, 0, 0, 83, 0, 0, 344, 10, 0, 203,
-diff --git a/arch/Sparc/SparcMapping.c b/arch/Sparc/SparcMapping.c
-index abe9be7a..5364bdea 100644
---- a/arch/Sparc/SparcMapping.c
-+++ b/arch/Sparc/SparcMapping.c
-@@ -211,6 +211,10 @@ static const name_map insn_alias_mnem_map[] = {
- 	{ SPARC_INS_ALIAS_CALL, "call" },
- 	{ SPARC_INS_ALIAS_END, NULL },
- };
-+
-+static const uint16_t alias_index[] = {
-+#include "SparcGenAliasIndex.inc"
-+};
- static void insert_op(MCInst *MI, unsigned index, cs_sparc_op op)
- {
- 	if (!detail_is_set(MI)) {
-@@ -304,8 +308,8 @@ void Sparc_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	Sparc_LLVM_printInst(MI, MI->address, "", O);
- 
- #ifndef CAPSTONE_DIET
--	map_set_alias_id(MI, O, insn_alias_mnem_map,
--			 ARR_SIZE(insn_alias_mnem_map));
-+	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
-+				 ARR_SIZE(alias_index) - 1);
- 	Sparc_correct_details(MI);
- #endif
- }
-diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 850fa787..d0c0beb0 100644
---- a/suite/auto-sync/README.md
-+++ b/suite/auto-sync/README.md
-@@ -222,4 +222,8 @@ Documentation about the `.inc` file generation is in the [llvm-capstone](https:/
-   python3 -m usort format src/autosync
-   python3 -m black src/autosync
-   ```
--  
-+
-+After updating the ARM, AArch64, Mips or Sparc alias mnemonic maps, run
-+`python3 suite/synctools/alias_mnemonic_index.py`. The first entry for each
-+spelling in the backend's name map determines its alias ID. The generator's
-+`--check` option verifies the checked-in indices.
-diff --git a/suite/synctools/alias_mnemonic_index.py b/suite/synctools/alias_mnemonic_index.py
-new file mode 100644
-index 00000000..69a886ec
---- /dev/null
-+++ b/suite/synctools/alias_mnemonic_index.py
-@@ -0,0 +1,72 @@
-+#!/usr/bin/env python3
-+# SPDX-License-Identifier: BSD-3-Clause
-+"""Index the first matching row in each indexed textual alias name map."""
-+
-+import argparse
-+from pathlib import Path
-+import re
-+
-+
-+def generate(directory):
-+    arch = directory.name
-+    source = (directory / f"{arch}Mapping.c").read_text()
-+    declaration = "static const name_map insn_alias_mnem_map[] = {"
-+    body = source.split(declaration, 1)[1].split("};", 1)[0]
-+    include = f"{arch}GenCSAliasMnemMap.inc"
-+    body = body.replace(f'#include "{include}"', (directory / include).read_text())
-+    body = re.sub(r"/\*.*?\*/|//[^\n]*", "", body, flags=re.S)
-+    row = re.compile(
-+        r'\s*\{\s*'
-+        + arch.upper()
-+        + r'_INS_ALIAS_(\w+)\s*,\s*(NULL|"[^"\\]*")\s*\},?'
-+    )
-+    names = []
-+    cursor = 0
-+    while body[cursor:].strip():
-+        match = row.match(body, cursor)
-+        if not match:
-+            raise ValueError(f"Unexpected {arch} alias name-map initializer")
-+        cursor = match.end()
-+        if match[2] == "NULL":
-+            if match[1] != "END" or body[cursor:].strip():
-+                raise ValueError(f"Unexpected {arch} alias terminator")
-+            break
-+        names.append(match[2][1:-1].encode("ascii"))
-+    else:
-+        raise ValueError(f"Missing {arch} alias terminator")
-+    if len(names) > 65535:
-+        raise ValueError(f"{arch} alias rows exceed the index width")
-+
-+    first = {}
-+    for i, name in enumerate(names, 1):
-+        first.setdefault(name, i)
-+    size = 1 << (max(2, 2 * len(first)) - 1).bit_length()
-+    slots = [0] * size
-+    for name, index in first.items():
-+        h = 2166136261
-+        for c in name:
-+            h = ((h ^ c) * 16777619) & 0xffffffff
-+        slot = h & (size - 1)
-+        while slots[slot]:
-+            slot = (slot + 1) & (size - 1)
-+        slots[slot] = index
-+    lines = ["/* Generated by suite/synctools/alias_mnemonic_index.py. */"]
-+    for i in range(0, size, 16):
-+        lines.append("\t" + ", ".join(map(str, slots[i : i + 16])) + ",")
-+    return "\n".join(lines) + "\n"
-+
-+
-+if __name__ == "__main__":
-+    parser = argparse.ArgumentParser(description=__doc__)
-+    parser.add_argument("--check", action="store_true")
-+    args = parser.parse_args()
-+    root = Path(__file__).resolve().parents[2] / "arch"
-+    for arch in ("ARM", "AArch64", "Mips", "Sparc"):
-+        directory = root / arch
-+        target = directory / f"{arch}GenAliasIndex.inc"
-+        content = generate(directory)
-+        if args.check:
-+            if target.read_text() != content:
-+                raise SystemExit(f"Regenerate {target.name}")
-+        else:
-+            target.write_text(content)
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index b6a40374..f3bda809 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -17,6 +17,11 @@ if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
-    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
- endif()
-+if(Python3_Interpreter_FOUND AND (CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR
-+   CAPSTONE_MIPS_SUPPORT OR CAPSTONE_SPARC_SUPPORT))
-+    add_test(NAME unit_alias_mnemonic_index_generator
-+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_index.py" --check)
-+endif()
- if(CAPSTONE_MIPS_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
- endif()
+ 	bool found = true;
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_name_lookup() && test_alias_lookup() &&
++	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&

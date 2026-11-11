@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='four alias indices and ARM detail gate' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='native Intel printer and bounded instruction groups' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -238,9 +238,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    backends = {'ARM':'ARM','RISCV':'RISCV','SystemZ':'SystemZ','LoongArch':'LoongArch','PowerPC':'PPC'}
-    if not incremental:
-        backends.update(AArch64='AArch64',Mips='Mips',Sparc='Sparc')
+    backends = {'AArch64':'AArch64','Mips':'Mips','PowerPC':'PPC','Sparc':'Sparc'}
     allowed = {prefix+'arch/'+arch+'/'+stem+'Mapping.c.o' for arch,stem in backends.items()}
     allowed.add(prefix+'Mapping.c.o')
     if set(changed) != allowed:
