@@ -1,0 +1,29 @@
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -12,6 +12,12 @@
+         add_test(NAME unit_mapping_diet_types_parser
+             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_mapping_diet_types.py")
+     endif()
++endif()
++if(CAPSTONE_PPC_SUPPORT AND Python3_Interpreter_FOUND)
++    add_test(NAME unit_ppc_alias_hints_generator
++        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/ppc_alias_hints.py" --check)
++    add_test(NAME unit_ppc_alias_hints_parser
++        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_ppc_alias_hints.py")
+ endif()
+ if(CAPSTONE_MIPS_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+--- a/suite/auto-sync/README.md
++++ b/suite/auto-sync/README.md
+@@ -113,6 +113,11 @@
+ table calls share the generated 64-bit `_3` helper; the translator preserves
+ that choice instead of inferring a helper suffix from the encoded width.
+ 
++After updating the PowerPC assembly writer or alias mnemonic map, run
++`python3 suite/synctools/ppc_alias_hints.py` and verify with `--check`.
++The generated hint identifies a candidate row. The printer validates the
++emitted mnemonic against that row and searches the full map on a miss.
++
+ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+ `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+ The generated immediate-size lookup preserves the original metadata and uses

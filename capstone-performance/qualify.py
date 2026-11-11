@@ -1,0 +1,75 @@
+"""Build and run the fork's own tests against actual, frozen product sources."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import xml.etree.ElementTree as ET
+
+from run import EVIDENCE, ROOT, SOURCE, WORK, cleanup, command, fetch, sha, write
+
+def tests(source, label, preset, selection=None):
+    d=WORK/('build-'+label)
+    flags=['-DCAPSTONE_ARCHITECTURE_DEFAULT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON',
+           '-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    if preset=='sanitized':
+        flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
+                      '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
+                      '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address,undefined'])
+        os.environ['ASAN_OPTIONS']='halt_on_error=1:detect_leaks=1'
+        os.environ['UBSAN_OPTIONS']='halt_on_error=1:print_stacktrace=1'
+    command(['cmake','-S',source,'-B',d,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release',
+             '-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCAPSTONE_BUILD_MACOS_THIN=ON',*flags],label+'-config')
+    command(['cmake','--build',d,'--parallel','3'],label+'-build')
+    args=['ctest','--test-dir',d,'--parallel','2','--output-on-failure','--no-tests=error',
+          '--output-junit',str(EVIDENCE/(label+'-ctest.xml'))]
+    if selection:
+        names=EVIDENCE/'failed-names.txt';names.write_text('\n'.join(selection)+'\n')
+        args+=['--tests-from-file',str(names)]
+    with (EVIDENCE/(label+'-ctest.log')).open('w') as f:
+        completed=subprocess.run(args,stdout=f,stderr=subprocess.STDOUT)
+    xml=ET.parse(EVIDENCE/(label+'-ctest.xml'))
+    cases=list(xml.iter('testcase'))
+    assert cases
+    failed=[x.attrib['name'] for x in cases if x.find('failure') is not None or x.find('error') is not None]
+    skipped=[x.attrib['name'] for x in cases if x.find('skipped') is not None]
+    if completed.returncode and not failed:raise RuntimeError('ctest stopped without a failing case')
+    result=dict(total=len(cases),failed=failed,skipped=skipped,returncode=completed.returncode)
+    write(label+'-summary.json',result)
+    return failed
+
+def main():
+    parser=argparse.ArgumentParser()
+    parser.add_argument('candidate',choices=['combined','x86'])
+    parser.add_argument('preset',choices=['sanitized','intel-release'])
+    args=parser.parse_args()
+    assert not WORK.exists() and not EVIDENCE.exists()
+    EVIDENCE.mkdir();WORK.mkdir()
+    ref=json.loads((SOURCE/'manifest.json').read_text())['capstone_revision']
+    source=fetch('candidate','https://github.com/NeverSight/capstone.git',ref)
+    patches=['candidate.patch' if args.candidate=='combined' else 'x86-lookup.patch','x86-qualification.patch']
+    if args.candidate=='combined':
+        patches+=['ppc-qualification.patch']
+        for f,target in [('ppc_alias_hints.py','suite/synctools'),('test_ppc_alias_hints.py','tests/unit')]:
+            shutil.copy2(SOURCE/f,source/target/f)
+    for i,f in enumerate(patches):
+        command(['git','apply','--check',SOURCE/f],f'check-{i}',source)
+        command(['git','apply',SOURCE/f],f'patch-{i}',source)
+    command(['git','diff','--check'],'source-diff',source)
+    write('inputs.json',dict(ref=ref,preset=args.preset,candidate=args.candidate,
+                             patches={f:sha(SOURCE/f) for f in patches}))
+    failed=tests(source,'candidate',args.preset)
+    if failed:
+        base=fetch('base','https://github.com/NeverSight/capstone.git',ref)
+        inherited=tests(base,'base',args.preset,failed)
+        write('baseline-comparison.json',dict(candidate_failed=failed,also_failed_on_base=inherited))
+        if set(failed)!=set(inherited):raise RuntimeError('New test failures')
+    write('completed.json',dict(complete=True))
+
+if __name__=='__main__':
+    try:
+        main()
+    finally:
+        EVIDENCE.mkdir(exist_ok=True)
+        cleanup()
