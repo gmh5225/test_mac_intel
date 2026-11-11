@@ -236,9 +236,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required={prefix+'arch/X86/'+stem+'.c.o' for stem in ('X86ATTInstPrinter','X86IntelInstPrinter','X86Mapping')}
-    allowed=required|{prefix+'arch/X86/X86IntelInstPrinterPrechecked.c.o'}
-    if not required <= set(changed) <= allowed:
+    required={prefix+'arch/X86/X86Mapping.c.o'}
+    if set(changed) != required:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
@@ -358,7 +357,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# X86 extension printer entry on public decode workloads', '',
+    lines = ['# Precomputed x86 public ID cache at handle creation', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
