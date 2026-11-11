@@ -1,0 +1,26 @@
+name: Compare x87 opcode aliases on native x86
+on:
+  push:
+    branches: [codex/capstone-x87-alias-hardware]
+    paths: [capstone-performance/x87/**, .github/workflows/capstone-x87-hardware.yml]
+permissions:
+  contents: read
+jobs:
+  run:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15-intel, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance/x87
+      - run: |
+          test "$(uname -m)" = x86_64
+          if test "$(uname)" = Darwin; then sysctl -n machdep.cpu.brand_string; else lscpu | head -24; fi
+          trap 'rm -f -- "$RUNNER_TEMP/x87-probe"' EXIT
+          clang -std=c11 -O2 -Wall -Wextra -Werror capstone-performance/x87/{probe.c,thunks.S} -o "$RUNNER_TEMP/x87-probe"
+          "$RUNNER_TEMP/x87-probe"
