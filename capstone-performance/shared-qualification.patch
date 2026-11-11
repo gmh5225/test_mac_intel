@@ -92,3 +92,23 @@
  The legacy x86 full Intel and AT&T printer tables store mnemonic lengths in
  unused high bits of their existing opcode records. The string bytes and operand
  fragment masks remain authoritative. After updating `X86GenAsmWriter*.inc`, run
+--- a/tests/unit/x86_encoding_accuracy.c
++++ b/tests/unit/x86_encoding_accuracy.c
+@@ -140,7 +140,7 @@
+ 	if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+ 		return false;
+ 	cs_struct *arch = (cs_struct *)(uintptr_t)handle;
+-	uint32_t *cache = arch->x86_insn_lut;
++	const uint32_t *cache = arch->x86_insn_lut;
+ 	bool ok = cache != NULL;
+ 	for (unsigned id = 0; id <= arch->x86_insn_lut_max + 1; ++id) {
+ 		cs_insn cached = { 0 }, fallback = { 0 };
+@@ -331,7 +331,7 @@
+ 	if (mode != CS_MODE_64)
+ 		return true;
+ 	cs_struct *arch = (cs_struct *)(uintptr_t)handle;
+-	uint32_t *cache = arch->x86_insn_lut;
++	const uint32_t *cache = arch->x86_insn_lut;
+ 	bool ok = cache != NULL;
+ 	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
+ 		if (cases[c].full_only && cs_support(CS_SUPPORT_X86_REDUCE))
