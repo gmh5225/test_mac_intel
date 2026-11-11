@@ -352,6 +352,10 @@ def finish():
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
             out.write(report)
+    cleanup()
+
+
+def cleanup():
     receipt = dict(path=str(WORK), files=0, logical_bytes=0, removed=False)
     if WORK.exists():
         for path in WORK.rglob('*'):

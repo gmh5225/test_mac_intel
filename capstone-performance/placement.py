@@ -78,6 +78,56 @@ def objects(label):
     return {name: next(directory.rglob(name)) for name in OBJECTS}
 
 
+def pad_sections(image, lengths):
+    # Keep section indices and relocations intact. Only move payloads that grow.
+    header = struct.Struct('<IIQQQQIIQQ')
+    if struct.unpack_from('<H', image, 16)[0] != 1:
+        raise ValueError('expected a relocatable object')
+    offset = struct.unpack_from('<Q', image, 40)[0]
+    size, count, names = struct.unpack_from('<HHH', image, 58)
+    if size != header.size or not 0 < names < count:
+        raise ValueError('unsupported section table')
+    entries = [list(header.unpack_from(image, offset + i * size)) for i in range(count)]
+    strings = entries[names]
+    original_names = image[strings[4]:strings[4] + strings[5]]
+    names_blob = bytearray(original_names)
+    by_name = {original_names[e[0]:original_names.index(b'\0', e[0])].decode(): e for e in entries}
+    result = bytearray(image)
+
+    def append(data, align):
+        result.extend(bytes(-len(result) % max(align, 1)))
+        start = len(result)
+        result.extend(data)
+        return start
+
+    for name, (length, align) in lengths.items():
+        entry = by_name.get(name)
+        if entry is None:
+            if name != '.rodata':
+                raise ValueError('unexpected missing section ' + name)
+            entry = [len(names_blob), 1, 2, 0, 0, 0, 0, 0, 1, 0]
+            entries.append(entry)
+            names_blob.extend(name.encode() + b'\0')
+        if entry[1] != 1 or entry[5] > length:
+            raise ValueError('invalid section growth ' + name)
+        if entry[5] != length or entry[8] != align:
+            old = image[entry[4]:entry[4] + entry[5]]
+            entry[4] = append(old + bytes(length - len(old)), align)
+            entry[5], entry[8] = length, align
+    if names_blob != original_names:
+        strings[4] = append(names_blob, strings[8])
+        strings[5] = len(names_blob)
+    new_table = append(b''.join(header.pack(*e) for e in entries), 8)
+    struct.pack_into('<Q', result, 40, new_table)
+    struct.pack_into('<H', result, 60, len(entries))
+    return result
+
+
+def relocation_inventory(image):
+    return {name: image[v['offset']:v['offset'] + v['length']]
+            for name, v in sections(image).items() if v['type'] in (4, 9)}
+
+
 def archive(label, pair, matched):
     # Enlarge each section only to the maximum of the two observed object sizes.
     # No instructions are replaced. The original archives are kept for the natural pair.
@@ -93,29 +143,21 @@ def archive(label, pair, matched):
             raise ValueError('expected a unique archive member: ' + name)
         inputs = {side: objects(side)[name].read_bytes() for side in ['base', 'new']}
         tables = {side: sections(data) for side, data in inputs.items()}
-        args = []
+        lengths = {}
         for section in matched:
-            entries = {side: table.get(section) for side, table in tables.items()}
-            existing = [v for v in entries.values() if v]
+            existing = [t[section] for t in tables.values() if section in t]
             if not existing:
                 continue
             length = max(v['length'] for v in existing)
             align = max(v['align'] for v in existing)
-            entry = entries[label]
-            size = entry['length'] if entry else 0
-            if size < length:
-                data = b'' if not entry else inputs[label][entry['offset']:entry['offset'] + size]
-                blob = directory / (name + section + '.bin')
-                blob.write_bytes(data + bytes(length - size))
-                args.extend(['--update-section' if entry else '--add-section', section + '=' + str(blob)])
-                if not entry:
-                    args.extend(['--set-section-flags', section + '=alloc,load,readonly,data,contents'])
-            if not entry or entry['align'] != align:
-                args.extend(['--set-section-alignment', section + '=' + str(align)])
-            changes.append(dict(object=name, section=section, before=size, after=length, align=align))
+            before = tables[label].get(section, {}).get('length', 0)
+            lengths[section] = (length, align)
+            changes.append(dict(object=name, section=section, before=before, after=length, align=align))
+        after = pad_sections(inputs[label], lengths)
+        if relocation_inventory(after) != relocation_inventory(inputs[label]):
+            raise ValueError('relocations changed: ' + name)
         target = directory / name
-        command(['objcopy', *args, objects(label)[name], target], pair + '-' + label + '-' + name)
-        after = target.read_bytes()
+        target.write_bytes(after)
         check = sections(after)
         for sec in matched:
             before = tables[label].get(sec)
@@ -149,6 +191,20 @@ def prepare():
                 command(['clang++', WORK / (consumer + '.o'), lib, *extra, '-lpthread', '-ldl',
                          '-lm', '-o', output], output.name + '-link')
     write('placement-sections.json', metadata)
+    # Reconstruct the failed first attempt on one object to check the tool's relocation behavior.
+    change = next(c for c in metadata['text-base'] if c['before'] < c['after'])
+    obj = objects('base')[change['object']]
+    before = obj.read_bytes()
+    entry = sections(before)['.text']
+    payload = WORK / 'objcopy-diagnostic.bin'
+    payload.write_bytes(before[entry['offset']:entry['offset'] + entry['length']] +
+                        bytes(change['after'] - change['before']))
+    old_path = WORK / 'objcopy-diagnostic.o'
+    command(['objcopy', '--update-section', '.text=' + str(payload), obj, old_path],
+            'objcopy-diagnostic')
+    write('objcopy-relocations.json', {k: {n: len(v) for n, v in relocation_inventory(data).items()}
+          for k, data in [('original', before), ('objcopy', old_path.read_bytes()),
+                          ('preserved', (WORK / 'text-base' / obj.name).read_bytes())]})
     lookup = {}
     for consumer in ['single', 'decoder']:
         for variant in VARIANTS[:-2]:
@@ -227,8 +283,25 @@ def measure():
     write('placement-complete.json', dict(complete=True, cases=len(rows), samples=len(rows)*64))
 
 
+def finish():
+    EVIDENCE.mkdir(exist_ok=True)
+    complete_path = EVIDENCE / 'placement-complete.json'
+    complete = json.loads(complete_path.read_text()) if complete_path.exists() else {'complete': False}
+    write('summary.json', dict(experiment='ELF placement', **complete))
+    lines = ['# ELF placement experiment', '', f"Timing complete: {complete['complete']}."]
+    if complete['complete']:
+        lines.append(f"{complete['samples']} observations across {complete['cases']} cases.")
+    report = '\n'.join(lines) + '\n'
+    (EVIDENCE / 'report.md').write_text(report)
+    if os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as out:
+            out.write(report)
+    from run import cleanup
+    cleanup()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('phase', choices=['prepare', 'measure'])
+    parser.add_argument('phase', choices=['prepare', 'measure', 'finish'])
     args = parser.parse_args()
-    {'prepare': prepare, 'measure': measure}[args.phase]()
+    {'prepare': prepare, 'measure': measure, 'finish': finish}[args.phase]()
