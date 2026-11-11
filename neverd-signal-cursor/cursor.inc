@@ -13,6 +13,13 @@ static void walk_signal(uintptr_t interrupted) {
     const uintptr_t address = (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_return_address);
     char mark = address == interrupted ? 'I' : address == expected_return ? 'R' : '.';
     write(2, &mark, 1);
+    Dl_info symbol;
+    if (dladdr((void *)address, &symbol) && symbol.dli_sname) {
+      size_t length = 0;
+      while (symbol.dli_sname[length]) ++length;
+      write(2, symbol.dli_sname, length);
+    }
+    write(2, "\n", 1);
     if (found) {
       if (address != expected_return)
         _exit(42);

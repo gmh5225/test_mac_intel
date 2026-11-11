@@ -45,7 +45,16 @@ try:
             (td/name).write_text(text)
         cc = [p['compiler'], *p['flags']]
         check([*cc, 'driver.c', 'caller.S', '-o', 'driver'], td)
-        for profile, flags in [('explicit', ['-DNEVERD_TEST_EXPLICIT_RA']), ('implicit', [])]:
+        for profile, flags, framed in [('explicit', ['-DNEVERD_TEST_EXPLICIT_RA'], False),
+                                       ('implicit', [], False), ('framed-explicit', ['-DNEVERD_TEST_EXPLICIT_RA'], True),
+                                       ('framed-implicit', [], True)]:
+            stages = body('kAssembly')
+            if framed:
+                stages = stages.replace('  sub sp, sp, #16\n.cfi_def_cfa_offset 16\n  str x30, [sp,#8]',
+                                        '  stp x29, x30, [sp,#-16]!\n.cfi_def_cfa_offset 16\n.cfi_offset x29,-16\n  mov x29,sp')
+                stages = stages.replace('  ldr x30, [sp,#8]\n.cfi_restore 30\n  add sp, sp, #16',
+                                        '  ldp x29,x30,[sp],#16\n.cfi_restore x29\n.cfi_restore 30')
+            (td/'stages.S').write_text(stages)
             image = td / (profile + '.dylib')
             check([*cc, '-dynamiclib', *flags, 'stages.S', 'companion.S', '-o', image], td)
             if compile_only:
