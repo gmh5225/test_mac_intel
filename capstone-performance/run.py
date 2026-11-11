@@ -141,13 +141,14 @@ def prepare():
                          if p.is_file() and '__pycache__' not in p.parts}))
     base = fetch('base', 'https://github.com/NeverSight/capstone.git', manifest['capstone_revision'])
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
-    common = SOURCE / 'qualified.patch'
+    variant = os.environ['SCAN_VARIANT']
+    common = SOURCE / ('with-profiles.patch' if variant == 'from-profiles' else 'qualified.patch')
     assert sha(common) == manifest['source_lineage'][common.name]['sha256']
     command(['git','apply',common], 'common-native-release',base)
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
     variant = os.environ['SCAN_VARIANT']
-    if variant != 'profiles':
+    if variant not in ('from-profiles','direct'):
         raise ValueError(variant)
     patch = SOURCE / (variant + '.patch')
     assert sha(patch) == manifest['source_lineage'][patch.name]['sha256']

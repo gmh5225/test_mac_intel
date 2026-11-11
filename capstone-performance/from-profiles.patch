@@ -1,0 +1,70 @@
+diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
+index 61dbb5d1..b56f8a97 100644
+--- a/arch/X86/X86GenMappingCounts.inc
++++ b/arch/X86/X86GenMappingCounts.inc
+@@ -4,6 +4,7 @@
+ #define X86_MAPPING_IMPLICIT_REPAIR (1U << 14)
+ 
+ #ifdef CAPSTONE_X86_REDUCE
++#define X86_FIRST_DENSE_MAPPING X86_AAA
+ #ifdef GET_X86_MAPPING_DETAILS
+ 	{ { 0 }, { 0 }, { X86_GRP_NOT64BITMODE }, 1024, 0 },
+ 	{ { X86_REG_EFLAGS }, { X86_REG_EFLAGS }, { 0 }, 33, 0 },
+@@ -1725,6 +1726,7 @@
+ 	{ X86_MOVSX16rr32, X86_INS_MOVSXD, 161 },
+ #endif
+ #else
++#define X86_FIRST_DENSE_MAPPING X86_AAA
+ #ifdef GET_X86_MAPPING_DETAILS
+ 	{ { 0 }, { 0 }, { X86_GRP_NOT64BITMODE }, 1024, 0 },
+ 	{ { 0 }, { X86_REG_FPSW }, { X86_GRP_FPU }, 1056, 0 },
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 8f7cd085..d930767e 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10253,8 +10253,14 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 	if (X86_get_insn_id_no_detail(h, insn, id))
+ 		return;
+ 
++#ifdef X86_FIRST_DENSE_MAPPING
++	/* A dense source table addresses its shared details without loading
++	 * the handle lookup first. Sparse tables retain the normal lookup. */
++	i = id - X86_FIRST_DENSE_MAPPING;
++#else
+ 	i = find_insn_h(h, id);
+-	if (i != -1) {
++#endif
++	if (i < ARR_SIZE(insns)) {
+ 		insn->id = insns[i].mapid;
+ 
+ 		if (h->detail_opt) {
+diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
+index 7ea35158..e29e7e7e 100644
+--- a/suite/synctools/x86_mapping_counts.py
++++ b/suite/synctools/x86_mapping_counts.py
+@@ -122,8 +122,9 @@ def generate(directory, suffix):
+         capacities[0] <= 32 and capacities[1] <= 32 and capacities[2] <= 16,
+         "Mapping counts exceed packed widths",
+     )
++    rows = entries(source)
+     previous = -1
+-    for row in entries(source):
++    for row in rows:
+         name = row[1]
+         require(
+             name in enum and enum[name] > previous,
+@@ -163,7 +164,13 @@ def generate(directory, suffix):
+         require(profile < (1 << 15), "Mapping details exceed packed index")
+         properties = (profile << 1) | int(row["is64bit"])
+         opcodes.append(f"\t{{ {name}, {row[2]}, {properties} }},")
+-    lines = ["#ifdef GET_X86_MAPPING_DETAILS"]
++    # After validating the increasing IDs, matching the span to the number
++    # of rows also proves that no instruction ID is missing inside the span.
++    lines = []
++    first = rows[0][1]
++    if previous - enum[first] + 1 == len(rows):
++        lines.append(f"#define X86_FIRST_DENSE_MAPPING {first}")
++    lines.append("#ifdef GET_X86_MAPPING_DETAILS")
+     for read, written, groups, value, jump in profiles:
+         fields = [
+             "{ " + (", ".join(field) or "0") + " }"
