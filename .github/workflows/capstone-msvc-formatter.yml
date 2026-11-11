@@ -1,8 +1,8 @@
-name: Same-consumer MSVC and clang-cl decode comparison
+name: Four-backend native dynamic CRT against iced
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-final-native-workloads]
+    branches: [codex/capstone-four-backend-x86]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD, MT]
+        crt: [MD]
     runs-on: windows-2022
     timeout-minutes: 55
     steps:
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: final-native-workloads-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: four-backend-x86-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
