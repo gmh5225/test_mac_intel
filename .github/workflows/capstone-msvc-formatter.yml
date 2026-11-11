@@ -2,7 +2,7 @@ name: Four-backend native dynamic CRT against iced
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-native-trie-x86]
+    branches: [codex/capstone-native-arm-alias-x86]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-trie-x86-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: native-arm-alias-x86-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

@@ -144,6 +144,13 @@ def get_cases():
         b = p.read_bytes()
         assert struct.unpack_from('<H', b, struct.unpack_from('<I', b, 60)[0] + 4)[0] == (0x14c if bits == 32 else 0x8664)
         add('kernel32-' + str(bits), bits, pe_text(b), digest(b))
+    for bits, system in [(32, 'SysWOW64'), (64, 'System32')]:
+        for stem in ('cmd','reg'):
+            path = Path(os.environ['SystemRoot']) / system / (stem+'.exe')
+            binary = path.read_bytes()
+            pe = int.from_bytes(binary[60:64], 'little')
+            assert int.from_bytes(binary[pe+4:pe+6], 'little') == (0x14c if bits==32 else 0x8664)
+            add(stem+'-'+str(bits), bits, pe_text(binary), digest(binary))
     for name, bits, flags in [('scalar32', 32, ['-fno-vectorize','-fno-slp-vectorize']),
                              ('scalar64', 64, ['-fno-vectorize','-fno-slp-vectorize']),
                              ('simd64', 64, ['-mavx2','-mfma'])]:
