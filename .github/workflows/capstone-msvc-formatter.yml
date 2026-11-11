@@ -2,7 +2,7 @@ name: Four-backend native dynamic CRT against iced
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-native-arm-alias-x86]
+    branches: [codex/capstone-whole-library-optimization]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -13,18 +13,18 @@ jobs:
       matrix:
         crt: [MD]
     runs-on: windows-2022
-    timeout-minutes: 55
+    timeout-minutes: 85
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/toolchains.py ${{ matrix.crt }}
+        run: python capstone-performance/msvc/ipo.py ${{ matrix.crt }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-arm-alias-x86-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: whole-library-optimization-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
