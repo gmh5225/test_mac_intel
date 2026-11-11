@@ -9,13 +9,14 @@ import subprocess
 from collections import Counter
 import run as p
 
-ref = '3b4aeea8566a118cca94ef00fb4f16c39c53a29a'
+ref = 'a60be2e71f73739659fd895009263e0f276e9d22'
 src, work, ev = p.source, p.work, p.evidence
 
 def profile():
     tree = p.fetch('capstone', 'capstone', ref)
     p.fetch('iced', 'iced', p.manifest['iced_revision'])
-    patch = src/'common.patch'
+    patch = src/'scan-and-printer.patch'
+    assert p.digest(patch.read_bytes())=='a6d822a90b67d13297f10bbe4c2222b63234296dfa0bed81aa1bb07eaa730dcd'
     p.run(['git','apply',patch], 'apply-native-output', tree)
     adapter = work/'adapter'
     adapter.mkdir()
@@ -70,7 +71,7 @@ target_link_libraries(sample_decode PRIVATE capstone_static "${ICED_ADAPTER}" ad
     for case in p.get_cases():
         if case['name'] not in ('putty-32-0.85','kernel32-64','scalar64','simd64'): continue
         for mode in ('scan','format','detail'):
-            for library in ('capstone',):
+            for library in ('capstone','iced'):
                 def args(n):
                     return [exe,library,mode,str(case['bits']),str(n),case['path']]
                 n = 1
@@ -95,7 +96,12 @@ target_link_libraries(sample_decode PRIVATE capstone_static "${ICED_ADAPTER}" ad
                     i=bisect.bisect_left(ips,int(addr,16))
                     asm=[l for _,l in excerpt[max(0,i-7):i+3]] if module.lower()=='sample_decode' else []
                     calls.append(dict(callee=callee,caller=name,next_rva=addr,samples=count,asm=asm))
-                summaries.append(dict(calls=calls,case=case['name'],mode=mode,library=library,samples=total,
+                hot=[]
+                for (module,addr),count in locations.most_common(28):
+                    if module.lower()!='sample_decode':continue
+                    i=bisect.bisect_left(ips,int(addr,16))
+                    hot.append(dict(rva=addr,count=count,asm=[line for _,line in excerpt[max(0,i-4):i+5]]))
+                summaries.append(dict(hot=hot,calls=calls,case=case['name'],mode=mode,library=library,samples=total,
                                       symbols=symbols.most_common(35),lines=lines.most_common(35),pcs=locations.most_common(12)))
                 p.write('samples.json', summaries)
                 print(case['name'],mode,library,total,symbols.most_common(3),flush=True)
