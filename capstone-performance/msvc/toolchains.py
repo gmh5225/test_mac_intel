@@ -16,9 +16,6 @@ def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
     trees = {'msvc':base}
-    baseline=source/'qualified.patch'
-    assert perf.digest(baseline.read_bytes())=='a6d822a90b67d13297f10bbe4c2222b63234296dfa0bed81aa1bb07eaa730dcd'
-    perf.run(['git','apply',baseline],'baseline-scan-and-printer',base)
     for name, expected in {'early': 'c96d12dfe0b347d6afb4b748c4a7bd697f5f797e03b1295cee528ccd1c8c15e2', 'full': 'af34afa8b6a084c6ed12437f599a65153f069cb3163fa8348df267a4a7be9bb2'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
