@@ -1,37 +1,696 @@
-diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 28ae2a67..3d3a864f 100644
---- a/arch/X86/X86FeatureExtension.h
-+++ b/arch/X86/X86FeatureExtension.h
-@@ -304,7 +304,15 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
- x86_feature_decode_result
- X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 			   MCInst *instr, uint16_t *size, uint8_t opcode);
--bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
-+bool X86_printExtensionOpcode(MCInst *instr, SStream *stream, bool att_syntax);
-+
-+static inline bool X86_printFeatureExtension(MCInst *instr, SStream *stream,
-+					     bool att_syntax)
-+{
-+	return MCInst_getOpcode(instr) >= X86_FEATURE_OPCODE_BASE &&
-+	       X86_printExtensionOpcode(instr, stream, att_syntax);
-+}
-+
- bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode, cs_mode mode);
- const char *X86_featureExtensionRegisterName(unsigned int reg);
- const char *X86_featureExtensionInstructionName(unsigned int id);
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..4f990d1d 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -8466,10 +8466,8 @@ static bool print_sha512_vex(MCInst *instr, SStream *stream, bool att_syntax)
- 	return true;
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..2558c4cc 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -109,148 +109,6 @@
+ #define GET_REGINFO_MC_DESC
+ #include "X86GenRegisterInfo.inc"
+ 
+-#ifndef CAPSTONE_X86_REDUCE
+-static bool gfniAffineBroadcastNeedsDisp8Scale(
+-	const InternalInstruction *insn)
+-{
+-	unsigned int i;
+-
+-	switch (insn->instructionID) {
+-	default:
+-		return false;
+-	case X86_VGF2P8AFFINEINVQBZ128rmbi:
+-	case X86_VGF2P8AFFINEINVQBZ128rmbik:
+-	case X86_VGF2P8AFFINEINVQBZ128rmbikz:
+-	case X86_VGF2P8AFFINEINVQBZ256rmbi:
+-	case X86_VGF2P8AFFINEINVQBZ256rmbik:
+-	case X86_VGF2P8AFFINEINVQBZ256rmbikz:
+-	case X86_VGF2P8AFFINEINVQBZrmbi:
+-	case X86_VGF2P8AFFINEINVQBZrmbik:
+-	case X86_VGF2P8AFFINEINVQBZrmbikz:
+-	case X86_VGF2P8AFFINEQBZ128rmbi:
+-	case X86_VGF2P8AFFINEQBZ128rmbik:
+-	case X86_VGF2P8AFFINEQBZ128rmbikz:
+-	case X86_VGF2P8AFFINEQBZ256rmbi:
+-	case X86_VGF2P8AFFINEQBZ256rmbik:
+-	case X86_VGF2P8AFFINEQBZ256rmbikz:
+-	case X86_VGF2P8AFFINEQBZrmbi:
+-	case X86_VGF2P8AFFINEQBZrmbik:
+-	case X86_VGF2P8AFFINEQBZrmbikz:
+-		break;
+-	}
+-
+-	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
+-		const OperandSpecifier *operand = &insn->operands[i];
+-
+-		if (operand->type == TYPE_M)
+-			return operand->encoding == ENCODING_RM;
+-	}
+-	return false;
+-}
+-#endif
+-
+-// copy x86 detail information from internal structure to public structure
+-static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
+-{
+-	if (inter->hasRex2) {
+-		/* REX2.M0 selects the generated map internally; 0F is not present
+-		 * in the architectural encoding. */
+-		pub->detail->x86.opcode[0] = inter->opcode;
+-	} else if (inter->vectorExtensionType != 0) {
+-		memcpy(pub->detail->x86.opcode, inter->vectorExtensionPrefix,
+-		       sizeof(pub->detail->x86.opcode));
+-	} else {
+-		if (inter->twoByteEscape) {
+-			if (inter->threeByteEscape) {
+-				pub->detail->x86.opcode[0] =
+-					inter->twoByteEscape;
+-				pub->detail->x86.opcode[1] =
+-					inter->threeByteEscape;
+-				pub->detail->x86.opcode[2] = inter->opcode;
+-			} else {
+-				pub->detail->x86.opcode[0] =
+-					inter->twoByteEscape;
+-				pub->detail->x86.opcode[1] = inter->opcode;
+-			}
+-		} else {
+-			pub->detail->x86.opcode[0] = inter->opcode;
+-		}
+-	}
+-
+-	/* rexPrefix carries a synthetic low REX nibble while decoding REX2. */
+-	pub->detail->x86.rex = inter->hasRex2 ? 0 : inter->rexPrefix;
+-	pub->detail->x86.rex2 = inter->hasRex2 ? inter->rex2Prefix : 0;
+-
+-	pub->detail->x86.addr_size = inter->addressSize;
+-
+-	pub->detail->x86.modrm = inter->orgModRM;
+-	pub->detail->x86.encoding.modrm_offset = inter->modRMOffset;
+-
+-	pub->detail->x86.sib = inter->sib;
+-	if (inter->sibIndex == SIB_INDEX_NONE &&
+-	    inter->sibBase == SIB_BASE_NONE) {
+-		pub->detail->x86.sib_index = X86_REG_INVALID;
+-		pub->detail->x86.sib_scale = inter->sibScale;
+-		pub->detail->x86.sib_base = X86_REG_INVALID;
+-	} else {
+-		pub->detail->x86.sib_index = x86_map_sib_index(inter->sibIndex);
+-		pub->detail->x86.sib_scale = inter->sibScale;
+-		pub->detail->x86.sib_base = x86_map_sib_base(inter->sibBase);
+-	}
+-	if (inter->apxEvexB4 && inter->sibBase != SIB_BASE_NONE) {
+-		const unsigned int number =
+-			16 |
+-			(bFromEVEX2of4(inter->vectorExtensionPrefix[1]) << 3) |
+-			(inter->sib & 7);
+-
+-		pub->detail->x86.sib_base = X86_register_map(
+-			(unsigned short)X86_featureExtensionMCGPR(
+-					number, inter->addressSize));
+-	}
+-	if (inter->hasRex2 && b4FromREX2(inter->rex2Prefix) &&
+-	    inter->sibBase != SIB_BASE_NONE) {
+-		const unsigned int number =
+-			16 | (b3FromREX2(inter->rex2Prefix) << 3) |
+-			(inter->sib & 7);
+-
+-		pub->detail->x86.sib_base = X86_register_map(
+-			(unsigned short)X86_featureExtensionMCGPR(
+-				number, inter->addressSize));
+-	}
+-	if (inter->apxEvexGprIndex) {
+-		const unsigned int number =
+-			16 |
+-			(xFromEVEX2of4(inter->vectorExtensionPrefix[1]) << 3) |
+-			((inter->sib >> 3) & 7);
+-
+-		pub->detail->x86.sib_index = X86_register_map(
+-			(unsigned short)X86_featureExtensionMCGPR(
+-					number, inter->addressSize));
+-	}
+-	if (inter->hasRex2 && x4FromREX2(inter->rex2Prefix) &&
+-	    inter->consumedSIB) {
+-		const unsigned int number =
+-			16 | (x3FromREX2(inter->rex2Prefix) << 3) |
+-			((inter->sib >> 3) & 7);
+-
+-		pub->detail->x86.sib_index = X86_register_map(
+-			(unsigned short)X86_featureExtensionMCGPR(
+-				number, inter->addressSize));
+-	}
+-
+-	pub->detail->x86.disp = inter->displacement;
+-	if (inter->consumedDisplacement) {
+-		pub->detail->x86.encoding.disp_offset =
+-			inter->displacementOffset;
+-		pub->detail->x86.encoding.disp_size = inter->displacementSize;
+-	}
+-
+-	pub->detail->x86.encoding.imm_offset = inter->immediateOffset;
+-	if (pub->detail->x86.encoding.imm_size == 0 &&
+-	    inter->immediateOffset != 0)
+-		pub->detail->x86.encoding.imm_size = inter->immediateSize;
+-}
+-
+ void X86_init(MCRegisterInfo *MRI)
+ {
+ 	// InitMCRegisterInfo(), X86GenRegisterInfo.inc
+@@ -329,11 +187,10 @@ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static int
+-decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+-		      size_t code_len, cs_mode mode,
+-		      bool *scalar_compare_p2_normalized,
+-		      uint8_t *original_scalar_compare_p2)
++int X86_decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
++			      size_t code_len, cs_mode mode,
++			      bool *scalar_compare_p2_normalized,
++			      uint8_t *original_scalar_compare_p2)
+ {
+ 	const uint8_t *decode_code = code;
+ 	size_t decode_size = code_len;
+@@ -599,173 +456,4 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	return 0;
  }
  
--bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax)
-+bool X86_printExtensionOpcode(MCInst *instr, SStream *stream, bool att_syntax)
- {
--	if (MCInst_getOpcode(instr) < X86_FEATURE_OPCODE_BASE)
+-static void prepareTranslation(InternalInstruction *insn)
+-{
+-#ifndef CAPSTONE_X86_REDUCE
+-	if (insn->displacementSize == 1 &&
+-	    gfniAffineBroadcastNeedsDisp8Scale(insn))
+-		insn->displacement *= 8;
+-#endif
+-}
+-
+-bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
+-{
+-	*size = (uint16_t)insn->length;
+-	prepareTranslation(insn);
+-	return !translateInstruction(instr, insn, false);
+-}
+-
+-#if defined(_MSC_VER)
+-#define X86_BACKEND_INLINE static __forceinline
+-#elif defined(__GNUC__)
+-#define X86_BACKEND_INLINE static inline __attribute__((always_inline))
+-#else
+-#define X86_BACKEND_INLINE static inline
+-#endif
+-
+-X86_BACKEND_INLINE bool
+-getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+-			      MCInst *instr, uint16_t *size,
+-			      uint8_t extension_opcode, bool scanOnly)
+-{
+-	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	bool scalar_compare_p2_normalized = false;
+-	bool operands_ready = false;
+-	uint8_t original_scalar_compare_p2 = 0;
+-	int ret;
+-	bool result;
+-
+-	InternalInstruction insn = { 0 };
+-	if (extension_opcode == 0x62)
+-		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+-					    &scalar_compare_p2_normalized,
+-					    &original_scalar_compare_p2);
+-	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
+-		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
+-					    instr, size);
+-		if (ret != X86_SCAN_RAW_READY)
+-			return ret == X86_SCAN_COMPLETE;
+-		ret = 0;
+-	} else {
+-		ret = decodeInstructionFull(&insn, code, code_len, handle->mode,
+-					    instr, size);
+-		if (ret == X86_DECODE_OPERANDS_READY) {
+-			operands_ready = true;
+-			ret = 0;
+-		}
+-	}
+-
+-	if (ret) {
 -		return false;
- 	return print_sha512_vex(instr, stream, att_syntax) ||
- 	       print_system_extension(instr, stream, att_syntax) ||
- 	       print_implicit_msr(instr, stream) ||
+-	} else {
+-		*size = (uint16_t)insn.length;
+-
+-		prepareTranslation(&insn);
+-		if (scanOnly || (handle->no_text && !handle->detail_opt))
+-			return !translateInstruction(instr, &insn, false);
+-		result = operands_ready ||
+-			 !translateInstruction(instr, &insn, true);
+-		if (result) {
+-			unsigned Flags = X86_IP_NO_PREFIX;
+-			if (scalar_compare_p2_normalized)
+-				insn.vectorExtensionPrefix[3] =
+-					original_scalar_compare_p2;
+-			instr->imm_size = insn.immSize;
+-
+-			// copy all prefixes
+-			instr->x86_prefix[0] = insn.prefix0;
+-			instr->x86_prefix[1] = insn.prefix1;
+-			instr->x86_prefix[2] = insn.prefix2;
+-			instr->x86_prefix[3] = insn.prefix3;
+-			instr->xAcquireRelease = insn.xAcquireRelease;
+-			instr->x86Lock = insn.hasLockPrefix;
+-
+-			if (handle->detail_opt) {
+-				update_pub_insn(instr->flat_insn, &insn);
+-			}
+-
+-			if (insn.hasAdSize)
+-				Flags |= X86_IP_HAS_AD_SIZE;
+-
+-			if (insn.hasOpSize)
+-				Flags |= X86_IP_HAS_OP_SIZE;
+-
+-			if (insn.repeatPrefix == 0xf2)
+-				Flags |= X86_IP_HAS_REPEAT_NE;
+-			else if (insn.repeatPrefix == 0xf3 &&
+-				 // It should not be 'pause' f3 90
+-				 insn.opcode != 0x90)
+-				Flags |= X86_IP_HAS_REPEAT;
+-			if (insn.hasLockPrefix)
+-				Flags |= X86_IP_HAS_LOCK;
+-
+-			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+-				if (insn.operands[i].encoding ==
+-				    ENCODING_WRITEMASK) {
+-					Flags |= X86_IP_HAS_EVEX_OPMASK;
+-					break;
+-				}
+-			}
+-
+-			instr->flags = Flags;
+-		}
+-
+-		return result;
+-	}
+-}
+-
+-// Public interface for the disassembler
+-bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+-			MCInst *instr, uint16_t *size, uint64_t address,
+-			void *_info)
+-{
+-	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	uint8_t extension_opcode;
+-	x86_feature_decode_result extension_result;
+-
+-	if (instr->flat_insn->detail) {
+-		// instr->flat_insn->detail initialization: 3 alternatives
+-
+-		// 1. The whole structure, this is how it's done in other arch disassemblers
+-		// Probably overkill since cs_detail is huge because of the 36 operands of ARM
+-
+-		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
+-
+-		// 2. Only the part relevant to x86
+-		memset(instr->flat_insn->detail, 0,
+-		       offsetof(cs_detail, x86) + sizeof(cs_x86));
+-
+-		// 3. The relevant part except for x86.operands
+-		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
+-		// marginally faster, should be okay since x86.op_count is set to 0
+-
+-		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
+-	}
+-
+-	extension_result = X86_FEATURE_NOT_HANDLED;
+-	if (X86_mayDecodeFeatureExtension(code, code_len,
+-					  (handle->mode & CS_MODE_64) != 0,
+-					  &extension_opcode))
+-		extension_result = X86_decodeFeatureExtension(
+-			ud, code, code_len, instr, size, extension_opcode);
+-	if (extension_result == X86_FEATURE_DECODED) {
+-		return true;
+-	}
+-	if (extension_result == X86_FEATURE_INVALID)
+-		return false;
+-
+-	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
+-					     extension_opcode, false);
+-}
+-
+-bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+-				       size_t code_len, MCInst *instr,
+-				       uint16_t *size, uint8_t extension_opcode)
+-{
+-	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
+-					     extension_opcode, true);
+-}
+-
+-#undef X86_BACKEND_INLINE
+-
+ #endif
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 4e1ab1d5..d11378de 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -32,6 +32,7 @@
+ 
+ #include "X86DisassemblerDecoder.h"
+ #include "X86Disassembler.h"
++#include "X86BaseInfo.h"
+ #include "X86Mapping.h"
+ #include "X86FeatureExtension.h"
+ #include "X86DisassemblerTranslator.h"
+@@ -3071,13 +3072,316 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+ 				     false, NULL);
+ }
+ 
+-int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+-			  size_t codeSize, cs_mode mode, MCInst *mcInst,
+-			  uint16_t *size)
++#ifndef CAPSTONE_X86_REDUCE
++static bool gfniAffineBroadcastNeedsDisp8Scale(
++	const InternalInstruction *insn)
+ {
+-	return decodeInstructionImpl(insn, code, codeSize, mode, NULL, size,
+-				     false, mcInst);
++	unsigned int i;
++
++	switch (insn->instructionID) {
++	default:
++		return false;
++	case X86_VGF2P8AFFINEINVQBZ128rmbi:
++	case X86_VGF2P8AFFINEINVQBZ128rmbik:
++	case X86_VGF2P8AFFINEINVQBZ128rmbikz:
++	case X86_VGF2P8AFFINEINVQBZ256rmbi:
++	case X86_VGF2P8AFFINEINVQBZ256rmbik:
++	case X86_VGF2P8AFFINEINVQBZ256rmbikz:
++	case X86_VGF2P8AFFINEINVQBZrmbi:
++	case X86_VGF2P8AFFINEINVQBZrmbik:
++	case X86_VGF2P8AFFINEINVQBZrmbikz:
++	case X86_VGF2P8AFFINEQBZ128rmbi:
++	case X86_VGF2P8AFFINEQBZ128rmbik:
++	case X86_VGF2P8AFFINEQBZ128rmbikz:
++	case X86_VGF2P8AFFINEQBZ256rmbi:
++	case X86_VGF2P8AFFINEQBZ256rmbik:
++	case X86_VGF2P8AFFINEQBZ256rmbikz:
++	case X86_VGF2P8AFFINEQBZrmbi:
++	case X86_VGF2P8AFFINEQBZrmbik:
++	case X86_VGF2P8AFFINEQBZrmbikz:
++		break;
++	}
++
++	for (i = 0; i < X86_MAX_OPERANDS; ++i) {
++		const OperandSpecifier *operand = &insn->operands[i];
++
++		if (operand->type == TYPE_M)
++			return operand->encoding == ENCODING_RM;
++	}
++	return false;
+ }
++#endif
++
++// copy x86 detail information from internal structure to public structure
++static void update_pub_insn(cs_insn *pub, InternalInstruction *inter)
++{
++	if (inter->hasRex2) {
++		/* REX2.M0 selects the generated map internally; 0F is not present
++		 * in the architectural encoding. */
++		pub->detail->x86.opcode[0] = inter->opcode;
++	} else if (inter->vectorExtensionType != 0) {
++		memcpy(pub->detail->x86.opcode, inter->vectorExtensionPrefix,
++		       sizeof(pub->detail->x86.opcode));
++	} else {
++		if (inter->twoByteEscape) {
++			if (inter->threeByteEscape) {
++				pub->detail->x86.opcode[0] =
++					inter->twoByteEscape;
++				pub->detail->x86.opcode[1] =
++					inter->threeByteEscape;
++				pub->detail->x86.opcode[2] = inter->opcode;
++			} else {
++				pub->detail->x86.opcode[0] =
++					inter->twoByteEscape;
++				pub->detail->x86.opcode[1] = inter->opcode;
++			}
++		} else {
++			pub->detail->x86.opcode[0] = inter->opcode;
++		}
++	}
++
++	/* rexPrefix carries a synthetic low REX nibble while decoding REX2. */
++	pub->detail->x86.rex = inter->hasRex2 ? 0 : inter->rexPrefix;
++	pub->detail->x86.rex2 = inter->hasRex2 ? inter->rex2Prefix : 0;
++
++	pub->detail->x86.addr_size = inter->addressSize;
++
++	pub->detail->x86.modrm = inter->orgModRM;
++	pub->detail->x86.encoding.modrm_offset = inter->modRMOffset;
++
++	pub->detail->x86.sib = inter->sib;
++	if (inter->sibIndex == SIB_INDEX_NONE &&
++	    inter->sibBase == SIB_BASE_NONE) {
++		pub->detail->x86.sib_index = X86_REG_INVALID;
++		pub->detail->x86.sib_scale = inter->sibScale;
++		pub->detail->x86.sib_base = X86_REG_INVALID;
++	} else {
++		pub->detail->x86.sib_index = x86_map_sib_index(inter->sibIndex);
++		pub->detail->x86.sib_scale = inter->sibScale;
++		pub->detail->x86.sib_base = x86_map_sib_base(inter->sibBase);
++	}
++	if (inter->apxEvexB4 && inter->sibBase != SIB_BASE_NONE) {
++		const unsigned int number =
++			16 |
++			(bFromEVEX2of4(inter->vectorExtensionPrefix[1]) << 3) |
++			(inter->sib & 7);
++
++		pub->detail->x86.sib_base = X86_register_map(
++			(unsigned short)X86_featureExtensionMCGPR(
++					number, inter->addressSize));
++	}
++	if (inter->hasRex2 && b4FromREX2(inter->rex2Prefix) &&
++	    inter->sibBase != SIB_BASE_NONE) {
++		const unsigned int number =
++			16 | (b3FromREX2(inter->rex2Prefix) << 3) |
++			(inter->sib & 7);
++
++		pub->detail->x86.sib_base = X86_register_map(
++			(unsigned short)X86_featureExtensionMCGPR(
++				number, inter->addressSize));
++	}
++	if (inter->apxEvexGprIndex) {
++		const unsigned int number =
++			16 |
++			(xFromEVEX2of4(inter->vectorExtensionPrefix[1]) << 3) |
++			((inter->sib >> 3) & 7);
++
++		pub->detail->x86.sib_index = X86_register_map(
++			(unsigned short)X86_featureExtensionMCGPR(
++					number, inter->addressSize));
++	}
++	if (inter->hasRex2 && x4FromREX2(inter->rex2Prefix) &&
++	    inter->consumedSIB) {
++		const unsigned int number =
++			16 | (x3FromREX2(inter->rex2Prefix) << 3) |
++			((inter->sib >> 3) & 7);
++
++		pub->detail->x86.sib_index = X86_register_map(
++			(unsigned short)X86_featureExtensionMCGPR(
++				number, inter->addressSize));
++	}
++
++	pub->detail->x86.disp = inter->displacement;
++	if (inter->consumedDisplacement) {
++		pub->detail->x86.encoding.disp_offset =
++			inter->displacementOffset;
++		pub->detail->x86.encoding.disp_size = inter->displacementSize;
++	}
++
++	pub->detail->x86.encoding.imm_offset = inter->immediateOffset;
++	if (pub->detail->x86.encoding.imm_size == 0 &&
++	    inter->immediateOffset != 0)
++		pub->detail->x86.encoding.imm_size = inter->immediateSize;
++}
++
++static void prepareTranslation(InternalInstruction *insn)
++{
++#ifndef CAPSTONE_X86_REDUCE
++	if (insn->displacementSize == 1 &&
++	    gfniAffineBroadcastNeedsDisp8Scale(insn))
++		insn->displacement *= 8;
++#endif
++}
++
++bool X86_completeScan(MCInst *instr, InternalInstruction *insn, uint16_t *size)
++{
++	*size = (uint16_t)insn->length;
++	prepareTranslation(insn);
++	return !translateInstruction(instr, insn, false);
++}
++
++#if defined(_MSC_VER)
++#define X86_BACKEND_INLINE static __forceinline
++#elif defined(__GNUC__)
++#define X86_BACKEND_INLINE static inline __attribute__((always_inline))
++#else
++#define X86_BACKEND_INLINE static inline
++#endif
++
++X86_BACKEND_INLINE bool
++getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
++			      MCInst *instr, uint16_t *size,
++			      uint8_t extension_opcode, bool scanOnly)
++{
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	bool scalar_compare_p2_normalized = false;
++	bool operands_ready = false;
++	uint8_t original_scalar_compare_p2 = 0;
++	int ret;
++	bool result;
++
++	InternalInstruction insn = { 0 };
++	if (extension_opcode == 0x62)
++		ret = X86_decodeEVEXInstruction(&insn, code, code_len, handle->mode,
++					    &scalar_compare_p2_normalized,
++					    &original_scalar_compare_p2);
++	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
++		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
++					    instr, size);
++		if (ret != X86_SCAN_RAW_READY)
++			return ret == X86_SCAN_COMPLETE;
++		ret = 0;
++	} else {
++		ret = decodeInstructionImpl(&insn, code, code_len, handle->mode,
++					    NULL, size, false, instr);
++		if (ret == X86_DECODE_OPERANDS_READY) {
++			operands_ready = true;
++			ret = 0;
++		}
++	}
++
++	if (ret) {
++		return false;
++	} else {
++		*size = (uint16_t)insn.length;
++
++		prepareTranslation(&insn);
++		if (scanOnly || (handle->no_text && !handle->detail_opt))
++			return !translateInstruction(instr, &insn, false);
++		result = operands_ready ||
++			 !translateInstruction(instr, &insn, true);
++		if (result) {
++			unsigned Flags = X86_IP_NO_PREFIX;
++			if (scalar_compare_p2_normalized)
++				insn.vectorExtensionPrefix[3] =
++					original_scalar_compare_p2;
++			instr->imm_size = insn.immSize;
++
++			// copy all prefixes
++			instr->x86_prefix[0] = insn.prefix0;
++			instr->x86_prefix[1] = insn.prefix1;
++			instr->x86_prefix[2] = insn.prefix2;
++			instr->x86_prefix[3] = insn.prefix3;
++			instr->xAcquireRelease = insn.xAcquireRelease;
++			instr->x86Lock = insn.hasLockPrefix;
++
++			if (handle->detail_opt) {
++				update_pub_insn(instr->flat_insn, &insn);
++			}
++
++			if (insn.hasAdSize)
++				Flags |= X86_IP_HAS_AD_SIZE;
++
++			if (insn.hasOpSize)
++				Flags |= X86_IP_HAS_OP_SIZE;
++
++			if (insn.repeatPrefix == 0xf2)
++				Flags |= X86_IP_HAS_REPEAT_NE;
++			else if (insn.repeatPrefix == 0xf3 &&
++				 // It should not be 'pause' f3 90
++				 insn.opcode != 0x90)
++				Flags |= X86_IP_HAS_REPEAT;
++			if (insn.hasLockPrefix)
++				Flags |= X86_IP_HAS_LOCK;
++
++			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
++				if (insn.operands[i].encoding ==
++				    ENCODING_WRITEMASK) {
++					Flags |= X86_IP_HAS_EVEX_OPMASK;
++					break;
++				}
++			}
++
++			instr->flags = Flags;
++		}
++
++		return result;
++	}
++}
++
++// Public interface for the disassembler
++bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
++			MCInst *instr, uint16_t *size, uint64_t address,
++			void *_info)
++{
++	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	uint8_t extension_opcode;
++	x86_feature_decode_result extension_result;
++
++	if (instr->flat_insn->detail) {
++		// instr->flat_insn->detail initialization: 3 alternatives
++
++		// 1. The whole structure, this is how it's done in other arch disassemblers
++		// Probably overkill since cs_detail is huge because of the 36 operands of ARM
++
++		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
++
++		// 2. Only the part relevant to x86
++		memset(instr->flat_insn->detail, 0,
++		       offsetof(cs_detail, x86) + sizeof(cs_x86));
++
++		// 3. The relevant part except for x86.operands
++		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
++		// marginally faster, should be okay since x86.op_count is set to 0
++
++		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
++	}
++
++	extension_result = X86_FEATURE_NOT_HANDLED;
++	if (X86_mayDecodeFeatureExtension(code, code_len,
++					  (handle->mode & CS_MODE_64) != 0,
++					  &extension_opcode))
++		extension_result = X86_decodeFeatureExtension(
++			ud, code, code_len, instr, size, extension_opcode);
++	if (extension_result == X86_FEATURE_DECODED) {
++		return true;
++	}
++	if (extension_result == X86_FEATURE_INVALID)
++		return false;
++
++	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
++					     extension_opcode, false);
++}
++
++bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
++				       size_t code_len, MCInst *instr,
++				       uint16_t *size, uint8_t extension_opcode)
++{
++	return getInstructionAfterExtensions(ud, code, code_len, instr, size,
++					     extension_opcode, true);
++}
++
++#undef X86_BACKEND_INLINE
+ 
+ enum { X86_SCAN_NOT_HANDLED = 3 };
+ 
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..fde58c13 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -718,9 +718,11 @@ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+  * to the caller; INVALID retains the original failure/size-write ordering.
+  * EVEX normalization callers keep the raw decoder. */
+ enum { X86_DECODE_OPERANDS_READY = 2 };
+-int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+-			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+-			  uint16_t *size);
++/* The EVEX normalizer restores encoded bytes before detail publication. */
++int X86_decodeEVEXInstruction(struct InternalInstruction *insn,
++			      const uint8_t *code, size_t code_len, cs_mode mode,
++			      bool *scalar_compare_p2_normalized,
++			      uint8_t *original_scalar_compare_p2);
+ 
+ //const char *x86DisassemblerGetInstrName(unsigned Opcode, const void *mii);
+ 
