@@ -1,0 +1,27 @@
+name: x86 compact scanner defined-state comparisons
+on:
+  push:
+    branches: [codex/capstone-terminal-scan-defined]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  states:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        reduce: ["ON", "OFF"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - run: python3 capstone-performance/check.py ${{ matrix.reduce }}
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: terminal-states-${{ matrix.reduce }}
+          path: capstone-evidence/
+          retention-days: 14
