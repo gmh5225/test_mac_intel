@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='parent with native Windows fixes and indexed MIPS aliases' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='published-boundary candidate before the ARM, AArch64 and SPARC index extension' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -238,6 +238,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + name + '.o' for name in ['Mapping.c', 'arch/AArch64/AArch64Mapping.c', 'arch/ARC/ARCMapping.c', 'arch/ARM/ARMMapping.c', 'arch/Alpha/AlphaMapping.c', 'arch/LoongArch/LoongArchMapping.c', 'arch/Mips/MipsMapping.c', 'arch/PowerPC/PPCInstPrinter.c', 'arch/PowerPC/PPCMapping.c', 'arch/Sparc/SparcMapping.c', 'arch/SystemZ/SystemZMapping.c', 'arch/TriCore/TriCoreMapping.c', 'arch/X86/X86Disassembler.c', 'arch/X86/X86IntelInstPrinter.c', 'arch/X86/X86Mapping.c', 'arch/Xtensa/XtensaMapping.c', 'cs.c']}
+    if incremental:
+        allowed = {'CMakeFiles/capstone.dir/arch/'+arch+'/'+arch+'Mapping.c.o' for arch in ('ARM','AArch64','Sparc')}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
