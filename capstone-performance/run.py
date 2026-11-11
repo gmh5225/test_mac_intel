@@ -209,7 +209,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['arch/PowerPC/PPCMapping.c', 'arch/PowerPC/PPCInstPrinter.c']}
+               ['arch/X86/X86Mapping.c']}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
@@ -334,7 +334,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               prior_m4_rejection_remains=True))
-    lines = ['# PPC alias validation through the existing name mapper', '',
+    lines = ['# x86 dense mapping rows', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
@@ -346,7 +346,7 @@ def finish():
                          f'{fmt("cpu_ns_base_over_iced")} | {fmt("cpu_ns_new_over_iced")} | '
                          f'{row["positive_cycles"]}/{len(row["pairs"])} | {row["aa_cpu_outside_2pct"]} |')
     lines += ['', 'Raw samples, including incomplete cycles or failed attempts, remain in this artifact.',
-              'The previous PPC design and its results remain separate. This experiment measures the updated candidate.']
+              'Dense row selection is measured against the same Capstone revision.']
     report = '\n'.join(lines) + '\n'
     (EVIDENCE / 'report.md').write_text(report)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
