@@ -2,7 +2,7 @@ name: Compiler-specific Capstone runtime object identity
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-dedicated-x86-release-scope]
+    branches: [codex/capstone-dedicated-x86-active-identity]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -13,15 +13,6 @@ jobs:
       matrix:
         include:
           - { host: windows-2022, flavor: MD, plan: active }
-          - { host: windows-2022, flavor: MD, plan: disabled }
-          - { host: windows-2022, flavor: MD, plan: four }
-          - { host: windows-2022, flavor: MD, plan: diet }
-          - { host: windows-2022, flavor: MD, plan: reduced }
-          - { host: windows-2022, flavor: MT, plan: x86 }
-          - { host: ubuntu-24.04, flavor: clang, plan: all }
-          - { host: ubuntu-24.04, flavor: gcc, plan: four }
-          - { host: macos-15, flavor: clang, plan: four }
-          - { host: macos-15-intel, flavor: clang, plan: x86 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 55
     steps:
@@ -35,6 +26,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-x86-release-scope-${{ matrix.host }}-${{ matrix.flavor }}-${{ matrix.plan }}-${{ github.run_attempt }}
+          name: dedicated-x86-active-identity-${{ matrix.host }}-${{ matrix.flavor }}-${{ matrix.plan }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
