@@ -1,19 +1,157 @@
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 952b6025..4bcd7f7c 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3080,7 +3080,13 @@ enum { X86_SCAN_NOT_HANDLED = 3 };
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..532ad0fb 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -635,7 +635,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	int ret;
+ 	bool result;
  
- /* Only the compact readers see this state. Generic/raw decoding starts its
-  * own state if the generated table has no terminal for this header. */
--X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
-+#if defined(_MSC_VER) && !defined(__clang__)
-+/* Keep the compact scanner in one MSVC frame across bitness and call sites. */
-+static __declspec(noinline)
-+#else
-+X86_DECODE_INLINE
-+#endif
-+int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
- 					  cs_mode mode, uint8_t opcode,
- 					  size_t opcodeOffset,
- 					  unsigned *instructionID,
+-	InternalInstruction insn = { 0 };
++	InternalInstruction insn;
++	memset(&insn, 0, offsetof(InternalInstruction, code));
+ 	if (extension_opcode == 0x62)
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..2be80faa 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -535,11 +535,16 @@ struct InstructionSpecifier {
+ #endif
+ };
+ 
++typedef char X86InternalRegisterWidths[
++	(MODRM_REG_max <= UINT16_MAX && EA_max <= UINT16_MAX &&
++	 SIB_INDEX_max <= UINT8_MAX && SIB_BASE_max <= UINT8_MAX &&
++	 SEG_OVERRIDE_max <= UINT8_MAX && EA_DISP_32 <= UINT8_MAX) ? 1 : -1];
++
+ /*
+  * The x86 internal instruction, which is produced by the decoder.
+  */
+ typedef struct InternalInstruction {
+-	// from here, all members must be initialized to ZERO to work properly
++	/* Prefix and optional operand state starts at zero. */
+ 	uint8_t operandSize;
+ 	uint8_t prefix0, prefix1, prefix2, prefix3;
+ 	/* The value of the REX prefix, if present */
+@@ -552,7 +557,7 @@ typedef struct InternalInstruction {
+ 	bool apxEvexX4;
+ 	bool apxEvexGprIndex;
+ 	/* The segment override type */
+-	SegmentOverride segmentOverride;
++	uint8_t segmentOverride;
+ 	bool consumedModRM;
+ 	uint8_t orgModRM; // save original modRM because we will modify modRM
+ 	/* The SIB byte, used for more complex 32- or 64-bit memory operands */
+@@ -566,10 +571,10 @@ typedef struct InternalInstruction {
+ 	/* The value of the three-byte escape prefix (usually 0x38 or 0x3a) */
+ 	uint8_t threeByteEscape;
+ 	/* SIB state */
+-	SIBIndex sibIndexBase;
+-	SIBIndex sibIndex;
++	uint8_t sibIndexBase;
++	uint8_t sibIndex;
+ 	uint8_t sibScale;
+-	SIBBase sibBase;
++	uint8_t sibBase;
+ 
+ 	// Embedded rounding control.
+ 	uint8_t RC;
+@@ -596,8 +601,48 @@ typedef struct InternalInstruction {
+ 	uint8_t immediateOffset;
+ 	uint8_t modRMOffset;
+ 
+-	// end-of-zero-members
++	/* state for additional bytes, consumed during operand decode.  Pattern:
++     consumed___ indicates that the byte was already consumed and does not
++     need to be consumed again */
++
++	/* The VEX.vvvv field, which contains a third register operand for some AVX
++     instructions */
++	uint16_t vvvv;
++
++	/* The writemask for AVX-512 instructions which is contained in EVEX.aaa */
++	uint16_t writemask;
++
++	/* The ModR/M byte, which contains most register operands and some portion of
++     all memory operands */
++	uint8_t modRM;
++
++	// special data to handle MOVcr, MOVdr, MOVrc, MOVrd
++	uint8_t firstByte; // save the first byte in stream
++
++	/* Immediates.  There can be two in some cases */
++	uint8_t numImmediatesTranslated;
++	uint64_t immediates[2];
++
++	/* A register or immediate operand encoded into the opcode */
++	uint16_t opcodeRegister;
++
++	/* Portions of the ModR/M byte */
++
++	/* These fields determine the allowable values for the ModR/M fields, which
++     depend on operand and address widths */
++	uint16_t eaRegBase;
++	uint16_t regBase;
++
++	/* The Mod and R/M fields can encode a base for an effective address, or a
++     register.  These are separated into two fields here */
++	uint16_t eaBase;
++	uint8_t eaDisplacement;
++	/* The reg field always encodes a register */
++	uint16_t reg;
++
++	const struct OperandSpecifier *operands;
+ 
++	/* The input header and selected instruction are assigned by the decoder. */
+ 	/* Input bytes; no padding or alignment is required. */
+ 	const uint8_t *code;
+ 	size_t codeSize;
+@@ -637,47 +682,6 @@ typedef struct InternalInstruction {
+ 	uint16_t instructionID;
+ 	/* The specifier for the instruction, from the instruction info table */
+ 	const struct InstructionSpecifier *spec;
+-
+-	/* state for additional bytes, consumed during operand decode.  Pattern:
+-     consumed___ indicates that the byte was already consumed and does not
+-     need to be consumed again */
+-
+-	/* The VEX.vvvv field, which contains a third register operand for some AVX
+-     instructions */
+-	Reg vvvv;
+-
+-	/* The writemask for AVX-512 instructions which is contained in EVEX.aaa */
+-	Reg writemask;
+-
+-	/* The ModR/M byte, which contains most register operands and some portion of
+-     all memory operands */
+-	uint8_t modRM;
+-
+-	// special data to handle MOVcr, MOVdr, MOVrc, MOVrd
+-	uint8_t firstByte; // save the first byte in stream
+-
+-	/* Immediates.  There can be two in some cases */
+-	uint8_t numImmediatesTranslated;
+-	uint64_t immediates[2];
+-
+-	/* A register or immediate operand encoded into the opcode */
+-	Reg opcodeRegister;
+-
+-	/* Portions of the ModR/M byte */
+-
+-	/* These fields determine the allowable values for the ModR/M fields, which
+-     depend on operand and address widths */
+-	EABase eaRegBase;
+-	Reg regBase;
+-
+-	/* The Mod and R/M fields can encode a base for an effective address, or a
+-     register.  These are separated into two fields here */
+-	EABase eaBase;
+-	EADisplacement eaDisplacement;
+-	/* The reg field always encodes a register */
+-	Reg reg;
+-
+-	const struct OperandSpecifier *operands;
+ } InternalInstruction;
+ 
+ /* decodeInstruction - Decode one instruction and store the decoding results in

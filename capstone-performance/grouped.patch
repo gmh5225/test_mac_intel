@@ -1,0 +1,124 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..532ad0fb 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -635,7 +635,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	int ret;
+ 	bool result;
+ 
+-	InternalInstruction insn = { 0 };
++	InternalInstruction insn;
++	memset(&insn, 0, offsetof(InternalInstruction, code));
+ 	if (extension_opcode == 0x62)
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..66b2a335 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -539,7 +539,7 @@ struct InstructionSpecifier {
+  * The x86 internal instruction, which is produced by the decoder.
+  */
+ typedef struct InternalInstruction {
+-	// from here, all members must be initialized to ZERO to work properly
++	/* Prefix and optional operand state starts at zero. */
+ 	uint8_t operandSize;
+ 	uint8_t prefix0, prefix1, prefix2, prefix3;
+ 	/* The value of the REX prefix, if present */
+@@ -596,48 +596,6 @@ typedef struct InternalInstruction {
+ 	uint8_t immediateOffset;
+ 	uint8_t modRMOffset;
+ 
+-	// end-of-zero-members
+-
+-	/* Input bytes; no padding or alignment is required. */
+-	const uint8_t *code;
+-	size_t codeSize;
+-	/* The offset of the next byte within code. */
+-	size_t readerCursor;
+-
+-	/* General instruction information */
+-
+-	/* The mode to disassemble for (64-bit, protected, real) */
+-	DisassemblerMode mode;
+-	/* The length of the instruction, in bytes */
+-	size_t length;
+-
+-	/* Prefix state */
+-
+-	/* The type of the vector extension prefix */
+-	VectorExtensionType vectorExtensionType;
+-
+-	/* Sizes of various critical pieces of data, in bytes */
+-	uint8_t registerSize;
+-	uint8_t addressSize;
+-	uint8_t displacementSize;
+-	uint8_t immediateSize;
+-
+-	uint8_t immSize; // immediate size for X86_OP_IMM operand
+-
+-	/* opcode state */
+-
+-	/* The last byte of the opcode, not counting any ModR/M extension */
+-	uint8_t opcode;
+-
+-	/* decode state */
+-
+-	/* The type of opcode, used for indexing into the array of decode tables */
+-	OpcodeType opcodeType;
+-	/* The instruction ID, extracted from the decode table */
+-	uint16_t instructionID;
+-	/* The specifier for the instruction, from the instruction info table */
+-	const struct InstructionSpecifier *spec;
+-
+ 	/* state for additional bytes, consumed during operand decode.  Pattern:
+      consumed___ indicates that the byte was already consumed and does not
+      need to be consumed again */
+@@ -678,6 +636,47 @@ typedef struct InternalInstruction {
+ 	Reg reg;
+ 
+ 	const struct OperandSpecifier *operands;
++
++	/* The input header and selected instruction are assigned by the decoder. */
++	/* Input bytes; no padding or alignment is required. */
++	const uint8_t *code;
++	size_t codeSize;
++	/* The offset of the next byte within code. */
++	size_t readerCursor;
++
++	/* General instruction information */
++
++	/* The mode to disassemble for (64-bit, protected, real) */
++	DisassemblerMode mode;
++	/* The length of the instruction, in bytes */
++	size_t length;
++
++	/* Prefix state */
++
++	/* The type of the vector extension prefix */
++	VectorExtensionType vectorExtensionType;
++
++	/* Sizes of various critical pieces of data, in bytes */
++	uint8_t registerSize;
++	uint8_t addressSize;
++	uint8_t displacementSize;
++	uint8_t immediateSize;
++
++	uint8_t immSize; // immediate size for X86_OP_IMM operand
++
++	/* opcode state */
++
++	/* The last byte of the opcode, not counting any ModR/M extension */
++	uint8_t opcode;
++
++	/* decode state */
++
++	/* The type of opcode, used for indexing into the array of decode tables */
++	OpcodeType opcodeType;
++	/* The instruction ID, extracted from the decode table */
++	uint16_t instructionID;
++	/* The specifier for the instruction, from the instruction info table */
++	const struct InstructionSpecifier *spec;
+ } InternalInstruction;
+ 
+ /* decodeInstruction - Decode one instruction and store the decoding results in
