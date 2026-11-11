@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='native dynamic-CRT state, four indexed alias maps and guarded ARM detail repairs'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='guard inside Intel and AT&T callers before invoking the extended opcode printer'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -189,7 +189,7 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','check-mips-alias']:
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index','x86_diet_feature_details','x86_encoding_accuracy']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
@@ -358,7 +358,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Shared x86 lookup tables, guarded ARM detail and validated PPC aliases', '',
+    lines = ['# X86 extension printer entry on public decode workloads', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
