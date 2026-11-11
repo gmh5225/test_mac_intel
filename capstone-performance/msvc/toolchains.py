@@ -15,10 +15,10 @@ ref = '3b4aeea8566a118cca94ef00fb4f16c39c53a29a'
 def libraries_and_driver():
     base = perf.fetch('base', 'capstone', ref)
     perf.fetch('iced', 'iced', perf.manifest['iced_revision'])
-    assert perf.digest((source/'common.patch').read_bytes())=='173f413bad6b6351bd19cc98c9e48e6898fe3c911c832a37e9f2d69080a1fe6d'
+    assert perf.digest((source/'common.patch').read_bytes())=='4f8a9bc418985bf67a4f68adc827fc83bb0bb338913e1978fed3fc05167132ad'
     perf.run(['git','apply',source/'common.patch'],'common-base',base)
     trees = {'msvc':base}
-    for name, expected in {'compact': 'ac3d071e35dfedf9530f4595f4905aa35726e4b5ba96939607471ccdd5b36842', 'fallback': 'a12e067aa6b2b8cae0b26d78deacd602d2690b172f41f0193b251d9c16c555ee'}.items():
+    for name, expected in {'fields': '09a845d652f16d2b9e95bd1163dab13cd0fe6f4e95210301119e98ee0698ed11', 'prefix': '9cef5c1847a5aafc4cb4d973b03226655d8609a6f79c6bc47b877bbd720d254d'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -56,7 +56,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','compact','fallback']
+    names=['msvc','prefix','fields']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -107,7 +107,7 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','compact','fallback','iced','fallback','compact','msvc'],['fallback','msvc','compact','iced','compact','msvc','fallback'],['compact','fallback','msvc','iced','msvc','fallback','compact']]
+    orders=[['msvc','prefix','fields','iced','fields','prefix','msvc'],['fields','msvc','prefix','iced','prefix','msvc','fields'],['prefix','fields','msvc','iced','msvc','fields','prefix']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
@@ -120,13 +120,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','compact','fallback','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','prefix','fields','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'compact': 'ac3d071e35dfedf9530f4595f4905aa35726e4b5ba96939607471ccdd5b36842', 'fallback': 'a12e067aa6b2b8cae0b26d78deacd602d2690b172f41f0193b251d9c16c555ee'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'fields': '09a845d652f16d2b9e95bd1163dab13cd0fe6f4e95210301119e98ee0698ed11', 'prefix': '9cef5c1847a5aafc4cb4d973b03226655d8609a6f79c6bc47b877bbd720d254d'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))

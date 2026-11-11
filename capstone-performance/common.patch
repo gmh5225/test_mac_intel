@@ -1,3 +1,19 @@
+diff --git a/Mapping.c b/Mapping.c
+index 11b3e619..f6dc6007 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -511,6 +511,11 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
+ uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
+ 			     const char *id, bool *found)
+ {
++	if (map_len == 0) {
++		*found = false;
++		return UINT64_MAX;
++	}
++
+ 	size_t l = 0;
+ 	size_t r = map_len;
+ 	size_t id_len = strlen(id);
 diff --git a/SStream.c b/SStream.c
 index 49e34d76..f1fd1246 100644
 --- a/SStream.c
@@ -20,7 +36,7 @@ index 49e34d76..f1fd1246 100644
  		if (ss->is_closed || len == 0)
  			return;
 diff --git a/cs.c b/cs.c
-index 55aab304..aef26571 100644
+index 55aab304..ea7b0e42 100644
 --- a/cs.c
 +++ b/cs.c
 @@ -491,6 +491,13 @@ cs_vsnprintf_t cs_vsnprintf = vsnprintf;
@@ -37,18 +53,6 @@ index 55aab304..aef26571 100644
  #endif
  #endif // defined(_WIN32_WCE)
  
-@@ -930,10 +937,7 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
- #include "cs_disasm_internal.h"
- 
- /* Keep the generic copy specialized without the private x86 length checks. */
--#if defined(__GNUC__)
--__attribute__((always_inline))
--#endif
--static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
-+CS_DECODE_INLINE void fill_insn(struct cs_struct *handle, cs_insn *insn,
- 			     SStream *OS, MCInst *mci,
- 			     PostPrinter_t postprinter, const uint8_t *code,
- 			     bool stream_length_valid)
 diff --git a/cs_priv.h b/cs_priv.h
 index 05a71d2a..903415e8 100644
 --- a/cs_priv.h
@@ -65,3 +69,18 @@ index 05a71d2a..903415e8 100644
  #else
  #define cs_default_vsnprintf vsnprintf
  #endif
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 6b15c4fe..1dd3f85b 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -190,6 +190,10 @@ static bool test_alias_lookup(void)
+ 
+ int main(void)
+ {
++	bool found = true;
++	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
++	    found)
++		return 1;
+ 	return test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
