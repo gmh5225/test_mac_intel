@@ -18,6 +18,8 @@
 #include <vector>
 #include <memory>
 #include <capstone/capstone.h>
+#include <cstdlib>
+extern "C" decltype(cs_disasm_iter) live_cs_disasm_iter, isolated_cs_disasm_iter;
 struct API {
   decltype(&::cs_open) cs_open;
   decltype(&::cs_option) cs_option;
@@ -32,7 +34,8 @@ struct API {
     cs_open = &::cs_open;
     cs_option = &::cs_option;
     cs_malloc = &::cs_malloc;
-    cs_disasm_iter = &::cs_disasm_iter;
+    const int which = std::atoi(std::getenv("CAPSTONE_BENCH_ITER"));
+    cs_disasm_iter = which == 1 ? &live_cs_disasm_iter : which == 2 ? &isolated_cs_disasm_iter : &::cs_disasm_iter;
     cs_regs_access = &::cs_regs_access;
     cs_free = &::cs_free;
     cs_close = &::cs_close;

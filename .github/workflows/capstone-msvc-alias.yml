@@ -1,7 +1,7 @@
 name: MSVC native multi-architecture alias formatting
 on:
   push:
-    branches: [codex/capstone-live-state-all-arches]
+    branches: [codex/capstone-shared-architecture-iterators]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -18,11 +18,11 @@ jobs:
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
-      - name: Check real outputs, count allocations and compare throughputs
+      - name: Compare three public iterators sharing one decoder and printer per architecture
         run: python capstone-performance/alias-windows.py ${{ matrix.crt }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-live-architectures-${{ matrix.crt }}
+          name: native-shared-arch-iterators-${{ matrix.crt }}
           path: capstone-evidence/
           retention-days: 14

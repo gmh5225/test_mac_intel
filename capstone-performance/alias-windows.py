@@ -57,80 +57,47 @@ def main():
     WORK.mkdir(); EVIDENCE.mkdir()
     command(['git','config','--global','core.autocrlf','false'],'lf')
     base = fetch('base','https://github.com/NeverSight/capstone.git',manifest['capstone_revision'])
-    assert digest((SOURCE/'msvc-alias.patch').read_bytes()) == manifest['source_lineage']['msvc-alias.patch']['sha256']
-    new = WORK/'new'
-    command(['git','worktree','add','--detach',new,'HEAD'],'worktree',base)
-    command(['git','apply',SOURCE/'msvc-alias.patch'],'apply',new)
-    common=SOURCE/'reference-escaped.patch';assert digest(common.read_bytes())=='953456d5b15eedb7d81528004ad6430aae6a91211eb40b77be58de771d34ce47'
-    command(['git','apply',common],'common-legacy-opcode-detail',base)
-    write('inputs.json',dict(ref=manifest['capstone_revision'],crt=crt,patch=digest((SOURCE/'msvc-alias.patch').read_bytes()),image=os.environ['ImageVersion']))
-    programs = {}; compiled = {}
-    for label,tree in [('base',base),('new',new)]:
-        build = WORK/(label+'-build')
-        targets = '''
-add_executable(native_single "${SOURCE}/single-msvc.cpp")
-target_compile_features(native_single PRIVATE cxx_std_17)
-target_link_libraries(native_single PRIVATE capstone_static)
-add_executable(native_snapshot "${SOURCE}/alias-snapshot.cpp")
-target_compile_features(native_snapshot PRIVATE cxx_std_17)
-target_link_libraries(native_snapshot PRIVATE capstone_static bcrypt)
-add_executable(native_sstream "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/sstream.c")
-target_include_directories(native_sstream PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/include")
-target_link_libraries(native_sstream PRIVATE capstone_static)
-'''
-        with (tree/'CMakeLists.txt').open('a') as f: f.write('\n'+targets)
-        command(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
-                 '-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
-                 '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')], label+'-configure')
-        def build_targets(step,*names):
-            command(['cmake','--build',build,'--config','Release','--parallel','4','--target',*names],label+step)
-        build_targets('-timed','native_single','native_sstream')
-        objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
-        compiled[label]={}
-        for stem in ('cs','SStream','Mapping','AArch64Mapping','ARMMapping','MipsMapping','SparcMapping','PPCMapping','RISCVMapping','LoongArchMapping','SystemZMapping'):
-            obj,=(build/'capstone.dir'/'Release').rglob(stem+'.obj')
-            listing=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
-            contents='\n'.join(line for line in listing.splitlines() if 'file format' not in line and line.strip()).encode()
-            compiled[label][stem]=digest(contents)
-        write('release-code.json',compiled)
-        timed=build/'Release/native_single.exe'
-        before = digest(timed.read_bytes())
-        command([build/'Release/native_sstream.exe'],label+'-sstream')
-        p=tree/'SStream.c';t=p.read_text()
-        start=t.index('CAPSTONE_INTERNAL void SStream_concat0_substr(')
-        t=t[:start]+'unsigned long long alias_direct_count, alias_heap_count;\n'+t[start:]
-        start=t.index('CAPSTONE_INTERNAL void SStream_concat0_substr(')
-        end=t.index('char *substr = cs_mem_malloc',start)
-        t=t[:start]+t[start:end].replace('assert(ss && s);','++alias_direct_count;\n\t\tassert(ss && s);')+'++alias_heap_count;\n\t'+t[end:]
-        p.write_text(t)
-        build_targets('-instrumented','native_snapshot')
-        assert digest(timed.read_bytes()) == before
-        programs[label] = (timed,build/'Release/native_snapshot.exe')
+    exports=('X86_getInstructionScan','X86_getInstructionScanResult','X86_scanBatch','X86_scanCallTarget','cs_disasm_iter','decodeInstruction','decodeInstructionFull','decodeInstructionScan')
+    for label in ('live','isolated'):
+        tree=WORK/label
+        patch=SOURCE/(label+'.patch')
+        assert digest(patch.read_bytes())==manifest['source_lineage'][patch.name]['sha256']
+        command(['git','worktree','add','--detach',tree,'HEAD'],label+'-tree',base)
+        command(['git','apply',patch],label+'-apply',tree)
+        impl=(tree/'arch/X86/X86DisassemblerDecoder.c').as_posix()
+        h=''.join('#define '+name+' '+label+'_'+name+'\n' for name in exports)
+        (base/'arch/X86'/('Bench'+label+'.c')).write_text(h+'#include "'+impl+'"\n')
+    with (base/'CMakeLists.txt').open('a') as f:
+        f.write('\ntarget_sources(capstone PRIVATE arch/X86/Benchlive.c arch/X86/Benchisolated.c)\nadd_executable(native_single "'+(SOURCE/'single-msvc.cpp').as_posix()+'")\ntarget_compile_features(native_single PRIVATE cxx_std_17)\ntarget_link_libraries(native_single PRIVATE capstone_static)\n')
+    build=WORK/'build'
+    command(['cmake','-S',base,'-B',build,'-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')],'configure')
+    command(['cmake','--build',build,'--config','Release','--parallel','4','--target','native_single'],'build')
+    exe=build/'Release/native_single.exe'
+    write('inputs.json',dict(manifest=manifest,crt=crt,image=digest(exe.read_bytes())))
     selected = {r['name']:r for r in manifest['inputs'] if r['name'] in (
-        'arm-ls','arm-cp','arm64-ls','ppc64el-ls','ppc64el-sort','mips64el-ls','sparc64-ls','loong64-ls','loong64-sort','putty-32-0.85')}
-    assert len(selected) == 10, selected.keys()
+        'arm-ls','arm64-ls','ppc64el-ls','loong64-ls','putty-32-0.85')}
+    assert len(selected)==5
     cache={};cases=[fixture(r,cache) for r in selected.values()]
     write('cases.json',cases)
     snapshots=[]; measurements=[]
     for case in cases:
         for mode in (1,2):
-            args=[str(case['selector']), str(mode), case['path']]
-            copies={k:json.loads(subprocess.check_output([progs[1],*args])) for k,progs in programs.items()}
-            snapshots.append(dict(case=case['name'],mode=mode,results=copies));write('snapshots.json',snapshots)
-            assert copies['base']['sha256']==copies['new']['sha256'] and copies['base']['records']==copies['new']['records']
+            args=[str(case['selector']),str(mode),case['path']]
+            labels=('base','live','isolated')
             def sample(label,n):
-                return json.loads(subprocess.check_output([programs[label][0],*args,str(n)]))
+                env=dict(os.environ,CAPSTONE_BENCH_ITER=str(labels.index(label)))
+                return json.loads(subprocess.check_output([exe,*args,str(n)],env=env))
             n=1
-            while (probe:=sample('base',n))['wall_ns'] < 10000000: n *= 4
-            repeats=max(1,math.ceil(n*130000000/probe['wall_ns']))
+            while (probe:=sample('base',n))['wall_ns']<10_000_000:n*=4
+            repeats=max(1,math.ceil(n*75_000_000/probe['wall_ns']))
             pairs=[]
             for cycle in range(6):
-                order=['base','new','new','base'] if cycle%2==0 else ['new','base','base','new']
-                rows=[(label,sample(label,repeats)) for label in order]
-                assert all(row['result']==rows[0][1]['result'] for _,row in rows)
-                a,b=([row['thread_cycles'] for label,row in rows if label==variant] for variant in ('base','new'))
-                pairs.append(dict(raw=rows,gain=statistics.mean(a)/statistics.mean(b),base_aa=a[0]/a[1],new_aa=b[0]/b[1]))
-            measurements.append(dict(case=case['name'],mode=mode,pairs=pairs,gain=statistics.median(p['gain'] for p in pairs)))
+                order=labels[cycle%3:]+labels[:cycle%3]
+                raw=[(label,sample(label,repeats))for label in order+order[::-1]]
+                assert all(row['result']==raw[0][1]['result']for _,row in raw)
+                v={label:[a['thread_cycles']for k,a in raw if k==label]for label in labels}
+                pairs.append(dict(raw=raw,gain={k:statistics.mean(v['base'])/statistics.mean(a)for k,a in v.items()},aa={k:a[0]/a[1]for k,a in v.items()}))
+            measurements.append(dict(case=case['name'],mode=mode,pairs=pairs))
             write('measurement.json',measurements)
     write('complete.json',dict(complete=True))
 
