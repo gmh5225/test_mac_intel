@@ -78,7 +78,7 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
 '''
         with (tree/'CMakeLists.txt').open('a') as f: f.write('\n'+targets)
         command(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
-                 '-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
+                 '-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
                  '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')], label+'-configure')
         def build_targets(step,*names):
             command(['cmake','--build',build,'--config','Release','--parallel','4','--target',*names],label+step)
@@ -86,7 +86,7 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
         compiled[label]={}
         for stem in ('cs','SStream'):
-            obj,=build.rglob(stem+'.obj')
+            obj,=(build/'capstone.dir'/'Release').rglob(stem+'.obj')
             listing=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
             contents='\n'.join(line for line in listing.splitlines() if 'file format' not in line and line.strip()).encode()
             compiled[label][stem]=digest(contents)
