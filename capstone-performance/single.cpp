@@ -75,8 +75,8 @@ static void text_value(Result &r, const char *s) {
 struct Session {
  const API &api; unsigned bits, mode; csh handle=0; cs_insn *insn=nullptr;
  Session(const API &a, unsigned b, unsigned m): api(a),bits(b),mode(m) {
-  const cs_arch archs[] = {CS_ARCH_AARCH64, CS_ARCH_ARM, CS_ARCH_RISCV, CS_ARCH_PPC, CS_ARCH_MIPS, CS_ARCH_SYSTEMZ, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_SPARC, CS_ARCH_LOONGARCH};
-  const cs_mode modes[] = {cs_mode(CS_MODE_LITTLE_ENDIAN), cs_mode(CS_MODE_ARM), cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD | CS_MODE_RISCV_A), cs_mode(CS_MODE_64), cs_mode(CS_MODE_MIPS64), cs_mode(CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_XTENSA_ESP32), cs_mode(CS_MODE_XTENSA_ESP32S2), cs_mode(CS_MODE_XTENSA_ESP32S3), cs_mode(CS_MODE_XTENSA_ESP8266), cs_mode(CS_MODE_V9 | CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_LOONGARCH64)};
+  const cs_arch archs[] = {CS_ARCH_AARCH64, CS_ARCH_ARM, CS_ARCH_RISCV, CS_ARCH_PPC, CS_ARCH_MIPS, CS_ARCH_SYSTEMZ, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_XTENSA, CS_ARCH_SPARC, CS_ARCH_LOONGARCH, CS_ARCH_ARC};
+  const cs_mode modes[] = {cs_mode(CS_MODE_LITTLE_ENDIAN), cs_mode(CS_MODE_ARM), cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C | CS_MODE_RISCV_FD | CS_MODE_RISCV_A), cs_mode(CS_MODE_64), cs_mode(CS_MODE_MIPS64), cs_mode(CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_XTENSA_ESP32), cs_mode(CS_MODE_XTENSA_ESP32S2), cs_mode(CS_MODE_XTENSA_ESP32S3), cs_mode(CS_MODE_XTENSA_ESP8266), cs_mode(CS_MODE_V9 | CS_MODE_BIG_ENDIAN), cs_mode(CS_MODE_LOONGARCH64), cs_mode(CS_MODE_LITTLE_ENDIAN)};
   if (bits != 32 && bits != 64 && bits >= sizeof(archs) / sizeof(archs[0])) throw std::runtime_error("architecture selector");
   if (api.cs_open(bits >= 16 ? CS_ARCH_X86 : archs[bits], bits == 64 ? CS_MODE_64 : bits == 32 ? CS_MODE_32 : modes[bits], &handle) != CS_ERR_OK)
     throw std::runtime_error("cs_open");
@@ -128,6 +128,24 @@ static Result run(Session &session,const std::vector<uint8_t>&bytes_,unsigned re
         for (unsigned i = 0; i < nw; ++i)
           result.values += written[i];
         result.values += insn->detail->groups_count + insn->detail->regs_read_count + insn->detail->regs_write_count;
+        if (session.bits == 11) {
+          const auto &d = insn->detail->loongarch;
+          for (unsigned i = 0; i < d.op_count; ++i) {
+            const auto &o = d.operands[i];
+            result.values += o.type + o.access;
+            if (o.type == LOONGARCH_OP_REG) result.values += o.reg;
+            if (o.type == LOONGARCH_OP_IMM) result.values += o.imm;
+            if (o.type == LOONGARCH_OP_MEM) result.values += o.mem.base + o.mem.index + uint64_t(o.mem.disp);
+          }
+        } else if (session.bits == 12) {
+          const auto &d = insn->detail->arc;
+          for (unsigned i = 0; i < d.op_count; ++i) {
+            const auto &o = d.operands[i];
+            result.values += o.type + o.access;
+            if (o.type == ARC_OP_REG) result.values += o.reg;
+            if (o.type == ARC_OP_IMM) result.values += o.imm;
+          }
+        }
         if (session.bits >= 16) {
           const auto &x=insn->detail->x86;
           result.values += x.eflags;
