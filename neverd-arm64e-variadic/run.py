@@ -43,8 +43,8 @@ def main():
             raise ValueError("Unexpected executable digest")
         host.chmod(0o700)
         (out / "host.json").write_text(json.dumps(report, indent=2))
-        xml = out / "results.xml"
-        with (out / "runtime.log").open("w") as log:
+        xml = out / policy["xml"]
+        with (out / policy["log"]).open("w") as log:
             subprocess.run([host, "--gtest_filter=" + policy["filter"],
                             "--gtest_output=xml:" + str(xml)],
                            stdout=log, stderr=subprocess.STDOUT,
@@ -53,9 +53,12 @@ def main():
         for case in ET.parse(xml).getroot().iter("testcase"):
             name = case.get("name")
             props = {p.get("name"): p.get("value") for p in case.findall("properties/property")}
+            expected = policy["tests"][name]
+            if isinstance(expected, int):
+                expected = {policy["image_count"]: expected}
             if (case.get("result") != "completed" or case.find("skipped") is not None
                     or case.find("failure") is not None or
-                    int(props["executed_native_images"]) != policy["tests"][name]):
+                    any(int(props[key]) != value for key, value in expected.items())):
                 raise ValueError("Incomplete native execution " + name)
             results[name] = props
         if results.keys() != policy["tests"].keys():
