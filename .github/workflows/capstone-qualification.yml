@@ -1,7 +1,7 @@
-name: Verify native Windows decoder tables and public output across build configurations
+name: Compare exact native Windows public states on random and real instructions
 on:
   push:
-    branches: [codex/capstone-native-decoder-qualification]
+    branches: [codex/capstone-native-public-states]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-qualification.yml
@@ -13,31 +13,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { host: ubuntu-24.04, candidate: combined, preset: sanitized }
-          - { host: macos-15-intel, candidate: combined, preset: intel-release }
-          - { host: windows-2022, candidate: combined, preset: windows-release }
-          - { host: windows-2022, candidate: combined, preset: static-crt }
-          - { host: ubuntu-24.04, candidate: combined, preset: user-alloc }
-          - { host: ubuntu-24.04, candidate: combined, preset: diet }
-          - { host: ubuntu-24.04, candidate: combined, preset: reduced }
-          - { host: windows-2022, candidate: combined, preset: four }
-          - { host: windows-2022, candidate: combined, preset: reduced }
-          - { host: windows-2022, candidate: combined, preset: diet }
-          - { host: windows-2022, candidate: combined, preset: user-alloc }
-    runs-on: ${{ matrix.host }}
+        config: [full, diet, reduced]
+    runs-on: windows-2022
     timeout-minutes: 65
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Build frozen source and run upstream tests
-        run: python3 capstone-performance/qualify.py "${{ matrix.candidate }}" "${{ matrix.preset }}"
-      - name: Keep test records
-        if: always()
+          persist-credentials: false
+      - name: Compare both DLLs on guarded tails, PE32 and PE64 text and arbitrary encodings
+        run: python capstone-performance/public_windows.py ${{ matrix.config }}
+      - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-qa-${{ matrix.host }}-${{ matrix.preset }}-${{ github.run_attempt }}
+          name: public-native-${{ matrix.config }}
           path: capstone-evidence/
           retention-days: 14
