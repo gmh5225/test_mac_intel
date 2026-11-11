@@ -81,10 +81,10 @@ def deb_binary(package, name):
         return archive.extractfile(matches[0]).read()
 
 
-def prepare(source, scratch, evidence, command):
+def prepare(source, scratch, evidence, command, manifest_name='manifest.json'):
     corpus = scratch / 'corpus'
     corpus.mkdir()
-    manifest = json.loads((source / 'manifest.json').read_text())
+    manifest = json.loads((source / manifest_name).read_text())
     packages = {}
     cases = []
     for row in manifest['inputs']:

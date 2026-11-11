@@ -1,0 +1,37 @@
+name: Capstone and iced trained releases
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/capstone-trained-release]
+    paths: [capstone-performance/**, .github/workflows/capstone-training.yml]
+permissions:
+  contents: read
+concurrency:
+  group: capstone-fixed-cpu
+  cancel-in-progress: false
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Verify experiment and install the matching Rust profile tool
+        run: |
+          python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
+          rustup component add llvm-tools-preview
+      - name: Build both forks from source and train on separate executables
+        run: python3 capstone-performance/training.py prepare
+      - name: Measure complete API requests on one logical CPU
+        run: python3 capstone-performance/training.py measure
+      - name: Report every completed pair and remove build products
+        if: always()
+        run: python3 capstone-performance/training.py finish
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: capstone-training-${{ github.run_id }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          retention-days: 14

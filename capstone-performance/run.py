@@ -112,6 +112,27 @@ def invoke(case, variant, repeats):
     return row
 
 
+def prepare_adapter():
+    adapter = WORK / 'adapter'
+    adapter.mkdir()
+    shutil.copyfile(SOURCE / 'iced.rs', adapter / 'iced.rs')
+    (adapter / 'Cargo.toml').write_text('''[package]
+name = "iced_compare"
+version = "0.1.0"
+edition = "2021"
+[lib]
+crate-type = ["staticlib"]
+path = "iced.rs"
+[dependencies]
+iced-x86 = { path = "../iced/src/rust/iced-x86", default-features = false, features = ["std", "decoder", "intel", "instr_info"] }
+[profile.release]
+opt-level = 3
+panic = "abort"
+''')
+    shutil.copyfile(SOURCE / 'Cargo.lock', adapter / 'Cargo.lock')
+    return adapter
+
+
 def prepare():
     if platform.machine() != 'x86_64' or platform.system() not in ('Darwin', 'Linux'):
         raise RuntimeError('this experiment requires native x86-64 macOS or Linux')
@@ -144,23 +165,7 @@ def prepare():
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     for label in ['base', 'new']:
         build(label)
-    adapter = WORK / 'adapter'
-    adapter.mkdir()
-    shutil.copyfile(SOURCE / 'iced.rs', adapter / 'iced.rs')
-    (adapter / 'Cargo.toml').write_text('''[package]
-name = "iced_compare"
-version = "0.1.0"
-edition = "2021"
-[lib]
-crate-type = ["staticlib"]
-path = "iced.rs"
-[dependencies]
-iced-x86 = { path = "../iced/src/rust/iced-x86", default-features = false, features = ["std", "decoder", "intel", "instr_info"] }
-[profile.release]
-opt-level = 3
-panic = "abort"
-''')
-    shutil.copyfile(SOURCE / 'Cargo.lock', adapter / 'Cargo.lock')
+    adapter = prepare_adapter()
     command(['cargo', 'build', '--locked', '--release', '--manifest-path', adapter / 'Cargo.toml'], 'iced-build')
     shutil.copyfile(adapter / 'Cargo.lock', EVIDENCE / 'Cargo.lock')
     iced_library = adapter / 'target/release/libiced_compare.a'
