@@ -1,0 +1,62 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..06c21b73 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -635,7 +635,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	int ret;
+ 	bool result;
+ 
+-	InternalInstruction insn = { 0 };
++	InternalInstruction insn;
++	cs_zero_fixed(&insn, sizeof(insn));
+ 	if (extension_opcode == 0x62)
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+@@ -732,8 +733,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
+ 
+ 		// 2. Only the part relevant to x86
+-		memset(instr->flat_insn->detail, 0,
+-		       offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(instr->flat_insn->detail,
++			      offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 
+ 		// 3. The relevant part except for x86.operands
+ 		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
+diff --git a/cs.c b/cs.c
+index ea7b0e42..3af57656 100644
+--- a/cs.c
++++ b/cs.c
+@@ -961,7 +961,7 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 
+ #ifndef CAPSTONE_DIET
+ 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
+-	memset(insn->op_str, '\0', sizeof(insn->op_str));
++	cs_zero_fixed(insn->op_str, sizeof(insn->op_str));
+ 	size_t off = 0;
+ 	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
+ 	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
+diff --git a/utils.h b/utils.h
+index 75cdc0e7..b739b1c9 100644
+--- a/utils.h
++++ b/utils.h
+@@ -13,6 +13,19 @@
+ #endif
+ #include "cs_priv.h"
+ 
++/* These fixed-size stores are on the per-instruction output path. */
++#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_X64) && \
++	!defined(_M_ARM64EC) && !defined(_KERNEL_MODE)
++#include <intrin.h>
++#pragma intrinsic(__stosb)
++static __forceinline void cs_zero_fixed(void *buffer, size_t length)
++{
++	__stosb((unsigned char *)buffer, 0, length);
++}
++#else
++#define cs_zero_fixed(buffer, length) memset((buffer), 0, (length))
++#endif
++
+ // threshold number, so above this number will be printed in hexa mode
+ #define HEX_THRESHOLD 9
+ 
