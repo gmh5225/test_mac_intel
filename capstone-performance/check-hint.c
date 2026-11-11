@@ -1,13 +1,12 @@
 #include <limits.h>
 #include <dlfcn.h>
+#ifndef RTLD_FIRST
+#define RTLD_FIRST 0
+#endif
 #include <stdio.h>
 #include <string.h>
 #include "Mapping.h"
 #include "utils.h"
-
-#ifndef RTLD_FIRST
-#define RTLD_FIRST 0
-#endif
 
 static const name_map ppc[] = {
 #include "arch/PowerPC/PPCGenCSAliasMnemMap.inc"
@@ -24,6 +23,17 @@ static const name_map custom[] = {
 };
 static unsigned long observations;
 static void (*reference_alias)(MCInst *, const SStream *, const name_map *, int);
+
+static void check_candidate(MCInst *MI, const SStream *O, const name_map *names, unsigned count, unsigned alias_hint)
+{
+	if (alias_hint) {
+		map_set_alias_id(MI, O, &names[alias_hint - 1], 1);
+		if (MI->flat_insn->alias_id)
+			return;
+	}
+	map_set_alias_id(MI, O, names,
+			 count);
+}
 
 static unsigned first_hint(const name_map *names, unsigned count,
                            const char *name)
@@ -49,8 +59,7 @@ static int check(const name_map *names, unsigned count, unsigned hint,
     strcpy(ss.buffer, text);
     reference_alias(&mi, &ss, names, count);
     mi.flat_insn = &candidate;
-    if (!map_try_alias_id_hint(&mi, &ss, names, hint))
-        map_set_alias_id(&mi, &ss, names, count);
+    check_candidate(&mi, &ss, names, count, hint);
     ++observations;
     if (original.alias_id != candidate.alias_id) {
         fprintf(stderr, "hint mismatch arch=%u hint=%u alias=%u text=%s old=%llu new=%llu\n",
@@ -113,7 +122,11 @@ int main(int argc, char **argv)
         return 1;
     /* With no alias, the hint path must not inspect stream/map/architecture. */
     MCInst mi = {0};
-    if (map_try_alias_id_hint(&mi, NULL, NULL, 1))
+    cs_insn insn = {0};
+    mi.flat_insn = &insn;
+    insn.alias_id = 77;
+    check_candidate(&mi, NULL, ppc, ARR_SIZE(ppc), 1);
+    if (insn.alias_id != 0)
         return 1;
     printf("Validated %lu hinted/original alias observations\n", observations);
     dlclose(library);
