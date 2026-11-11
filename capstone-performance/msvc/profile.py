@@ -9,13 +9,14 @@ import subprocess
 from collections import Counter
 import run as p
 
-ref = '3b4aeea8566a118cca94ef00fb4f16c39c53a29a'
+ref = 'c3fd1f110810201fa4d82a2d057ed82f5b08d5b1'
 src, work, ev = p.source, p.work, p.evidence
 
 def profile():
     tree = p.fetch('capstone', 'capstone', ref)
     p.fetch('iced', 'iced', p.manifest['iced_revision'])
     patch = src/'common.patch'
+    assert p.digest(patch.read_bytes()) == '4dac9de16eab2738dd8edf56c97394d452596bd6343155ea15aed839b5c22417'
     p.run(['git','apply',patch], 'apply-native-output', tree)
     adapter = work/'adapter'
     adapter.mkdir()
@@ -51,9 +52,9 @@ target_link_options(sample_decode PRIVATE /DEBUG:FULL /OPT:REF /OPT:ICF /INCREME
 target_link_libraries(sample_decode PRIVATE capstone_static "${ICED_ADAPTER}" advapi32 bcrypt ntdll userenv ws2_32 dbghelp)
 ''')
     build = work/'build'
-    p.run(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
+    p.run(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64','-T','host=x64',
            '-DPROFILE_DIR='+work.as_posix(),'-DICED_ADAPTER='+(work/'cargo-target/release/iced_compare.lib').as_posix(),
-           '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON',
+           '-DCAPSTONE_ARCHITECTURE_DEFAULT=ON','-DCAPSTONE_X86_SUPPORT=ON',
            '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'profile-configure')
     p.run(['cmake','--build',build,'--config','Release','--target','sample_decode','--parallel','4'],'profile-build')
     exe = build/'Release/sample_decode.exe'
@@ -70,7 +71,7 @@ target_link_libraries(sample_decode PRIVATE capstone_static "${ICED_ADAPTER}" ad
     for case in p.get_cases():
         if case['name'] not in ('putty-32-0.85','kernel32-64','scalar64','simd64'): continue
         for mode in ('scan','format','detail'):
-            for library in ('capstone',):
+            for library in ('capstone','iced'):
                 def args(n):
                     return [exe,library,mode,str(case['bits']),str(n),case['path']]
                 n = 1
