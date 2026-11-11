@@ -89,8 +89,8 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         compiled[label]=digest(timed.read_bytes())
         programs[label]=timed
     write('binaries.json',compiled)
-    selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm-ls','arm-cp','arm-sort','thumb-ls','thumb-cp','thumb-sort','putty-32-0.85')}
-    assert len(selected)==7
+    selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm-ls','arm-cp','arm-sort','thumb-ls','thumb-cp','thumb-sort','arm64-ls','arm64-cp','arm64-sort','putty-32-0.85')}
+    assert len(selected)==10
     cache={};cases=[fixture(r,cache) for r in selected.values()]
     write('cases.json',cases)
     snapshots=[]; measurements=[]
@@ -101,9 +101,9 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
                 return json.loads(subprocess.check_output([programs[label],*args,str(n)]))
             n=1
             while (probe:=sample('base',n))['wall_ns'] < 10000000: n *= 4
-            repeats=max(1,math.ceil(n*220000000/probe['wall_ns']))
+            repeats=max(1,math.ceil(n*120000000/probe['wall_ns']))
             pairs=[]
-            for cycle in range(15):
+            for cycle in range(12):
                 order=['base','new','new','base'] if cycle%2==(0 if sys.argv[2]=='first' else 1) else ['new','base','base','new']
                 rows=[(label,sample(label,repeats)) for label in order]
                 assert all(row['result']==rows[0][1]['result'] for _,row in rows)

@@ -1,15 +1,15 @@
-diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index 96760766..ebe301e2 100644
---- a/arch/ARM/ARMInstPrinter.c
-+++ b/arch/ARM/ARMInstPrinter.c
-@@ -108,8 +108,22 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index bffb617f..55b695c4 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -80,14 +80,43 @@ DECLARE_printComplexRotationOp(90, 0);
  
- static void printRegName(SStream *OS, unsigned RegNo)
+ void printRegName(SStream *OS, unsigned Reg)
  {
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
-+	const char *name = getRegisterName(RegNo, ARM_NoRegAltName);
++	const char *name = getRegisterName(Reg, AArch64_NoRegAltName);
 +	/* With markup disabled the two empty tags contribute no bytes. The
 +	 * generic formatter still owns custom callbacks and full streams. */
 +	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
@@ -20,8 +20,157 @@ index 96760766..ebe301e2 100644
 +	SStream_concat2(OS, markup("<reg:"), name);
 +#else
  	SStream_concat2(OS, markup("<reg:"),
- 			getRegisterName(RegNo, ARM_NoRegAltName));
+ 			getRegisterName(Reg, AArch64_NoRegAltName));
 +#endif
  	SStream_concat0(OS, markup(">"));
  }
  
+ void printRegNameAlt(SStream *OS, unsigned Reg, unsigned AltIdx)
+ {
+-	SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg, AltIdx));
++#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	const char *name = getRegisterName(Reg, AltIdx);
++	/* With markup disabled the two empty tags contribute no bytes. The
++	 * generic formatter still owns custom callbacks and full streams. */
++	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
++	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
++		SStream_concat0(OS, name);
++		return;
++	}
++	SStream_concat2(OS, markup("<reg:"), name);
++#else
++	SStream_concat2(OS, markup("<reg:"),
++			getRegisterName(Reg, AltIdx));
++#endif
+ 	SStream_concat0(OS, markup(">"));
+ }
+ 
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+index c74ca4e1..de1366ff 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
+@@ -634,6 +634,31 @@ public:
+         syntax = b"{ int y = 1; int x = 1; OS << x; }"
+         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
+ 
++    def test_register_writer(self):
++        from autosync.cpptranslator.patches.StreamOperation import REGISTER_WRITER
++
++        name = b"getRegisterName(Reg, AltIdx)"
++        expected = (
++            REGISTER_WRITER.replace(b"$LOCAL", b"name")
++            .replace(b"$STREAM", b"O")
++            .replace(b"$NAME", name)
++        )
++        for statement in (
++            b'O << markup("<reg:") << ' + name + b' << markup(">");',
++            b"markup(O, Markup::Register) << " + name + b";",
++        ):
++            self.check_patching_result(
++                StreamOperations(0), b"void printRegName() {" + statement + b"}", expected
++            )
++
++        self.check_patching_result(
++            StreamOperations(0),
++            b"void printRegName(int name) {markup(O, Markup::Register) << getRegisterName(name, AltIdx);}",
++            REGISTER_WRITER.replace(b"$LOCAL", b"name_")
++            .replace(b"$STREAM", b"O")
++            .replace(b"$NAME", b"getRegisterName(name, AltIdx)"),
++        )
++
+     def test_streamoperation_string_groups(self):
+         patch = StreamOperations(0)
+         for syntax, expected in [
+diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+index e507eae0..88b27a6e 100644
+--- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
++++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
+@@ -7,6 +7,75 @@ from autosync.cpptranslator.patches.Helper import get_text, get_text_from_node
+ from autosync.cpptranslator.patches.Patch import Patch
+ 
+ 
++def _register_writer(stream: Node, operands: list[Node], statement: Node, src: bytes):
++    """Lower a complete void register writer, including its callback fallback."""
++    body = statement.parent
++    if (
++        not body
++        or body.type != "compound_statement"
++        or body.named_child_count != 1
++        or not body.parent
++        or body.parent.type != "function_definition"
++        or body.parent.child_by_field_name("type") is None
++        or get_text_from_node(src, body.parent.child_by_field_name("type")) != b"void"
++    ):
++        return None
++    if len(operands) == 3:
++        if (
++            stream.type != "identifier"
++            or get_text_from_node(src, operands[0]) != b'markup("<reg:")'
++            or get_text_from_node(src, operands[2]) != b'markup(">")'
++        ):
++            return None
++        name = operands[1]
++    elif len(operands) == 1 and stream.type == "call_expression":
++        if get_text_from_node(src, stream.child_by_field_name("function")) != b"markup":
++            return None
++        args = stream.child_by_field_name("arguments").named_children
++        if (
++            len(args) != 2
++            or args[0].type != "identifier"
++            or get_text_from_node(src, args[1]) != b"Markup::Register"
++        ):
++            return None
++        stream, name = args[0], operands[0]
++    else:
++        return None
++    if (
++        name.type != "call_expression"
++        or get_text_from_node(src, name.child_by_field_name("function"))
++        != b"getRegisterName"
++    ):
++        return None
++    local = b"name"
++    function = get_text_from_node(src, body.parent)
++    while local in function:
++        local += b"_"
++    return (
++        REGISTER_WRITER.replace(b"$LOCAL", local)
++        .replace(b"$STREAM", get_text_from_node(src, stream))
++        .replace(b"$NAME", get_text_from_node(src, name))
++    )
++
++
++REGISTER_WRITER = br"""#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++    !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++    !defined(_WIN32_WCE)
++    const char *$LOCAL = $NAME;
++    /* With markup disabled the two empty tags contribute no bytes. The
++     * generic formatter still owns custom callbacks and full streams. */
++    if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
++        $STREAM->index < SSTREAM_BUF_LEN - 1 && $LOCAL && $LOCAL[0]) {
++        SStream_concat0($STREAM, $LOCAL);
++        return;
++    }
++    SStream_concat2($STREAM, markup("<reg:"), $LOCAL);
++#else
++    SStream_concat2($STREAM, markup("<reg:"),
++            $NAME);
++#endif
++    SStream_concat0($STREAM, markup(">"));"""
++
+ class StreamOperations(Patch):
+     """
+     Patch   OS << ...
+@@ -57,6 +126,10 @@ class StreamOperations(Patch):
+         # We reversing it so the left most operand comes first.
+         ops.reverse()
+ 
++        register = _register_writer(bin_expr, ops, captures[0][0], src)
++        if register is not None:
++            return register
++
+         res = b""
+         # Capstone uses the following functions to copy the strings to a buffer:
+         # SStream_concat  - Copies multiple strings.
