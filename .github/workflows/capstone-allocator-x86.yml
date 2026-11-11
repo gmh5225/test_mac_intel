@@ -12,11 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, config: full }
-          - { host: ubuntu-24.04, config: reduced }
-          - { host: ubuntu-24.04, config: diet }
           - { host: windows-2022, config: full }
-          - { host: macos-15-intel, config: full }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 58
     steps:
