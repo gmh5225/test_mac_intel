@@ -2,6 +2,7 @@
 import json,math,os,shutil,statistics,subprocess as sp
 from pathlib import Path
 import run as tool
+from inspect_release import inspect
 s,w=tool.source,tool.work
 def main():
     c=tool.fetch('base','capstone',tool.manifest['capstone_revision'])
@@ -23,32 +24,48 @@ panic="abort"
 opt-level=3
 '''
     rs={}
-    for name,opts in [('regular',''),('ipo','lto="fat"\ncodegen-units=1\n')]:
+    for name,opts in [('regular','')]:
         (adapter/'Cargo.toml').write_text(cargo+opts)
         dest=w/('cargo-'+name)
         tool.run(['cargo','build','--release','--locked','--target-dir',dest,'--manifest-path',adapter/'Cargo.toml'],'rust-'+name)
         rs[name]=dest/'release/iced_compare.lib'
     cpp={}
     opts=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL']
-    for name,on in [('regular','OFF'),('ipo','ON')]:
-        b=w/('capstone-'+name)
-        tool.run(['cmake','-S',c,'-B',b,*opts,'-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+on,'-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('X86','ARM','AARCH64','MIPS')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=OFF'],'configure-'+name)
+    with (c/'CMakeLists.txt').open('a') as cm:
+        cm.write('\nif(TEST_SCAN_NOLTO)\n  set_source_files_properties(${TEST_SCAN_NOLTO} PROPERTIES COMPILE_OPTIONS /GL-)\nendif()\n')
+    variants=[('regular','OFF',''),('ipo','ON',''),('plain_decoder','ON','arch/X86/X86DisassemblerDecoder.c'),('plain_core','ON','cs.c'),('plain_backend','ON','arch/X86/X86Disassembler.c')]
+    for name,on,ordinary in variants:
+        b=w/('regular-build' if on=='OFF' else 'mixed-build')
+        args=['-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+on,'-DCMAKE_C_FLAGS=/MP4','-DTEST_SCAN_NOLTO='+ordinary,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('X86','ARM','AARCH64','MIPS')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=OFF']
+        tool.run(['cmake','-S',c,'-B',b,*opts,*args],'configure-'+name)
         tool.run(['cmake','--build',b,'--config','Release','--parallel','4','--target','capstone_static'],'build-'+name)
-        flags=[q.read_text(encoding='utf-16',errors='replace') for q in b.rglob('CL.command.1.tlog') if q.parent.name.lower().startswith('capstone.')]
-        assert flags and any('/GL ' in t.upper() or '/GL\n' in t.upper() for t in flags)==(on=='ON')
-        tool.write(name+'-compiler.json',[t.splitlines()[1][:5000] for t in flags])
-        cpp[name]=b/'Release/capstone.lib'
+        flags={}
+        for tlog in (b/'capstone.dir'/'Release').rglob('CL.command.1.tlog'):
+            for unit,cmd in zip(*[iter(tlog.read_text(encoding='utf-16',errors='replace').splitlines())]*2):
+                units=unit.lstrip('^').split('|')
+                for path in units: flags[Path(path).name.lower()]=cmd
+        chosen={k:flags[k] for k in ('cs.c','x86disassemblerdecoder.c','x86disassembler.c')}
+        def gl(cmd):
+            switches=[v for v in cmd.upper().split() if v in ('/GL','/GL-')]
+            return bool(switches and switches[-1]=='/GL')
+        assert all(gl(v)==(on=='ON' and k!=Path(ordinary).name.lower()) for k,v in chosen.items()),chosen
+        tool.write(name+'-compiler.json',chosen)
+        cpp[name]=w/(name+'.lib');shutil.copyfile(b/'Release/capstone.lib',cpp[name])
     d=w/'driver';d.mkdir()
     defs=['cmake_minimum_required(VERSION 3.20)','project(driver CXX)',f'add_library(consumer OBJECT "{(s/"msvc/compare.cpp").as_posix()}")','target_compile_features(consumer PRIVATE cxx_std_17)',f'target_include_directories(consumer PRIVATE "{(c/"include").as_posix()}")']
-    for name,cl,rust in [('base','regular','regular'),('optimized','ipo','regular'),('rustopt','regular','ipo')]:
-        defs+=[f'add_executable({name} $<TARGET_OBJECTS:consumer>)',f'target_link_libraries({name} PRIVATE "{cpp[cl].as_posix()}" "{rs[rust].as_posix()}" advapi32 bcrypt ntdll userenv ws2_32)']
-        if cl=='ipo':defs.append('target_link_options(optimized PRIVATE /LTCG)')
+    for name,on,ordinary in variants:
+        defs.extend([f'add_executable({name} $<TARGET_OBJECTS:consumer>)',f'target_link_libraries({name} PRIVATE "{cpp[name].as_posix()}" "{rs["regular"].as_posix()}" advapi32 bcrypt ntdll userenv ws2_32)',f'target_link_options({name} PRIVATE /MAP:{name}.map'+(' /LTCG)' if on=='ON' else ')')])
     (d/'CMakeLists.txt').write_text('\n'.join(defs)+'\n');b=w/'driver-build'
-    tool.run(['cmake','-S',d,'-B',b,*opts],'driver-config');tool.run(['cmake','--build',b,'--config','Release','--parallel','3'],'driver-build')
-    obj,=b.rglob('compare.obj');tool.write('products.json',dict(consumer=tool.digest(obj.read_bytes()),libraries={n:{k:tool.digest(f.read_bytes()) for k,f in a.items()} for n,a in [('capstone',cpp),('iced',rs)]}))
-    labels=['base','optimized','iced','iced_opt'];exes=['base','optimized','base','rustopt'];programs={k:b/'Release'/(v+'.exe') for k,v in zip(labels,exes)}
+    tool.run(['cmake','-S',d,'-B',b,*opts],'driver-config');tool.run(['cmake','--build',b,'--config','Release','--parallel','2'],'driver-build')
+    obj,=b.rglob('compare.obj');tool.write('products.json',dict(consumer=tool.digest(obj.read_bytes()),libraries={n:tool.digest(f.read_bytes()) for n,f in cpp.items()}))
+    labels=list(cpp)
+    programs={name:b/'Release'/(name+'.exe') for name in labels}
+    assembly={}
+    for name,exe in programs.items():
+        linker_map,=b.rglob(name+'.map')
+        assembly[name]=inspect(exe,linker_map,tool.evidence);tool.write('linked-functions.json',assembly)
     results=[]
-    for case in tool.get_cases():
+    for case in [v for v in tool.get_cases() if v['name'] in ('putty-32-0.85','cmd-64','scalar32','simd64')]:
         for mode in ('scan','format','detail'):
             def sample(k,n):
                 label='iced' if k.startswith('iced') else 'capstone'
@@ -57,18 +74,14 @@ opt-level=3
             while (probe:=sample('base',n))['wall_ns']<10000000:n*=3
             n=max(1,math.ceil(n*120000000/probe['wall_ns']))
             cycles=[]
-            for i in range(6):
-                order=labels[i%4:]+labels[:i%4]
+            for i in range(10):
+                position=i%len(labels);order=labels[position:]+labels[:position]
                 if i%2:order.reverse()
                 raw=[(k,sample(k,n)) for k in order+order[::-1]]
-                def signature(row,values):
-                    return tuple(row[key] for key in (('instructions','rejected','boundary_hash','value_hash') if values else ('instructions','rejected','boundary_hash')))
-                for group in (labels[:2],labels[2:]):
-                    assert len({signature(t,True) for k,t in raw if k in group})==1
-                same=len({signature(t,False) for k,t in raw})==1
+                assert len({tuple(t[key] for key in ('instructions','rejected','boundary_hash','value_hash')) for _,t in raw})==1
                 times={k:[t['thread_cycles'] for lab,t in raw if lab==k] for k in labels}
                 avg={k:statistics.mean(v) for k,v in times.items()}
-                cycles.append(dict(raw=raw,same_boundaries=same,capstone=avg['base']/avg['optimized'],iced=avg['iced']/avg['iced_opt'],relative=avg['iced_opt']/avg['optimized'] if same else None,aa={k:a[0]/a[1] for k,a in times.items()}))
+                cycles.append(dict(raw=raw,relative={k:avg['regular']/avg[k] for k in labels},aa={k:a[0]/a[1] for k,a in times.items()}))
             results.append(dict(case=case['name'],mode=mode,cycles=cycles))
             tool.write('measurements.json',results)
     tool.write('complete.json',dict(complete=True))
