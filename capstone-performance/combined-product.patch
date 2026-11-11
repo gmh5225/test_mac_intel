@@ -1,16 +1,116 @@
+diff --git a/Mapping.c b/Mapping.c
+index 11b3e619..06d1162b 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -470,24 +470,18 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
+ 	}
+ }
+ 
+-/// Sets an alternative id for some instruction.
+-/// Or -1 if it fails.
+-/// You must add (<ARCH>_INS_ALIAS_BEGIN + 1) to the id to get the real id.
+-void map_set_alias_id(MCInst *MI, const SStream *O,
+-		      const name_map *alias_mnem_id_map, int map_size)
++/* Use the same final stream and mnemonic delimiters for both lookup forms. */
++static const char *alias_mnemonic(const MCInst *MI, const SStream *O,
++				  size_t *length)
+ {
+-	if (!MCInst_isAlias(MI)) {
+-		MI->flat_insn->alias_id = 0;
+-		return;
+-	}
+-
++	if (!MCInst_isAlias(MI))
++		return NULL;
+ 	int i = 0, j = 0;
+ 	const char *asm_str_buf = O->buffer;
+ 	// Skip spaces and tabs
+ 	while (is_blank_char(asm_str_buf[i])) {
+ 		if (!asm_str_buf[i]) {
+-			MI->flat_insn->alias_id = 0;
+-			return;
++			return NULL;
+ 		}
+ 		++i;
+ 	}
+@@ -498,9 +492,42 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 			break;
+ 	}
+ 
+-	int alias_id = name2id_n(alias_mnem_id_map, map_size, alias_mnem, j);
+-	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
++	*length = j;
++	return alias_mnem;
++}
++
++void map_set_alias_id(MCInst *MI, const SStream *O, const name_map *map,
++		      int map_size)
++{
++	size_t length;
++	const char *name = alias_mnemonic(MI, O, &length);
++	int id = name ? name2id_n(map, map_size, name, length) : -1;
++	MI->flat_insn->alias_id = id < 0 ? 0 : id;
++}
++
++#if defined(CAPSTONE_HAS_MIPS) && !defined(CAPSTONE_DIET)
++void map_set_alias_id_indexed(MCInst *MI, const SStream *O, const name_map *map,
++			      const uint16_t *rows, unsigned mask)
++{
++	size_t length;
++	const char *name = alias_mnemonic(MI, O, &length);
++	MI->flat_insn->alias_id = 0;
++	if (!name)
++		return;
++
++	uint32_t hash = 2166136261u;
++	for (size_t i = 0; i < length; ++i)
++		hash = (hash ^ (unsigned char)name[i]) * 16777619u;
++	for (unsigned slot = hash & mask; rows[slot]; slot = (slot + 1) & mask) {
++		const name_map *entry = &map[rows[slot] - 1];
++		if (strncmp(entry->name, name, length) == 0 &&
++		    entry->name[length] == '\0') {
++			MI->flat_insn->alias_id = entry->id;
++			return;
++		}
++	}
+ }
++#endif
+ 
+ /// Does a binary search over the given map and searches for @id.
+ /// If @id exists in @map, it sets @found to true and returns
+diff --git a/Mapping.h b/Mapping.h
+index 9f69f881..958566bb 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -296,6 +296,14 @@ bool map_use_alias_details(const MCInst *MI);
+ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 		      const name_map *alias_mnem_id_map, int map_size);
+ 
++#if defined(CAPSTONE_HAS_MIPS) && !defined(CAPSTONE_DIET)
++/* Power-of-two linear probing table with one-based rows and empty slot zero. */
++CAPSTONE_INTERNAL void map_set_alias_id_indexed(MCInst *MI, const SStream *O,
++						const name_map *map,
++						const uint16_t *rows,
++						unsigned mask);
++#endif
++
+ /// Mapping from Capstone enumeration identifiers and their values.
+ ///
+ /// This map MUST BE sorted to allow binary searches.
 diff --git a/SStream.c b/SStream.c
-index 49e34d76..28ebdbd0 100644
+index 49e34d76..f1fd1246 100644
 --- a/SStream.c
 +++ b/SStream.c
-@@ -260,7 +260,14 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
+@@ -260,7 +260,15 @@ CAPSTONE_INTERNAL void SStream_concat0_substr(SStream *ss, const char *s,
  {
  #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE)
 -	if (cs_mem_malloc == malloc && cs_mem_free == free) {
 +#if defined(_MSC_VER) && defined(_DLL) && !defined(_WIN32_WCE)
 +	bool default_allocator =
-+		cs_mem_malloc == cs_initial_memory_hooks.malloc &&
-+		cs_mem_free == cs_initial_memory_hooks.free;
++		(cs_mem_malloc == cs_initial_memory_hooks.malloc &&
++		 cs_mem_free == cs_initial_memory_hooks.free) ||
++		(cs_mem_malloc == malloc && cs_mem_free == free);
 +#else
 +	bool default_allocator = cs_mem_malloc == malloc && cs_mem_free == free;
 +#endif
@@ -18,27 +118,55 @@ index 49e34d76..28ebdbd0 100644
  		assert(ss && s);
  		if (ss->is_closed || len == 0)
  			return;
-diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
-index cb880c40..bddcd8fa 100644
---- a/arch/X86/X86DisassemblerTranslator.h
-+++ b/arch/X86/X86DisassemblerTranslator.h
-@@ -1404,11 +1404,14 @@ X86_TRANSLATE_INLINE bool translateInstruction(MCInst *mcInst,
- 	if (beginTranslation(mcInst, insn))
- 		return true;
- 
--	/* UD1 has a runtime operand override; other selected sets use
--	 * the same translators with constant descriptors, including duplicates. */
-+#if !defined(_MSC_VER) || defined(__clang__)
-+	/* MSVC expands both generated switches into a stack-probed frame.
-+	 * Its descriptor loop below uses the same operand translators.
-+	 * UD1 always uses that loop for its runtime operand override. */
- 	if (insn->instructionID != X86_UD1) {
- #include "X86GenOperandTranslate.inc"
+diff --git a/arch/Mips/MipsGenAliasIndex.inc b/arch/Mips/MipsGenAliasIndex.inc
+new file mode 100644
+index 00000000..0545386b
+--- /dev/null
++++ b/arch/Mips/MipsGenAliasIndex.inc
+@@ -0,0 +1,17 @@
++/* Generated by suite/synctools/mips_alias_index.py. */
++	86, 66, 35, 61, 0, 0, 0, 34, 77, 11, 97, 24, 100, 0, 0, 0,
++	0, 0, 69, 0, 9, 84, 0, 0, 31, 0, 15, 23, 72, 0, 52, 0,
++	0, 0, 0, 0, 0, 60, 0, 0, 56, 88, 102, 39, 83, 2, 87, 0,
++	0, 0, 0, 79, 0, 0, 0, 0, 4, 95, 57, 0, 0, 0, 14, 0,
++	0, 12, 0, 0, 0, 0, 110, 0, 8, 76, 0, 0, 0, 49, 0, 0,
++	42, 0, 30, 0, 0, 0, 0, 64, 0, 0, 25, 103, 62, 108, 0, 0,
++	27, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3,
++	93, 0, 36, 0, 0, 0, 0, 75, 18, 0, 70, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 106, 0, 5, 0, 0, 0, 1, 0,
++	0, 0, 0, 68, 0, 16, 26, 58, 82, 44, 17, 29, 0, 71, 73, 0,
++	80, 0, 0, 89, 0, 32, 45, 0, 0, 0, 0, 19, 78, 0, 98, 6,
++	81, 90, 28, 43, 51, 59, 105, 0, 0, 0, 0, 0, 0, 101, 0, 0,
++	37, 0, 33, 54, 0, 0, 0, 0, 96, 0, 94, 22, 65, 91, 46, 0,
++	50, 7, 63, 109, 0, 85, 0, 0, 0, 0, 47, 74, 13, 0, 0, 0,
++	10, 99, 104, 0, 0, 107, 0, 0, 0, 0, 0, 0, 0, 0, 20, 92,
++	0, 41, 0, 53, 67, 55, 0, 48, 0, 21, 0, 0, 0, 38, 0, 0,
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 20e28fba..4b9aa7a6 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -83,6 +83,10 @@ static const name_map insn_alias_mnem_map[] = {
+ 	{ MIPS_INS_ALIAS_LI, "li" }, // addiu
+ 	{ MIPS_INS_ALIAS_END, NULL },
+ };
++
++static const uint16_t mips_alias_index[] = {
++#include "MipsGenAliasIndex.inc"
++};
+ #endif
+ const char *Mips_insn_name(csh handle, unsigned int id)
+ {
+@@ -388,8 +392,8 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	}
-+#endif
+ #endif
+ #ifndef CAPSTONE_DIET
+-	map_set_alias_id(MI, O, insn_alias_mnem_map,
+-			 ARR_SIZE(insn_alias_mnem_map));
++	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, mips_alias_index,
++				 ARR_SIZE(mips_alias_index) - 1);
+ #endif
+ }
  
- 	for (index = 0; index < X86_MAX_OPERANDS &&
- 			insn->operands[index].encoding != ENCODING_NONE;
 diff --git a/cs.c b/cs.c
 index 55aab304..aef26571 100644
 --- a/cs.c
@@ -85,3 +213,87 @@ index 05a71d2a..903415e8 100644
  #else
  #define cs_default_vsnprintf vsnprintf
  #endif
+diff --git a/suite/synctools/mips_alias_index.py b/suite/synctools/mips_alias_index.py
+new file mode 100644
+index 00000000..b8b9f2fc
+--- /dev/null
++++ b/suite/synctools/mips_alias_index.py
+@@ -0,0 +1,63 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: BSD-3-Clause
++"""Index the first matching row in the MIPS textual alias name map."""
++
++import argparse
++from pathlib import Path
++import re
++
++
++def generate(directory):
++    source = (directory / "MipsMapping.c").read_text()
++    body = source.split("static const name_map insn_alias_mnem_map[] = {", 1)[1].split("};", 1)[0]
++    body = body.replace('#include "MipsGenCSAliasMnemMap.inc"',
++                        (directory / "MipsGenCSAliasMnemMap.inc").read_text())
++    body = re.sub(r"/\*.*?\*/|//[^\n]*", "", body, flags=re.S)
++    row = re.compile(r'\s*\{\s*MIPS_INS_ALIAS_(\w+)\s*,\s*(NULL|"[^"\\]*")\s*\},')
++    names = []
++    cursor = 0
++    while body[cursor:].strip():
++        match = row.match(body, cursor)
++        if not match:
++            raise ValueError("Unexpected MIPS alias name-map initializer")
++        cursor = match.end()
++        if match[2] == "NULL":
++            if match[1] != "END" or body[cursor:].strip():
++                raise ValueError("Unexpected MIPS alias terminator")
++            break
++        names.append(match[2][1:-1].encode("ascii"))
++    else:
++        raise ValueError("Missing MIPS alias terminator")
++    if len(names) > 65535:
++        raise ValueError("MIPS alias rows exceed the index width")
++
++    first = {}
++    for i, name in enumerate(names, 1):
++        first.setdefault(name, i)
++    size = 1 << (max(2, 2 * len(first)) - 1).bit_length()
++    slots = [0] * size
++    for name, index in first.items():
++        h = 2166136261
++        for c in name:
++            h = ((h ^ c) * 16777619) & 0xffffffff
++        slot = h & (size - 1)
++        while slots[slot]:
++            slot = (slot + 1) & (size - 1)
++        slots[slot] = index
++    return "/* Generated by suite/synctools/mips_alias_index.py. */\n" + "".join(
++        "\t" + ", ".join(map(str, slots[i:i + 16])) + ",\n" for i in range(0, size, 16)
++    )
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--check", action="store_true")
++    args = parser.parse_args()
++    directory = Path(__file__).resolve().parents[2] / "arch/Mips"
++    target = directory / "MipsGenAliasIndex.inc"
++    content = generate(directory)
++    if args.check:
++        if target.read_text() != content:
++            raise SystemExit("Regenerate MipsGenAliasIndex.inc")
++    else:
++        target.write_text(content)
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 8ed9ee00..2f6e7924 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -18,6 +18,10 @@ if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
+     list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
+ endif()
+ if(CAPSTONE_MIPS_SUPPORT)
++    if(Python3_Interpreter_FOUND)
++        add_test(NAME unit_mips_alias_index_generator
++            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/mips_alias_index.py" --check)
++    endif()
+     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
