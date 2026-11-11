@@ -17,7 +17,7 @@ def verify(w):
     run(['git','init','-q'],src)
     run(['git','fetch','-q','--depth=1','https://github.com/NeverSight/capstone','a60be2e71f73739659fd895009263e0f276e9d22'],src)
     run(['git','checkout','-q','--detach','FETCH_HEAD'],src)
-    for f in ('span.patch','header.patch'):
+    for f in ('guard.patch', 'embedded.patch'):
         assert hashlib.sha256((d/f).read_bytes()).hexdigest() == (d/(f+'.sha256')).read_text().strip()
     (w/'main.c').write_text('int test_terminal_states(void);\nint main(void) { return test_terminal_states(); }\n')
     with (src/'CMakeLists.txt').open('a') as f:
@@ -25,7 +25,7 @@ def verify(w):
     b=w/'build'
     run(['cmake','-G','Ninja','-S',src,'-B',b,'-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_BUILD_TYPE=RelWithDebInfo','-DCMAKE_C_FLAGS_RELWITHDEBINFO=-O1 -gline-tables-only -DNDEBUG','-DCMAKE_C_FLAGS=-fsanitize=memory -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -fPIE','-DCMAKE_EXE_LINKER_FLAGS=-pie -fsanitize=memory','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_X86_REDUCE='+sys.argv[1]],w)
     reference=None
-    for name in ('base','span','header'):
+    for name in ('base', 'guard', 'embedded'):
         run(['git','restore','--source=HEAD','--',x,'arch/X86/X86GenLegacyTerminal.inc','suite/synctools/x86_operand_specializations.py'],src)
         if name!='base':run(['git','apply',d/(name+'.patch')],src)
         with (src/x).open('a') as f:f.write('\n#include "'+str(d/'check.c')+'"\n')
