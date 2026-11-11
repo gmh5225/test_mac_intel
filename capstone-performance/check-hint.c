@@ -1,52 +1,41 @@
+#include "arch/X86/X86Mapping.h"
 #include <dlfcn.h>
-#include <limits.h>
 #include <stdio.h>
-#include "arch/X86/X86Mapping.c"
-
 #ifndef RTLD_FIRST
 #define RTLD_FIRST 0
 #endif
-
-typedef unsigned (*reference_find)(unsigned);
-
-static int check_id(cs_struct *h, reference_find find, unsigned id)
+typedef const uint8_t *(*query)(cs_struct *, unsigned, uint64_t *);
+int main(int argc,char **argv)
 {
-	unsigned expected = find(id);
-	if (find_insn_h(h, id) != expected || find_insn_h(NULL, id) != expected) {
-		fprintf(stderr, "row mismatch for %u, expected %u\n", id, expected);
-		return 1;
+	if(argc!=2)return 2;
+	void *dll=dlopen(argv[1],RTLD_NOW|RTLD_LOCAL|RTLD_FIRST);
+	if(!dll)return 3;
+	query old=(query)dlsym(dll,"X86_get_op_access");
+	csh handle;
+	if(!old || cs_open(CS_ARCH_X86,CS_MODE_64,&handle)!=CS_ERR_OK)return 4;
+	cs_struct *h=(cs_struct *)handle;
+	uint32_t *cache=h->x86_insn_lut;
+	unsigned observations=0;
+	for(unsigned state=0;state<3;++state){
+		h->x86_insn_lut=state==1?NULL:cache;
+		for(unsigned n=0;n<=65538;++n){
+			unsigned id=n==65537?UINT32_MAX:n==65538?0x80000000u:n;
+			uint64_t flags1=UINT64_C(0x1212343456567878),flags2=flags1;
+			const uint8_t *a=old(state==2?NULL:h,id,&flags1);
+			const uint8_t *b=X86_get_op_access(state==2?NULL:h,id,&flags2);
+			if(!!a!=!!b || flags1!=flags2)return 5;
+			if(a)for(unsigned i=0;i<6;++i){
+				if(a[i]!=b[i]){
+					fprintf(stderr,"opcode %u access %u differs\n",id,i);
+					return 6;
+				}
+				if(!a[i])break;
+			}
+			++observations;
+		}
 	}
-	return 0;
-}
-
-int main(int argc, char **argv)
-{
-	if (argc != 2)
-		return 2;
-	void *base = dlopen(argv[1], RTLD_NOW | RTLD_LOCAL | RTLD_FIRST);
-	if (!base)
-		return 3;
-	reference_find find = (reference_find)dlsym(base, "find_insn");
-	if (!find)
-		return 4;
-	csh handle = 0;
-	if (cs_open(CS_ARCH_X86, CS_MODE_32, &handle) != CS_ERR_OK)
-		return 5;
-	cs_struct *h = (cs_struct *)(uintptr_t)handle;
-	uint32_t *cache = h->x86_insn_lut;
-	if (!cache)
-		return 6;
-	for (unsigned cached = 0; cached < 2; ++cached) {
-		h->x86_insn_lut = cached ? cache : NULL;
-		for (unsigned id = 0; id <= UINT16_MAX; ++id)
-			if (check_id(h, find, id))
-				return 7;
-		if (check_id(h, find, UINT_MAX) || check_id(h, find, UINT_MAX - 1))
-			return 8;
-	}
-	h->x86_insn_lut = cache;
-	cs_close(&handle);
-	dlclose(base);
-	printf("Compared 262152 cached, uncached and NULL-handle row selections\n");
+	h->x86_insn_lut=cache;
+	if(cs_close(&handle)!=CS_ERR_OK)return 7;
+	printf("Verified %u complete flags and operand access lists across cached, missing-cache and NULL handles\n",observations);
 	return 0;
 }

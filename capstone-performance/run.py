@@ -334,7 +334,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               prior_m4_rejection_remains=True))
-    lines = ['# x86 dense mapping rows', '',
+    lines = ['# Resolve access masks and flags from one canonical x86 operand row', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
@@ -346,7 +346,7 @@ def finish():
                          f'{fmt("cpu_ns_base_over_iced")} | {fmt("cpu_ns_new_over_iced")} | '
                          f'{row["positive_cycles"]}/{len(row["pairs"])} | {row["aa_cpu_outside_2pct"]} |')
     lines += ['', 'Raw samples, including incomplete cycles or failed attempts, remain in this artifact.',
-              'Dense row selection is measured against the same Capstone revision.']
+              'BOUND, CMPXCHG and UD1 access semantics are stored in the corresponding full and reduced rows.']
     report = '\n'.join(lines) + '\n'
     (EVIDENCE / 'report.md').write_text(report)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
