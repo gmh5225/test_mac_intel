@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='native live state and four indexed alias maps'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='native dynamic-CRT state, four indexed alias maps and guarded ARM detail repairs'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
