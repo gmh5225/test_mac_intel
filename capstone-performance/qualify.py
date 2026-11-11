@@ -19,6 +19,7 @@ def tests(source, label, preset, selection=None):
     if subset:
         flags += ['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON',
                   '-DCAPSTONE_ARM_SUPPORT=ON', '-DCAPSTONE_AARCH64_SUPPORT=ON', '-DCAPSTONE_PPC_SUPPORT=ON',
+                  '-DCAPSTONE_ARC_SUPPORT=ON', '-DCAPSTONE_LOONGARCH_SUPPORT=ON',
                   '-DCAPSTONE_BUILD_DIET=ON' if preset=='diet' else '-DCAPSTONE_X86_REDUCE=ON']
     if preset=='user-alloc':
         subset = True
