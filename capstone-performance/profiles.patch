@@ -1,19 +1,34 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index f4e9d481..1ddd25c1 100644
+index f4e9d481..c9b681ce 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -163,6 +163,11 @@ if(use_alias_trie)
-     add_compile_definitions(CAPSTONE_USE_ALIAS_TRIE)
+@@ -144,10 +144,14 @@ endif()
+ list(LENGTH SUPPORTED_ARCHITECTURES count)
+ math(EXPR count "${count}-1")
+ # create options controlling whether support for a particular architecture is needed
++set(enabled_architectures)
+ foreach(i RANGE ${count})
+     list(GET SUPPORTED_ARCHITECTURES ${i} supported_architecture)
+     list(GET SUPPORTED_ARCHITECTURE_LABELS ${i} supported_architecture_label)
+     option("CAPSTONE_${supported_architecture}_SUPPORT" "${supported_architecture_label} support" ${CAPSTONE_ARCHITECTURE_DEFAULT})
++    if(CAPSTONE_${supported_architecture}_SUPPORT)
++        list(APPEND enabled_architectures ${supported_architecture})
++    endif()
+ endforeach()
+ 
+ # Dedicated builds of these backends use their generated mnemonic tries.
+@@ -164,6 +168,11 @@ if(use_alias_trie)
  endif()
  
-+option(CAPSTONE_MSVC_NATIVE_DECODER "Use the native x64 MSVC dynamic CRT decoder profile" OFF)
-+if(CAPSTONE_MSVC_NATIVE_DECODER AND MSVC)
-+    add_compile_definitions(CAPSTONE_MSVC_NATIVE_DECODER)
-+endif()
-+
  option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
++option(CAPSTONE_MSVC_NATIVE_DECODER "Optimize dedicated x86 Release builds with native x64 MSVC and the dynamic CRT" ON)
++if(CAPSTONE_MSVC_NATIVE_DECODER AND CMAKE_C_COMPILER_ID STREQUAL "MSVC"
++   AND enabled_architectures STREQUAL "X86" AND NOT CAPSTONE_BUILD_DIET AND NOT CAPSTONE_X86_REDUCE)
++    add_compile_definitions("$<$<CONFIG:Release>:CAPSTONE_MSVC_NATIVE_DECODER>")
++endif()
  option(CAPSTONE_X86_ATT_DISABLE "Disable x86 AT&T syntax" OFF)
  option(CAPSTONE_X86_SCAN_ADAPTER "Build the private x86 scan adapter hook" OFF)
+ option(CAPSTONE_OSXKERNEL_SUPPORT "Support to embed Capstone into OS X Kernel extensions" OFF)
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
 index 8c3dea2e..0abd7602 100644
 --- a/arch/X86/X86Disassembler.c
@@ -17841,7 +17856,7 @@ index 903415e8..f8f89146 100644
  #include <capstone/capstone.h>
  
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index f8d6b926..fa36a8dd 100644
+index f8d6b926..8bbb2f21 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
 @@ -608,16 +608,18 @@ This check runs in the unit suite when Python is available. Edit the original
@@ -17860,9 +17875,9 @@ index f8d6b926..fa36a8dd 100644
 -statements that cannot be skipped under this guard.
 +The x86 mapper derives its register and group counts from the canonical
 +`X86MappingInsn*.inc` tables with `suite/synctools/x86_mapping_counts.py`.
-+On native x64 MSVC with the dynamic CRT, the
-+`CAPSTONE_MSVC_NATIVE_DECODER` option enables a four-byte public ID and
-+property record per opcode in full builds. The property word holds the 64-bit
++Dedicated x86 CMake Release builds with native x64 MSVC and the dynamic CRT
++use a four-byte opcode record in the full decoder by default.
++`CAPSTONE_MSVC_NATIVE_DECODER=OFF` selects the ordinary mapping and scan paths. The property word holds the 64-bit
 +flag and the index of the shared implicit register and group data. Contiguous
 +internal IDs use a checked offset from the first ID. Sparse IDs retain a
 +sorted lookup. Other configurations read
