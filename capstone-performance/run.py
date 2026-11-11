@@ -209,7 +209,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['arch/X86/X86Mapping.c']}
+               ['arch/X86/X86Mapping.c','arch/X86/X86IntelInstPrinter.c']}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

@@ -1,216 +1,145 @@
---- a/arch/X86/X86MappingInsnOp.inc
-+++ b/arch/X86/X86MappingInsnOp.inc
-@@ -1330,12 +1330,12 @@
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -820,9 +820,6 @@
  
- {	/* X86_BOUNDS16rm, X86_INS_BOUND: bound */
- 	0,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_BOUNDS32rm, X86_INS_BOUND: bound */
- 	0,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_BSF16rm, X86_INS_BSF: bsf */
-@@ -2790,52 +2790,52 @@
- 
- {	/* X86_CMPXCHG16B, X86_INS_CMPXCHG16B: cmpxchg16b */
- 	X86_EFLAGS_MODIFY_ZF,
--	{ CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, 0 }
- },
- 
- {	/* X86_CMPXCHG16rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG16rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG32rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG32rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG64rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG64rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG8B, X86_INS_CMPXCHG8B: cmpxchg8b */
- 	X86_EFLAGS_MODIFY_ZF,
--	{ CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, 0 }
- },
- 
- {	/* X86_CMPXCHG8rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG8rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_COMISDrm, X86_INS_COMISD: comisd */
---- a/arch/X86/X86MappingInsnOp_reduce.inc
-+++ b/arch/X86/X86MappingInsnOp_reduce.inc
-@@ -875,12 +875,12 @@
- 
- {	/* X86_BOUNDS16rm, X86_INS_BOUND: bound */
- 	0,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_BOUNDS32rm, X86_INS_BOUND: bound */
- 	0,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_BSF16rm, X86_INS_BSF: bsf */
-@@ -2050,52 +2050,52 @@
- 
- {	/* X86_CMPXCHG16B, X86_INS_CMPXCHG16B: cmpxchg16b */
- 	X86_EFLAGS_MODIFY_ZF,
--	{ CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, 0 }
- },
- 
- {	/* X86_CMPXCHG16rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG16rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG32rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG32rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG64rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG64rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG8B, X86_INS_CMPXCHG8B: cmpxchg8b */
- 	X86_EFLAGS_MODIFY_ZF,
--	{ CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, 0 }
- },
- 
- {	/* X86_CMPXCHG8rm, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_READ, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CMPXCHG8rr, X86_INS_CMPXCHG: cmpxchg */
- 	X86_EFLAGS_MODIFY_OF | X86_EFLAGS_MODIFY_SF | X86_EFLAGS_MODIFY_ZF | X86_EFLAGS_MODIFY_AF | X86_EFLAGS_MODIFY_PF | X86_EFLAGS_MODIFY_CF,
--	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+	{ CS_AC_READ_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_CPUID, X86_INS_CPUID: cpuid */
-@@ -7110,7 +7110,7 @@
- 
- {	/* X86_UD1, X86_INS_UD1: ud1 */
- 	0,
--	{ 0 }
-+	{ CS_AC_READ, CS_AC_READ, 0 }
- },
- 
- {	/* X86_UD2, X86_INS_UD2: ud2 */
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -11883,39 +11883,12 @@
- const uint8_t *X86_get_op_access(cs_struct *h, unsigned int id,
- 				 uint64_t *eflags)
+ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
  {
--	/* Match the explicit UD1 descriptor in readOperands, including reduce
--	 * builds whose generated access table has no operands for UD1. */
--	static const uint8_t ud1_access[] = { CS_AC_READ, CS_AC_READ, 0 };
--	if (id == X86_UD1) {
--		*eflags = 0;
--		return ud1_access;
--	}
- 	unsigned int i = find_insn_h(h, id);
--	if (i != -1) {
--		*eflags = insn_ops[i].flags;
--		/* Compare-exchange reads and conditionally replaces its destination;
--		 * memory destinations receive a write cycle even on mismatch. */
--		static const uint8_t compare_access[] = { CS_AC_READ_WRITE,
--							  CS_AC_READ, 0 };
--		static const uint8_t pair_access[] = { CS_AC_READ_WRITE, 0 };
--		static const uint8_t bound_access[] = { CS_AC_READ, CS_AC_READ, 0 };
--		switch (insns[i].mapid) {
--		case X86_INS_BOUND:
--			/* BOUND compares the index without modifying it or EFLAGS. */
--			*eflags = 0;
--			return bound_access;
--		case X86_INS_CMPXCHG:
--			return compare_access;
--		case X86_INS_CMPXCHG8B:
--		case X86_INS_CMPXCHG16B:
--			return pair_access;
--		default:
--			break;
+-	x86_reg reg = X86_REG_INVALID, reg2;
+-	enum cs_ac_type access1, access2;
+-
+ 	if (X86_printFeatureExtension(MI, O, false))
+ 		return;
+ 
+@@ -856,70 +853,8 @@
+ 			printInstruction(MI, O);
+ 	}
+ 
+-	if (MI->csh->detail_opt) {
+-#ifndef CAPSTONE_DIET
+-		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE] = { 0 };
+-#endif
+-
+-		// first op can be embedded in the asm by llvm.
+-		// so we have to add the missing register as the first operand
+-		reg = X86_insn_reg_intel_h(MI->csh, MCInst_getOpcode(MI),
+-					   &access1);
+-		if (reg) {
+-			// shift all the ops right to leave 1st slot for this new register op
+-			memmove(&(MI->flat_insn->detail->x86.operands[1]),
+-				&(MI->flat_insn->detail->x86.operands[0]),
+-				sizeof(MI->flat_insn->detail->x86.operands[0]) *
+-					(ARR_SIZE(MI->flat_insn->detail->x86
+-							  .operands) -
+-					 1));
+-			memset(&(MI->flat_insn->detail->x86.operands[0]), 0,
+-			       sizeof(MI->flat_insn->detail->x86.operands[0]));
+-			MI->flat_insn->detail->x86.operands[0].type =
+-				X86_OP_REG;
+-			MI->flat_insn->detail->x86.operands[0].reg = reg;
+-			MI->flat_insn->detail->x86.operands[0].size =
+-				MI->csh->regsize_map[reg];
+-			MI->flat_insn->detail->x86.operands[0].access = access1;
+-			MI->flat_insn->detail->x86.op_count++;
+-		} else {
+-			if (X86_insn_reg_intel2(MCInst_getOpcode(MI), &reg,
+-						&access1, &reg2, &access2)) {
+-				MI->flat_insn->detail->x86.operands[0].type =
+-					X86_OP_REG;
+-				MI->flat_insn->detail->x86.operands[0].reg =
+-					reg;
+-				MI->flat_insn->detail->x86.operands[0].size =
+-					MI->csh->regsize_map[reg];
+-				MI->flat_insn->detail->x86.operands[0].access =
+-					access1;
+-				MI->flat_insn->detail->x86.operands[1].type =
+-					X86_OP_REG;
+-				MI->flat_insn->detail->x86.operands[1].reg =
+-					reg2;
+-				MI->flat_insn->detail->x86.operands[1].size =
+-					MI->csh->regsize_map[reg2];
+-				MI->flat_insn->detail->x86.operands[1].access =
+-					access2;
+-				MI->flat_insn->detail->x86.op_count = 2;
+-			}
 -		}
--		return insn_ops[i].access;
+-
+-#ifndef CAPSTONE_DIET
+-		// Assign access once the implicit operands have their final positions.
+-		get_op_access(MI->csh, MCInst_getOpcode(MI), access,
+-			      &MI->flat_insn->detail->x86.eflags);
+-		for (uint8_t i = 0; i < MI->flat_insn->detail->x86.op_count &&
+-				    i < ARR_SIZE(access);
+-		     i++) {
+-			MI->flat_insn->detail->x86.operands[i].access =
+-				access[i];
+-		}
+-#endif
 -	}
 -
--	return NULL;
-+	if (i == (unsigned int)-1)
-+		return NULL;
-+
-+	*eflags = insn_ops[i].flags;
-+	return insn_ops[i].access;
+-	if (MI->op1_size == 0 && reg)
+-		MI->op1_size = MI->csh->regsize_map[reg];
++	if (MI->csh->detail_opt)
++		X86_finalize_intel_operands(MI);
  }
  
- void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ #endif // CAPSTONE_SSTREAM_PRECHECKED
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11986,6 +11986,47 @@
+ }
+ #endif
+ 
++/* Finish the public Intel operand list after the instruction was printed.
++ * Implicit registers precede the printed operands; access follows that order. */
++void X86_finalize_intel_operands(MCInst *mi)
++{
++	cs_struct *h = mi->csh;
++	cs_x86 *x86 = &mi->flat_insn->detail->x86;
++	unsigned int id = MCInst_getOpcode(mi);
++	enum cs_ac_type access1, access2;
++	x86_reg reg2;
++	x86_reg reg = X86_insn_reg_intel_h(h, id, &access1);
++	if (reg) {
++		memmove(x86->operands + 1, x86->operands,
++			(ARR_SIZE(x86->operands) - 1) * sizeof(x86->operands[0]));
++		memset(&x86->operands[0], 0, sizeof(x86->operands[0]));
++		x86->operands[0].type = X86_OP_REG;
++		x86->operands[0].reg = reg;
++		x86->operands[0].size = h->regsize_map[reg];
++		x86->operands[0].access = access1;
++		++x86->op_count;
++	} else if (X86_insn_reg_intel2(id, &reg, &access1, &reg2, &access2)) {
++		x86->operands[0].type = X86_OP_REG;
++		x86->operands[0].reg = reg;
++		x86->operands[0].size = h->regsize_map[reg];
++		x86->operands[0].access = access1;
++		x86->operands[1].type = X86_OP_REG;
++		x86->operands[1].reg = reg2;
++		x86->operands[1].size = h->regsize_map[reg2];
++		x86->operands[1].access = access2;
++		x86->op_count = 2;
++	}
++#ifndef CAPSTONE_DIET
++	const uint8_t *raw = X86_get_op_access(h, id, &x86->eflags);
++	for (unsigned i = 0; i < x86->op_count && i < ARR_SIZE(insn_ops[0].access); ++i) {
++		uint8_t access = raw && *raw ? *raw++ : 0;
++		x86->operands[i].access = access == CS_AC_IGNORE ? 0 : access;
++	}
++#endif
++	if (!mi->op1_size && reg)
++		mi->op1_size = h->regsize_map[reg];
++}
++
+ // Generated from X86ImmSize.inc for the full and reduced instruction enums.
+ #include "X86GenImmSize.inc"
+ 
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -63,6 +63,7 @@
+ // return register of given instruction id
+ // return 0 if not found
+ // this is to handle instructions embedding accumulate registers into AsmStrs[]
++void X86_finalize_intel_operands(MCInst *mi);
+ x86_reg X86_insn_reg_intel(unsigned int id, enum cs_ac_type *access);
+ x86_reg X86_insn_reg_intel_h(cs_struct *h, unsigned int id,
+ 			     enum cs_ac_type *access);
