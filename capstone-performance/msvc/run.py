@@ -91,6 +91,10 @@ opt-level = 3
         programs = {n: build / 'Release' / ('native_' + n + '.exe') for n in ('compare', 'snapshot', 'sstream')}
         executables[label] = programs
         run([programs['sstream']], label + '-sstream')
+        if label == 'new':
+            build_targets(['native_checked'], 'build-printer-test')
+            outcome = run([build / 'Release/native_checked.exe'], 'full-printer-state')
+            assert 'complete printer' in outcome
         # Instrument the two owners after links above. Timed executables stay byte-identical.
         hashes = {key: digest(p.read_bytes()) for key, p in programs.items()}
         for file, func in [('SStream.c', 'stream_hooks'), ('arch/X86/X86Mapping.c', 'mapping_hooks')]:
@@ -211,7 +215,7 @@ try:
     write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
           image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
           iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
-    assert digest((source / 'windows-formatter.patch').read_bytes()) == 'f597fc82a80c9e920db2d7021ce9b3a7a9e3868c173cf7629ee0f4ed34b2d7b2'
+    assert digest((source / 'windows-formatter.patch').read_bytes()) == '0768aa7dd2bd07429e4724f2ad6d29363008781dca406cb35608994941b8bd62'
     programs = make_programs()
     cases = get_cases()
     snapshot(programs, cases)

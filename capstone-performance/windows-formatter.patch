@@ -29,6 +29,35 @@ index 0c1ef65e..49e34d76 100644
  		assert(ss);
  		SSTREAM_RETURN_IF_CLOSED(ss);
  		if (SStream_remaining(ss) == 0)
+diff --git a/arch/X86/X86InstPrinter.h b/arch/X86/X86InstPrinter.h
+index 04cfcd38..2d743f4f 100644
+--- a/arch/X86/X86InstPrinter.h
++++ b/arch/X86/X86InstPrinter.h
+@@ -21,17 +21,23 @@
+ #include "../../SStream.h"
+ 
+ void X86_Intel_printInst(MCInst *MI, SStream *OS, void *Info);
+-#if defined(__GNUC__) && !defined(CAPSTONE_DIET) && \
++#if (defined(__GNUC__) || defined(_MSC_VER)) && !defined(CAPSTONE_DIET) && \
+ 	!defined(CAPSTONE_X86_REDUCE) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #define CAPSTONE_X86_PRECHECKED_PRINTER
+ void X86_Intel_printInstructionPrechecked(MCInst *MI, SStream *OS);
++#ifdef _MSC_VER
++void X86_Intel_printInstructionGeneral(MCInst *MI, SStream *OS);
++__declspec(noinline) void
++X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative);
++#else
+ __attribute__((visibility("hidden"))) void
+ X86_Intel_printInstructionGeneral(MCInst *MI, SStream *OS);
+ __attribute__((visibility("hidden"), noinline)) void
+ X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative);
+ #endif
++#endif
+ 
+ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *Info);
+ 
 diff --git a/arch/X86/X86InstPrinterCommon.c b/arch/X86/X86InstPrinterCommon.c
 index 0eac17e9..2ee82ef7 100644
 --- a/arch/X86/X86InstPrinterCommon.c
@@ -43,9 +72,18 @@ index 0eac17e9..2ee82ef7 100644
  			const char text[] = { ',', ' ', (char)('0' + scale),
  					      '\0' };
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index aae2c545..77da9e58 100644
+index aae2c545..d3b47d6a 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
+@@ -60,7 +60,7 @@
+ 
+ #include "X86BaseInfo.h"
+ 
+-#ifdef CAPSTONE_SSTREAM_PRECHECKED
++#if defined(CAPSTONE_SSTREAM_PRECHECKED) && defined(__GNUC__)
+ #define X86_OPTIONAL_PRINTER __attribute__((unused))
+ #else
+ #define X86_OPTIONAL_PRINTER
 @@ -490,7 +490,7 @@ static inline void set_early_operand_access(MCInst *MI)
  #if defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
  	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
@@ -64,6 +102,40 @@ index aae2c545..77da9e58 100644
  		    !O->markup_stream && !O->prefixed_by_markup &&
  		    O->index <= SSTREAM_BUF_LEN - 1 - X86_PRINTER_MAX_LENGTH)
  			X86_Intel_printInstructionPrechecked(MI, O);
+diff --git a/arch/X86/X86IntelInstPrinterNumbers.c b/arch/X86/X86IntelInstPrinterNumbers.c
+index f99f145f..2d0665a0 100644
+--- a/arch/X86/X86IntelInstPrinterNumbers.c
++++ b/arch/X86/X86IntelInstPrinterNumbers.c
+@@ -2,6 +2,7 @@
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+ #include "X86InstPrinter.h"
++#include "../../MathExtras.h"
+ 
+ #if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
+ // The private printer entry proves a plain open stream, default formatter and
+@@ -10,7 +11,7 @@
+ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
+ {
+ 	const unsigned digits =
+-		value ? (64U - (unsigned)__builtin_clzll(value) + 3U) / 4U : 1U;
++		value ? (64U - CountLeadingZeros_64(value) + 3U) / 4U : 1U;
+ 	char *out = OS->buffer + OS->index;
+ 	OS->index += digits + (negative ? 3U : 2U);
+ 	char *end = OS->buffer + OS->index;
+diff --git a/arch/X86/X86IntelInstPrinterPrechecked.c b/arch/X86/X86IntelInstPrinterPrechecked.c
+index 53a53dd3..696352a3 100644
+--- a/arch/X86/X86IntelInstPrinterPrechecked.c
++++ b/arch/X86/X86IntelInstPrinterPrechecked.c
+@@ -1,7 +1,7 @@
+ /* Capstone Disassembly Engine */
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+-#if defined(CAPSTONE_HAS_X86) && defined(__GNUC__) && \
++#if defined(CAPSTONE_HAS_X86) && (defined(__GNUC__) || defined(_MSC_VER)) && \
+ 	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 diff --git a/cs.c b/cs.c
 index 0a91fe20..55aab304 100644
 --- a/cs.c
@@ -155,3 +227,35 @@ index 16e7da1e..8652b720 100644
  	bool result = test_concat2_appends();
  	if (cs_support(CS_SUPPORT_DIET))
  		return result && test_diet_appends() ? 0 : -1;
+diff --git a/tests/unit/x86_printer_prechecked.c b/tests/unit/x86_printer_prechecked.c
+index 548120f3..ef91bdc6 100644
+--- a/tests/unit/x86_printer_prechecked.c
++++ b/tests/unit/x86_printer_prechecked.c
+@@ -9,6 +9,7 @@
+ #include <string.h>
+ 
+ #ifdef CAPSTONE_X86_PRECHECKED_PRINTER
++static cs_vsnprintf_t default_formatter;
+ static int passthrough(char *buffer, size_t size, const char *format,
+ 		       va_list args)
+ {
+@@ -38,9 +39,9 @@ static void print(Result *out, const Result *seed, size_t index, unsigned flags,
+ 	out->stream.markup_stream = flags & 2;
+ 	out->stream.prefixed_by_markup = flags & 4;
+ 	out->stream.unsigned_num = flags & 8;
+-	cs_vsnprintf = generic ? passthrough : vsnprintf;
++	cs_vsnprintf = generic ? passthrough : default_formatter;
+ 	X86_Intel_printInst(&out->internal, &out->stream, NULL);
+-	cs_vsnprintf = vsnprintf;
++	cs_vsnprintf = default_formatter;
+ 	// Compare complete private/public values after normalizing object addresses.
+ 	out->internal.csh = NULL;
+ 	out->internal.flat_insn = NULL;
+@@ -49,6 +50,7 @@ static void print(Result *out, const Result *seed, size_t index, unsigned flags,
+ 
+ int main(void)
+ {
++	default_formatter = cs_vsnprintf;
+ 	static const uint8_t code[][15] = {
+ 		{ 0x90 },
+ 		{ 0xc3 },

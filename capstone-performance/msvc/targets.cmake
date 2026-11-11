@@ -11,3 +11,6 @@ target_link_libraries(native_hooks PRIVATE capstone_static)
 add_executable(native_sstream "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/sstream.c")
 target_include_directories(native_sstream PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/include")
 target_link_libraries(native_sstream PRIVATE capstone_static)
+
+add_executable(native_checked "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/x86_printer_prechecked.c")
+target_link_libraries(native_checked PRIVATE capstone_static)
