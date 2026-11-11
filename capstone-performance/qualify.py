@@ -27,7 +27,7 @@ def tests(source, label, preset, selection=None):
         units = ['x86_mapping_counts']
     if preset=='static-crt':
         subset=True
-        units=['x86_mapping_counts','x86_encoding_accuracy']
+        units=['x86_printer_prechecked','x86_mapping_counts','x86_encoding_accuracy','sstream']
         flags.extend(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=ON'])
     if preset=='sanitized':
         flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
@@ -45,7 +45,7 @@ def tests(source, label, preset, selection=None):
     args=['ctest','--test-dir',d,'-C','Release','--parallel','2','--output-on-failure','--no-tests=error',
           '--output-junit',str(EVIDENCE/(label+'-ctest.xml'))]
     if subset and not selection:
-        args += ['-R', '^unit_('+'|'.join(units+([] if preset=='user-alloc' else ['alias_mnemonic_index_generator']))+')$']
+        args += ['-R', '^unit_('+'|'.join(units)+')$']
     if selection:
         names=EVIDENCE/'failed-names.txt';names.write_text('\n'.join(selection)+'\n')
         args+=['--tests-from-file',str(names)]
