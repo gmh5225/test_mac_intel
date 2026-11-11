@@ -15,7 +15,7 @@ def tests(source, label, preset, selection=None):
     flags=['-DCAPSTONE_ARCHITECTURE_DEFAULT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON',
            '-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     subset = preset in ('diet', 'reduced')
-    units = ['x86_mapping_counts', 'x86_reg_access', 'x86_scan_batch', 'sstream', 'api', 'mapping']
+    units = ['x86_bextr_flags', 'x86_mapping_counts', 'x86_reg_access', 'x86_scan_batch', 'sstream', 'api', 'mapping']
     if subset:
         flags += ['-DCAPSTONE_ARCHITECTURE_DEFAULT=' + ('ON' if preset == 'diet' else 'OFF'), '-DCAPSTONE_X86_SUPPORT=ON',
                   '-DCAPSTONE_ARM_SUPPORT=ON', '-DCAPSTONE_AARCH64_SUPPORT=ON', '-DCAPSTONE_PPC_SUPPORT=ON',
