@@ -1,7 +1,7 @@
 name: Native dynamic CRT for the four production backends
 on:
   push:
-    branches: [codex/capstone-native-trie-arches]
+    branches: [codex/capstone-native-arm-alias-all-arches]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -23,6 +23,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-trie-arches-${{ matrix.crt }}
+          name: native-arm-alias-all-arches-${{ matrix.crt }}
           path: capstone-evidence/
           retention-days: 14
