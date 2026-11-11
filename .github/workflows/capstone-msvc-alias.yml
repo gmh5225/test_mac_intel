@@ -1,7 +1,7 @@
 name: MSVC native multi-architecture alias formatting
 on:
   push:
-    branches: [codex/capstone-final-native-arches]
+    branches: [codex/capstone-static-runtime-arches]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -23,6 +23,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: final-native-arches-${{ matrix.crt }}
+          name: static-runtime-arches-${{ matrix.crt }}
           path: capstone-evidence/
           retention-days: 14
