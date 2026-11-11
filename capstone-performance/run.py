@@ -189,6 +189,10 @@ panic = "abort"
         extra = ([libraries['base']] if unit == 'check-hint' else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
+    flag_test=WORK/'flags-state'
+    command(['clang','-std=c11','-O3',*defs,*includes,SOURCE/'flags-state.c',
+             *(['-ldl'] if platform.system()=='Linux' else []), '-o',flag_test], 'flags-test-build')
+    command([flag_test,libraries['base'],libraries['new']], 'flags-test')
     option_test=WORK/'option-state'
     command(['clang++','-std=c++17','-O3','-I',WORK/'new/include',SOURCE/'option-state.cpp',
              *(['-ldl'] if platform.system()=='Linux' else []), '-o',option_test], 'option-test-build')
@@ -213,8 +217,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['cs.c','SStream.c']}
-    if 'CMakeFiles/capstone.dir/cs.c.o' not in changed or set(changed) - allowed:
+               ['arch/X86/X86Disassembler.c','arch/X86/X86DisassemblerDecoder.c']}
+    if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += list(libraries.values()) + [iced_library]

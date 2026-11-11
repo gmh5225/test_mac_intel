@@ -1,55 +1,45 @@
-diff --git a/SStream.c b/SStream.c
-index 0c1ef65e..7d234a88 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -63,13 +63,7 @@ static void SStream_close_markup(SStream *ss)
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index 8c3dea2e..5eae75d4 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -699,13 +699,8 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 			if (insn.hasLockPrefix)
+ 				Flags |= X86_IP_HAS_LOCK;
  
- void SStream_Init(SStream *ss)
- {
--	assert(ss);
--	ss->index = 0;
--	memset(ss->buffer, 0, sizeof(ss->buffer));
--	ss->is_closed = false;
--	ss->markup_stream = false;
--	ss->prefixed_by_markup = false;
--	ss->unsigned_num = false;
-+	SStream_init_options(ss, false);
+-			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+-				if (insn.operands[i].encoding ==
+-				    ENCODING_WRITEMASK) {
+-					Flags |= X86_IP_HAS_EVEX_OPMASK;
+-					break;
+-				}
+-			}
++			if (insn.hasWritemask)
++				Flags |= X86_IP_HAS_EVEX_OPMASK;
+ 
+ 			instr->flags = Flags;
+ 		}
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..04d4e0b3 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2271,6 +2271,7 @@ static int readMaskRegister(struct InternalInstruction *insn)
+ 
+ 	insn->writemask =
+ 		(Reg)(aaaFromEVEX4of4(insn->vectorExtensionPrefix[3]));
++	insn->hasWritemask = true;
+ 
+ 	return 0;
  }
- 
- void SStream_opt_unum(SStream *ss, bool print_unsigned_numbers)
-diff --git a/SStream.h b/SStream.h
-index 2c9bc2c3..0260d05e 100644
---- a/SStream.h
-+++ b/SStream.h
-@@ -33,6 +33,17 @@ typedef struct SStream {
- 			return; \
- 	} while (0)
- 
-+static inline void SStream_init_options(SStream *ss, bool unsigned_num)
-+{
-+	assert(ss);
-+	ss->index = 0;
-+	memset(ss->buffer, 0, sizeof(ss->buffer));
-+	ss->is_closed = false;
-+	ss->markup_stream = false;
-+	ss->prefixed_by_markup = false;
-+	ss->unsigned_num = unsigned_num;
-+}
-+
- void SStream_Init(SStream *ss);
- void SStream_opt_unum(SStream *ss, bool print_unsigned_numbers);
- 
-diff --git a/cs.c b/cs.c
-index 0a91fe20..76252bdc 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1075,8 +1075,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		} else
- #endif
- 		{
--			SStream_Init(&ss);
--			SStream_opt_unum(&ss, handle->imm_unsigned);
-+			SStream_init_options(&ss, handle->imm_unsigned);
- 			handle->printer(&mci, &ss, handle->printer_info);
- 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
- 				  code, false);
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..29eead48 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -551,6 +551,8 @@ typedef struct InternalInstruction {
+ 	bool apxEvexB4;
+ 	bool apxEvexX4;
+ 	bool apxEvexGprIndex;
++	/* A write-mask descriptor can select k0. */
++	bool hasWritemask;
+ 	/* The segment override type */
+ 	SegmentOverride segmentOverride;
+ 	bool consumedModRM;
