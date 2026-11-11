@@ -6,6 +6,7 @@
 /// \file
 /// Compare x86 decoder API workloads. Benchmark-only; not linked into NeverD.
 
+#include <valgrind/callgrind.h>
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -76,6 +77,8 @@ static void text_value(Result &r, const char *s) {
   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
 }
 
+static bool collect_work;
+
 static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
                            unsigned mode, unsigned repeats) {
   csh handle = 0;
@@ -117,6 +120,7 @@ static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
     return result;
   }
 #endif
+  if (collect_work) { CALLGRIND_TOGGLE_COLLECT; }
   for (unsigned repeat = 0; repeat < repeats; ++repeat) {
     const uint8_t *cursor = bytes;
     size_t left = count;
@@ -163,6 +167,7 @@ static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
       }
     }
   }
+  if (collect_work) { CALLGRIND_TOGGLE_COLLECT; }
   cs_free(insn, 1);
   cs_close(&handle);
   return result;
@@ -195,15 +200,22 @@ int main(int argc, char **argv) {
         return capstone_run(bytes.data(), bytes.size(), bits, mode, n);
       if (library == "iced") {
         Result r;
+        if (collect_work) { CALLGRIND_TOGGLE_COLLECT; }
         iced_run(iced, bytes.data(), bytes.size(), n, &r);
+        if (collect_work) { CALLGRIND_TOGGLE_COLLECT; }
         return r;
       }
       throw std::runtime_error("unknown library");
     };
+    CALLGRIND_START_INSTRUMENTATION;
     Result warm = run(1);
+    CALLGRIND_ZERO_STATS;
+    collect_work = true;
     auto cpu_start = process_cpu_ns();
     auto start = std::chrono::steady_clock::now();
     Result result = run(repeats);
+    collect_work = false;
+    CALLGRIND_STOP_INSTRUMENTATION;
     auto end = std::chrono::steady_clock::now();
     auto cpu_end = process_cpu_ns();
     iced_destroy(iced);
