@@ -2,7 +2,7 @@ name: Same-consumer MSVC and clang-cl decode comparison
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-native-vex-extents]
+    branches: [codex/capstone-dynamic-state-identity]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -20,11 +20,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/toolchains.py ${{ matrix.crt }}
+        run: python capstone-performance/scope.py ${{ matrix.crt }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-vex-extents-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: native-runtime-identity-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
