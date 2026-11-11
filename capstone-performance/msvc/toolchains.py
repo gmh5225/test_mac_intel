@@ -19,7 +19,7 @@ def libraries_and_driver():
     baseline=source/'qualified.patch'
     assert perf.digest(baseline.read_bytes())=='d6cc1c672df8857378bffb28f91f9dbd53030887869a0c13f8ed4186df5d0471'
     perf.run(['git','apply',baseline],'qualified-native-scan-and-detail',base)
-    for name, expected in {'vex': 'a7e1e1a52f69e5b97aa07e7eb4356189e045728b7368da5caf10e1f46681dfd4'}.items():
+    for name, expected in {'profiles': '686de40d42e2ac91920b37a6876a2d74c4b10811143c86d2426b89a415526cfa'}.items():
         trees[name]=work/name
         patch=source/(name+'.patch')
         assert perf.digest(patch.read_bytes())==expected
@@ -56,7 +56,7 @@ opt-level = 3
         lib_paths[name]=(build/'Release/capstone.lib').as_posix()
         record_codegen(name,build)
     driver=work/'driver';driver.mkdir()
-    names=['msvc','vex']
+    names=['msvc','profiles']
     lines=['cmake_minimum_required(VERSION 3.15)','project(shared_driver CXX)',
            f'add_library(consumer OBJECT "{(source/"msvc/compare.cpp").as_posix()}")',
            'target_compile_features(consumer PRIVATE cxx_std_17)',
@@ -107,7 +107,7 @@ def measure(progs,cases):
         import json
         exe=progs['msvc' if label=='iced' else label]
         return json.loads(subprocess.check_output([exe,'iced' if label=='iced' else 'capstone',mode,str(case['bits']),str(n),case['path']]))
-    orders=[['msvc','vex','iced','vex','msvc'],['vex','msvc','iced','msvc','vex']]
+    orders=[['msvc','profiles','iced','profiles','msvc'],['profiles','msvc','iced','msvc','profiles']]
     for c in cases:
         for mode in ('scan','format','detail'):
             n=1
@@ -120,13 +120,13 @@ def measure(progs,cases):
                 common_fields=('instructions','rejected','boundary_hash')
                 assert len({result(r,common_fields+('value_hash',)) for k,r in raw if k!='iced'})==1
                 agree=len({result(r,common_fields) for k,r in raw})==1
-                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','vex','iced']}
+                values={k:[r['thread_cycles'] for name,r in raw if name==k] for k in ['msvc','profiles','iced']}
                 baseline=statistics.mean(values['msvc'])
                 pairs.append(dict(raw=raw,relative={k:baseline/statistics.mean(v) for k,v in values.items()},iced={k:values['iced'][0]/statistics.mean(v) if agree else None for k,v in values.items()},aa={k:v[0]/v[-1] for k,v in values.items() if k!='iced'}))
             rows.append(dict(case=c['name'],mode=mode,repeats=repeats,pairs=pairs))
             perf.write('measurements.json',rows)
 try:
-    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'vex': 'a7e1e1a52f69e5b97aa07e7eb4356189e045728b7368da5caf10e1f46681dfd4'}))
+    perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patches={'profiles': '686de40d42e2ac91920b37a6876a2d74c4b10811143c86d2426b89a415526cfa'}))
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
