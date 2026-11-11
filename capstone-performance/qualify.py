@@ -25,6 +25,10 @@ def tests(source, label, preset, selection=None):
         subset = True
         flags.extend(['-DCAPSTONE_USE_DEFAULT_ALLOC=OFF', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON'])
         units = ['x86_mapping_counts']
+    if preset=='windows-release':
+        subset = True
+        flags.extend(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON'])
+        units = ['x86_mapping_counts']
     if preset=='sanitized':
         flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
                       '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
@@ -73,12 +77,25 @@ def main():
     command(['git','diff','--check'],'source-diff',source)
     write('inputs.json',dict(ref=ref,preset=args.preset,candidate=args.candidate,
                              patches={f:sha(SOURCE/f) for f in patches}))
+    engine = source / 'cs.c'
+    with engine.open('a') as f:
+        f.write("""
+static const cs_opt_mem frozen_hooks = { malloc, calloc, realloc, free, vsnprintf };
+void dump_initial_hooks(void)
+{
+    printf("owner expr=%d,%d,%d,%d,%d stored=%d,%d,%d,%d,%d system=%d\\n",
+           cs_mem_malloc==malloc, cs_mem_calloc==calloc, cs_mem_realloc==realloc, cs_mem_free==free, cs_vsnprintf==vsnprintf,
+           cs_mem_malloc==frozen_hooks.malloc, cs_mem_calloc==frozen_hooks.calloc, cs_mem_realloc==frozen_hooks.realloc,
+           cs_mem_free==frozen_hooks.free, cs_vsnprintf==frozen_hooks.vsnprintf, cs_mem_uses_system_defaults());
+}
+""")
+    unit = source / 'tests/unit/x86_mapping_counts.c'
+    u = unit.read_text().replace('bool shared_ids =', 'extern void dump_initial_hooks(void); dump_initial_hooks(); bool shared_ids =')
+    u = u.replace('cs_close(&second);', 'printf("expected=%d actual=%d,%d owned=%d,%d lookup=%p,%p regs=%p,%p\\n", expect_shared,shared_ids,shared_regs,h->x86_uses_shared_luts,h2->x86_uses_shared_luts,(void*)h->x86_insn_lut,(void*)h2->x86_insn_lut,(void*)h->x86_insn_reg_lut,(void*)h2->x86_insn_reg_lut); cs_close(&second);')
+    unit.write_text(u)
     failed=tests(source,'candidate',args.preset)
     if failed:
-        base=fetch('base','https://github.com/NeverSight/capstone.git',ref)
-        inherited=tests(base,'base',args.preset,failed)
-        write('baseline-comparison.json',dict(candidate_failed=failed,also_failed_on_base=inherited))
-        if set(failed)!=set(inherited):raise RuntimeError('New test failures')
+        raise RuntimeError('See exact hook and handle diagnostics in the CTest log')
     write('completed.json',dict(complete=True))
 
 if __name__=='__main__':
