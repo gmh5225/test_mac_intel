@@ -179,14 +179,14 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-callback', 'check-register-text']:
+    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-callback', 'check-dense']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit in ('check-hint','check-register-text') else
+        extra = ([libraries['base']] if unit in ('check-hint','check-dense') else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
     flag_test=WORK/'flags-state'
@@ -198,10 +198,6 @@ panic = "abort"
              *(['-ldl'] if platform.system()=='Linux' else []), '-o',option_test], 'option-test-build')
     command([option_test,libraries['base'],libraries['new']], 'option-test')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
-    for item in inputs:
-        if item['selector'] >= 16:
-            command([WORK/'check-register-text', item['path'], str(item['selector'])],
-                    'coverage-' + item['name'])
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     write('cases.json', cases)
@@ -221,7 +217,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['cs.c','arch/X86/X86IntelInstPrinterPrechecked.c']}
+               ['arch/ARC/ARCMapping.c', 'arch/LoongArch/LoongArchMapping.c']}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
@@ -358,7 +354,7 @@ def finish():
                          f'{fmt("cpu_ns_base_over_iced")} | {fmt("cpu_ns_new_over_iced")} | '
                          f'{row["positive_cycles"]}/{len(row["pairs"])} | {row["aa_cpu_outside_2pct"]} |')
     lines += ['', 'Raw samples, including incomplete cycles or failed attempts, remain in this artifact.',
-              'Only the two ARM mapping objects change.']
+              'Changed runtime objects are recorded and checked during preparation.']
     report = '\n'.join(lines) + '\n'
     (EVIDENCE / 'report.md').write_text(report)
     if os.environ.get('GITHUB_STEP_SUMMARY'):
