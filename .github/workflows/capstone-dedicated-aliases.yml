@@ -1,7 +1,7 @@
 name: GCC ARM and Thumb register formatting on real files
 on:
   push:
-    branches: [codex/capstone-plain-arm-register-gcc]
+    branches: [codex/capstone-plain-arm-register-arm64-gcc]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {host: ubuntu-24.04, plan: ARM}
+          - {host: ubuntu-24.04-arm, plan: ARM}
     env:
       ARCH_PLAN: ${{ matrix.plan }}
     runs-on: ${{ matrix.host }}
