@@ -51,26 +51,19 @@ def fetch(name, repo, rev):
 def make_programs():
     base = fetch('base', 'capstone', manifest['capstone_revision'])
     fetch('iced', 'iced', manifest['iced_revision'])
-    path='arch/X86/X86IntelInstPrinterPrechecked.c'
-    body='arch/X86/X86IntelInstPrinter.c'
-    original=(base/path).read_text()
-    for variant in ('known','fixed'):
-        patch=source/('printer-'+variant+'.patch')
+    common=source/'printer-fixed.patch'
+    assert digest(common.read_bytes())==manifest['source_lineage'][common.name]['sha256']
+    run(['git','apply',common],'common-printer',base)
+    exports=('X86_getInstructionScan','X86_getInstructionScanResult','X86_scanBatch','X86_scanCallTarget','cs_disasm_iter','decodeInstruction','decodeInstructionFull','decodeInstructionScan')
+    for label in ('extent','early'):
+        tree=work/label
+        patch=source/('iterator-'+label+'.patch')
         assert digest(patch.read_bytes())==manifest['source_lineage'][patch.name]['sha256']
-        run(['git','apply',patch],variant+'-apply',base)
-        candidate=(base/path).read_text()
-        name='X86_Intel_printInstruction'+variant
-        dest=base/'arch/X86'/('Bench'+variant.title()+'.c')
-        dest.write_text('#define X86_Intel_printInstructionPrechecked '+name+'\n'+candidate)
-        run(['git','restore','--',path,body],variant+'-restore',base)
-    f=base/body
-    text=f.read_text().replace('SStream_concat0(OS, extension_name);','(SStream_concat0)(OS, extension_name);')
-    k='void X86_Intel_printInstructionGeneral(MCInst *MI, SStream *O)'
-    assert text.count(k)==1
-    text=text.replace(k,'void X86_Intel_printInstructionknown(MCInst *, SStream *);\nvoid X86_Intel_printInstructionfixed(MCInst *, SStream *);\nstatic void (*bench_printer)(MCInst *,SStream *)=X86_Intel_printInstructionPrechecked;\nvoid bench_select_printer(unsigned mode) { bench_printer=mode==2 ? X86_Intel_printInstructionfixed : mode==1 ? X86_Intel_printInstructionknown : X86_Intel_printInstructionPrechecked; }\n'+k)
-    k='X86_Intel_printInstructionPrechecked(MI, O);'
-    assert text.count(k)==1
-    f.write_text(text.replace(k,'bench_printer(MI, O);'))
+        run(['git','worktree','add','--detach',tree,'HEAD'],label+'-tree',base)
+        run(['git','apply',patch],label+'-apply',tree)
+        impl=(tree/'arch/X86/X86DisassemblerDecoder.c').as_posix()
+        h=''.join('#define '+name+' '+label+'_'+name+'\n' for name in exports)
+        (base/'arch/X86'/('Bench'+label.title()+'.c')).write_text(h+'#include "'+impl+'"\n')
     adapter = work / 'adapter'
     adapter.mkdir()
     for name in ['Cargo.lock', 'iced.rs']:
@@ -91,23 +84,26 @@ opt-level = 3
     run(['cargo', 'build', '--release', '--locked', '--manifest-path', adapter / 'Cargo.toml'], 'cargo-build')
     driver=work/'same.cpp'
     text=(source/'msvc/compare.cpp').read_text()
-    key='int main(int argc, char **argv) {'
-    assert text.count(key)==1
-    driver.write_text(text.replace(key,'#include <cstdlib>\nextern "C" void bench_select_printer(unsigned);\n'+key+'\n  bench_select_printer(static_cast<unsigned>(std::atoi(std::getenv("CAPSTONE_BENCH_PRINTER"))));'))
+    user_fn='static Result capstone_run('
+    declaration='#include <cstdlib>\nextern "C" decltype(cs_disasm_iter) extent_cs_disasm_iter, early_cs_disasm_iter;\nstatic decltype(&cs_disasm_iter) bench_iter = cs_disasm_iter;\n'
+    text=text.replace(user_fn,declaration+user_fn).replace('bool ok = cs_disasm_iter(', 'bool ok = bench_iter(')
+    main='int main(int argc, char **argv) {'
+    driver.write_text(text.replace(main,main+'\n  unsigned sel=std::atoi(std::getenv("CAPSTONE_BENCH_ITER"));\n  bench_iter=sel==2 ? early_cs_disasm_iter : sel==1 ? extent_cs_disasm_iter : cs_disasm_iter;'))
     with (base/'CMakeLists.txt').open('a') as f:
-        f.write('\ntarget_sources(capstone PRIVATE arch/X86/BenchKnown.c arch/X86/BenchFixed.c)\nadd_executable(same "'+driver.as_posix()+'")\ntarget_compile_features(same PRIVATE cxx_std_17)\ntarget_link_libraries(same PRIVATE capstone_static "'+(work/'cargo-target/release/iced_compare.lib').as_posix()+'" advapi32 bcrypt ntdll userenv ws2_32)\n')
+        f.write('\ntarget_sources(capstone PRIVATE arch/X86/BenchExtent.c arch/X86/BenchEarly.c)\nadd_executable(same "'+driver.as_posix()+'")\ntarget_compile_features(same PRIVATE cxx_std_17)\ntarget_link_libraries(same PRIVATE capstone_static "'+(work/'cargo-target/release/iced_compare.lib').as_posix()+'" advapi32 bcrypt ntdll userenv ws2_32)\n')
     build=work/'build'
     run(['cmake','-S',base,'-B',build,'-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF'),'-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'config')
     run(['cmake','--build',build,'--config','Release','--parallel','4','--target','same'],'build')
     exe=build/'Release/same.exe'
     objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
     import re
-    code={}
-    for key in ('X86IntelInstPrinterPrechecked','BenchKnown','BenchFixed'):
-        obj,=build.rglob(key+'.obj')
-        dump=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
-        code[key]=dict(object_bytes=obj.stat().st_size,concat0_relocations=sum(line.split()[-1:] == ['SStream_concat0'] for line in dump.splitlines()),instructions=sum(bool(re.match(r'^\s*[0-9a-f]+:\s+\w+',line))for line in dump.splitlines()))
-    write('native-code.json',code)
+    data={}
+    for stem,label in [('X86DisassemblerDecoder','cs_disasm_iter'),('BenchExtent','extent_cs_disasm_iter'),('BenchEarly','early_cs_disasm_iter')]:
+        obj,=build.rglob(stem+'.obj')
+        out=subprocess.check_output([objdump,'-dr','--no-show-raw-insn','--x86-asm-syntax=intel','--disassemble-symbols='+label,str(obj)],text=True,errors='replace')
+        assert '<'+label+'>:' in out, label
+        data[label]=out.splitlines()[:70]
+    write('entry-code.json',data)
     return exe
 
 def get_cases():
@@ -146,16 +142,16 @@ def get_cases():
 
 
 def measure(exe):
-    labels=('stock','known','fixed')
+    labels=('stock','extent','early')
     def sample(case,mode,label,n):
-        env=dict(os.environ,CAPSTONE_BENCH_PRINTER=str(labels.index(label)))
+        env=dict(os.environ,CAPSTONE_BENCH_ITER=str(labels.index(label)))
         return json.loads(subprocess.check_output([exe,'capstone',mode,str(case['bits']),str(n),case['path']],env=env))
     rows=[]
     for case in get_cases():
         for mode in ('scan','format','detail'):
             n=1
             while (probe:=sample(case,mode,'stock',n))['wall_ns']<12_000_000:n*=4
-            n=max(1,math.ceil(n*110_000_000/probe['wall_ns']))
+            n=max(1,math.ceil(n*75_000_000/probe['wall_ns']))
             pairs=[]
             for i in range(6):
                 order=labels[i%3:]+labels[:i%3]
