@@ -236,7 +236,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    backends = {'AArch64':'AArch64','Mips':'Mips','PowerPC':'PPC','Sparc':'Sparc','ARM':'ARM'}
+    backends = {'AArch64':'AArch64','Mips':'Mips','PowerPC':'PPC','Sparc':'Sparc'}
     allowed = {prefix+'arch/'+arch+'/'+stem+'Mapping.c.o' for arch,stem in backends.items()}
     allowed.update(prefix+x for x in ('Mapping.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86Mapping.c.o'))
     if set(changed) != allowed:
