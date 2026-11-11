@@ -33,6 +33,53 @@ def snapshot(exe):
     return dict(file=digest(data), sections=sections)
 
 
+def section_diffs(old, new, mapfile):
+    import bisect
+    import re
+    symbols = []
+    for line in mapfile.splitlines():
+        m = re.match(r"\s+[0-9a-fA-F]{4}:[0-9a-fA-F]{8}\s+(\S+)\s+([0-9a-fA-F]{8,16})\s+", line)
+        if m:
+            symbols.append((int(m[2], 16), m[1]))
+    symbols.sort()
+    def sections(buf):
+        pe, = struct.unpack_from("<I",buf,0x3c)
+        count, = struct.unpack_from("<H",buf,pe+6)
+        opt, = struct.unpack_from("<H",buf,pe+20)
+        image_base, = struct.unpack_from("<Q",buf,pe+24+24)
+        result={}
+        for i in range(count):
+            at=pe+24+opt+i*40
+            name=buf[at:at+8].rstrip(b"\0").decode("ascii")
+            _, addr, size, start=struct.unpack_from("<4I",buf,at+8)
+            result[name]=(image_base+addr,buf[start:start+size])
+        return result
+    left, right = sections(old), sections(new)
+    changes={}
+    for name,(base,before) in left.items():
+        new_base,after=right[name]
+        assert new_base==base and len(before)==len(after)
+        if after==before:
+            continue
+        runs=[]
+        for i,(a,b) in enumerate(zip(before,after)):
+            if a==b:
+                continue
+            if runs and i==runs[-1][1]:
+                runs[-1][1]=i+1
+            else:
+                runs.append([i,i+1])
+        items=[]
+        for a,b in runs[:100]:
+            address=base+a
+            k=bisect.bisect_right(symbols,(address,chr(0x10ffff)))-1
+            start,symbol=symbols[k] if k>=0 else (0,"")
+            items.append(dict(address=hex(address),length=b-a,symbol=symbol,symbol_offset=hex(address-start),
+                              old=before[max(0,a-8):min(b+8,a+64)].hex(),new=after[max(0,a-8):min(b+8,a+64)].hex()))
+        changes[name]=dict(ranges=len(runs),bytes=sum(b-a for a,b in runs),examples=items)
+    return changes
+
+
 def main(tmp):
     src = tmp / "capstone"
     env = dict(os.environ)
@@ -78,7 +125,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
 add_subdirectory(capstone)
 add_executable(runtime_image smoke.c)
 target_link_libraries(runtime_image PRIVATE capstone_static)
-target_link_options(runtime_image PRIVATE /INCREMENTAL:NO /Brepro /DEBUG:NONE)
+target_link_options(runtime_image PRIVATE /INCREMENTAL:NO /Brepro /DEBUG:NONE /MAP:runtime_probe.map)
 ''')
     build = tmp / "build"
     run(["cmake","-S",tmp,"-B",build,"-G","Ninja","-DCMAKE_BUILD_TYPE=Release",
@@ -89,6 +136,7 @@ target_link_options(runtime_image PRIVATE /INCREMENTAL:NO /Brepro /DEBUG:NONE)
     run(build_cmd)
     exe = build / "runtime_image.exe"
     run([exe])
+    before_bytes = exe.read_bytes()
     before = snapshot(exe)
     objects = list(build.rglob("*.obj"))
     target, = [f for f in objects if f.name.lower() == "x86disassemblerdecoder.c.obj"]
@@ -110,18 +158,21 @@ target_link_options(runtime_image PRIVATE /INCREMENTAL:NO /Brepro /DEBUG:NONE)
     changed = [str(f.relative_to(build)) for f in objects if digest(f.read_bytes()) != base_objects[f]]
     data = dict(reference=BASE, flags="/MD /O2 /Brepro", before=before, after=after, changed_objects=changed,
                 same_image=before["file"]==after["file"], same_sections=before["sections"]==after["sections"])
+    data["section_differences"] = section_diffs(before_bytes,exe.read_bytes(),(build/"runtime_probe.map").read_text(errors="replace"))
     (EVIDENCE / "linked-image.json").write_text(json.dumps(data, indent=2)+"\n")
     print(json.dumps(data), flush=True)
-    assert data["same_sections"]
+    assert [Path(n).name.lower() for n in changed] == ["x86disassemblerdecoder.c.obj"]
+    assert before["sections"].keys() == after["sections"].keys()
 
 
 if __name__ == "__main__":
     EVIDENCE.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=os.environ["RUNNER_TEMP"]) as temp:
+    workspace = tempfile.TemporaryDirectory(dir=os.environ["RUNNER_TEMP"])
+    with workspace as temp:
         root = Path(temp)
         try:
             main(root)
         finally:
             size = sum(f.stat().st_size for f in root.rglob("*") if f.is_file())
-            shutil.rmtree(root)
+            workspace.cleanup()
             (EVIDENCE / "cleanup.json").write_text(json.dumps(dict(removed=not root.exists(),bytes=size)))
