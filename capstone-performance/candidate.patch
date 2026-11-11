@@ -3143,3 +3143,57 @@ index fd26a73a..bc3ce76e 100644
  	bool ok = cache != NULL;
  	for (size_t c = 0; c < sizeof(cases) / sizeof(cases[0]); ++c) {
  		if (cases[c].full_only && cs_support(CS_SUPPORT_X86_REDUCE))
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -154,6 +154,7 @@
+ 	uint64_t address; // address of this insn
+ 	cs_struct *csh; // save the main csh
+ 	uint8_t x86opsize; // opsize for [mem] operand
++	bool x86_plain_onebyte;
+ 
+ 	// These flags could be used to pass some info from one target subcomponent
+ 	// to another, for example, from disassembler to asm printer. The values of
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -679,6 +679,13 @@
+ 			instr->x86_prefix[3] = insn.prefix3;
+ 			instr->xAcquireRelease = insn.xAcquireRelease;
+ 			instr->x86Lock = insn.hasLockPrefix;
++			/* The classic one-byte map has no vector mask or broadcast.
++			 * Leave the C0/C1 shifts, D0-D3 shifts and x87 range
++			 * to the postprinter for RCL and x87 environment repairs. */
++			instr->x86_plain_onebyte =
++				insn.opcodeType == ONEBYTE && !insn.vectorExtensionType &&
++				!insn.hasRex2 && (insn.opcode & 0xfe) != 0xc0 &&
++				(insn.opcode & 0xf0) != 0xd0;
+ 
+ 			if (handle->detail_opt) {
+ 				update_pub_insn(instr->flat_insn, &insn);
+--- a/cs.c
++++ b/cs.c
+@@ -78,6 +78,7 @@
+ #include "arch/WASM/WASMModule.h"
+ #ifdef CAPSTONE_HAS_X86
+ #include "arch/X86/X86Mapping.h"
++#include "arch/X86/X86InstPrinter.h"
+ #include "arch/X86/X86Disassembler.h"
+ #endif
+ #include "arch/X86/X86Module.h"
+@@ -1069,11 +1070,13 @@
+ 			ss.prefixed_by_markup = false;
+ 			ss.unsigned_num = false;
+ 			SStream_opt_unum(&ss, handle->imm_unsigned);
++			bool intel = handle->printer == X86_Intel_printInst;
+ 			handle->printer(&mci, &ss, handle->printer_info);
+-			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+-				  code,
+-				  !mci.assembly[0] && handle->post_printer ==
+-							      X86_postprinter);
++			PostPrinter_t post = handle->post_printer;
++			bool exact = !mci.assembly[0] && post == X86_postprinter;
++			if (exact && intel && mci.x86_plain_onebyte)
++				post = NULL;
++			fill_insn(handle, insn, &ss, &mci, post, code, exact);
+ 		} else
+ #endif
+ 		{

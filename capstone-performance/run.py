@@ -145,6 +145,10 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
+    incremental = os.environ.get('COMPARE_BASE') == 'combined'
+    if incremental:
+        command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
+    write('comparison.json', dict(baseline='shared integrated candidate' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -187,14 +191,14 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-ppc', 'check-defaults', 'check-shared', 'check-callback']:
+    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-ppc', 'check-defaults', 'check-shared', 'check-post', 'check-callback']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared') else
+        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post') else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
@@ -236,6 +240,9 @@ panic = "abort"
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
                ['cs.c','arch/X86/X86Mapping.c','arch/ARM/ARMMapping.c','arch/AArch64/AArch64Mapping.c',
                 'arch/PowerPC/PPCMapping.c','arch/PowerPC/PPCInstPrinter.c']}
+    if incremental:
+        allowed = {'CMakeFiles/capstone.dir/cs.c.o'}
+    allowed.add('CMakeFiles/capstone.dir/arch/X86/X86Disassembler.c.o')
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

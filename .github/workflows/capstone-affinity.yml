@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-shared-multiarch]
+    branches: [codex/capstone-legacy-postprinter]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-shared-multiarch
+  group: capstone-legacy-postprinter
   cancel-in-progress: false
 
 jobs:
@@ -20,7 +20,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: [ubuntu-24.04, macos-15]
+        include:
+          - { host: ubuntu-24.04, baseline: published }
+          - { host: ubuntu-24.04, baseline: combined }
+          - { host: macos-15-intel, baseline: published }
+    env:
+      COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     steps:
@@ -45,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-shared-multiarch-${{ matrix.host }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-legacy-postprinter-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
