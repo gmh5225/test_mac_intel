@@ -126,5 +126,29 @@ def prepare(source, scratch, evidence, command):
                           text_sha256=digest(text), source=source_name,
                           source_sha256=digest((source / source_name).read_bytes()),
                           executable_was_run=False))
+    import io, tarfile
+    url = 'https://deb.debian.org/debian/pool/main/s/syslinux/syslinux-common_6.04~git20190206.bf6db5b4+dfsg1-3.2_all.deb'
+    package = scratch/'syslinux-common.deb'
+    command(['curl','-fsSL','--retry','3',url,'-o',package], 'syslinux-download')
+    data=package.read_bytes()
+    package_sha='2abf8dcb2bd456a4fc667f86e7d9d772de720389e3655a0e18c260e1d15f66a9'
+    assert digest(data)==package_sha
+    i=8
+    while i<len(data):
+        h=data[i:i+60];n=int(h[48:58]);i+=60
+        if h[:16].startswith(b'data.tar'): break
+        i+=n+n%2
+    members={'mbr.bin':'4746f74bc9b9d3d579c41988a4a29bb7ac932ad1c70470ea779ea161eb799b64',
+             'gptmbr.bin':'d2a9081727f91f4c38494e52cdeb86ebd9009fead17a739effbad4011c581d1f',
+             'diag/handoff/handoff.bin':'1ce430647233e86ec917106f22073c133b196bcebe630c2c78081eb23c0a14a3'}
+    with tarfile.open(fileobj=io.BytesIO(data[i:i+n])) as ar:
+        for member, expected in members.items():
+            name='syslinux-'+Path(member).stem
+            binary=ar.extractfile('./usr/lib/syslinux/mbr/'+member).read()
+            assert digest(binary)==expected
+            path=scratch/(name+'.bin');path.write_bytes(binary)
+            cases.append(dict(name=name,selector=16,path=str(path),bytes=len(binary),
+                              url=url,kind='real-mode boot record',package_sha256=package_sha,
+                              text_sha256=expected,binary_sha256=expected,executable_was_run=False))
     (evidence / 'corpus.json').write_text(json.dumps(cases, indent=2) + '\n')
     return cases

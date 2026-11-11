@@ -10859,3 +10859,131 @@ index f0be5f3c..c19036e4 100644
 -	return 0;
 +	return check_lookup();
  }
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 952b6025..542aca8f 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1780,6 +1780,65 @@ X86_DECODE_INLINE int readDisplacement(struct InternalInstruction *insn,
+ 	return 0;
+ }
+ 
++/* Keep 16-bit addressing out of the 32/64-bit reader, including its
++ * register-direct case which records the displacement offset. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline, cold))
++#endif
++static int readModRMAddress16(struct InternalInstruction *insn, uint8_t mod,
++			      uint8_t rm, bool materialize)
++{
++	EABase eaBaseBase = EA_BASE_BX_SI;
++
++	switch (mod) {
++	case 0x0:
++		if (rm == 0x6) {
++			if (materialize) {
++				insn->eaBase = EA_BASE_NONE;
++			}
++			insn->eaDisplacement = EA_DISP_16;
++			if (readDisplacement(insn, materialize))
++				return -1;
++		} else {
++			if (materialize) {
++				insn->eaBase =
++					(EABase)(eaBaseBase + rm);
++			}
++			insn->eaDisplacement = EA_DISP_NONE;
++		}
++		break;
++	case 0x1:
++		if (materialize) {
++			insn->eaBase = (EABase)(eaBaseBase + rm);
++		}
++		insn->eaDisplacement = EA_DISP_8;
++		if (materialize) {
++			insn->displacementSize = 1;
++		}
++		if (readDisplacement(insn, materialize))
++			return -1;
++		break;
++	case 0x2:
++		if (materialize) {
++			insn->eaBase = (EABase)(eaBaseBase + rm);
++		}
++		insn->eaDisplacement = EA_DISP_16;
++		if (readDisplacement(insn, materialize))
++			return -1;
++		break;
++	case 0x3:
++		if (materialize) {
++			insn->eaBase = (EABase)(insn->eaRegBase + rm);
++		}
++		if (readDisplacement(insn, materialize))
++			return -1;
++		break;
++	}
++	return 0;
++}
++
+ /*
+  * readModRM - Consumes all addressing information (ModR/M byte, SIB byte, and
+  *   displacement) for an instruction and interprets it.
+@@ -1855,55 +1914,8 @@ X86_DECODE_INLINE int readModRMImpl(struct InternalInstruction *insn,
+ 	rm |= bFromREX(insn->rexPrefix) << 3;
+ 
+ 	switch (insn->addressSize) {
+-	case 2: {
+-		EABase eaBaseBase = EA_BASE_BX_SI;
+-
+-		switch (mod) {
+-		case 0x0:
+-			if (rm == 0x6) {
+-				if (materialize) {
+-					insn->eaBase = EA_BASE_NONE;
+-				}
+-				insn->eaDisplacement = EA_DISP_16;
+-				if (readDisplacement(insn, materialize))
+-					return -1;
+-			} else {
+-				if (materialize) {
+-					insn->eaBase =
+-						(EABase)(eaBaseBase + rm);
+-				}
+-				insn->eaDisplacement = EA_DISP_NONE;
+-			}
+-			break;
+-		case 0x1:
+-			if (materialize) {
+-				insn->eaBase = (EABase)(eaBaseBase + rm);
+-			}
+-			insn->eaDisplacement = EA_DISP_8;
+-			if (materialize) {
+-				insn->displacementSize = 1;
+-			}
+-			if (readDisplacement(insn, materialize))
+-				return -1;
+-			break;
+-		case 0x2:
+-			if (materialize) {
+-				insn->eaBase = (EABase)(eaBaseBase + rm);
+-			}
+-			insn->eaDisplacement = EA_DISP_16;
+-			if (readDisplacement(insn, materialize))
+-				return -1;
+-			break;
+-		case 0x3:
+-			if (materialize) {
+-				insn->eaBase = (EABase)(insn->eaRegBase + rm);
+-			}
+-			if (readDisplacement(insn, materialize))
+-				return -1;
+-			break;
+-		}
+-		break;
+-	}
++	case 2:
++		return readModRMAddress16(insn, mod, rm, materialize);
+ 
+ 	case 4:
+ 	case 8: {

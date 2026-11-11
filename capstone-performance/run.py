@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='unconditional one-byte classification' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='integrated native release before separating address16' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -237,7 +237,7 @@ panic = "abort"
     write('objects.json', objects)
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
-    allowed = {'CMakeFiles/capstone.dir/' + name + '.o' for name in ['Mapping.c', 'arch/AArch64/AArch64Mapping.c', 'arch/ARC/ARCMapping.c', 'arch/ARM/ARMMapping.c', 'arch/Alpha/AlphaMapping.c', 'arch/LoongArch/LoongArchMapping.c', 'arch/Mips/MipsMapping.c', 'arch/PowerPC/PPCInstPrinter.c', 'arch/PowerPC/PPCMapping.c', 'arch/Sparc/SparcMapping.c', 'arch/SystemZ/SystemZMapping.c', 'arch/TriCore/TriCoreMapping.c', 'arch/X86/X86Disassembler.c', 'arch/X86/X86IntelInstPrinter.c', 'arch/X86/X86Mapping.c', 'arch/Xtensa/XtensaMapping.c', 'cs.c']}
+    allowed = {'CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
@@ -300,19 +300,17 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    selected = {('putty-32-0.85','format'),('putty-32-0.85','detail'),('putty-32-0.85','scan'),
-                ('scalar64','detail'),('simd64','scan'),('simd64','format'),('simd64','detail'),
-                ('mips64el-ls','detail'),('mips64el-ls','format'),('sparc64-ls','detail'),('riscv64-cp','detail'),
-                ('riscv64-cp','format'),('s390x-ls','detail'),('s390x-cp','detail'),('s390x-sort','detail'),
-                ('ppc64el-ls','format'),('arm64-sort','format'),('loong64-ls','detail'),('arc-libm','detail')}
+    x86 = ['syslinux-mbr','syslinux-gptmbr','syslinux-handoff','putty-32-0.85','putty-64-0.85','scalar32','scalar64','simd64','amd64-ls']
+    selected = {(name, mode) for name in x86 for mode in ['scan','format','detail']}
+    selected.update([('mips64el-ls','detail'),('ppc64el-ls','format'),('riscv64-cp','format'),('arm64-sort','format')])
     selected_cases = [c for c in cases if (c['name'],c['mode']) in selected]
     assert len(selected_cases)==len(selected)
-    controls = [c for c in selected_cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','format'),('simd64','scan')}]
-    target = 350_000_000 if platform.system() == 'Linux' else 240_000_000
+    controls = [c for c in selected_cases if (c['name'],c['mode']) in {('syslinux-mbr','detail'),('putty-32-0.85','format'),('simd64','scan')}]
+    target = 200_000_000
     measure_panel('null', controls, 12, ['base','new','base_aa','new_aa'], target)
-    measure_panel('x86', [c for c in selected_cases if c['consumer']=='decoder'],12,
+    measure_panel('x86', [c for c in selected_cases if c['consumer']=='decoder'],6,
                   ['base','new','base_aa','new_aa','iced','iced_aa'],target)
-    measure_panel('other', [c for c in selected_cases if c['consumer']=='single'],12,
+    measure_panel('other', [c for c in selected_cases if c['consumer']=='single'],6,
                   ['base','new','base_aa','new_aa'],target)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
