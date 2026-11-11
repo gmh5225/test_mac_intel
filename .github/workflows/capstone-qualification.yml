@@ -1,7 +1,7 @@
 name: Capstone source qualification
 on:
   push:
-    branches: [codex/capstone-shared-access-qualification]
+    branches: [codex/capstone-integrated-qualification]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-qualification.yml
@@ -14,8 +14,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, candidate: shared, preset: sanitized }
-          - { host: windows-2022, candidate: shared, preset: windows-release }
+          - { host: ubuntu-24.04, candidate: combined, preset: sanitized }
+          - { host: macos-15-intel, candidate: combined, preset: intel-release }
+          - { host: windows-2022, candidate: combined, preset: windows-release }
+          - { host: ubuntu-24.04, candidate: combined, preset: diet }
+          - { host: ubuntu-24.04, candidate: combined, preset: reduced }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 65
     steps:

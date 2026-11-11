@@ -14,6 +14,12 @@ def tests(source, label, preset, selection=None):
     d=WORK/('build-'+label)
     flags=['-DCAPSTONE_ARCHITECTURE_DEFAULT=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON',
            '-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    subset = preset in ('diet', 'reduced')
+    units = ['x86_mapping_counts', 'x86_reg_access', 'x86_scan_batch', 'sstream', 'api', 'mapping']
+    if subset:
+        flags += ['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON',
+                  '-DCAPSTONE_ARM_SUPPORT=ON', '-DCAPSTONE_AARCH64_SUPPORT=ON', '-DCAPSTONE_PPC_SUPPORT=ON',
+                  '-DCAPSTONE_BUILD_DIET=ON' if preset=='diet' else '-DCAPSTONE_X86_REDUCE=ON']
     if preset=='sanitized':
         flags.extend(['-DCMAKE_C_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
                       '-DCMAKE_CXX_FLAGS=-fsanitize=address,undefined -fno-omit-frame-pointer',
@@ -24,9 +30,13 @@ def tests(source, label, preset, selection=None):
         '-G','Ninja','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++']
     command(['cmake','-S',source,'-B',d,*generator,'-DCMAKE_BUILD_TYPE=Release',
              '-DCAPSTONE_BUILD_MACOS_THIN=ON',*flags],label+'-config')
-    command(['cmake','--build',d,'--config','Release','--parallel','3'],label+'-build')
+
+    targets = ['--target', 'capstone_static', *units] if subset else []
+    command(['cmake','--build',d,'--config','Release','--parallel','3', *targets],label+'-build')
     args=['ctest','--test-dir',d,'-C','Release','--parallel','2','--output-on-failure','--no-tests=error',
           '--output-junit',str(EVIDENCE/(label+'-ctest.xml'))]
+    if subset and not selection:
+        args += ['-R', '^unit_('+'|'.join(units+['ppc_alias_hints_generator','ppc_alias_hints_parser'])+')$']
     if selection:
         names=EVIDENCE/'failed-names.txt';names.write_text('\n'.join(selection)+'\n')
         args+=['--tests-from-file',str(names)]
@@ -44,14 +54,14 @@ def tests(source, label, preset, selection=None):
 
 def main():
     parser=argparse.ArgumentParser()
-    parser.add_argument('candidate',choices=['shared','access'])
-    parser.add_argument('preset',choices=['sanitized','windows-release'])
+    parser.add_argument('candidate',choices=['combined'])
+    parser.add_argument('preset',choices=['sanitized','windows-release','intel-release','diet','reduced'])
     args=parser.parse_args()
     assert not WORK.exists() and not EVIDENCE.exists()
     EVIDENCE.mkdir();WORK.mkdir()
     ref=json.loads((SOURCE/'manifest.json').read_text())['capstone_revision']
     source=fetch('candidate','https://github.com/NeverSight/capstone.git',ref)
-    patches=[args.candidate+'-runtime.patch',args.candidate+'-qualification.patch']
+    patches=['combined-product.patch','cstest-multiconfig.patch']
     for i,f in enumerate(patches):
         command(['git','apply','--check',SOURCE/f],f'check-{i}',source)
         command(['git','apply',SOURCE/f],f'patch-{i}',source)
@@ -61,6 +71,7 @@ def main():
     failed=tests(source,'candidate',args.preset)
     if failed:
         base=fetch('base','https://github.com/NeverSight/capstone.git',ref)
+        command(['git','apply',SOURCE/'cstest-multiconfig.patch'],'base-cstest-config',base)
         inherited=tests(base,'base',args.preset,failed)
         write('baseline-comparison.json',dict(candidate_failed=failed,also_failed_on_base=inherited))
         if set(failed)!=set(inherited):raise RuntimeError('New test failures')

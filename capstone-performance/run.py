@@ -393,7 +393,12 @@ def cleanup():
             if path.is_file() and not path.is_symlink():
                 receipt['files'] += 1
                 receipt['logical_bytes'] += path.stat().st_size
-        shutil.rmtree(WORK)
+        def retry_readonly(function, path, exc_info):
+            if os.name != "nt" or not isinstance(exc_info[1], PermissionError):
+                raise exc_info[1]
+            os.chmod(path, 0o700)
+            function(path)
+        shutil.rmtree(WORK, onerror=retry_readonly)
         receipt['removed'] = True
     write('cleanup.json', receipt)
     print('Retired', receipt['logical_bytes'], 'bytes; evidence retained.', flush=True)
