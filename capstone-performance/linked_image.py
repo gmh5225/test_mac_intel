@@ -36,11 +36,14 @@ def snapshot(exe):
 def main(tmp):
     src = tmp / "capstone"
     env = dict(os.environ)
-    vs = Path(env["ProgramFiles"]) / "Microsoft Visual Studio/2022"
+    vs = Path(os.environ["ProgramFiles"]) / "Microsoft Visual Studio/2022"
     vcvars = next(vs.glob("*/VC/Auxiliary/Build/vcvars64.bat"))
     (tmp / "load-vc.cmd").write_text('@echo off\ncall "'+str(vcvars)+'" >nul\nif errorlevel 1 exit /b 1\nset\n')
     lines = sp.check_output(["cmd.exe", "/d", "/c", "load-vc.cmd"], cwd=tmp).decode("mbcs").splitlines()
-    env.update(dict(line.split("=", 1) for line in lines if "=" in line and not line.startswith("=")))
+    for line in lines:
+        if "=" in line and not line.startswith("="):
+            name, value = line.split("=", 1)
+            env[name.upper()] = value
     env["CL"] = "/Brepro"
     def run(args, cwd=tmp):
         print(" ".join(map(str, args)), flush=True)
