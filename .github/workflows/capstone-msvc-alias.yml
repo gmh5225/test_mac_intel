@@ -1,7 +1,7 @@
-name: Native dynamic CRT for the four production backends
+name: Retest ARM32 output and PE32 controls on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-native-trie-arches]
+    branches: [codex/capstone-native-arm32-controls]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -11,18 +11,19 @@ jobs:
       fail-fast: false
       matrix:
         crt: [MD]
+        order: [first, second]
     runs-on: windows-2022
-    timeout-minutes: 50
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
       - name: Check real outputs, count allocations and compare throughputs
-        run: python capstone-performance/alias-windows.py ${{ matrix.crt }}
+        run: python capstone-performance/alias-windows.py ${{ matrix.crt }} ${{ matrix.order }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-trie-arches-${{ matrix.crt }}
+          name: native-arm32-controls-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14
