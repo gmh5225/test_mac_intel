@@ -1,8 +1,41 @@
 diff --git a/Mapping.c b/Mapping.c
-index f6dc6007..eb922e52 100644
+index f6dc6007..fd91bd30 100644
 --- a/Mapping.c
 +++ b/Mapping.c
-@@ -470,24 +470,18 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
+@@ -249,16 +249,23 @@ void map_groups(MCInst *MI, const insn_map *imap)
+ 
+ 	cs_detail *detail = MI->flat_insn->detail;
+ 	unsigned Opcode = MCInst_getOpcode(MI);
+-	unsigned i = 0;
+-	uint16_t group = imap[Opcode].groups[i];
+-	while (group != 0) {
+-		if (detail->groups_count >= MAX_NUM_GROUPS) {
+-			printf("ERROR: Too many groups defined in instruction mapping.\n");
+-			return;
+-		}
+-		detail->groups[detail->groups_count++] = group;
+-		group = imap[Opcode].groups[++i];
++	const unsigned char *groups = imap[Opcode].groups;
++	unsigned start = detail->groups_count;
++	unsigned count = start;
++
++	while (count < MAX_NUM_GROUPS) {
++		unsigned char group = groups[count - start];
++		if (!group)
++			break;
++		detail->groups[count++] = group;
+ 	}
++	detail->groups_count = count;
++
++	/* A full source row has no trailing zero. Only inspect the next
++	 * source entry when existing destination groups limited the copy. */
++	if (count >= MAX_NUM_GROUPS && count - start < MAX_NUM_GROUPS &&
++	    groups[count - start])
++		printf("ERROR: Too many groups defined in instruction mapping.\n");
+ #endif // CAPSTONE_DIET
+ }
+ 
+@@ -470,24 +477,18 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
  	}
  }
  
@@ -33,7 +66,7 @@ index f6dc6007..eb922e52 100644
  		}
  		++i;
  	}
-@@ -498,9 +492,44 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
+@@ -498,9 +499,46 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
  			break;
  	}
  
@@ -53,7 +86,9 @@ index f6dc6007..eb922e52 100644
 +}
 +
 +#if defined(CAPSTONE_HAS_ARM) || defined(CAPSTONE_HAS_AARCH64) || \
-+	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_SPARC)) && \
++	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_SPARC) || \
++	  defined(CAPSTONE_HAS_POWERPC) || defined(CAPSTONE_HAS_RISCV) || \
++	  defined(CAPSTONE_HAS_LOONGARCH) || defined(CAPSTONE_HAS_SYSTEMZ)) && \
 +	 !defined(CAPSTONE_DIET))
 +void map_set_alias_id_indexed(MCInst *MI, const SStream *O, const name_map *map,
 +			      const uint16_t *rows, unsigned mask)
@@ -81,15 +116,17 @@ index f6dc6007..eb922e52 100644
  /// Does a binary search over the given map and searches for @id.
  /// If @id exists in @map, it sets @found to true and returns
 diff --git a/Mapping.h b/Mapping.h
-index 9f69f881..53687e80 100644
+index 9f69f881..08caccb2 100644
 --- a/Mapping.h
 +++ b/Mapping.h
-@@ -296,6 +296,16 @@ bool map_use_alias_details(const MCInst *MI);
+@@ -296,6 +296,18 @@ bool map_use_alias_details(const MCInst *MI);
  void map_set_alias_id(MCInst *MI, const SStream *O,
  		      const name_map *alias_mnem_id_map, int map_size);
  
 +#if defined(CAPSTONE_HAS_ARM) || defined(CAPSTONE_HAS_AARCH64) || \
-+	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_SPARC)) && \
++	((defined(CAPSTONE_HAS_MIPS) || defined(CAPSTONE_HAS_SPARC) || \
++	  defined(CAPSTONE_HAS_POWERPC) || defined(CAPSTONE_HAS_RISCV) || \
++	  defined(CAPSTONE_HAS_LOONGARCH) || defined(CAPSTONE_HAS_SYSTEMZ)) && \
 +	 !defined(CAPSTONE_DIET))
 +/* Power-of-two linear probing table with one-based rows and empty slot zero. */
 +CAPSTONE_INTERNAL void map_set_alias_id_indexed(MCInst *MI, const SStream *O,
@@ -214,7 +251,7 @@ index 00000000..feaa1147
 +	0, 27, 19, 15, 0, 16, 0, 40, 0, 0, 0, 0, 0, 36, 38, 0,
 +	10, 21, 29, 34, 42, 9, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..4c7a1360 100644
+index 30e28897..af05dc16 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -37,6 +37,10 @@ static const name_map insn_alias_mnem_map[] = {
@@ -228,16 +265,18 @@ index 30e28897..4c7a1360 100644
  static const char *get_custom_reg_alias(unsigned reg)
  {
  	switch (reg) {
-@@ -699,12 +703,14 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -698,13 +702,15 @@ void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
  	MI->flat_insn->alias_id = 0;
  	ARM_LLVM_printInstruction(MI, O, info);
- 	if (!MI->flat_insn->alias_id)
+-	if (!MI->flat_insn->alias_id)
 -		map_set_alias_id(MI, O, insn_alias_mnem_map,
 -				 ARR_SIZE(insn_alias_mnem_map) - 1);
 -	ARM_add_not_defined_ops(MI);
 -	ARM_post_index_detection(MI);
 -	ARM_check_mem_access_validity(MI);
 -	ARM_add_cs_groups(MI);
++	if (!MI->flat_insn->alias_id && MCInst_isAlias(MI))
 +		map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
 +				 ARR_SIZE(alias_index) - 1);
 +	if (MI->flat_insn->detail) {
@@ -249,6 +288,40 @@ index 30e28897..4c7a1360 100644
  	int syntax_opt = MI->csh->syntax;
  	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
  		patch_cs_reg_alias(O->buffer);
+diff --git a/arch/LoongArch/LoongArchGenAliasIndex.inc b/arch/LoongArch/LoongArchGenAliasIndex.inc
+new file mode 100644
+index 00000000..339b2207
+--- /dev/null
++++ b/arch/LoongArch/LoongArchGenAliasIndex.inc
+@@ -0,0 +1,2 @@
++/* Generated by suite/synctools/alias_mnemonic_index.py. */
++	0, 0, 3, 0, 5, 0, 0, 0, 2, 0, 0, 0, 6, 7, 1, 4,
+diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
+index a9af759a..c7c6bf18 100644
+--- a/arch/LoongArch/LoongArchMapping.c
++++ b/arch/LoongArch/LoongArchMapping.c
+@@ -65,6 +65,10 @@ static const name_map insn_alias_mnem_map[] = {
+ #include "LoongArchGenCSAliasMnemMap.inc"
+ 	{ LOONGARCH_INS_ALIAS_END, NULL },
+ };
++
++static const uint16_t alias_index[] = {
++#include "LoongArchGenAliasIndex.inc"
++};
+ #endif
+ 
+ const char *LoongArch_insn_name(csh handle, unsigned int id)
+@@ -487,8 +491,8 @@ void LoongArch_printer(MCInst *MI, SStream *O,
+ 	LoongArch_rewrite_address_operand(MI);
+ 	LoongArch_add_cs_groups(MI);
+ #ifndef CAPSTONE_DIET
+-	map_set_alias_id(MI, O, insn_alias_mnem_map,
+-			 ARR_SIZE(insn_alias_mnem_map));
++	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
++			 ARR_SIZE(alias_index) - 1);
+ #endif
+ }
+ 
 diff --git a/arch/Mips/MipsGenAliasIndex.inc b/arch/Mips/MipsGenAliasIndex.inc
 new file mode 100644
 index 00000000..a1c93d3c
@@ -295,6 +368,216 @@ index 20e28fba..4b9aa7a6 100644
 -			 ARR_SIZE(insn_alias_mnem_map));
 +	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, mips_alias_index,
 +				 ARR_SIZE(mips_alias_index) - 1);
+ #endif
+ }
+ 
+diff --git a/arch/PowerPC/PPCGenAliasIndex.inc b/arch/PowerPC/PPCGenAliasIndex.inc
+new file mode 100644
+index 00000000..1c5bf8e2
+--- /dev/null
++++ b/arch/PowerPC/PPCGenAliasIndex.inc
+@@ -0,0 +1,129 @@
++/* Generated by suite/synctools/alias_mnemonic_index.py. */
++	0, 0, 0, 0, 0, 0, 0, 0, 277, 47, 0, 584, 0, 0, 138, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 686, 88, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 575, 0, 0, 172, 447, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 189, 523, 0, 0, 551, 0, 228, 0, 0, 0, 360, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 431, 0, 0, 0, 211, 0, 0, 95,
++	0, 0, 0, 0, 0, 183, 0, 0, 161, 503, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 670, 0, 0, 0, 0,
++	0, 0, 604, 0, 0, 0, 413, 0, 0, 0, 382, 0, 0, 0, 0, 0,
++	308, 64, 134, 659, 0, 0, 0, 497, 0, 638, 0, 519, 379, 0, 0, 0,
++	0, 0, 0, 152, 433, 0, 402, 264, 0, 328, 0, 0, 0, 362, 0, 0,
++	637, 0, 0, 124, 0, 0, 0, 0, 343, 0, 0, 446, 0, 273, 476, 556,
++	249, 436, 496, 579, 0, 0, 0, 0, 329, 501, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 620, 0, 0, 0, 0, 0, 483, 0, 0, 0, 0, 0, 678,
++	0, 569, 0, 312, 0, 470, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 650, 0, 0, 0, 0, 78, 0, 0, 0, 142, 0, 0, 630,
++	0, 243, 0, 0, 125, 0, 0, 0, 0, 387, 0, 250, 395, 667, 0, 0,
++	300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 310, 0, 0,
++	0, 0, 0, 0, 0, 14, 0, 0, 0, 101, 0, 165, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 35, 0, 87, 0, 0,
++	0, 0, 568, 110, 0, 0, 552, 89, 376, 40, 563, 655, 0, 0, 649, 0,
++	475, 0, 0, 0, 0, 0, 0, 0, 0, 262, 75, 0, 611, 0, 0, 635,
++	393, 0, 0, 0, 487, 543, 180, 562, 583, 0, 0, 0, 592, 428, 0, 0,
++	411, 0, 0, 399, 51, 0, 0, 0, 271, 267, 246, 0, 0, 612, 274, 0,
++	0, 0, 429, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 281,
++	0, 0, 502, 0, 288, 391, 0, 0, 239, 540, 251, 0, 70, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 541, 0, 0, 371, 0, 0, 532, 0,
++	0, 0, 0, 195, 0, 0, 0, 0, 0, 0, 361, 506, 548, 0, 0, 0,
++	459, 0, 25, 671, 0, 0, 0, 0, 0, 603, 0, 170, 0, 0, 0, 0,
++	0, 0, 0, 0, 199, 0, 269, 0, 0, 0, 0, 0, 0, 0, 0, 176,
++	1, 370, 0, 0, 244, 221, 307, 0, 0, 0, 0, 0, 511, 357, 0, 445,
++	0, 0, 640, 0, 0, 0, 0, 0, 520, 0, 0, 270, 472, 463, 0, 12,
++	0, 0, 0, 292, 0, 0, 0, 85, 0, 0, 18, 0, 438, 0, 0, 0,
++	0, 0, 71, 644, 0, 0, 574, 527, 340, 417, 0, 0, 0, 0, 268, 618,
++	0, 367, 0, 474, 48, 136, 145, 505, 524, 0, 0, 0, 0, 0, 0, 261,
++	318, 0, 561, 22, 0, 0, 0, 0, 608, 0, 60, 425, 491, 0, 377, 522,
++	37, 0, 0, 0, 0, 0, 126, 406, 0, 0, 282, 0, 0, 0, 0, 439,
++	220, 163, 324, 560, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 457, 657,
++	0, 0, 0, 46, 293, 444, 0, 0, 0, 73, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 531, 484, 0, 0, 666, 0, 0, 0, 0, 508, 450, 0, 3,
++	602, 231, 0, 0, 0, 0, 0, 23, 118, 120, 0, 164, 0, 0, 20, 144,
++	0, 383, 421, 681, 0, 0, 187, 127, 0, 0, 0, 0, 352, 287, 338, 0,
++	0, 507, 207, 0, 0, 0, 0, 0, 0, 577, 0, 0, 0, 0, 0, 0,
++	63, 97, 91, 386, 0, 0, 0, 0, 133, 0, 0, 0, 0, 0, 0, 672,
++	0, 0, 365, 682, 336, 515, 0, 0, 0, 0, 0, 0, 0, 0, 0, 351,
++	0, 0, 0, 0, 576, 0, 528, 0, 0, 0, 0, 177, 0, 0, 0, 80,
++	656, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	480, 489, 0, 389, 0, 0, 0, 0, 356, 513, 0, 232, 0, 676, 0, 0,
++	0, 469, 629, 0, 0, 0, 0, 0, 0, 564, 0, 553, 0, 151, 203, 0,
++	0, 0, 162, 610, 0, 0, 257, 115, 468, 0, 606, 0, 0, 0, 0, 216,
++	588, 33, 331, 275, 350, 388, 0, 0, 0, 0, 320, 102, 0, 385, 0, 0,
++	0, 0, 0, 0, 0, 0, 669, 27, 0, 179, 0, 0, 54, 345, 0, 0,
++	0, 536, 0, 652, 0, 0, 28, 355, 0, 0, 493, 499, 254, 464, 510, 0,
++	0, 44, 0, 200, 0, 0, 0, 0, 0, 0, 0, 212, 0, 90, 55, 627,
++	0, 0, 0, 0, 0, 0, 423, 0, 0, 346, 0, 0, 0, 0, 622, 301,
++	0, 299, 375, 358, 104, 0, 674, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 255,
++	0, 0, 297, 140, 309, 258, 461, 679, 0, 278, 380, 41, 631, 0, 634, 434,
++	668, 0, 0, 0, 204, 448, 315, 334, 0, 0, 0, 344, 317, 0, 619, 0,
++	0, 0, 157, 0, 291, 0, 0, 147, 0, 0, 372, 0, 0, 233, 414, 490,
++	0, 0, 0, 314, 0, 96, 557, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	554, 0, 235, 0, 0, 0, 0, 0, 66, 128, 337, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 272, 0, 0, 0, 0, 0, 0, 0, 394, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 595, 0, 547, 0, 0, 0, 0, 0, 0,
++	21, 247, 0, 223, 26, 0, 628, 265, 488, 330, 430, 31, 675, 0, 0, 512,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 539, 665, 0, 597, 0, 0,
++	0, 0, 146, 0, 0, 0, 0, 0, 0, 0, 121, 0, 0, 0, 0, 0,
++	0, 323, 342, 426, 0, 252, 359, 0, 0, 0, 0, 93, 492, 290, 451, 0,
++	34, 114, 427, 65, 168, 390, 0, 0, 107, 0, 0, 135, 236, 353, 0, 0,
++	0, 0, 477, 0, 418, 369, 471, 514, 0, 0, 0, 319, 197, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 624, 0, 178, 0, 0, 74, 462,
++	0, 0, 0, 325, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 9, 485, 663, 0, 111, 0, 0, 0, 509, 0, 0, 0, 0,
++	0, 0, 544, 0, 333, 0, 0, 454, 234, 0, 6, 0, 58, 0, 0, 0,
++	0, 0, 0, 0, 466, 0, 50, 401, 0, 0, 0, 0, 0, 153, 0, 0,
++	92, 0, 0, 0, 0, 633, 0, 392, 245, 0, 0, 0, 0, 316, 0, 0,
++	214, 0, 0, 0, 363, 0, 294, 0, 0, 0, 0, 0, 0, 0, 4, 52,
++	341, 0, 16, 38, 0, 0, 79, 45, 150, 442, 683, 593, 0, 0, 0, 241,
++	460, 117, 224, 0, 29, 677, 0, 30, 0, 0, 0, 653, 0, 0, 535, 578,
++	643, 53, 0, 0, 0, 0, 0, 632, 0, 10, 167, 645, 0, 0, 0, 0,
++	654, 139, 0, 0, 0, 0, 0, 0, 0, 615, 0, 0, 0, 0, 0, 348,
++	521, 0, 0, 0, 311, 0, 0, 0, 565, 0, 0, 0, 0, 373, 0, 0,
++	0, 0, 0, 219, 0, 0, 0, 378, 0, 465, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 276, 550, 0, 321,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 238, 141, 456, 0, 0, 0, 0,
++	0, 410, 263, 0, 42, 0, 2, 538, 0, 0, 0, 0, 0, 196, 295, 494,
++	248, 525, 0, 558, 658, 0, 0, 0, 0, 0, 0, 68, 130, 193, 227, 0,
++	57, 600, 407, 642, 0, 0, 0, 0, 0, 11, 49, 405, 0, 0, 0, 605,
++	384, 0, 0, 0, 0, 0, 0, 0, 0, 0, 572, 0, 119, 500, 19, 0,
++	0, 0, 0, 0, 0, 0, 0, 240, 0, 0, 397, 647, 684, 0, 0, 0,
++	530, 0, 0, 0, 259, 0, 0, 0, 0, 0, 0, 0, 327, 0, 43, 0,
++	0, 0, 0, 0, 0, 148, 0, 98, 190, 680, 0, 0, 416, 123, 56, 559,
++	0, 479, 0, 0, 0, 103, 0, 0, 0, 0, 0, 0, 0, 0, 0, 109,
++	0, 0, 0, 32, 0, 422, 67, 106, 664, 166, 586, 0, 0, 481, 129, 229,
++	591, 639, 482, 537, 601, 335, 0, 0, 0, 0, 354, 0, 0, 0, 0, 0,
++	0, 218, 0, 0, 0, 302, 0, 0, 0, 660, 242, 594, 0, 0, 0, 0,
++	368, 458, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 149, 0, 0, 0, 237, 498, 0, 0, 206, 0, 0, 0, 0, 549,
++	570, 0, 455, 0, 0, 0, 159, 285, 420, 0, 0, 154, 209, 585, 598, 0,
++	646, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 626, 0, 0,
++	599, 0, 0, 0, 0, 208, 0, 0, 279, 0, 0, 260, 0, 185, 8, 339,
++	587, 0, 0, 0, 0, 443, 0, 0, 0, 0, 478, 529, 0, 0, 0, 0,
++	0, 609, 171, 661, 0, 0, 0, 0, 0, 0, 0, 81, 526, 0, 0, 0,
++	0, 0, 0, 0, 685, 210, 589, 0, 437, 0, 0, 0, 404, 0, 0, 0,
++	0, 582, 0, 555, 173, 217, 0, 0, 160, 188, 191, 322, 580, 0, 112, 0,
++	0, 0, 0, 0, 0, 0, 201, 0, 0, 0, 0, 108, 0, 0, 72, 0,
++	0, 0, 617, 289, 0, 0, 349, 0, 222, 596, 0, 0, 0, 415, 0, 230,
++	625, 673, 517, 0, 0, 0, 0, 0, 0, 0, 616, 304, 86, 0, 651, 0,
++	5, 0, 0, 0, 0, 0, 82, 0, 0, 571, 0, 424, 84, 113, 636, 641,
++	156, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 303, 99, 143, 0,
++	62, 0, 0, 495, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 137, 0,
++	0, 184, 545, 205, 0, 0, 0, 467, 24, 158, 298, 374, 449, 0, 61, 132,
++	0, 213, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 194, 0,
++	400, 0, 59, 0, 0, 0, 0, 0, 504, 0, 366, 0, 0, 0, 0, 0,
++	122, 0, 0, 0, 0, 0, 0, 0, 313, 100, 0, 0, 0, 202, 105, 409,
++	440, 573, 0, 534, 0, 0, 0, 0, 0, 0, 0, 0, 0, 175, 174, 0,
++	0, 0, 0, 284, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 412,
++	613, 648, 0, 0, 542, 0, 0, 432, 0, 408, 0, 0, 614, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 77, 0, 69, 0, 0, 0, 0, 256, 0,
++	0, 131, 662, 0, 0, 486, 381, 533, 607, 0, 0, 0, 0, 253, 286, 0,
++	0, 0, 0, 0, 0, 0, 0, 280, 181, 419, 0, 396, 0, 0, 0, 0,
++	0, 283, 0, 364, 17, 0, 0, 215, 0, 0, 0, 0, 0, 0, 0, 0,
++	623, 0, 0, 516, 225, 621, 0, 0, 0, 182, 94, 306, 473, 0, 0, 0,
++	546, 0, 155, 0, 0, 0, 192, 0, 0, 0, 435, 403, 0, 0, 0, 581,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 83, 0, 0, 0, 398, 0,
++	0, 0, 590, 0, 0, 567, 0, 326, 453, 0, 0, 0, 76, 0, 0, 0,
++	0, 0, 0, 452, 566, 13, 0, 296, 0, 0, 0, 0, 0, 39, 36, 0,
++	0, 15, 0, 0, 0, 169, 0, 226, 332, 186, 0, 0, 266, 116, 0, 0,
++	347, 0, 0, 0, 0, 0, 518, 0, 0, 0, 0, 441, 0, 0, 305, 0,
+diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
+index fd26a73a..96addbb5 100644
+--- a/arch/PowerPC/PPCMapping.c
++++ b/arch/PowerPC/PPCMapping.c
+@@ -153,6 +153,10 @@ static const name_map insn_alias_mnem_map[] = {
+ 	{ PPC_INS_ALIAS_END, NULL },
+ };
+ 
++static const uint16_t alias_index[] = {
++#include "PPCGenAliasIndex.inc"
++};
++
+ #endif
+ 
+ const char *PPC_insn_name(csh handle, unsigned int id)
+@@ -325,8 +329,8 @@ void PPC_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->flat_insn->usesAliasDetails = map_use_alias_details(MI);
+ 	PPC_LLVM_printInst(MI, MI->address, "", O);
+ #ifndef CAPSTONE_DIET
+-	map_set_alias_id(MI, O, insn_alias_mnem_map,
+-			 ARR_SIZE(insn_alias_mnem_map));
++	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
++			 ARR_SIZE(alias_index) - 1);
+ #endif
+ }
+ 
+diff --git a/arch/RISCV/RISCVGenAliasIndex.inc b/arch/RISCV/RISCVGenAliasIndex.inc
+new file mode 100644
+index 00000000..877af183
+--- /dev/null
++++ b/arch/RISCV/RISCVGenAliasIndex.inc
+@@ -0,0 +1,17 @@
++/* Generated by suite/synctools/alias_mnemonic_index.py. */
++	10, 81, 6, 0, 0, 0, 0, 0, 0, 0, 3, 0, 64, 0, 0, 0,
++	0, 0, 28, 74, 0, 0, 23, 0, 0, 0, 41, 0, 0, 0, 0, 59,
++	33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 63, 0, 0, 7, 0, 70, 15, 84, 0, 51, 0, 1, 0,
++	0, 5, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 76, 0,
++	34, 0, 0, 0, 0, 16, 30, 0, 0, 0, 0, 12, 57, 0, 0, 86,
++	0, 0, 0, 0, 44, 0, 0, 0, 0, 0, 0, 26, 32, 62, 21, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 47, 0, 27, 42, 0, 18, 0, 0,
++	0, 0, 0, 0, 17, 0, 0, 0, 0, 83, 4, 52, 0, 24, 25, 65,
++	14, 0, 0, 0, 0, 0, 48, 0, 0, 46, 55, 0, 78, 20, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 54, 60, 50, 77, 22, 45, 58, 85,
++	0, 11, 8, 31, 0, 0, 0, 49, 0, 29, 0, 37, 0, 0, 0, 0,
++	0, 38, 0, 0, 0, 0, 53, 0, 0, 61, 0, 0, 0, 0, 0, 0,
++	56, 0, 13, 0, 0, 0, 0, 0, 0, 66, 69, 82, 0, 0, 0, 35,
++	40, 0, 0, 0, 0, 68, 0, 0, 19, 43, 75, 9, 36, 79, 0, 72,
++	0, 39, 71, 0, 0, 67, 0, 0, 0, 73, 0, 80, 0, 0, 0, 0,
+diff --git a/arch/RISCV/RISCVMapping.c b/arch/RISCV/RISCVMapping.c
+index 87f197be..5083a20b 100644
+--- a/arch/RISCV/RISCVMapping.c
++++ b/arch/RISCV/RISCVMapping.c
+@@ -52,6 +52,10 @@ static const map_insn_ops insn_operands[] = {
+ static const name_map insn_alias_mnem_map[] = {
+ #include "RISCVGenCSAliasMnemMap.inc"
+ };
++
++static const uint16_t alias_index[] = {
++#include "RISCVGenAliasIndex.inc"
++};
+ #endif
+ 
+ void RISCV_add_cs_detail_0(MCInst *MI, riscv_op_group opgroup, unsigned OpNum)
+@@ -404,8 +408,8 @@ static const char *const insn_name_maps[] = {
+ void RISCV_set_alias_id(MCInst *MI, SStream *O)
+ {
+ #ifndef CAPSTONE_DIET
+-	map_set_alias_id(MI, O, insn_alias_mnem_map,
+-			 ARR_SIZE(insn_alias_mnem_map));
++	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
++			 ARR_SIZE(alias_index) - 1);
  #endif
  }
  
@@ -395,26 +678,68 @@ index abe9be7a..5364bdea 100644
  	Sparc_correct_details(MI);
  #endif
  }
+diff --git a/arch/SystemZ/SystemZGenAliasIndex.inc b/arch/SystemZ/SystemZGenAliasIndex.inc
+new file mode 100644
+index 00000000..f5f67a9d
+--- /dev/null
++++ b/arch/SystemZ/SystemZGenAliasIndex.inc
+@@ -0,0 +1,9 @@
++/* Generated by suite/synctools/alias_mnemonic_index.py. */
++	0, 0, 0, 0, 0, 9, 14, 21, 0, 28, 0, 30, 0, 0, 0, 0,
++	0, 0, 0, 5, 38, 25, 0, 41, 0, 0, 0, 0, 22, 0, 0, 0,
++	6, 0, 0, 24, 0, 8, 0, 0, 0, 33, 0, 0, 0, 23, 34, 35,
++	0, 0, 0, 0, 0, 12, 0, 0, 0, 0, 0, 17, 0, 0, 0, 0,
++	0, 0, 0, 0, 16, 0, 0, 27, 0, 19, 0, 0, 0, 0, 20, 2,
++	0, 13, 0, 0, 0, 26, 40, 1, 4, 18, 42, 0, 0, 0, 0, 15,
++	0, 39, 0, 7, 0, 29, 0, 31, 0, 0, 0, 0, 0, 0, 0, 3,
++	37, 0, 11, 0, 0, 10, 0, 0, 0, 0, 36, 0, 32, 0, 0, 0,
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 31844a02..55e7bb5a 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -26,6 +26,10 @@ static const name_map insn_alias_mnem_map[] = {
+ 	{ SYSTEMZ_INS_ALIAS_END, NULL },
+ };
+ 
++static const uint16_t alias_index[] = {
++#include "SystemZGenAliasIndex.inc"
++};
++
+ static const map_insn_ops insn_operands[] = {
+ #include "SystemZGenCSMappingInsnOp.inc"
+ };
+@@ -73,8 +77,8 @@ void SystemZ_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	MI->fillDetailOps = detail_is_set(MI);
+ 	SystemZ_LLVM_printInstruction(MI, "", O);
+ #ifndef CAPSTONE_DIET
+-	map_set_alias_id(MI, O, insn_alias_mnem_map,
+-			 ARR_SIZE(insn_alias_mnem_map));
++	map_set_alias_id_indexed(MI, O, insn_alias_mnem_map, alias_index,
++			 ARR_SIZE(alias_index) - 1);
+ #endif
+ }
+ 
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 850fa787..d0c0beb0 100644
+index 850fa787..05f2d361 100644
 --- a/suite/auto-sync/README.md
 +++ b/suite/auto-sync/README.md
-@@ -222,4 +222,8 @@ Documentation about the `.inc` file generation is in the [llvm-capstone](https:/
+@@ -222,4 +222,9 @@ Documentation about the `.inc` file generation is in the [llvm-capstone](https:/
    python3 -m usort format src/autosync
    python3 -m black src/autosync
    ```
 -  
 +
-+After updating the ARM, AArch64, Mips or Sparc alias mnemonic maps, run
++After updating the ARM, AArch64, LoongArch, Mips, PowerPC, RISC-V, Sparc
++or SystemZ alias mnemonic maps, run
 +`python3 suite/synctools/alias_mnemonic_index.py`. The first entry for each
 +spelling in the backend's name map determines its alias ID. The generator's
 +`--check` option verifies the checked-in indices.
 diff --git a/suite/synctools/alias_mnemonic_index.py b/suite/synctools/alias_mnemonic_index.py
 new file mode 100644
-index 00000000..69a886ec
+index 00000000..bb19e217
 --- /dev/null
 +++ b/suite/synctools/alias_mnemonic_index.py
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,71 @@
 +#!/usr/bin/env python3
 +# SPDX-License-Identifier: BSD-3-Clause
 +"""Index the first matching row in each indexed textual alias name map."""
@@ -425,7 +750,7 @@ index 00000000..69a886ec
 +
 +
 +def generate(directory):
-+    arch = directory.name
++    arch = "PPC" if directory.name == "PowerPC" else directory.name
 +    source = (directory / f"{arch}Mapping.c").read_text()
 +    declaration = "static const name_map insn_alias_mnem_map[] = {"
 +    body = source.split(declaration, 1)[1].split("};", 1)[0]
@@ -449,8 +774,6 @@ index 00000000..69a886ec
 +                raise ValueError(f"Unexpected {arch} alias terminator")
 +            break
 +        names.append(match[2][1:-1].encode("ascii"))
-+    else:
-+        raise ValueError(f"Missing {arch} alias terminator")
 +    if len(names) > 65535:
 +        raise ValueError(f"{arch} alias rows exceed the index width")
 +
@@ -478,9 +801,10 @@ index 00000000..69a886ec
 +    parser.add_argument("--check", action="store_true")
 +    args = parser.parse_args()
 +    root = Path(__file__).resolve().parents[2] / "arch"
-+    for arch in ("ARM", "AArch64", "Mips", "Sparc"):
++    for arch in ("ARM", "AArch64", "LoongArch", "Mips", "PowerPC", "RISCV", "Sparc", "SystemZ"):
 +        directory = root / arch
-+        target = directory / f"{arch}GenAliasIndex.inc"
++        prefix = "PPC" if arch == "PowerPC" else arch
++        target = directory / f"{prefix}GenAliasIndex.inc"
 +        content = generate(directory)
 +        if args.check:
 +            if target.read_text() != content:
@@ -488,18 +812,75 @@ index 00000000..69a886ec
 +        else:
 +            target.write_text(content)
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index b6a40374..f3bda809 100644
+index b6a40374..1456b885 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
-@@ -17,6 +17,11 @@ if(CAPSTONE_ARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_MIPS_SUPPORT
-    OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES register_descriptors.c)
- endif()
-+if(Python3_Interpreter_FOUND AND (CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR
-+   CAPSTONE_MIPS_SUPPORT OR CAPSTONE_SPARC_SUPPORT))
-+    add_test(NAME unit_alias_mnemonic_index_generator
-+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_index.py" --check)
-+endif()
- if(CAPSTONE_MIPS_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
- endif()
+@@ -26,6 +26,12 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+    OR CAPSTONE_XTENSA_SUPPORT)
+     find_package(Python3 3.8 COMPONENTS Interpreter QUIET)
+     if(Python3_Interpreter_FOUND)
++        if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR
++           CAPSTONE_PPC_SUPPORT OR CAPSTONE_SPARC_SUPPORT OR CAPSTONE_LOONGARCH_SUPPORT OR
++           CAPSTONE_RISCV_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT)
++            add_test(NAME unit_alias_mnemonic_index_generator
++                COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_index.py" --check)
++        endif()
+         add_test(NAME unit_fixed_len_decoder
+             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/fixed_len_decoder.py" --check)
+         add_test(NAME unit_fixed_len_decoder_newlines
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 1dd3f85b..e6f3e5cb 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -3,6 +3,7 @@
+ #include "../../Mapping.h"
+ #include <limits.h>
+ #include <stdio.h>
++#include <string.h>
+ 
+ static bool check_lookup(const insn_map *table, unsigned size, unsigned opcode,
+ 			 unsigned expected)
+@@ -188,13 +189,42 @@ static bool test_alias_lookup(void)
+ 	return true;
+ }
+ 
++static bool test_full_group_map(void)
++{
++#ifndef CAPSTONE_DIET
++	insn_map row = { 0 };
++	cs_detail detail = { 0 };
++	cs_insn insn = { 0 };
++	MCInst mi = { 0 };
++	mi.flat_insn = &insn;
++	insn.detail = &detail;
++	row.branch = true;
++	for (unsigned i = 0; i < MAX_NUM_GROUPS; ++i)
++		row.groups[i] = i + 1;
++
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS ||
++	    memcmp(detail.groups, row.groups, sizeof(row.groups)))
++		return false;
++
++	/* Preserve the existing group and append as many entries as fit. */
++	detail.groups_count = 1;
++	detail.groups[0] = 99;
++	map_groups(&mi, &row);
++	if (detail.groups_count != MAX_NUM_GROUPS || detail.groups[0] != 99 ||
++	    memcmp(detail.groups + 1, row.groups, MAX_NUM_GROUPS - 1))
++		return false;
++#endif
++	return true;
++}
++
+ int main(void)
+ {
+ 	bool found = true;
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_name_lookup() && test_alias_lookup() &&
++	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
