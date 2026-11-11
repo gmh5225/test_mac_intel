@@ -1,5 +1,5 @@
 {
-  "capstone_revision": "e9a8b79bf71d80e5c032267bd3c253899b3de965",
+  "capstone_revision": "7b209eb13c8e0f9915307320016e8a1cecd12253",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "source_lineage": {
     "single.cpp": {
@@ -11,8 +11,8 @@
       "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
     },
     "candidate.patch": {
-      "experiment": "round389-integrated-detail/product.patch",
-      "sha256": "aa647ee0f032b603e2d1fdd1db16844765694dc45888aa429cf4317d3392abaf"
+      "experiment": "round393-mips-small-groups/candidate.patch",
+      "sha256": "67122c45f70f0683cd5c8bf9a6b3c73e5376e22ef1f80d99a544d6e6f8d21007"
     },
     "check-hint.c": {
       "experiment": "round357-x86-handle-lookup/check-lookup.c",
@@ -47,8 +47,8 @@
       "sha256": "24d314d758024b8d329f68fbb79fae2f8d4e63ee43b7bb9e66f34b9bd7ef9c31"
     },
     "prior-combined.patch": {
-      "experiment": "round362-legacy-postprinter/runtime.patch",
-      "sha256": "d16da38962c7dfb1f103d8773e797d62471a43aa6df6852c183d8eaaf6a3cf58"
+      "experiment": "round393-mips-small-groups/prior-combined.patch",
+      "sha256": "4b4ba81f3312373ef8b908604cbe1bf0771f39ff9ccc514ff36d353cbe860182"
     },
     "check-post.c": {
       "experiment": "round362-legacy-postprinter/check-post.c",
@@ -73,6 +73,10 @@
     "check-systemz.c": {
       "experiment": "round385-systemz-form/check-systemz.c",
       "sha256": "bda02cbb6e991d5551c0754ef0296fa8d8e744a3ecd5d3c2f96d3eee79bfb433"
+    },
+    "check-mips.c": {
+      "experiment": "round393-mips-small-groups/check-mips.c",
+      "sha256": "6f2fdd6fca46c2fcfff4e75b709caa59791365271a492be47063e522f9380960"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
@@ -337,6 +341,22 @@
       "kind": "deb",
       "command": "cp",
       "text_sha256": "440f5a0e2465f1ca824c7faac73c4eea33d917a9b6832c2d95b2353f63679fd4"
+    },
+    {
+      "name": "mips64el-cp",
+      "selector": 4,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
+      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
+      "kind": "deb",
+      "command": "cp"
+    },
+    {
+      "name": "mips64el-sort",
+      "selector": 4,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
+      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
+      "kind": "deb",
+      "command": "sort"
     }
   ]
 }

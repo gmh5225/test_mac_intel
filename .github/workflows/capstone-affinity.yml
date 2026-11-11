@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-release-controls]
+    branches: [codex/capstone-mips-short-groups]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-release-controls
+  group: capstone-mips-short-groups
   cancel-in-progress: false
 
 jobs:
@@ -22,6 +22,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, baseline: published }
+          - { host: ubuntu-24.04, baseline: combined }
           - { host: macos-15, baseline: published }
           - { host: macos-15-intel, baseline: published }
     env:
@@ -50,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-release-controls-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-mips-short-groups-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

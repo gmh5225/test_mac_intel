@@ -148,7 +148,7 @@ def prepare():
     incremental = os.environ.get('COMPARE_BASE') == 'combined'
     if incremental:
         command(['git','apply',SOURCE/'prior-combined.patch'], 'baseline-combined-patch', base)
-    write('comparison.json', dict(baseline='unconditional one-byte classification' if incremental else 'published next'))
+    write('comparison.json', dict(baseline='integrated mapper prior to short MIPS groups' if incremental else 'published next'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -191,14 +191,14 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-ppc', 'check-defaults', 'check-shared', 'check-post', 'check-final', 'check-arc-loongarch', 'check-callback', 'check-metadata','check-dense','check-systemz']:
+    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-ppc', 'check-defaults', 'check-shared', 'check-post', 'check-final', 'check-arc-loongarch', 'check-callback', 'check-metadata','check-dense','check-systemz','check-mips']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz') else
+        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips') else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
@@ -238,6 +238,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + name + '.o' for name in ['Mapping.c', 'arch/AArch64/AArch64Mapping.c', 'arch/ARC/ARCMapping.c', 'arch/ARM/ARMMapping.c', 'arch/Alpha/AlphaMapping.c', 'arch/LoongArch/LoongArchMapping.c', 'arch/Mips/MipsMapping.c', 'arch/PowerPC/PPCInstPrinter.c', 'arch/PowerPC/PPCMapping.c', 'arch/Sparc/SparcMapping.c', 'arch/SystemZ/SystemZMapping.c', 'arch/TriCore/TriCoreMapping.c', 'arch/X86/X86Disassembler.c', 'arch/X86/X86IntelInstPrinter.c', 'arch/X86/X86Mapping.c', 'arch/Xtensa/XtensaMapping.c', 'cs.c']}
+    if incremental:
+        allowed={'CMakeFiles/capstone.dir/arch/Mips/MipsMapping.c.o'}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
@@ -305,6 +307,9 @@ def measure():
                 ('mips64el-ls','detail'),('mips64el-ls','format'),('sparc64-ls','detail'),('riscv64-cp','detail'),
                 ('riscv64-cp','format'),('s390x-ls','detail'),('s390x-cp','detail'),('s390x-sort','detail'),
                 ('ppc64el-ls','format'),('arm64-sort','format'),('loong64-ls','detail'),('arc-libm','detail')}
+    selected = {(name,mode) for name in ('mips64el-ls','mips64el-cp','mips64el-sort')
+                for mode in ('format','detail')} | {('putty-32-0.85',mode) for mode in ('scan','format','detail')} | {
+                ('simd64','scan'),('simd64','detail'),('scalar64','detail'),('ppc64el-ls','format'),('s390x-ls','detail')}
     selected_cases = [c for c in cases if (c['name'],c['mode']) in selected]
     assert len(selected_cases)==len(selected)
     controls = [c for c in selected_cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','format'),('simd64','scan')}]
