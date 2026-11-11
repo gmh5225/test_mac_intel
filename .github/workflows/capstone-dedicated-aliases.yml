@@ -1,7 +1,7 @@
-name: Compare both register writers inside one process with reversed library loading
+name: Measure the AArch64 formatting change at two link positions and record symbol addresses
 on:
   push:
-    branches: [codex/capstone-local-register-writers-process]
+    branches: [codex/capstone-register-layout-experiment]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: register-pair-${{ matrix.host }}-${{ github.run_attempt }}
+          name: register-layout-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
