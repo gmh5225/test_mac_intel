@@ -285,10 +285,10 @@ index 5627f249..531b8dbb 100644
  				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
  {
 diff --git a/arch/X86/X86GenMappingCounts.inc b/arch/X86/X86GenMappingCounts.inc
-index c5f2c531..61dbb5d1 100644
+index c5f2c531..b56f8a97 100644
 --- a/arch/X86/X86GenMappingCounts.inc
 +++ b/arch/X86/X86GenMappingCounts.inc
-@@ -4,16701 +4,17119 @@
+@@ -4,16701 +4,17121 @@
  #define X86_MAPPING_IMPLICIT_REPAIR (1U << 14)
  
  #ifdef CAPSTONE_X86_REDUCE
@@ -1843,6 +1843,7 @@ index c5f2c531..61dbb5d1 100644
 -	1024, // X86_MOVSX16rm32
 -	1024, // X86_MOVSX16rr32
 -};
++#define X86_FIRST_DENSE_MAPPING X86_AAA
 +#ifdef GET_X86_MAPPING_DETAILS
 +	{ { 0 }, { 0 }, { X86_GRP_NOT64BITMODE }, 1024, 0 },
 +	{ { X86_REG_EFLAGS }, { X86_REG_EFLAGS }, { 0 }, 33, 0 },
@@ -18709,6 +18710,7 @@ index c5f2c531..61dbb5d1 100644
 +	{ X86_MOVSX16rr32, X86_INS_MOVSXD, 161 },
 +#endif
 +#else
++#define X86_FIRST_DENSE_MAPPING X86_AAA
 +#ifdef GET_X86_MAPPING_DETAILS
 +	{ { 0 }, { 0 }, { X86_GRP_NOT64BITMODE }, 1024, 0 },
 +	{ { 0 }, { X86_REG_FPSW }, { X86_GRP_FPU }, 1056, 0 },
@@ -34105,7 +34107,7 @@ index c5f2c531..61dbb5d1 100644
 +#endif
  #endif
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index df60fd3f..8f7cd085 100644
+index df60fd3f..d930767e 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -10163,19 +10163,27 @@ const char *X86_group_name(csh handle, unsigned int id)
@@ -34154,7 +34156,21 @@ index df60fd3f..8f7cd085 100644
  // given internal insn id, return public instruction info
  void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  {
-@@ -10256,27 +10260,29 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10249,34 +10253,42 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 	if (X86_get_insn_id_no_detail(h, insn, id))
+ 		return;
+ 
++#ifdef X86_FIRST_DENSE_MAPPING
++	/* A dense source table addresses its shared details without loading
++	 * the handle lookup first. Sparse tables retain the normal lookup. */
++	i = id - X86_FIRST_DENSE_MAPPING;
++#else
+ 	i = find_insn_h(h, id);
+-	if (i != -1) {
++#endif
++	if (i < ARR_SIZE(insns)) {
+ 		insn->id = insns[i].mapid;
+ 
  		if (h->detail_opt) {
  #ifndef CAPSTONE_DIET
  			cs_mode mode = x86_get_bit_mode(h->mode);
@@ -34193,7 +34209,7 @@ index df60fd3f..8f7cd085 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10289,10 +10295,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10289,10 +10301,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			case X86_RDTSCP:
  				if (mode == CS_MODE_64) {
  					memcpy(insn->detail->regs_write,
@@ -34207,7 +34223,7 @@ index df60fd3f..8f7cd085 100644
  						 31);
  				} else {
  					insn->detail->regs_write[0] =
-@@ -10306,7 +10312,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10306,7 +10318,7 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  				break;
  			}
  			/* The generator derives eligibility from the switches below. */
@@ -34216,7 +34232,7 @@ index df60fd3f..8f7cd085 100644
  			      X86_MAPPING_IMPLICIT_REPAIR))
  				goto implicit_registers_done;
  
-@@ -10735,12 +10741,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10735,12 +10747,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			}
  
  implicit_registers_done:
@@ -34270,6 +34286,33 @@ index a2677cb8..63bcab53 100644
  
  extern const insn_map_x86 insns[];
  
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index f8d6b926..1dd10428 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -608,13 +608,15 @@ This check runs in the unit suite when Python is available. Edit the original
+ tables, then regenerate; the packed tables are not a separate instruction
+ definition.
+ 
+-Implicit register and group counts are projected from `X86MappingInsn*.inc`
+-by `suite/synctools/x86_mapping_counts.py`. Counts stop at the same first zero as
+-the runtime helpers and use each array's declared capacity. Bit 14 of the same
+-record marks public IDs handled by the implicit-register repair switches in
+-`X86_get_insn_id`. The generator derives eligibility from those switches and
+-requires their defaults to do no work; other IDs skip the entire repair block.
+-Full-array copies, correction order and branch-group insertion remain unchanged.
++The x86 mapper projects a six-byte opcode record and shared implicit-operand
++records from `X86MappingInsn*.inc` with
++`suite/synctools/x86_mapping_counts.py`. Opcodes retain their sorted internal
++ID, public ID and 64-bit flag. Opcodes with the same implicit registers, groups,
++jump classification and repair eligibility can share a detail record. The
++register and group counts stop at the first zero. The mapper copies the full
++source arrays, including entries beyond the counts. Bit 14 of the count word
++selects the public-ID repair switches in `X86_get_insn_id`. DIET reads its
++opcode records directly from the canonical tables.
+ Run the generator after changing either mapping table or the repair switches.
+ Its `--check` mode and unit checks validate the full/reduced projection and reject
+ statements that cannot be skipped under this guard.
 diff --git a/docs/cs_v6_release_guide.md b/docs/cs_v6_release_guide.md
 index b8a9c5f2..4d93ac23 100644
 --- a/docs/cs_v6_release_guide.md
@@ -34289,7 +34332,7 @@ index b8a9c5f2..4d93ac23 100644
  
  `FLDENV` and `FNSTENV` report a 14- or 28-byte memory operand according to
 diff --git a/suite/synctools/x86_mapping_counts.py b/suite/synctools/x86_mapping_counts.py
-index eea8f8de..2ee6b566 100644
+index eea8f8de..e29e7e7e 100644
 --- a/suite/synctools/x86_mapping_counts.py
 +++ b/suite/synctools/x86_mapping_counts.py
 @@ -1,6 +1,6 @@
@@ -34305,10 +34348,10 @@ index eea8f8de..2ee6b566 100644
  ROOT = Path(__file__).resolve().parents[2]
  ENTRY = re.compile(
 -    r"\{\s*(X86_\w+),\s*(X86_INS_\w+),\s*\d+,\s*"
-+    r"\{\s*(X86_\w+),\s*(X86_INS_\w+),\s*([01]),\s*"
++    r"\{\s*(X86_\w+),\s*(X86_INS_\w+),\s*(?P<is64bit>[01]),\s*"
      r"#ifndef CAPSTONE_DIET\s*"
 -    r"\{([^{}]*)\},\s*\{([^{}]*)\},\s*\{([^{}]*)\},\s*\d+,\s*\d+"
-+    r"\{([^{}]*)\},\s*\{([^{}]*)\},\s*\{([^{}]*)\},\s*([01]),\s*([01])"
++    r"\{([^{}]*)\},\s*\{([^{}]*)\},\s*\{([^{}]*)\},\s*(?P<branch>[01]),\s*(?P<indirect_branch>[01])"
      r"\s*#endif\s*\},"
  )
  
@@ -34331,7 +34374,18 @@ index eea8f8de..2ee6b566 100644
      header = re.sub(
          r"/\*.*?\*/|//[^\n]*", "", (directory / "X86Mapping.h").read_text(), flags=re.S
      )
-@@ -130,8 +131,9 @@ def generate(directory, suffix):
+@@ -121,8 +122,9 @@ def generate(directory, suffix):
+         capacities[0] <= 32 and capacities[1] <= 32 and capacities[2] <= 16,
+         "Mapping counts exceed packed widths",
+     )
++    rows = entries(source)
+     previous = -1
+-    for row in entries(source):
++    for row in rows:
+         name = row[1]
+         require(
+             name in enum and enum[name] > previous,
+@@ -130,8 +132,9 @@ def generate(directory, suffix):
          )
          previous = enum[name]
          counts = []
@@ -34342,7 +34396,7 @@ index eea8f8de..2ee6b566 100644
          ):
              tokens = [value.strip() for value in body.split(",") if value.strip()]
              require(len(tokens) <= capacity, "Mapping list exceeds its storage")
-@@ -146,13 +148,26 @@ def generate(directory, suffix):
+@@ -146,13 +149,35 @@ def generate(directory, suffix):
                  "0" in tokens or len(tokens) < capacity, "Unterminated mapping list"
              )
              counts.append(tokens.index("0") if "0" in tokens else len(tokens))
@@ -34357,15 +34411,24 @@ index eea8f8de..2ee6b566 100644
              value |= 1 << 14
 -        lines.append(f"\t{value}, // {name}")
 -    return "\n".join(lines + ["};", ""])
-+        jump = int(row[7]) | int(row[8])
++        jump = int(row["branch"]) | int(row["indirect_branch"])
 +        key = (*arrays, value, jump)
 +        profile = profiles.setdefault(key, len(profiles))
 +        require(profile < (1 << 15), "Mapping details exceed packed index")
-+        properties = (profile << 1) | int(row[3])
++        properties = (profile << 1) | int(row["is64bit"])
 +        opcodes.append(f"\t{{ {name}, {row[2]}, {properties} }},")
-+    lines = ["#ifdef GET_X86_MAPPING_DETAILS"]
++    # After validating the increasing IDs, matching the span to the number
++    # of rows also proves that no instruction ID is missing inside the span.
++    lines = []
++    first = rows[0][1]
++    if previous - enum[first] + 1 == len(rows):
++        lines.append(f"#define X86_FIRST_DENSE_MAPPING {first}")
++    lines.append("#ifdef GET_X86_MAPPING_DETAILS")
 +    for read, written, groups, value, jump in profiles:
-+        fields = ["{ " + (", ".join(field) or "0") + " }" for field in (read, written, groups)]
++        fields = [
++            "{ " + (", ".join(field) or "0") + " }"
++            for field in (read, written, groups)
++        ]
 +        lines.append("\t{ " + ", ".join([*fields, str(value), str(jump)]) + " },")
 +    return "\n".join([*lines, "#else", *opcodes, "#endif", ""])
  
