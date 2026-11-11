@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-guarded-detail-integration]
+    branches: [codex/capstone-shared-multiarch]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,12 +12,16 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-guarded-integration
+  group: capstone-shared-multiarch
   cancel-in-progress: false
 
 jobs:
   measure:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -26,7 +30,7 @@ jobs:
           sparse-checkout: capstone-performance
       - name: Validate protocol and native host
         run: |
-          test "$(uname -m)" = x86_64
+          uname -sm
           python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
       - name: Build immutable sources and verify outputs
         timeout-minutes: 17
@@ -41,7 +45,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: capstone-guarded-integration-${{ github.run_id }}-${{ github.run_attempt }}
+          name: capstone-shared-multiarch-${{ matrix.host }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

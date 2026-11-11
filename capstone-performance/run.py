@@ -61,7 +61,7 @@ def build(label):
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
              '-DCMAKE_C_COMPILER=clang',
-             '-DCMAKE_OSX_ARCHITECTURES=x86_64', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
+             f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
     command(['cmake', '--build', build_dir, '--target', 'capstone_static', 'capstone_shared',
@@ -116,8 +116,8 @@ def invoke(case, variant, repeats):
 
 
 def prepare():
-    if platform.machine() != 'x86_64' or platform.system() not in ('Darwin', 'Linux'):
-        raise RuntimeError('this experiment requires native x86-64 macOS or Linux')
+    if (platform.system(), platform.machine()) not in [('Linux','x86_64'),('Darwin','x86_64'),('Darwin','arm64')]:
+        raise RuntimeError('unsupported host for this release experiment')
     if WORK.exists() or EVIDENCE.exists():
         raise RuntimeError('existing work/evidence must be retained under a separate attempt')
     WORK.mkdir()
@@ -187,14 +187,14 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-ppc', 'check-defaults', 'check-callback']:
+    for unit in ['mapping', 'api', 'sstream', 'detail_option', 'check-hint', 'check-ppc', 'check-defaults', 'check-shared', 'check-callback']:
         source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
-        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults') else
+        extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared') else
                  [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
@@ -234,7 +234,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     allowed = {'CMakeFiles/capstone.dir/' + s + '.o' for s in
-               ['arch/X86/X86Mapping.c','arch/ARM/ARMMapping.c','arch/AArch64/AArch64Mapping.c',
+               ['cs.c','arch/X86/X86Mapping.c','arch/ARM/ARMMapping.c','arch/AArch64/AArch64Mapping.c',
                 'arch/PowerPC/PPCMapping.c','arch/PowerPC/PPCInstPrinter.c']}
     if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
@@ -365,7 +365,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Combined x86, ARM, AArch64 and PPC defaults', '',
+    lines = ['# Shared x86 lookup tables, guarded ARM detail and validated PPC aliases', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
