@@ -1,0 +1,64 @@
+name: NeverD native Swift error register
+on:
+  push:
+    branches: [codex/neverd-swift-error-native]
+    paths: [neverd-arm64e-leaves/**, .github/workflows/neverd-arm64e-leaves.yml]
+permissions:
+  # The test host is a private draft release asset in this repository.
+  contents: write
+jobs:
+  policy:
+    runs-on: macos-26
+    outputs:
+      revision: ${{ steps.policy.outputs.source_revision }}
+      runners: ${{ steps.policy.outputs.runners }}
+      timeout_minutes: ${{ steps.policy.outputs.timeout_minutes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - id: policy
+        run: |
+          python3 - <<'PYTHON'
+          import json, os
+          from pathlib import Path
+          policy = json.loads(Path('neverd-arm64e-leaves/Replay.def').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              for key in ('source_revision', 'runners', 'timeout_minutes'):
+                  value = policy[key]
+                  print(key + '=' + (json.dumps(value) if isinstance(value, list) else str(value)), file=out)
+          PYTHON
+  entry:
+    needs: policy
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ fromJSON(needs.policy.outputs.timeout_minutes) }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ fromJSON(needs.policy.outputs.runners) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: ${{ needs.policy.outputs.revision }}
+          path: neverd
+          persist-credentials: false
+      - name: Validate evidence and cleanup gates
+        working-directory: neverd
+        run: python3 -m unittest scripts.tests.test_verify_arm64e_entry scripts.tests.test_verify_arm64e_native scripts.tests.test_arm64e_artifact_lifecycle -q
+      - name: Execute Swift error register, signed frames and published Darwin controls
+        run: |
+          ulimit -c 0
+          python3 neverd-arm64e-leaves/run.py
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: swift-errors-${{ matrix.runner }}
+          path: leaf-replay-evidence/
+          retention-days: 14
+          if-no-files-found: error
