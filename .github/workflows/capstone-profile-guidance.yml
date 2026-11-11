@@ -1,0 +1,28 @@
+name: Compare profile-guided Capstone and iced on held-out executables
+on:
+  push:
+    branches: [codex/capstone-heldout-profile-guidance]
+    paths: [capstone-performance/**, .github/workflows/capstone-profile-guidance.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Install the profiler matching rustc
+        run: rustup component add llvm-tools-preview
+      - name: Train each library, validate outputs and compare on separate images
+        run: python3 capstone-performance/profile_guidance.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: heldout-profile-guidance-${{ github.run_id }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: warn
+          retention-days: 14
