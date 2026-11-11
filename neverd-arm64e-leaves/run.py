@@ -123,11 +123,26 @@ def main():
             if leaves[POLICY["tail_case"]].get(POLICY["tail_property"]) not in ("1", "true"):
                 raise ValueError(POLICY["errors"]["case"])
             startup = output / POLICY["startup_directory"]
-            subprocess.run([sys.executable, *POLICY["startup_args"], str(startup)], cwd=SOURCE, check=True)
+            raw_start = subprocess.run([sys.executable, *POLICY["startup_args"], str(startup)], cwd=SOURCE)
             control = json.loads((startup / POLICY["probe_report"]).read_text())
-            if not (control["native_pac_qualified"] and control["compiler_original_call_unwind_qualified"]
-                    and control["source_revision"] == POLICY["source_revision"]):
+            if not (control["native_pac_qualified"] and control["source_revision"] == POLICY["source_revision"]
+                    and control["control_loading"] == native.POLICY["startup_loading"]
+                    and control["fixup_loader"] == native.POLICY["system_fixup_loader"]):
                 raise ValueError(POLICY["errors"]["probe"])
+            controls = control["controls"]
+            if raw_start.returncode:
+                fixups = json.loads((startup / POLICY["startup_fixups_file"]).read_text())["stdout"]
+                if (control["compiler_original_startup_qualified"]
+                        or [item["label"] for item in controls] != POLICY["startup_raw_cases"]
+                        or any(item["returncode"] for item in controls[:-1])
+                        or controls[-1]["returncode"] != POLICY["startup_sigtrap"]
+                        or any(marker not in fixups for marker in POLICY["startup_required_key_markers"])):
+                    raise ValueError(POLICY["errors"]["probe"])
+            elif not (control["compiler_original_call_unwind_qualified"]
+                      and control["compiler_original_startup_qualified"]):
+                raise ValueError(POLICY["errors"]["probe"])
+            report["raw_system_startup"] = {"qualified": control["compiler_original_startup_qualified"],
+                                            "controls": {item["label"]: item["returncode"] for item in controls}}
             prefix = subprocess.check_output(POLICY["ir_compiler_prefix_command"], text=True).strip()
             compiler = Path(prefix) / POLICY["ir_compiler_relative"]
             report["ir_frontend"] = {

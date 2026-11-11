@@ -152,7 +152,9 @@
     "AppleClang/MachOArm64eNativeObjectInstallation.RelocatedSignedLanguageFramesExecute/3"
   ],
   "analysis_env": {
-    "NEVERD_ARM64E_EXECUTABLE_PROFILE": "1"
+    "NEVERD_ARM64E_EXECUTABLE_PROFILE": "1",
+    "NEVERD_THREADS": "1",
+    "NEVERD_SIGNATURE_CACHE": "off"
   },
   "legacy_env": "NEVERD_ARM64E_LEGACY_FIXTURES",
   "legacy_directory": "legacy",
@@ -213,5 +215,16 @@
       "-tvV"
     ],
     "error_register": "x21"
-  }
+  },
+  "startup_raw_cases": [
+    "pac-O0",
+    "pac-O2",
+    "original-O0-dwarf-False"
+  ],
+  "startup_sigtrap": -5,
+  "startup_fixups_file": "original-O0-dwarf-False-fixups-command.json",
+  "startup_required_key_markers": [
+    "key: IB",
+    "key: DB"
+  ]
 }
