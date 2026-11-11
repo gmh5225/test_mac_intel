@@ -1,0 +1,33 @@
+name: Single-pass alias lookup across three native processors
+on:
+  push:
+    branches: [codex/capstone-alias-trie]
+    paths: [capstone-performance/**, .github/workflows/capstone-alias-trie.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 58
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Install the instruction counter on Linux
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y valgrind
+      - name: Compare real output, paired throughput and executed instructions
+        run: python3 capstone-performance/alias_workload.py
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: alias-trie-${{ matrix.host }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: warn
+          retention-days: 14
