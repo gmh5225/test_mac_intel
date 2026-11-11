@@ -62,6 +62,7 @@ def main():
     command(['git','worktree','add','--detach',new,'HEAD'],'worktree',base)
     command(['git','apply',SOURCE/'msvc-alias.patch'],'apply',new)
     write('inputs.json',dict(ref=manifest['capstone_revision'],crt=crt,patch=digest((SOURCE/'msvc-alias.patch').read_bytes()),image=os.environ['ImageVersion']))
+    write('processor.json',json.loads(subprocess.check_output(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'],text=True)))
     programs = {}; compiled = {}
     for label,tree in [('base',base),('new',new)]:
         build = WORK/(label+'-build')
@@ -78,14 +79,14 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
 '''
         with (tree/'CMakeLists.txt').open('a') as f: f.write('\n'+targets)
         command(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
-                 '-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
+                 '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
                  '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')], label+'-configure')
         def build_targets(step,*names):
             command(['cmake','--build',build,'--config','Release','--parallel','4','--target',*names],label+step)
         build_targets('-timed','native_single','native_sstream')
         objdump=shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
         compiled[label]={}
-        for stem in ('cs','SStream','Mapping','AArch64Mapping','ARMMapping','MipsMapping','SparcMapping','PPCMapping','RISCVMapping','LoongArchMapping','SystemZMapping'):
+        for stem in ('cs','SStream','Mapping','AArch64Mapping','ARMMapping','MipsMapping','X86Mapping','X86DisassemblerDecoder'):
             obj,=(build/'capstone.dir'/'Release').rglob(stem+'.obj')
             listing=subprocess.check_output([objdump,'-dr','--no-show-raw-insn',obj],text=True,errors='replace')
             contents='\n'.join(line for line in listing.splitlines() if 'file format' not in line and line.strip()).encode()
@@ -105,7 +106,7 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
         assert digest(timed.read_bytes()) == before
         programs[label] = (timed,build/'Release/native_snapshot.exe')
     selected = {r['name']:r for r in manifest['inputs'] if r['name'] in (
-        'arm-ls','arm-cp','arm64-ls','ppc64el-ls','ppc64el-sort','mips64el-ls','sparc64-ls','loong64-ls','loong64-sort','putty-32-0.85')}
+        'arm-ls','arm-cp','arm-sort','arm64-ls','arm64-cp','arm64-sort','mips64el-ls','putty-32-0.85','putty-64-0.85','amd64-ls')}
     assert len(selected) == 10, selected.keys()
     cache={};cases=[fixture(r,cache) for r in selected.values()]
     write('cases.json',cases)
