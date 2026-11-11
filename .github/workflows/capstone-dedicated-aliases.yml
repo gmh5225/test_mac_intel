@@ -1,7 +1,7 @@
-name: Real files on dedicated alias backends
+name: GCC ARM and Thumb register formatting on real files
 on:
   push:
-    branches: [codex/capstone-plain-arm-register-posix]
+    branches: [codex/capstone-plain-arm-register-gcc]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -13,8 +13,6 @@ jobs:
       matrix:
         include:
           - {host: ubuntu-24.04, plan: ARM}
-          - {host: macos-15, plan: ARM}
-          - {host: macos-15-intel, plan: ARM}
     env:
       ARCH_PLAN: ${{ matrix.plan }}
     runs-on: ${{ matrix.host }}

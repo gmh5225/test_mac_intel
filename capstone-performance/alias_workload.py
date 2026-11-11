@@ -31,7 +31,7 @@ def main(root):
     cases = [c for c in cases if arch_for.get(c["name"].split("-")[0]) in plan]
     assert {arch_for[c["name"].split("-")[0]] for c in cases} == set(plan)
     flags = ["-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF", *["-DCAPSTONE_"+a+"_SUPPORT=ON" for a in plan]]
-    run.command(["clang", "--version"], "compiler")
+    run.command(["gcc", "--version"], "compiler")
     linux = platform.system() == "Linux"
     run.command(["lscpu", "--json"] if linux else ["sysctl","machdep.cpu.brand_string","hw.ncpu"], "cpu")
     # Consume the alias ID explicitly as well as the standard formatted text and detail.
@@ -40,9 +40,9 @@ def main(root):
     assert consumer.count(key) == 1
     consumer = consumer.replace(key, "      if (mode) {\n        result.values += insn->alias_id;\n        text_value(result, insn->mnemonic);")
     (root / "consumer.cpp").write_text(consumer)
-    run.command(["clang++","-std=c++17","-O3","-DNDEBUG","-I",source/"include","-c",root/"consumer.cpp","-o",root/"consumer.o"], "consumer")
+    run.command(["g++","-std=c++17","-O3","-DNDEBUG","-I",source/"include","-c",root/"consumer.cpp","-o",root/"consumer.o"], "consumer")
     build = root/"build"
-    run.command(["cmake","-S",source,"-B",build,"-G","Ninja",*flags,"-DCMAKE_BUILD_TYPE=Release","-DCMAKE_C_COMPILER=clang",
+    run.command(["cmake","-S",source,"-B",build,"-G","Ninja",*flags,"-DCMAKE_BUILD_TYPE=Release","-DCMAKE_C_COMPILER=gcc",
                  "-DCAPSTONE_BUILD_MACOS_THIN=ON","-DCAPSTONE_BUILD_CSTOOL=OFF","-DCAPSTONE_BUILD_LEGACY_TESTS=OFF",
                  "-DCAPSTONE_BUILD_SHARED_LIBS=OFF"],"configure")
     bins = {}
@@ -56,7 +56,7 @@ def main(root):
             assert changed == ["arch/ARM/ARMInstPrinter.c"], changed
         run.command(["cmake","--build",build,"--target","capstone_static","--parallel","4"],"build-"+variant)
         exe = root / ("bench-"+variant)
-        run.command(["clang++",root/"consumer.o",build/"libcapstone.a","-o",exe],"link-"+variant)
+        run.command(["g++",root/"consumer.o",build/"libcapstone.a","-o",exe],"link-"+variant)
         bins[variant] = exe
     assert run.sha(bins["base"]) != run.sha(bins["trie"])
     bins["control"] = bins["base"]
