@@ -117,6 +117,7 @@ def measure(progs,cases):
             perf.write('measurements.json',rows)
 try:
     perf.write('inputs.json',dict(crt=perf.crt,capstone=ref,iced=perf.manifest['iced_revision'],patch=perf.digest((source/'msvc-split.patch').read_bytes())))
+    assert perf.digest((source/'msvc-split.patch').read_bytes()) == 'a086b6e246c2400ee3b6e2473efd877f0679949e207d7cbbe9fe9e32de25f3c7'
     progs=libraries_and_driver()
     measure(progs,perf.get_cases())
     perf.write('completed.json',dict(success=True))
