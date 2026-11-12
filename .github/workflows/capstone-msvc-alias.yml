@@ -1,7 +1,7 @@
 name: Measure ARM, Thumb, AArch64 and MIPS on the integrated Windows x86 change on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-same-address-library]
+    branches: [codex/capstone-scan-mask-factorial]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -10,21 +10,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD]
-        order: [first]
+        layout: [fixed, aslr]
         image: [windows-2022, windows-2025]
     runs-on: ${{ matrix.image }}
-    timeout-minutes: 72
+    timeout-minutes: 80
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
-      - name: Compare libraries at identical addresses with shared output storage
-        run: python capstone-performance/same-address-library.py ${{ matrix.crt }} ${{ matrix.order }}
+      - name: Separate the scan boundary and writemask lookup with fixed and default ASLR images
+        run: python capstone-performance/scan-mask-factorial.py ${{ matrix.layout }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: same-address-${{ matrix.image }}
+          name: scan-mask-${{ matrix.image }}-${{ matrix.layout }}
           path: capstone-evidence/
           retention-days: 14
