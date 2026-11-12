@@ -21,8 +21,8 @@ ROOT = SOURCE.parent
 WORK = ROOT / '.capstone-intel-work'
 EVIDENCE = ROOT / 'capstone-evidence'
 PROFILE = os.environ['COMPARE_BASE']
-assert PROFILE in ('neverd-four', 'all')
-ARCHES = ('X86','ARM','AARCH64','MIPS') if PROFILE == 'neverd-four' else ('X86','ARM','AARCH64','MIPS','SPARC','RISCV','LOONGARCH')
+assert PROFILE in ('clang','gcc')
+ARCHES = ('X86',)
 MODES = {'scan': 0, 'format': 1, 'detail': 2}
 
 
@@ -63,10 +63,9 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
+             '-DCMAKE_C_COMPILER='+PROFILE, '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
              *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES],
-             *(['-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers']
-               if PROFILE == 'neverd-four' else []),
+             '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer',
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
@@ -250,7 +249,7 @@ panic = "abort"
         command([verifier, libraries['base'], libraries['new'], '65536',
                  Path(inputs[0]['path']).parent], label)
         rows=[json.loads(line) for line in (EVIDENCE/(label+'.log')).read_text().splitlines() if line.startswith('{')]
-        assert rows[-1]['compared_total'] > 15000000
+        assert rows[-1]['compared_total'] > 10000000
         states.append(dict(custom=custom, cells=len(rows), total=rows[-1]['compared_total']))
     os.environ.pop('CUSTOM_NAMES',None)
     write('layout-public-states.json',states)
@@ -269,8 +268,7 @@ panic = "abort"
             ('legacy_memory', 'legacy_without_memory', 'full_repair'))
         repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
     write('repair-census.json', repair_counts)
-    selectors = {0,1,4,13} if PROFILE == 'neverd-four' else {0,1,2,4,10,11,13}
-    inputs = [item for item in inputs if item['selector'] >= 16 or item['selector'] in selectors]
+    inputs = [item for item in inputs if item['selector'] >= 16]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -428,7 +426,7 @@ def finish():
                               qualified=False, published=False,
                               profile="full streams and short windows"))
     lines = ['# Common MCInst metadata layout', '',
-             'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
+             'Ratios > 1 mean candidate faster. Dedicated x86. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
     for panel, rows in panels.items():
