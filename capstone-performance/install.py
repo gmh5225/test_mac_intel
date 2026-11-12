@@ -17,6 +17,7 @@ def install(baseline, candidate, tools, work):
 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \\
 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
 #define CAPSTONE_X86_SIMPLE_OUTPUT
+#include "../../cs_priv.h"
 CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
 					 size_t size, cs_insn *insn,
 					 uint16_t *insn_size);
