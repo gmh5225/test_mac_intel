@@ -1,7 +1,7 @@
-name: Verify dedicated Linux x86 repairs with GCC and Clang
+name: Compare complete x86 records and replicate dedicated Linux throughput
 on:
   push:
-    branches: [codex/capstone-linux-dedicated-memory-repairs]
+    branches: [codex/capstone-native-linux-repair-qualification]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -12,14 +12,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {host: ubuntu-24.04, cc: clang}
-          - {host: ubuntu-24.04-arm, cc: clang}
-          - {host: ubuntu-24.04, cc: gcc}
-          - {host: ubuntu-24.04-arm, cc: gcc}
-          - {host: macos-15, cc: clang}
-          - {host: macos-15-intel, cc: clang}
+          - {host: ubuntu-24.04, cc: clang, cfg: full, timing: 'yes', copy: first}
+          - {host: ubuntu-24.04, cc: clang, cfg: full, timing: 'yes', copy: second}
+          - {host: ubuntu-24.04, cc: gcc, cfg: full, timing: 'yes', copy: first}
+          - {host: ubuntu-24.04, cc: gcc, cfg: full, timing: 'yes', copy: second}
+          - {host: ubuntu-24.04, cc: clang, cfg: diet, timing: 'no', copy: one}
+          - {host: ubuntu-24.04, cc: gcc, cfg: reduced, timing: 'no', copy: one}
+          - {host: ubuntu-24.04-arm, cc: clang, cfg: no-att, timing: 'no', copy: one}
     env:
       CC: ${{ matrix.cc }}
+      CONFIGURATION: ${{ matrix.cfg }}
+      TIMING: ${{ matrix.timing }}
       ARCH_PLAN: X86
     runs-on: ${{ matrix.host }}
     timeout-minutes: 58
@@ -33,7 +36,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: linux-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_attempt }}
+          name: repair-recheck-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.cfg }}-${{ matrix.copy }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14

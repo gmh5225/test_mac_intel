@@ -1,6 +1,6 @@
 from pathlib import Path
 import json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
-import run,corpus
+import run,corpus,native
 src=run.SOURCE
 cc=os.environ['CC']
 def main(root):
@@ -9,6 +9,12 @@ def main(root):
  cases=[row for row in corpus.prepare(src,root,run.EVIDENCE,run.command) if row['name'] in inputs]
  assert len(cases)==len(inputs)==8 and {row['name'] for row in cases}==inputs
  f=src/'alias-trie.patch';assert run.sha(f)==(src/'alias-trie.sha256').read_text().strip()
+ run.command(['lscpu'],'cpu')
+ run.command([cc,'--version'],'compiler')
+ cfg=os.environ['CONFIGURATION']
+ native.verify(w, root, cases, cc, cfg)
+ if os.environ['TIMING']!='yes':return
+ cases=[row for row in cases if row['name']in('putty-32-0.85','amd64-sort','amd64-cp','simd64')]
  cpp=(src/'single.cpp').read_text();a=cpp.index('  API() {');z=cpp.index('\n  }',a)
  names=['cs_open','cs_option','cs_malloc','cs_disasm_iter','cs_regs_access','cs_free','cs_close']
  cpp=cpp[:a]+'''  explicit API(const char *path) {
