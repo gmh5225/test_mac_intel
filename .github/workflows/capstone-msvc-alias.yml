@@ -1,7 +1,7 @@
-name: Retest AArch64 output with ARM, Thumb and PE32 controls on independent Windows runners
+name: Measure ARM, Thumb, AArch64 and MIPS on the integrated Windows x86 change on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-local-register-writers-msvc]
+    branches: [codex/capstone-dynamic-crt-other-architectures]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: local-register-writers-${{ matrix.order }}
+          name: dynamic-mixed-arch-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14
