@@ -1,0 +1,16 @@
+--- a/cs.c
++++ b/cs.c
+@@ -1054,6 +1054,13 @@
+ 		/* MIPS constructs each MCOperand before reading it. The public
+ 		 * detail and alias records are reset by the MIPS decoder. */
+ 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
++	else
++#endif
++#ifdef CAPSTONE_HAS_RISCV
++	if (handle->arch == CS_ARCH_RISCV)
++		/* RISC-V constructs each operand before reading it, including
++		 * retries after incomplete decodes. */
++		MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
+ 	else
+ #endif
+ 		MCInst_Init(&mci, handle->arch);
