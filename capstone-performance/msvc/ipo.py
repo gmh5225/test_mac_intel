@@ -38,7 +38,7 @@ opt-level=3
         sp.run([*args,'--check',path],check=True);sp.run([*args,path],check=True)
     tool.write('processor.json',json.loads(sp.check_output(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'],text=True)))
     decoder='arch/X86/X86DisassemblerDecoder.c'
-    variants=[('regular','OFF',''),('regular_new','OFF',decoder),('ipo','ON',decoder if tool.crt=='MT' else ''),('ipo_new','ON',decoder if tool.crt=='MT' else '')]
+    variants=[('regular','OFF',''),('regular_new','OFF',''),('ipo','ON',decoder if tool.crt=='MT' else ''),('ipo_new','ON',decoder)]
     for name,on,ordinary in variants:
         if name in ('regular_new','ipo_new'):apply('profiles.patch')
         elif name=='ipo':apply('profiles.patch',reverse=True)

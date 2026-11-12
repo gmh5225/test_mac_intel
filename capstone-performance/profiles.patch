@@ -1,107 +1,13 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..743fac8d 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -59,6 +59,7 @@
- 
- #define GET_REGINFO_ENUM
- #include "X86GenRegisterInfo.inc"
-+#include "X86ImplicitRegPair.h"
- 
- static void printMemReference(MCInst *MI, unsigned Op, SStream *O);
- static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
-@@ -1230,7 +1231,8 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
- 
- 			MI->flat_insn->detail->x86.op_count++;
- 		} else {
--			if (X86_insn_reg_att2(MCInst_getOpcode(MI), &reg,
-+			if (X86_hasImplicitRegPair(MCInst_getOpcode(MI)) &&
-+			    X86_insn_reg_att2(MCInst_getOpcode(MI), &reg,
- 					      &access1, &reg2, &access2)) {
- 				MI->flat_insn->detail->x86.operands[0].type =
- 					X86_OP_REG;
-diff --git a/arch/X86/X86ImplicitRegPair.h b/arch/X86/X86ImplicitRegPair.h
-new file mode 100644
-index 00000000..623d97d7
---- /dev/null
-+++ b/arch/X86/X86ImplicitRegPair.h
-@@ -0,0 +1,18 @@
-+/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
-+#ifndef CS_X86_IMPLICIT_REG_PAIR_H
-+#define CS_X86_IMPLICIT_REG_PAIR_H
-+
-+/* Most opcodes have no pair embedded in their assembly string. */
-+static inline bool X86_hasImplicitRegPair(unsigned int opcode)
-+{
-+	switch (opcode) {
-+#define X86_REG_PAIR(op, r1, r2, a1, a2) case X86_##op:
-+#include "X86ImplicitRegPair.inc"
-+#undef X86_REG_PAIR
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+#endif
-diff --git a/arch/X86/X86ImplicitRegPair.inc b/arch/X86/X86ImplicitRegPair.inc
-new file mode 100644
-index 00000000..69001b93
---- /dev/null
-+++ b/arch/X86/X86ImplicitRegPair.inc
-@@ -0,0 +1,10 @@
-+/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
-+/* Instructions with both registers embedded in the assembly string. */
-+X86_REG_PAIR(IN16rr, AX, DX, WRITE, READ)
-+X86_REG_PAIR(IN32rr, EAX, DX, WRITE, READ)
-+X86_REG_PAIR(IN8rr, AL, DX, WRITE, READ)
-+X86_REG_PAIR(INVLPGA32, EAX, ECX, READ, READ)
-+X86_REG_PAIR(INVLPGA64, RAX, ECX, READ, READ)
-+X86_REG_PAIR(OUT16rr, DX, AX, READ, READ)
-+X86_REG_PAIR(OUT32rr, DX, EAX, READ, READ)
-+X86_REG_PAIR(OUT8rr, DX, AL, READ, READ)
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..d6a54b03 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -57,6 +57,7 @@
- 
- #define GET_REGINFO_ENUM
- #include "X86GenRegisterInfo.inc"
-+#include "X86ImplicitRegPair.h"
- 
- #include "X86BaseInfo.h"
- 
-@@ -883,7 +884,8 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
- 			MI->flat_insn->detail->x86.operands[0].access = access1;
- 			MI->flat_insn->detail->x86.op_count++;
- 		} else {
--			if (X86_insn_reg_intel2(MCInst_getOpcode(MI), &reg,
-+			if (X86_hasImplicitRegPair(MCInst_getOpcode(MI)) &&
-+			    X86_insn_reg_intel2(MCInst_getOpcode(MI), &reg,
- 						&access1, &reg2, &access2)) {
- 				MI->flat_insn->detail->x86.operands[0].type =
- 					X86_OP_REG;
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index e2c0eb9e..5fcd9a1c 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -11097,14 +11097,10 @@ static const struct insn_reg insn_regs_intel_extra[] = {
- };
- 
- static const struct insn_reg2 insn_regs_intel2[] = {
--	{ X86_IN16rr, X86_REG_AX, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
--	{ X86_IN32rr, X86_REG_EAX, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
--	{ X86_IN8rr, X86_REG_AL, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
--	{ X86_INVLPGA32, X86_REG_EAX, X86_REG_ECX, CS_AC_READ, CS_AC_READ },
--	{ X86_INVLPGA64, X86_REG_RAX, X86_REG_ECX, CS_AC_READ, CS_AC_READ },
--	{ X86_OUT16rr, X86_REG_DX, X86_REG_AX, CS_AC_READ, CS_AC_READ },
--	{ X86_OUT32rr, X86_REG_DX, X86_REG_EAX, CS_AC_READ, CS_AC_READ },
--	{ X86_OUT8rr, X86_REG_DX, X86_REG_AL, CS_AC_READ, CS_AC_READ },
-+#define X86_REG_PAIR(op, r1, r2, a1, a2) \
-+	{ X86_##op, X86_REG_##r1, X86_REG_##r2, CS_AC_##a1, CS_AC_##a2 },
-+#include "X86ImplicitRegPair.inc"
-+#undef X86_REG_PAIR
- };
- 
- static int binary_search1(const struct insn_reg *insns, unsigned int max,
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9d44ec7d..9b3880e7 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -442,7 +442,7 @@ if(CAPSTONE_X86_SUPPORT)
+     if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
+         if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME)
+             set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
+-        elseif(capstone_enabled_architectures STREQUAL "X86")
++        else()
+             set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION})
+             if(DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+                 set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE})

@@ -1,8 +1,8 @@
-name: Measure direct x86 relative text and details against current Capstone and native iced
+name: Measure the mixed dynamic CRT Release iterator and native iced
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-pair-presence-windows]
+    branches: [codex/capstone-mixed-dynamic-ltcg]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -14,7 +14,6 @@ jobs:
         include:
           - { crt: MD, image: windows-2022 }
           - { crt: MD, image: windows-2025 }
-          - { crt: MT, image: windows-2022 }
     runs-on: ${{ matrix.image }}
     timeout-minutes: 100
     steps:
@@ -28,6 +27,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pair-presence-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: mixed-dynamic-ltcg-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
