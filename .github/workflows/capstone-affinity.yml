@@ -1,9 +1,9 @@
-name: Capstone fixed CPU performance control
+name: Capstone post-printer linked text control
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-legacy-memory-repair]
+    branches: [codex/capstone-postprinter-link-layout]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-legacy-memory-repair
+  group: capstone-postprinter-link-layout
   cancel-in-progress: false
 
 jobs:
@@ -23,8 +23,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, baseline: combined }
           - { host: ubuntu-24.04-arm, baseline: combined }
-          - { host: macos-15, baseline: combined }
-          - { host: macos-15-intel, baseline: combined }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -41,17 +39,17 @@ jobs:
       - name: Build immutable sources and verify outputs
         timeout-minutes: 27
         run: python3 capstone-performance/run.py prepare
-      - name: Measure fixed CPU A/A and paired workloads
+      - name: Compare ordinary and matched text extents
         timeout-minutes: 37
-        run: python3 capstone-performance/run.py measure
+        run: python3 capstone-performance/layout_probe.py
       - name: Retire disposable products and summarize evidence
         if: always()
-        run: python3 capstone-performance/run.py finish
+        run: python3 capstone-performance/layout_probe.py cleanup
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-memory-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: postprinter-layout-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
