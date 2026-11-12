@@ -1,5 +1,5 @@
 {
-  "capstone_revision": "7e761ce29b7e6d321c7ef37bcfd5d7855d413b2a",
+  "capstone_revision": "f52e6e73c419bb58129e19495204bae1ab9d42b2",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "source_lineage": {
     "single.cpp": {
@@ -11,8 +11,8 @@
       "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
     },
     "candidate.patch": {
-      "sha256": "c831c87f15244aa9f68456154f96eac8d041eafcb03f37a103eff079b09fa650",
-      "experiment": "round574-legacy-memory-repair"
+      "sha256": "3f4729916de5dba75106e98569521568572c547cd4bc6c61fa0edf3e1993dd4b",
+      "experiment": "round583-outline-extended-x86-repairs"
     },
     "check-hint.c": {
       "experiment": "round357-x86-handle-lookup/check-lookup.c",
@@ -85,10 +85,41 @@
     "repair_census.cpp": {
       "sha256": "26d778aaa200a15f3881d732122b3fa3ede9ab790d8dc10ac721a16f6006be10",
       "experiment": "round574-legacy-memory-repair"
+    },
+    "simple-repair.patch": {
+      "sha256": "0d90aaf4bf2b185b157ee2b57c07fb82ec88a76ab38d132f4dc17ea891e22491",
+      "experiment": "round583-outline-extended-x86-repairs"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
   "inputs": [
+    {
+      "name": "ppc64el-ls",
+      "selector": 3,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_ppc64el.deb",
+      "package_sha256": "e957dbba78571202de4302b94b977157d461c772f1710be8502e2ef920d7c124",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "4c2fa536d2ee462f5a1841fb9754bea4d191029ff900907595da95fca16cb5e4"
+    },
+    {
+      "name": "ppc64el-sort",
+      "selector": 3,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_ppc64el.deb",
+      "package_sha256": "e957dbba78571202de4302b94b977157d461c772f1710be8502e2ef920d7c124",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "01d010a1a2aa03b88f91dc97f49d10705994fdfb8bf3858e4b931041f6e11a26"
+    },
+    {
+      "name": "ppc64el-cp",
+      "selector": 3,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_ppc64el.deb",
+      "package_sha256": "e957dbba78571202de4302b94b977157d461c772f1710be8502e2ef920d7c124",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "2d343f9f02856a0fdc78d59701931dc3f50dce1a474b10c3440a703aee601c61"
+    },
     {
       "name": "mips64el-ls",
       "selector": 4,
@@ -97,6 +128,24 @@
       "kind": "deb",
       "command": "ls",
       "text_sha256": "3b48cf397f99bbee260ba1c12f976a9b790cc44b120f8ae0dfad89384ca6a2fa"
+    },
+    {
+      "name": "riscv64-ls",
+      "selector": 2,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_riscv64.deb",
+      "package_sha256": "47b00d78d09c7921296f1b849cd04e5cdda7fd948abf17d8659efb906ac386d7",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "59520508376e30943d11d74866cd5b57c323aa8161f665b61862c19d32e1f487"
+    },
+    {
+      "name": "riscv64-cp",
+      "selector": 2,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_riscv64.deb",
+      "package_sha256": "47b00d78d09c7921296f1b849cd04e5cdda7fd948abf17d8659efb906ac386d7",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "96f9c1f6b78863061c7d2a62b1c18da5b872d3115bb37cdbed72357bc17cee80"
     },
     {
       "name": "arm-ls",
@@ -187,6 +236,123 @@
       "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
       "kind": "deb",
       "command": "sort"
+    },
+    {
+      "name": "arc-ld-linux-arc",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/ld-linux-arc.so.2",
+      "text_sha256": "a863c07ded182d06db715a130cc348a858a1bc4b9a339aaee9f20c53b23bb46b"
+    },
+    {
+      "name": "arc-libc",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/libc.so.6",
+      "text_sha256": "6a32e5c56081cfc19692c86cda2d860c5e15c21d512dd32d9a2df322db0bde3e"
+    },
+    {
+      "name": "arc-libm",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/libm.so.6",
+      "text_sha256": "5ee7ed7d8855be92c9a9bf8aa15e96e02bf4a260af2399c552d37f409eef3142"
+    },
+    {
+      "name": "arc-libresolv",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/libresolv.so.2",
+      "text_sha256": "47316751fdf0ca88f3fc6a1b50a8f08fc4c11a52b0976b198e1c798f3ff9bef7"
+    },
+    {
+      "name": "loong64-ls",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "79aee1454bea976cd0a7216849ce9852efabe3dbb7aaea15f2ddc8bb92eb3e7b"
+    },
+    {
+      "name": "loong64-cp",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "d630e3eeedfa80897a78b980135a7d156e90f6efc9cc82c4980a0e0c96a8f16d"
+    },
+    {
+      "name": "loong64-sort",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "c591f3113374726c163b6448964bb5f8e7bbcb7a9fd480efac27f5aa339690dc"
+    },
+    {
+      "name": "s390x-ls",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "46819752e9b45e34a3402b173ffa4099c4a2a249647062c92de2c8f99606db08"
+    },
+    {
+      "name": "s390x-sort",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "3423b7a3b4c97f02d0b9f41d3cd95917f1415c934f9ae64f946c8de6a8b2f881"
+    },
+    {
+      "name": "s390x-cp",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "8233e8f281a6961b61d5ed52224317097681dc05a86c0b21d73a8376547f915d"
+    },
+    {
+      "name": "sparc64-ls",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "c3cab47f209f053de272d4c9b6fc28d5a457d8cb2c8569fcbd5e7e453010511a"
+    },
+    {
+      "name": "sparc64-sort",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
+      "kind": "deb",
+      "command": "sort",
+      "text_sha256": "124d1ade2c7c2b3d5cc4d11487a45c85d7d711ae57678e9af3f97a9c61da128c"
+    },
+    {
+      "name": "sparc64-cp",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "440f5a0e2465f1ca824c7faac73c4eea33d917a9b6832c2d95b2353f63679fd4"
     },
     {
       "name": "mips64el-cp",

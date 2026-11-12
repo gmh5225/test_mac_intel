@@ -21,7 +21,7 @@ ROOT = SOURCE.parent
 WORK = ROOT / '.capstone-intel-work'
 EVIDENCE = ROOT / 'capstone-evidence'
 PROFILE = os.environ['COMPARE_BASE']
-assert PROFILE in ('neverd-four', 'x86')
+assert PROFILE in ('all', 'neverd-four', 'x86')
 ARCHES = ('X86','ARM','AARCH64','MIPS') if PROFILE == 'neverd-four' else ('X86',)
 MODES = {'scan': 0, 'format': 1, 'detail': 2}
 
@@ -63,8 +63,8 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
-             *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES],
+             '-DCMAKE_C_COMPILER=clang', *(['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF'] if PROFILE != 'all' else []),
+             *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES if PROFILE != 'all'],
              *(['-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers']
                if PROFILE == 'neverd-four' else []),
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
@@ -98,7 +98,7 @@ def check_outputs(rows, case):
 
 
 def invoke(case, variant, repeats):
-    label = 'new' if variant.startswith('new') else 'base'
+    label = 'simple' if variant.startswith('simple') else 'new' if variant.startswith('new') else 'base'
     library = 'iced' if variant.startswith('iced') else 'capstone'
     binary = WORK / f'{case["consumer"]}-{label}'
     if case['consumer'] in ('window', 'open'):
@@ -152,14 +152,17 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Limit legacy post-printer repairs to the first memory operand'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Separate extended operand and broadcast helpers from the hot x86 post-printer'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
         selected = {line.split(':')[0] for line in fields if line.startswith('CAPSTONE_')
                     and line.endswith('_SUPPORT:BOOL=ON')}
-        assert selected == {'CAPSTONE_'+arch+'_SUPPORT' for arch in ARCHES}, selected
+        if PROFILE == 'all':
+            assert len(selected) > 20
+        else:
+            assert selected == {'CAPSTONE_'+arch+'_SUPPORT' for arch in ARCHES}, selected
     adapter = WORK / 'adapter'
     adapter.mkdir()
     shutil.copyfile(SOURCE / 'iced.rs', adapter / 'iced.rs')
@@ -232,7 +235,7 @@ panic = "abort"
             ('legacy_memory', 'legacy_without_memory', 'full_repair'))
         repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
     write('repair-census.json', repair_counts)
-    inputs = [item for item in inputs if item['selector'] >= 16 or
+    inputs = [item for item in inputs if PROFILE == 'all' or item['selector'] >= 16 or
               (PROFILE == 'neverd-four' and item['selector'] in (0,1,4,13))]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
@@ -274,9 +277,49 @@ panic = "abort"
     allowed = required
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
+    # Rebuild the unoutlined first-memory candidate against the same baseline.
+    # The separately verified primary libraries are already complete.
+    ctrl=WORK/'simple-control'; ctrl.mkdir()
+    unit='arch/X86/X86Mapping.c'
+    tmpsrc=ctrl/unit
+    tmpsrc.parent.mkdir(parents=True)
+    shutil.copyfile(WORK/'base'/unit,tmpsrc)
+    command(['git','init',ctrl],'simple-init')
+    command(['git','apply','--check',SOURCE/'simple-repair.patch'],'simple-check',ctrl)
+    command(['git','apply',SOURCE/'simple-repair.patch'],'simple-apply',ctrl)
+    assert tmpsrc.read_bytes() != (WORK/'base'/unit).read_bytes()
+    original=next(row for row in commands if row['file']==str(WORK/'base'/unit).replace('/base/','/new/'))
+    args=shlex.split(original['command'])
+    obj=ctrl/'X86Mapping.c.o'
+    args[args.index('-o')+1]=str(obj)
+    args[args.index(original['file'])]=str(tmpsrc)
+    args+=['-I',str(WORK/'base/arch/X86')]
+    command(args,'simple-compile',original['directory'])
+    cache=(WORK/'base-build/CMakeCache.txt').read_text().splitlines()
+    ar=next(v.split('=',1)[1] for v in cache if v.startswith('CMAKE_AR:FILEPATH='))
+    ranlib=next(v.split('=',1)[1] for v in cache if v.startswith('CMAKE_RANLIB:FILEPATH='))
+    archive=ctrl/'libcapstone.a'
+    shutil.copyfile(WORK/'base-build/libcapstone.a',archive)
+    before=subprocess.check_output([ar,'t',archive],text=True).splitlines()
+    assert before.count(obj.name)==1
+    command([ar,'r',archive,obj],'simple-archive')
+    command([ranlib,archive],'simple-index')
+    assert before==subprocess.check_output([ar,'t',archive],text=True).splitlines()
+    assert subprocess.check_output([ar,'p',archive,obj.name])==obj.read_bytes()
+    command(['clang++',WORK/'decoder.o',archive,iced_library,'-lpthread',
+             *(['-ldl','-lm'] if platform.system()=='Linux' else []),'-o',WORK/'decoder-simple'],'simple-link')
+    control_cases=[c for c in cases if c['name'] in ('putty-32-0.85','simd64','amd64-cp')
+                   and c['mode'] in ('detail','format') and c['consumer']=='decoder']
+    assert len(control_cases)==6
+    proof=[]
+    for case in control_cases:
+        rows=[invoke(case,v,1) for v in ('base','new','simple')]
+        assert check_outputs(rows,case)
+        proof.append(dict(case=case['name'],mode=case['mode'],rows=rows))
+    write('outline-preflight.json',proof)
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
-    binaries += list(libraries.values()) + [iced_library]
+    binaries += list(libraries.values()) + [iced_library,WORK/'decoder-simple',archive]
     write('binaries.json', {str(p.relative_to(WORK)): sha(p) for p in binaries})
     write('ready.json', dict(semantic_checks='native tests and traversal checks passed; not full qualification',
                              cases=len(cases), runtime_objects_changed=changed))
@@ -343,6 +386,9 @@ def measure():
             continue
         variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
         measure_panel(panel,choices,cycles,variants,duration)
+    extra=[c for c in cases if c['name'] in ('putty-32-0.85','simd64','amd64-cp')
+           and c['mode'] in ('detail','format') and c['consumer']=='decoder']
+    measure_panel('outline',extra,cycles,['base','new','base_aa','new_aa','simple','simple_aa'],duration)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
@@ -370,6 +416,10 @@ def summarize_panel(name):
                 pair[timer + '_gain'] = math.sqrt(t['base'] * t['base_aa'] / (t['new'] * t['new_aa']))
                 for label in ['base', 'new'] + (['iced'] if 'iced' in t else []):
                     pair[timer + '_' + label + '_aa'] = t[label] / t[label + '_aa']
+                if 'simple' in t:
+                    pair[timer+'_new_over_simple']=math.sqrt(t['simple']*t['simple_aa']/(t['new']*t['new_aa']))
+                    pair[timer+'_simple_gain']=math.sqrt(t['base']*t['base_aa']/(t['simple']*t['simple_aa']))
+                    pair[timer+'_simple_aa']=t['simple']/t['simple_aa']
                 if 'iced' in t:
                     agree = all(values['base'][k] == values['iced'][k] for k in ['instructions', 'rejected', 'boundary_hash'])
                     pair['cross_decoder_boundaries_agree'] = agree
@@ -390,11 +440,11 @@ def summarize_panel(name):
 
 def finish():
     EVIDENCE.mkdir(exist_ok=True)
-    panels = {name: summarize_panel(name) for name in ['null', 'x86', 'other', 'window', 'open']}
+    panels = {name: summarize_panel(name) for name in ['null', 'x86', 'other', 'window', 'open', 'outline']}
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Legacy first-memory repair', '',
+    lines = ['# Outlined x86 repair helpers', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
