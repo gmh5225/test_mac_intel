@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-x86-arch-relative-dispatch]
+    branches: [codex/capstone-relative-dispatch-counters]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-x86-arch-relative-dispatch
+  group: capstone-relative-dispatch-counters
   cancel-in-progress: false
 
 jobs:
@@ -22,9 +22,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, baseline: combined }
-          - { host: ubuntu-24.04-arm, baseline: combined }
-          - { host: macos-15, baseline: combined }
-          - { host: macos-15-intel, baseline: combined }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -34,19 +31,10 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Validate protocol and native host
-        run: |
-          uname -sm
-          python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
-      - name: Build immutable sources and verify outputs
-        timeout-minutes: 17
-        run: python3 capstone-performance/run.py prepare
-      - name: Measure fixed CPU A/A and paired workloads
-        timeout-minutes: 37
-        run: python3 capstone-performance/run.py measure
-      - name: Retire disposable products and summarize evidence
-        if: always()
-        run: python3 capstone-performance/run.py finish
+      - name: Install Linux instruction profiler
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends valgrind
+      - name: Count warm workload instructions, memory, branches and simulated cache misses
+        run: python3 capstone-performance/instructions.py
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
