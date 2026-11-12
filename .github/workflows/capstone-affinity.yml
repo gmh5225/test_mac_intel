@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-word-hexadecimal]
+    branches: [codex/capstone-same-image-hex]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-word-hexadecimal
+  group: capstone-same-image-hex
   cancel-in-progress: false
 
 jobs:
@@ -23,8 +23,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, baseline: combined }
           - { host: ubuntu-24.04-arm, baseline: combined }
-          - { host: macos-15, baseline: combined }
-          - { host: macos-15-intel, baseline: combined }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -38,20 +36,13 @@ jobs:
         run: |
           uname -sm
           python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
-      - name: Build immutable sources and verify outputs
-        timeout-minutes: 27
-        run: python3 capstone-performance/run.py prepare
-      - name: Measure fixed CPU A/A and paired workloads
-        timeout-minutes: 37
-        run: python3 capstone-performance/run.py measure
-      - name: Retire disposable products and summarize evidence
-        if: always()
-        run: python3 capstone-performance/run.py finish
+      - name: Compare both hexadecimal writers in one immutable decoder image
+        run: python3 capstone-performance/hex_controls.py
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-arch-relative-dispatch-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: same-image-hex-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

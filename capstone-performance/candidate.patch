@@ -1,11 +1,26 @@
-diff --git a/arch/X86/X86IntelInstPrinterNumbers.c b/arch/X86/X86IntelInstPrinterNumbers.c
-index 2d0665a0..2136f2e5 100644
 --- a/arch/X86/X86IntelInstPrinterNumbers.c
 +++ b/arch/X86/X86IntelInstPrinterNumbers.c
-@@ -5,11 +5,50 @@
- #include "../../MathExtras.h"
- 
- #if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
+@@ -8,7 +8,7 @@
+ // The private printer entry proves a plain open stream, default formatter and
+ // capacity for the complete generated output. A signed uint64 hexadecimal
+ // spelling needs at most 19 bytes, already included in that generated bound.
+-void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
++static void scalar_hex(SStream *OS, uint64_t value, bool negative)
+ {
+ 	const unsigned digits =
+ 		value ? (64U - CountLeadingZeros_64(value) + 3U) / 4U : 1U;
+@@ -27,3 +27,121 @@
+ 	} while (value);
+ }
+ #endif
++
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include "X86InstPrinter.h"
++#include "../../MathExtras.h"
++
++#if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
 +#if defined(__GNUC__) && __SIZEOF_POINTER__ == 8 && \
 +	__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 +#define X86_HEX_WORD
@@ -24,11 +39,11 @@ index 2d0665a0..2136f2e5 100644
 +}
 +#endif
 +
- // The private printer entry proves a plain open stream, default formatter and
- // capacity for the complete generated output. A signed uint64 hexadecimal
- // spelling needs at most 19 bytes, already included in that generated bound.
- void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
- {
++// The private printer entry proves a plain open stream, default formatter and
++// capacity for the complete generated output. A signed uint64 hexadecimal
++// spelling needs at most 19 bytes, already included in that generated bound.
++static void word_hex(SStream *OS, uint64_t value, bool negative)
++{
 +#ifdef X86_HEX_WORD
 +	if (value < 256) {
 +		char *out = OS->buffer + OS->index;
@@ -50,13 +65,17 @@ index 2d0665a0..2136f2e5 100644
 +		return;
 +	}
 +#endif
- 	const unsigned digits =
- 		value ? (64U - CountLeadingZeros_64(value) + 3U) / 4U : 1U;
- 	char *out = OS->buffer + OS->index;
-@@ -21,9 +60,46 @@ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
- 	*out = 'x';
- 	*end = '\0';
- 
++	const unsigned digits =
++		value ? (64U - CountLeadingZeros_64(value) + 3U) / 4U : 1U;
++	char *out = OS->buffer + OS->index;
++	OS->index += digits + (negative ? 3U : 2U);
++	char *end = OS->buffer + OS->index;
++	if (negative)
++		*out++ = '-';
++	*out++ = '0';
++	*out = 'x';
++	*end = '\0';
++
 +#ifdef X86_HEX_WORD
 +	if (digits >= 5) {
 +		unsigned head_digits = digits;
@@ -93,10 +112,22 @@ index 2d0665a0..2136f2e5 100644
 +		end[-2] = "0123456789abcdef"[(value >> 4) & 15];
 +	end[-1] = "0123456789abcdef"[value & 15];
 +#else
- 	do {
- 		*--end = "0123456789abcdef"[value & 15];
- 		value >>= 4;
- 	} while (value);
++	do {
++		*--end = "0123456789abcdef"[value & 15];
++		value >>= 4;
++	} while (value);
 +#endif
- }
- #endif
++}
++#endif
++
++#if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
++static void (*hex_writer)(SStream *, uint64_t, bool) = scalar_hex;
++void benchmark_set_hex_variant(int variant)
++{
++    hex_writer = variant ? word_hex : scalar_hex;
++}
++void X86_Intel_printHexPrechecked(SStream *stream, uint64_t value, bool negative)
++{
++    hex_writer(stream, value, negative);
++}
++#endif
