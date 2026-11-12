@@ -1,57 +1,69 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..2364d230 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -742,6 +742,14 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
- 		//memset(instr->flat_insn->detail, 0, offsetof(cs_detail, x86)+offsetof(cs_x86, operands));
- 	}
+diff --git a/SStream.c b/SStream.c
+index f1fd1246..687a587b 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -347,11 +347,7 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
+ 		SSTREAM_RETURN_IF_CLOSED(ss);
+ 		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
+ 		char *end = buffer + sizeof(buffer);
+-		char *p = end;
+-		do {
+-			*--p = "0123456789abcdef"[value & 15];
+-			value >>= 4;
+-		} while (value);
++		char *p = SStream_hex_digits(end, value);
+ 		*--p = 'x';
+ 		*--p = '0';
+ 		if (negative)
+diff --git a/SStream.h b/SStream.h
+index 2c9bc2c3..45c05cb4 100644
+--- a/SStream.h
++++ b/SStream.h
+@@ -61,6 +61,16 @@ void SStream_concat(SStream *ss, const char *fmt, ...);
+ void SStream_concat2(SStream *ss, const char *first, const char *second);
  
-+	/* Unprefixed relative CALL, JMP and Jcc all have one signed operand. */
-+	if (code_len >= 2 &&
-+	    ((code[0] & 0xf0) == 0x70 || (code[0] & 0xfe) == 0xe8 ||
-+	     code[0] == 0xeb || (code[0] == 0x0f && (code[1] & 0xf0) == 0x80)) &&
-+	    (!handle->no_text || handle->detail_opt) &&
-+	    X86_decodeRelativeBranch(handle, code, code_len, instr, size))
-+		return true;
+ // Append a lowercase 0x-prefixed magnitude, optionally preceded by a minus sign.
++/* Write the digits backward so the caller can append or copy them as a span. */
++static inline char *SStream_hex_digits(char *end, uint64_t value)
++{
++	do {
++		*--end = "0123456789abcdef"[value & 15];
++		value >>= 4;
++	} while (value);
++	return end;
++}
 +
- 	extension_result = X86_FEATURE_NOT_HANDLED;
- 	if (X86_mayDecodeFeatureExtension(code, code_len,
- 					  (handle->mode & CS_MODE_64) != 0,
+ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
+ 
+ // Append a decimal magnitude, optionally preceded by a minus sign.
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 97b899b5..395d0613 100644
+index 97b899b5..2a307fe8 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
 @@ -50,6 +50,9 @@ struct InternalInstruction;
  bool X86_completeScan(MCInst *instr, struct InternalInstruction *insn,
  		      uint16_t *size);
  
-+bool X86_decodeRelativeBranch(cs_struct *handle, const uint8_t *code,
-+			      size_t code_len, MCInst *instr, uint16_t *size);
++bool X86_formatRelative(cs_struct *handle, const uint8_t *code, size_t length,
++			cs_insn *insn, uint16_t *size);
 +
  void X86_init(MCRegisterInfo *MRI);
  
  #endif
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..bea50c6f 100644
+index 90ef6e93..07405ab7 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -31,6 +31,7 @@
- #include "../../utils.h"
- 
- #include "X86DisassemblerDecoder.h"
-+#include "X86BaseInfo.h"
- #include "X86Disassembler.h"
- #include "X86Mapping.h"
- #include "X86FeatureExtension.h"
-@@ -3757,4 +3758,58 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
+@@ -3757,4 +3757,50 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
  
  #undef X86_DECODE_INLINE
  
-+CAPSTONE_INTERNAL bool X86_decodeRelativeBranch(cs_struct *handle, const uint8_t *code,
-+					       size_t code_len, MCInst *instr, uint16_t *size)
++#ifndef CAPSTONE_DIET
++CAPSTONE_INTERNAL bool X86_formatRelative(cs_struct *handle, const uint8_t *code,
++					 size_t length, cs_insn *insn, uint16_t *size)
 +{
 +	InternalInstruction header;
-+	initializeInstructionHeader(&header, code, code_len, handle->mode);
++	initializeInstructionHeader(&header, code, length, handle->mode);
 +	header.rexPrefix = 0;
 +	setInstructionSizes(&header, false, false);
 +	const bool escaped = code[0] == 0x0f;
@@ -75,30 +87,91 @@ index 90ef6e93..bea50c6f 100644
 +			return false;
 +		displacement = rel32;
 +	}
-+	const unsigned int row = header.mode == MODE_16BIT ? X86_TERMINAL_16 :
-+				 header.mode == MODE_32BIT ? X86_TERMINAL_32 :
-+							     X86_TERMINAL_64;
-+	const unsigned int uid = x86LegacyDecisions[row][escaped][opcode] &
-+				 X86_TERMINAL_UID_MASK;
-+	if (!uid)
++	const unsigned row = header.mode == MODE_16BIT ? X86_TERMINAL_16 :
++			     header.mode == MODE_32BIT ? X86_TERMINAL_32 :
++							 X86_TERMINAL_64;
++	const unsigned public_id = x86LegacyPublicDecisions[row][escaped][opcode] &
++				   X86_TERMINAL_UID_MASK;
++	if (!public_id)
 +		return false;
-+	MCInst_clear(instr);
-+	MCInst_setOpcode(instr, uid);
-+	MCOperand_CreateImm0(instr, displacement);
-+	instr->imm_size = header.immSize;
-+	instr->flags = X86_IP_NO_PREFIX;
-+	memset(instr->x86_prefix, 0, sizeof(instr->x86_prefix));
-+	instr->xAcquireRelease = 0;
-+	instr->x86Lock = false;
-+	if (handle->detail_opt) {
-+		cs_x86 *x86 = &instr->flat_insn->detail->x86;
-+		memcpy(x86->opcode, code, offset);
-+		x86->addr_size = header.addressSize;
-+		x86->encoding.imm_offset = offset;
-+		x86->encoding.imm_size = header.readerCursor - offset;
-+	}
 +	*size = (uint16_t)header.readerCursor;
++	insn->size = *size;
++	insn->id = public_id;
++	uint64_t target = X86_relativeBranchTarget(handle->mode, insn->address,
++						  *size, displacement, header.immSize);
++	X86_writeRelativeIntel(handle, insn, target);
 +	return true;
 +}
++#endif
 +
  #endif
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..5d7bf0ac 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -924,6 +924,25 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ 
+ #endif // CAPSTONE_SSTREAM_PRECHECKED
+ 
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_SSTREAM_PRECHECKED)
++void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target)
++{
++	const char *mnemonic = X86_insn_name((csh)(uintptr_t)handle, insn->id);
++	strncpy(insn->mnemonic, mnemonic, sizeof(insn->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	if (target <= HEX_THRESHOLD) {
++		insn->op_str[0] = (char)('0' + target);
++	} else {
++		char digits[16];
++		char *end = digits + sizeof(digits);
++		char *first = SStream_hex_digits(end, target);
++		insn->op_str[0] = '0';
++		insn->op_str[1] = 'x';
++		memcpy(insn->op_str + 2, first, (size_t)(end - first));
++	}
++}
++#endif
++
+ /// printPCRelImm - This is used to print an immediate value that ends up
+ /// being encoded as a pc-relative value.
+ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index a2677cb8..ebddaeb7 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -55,6 +55,7 @@ static inline bool X86_get_insn_id_no_detail(const cs_struct *h, cs_insn *insn,
+ }
+ 
+ // return insn name, given insn id
++void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target);
+ const char *X86_insn_name(csh handle, unsigned int id);
+ 
+ // return group name, given group id
+diff --git a/cs.c b/cs.c
+index ea7b0e42..6d29bb46 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1043,6 +1043,23 @@ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
++#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++	/* These unprefixed relative branches have one immediate. The
++	 * default Intel spelling can be written to the two public fields. */
++	if (handle->arch == CS_ARCH_X86 && !handle->no_text && !insn->detail &&
++	    !handle->detail_opt && size >= 2 &&
++	    ((code[0] & 0xf0) == 0x70 || (code[0] & 0xfe) == 0xe8 ||
++	     code[0] == 0xeb || (code[0] == 0x0f && (code[1] & 0xf0) == 0x80)) &&
++	    handle->syntax == CS_OPT_SYNTAX_INTEL && !handle->mnem_list &&
++	    cs_vsnprintf == vsnprintf &&
++	    X86_formatRelative(handle, code, size, insn, insn_size)) {
++		copy_insn_bytes(insn, code, true);
++		return true;
++	}
++#endif
+ 	MCInst mci;
+ #ifdef CAPSTONE_HAS_X86
+ 	if (handle->arch == CS_ARCH_X86)
