@@ -344,6 +344,7 @@ def measure_panel(name, cases, cycles, variants, target_ns):
                     # Null labels intentionally load exactly the same executable.
                     actual = 'base' if name == 'null' else variant
                     row = invoke(case, actual, calibrations[index]['repeats'])
+                    row['executed_label']=actual
                     row.update(variant=variant, cycle=cycle, slot=slot, case_position=position,
                                load=list(os.getloadavg()), monotonic=time.monotonic())
                     out.write(json.dumps(row) + '\n')
@@ -375,7 +376,9 @@ def measure():
     assert len(controls)==4
     for label in ('base','new'):
         command(['objdump','-d','--disassemble=cs_disasm_iter',WORK/('decoder-'+label)],'iterator-'+label)
-    measure_panel('null',controls,23,['base','new','base_aa','new_aa'],420000000)
+    assert sha(WORK/'decoder-base') != sha(WORK/'decoder-new')
+    measure_panel('null',controls,5,['base','new','base_aa','new_aa'],420000000)
+    measure_panel('other',controls,23,['base','new','base_aa','new_aa'],420000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
