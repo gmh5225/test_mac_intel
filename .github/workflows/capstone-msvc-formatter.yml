@@ -1,32 +1,30 @@
-name: Measure the mixed dynamic CRT Release iterator and native iced
+name: Verify mixed-library Release IPO configurations
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-mixed-dynamic-ltcg]
-    paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
+    branches: [codex/capstone-mixed-ltcg-configurations]
+    paths: [capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
 jobs:
-  measure:
+  verify:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { crt: MD, image: windows-2022 }
-          - { crt: MD, image: windows-2025 }
-    runs-on: ${{ matrix.image }}
-    timeout-minutes: 100
+        profile: [full, diet, reduced, no-att]
+    runs-on: windows-2022
+    timeout-minutes: 70
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/ipo.py ${{ matrix.crt }}
-      - name: Retain exact inputs, control measurements and cleanup receipt
+      - name: Compare public records, mask states and architecture unit tests
+        run: python capstone-performance/msvc/public_mask.py MD ${{ matrix.profile }}
+      - name: Retain outputs and cleanup receipts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-dynamic-ltcg-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: mixed-ltcg-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
