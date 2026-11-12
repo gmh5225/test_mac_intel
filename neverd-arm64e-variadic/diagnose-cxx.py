@@ -34,5 +34,10 @@ for arch in ('arm64e','arm64'):
   p=out/(arch+'-sp-'+str(size))
   sp.run([*cc,'-O2',f'-DRECORD_SIZE="{size}"','probe.cpp','probe-driver.cpp','-o',str(p)],cwd=out,check=True)
   report[p.name]=invoke([p],p.name)
+lldb=['/usr/bin/lldb','--batch','-o','run','-o','bt','-o','register read pc lr sp x16 x17','-o','disassemble --frame','--',out/'arm64e-sp-16']
+try:
+ report['lldb']=invoke(lldb,'trap-lldb')
+except sp.TimeoutExpired:
+ pass
 with (out/'observed.json').open('w') as f:json.dump(report,f,indent=2)
 print(json.dumps({k:{a:x['exit'] for a,x in v.items()} if 'driver' in v else v for k,v in report.items()},indent=2))
