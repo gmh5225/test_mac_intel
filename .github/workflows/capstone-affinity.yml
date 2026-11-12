@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-x86-arch-relative-dispatch]
+    branches: [codex/capstone-x86-process-lookups]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-x86-arch-relative-dispatch
+  group: capstone-x86-process-lookups
   cancel-in-progress: false
 
 jobs:
