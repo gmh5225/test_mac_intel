@@ -1,7 +1,13 @@
 #include <libunwind.h>
 #include <string.h>
-static int target_stage;
-static void walk_signal(const arm_thread_state64_t *regs, uintptr_t interrupted) {
+static int target_stage, parent_seed;
+static void trace_set(unsigned stage) {
+  char text[] = "00\n";
+  text[0] += stage / 10;
+  text[1] += stage % 10;
+  write(2, text, sizeof(text) - 1);
+}
+static void walk_signal(const arm_thread_state64_t *regs, uintptr_t interrupted, uintptr_t caller, uintptr_t cfa) {
   unw_context_t context;
   unw_cursor_t cursor;
   if (unw_getcontext(&context) || unw_init_local(&cursor, &context))
@@ -16,21 +22,36 @@ static void walk_signal(const arm_thread_state64_t *regs, uintptr_t interrupted)
         !strcmp(symbol.dli_sname, "_sigtramp")) {
       static const char trampoline[] = "trampoline\n";
       write(2, trampoline, sizeof(trampoline) - 1);
-      for (unsigned r = 0; r < UNW_ARM64_FP; ++r)
+      for (unsigned r = 0; r < UNW_ARM64_FP; ++r) {
+        trace_set(r);
         if (unw_set_reg(&cursor, UNW_ARM64_X0 + r, regs->__x[r])) _exit(51);
-      if (unw_set_reg(&cursor, UNW_ARM64_FP, arm_thread_state64_get_fp(*regs)) ||
-          unw_set_reg(&cursor, UNW_ARM64_LR, arm_thread_state64_get_lr(*regs)) ||
-          unw_set_reg(&cursor, UNW_REG_SP, arm_thread_state64_get_sp(*regs)) ||
-          unw_set_reg(&cursor, UNW_REG_IP, interrupted))
-        _exit(52);
-      if (unw_get_reg(&cursor, UNW_REG_IP, &ip) || ip != interrupted)
-        _exit(53);
+      }
+      const uintptr_t fp = arm_thread_state64_get_fp(*regs);
+      trace_set(29);
+      if (unw_set_reg(&cursor, UNW_ARM64_FP, fp)) _exit(56);
+      trace_set(30);
+      if (unw_set_reg(&cursor, UNW_ARM64_LR, arm_thread_state64_get_lr(*regs))) _exit(57);
+      trace_set(31);
+      if (unw_set_reg(&cursor, UNW_REG_SP, parent_seed ? cfa : arm_thread_state64_get_sp(*regs))) _exit(58);
+      trace_set(32);
+      const uintptr_t target = parent_seed ? caller : interrupted;
+      const void *signed_ip = ptrauth_sign_unauthenticated((void *)target, ptrauth_key_function_pointer, 0);
+      if (unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)signed_ip)) _exit(52);
+      trace_set(33);
+      if (unw_get_reg(&cursor, UNW_REG_IP, &ip) ||
+          (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_function_pointer) != target) _exit(53);
       static const char resumed[] = "interrupted\n";
       write(2, resumed, sizeof(resumed) - 1);
       if (unw_step(&cursor) <= 0 || unw_get_reg(&cursor, UNW_REG_IP, &ip))
         _exit(54);
       address = (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_return_address);
-      if (address != expected_return) _exit(55);
+      uintptr_t expected = expected_return;
+      if (parent_seed) {
+        expected = *(const uintptr_t *)(fp + sizeof(uintptr_t));
+        const uintptr_t parent_cfa = fp + 2 * sizeof(uintptr_t);
+        __asm__ volatile("autib %0, %1" : "+r"(expected) : "r"(parent_cfa));
+      }
+      if (address != expected) _exit(55);
       static const char returned[] = "caller\n";
       write(2, returned, sizeof(returned) - 1);
       return;

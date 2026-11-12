@@ -38,8 +38,8 @@ try:
         driver = body('kObserver')
         driver = driver.replace('static void observe(', (base / p['unwind']).read_text() + '\nstatic void observe(')
         driver = driver.replace('  atomic_store(&state.done, stage);',
-                                '  if (stage == target_stage) walk_signal(regs, s->pc);\n  atomic_store(&state.done, stage);')
-        driver = driver.replace('if (argc != 5)', 'if (argc != 6)').replace('  alarm(20);','  target_stage = atoi(argv[5]);\n  alarm(20);')
+                                '  if (stage == target_stage) walk_signal(regs, s->pc, caller, entry_sp);\n  atomic_store(&state.done, stage);')
+        driver = driver.replace('if (argc != 5)', 'if (argc != 7)').replace('  alarm(20);','  target_stage = atoi(argv[5]); parent_seed = atoi(argv[6]);\n  alarm(20);')
         for name, text in [('stages.S', body('kAssembly')), ('companion.S', body('kOriginalCompanion')),
                            ('caller.S', wrapper), ('driver.c', driver)]:
             (td/name).write_text(text)
@@ -60,9 +60,9 @@ try:
             if compile_only:
                 continue
             # Zero exercises the compiler-original hardware control without a cursor.
-            for stage in [0, *p['stages']]:
-                r = run([td/'driver', image, 0, 3, td/'samples', stage], td)
-                report['results'].append({'profile': profile, 'stage': stage,
+            for stage, parent in [(0, 0), *((v, m) for v in p['stages'] for m in [0, 1])]:
+                r = run([td/'driver', image, 0, 3, td/'samples', stage, parent], td)
+                report['results'].append({'profile': profile, 'stage': stage, 'parent_seed': bool(parent),
                                           'exit': r.returncode, 'trace': r.stderr[-2048:]})
                 if stage == 0:
                     r.check_returncode()
