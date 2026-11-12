@@ -150,10 +150,8 @@ def prepare():
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
-    import install
-    dimensions=install.install(base, WORK/'new', SOURCE, WORK)
-    write('fixed-output.json',dimensions)
-    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Use verified portable public fields for fixed and register-register integer instructions'))
+    command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
+    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Architecture-owned iterator in a separately linked archive member; ordinary public decoder objects unchanged'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -180,20 +178,10 @@ panic = "abort"
     command(['cargo', 'build', '--locked', '--release', '--manifest-path', adapter / 'Cargo.toml'], 'iced-build')
     shutil.copyfile(adapter / 'Cargo.lock', EVIDENCE / 'Cargo.lock')
     iced_library = adapter / 'target/release/libiced_compare.a'
-    for consumer, source in [('decoder', 'compare.cpp'), ('single', 'single.cpp')]:
-        obj = WORK / (consumer + '.o')
-        command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
-                 '-c', SOURCE / source, '-o', obj], consumer + '-compile')
-        for label in ['base', 'new']:
-            command(['clang++', obj, WORK / (label + '-build/libcapstone.a'),
-                     *([iced_library] if consumer == 'decoder' else []), '-lpthread',
-                     *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
-                     '-o', WORK / (consumer + '-' + label)], consumer + '-' + label + '-link')
-    for label in ['base', 'new']:
-        command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
-                 SOURCE / 'windows.cpp', WORK / (label + '-build/libcapstone.a'),
-                 iced_library, '-lpthread', '-ldl', '-lm', '-o', WORK / ('windows-' + label)],
-                'windows-' + label + '-link')
+    for label in ('base','new'):
+        for consumer,src in [('decoder','compare.cpp'),('single','single.cpp'),('windows','windows.cpp')]:
+            flags=['-DUSE_X86_OUTPUT_ITERATOR','-I',WORK/'new/arch/X86'] if label=='new' and consumer!='single' else []
+            command(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',*flags,SOURCE/src,WORK/(label+'-build/libcapstone.a'),*([iced_library] if consumer!='single' else []),'-lpthread','-ldl','-lm','-o',WORK/(consumer+'-'+label)],consumer+'-'+label+'-link')
     commands = json.loads((WORK / 'new-build/compile_commands.json').read_text())
     args = shlex.split(next(c['command'] for c in commands if c['file'].endswith('/Mapping.c')))
     defs = [arg for arg in args if arg.startswith('-D')]
@@ -214,10 +202,11 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert changed[0].keys()==changed[1].keys()
-    difference=sorted(n for n in changed[0] if changed[0][n]!=changed[1][n])
-    assert difference==['arch/X86/X86Disassembler.c.o','cs.c.o'],difference
-    write('object-difference.json',dict(changed=difference,total=len(changed[0])))
+    introduced=set(changed[1])-set(changed[0]);assert introduced=={'arch/X86/X86OutputIterator.c.o'},introduced
+    assert all(changed[0][k]==changed[1][k] for k in changed[0])
+    write('object-difference.json',dict(new=sorted(introduced),identical=len(changed[0]),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
+    command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
+    command([WORK/'integer-states'],'pass-integer-states')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
@@ -241,7 +230,7 @@ panic = "abort"
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
     verifier = WORK / 'layout-public'
     command(['clang++','-std=c++17','-O2','-I',base/'include',SOURCE/'layout-public.cpp',
-             '-ldl','-o',verifier], 'build-layout-public')
+             '-I',WORK/'new/arch/X86', WORK/'new-build/libcapstone.a','-ldl','-o',verifier], 'build-layout-public')
     states = []
     for custom in (False, True):
         label = 'layout-states-custom' if custom else 'layout-states-default'
@@ -304,7 +293,7 @@ panic = "abort"
         objects[label] = {str(p.relative_to(build_dir)): sha(p)
                           for p in (build_dir / 'CMakeFiles/capstone.dir').rglob('*.o')}
     write('objects.json', objects)
-    changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
+    changed = list(set(objects['new'])-set(objects['base']))
     write('changed-objects.json', changed)
     # The common decoder object was independently verified above.
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

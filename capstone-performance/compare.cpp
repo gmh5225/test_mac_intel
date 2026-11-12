@@ -35,6 +35,9 @@
 #endif
 
 #include <capstone/capstone.h>
+#ifdef USE_X86_OUTPUT_ITERATOR
+#include "X86ScanAdapter.h"
+#endif
 
 struct Result {
   uint64_t instructions = 0, rejected = 0;
@@ -123,7 +126,11 @@ static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
     uint64_t ip = 0x100000;
     while (left) {
       size_t offset = cursor - bytes;
-      bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);
+      bool ok =
+#ifdef USE_X86_OUTPUT_ITERATOR
+          mode ? X86_disasmIter(handle, &cursor, &left, &ip, insn) :
+#endif
+          cs_disasm_iter(handle, &cursor, &left, &ip, insn);
       record(result, offset, ok ? insn->size : 1, ok);
       if (!ok) {
         ++cursor;

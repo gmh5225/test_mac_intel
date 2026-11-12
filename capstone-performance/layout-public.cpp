@@ -1,4 +1,5 @@
 #include <capstone/capstone.h>
+#include "X86ScanAdapter.h"
 #include <array>
 #include <dlfcn.h>
 #include <sys/mman.h>
@@ -60,6 +61,10 @@ int main(int argc, char **argv) {
   try {
     if (argc != 5) throw std::runtime_error("baseline candidate iterations corpus-directory");
     API api[2] = {API(argv[1]), API(argv[2])};
+    // The private static entry and its handles have to come from one image.
+    api[1].open=cs_open;api[1].close=cs_close;api[1].option=cs_option;api[1].iter=X86_disasmIter;
+    api[1].error=cs_errno;api[1].regs=cs_regs_access;
+
     const unsigned iterations = std::stoul(argv[3]);
     for (const auto &config : configs) {
       if (std::getenv("ONLY_X86") && config.arch != CS_ARCH_X86) continue;
