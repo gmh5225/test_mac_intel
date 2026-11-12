@@ -1,9 +1,9 @@
-name: Qualify AArch64 initialization on the released formatter and unchanged x86 workloads
+name: Measure one shared AArch64 and MIPS initialization path in released decoder configurations
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-aarch64-current-release]
+    branches: [codex/capstone-aarch64-mips-initializer]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-aarch64-current-release
+  group: capstone-aarch64-mips-initializer
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aarch64-current-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: aarch64-mips-shared-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

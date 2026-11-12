@@ -1,17 +1,18 @@
-diff --git a/cs.c b/cs.c
-index 8db01e0d..29db990d 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1049,6 +1049,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -1049,11 +1049,10 @@
  		MCInst_InitX86(&mci);
  	else
  #endif
-+#ifdef CAPSTONE_HAS_AARCH64
-+	if (handle->arch == CS_ARCH_AARCH64)
-+		/* The AArch64 decoder constructs its operands before printing. */
-+		MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+	else
-+#endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
- 		/* MIPS constructs each MCOperand before reading it. The public
+-#ifdef CAPSTONE_HAS_MIPS
+-	if (handle->arch == CS_ARCH_MIPS)
+-		/* MIPS constructs each MCOperand before reading it. The public
+-		 * detail and alias records are reset by the MIPS decoder. */
+-		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
++#if defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS)
++	if (handle->arch == CS_ARCH_AARCH64 || handle->arch == CS_ARCH_MIPS)
++		/* Both decoders construct each operand before reading it. */
++		MCInst_InitStorage(&mci, handle->arch, false);
+ 	else
+ #endif
+ #ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS

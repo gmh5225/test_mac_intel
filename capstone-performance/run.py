@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Avoid clearing unused AArch64 operands in mixed four- and seven-backend products'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Select the existing MIPS operand initialization for AArch64 with one shared architecture test'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
