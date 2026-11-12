@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
-  command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld','-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=OFF','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
+  command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld','-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   products={}
   import struct,collections
@@ -41,10 +41,12 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
+  command(['git','apply',r/'owner.patch'],'normalize-mpx-record',nd)
   for label in ('base','direct','forward','arch'):
    if label!='base':
     command(['git','apply',r/(label+'.patch')],'select-'+label,nd)
-   command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','--parallel','4'],'product-'+label,nd)
+   command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
+   command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'));trace=t/(label+'.trace')
    signature=sp.check_output([tool,trace],text=True).strip();write(label+'-public-state',signature)
    if label=='base':
@@ -80,11 +82,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     cases_of_interest={'arm-cp':(0,1,2),'arm64-ls':(0,2),'arm64-sort':(0,),'mips64el-ls':(0,1),'putty-32-0.85':(0,1,2),'simd64':(2,)}
     if mode not in cases_of_interest.get(case['name'],()):continue
     # A long full text and a tiny compiler fixture have very different costs.
-    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(230000/start)))
+    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(140000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
     for idx,label in enumerate(('base-copy','direct','forward','arch')):
      plans=[]
-     for cycle in range(13):
+     for cycle in range(7):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
       times={'base':[],label:[]}
       for who in order:
@@ -94,6 +96,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
     row['signature']=oracle;results.append(row);write('timings',results)
+  remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
   assert len(results)==12;write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
