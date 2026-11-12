@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 33536219..a608d28f 100644
+index 33536219..2ae8399c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -167,7 +167,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
@@ -11,16 +11,17 @@ index 33536219..a608d28f 100644
  endif()
  
  # Dedicated builds of these backends use their generated mnemonic tries.
-@@ -444,6 +444,7 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -444,6 +444,8 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86InstPrinterCommon.c
          arch/X86/X86Mapping.c
          arch/X86/X86Module.c
 +        arch/X86/X86OutputIterator.c
++        arch/X86/X86VectorOutput.c
      )
      # MSVC can inline the decoder into the public iterator under LTCG, giving
      # even a compact scan a very large probed stack frame.
 diff --git a/Makefile b/Makefile
-index d7536526..636d0411 100644
+index d7536526..69b80602 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -128,7 +128,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
@@ -32,11 +33,12 @@ index d7536526..636d0411 100644
  endif
  
  ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
-@@ -248,6 +248,7 @@ endif
+@@ -248,6 +248,8 @@ endif
  endif
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
 +	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
  
@@ -96,7 +98,7 @@ index 0d9018a8..a269b603 100644
  	DecodeStatus Result = AArch64_LLVM_getInstruction(
  		handle, code, code_len, MI, size, address, info);
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 97b899b5..655d62fe 100644
+index 97b899b5..aedc72c2 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
 @@ -20,6 +20,19 @@
@@ -119,11 +121,12 @@ index 97b899b5..655d62fe 100644
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
-@@ -37,6 +50,11 @@ typedef struct X86ScanResult {
+@@ -37,6 +50,12 @@ typedef struct X86ScanResult {
  	uint8_t popcode_adjust;
  } X86ScanResult;
  
-+#ifdef CAPSTONE_X86_DEDICATED_EVEX_SCAN
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++#include "../../cs_priv.h"
 +CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
 +				       X86ScanResult *result);
 +#endif
@@ -303,7 +306,7 @@ index 00000000..d4fb8658
 +}
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 new file mode 100644
-index 00000000..7fbfe235
+index 00000000..23e2c6c0
 --- /dev/null
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -0,0 +1,490 @@
@@ -320,7 +323,7 @@ index 00000000..7fbfe235
 +			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
-+			0, 0, 0, 2, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
++			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
 +			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -392,13 +395,13 @@ index 00000000..7fbfe235
 +			537, 541, 538, 542, 0, 0, 0, 0, 545, 549, 546, 550, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
-+			0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
-+			0, 0, 0, 2, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
++			0, 0, 0, 65534, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
 +			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 760, 3, 3, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
++			0, 0, 0, 760, 65535, 65535, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
 +			0, 0, 0, 0, 0, 0, 0, 780, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 787, 791, 0, 795, 796, 800, 804, 808,
 +			0, 0, 0, 0, 812, 816, 0, 0, 820, 824, 828, 832, 836, 840, 0, 0,
@@ -412,7 +415,7 @@ index 00000000..7fbfe235
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 2, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
++			0, 0, 0, 65534, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -430,7 +433,7 @@ index 00000000..7fbfe235
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 2, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
++			0, 0, 0, 65534, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -799,76 +802,16 @@ index 00000000..7fbfe235
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..15eb8e52
+index 00000000..1cb331ce
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,621 @@
+@@ -0,0 +1,335 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#ifdef CAPSTONE_HAS_X86
 +#include "../../cs_priv.h"
 +#include "X86ScanAdapter.h"
-+
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	(defined(CAPSTONE_X86_ONLY) || \
-+	 (defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	  !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	  !defined(_WIN32_WCE)))
-+#include "X86Disassembler.h"
-+#include "X86GenEvexScan.inc"
-+/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
-+ * public IDs of ordinary vector register or base/index addresses are used. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+#ifdef CAPSTONE_X86_ONLY
-+CAPSTONE_INTERNAL
-+#else
-+static
-+#endif
-+	bool X86_tryEvexScan(const uint8_t *code, size_t size,
-+			     X86ScanResult *result)
-+{
-+	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) || (code[3] & 0x97) ||
-+	    (code[3] & 0x60) == 0x60)
-+		return false;
-+	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
-+	const struct X86EvexScanForm *form = evex_scan_form(key);
-+	if (!form ||
-+	    (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
-+		return false;
-+	bool reg = code[5] >= 0xc0;
-+	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
-+	if (!id)
-+		return false;
-+	/* In 64-bit address mode the ModR/M mod and r/m fields determine the
-+	 * extent, except for a no-base SIB with mod=0. Only that SIB is read. */
-+	static const uint8_t extra[4][8] = {
-+		{ 0, 0, 0, 0, 1, 4, 0, 0 },
-+		{ 1, 1, 1, 1, 2, 1, 1, 1 },
-+		{ 4, 4, 4, 4, 5, 4, 4, 4 },
-+		{ 0, 0, 0, 0, 0, 0, 0, 0 },
-+	};
-+	unsigned length =
-+		6 + extra[code[5] >> 6][code[5] & 7] + form->immediate;
-+	if ((code[5] & 0xc7) == 4) {
-+		if (size <= 6)
-+			return false;
-+		if ((code[6] & 7) == 5)
-+			length += 4;
-+	}
-+	if (length > size)
-+		return false;
-+	result->opcode = 0;
-+	result->opcode_pub = id;
-+	result->length = (uint16_t)length;
-+	result->popcode_adjust = 0;
-+	return true;
-+}
-+#endif
 +
 +#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
@@ -881,27 +824,6 @@ index 00000000..15eb8e52
 +#include "X86Mapping.h"
 +#include "X86SimpleOutput.h"
 +#include "X86GenSimpleOutput.inc"
-+
-+static inline char *writeDisp8(char *out, int displacement)
-+{
-+	if (displacement) {
-+		const unsigned magnitude = displacement < 0 ? -displacement :
-+							      displacement;
-+		memcpy(out, displacement < 0 ? " - " : " + ", 3);
-+		out += 3;
-+		if (magnitude <= HEX_THRESHOLD) {
-+			*out++ = (char)('0' + magnitude);
-+		} else {
-+			static const char digits[] = "0123456789abcdef";
-+			memcpy(out, "0x", 2);
-+			out += 2;
-+			if (magnitude >= 16)
-+				*out++ = digits[magnitude >> 4];
-+			*out++ = digits[magnitude & 15];
-+		}
-+	}
-+	return out;
-+}
 +
 +/* The admitted MOV forms share the register/register row's access and widths.
 + * The ModR/M byte selects an integer base without SIB, RIP or a disp32. */
@@ -940,7 +862,7 @@ index 00000000..15eb8e52
 +	}
 +	memcpy(out, base->name, sizeof(base->name));
 +	out += base->length;
-+	out = writeDisp8(out, displacement);
++	out = X86_writeDisp8(out, displacement);
 +	*out++ = ']';
 +	if (!load) {
 +		memcpy(out, ", ", 2);
@@ -963,210 +885,6 @@ index 00000000..15eb8e52
 +		op->mem.scale = 1;
 +		op->mem.disp = displacement;
 +	}
-+}
-+
-+#include "X86GenEvexOutput.inc"
-+static char *writeVectorRegister(char *out, unsigned length_code,
-+				 unsigned number)
-+{
-+	*out++ = "xyz"[length_code];
-+	*out++ = 'm';
-+	*out++ = 'm';
-+	if (number >= 10)
-+		*out++ = (char)('0' + number / 10);
-+	*out++ = (char)('0' + number % 10);
-+	return out;
-+}
-+
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static bool writeEvexRegisterOutput(const uint8_t *code, size_t size,
-+				    cs_insn *insn, uint16_t *insn_size)
-+{
-+	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
-+	    (code[3] & 0x60) == 0x60 || code[5] < 0xc0)
-+		return false;
-+	const unsigned ll = code[3] >> 5;
-+	const unsigned w = code[2] >> 7;
-+	const struct VectorOutputRow *row =
-+		evexOutputRow(((code[1] & 15) << 8) | code[4], w, ll);
-+	if (!row || (row->immediate && size < 7))
-+		return false;
-+	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
-+	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
-+					  (~(unsigned)code[1] & 16),
-+				  ((~(unsigned)code[2] >> 3) & 15) |
-+					  ((~(unsigned)code[3] & 8) << 1),
-+				  (code[5] & 7) | ((rxb & 3) << 3) };
-+	const unsigned len = 6 + row->immediate;
-+	*insn_size = insn->size = (uint16_t)len;
-+	insn->id = row->id;
-+	memcpy(insn->bytes, code, len);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	char *out = writeVectorRegister(insn->op_str, ll, regs[0]);
-+	for (unsigned n = 1; n != 3; ++n) {
-+		memcpy(out, ", ", 2);
-+		out = writeVectorRegister(out + 2, ll, regs[n]);
-+	}
-+	if (row->immediate) {
-+		const unsigned value = code[6];
-+		memcpy(out, ", ", 2);
-+		out += 2;
-+		if (value <= HEX_THRESHOLD) {
-+			*out = (char)('0' + value);
-+		} else {
-+			static const char digits[] = "0123456789abcdef";
-+			memcpy(out, "0x", 2);
-+			out += 2;
-+			if (value >= 16)
-+				*out++ = digits[value >> 4];
-+			*out = digits[value & 15];
-+		}
-+	}
-+	if (insn->detail) {
-+		cs_detail *d = insn->detail;
-+		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		memcpy(d->groups, row->groups, sizeof(row->groups));
-+		d->groups_count = row->group_count;
-+		cs_x86 *x = &d->x86;
-+		memcpy(x->opcode, code, sizeof(x->opcode));
-+		x->addr_size = 8;
-+		x->rex = (uint8_t)(0x40 | (w << 3) | rxb);
-+		x->modrm = code[5];
-+		x->encoding.modrm_offset = 5;
-+		x->op_count = 3 + row->immediate;
-+		static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
-+						 X86_REG_ZMM0 };
-+		for (unsigned n = 0; n != 3; ++n) {
-+			cs_x86_op *op = &x->operands[n];
-+			op->type = X86_OP_REG;
-+			op->reg = (x86_reg)(bases[ll] + regs[n]);
-+			op->access = (cs_ac_type)row->access[n];
-+			op->size = (uint8_t)(16 << ll);
-+		}
-+		if (row->immediate) {
-+			x->operands[3].type = X86_OP_IMM;
-+			x->operands[3].imm = code[6];
-+			x->operands[3].access = (cs_ac_type)row->access[3];
-+			x->operands[3].size = 1;
-+			x->encoding.imm_offset = 6;
-+			x->encoding.imm_size = 1;
-+		}
-+	}
-+	return true;
-+}
-+
-+/* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-+ * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size)
-+{
-+	const bool fma = code[0] == 0xc4;
-+	const unsigned prefix = fma ? 3 : 2;
-+	if (size < prefix + 3)
-+		return false;
-+	const uint8_t flags = code[prefix - 1];
-+	if (fma) {
-+		if ((code[1] & 0x1f) != 2 || (flags & 0x83) != 1 ||
-+		    code[prefix] != 0xa8)
-+			return false;
-+	} else if ((flags & 0x7b) != 0x78 || code[prefix] != 0x28) {
-+		return false;
-+	}
-+	const unsigned modrm = code[prefix + 1];
-+	const unsigned sib = code[prefix + 2];
-+	const bool has_disp = (modrm & 0x40) != 0;
-+	const unsigned len = prefix + 3 + has_disp;
-+	if ((modrm & 0x87) != 4 || len > size || (!has_disp && (sib & 7) == 5))
-+		return false;
-+	const unsigned rxb = (~(unsigned)code[1] >> 5) & (fma ? 7 : 4);
-+	const unsigned index = ((rxb & 2) << 2) | ((sib >> 3) & 7);
-+	if (index == 4)
-+		return false;
-+	const unsigned base = ((rxb & 1) << 3) | (sib & 7);
-+	const unsigned scale = 1u << (sib >> 6);
-+	const int disp = has_disp ? (int8_t)code[len - 1] : 0;
-+	const unsigned ll = (flags >> 2) & 1;
-+	const unsigned dst = ((rxb & 4) << 1) | ((modrm >> 3) & 7);
-+	const unsigned src = (~(unsigned)flags >> 3) & 15;
-+	const struct X86SimpleRegister *regs = x86_simple_registers[3];
-+	const struct VectorOutputRow *row = &vex_indexed_rows[fma][ll];
-+	*insn_size = insn->size = (uint16_t)len;
-+	insn->id = row->id;
-+	memcpy(insn->bytes, code, len);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	char *out = writeVectorRegister(insn->op_str, ll, dst);
-+	if (fma) {
-+		memcpy(out, ", ", 2);
-+		out = writeVectorRegister(out + 2, ll, src);
-+	}
-+	memcpy(out, ", xmmword ptr [", 15);
-+	out[2] = "xy"[ll];
-+	out += 15;
-+	memcpy(out, regs[base].name, sizeof(regs[base].name));
-+	out += regs[base].length;
-+	memcpy(out, " + ", 3);
-+	out += 3;
-+	memcpy(out, regs[index].name, sizeof(regs[index].name));
-+	out += regs[index].length;
-+	if (scale != 1) {
-+		*out++ = '*';
-+		*out++ = (char)('0' + scale);
-+	}
-+	out = writeDisp8(out, disp);
-+	*out = ']';
-+	if (insn->detail) {
-+		cs_detail *d = insn->detail;
-+		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		memcpy(d->groups, row->groups, sizeof(row->groups));
-+		d->groups_count = row->group_count;
-+		cs_x86 *x = &d->x86;
-+		memcpy(x->opcode, code, prefix);
-+		x->addr_size = 8;
-+		x->rex = (uint8_t)(0x40 | rxb);
-+		x->modrm = (uint8_t)modrm;
-+		x->sib = (uint8_t)sib;
-+		x->sib_base = (x86_reg)regs[base].reg;
-+		x->sib_index = (x86_reg)regs[index].reg;
-+		x->sib_scale = (int8_t)scale;
-+		x->disp = disp;
-+		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
-+		if (has_disp) {
-+			x->encoding.disp_offset = (uint8_t)(len - 1);
-+			x->encoding.disp_size = 1;
-+		}
-+		x->op_count = (uint8_t)(2 + fma);
-+		const x86_reg first = ll ? X86_REG_YMM0 : X86_REG_XMM0;
-+		const unsigned reg_count = 1u + fma;
-+		for (unsigned i = 0; i < reg_count; ++i) {
-+			cs_x86_op *op = &x->operands[i];
-+			op->type = X86_OP_REG;
-+			op->reg = (x86_reg)(first + (i ? src : dst));
-+			op->size = (uint8_t)(16u << ll);
-+			op->access = (cs_ac_type)row->access[i];
-+		}
-+		cs_x86_op *op = &x->operands[reg_count];
-+		op->type = X86_OP_MEM;
-+		op->mem.base = x->sib_base;
-+		op->mem.index = x->sib_index;
-+		op->mem.scale = (int)scale;
-+		op->mem.disp = disp;
-+		op->size = (uint8_t)(16u << ll);
-+		op->access = (cs_ac_type)row->access[reg_count];
-+	}
-+	return true;
 +}
 +
 +/* The /digit selects the same flags and register access as the corresponding
@@ -1279,20 +997,19 @@ index 00000000..15eb8e52
 +	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
 +
-+	if (plan <= X86_PLAN_VECTOR) {
-+		if (plan == X86_PLAN_VECTOR) {
-+			if (opcode == 0x62)
-+				return writeEvexRegisterOutput(code, size, insn,
-+							       insn_size);
-+			return writeVexIndexedOutput(code, size, insn,
-+						     insn_size);
-+		}
++	if (plan >= X86_PLAN_GROUP1_IMM8) {
++		if (plan == X86_PLAN_VECTOR)
++			return X86_writeVectorOutput(code, size, insn,
++						     insn_size,
++						     x86_simple_registers[3]);
 +		if (size < 3u + has_rex)
 +			return false;
-+		const unsigned alu = (modrm & 0x38) | 1;
-+		const unsigned pair = x86_simple_plans[wide][prefix_class][alu];
-+		writeGroup1Immediate(insn, &x86_simple_outputs[pair >> 2], code,
-+				     rex, modrm, insn_size);
++		unsigned reg_plan =
++			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
++		if (!reg_plan)
++			return false;
++		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
++				     code, rex, modrm, insn_size);
 +		return true;
 +	}
 +	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
@@ -1443,10 +1160,10 @@ index 99a0800e..11e5b3a6 100644
   * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 new file mode 100644
-index 00000000..a90624a8
+index 00000000..9db1c7f1
 --- /dev/null
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,112 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1456,6 +1173,7 @@ index 00000000..a90624a8
 +#include <stddef.h>
 +#include <string.h>
 +#include <capstone/capstone.h>
++#include "../../utils.h"
 +
 +/* The generated records describe the same register operands and implicit
 + * effects as the ordinary Intel printer. Only the public x86 prefix of the
@@ -1492,12 +1210,38 @@ index 00000000..a90624a8
 +	X86_SIMPLE_RELATIVE,
 +};
 +
-+/* Row zero has no instruction. Its nonzero form bits dispatch encodings
-+ * whose opcode or operand kind also depends on later bytes. */
-+enum X86SpecialOutputPlan {
-+	X86_PLAN_GROUP1_IMM8 = X86_SIMPLE_REG_RM,
-+	X86_PLAN_VECTOR = X86_SIMPLE_RELATIVE,
-+};
++/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
++ * same register-only operand check as a register pair. */
++#define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
++
++/* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
++#define X86_PLAN_VECTOR UINT16_MAX
++
++CAPSTONE_INTERNAL bool
++X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
++		      uint16_t *insn_size,
++		      const struct X86SimpleRegister *regs);
++
++static inline char *X86_writeDisp8(char *out, int displacement)
++{
++	if (displacement) {
++		const unsigned magnitude = displacement < 0 ? -displacement :
++							      displacement;
++		memcpy(out, displacement < 0 ? " - " : " + ", 3);
++		out += 3;
++		if (magnitude <= HEX_THRESHOLD) {
++			*out++ = (char)('0' + magnitude);
++		} else {
++			static const char digits[] = "0123456789abcdef";
++			memcpy(out, "0x", 2);
++			out += 2;
++			if (magnitude >= 16)
++				*out++ = digits[magnitude >> 4];
++			*out++ = digits[magnitude & 15];
++		}
++	}
++	return out;
++}
 +
 +static inline void X86_writeSimpleDetail(cs_detail *detail,
 +					 const struct X86SimpleOutput *row,
@@ -1531,6 +1275,291 @@ index 00000000..a90624a8
 +	}
 +}
 +
++#endif
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+new file mode 100644
+index 00000000..22c8d600
+--- /dev/null
++++ b/arch/X86/X86VectorOutput.c
+@@ -0,0 +1,279 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	(defined(CAPSTONE_X86_ONLY) || \
++	 (defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	  !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	  !defined(_WIN32_WCE)))
++#include "X86Disassembler.h"
++#include "X86GenEvexScan.inc"
++/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
++ * public IDs of ordinary vector register or base/index addresses are used. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
++				       X86ScanResult *result)
++{
++	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) || (code[3] & 0x97) ||
++	    (code[3] & 0x60) == 0x60)
++		return false;
++	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
++	const struct X86EvexScanForm *form = evex_scan_form(key);
++	if (!form ||
++	    (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
++		return false;
++	bool reg = code[5] >= 0xc0;
++	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
++	if (!id)
++		return false;
++	/* In 64-bit address mode the ModR/M mod and r/m fields determine the
++	 * extent, except for a no-base SIB with mod=0. Only that SIB is read. */
++	static const uint8_t extra[4][8] = {
++		{ 0, 0, 0, 0, 1, 4, 0, 0 },
++		{ 1, 1, 1, 1, 2, 1, 1, 1 },
++		{ 4, 4, 4, 4, 5, 4, 4, 4 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
++	};
++	unsigned length =
++		6 + extra[code[5] >> 6][code[5] & 7] + form->immediate;
++	if ((code[5] & 0xc7) == 4) {
++		if (size <= 6)
++			return false;
++		if ((code[6] & 7) == 5)
++			length += 4;
++	}
++	if (length > size)
++		return false;
++	result->opcode = 0;
++	result->opcode_pub = id;
++	result->length = (uint16_t)length;
++	result->popcode_adjust = 0;
++	return true;
++}
++#endif
++
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86SimpleOutput.h"
++#include "X86GenEvexOutput.inc"
++static char *writeVectorRegister(char *out, unsigned length_code,
++				 unsigned number)
++{
++	*out++ = "xyz"[length_code];
++	*out++ = 'm';
++	*out++ = 'm';
++	if (number >= 10)
++		*out++ = (char)('0' + number / 10);
++	*out++ = (char)('0' + number % 10);
++	return out;
++}
++
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool writeEvexRegisterOutput(const uint8_t *code, size_t size,
++				    cs_insn *insn, uint16_t *insn_size)
++{
++	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
++	    (code[3] & 0x60) == 0x60 || code[5] < 0xc0)
++		return false;
++	const unsigned ll = code[3] >> 5;
++	const unsigned w = code[2] >> 7;
++	const struct VectorOutputRow *row =
++		evexOutputRow(((code[1] & 15) << 8) | code[4], w, ll);
++	if (!row || (row->immediate && size < 7))
++		return false;
++	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
++	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
++					  (~(unsigned)code[1] & 16),
++				  ((~(unsigned)code[2] >> 3) & 15) |
++					  ((~(unsigned)code[3] & 8) << 1),
++				  (code[5] & 7) | ((rxb & 3) << 3) };
++	const unsigned len = 6 + row->immediate;
++	*insn_size = insn->size = (uint16_t)len;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, len);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = writeVectorRegister(insn->op_str, ll, regs[0]);
++	for (unsigned n = 1; n != 3; ++n) {
++		memcpy(out, ", ", 2);
++		out = writeVectorRegister(out + 2, ll, regs[n]);
++	}
++	if (row->immediate) {
++		const unsigned value = code[6];
++		memcpy(out, ", ", 2);
++		out += 2;
++		if (value <= HEX_THRESHOLD) {
++			*out = (char)('0' + value);
++		} else {
++			static const char digits[] = "0123456789abcdef";
++			memcpy(out, "0x", 2);
++			out += 2;
++			if (value >= 16)
++				*out++ = digits[value >> 4];
++			*out = digits[value & 15];
++		}
++	}
++	if (insn->detail) {
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		memcpy(d->groups, row->groups, sizeof(row->groups));
++		d->groups_count = row->group_count;
++		cs_x86 *x = &d->x86;
++		memcpy(x->opcode, code, sizeof(x->opcode));
++		x->addr_size = 8;
++		x->rex = (uint8_t)(0x40 | (w << 3) | rxb);
++		x->modrm = code[5];
++		x->encoding.modrm_offset = 5;
++		x->op_count = 3 + row->immediate;
++		static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
++						 X86_REG_ZMM0 };
++		for (unsigned n = 0; n != 3; ++n) {
++			cs_x86_op *op = &x->operands[n];
++			op->type = X86_OP_REG;
++			op->reg = (x86_reg)(bases[ll] + regs[n]);
++			op->access = (cs_ac_type)row->access[n];
++			op->size = (uint8_t)(16 << ll);
++		}
++		if (row->immediate) {
++			x->operands[3].type = X86_OP_IMM;
++			x->operands[3].imm = code[6];
++			x->operands[3].access = (cs_ac_type)row->access[3];
++			x->operands[3].size = 1;
++			x->encoding.imm_offset = 6;
++			x->encoding.imm_size = 1;
++		}
++	}
++	return true;
++}
++
++/* VEX packed loads and FMA with an ordinary base, index and optional disp8.
++ * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
++				  cs_insn *insn, uint16_t *insn_size,
++				  const struct X86SimpleRegister *regs)
++{
++	const bool fma = code[0] == 0xc4;
++	const unsigned prefix = fma ? 3 : 2;
++	if (size < prefix + 3)
++		return false;
++	const uint8_t flags = code[prefix - 1];
++	if (fma) {
++		if ((code[1] & 0x1f) != 2 || (flags & 0x83) != 1 ||
++		    code[prefix] != 0xa8)
++			return false;
++	} else if ((flags & 0x7b) != 0x78 || code[prefix] != 0x28) {
++		return false;
++	}
++	const unsigned modrm = code[prefix + 1];
++	const unsigned sib = code[prefix + 2];
++	const bool has_disp = (modrm & 0x40) != 0;
++	const unsigned len = prefix + 3 + has_disp;
++	if ((modrm & 0x87) != 4 || len > size || (!has_disp && (sib & 7) == 5))
++		return false;
++	const unsigned rxb = (~(unsigned)code[1] >> 5) & (fma ? 7 : 4);
++	const unsigned index = ((rxb & 2) << 2) | ((sib >> 3) & 7);
++	if (index == 4)
++		return false;
++	const unsigned base = ((rxb & 1) << 3) | (sib & 7);
++	const unsigned scale = 1u << (sib >> 6);
++	const int disp = has_disp ? (int8_t)code[len - 1] : 0;
++	const unsigned ll = (flags >> 2) & 1;
++	const unsigned dst = ((rxb & 4) << 1) | ((modrm >> 3) & 7);
++	const unsigned src = (~(unsigned)flags >> 3) & 15;
++	const struct VectorOutputRow *row = &vex_indexed_rows[fma][ll];
++	*insn_size = insn->size = (uint16_t)len;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, len);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = writeVectorRegister(insn->op_str, ll, dst);
++	if (fma) {
++		memcpy(out, ", ", 2);
++		out = writeVectorRegister(out + 2, ll, src);
++	}
++	memcpy(out, ", xmmword ptr [", 15);
++	out[2] = "xy"[ll];
++	out += 15;
++	memcpy(out, regs[base].name, sizeof(regs[base].name));
++	out += regs[base].length;
++	memcpy(out, " + ", 3);
++	out += 3;
++	memcpy(out, regs[index].name, sizeof(regs[index].name));
++	out += regs[index].length;
++	if (scale != 1) {
++		*out++ = '*';
++		*out++ = (char)('0' + scale);
++	}
++	out = X86_writeDisp8(out, disp);
++	*out = ']';
++	if (insn->detail) {
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		memcpy(d->groups, row->groups, sizeof(row->groups));
++		d->groups_count = row->group_count;
++		cs_x86 *x = &d->x86;
++		memcpy(x->opcode, code, prefix);
++		x->addr_size = 8;
++		x->rex = (uint8_t)(0x40 | rxb);
++		x->modrm = (uint8_t)modrm;
++		x->sib = (uint8_t)sib;
++		x->sib_base = (x86_reg)regs[base].reg;
++		x->sib_index = (x86_reg)regs[index].reg;
++		x->sib_scale = (int8_t)scale;
++		x->disp = disp;
++		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
++		if (has_disp) {
++			x->encoding.disp_offset = (uint8_t)(len - 1);
++			x->encoding.disp_size = 1;
++		}
++		x->op_count = (uint8_t)(2 + fma);
++		const x86_reg first = ll ? X86_REG_YMM0 : X86_REG_XMM0;
++		const unsigned reg_count = 1u + fma;
++		for (unsigned i = 0; i < reg_count; ++i) {
++			cs_x86_op *op = &x->operands[i];
++			op->type = X86_OP_REG;
++			op->reg = (x86_reg)(first + (i ? src : dst));
++			op->size = (uint8_t)(16u << ll);
++			op->access = (cs_ac_type)row->access[i];
++		}
++		cs_x86_op *op = &x->operands[reg_count];
++		op->type = X86_OP_MEM;
++		op->mem.base = x->sib_base;
++		op->mem.index = x->sib_index;
++		op->mem.scale = (int)scale;
++		op->mem.disp = disp;
++		op->size = (uint8_t)(16u << ll);
++		op->access = (cs_ac_type)row->access[reg_count];
++	}
++	return true;
++}
++
++bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			   uint16_t *insn_size,
++			   const struct X86SimpleRegister *regs)
++{
++	if (code[0] == 0x62)
++		return writeEvexRegisterOutput(code, size, insn, insn_size);
++	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
++}
++#endif
 +#endif
 diff --git a/cs.c b/cs.c
 index e9785f4a..59a88cf8 100644

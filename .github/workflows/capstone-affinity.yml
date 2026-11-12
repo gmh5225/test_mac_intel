@@ -1,9 +1,9 @@
-name: Compare the complete vector output candidate with the current published x86 release across independent long runs
+name: Measure an independent vector formatter object against the published scalar decoder on six hosts
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-vector-published-controls]
+    branches: [codex/capstone-vector-output-object]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-vector-published-controls
+  group: capstone-vector-output-object
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-release-trial-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: separate-vector-object-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

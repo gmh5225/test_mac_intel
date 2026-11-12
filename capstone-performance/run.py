@@ -212,7 +212,7 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert changed[0].keys()==changed[1].keys()
+    assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
     assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
@@ -378,7 +378,7 @@ def measure():
     selected={('amd64-ls','detail'),('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('scalar32','format'),('scalar64','detail'),('simd64','detail'),('putty-64-0.85','format')}
     checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
     measure_panel('null',[v for v in checks if (v['name'],v['mode']) in [('putty-32-0.85','format'),('scalar32','format')]],9,['base','new','base_aa','new_aa'],350000000)
-    measure_panel('other',checks,23,['base','new','base_aa','new_aa'],350000000)
+    measure_panel('x86',checks,19,['base','new','base_aa','new_aa','iced','iced_aa'],300000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
