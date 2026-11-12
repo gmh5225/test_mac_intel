@@ -1,7 +1,7 @@
-name: Measure fixed register storage in dedicated AArch64; verify exact mixed-build objects
+name: Measure fixed register storage in dedicated SPARC V9; verify exact mixed-build objects
 on:
   push:
-    branches: [codex/capstone-aarch64-compact-name-storage]
+    branches: [codex/capstone-dedicated-sparc-v9]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: compact-register-${{ matrix.host }}-${{ github.run_attempt }}
+          name: sparc-v9-register-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
