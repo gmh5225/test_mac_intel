@@ -44,7 +44,7 @@ index 97b899b5..ae1554b0 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..fa0a0714 100644
+index 90ef6e93..ea83fce4 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3276,6 +3276,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
@@ -59,7 +59,7 @@ index 90ef6e93..fa0a0714 100644
  /* Only generic and extension decoding need an MCInst in the core scan path. */
  #if defined(_MSC_VER)
  __declspec(noinline)
-@@ -3312,13 +3317,20 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+@@ -3312,13 +3317,14 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
  			if (status != X86_SCAN_NOT_HANDLED)
  				return status == X86_SCAN_COMPLETE;
  		}
@@ -72,12 +72,6 @@ index 90ef6e93..fa0a0714 100644
 -							 &size);
 +		bool decoded;
 +		if (opcode == 0x62) {
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+			if (handle->mode == CS_MODE_64 &&
-+			    handle->insn_id == X86_get_insn_id &&
-+			    tryEvexTerminalScan(code, code_len, result))
-+				return true;
-+#endif
 +			decoded = X86_getInstructionAfterExtensions(
 +				ud, code, code_len, &instr, &size, opcode);
 +		} else {
@@ -87,7 +81,22 @@ index 90ef6e93..fa0a0714 100644
  		if (!decoded)
  			return false;
  	}
-@@ -3751,6 +3763,51 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
+@@ -3358,6 +3364,14 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return true;
+ 		}
+ 	}
++#endif
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++	/* Standard unmasked terminals use the same verified opcode rows as
++	 * the full decoder. An installed adapter has already had first use. */
++	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
++	    handle->insn_id == X86_get_insn_id &&
++	    tryEvexTerminalScan(code, code_len, result))
++		return true;
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+@@ -3751,6 +3765,55 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
  	return (uint16_t)insn.length;
  }
  
@@ -115,17 +124,21 @@ index 90ef6e93..fa0a0714 100644
 +	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
 +	if (!id)
 +		return false;
-+	size_t length = 6;
-+	if (!reg) {
-+		InternalInstruction insn = { 0 };
-+		initializeInstructionHeader(&insn, code, size, CS_MODE_64);
-+		insn.readerCursor = 5;
-+		insn.addressSize = 8;
-+		if (readModRMScan(&insn))
++	/* In 64-bit address mode the ModR/M mod and r/m fields determine the
++	 * extent, except for a no-base SIB with mod=0. Only that SIB is read. */
++	static const uint8_t extra[4][8] = {
++		{ 0, 0, 0, 0, 1, 4, 0, 0 },
++		{ 1, 1, 1, 1, 2, 1, 1, 1 },
++		{ 4, 4, 4, 4, 5, 4, 4, 4 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
++	};
++	unsigned length = 6 + extra[code[5] >> 6][code[5] & 7] + form->immediate;
++	if ((code[5] & 0xc7) == 4) {
++		if (size <= 6)
 +			return false;
-+		length = insn.readerCursor;
++		if ((code[6] & 7) == 5)
++			length += 4;
 +	}
-+	length += form->immediate;
 +	if (length > size)
 +		return false;
 +	result->opcode = 0;

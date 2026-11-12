@@ -23,7 +23,7 @@ index d7536526..d2d5c638 100644
  endif
  
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 97b899b5..ae1554b0 100644
+index 97b899b5..ddf9c487 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
 @@ -20,6 +20,16 @@
@@ -43,115 +43,37 @@ index 97b899b5..ae1554b0 100644
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..ea83fce4 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3276,6 +3276,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
- X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 					 uint8_t prefix, X86ScanResult *result);
+@@ -37,6 +47,12 @@ typedef struct X86ScanResult {
+ 	uint8_t popcode_adjust;
+ } X86ScanResult;
  
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+static bool tryEvexTerminalScan(const uint8_t *code, size_t size,
-+				X86ScanResult *result);
++#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++#include "../../cs_priv.h"
++CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
++				       X86ScanResult *result);
 +#endif
 +
- /* Only generic and extension decoding need an MCInst in the core scan path. */
- #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -3312,13 +3317,14 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 			if (status != X86_SCAN_NOT_HANDLED)
- 				return status == X86_SCAN_COMPLETE;
- 		}
--		bool decoded = opcode == 0x62 ?
--				       X86_getInstructionAfterExtensions(
--					       ud, code, code_len, &instr,
--					       &size, opcode) :
--				       decodeGenericScan(code, code_len,
--							 handle->mode, &instr,
--							 &size);
-+		bool decoded;
-+		if (opcode == 0x62) {
-+			decoded = X86_getInstructionAfterExtensions(
-+				ud, code, code_len, &instr, &size, opcode);
-+		} else {
-+			decoded = decodeGenericScan(
-+				code, code_len, handle->mode, &instr, &size);
-+		}
- 		if (!decoded)
- 			return false;
- 	}
-@@ -3358,6 +3364,14 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+ 				  size_t code_len, cs_insn *insn,
+ 				  X86ScanResult *result);
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 90ef6e93..ab3eb49a 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3358,6 +3358,13 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
  			return true;
  		}
  	}
 +#endif
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+	/* Standard unmasked terminals use the same verified opcode rows as
-+	 * the full decoder. An installed adapter has already had first use. */
++#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++	/* An installed adapter has already had the opportunity to classify this packet. */
 +	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
 +	    handle->insn_id == X86_get_insn_id &&
-+	    tryEvexTerminalScan(code, code_len, result))
++	    X86_tryEvexScan(code, code_len, result))
 +		return true;
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-@@ -3751,6 +3765,55 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
- 	return (uint16_t)insn.length;
- }
- 
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+#include "X86GenEvexScan.inc"
-+/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
-+ * public IDs of ordinary vector register or base/index addresses are used. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static bool tryEvexTerminalScan(const uint8_t *code, size_t size,
-+				X86ScanResult *result)
-+{
-+	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) || (code[3] & 0x97) ||
-+	    (code[3] & 0x60) == 0x60)
-+		return false;
-+	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
-+	const struct X86EvexScanForm *form = evex_scan_form(key);
-+	if (!form ||
-+	    (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
-+		return false;
-+	bool reg = code[5] >= 0xc0;
-+	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
-+	if (!id)
-+		return false;
-+	/* In 64-bit address mode the ModR/M mod and r/m fields determine the
-+	 * extent, except for a no-base SIB with mod=0. Only that SIB is read. */
-+	static const uint8_t extra[4][8] = {
-+		{ 0, 0, 0, 0, 1, 4, 0, 0 },
-+		{ 1, 1, 1, 1, 2, 1, 1, 1 },
-+		{ 4, 4, 4, 4, 5, 4, 4, 4 },
-+		{ 0, 0, 0, 0, 0, 0, 0, 0 },
-+	};
-+	unsigned length = 6 + extra[code[5] >> 6][code[5] & 7] + form->immediate;
-+	if ((code[5] & 0xc7) == 4) {
-+		if (size <= 6)
-+			return false;
-+		if ((code[6] & 7) == 5)
-+			length += 4;
-+	}
-+	if (length > size)
-+		return false;
-+	result->opcode = 0;
-+	result->opcode_pub = id;
-+	result->length = (uint16_t)length;
-+	result->popcode_adjust = 0;
-+	return true;
-+}
-+#endif
-+
- #undef CS_DECODE_INLINE
- #undef CS_DECODE_LIKELY
- #undef CS_DECODE_UNLIKELY
 diff --git a/arch/X86/X86GenEvexOutput.inc b/arch/X86/X86GenEvexOutput.inc
 new file mode 100644
 index 00000000..d44a9bb0
@@ -792,16 +714,76 @@ index 00000000..d4745fe5
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..b605a0c4
+index 00000000..2e1c31ba
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,422 @@
+@@ -0,0 +1,503 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#ifdef CAPSTONE_HAS_X86
 +#include "../../cs_priv.h"
 +#include "X86ScanAdapter.h"
++
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	(defined(CAPSTONE_X86_ONLY) || \
++	 (defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	  !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	  !defined(_WIN32_WCE)))
++#include "X86Disassembler.h"
++#include "X86GenEvexScan.inc"
++/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
++ * public IDs of ordinary vector register or base/index addresses are used. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++#ifdef CAPSTONE_X86_ONLY
++CAPSTONE_INTERNAL
++#else
++static
++#endif
++	bool X86_tryEvexScan(const uint8_t *code, size_t size,
++			     X86ScanResult *result)
++{
++	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) || (code[3] & 0x97) ||
++	    (code[3] & 0x60) == 0x60)
++		return false;
++	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
++	const struct X86EvexScanForm *form = evex_scan_form(key);
++	if (!form ||
++	    (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
++		return false;
++	bool reg = code[5] >= 0xc0;
++	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
++	if (!id)
++		return false;
++	/* In 64-bit address mode the ModR/M mod and r/m fields determine the
++	 * extent, except for a no-base SIB with mod=0. Only that SIB is read. */
++	static const uint8_t extra[4][8] = {
++		{ 0, 0, 0, 0, 1, 4, 0, 0 },
++		{ 1, 1, 1, 1, 2, 1, 1, 1 },
++		{ 4, 4, 4, 4, 5, 4, 4, 4 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
++	};
++	unsigned length =
++		6 + extra[code[5] >> 6][code[5] & 7] + form->immediate;
++	if ((code[5] & 0xc7) == 4) {
++		if (size <= 6)
++			return false;
++		if ((code[6] & 7) == 5)
++			length += 4;
++	}
++	if (length > size)
++		return false;
++	result->opcode = 0;
++	result->opcode_pub = id;
++	result->length = (uint16_t)length;
++	result->popcode_adjust = 0;
++	return true;
++}
++#endif
 +
 +#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
@@ -1212,23 +1194,44 @@ index 00000000..b605a0c4
 +{
 +#ifdef CS_DECODE_TRY_OUTPUT
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
-+		return cs_disasm_iter_core(ud, code, size, address, insn);
++	if (handle && handle->arch == CS_ARCH_X86) {
++		if (!handle->no_text)
++			return cs_disasm_iter_core(ud, code, size, address,
++						   insn);
++#ifndef CAPSTONE_X86_ONLY
++		X86ScanResult result;
++		if (handle->mode == CS_MODE_64 && *size >= 6 &&
++		    **code == 0x62 && !handle->detail_opt &&
++		    handle->insn_id == X86_get_insn_id &&
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++		    !handle->x86_scan_adapter &&
++#endif
++		    X86_tryEvexScan(*code, *size, &result)) {
++			handle->errnum = CS_ERR_OK;
++			insn->address = *address;
++			finish_x86_scan(handle, insn, &result, *code, false,
++					true);
++			cs_disasm_iter_advance(code, size, address,
++					       result.length);
++			return true;
++		}
++#endif
++	}
 +#endif
 +	return cs_disasm_iter(ud, code, size, address, insn);
 +}
 +#endif
 diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
-index 99a0800e..ff9a2542 100644
+index 99a0800e..11e5b3a6 100644
 --- a/arch/X86/X86ScanAdapter.h
 +++ b/arch/X86/X86ScanAdapter.h
 @@ -34,6 +34,12 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
  uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
  			    uint64_t address, uint64_t *target);
  
-+/* Private static-link iterator for x86 consumers that request text. Uses the
++/* Private static-link iterator for x86 consumers. Uses the
 + * same options, cursor, errors, callbacks and public records as cs_disasm_iter.
-+ * Other architectures and text-free scans use cs_disasm_iter directly. */
++ * Other architectures use cs_disasm_iter directly. */
 +bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
 +		    uint64_t *address, cs_insn *insn);
 +
@@ -1342,7 +1345,7 @@ index e9785f4a..59a88cf8 100644
  #ifdef CAPSTONE_HAS_X86
  	if (handle->arch == CS_ARCH_X86)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..b883b547 100644
+index 0a4c959f..3b555da5 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -116,7 +116,7 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
@@ -1354,7 +1357,7 @@ index 0a4c959f..b883b547 100644
   * implementation. Other users retain the normal private decoder entry. */
  #ifndef CS_DECODE_SCAN
  #define CS_DECODE_SCAN X86_getInstructionScanResult
-@@ -158,6 +158,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+@@ -158,11 +158,23 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
  		return true;
  #endif
  	}
@@ -1365,6 +1368,30 @@ index 0a4c959f..b883b547 100644
  #endif
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
+ #undef CS_DECODE_SCAN
+ 
++CS_DECODE_INLINE void cs_disasm_iter_advance(const uint8_t **code, size_t *size,
++					     uint64_t *address, uint16_t length)
++{
++	*code += length;
++	*size -= length;
++	*address += length;
++}
++
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+ 					  uint64_t *address, cs_insn *insn)
+@@ -182,9 +194,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
+ 	if (CS_DECODE_LIKELY(r)) {
+-		*code += insn_size;
+-		*size -= insn_size;
+-		*address += insn_size;
++		cs_disasm_iter_advance(code, size, address, insn_size);
+ 	} else {
+ 		return cs_disasm_iter_skipdata(handle, code, size, address,
+ 					       insn);
 diff --git a/suite/synctools/x86_evex_tables.cpp b/suite/synctools/x86_evex_tables.cpp
 new file mode 100644
 index 00000000..ad0bd09e
@@ -2164,10 +2191,10 @@ index e42caf08..67acfcb5 100644
      list(APPEND UNIT_TEST_SOURCES x86_bextr_flags.c)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
-index 00000000..d7c2d24d
+index 00000000..f18c2cc5
 --- /dev/null
 +++ b/tests/unit/x86_simple_output.c
-@@ -0,0 +1,195 @@
+@@ -0,0 +1,233 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -2311,6 +2338,43 @@ index 00000000..d7c2d24d
 +	return true;
 +}
 +
++static bool check_evex(csh handles[2])
++{
++	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
++					  0x344, 0x325, 0x1fe, 0x200 };
++	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
++					 0xc0, 0xcb, 0xf7, 0xff };
++	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
++		for (unsigned reg = 0; reg < 32; ++reg)
++			for (unsigned wl = 0; wl < 8; ++wl)
++				for (unsigned j = 0; j < sizeof(tails); ++j) {
++					uint8_t bytes[12] = {
++						0x62,
++						(uint8_t)((reg << 4) |
++							  (forms[i] >> 8)),
++						(uint8_t)(((wl & 4) << 5) |
++							  ((reg & 15) << 3) |
++							  5),
++						(uint8_t)(((wl & 3) << 5) |
++							  ((reg >> 4) << 3)),
++						(uint8_t)forms[i],
++						tails[j],
++						5,
++						0x80,
++						0xff,
++						9,
++						0,
++						0x7f
++					};
++					for (size_t n = 5; n <= sizeof(bytes);
++					     ++n)
++						if (!compare(handles, bytes, n,
++							     reg ^ wl ^ j))
++							return false;
++				}
++	return true;
++}
++
 +static bool check_mode(cs_mode mode)
 +{
 +	csh handles[2] = { 0 };
@@ -2327,7 +2391,8 @@ index 00000000..d7c2d24d
 +				      detail ? CS_OPT_ON : CS_OPT_OFF))
 +				goto done;
 +		if (!check_branches(handles) || !check_memory(handles, mode) ||
-+		    !check_group1(handles, mode))
++		    !check_group1(handles, mode) ||
++		    (mode == CS_MODE_64 && !check_evex(handles)))
 +			goto done;
 +		for (unsigned op = 0; op < 256; ++op) {
 +			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

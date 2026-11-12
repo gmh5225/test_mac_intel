@@ -1,7 +1,7 @@
-name: Isolate EVEX frame and addressing cost on real vector workloads
+name: Verify isolated decoder layout on vector controls and exact application paths
 on:
   push:
-    branches: [codex/capstone-evex-length-library]
+    branches: [codex/capstone-separated-evex-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: early-evex-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: separate-vector-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
