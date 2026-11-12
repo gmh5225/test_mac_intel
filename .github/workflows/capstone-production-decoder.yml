@@ -1,7 +1,7 @@
-name: Compare integer, relative-branch and base-memory records inside production NeverD with current fork LLVM source
+name: Measure production decoder iterator selection and format-specific detail fixups against the shipping product
 on:
   push:
-    branches: [codex/capstone-neverd-relative-and-memory]
+    branches: [codex/capstone-neverd-iterator-selection]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: incremental-x86-product
+          name: neverd-selection-product
           path: product-evidence/
           retention-days: 14

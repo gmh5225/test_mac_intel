@@ -1,0 +1,89 @@
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -12,6 +12,7 @@
+ #include "neverd/decode/Decoder.h"
+ 
+ #include "DecoderDetail.h"
++#include "X86ScanAdapter.h"
+ 
+ #include "neverd/ArchSupport.h"
+ #include "neverd/ir/intrinsics/Intrinsics.h"
+@@ -328,7 +329,8 @@
+   const uint8_t *Code = Bytes;
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+-  if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf))
++  if ((Text && X86 ? X86_disasmIter : cs_disasm_iter)(
++          Handle, &Code, &Remaining, &PC, InsnBuf))
+     return true;
+   return !VectorPool && decodeArchitectureFallback(Bytes, Len, Addr);
+ }
+--- a/lib/decode/X86/X86Decoder.cpp
++++ b/lib/decode/X86/X86Decoder.cpp
+@@ -212,13 +212,29 @@
+ }
+ 
+ void Decoder::fixupX86DecodeMetadata(cs_insn *I) const {
+-  fixupX86MpxDetail(I);
+-  fixupX86DisplacementDetail(I);
++  switch (I->id) {
++  case X86_INS_BNDCL:
++  case X86_INS_BNDCU:
++  case X86_INS_BNDCN:
++  case X86_INS_BNDMK:
++  case X86_INS_BNDMOV:
++  case X86_INS_BNDLDX:
++  case X86_INS_BNDSTX:
++    fixupX86MpxDetail(I);
++    break;
++  default:
++    break;
++  }
++  if (!Detail || !Text || !I->detail)
++    return;
++  if (TargetArch == Arch::X64) {
++    fixupX86DisplacementDetail(I);
++    return;
++  }
+   // The pinned Capstone sign-extends XBEGIN using the address size in i386,
+   // not the encoded immediate size. Normalize only that known decoder
+   // representation before CFG consumers or lifting see the fallback.
+-  if (TargetArch != Arch::X86 || !Detail || !Text || !I || !I->detail ||
+-      I->id != X86_INS_XBEGIN)
++  if (I->id != X86_INS_XBEGIN)
+     return;
+   const auto E =
+       x86TransactionBeginEncoding({I->bytes, I->size}, I->address, false);
+@@ -247,8 +263,7 @@
+   // Correct that metadata once, before relocation ownership and form audits
+   // consume it. Do not reinterpret genuine i386 disp16, moffs, compressed
+   // disp8 or an instruction decoded without populated operand detail.
+-  if (TargetArch != Arch::X64 || !Detail || !Text || !I || !I->detail ||
+-      !I->size || I->size > 15)
++  if (!I->size || I->size > 15)
+     return;
+   auto &X = I->detail->x86;
+   auto &E = X.encoding;
+--- a/lib/decode/X86/X86MpxDecoder.cpp
++++ b/lib/decode/X86/X86MpxDecoder.cpp
+@@ -101,20 +101,6 @@
+ }
+ 
+ void Decoder::fixupX86MpxDetail(cs_insn *Insn) const {
+-  if (!X86 || !Insn)
+-    return;
+-  switch (Insn->id) {
+-  case X86_INS_BNDCL:
+-  case X86_INS_BNDCU:
+-  case X86_INS_BNDCN:
+-  case X86_INS_BNDMK:
+-  case X86_INS_BNDMOV:
+-  case X86_INS_BNDLDX:
+-  case X86_INS_BNDSTX:
+-    break;
+-  default:
+-    return;
+-  }
+   if (Insn->size > sizeof(Insn->bytes))
+     return;
+   const auto E = decodeX86MpxEncoding({Insn->bytes, Insn->size}, TargetArch);
