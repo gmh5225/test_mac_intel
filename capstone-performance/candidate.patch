@@ -1,93 +1,29 @@
 diff --git a/MCInst.h b/MCInst.h
-index 641480ed..ea3d8046 100644
+index 641480ed..aa5397e4 100644
 --- a/MCInst.h
 +++ b/MCInst.h
-@@ -183,13 +183,8 @@ struct MCInst {
- 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
- };
- 
--// create Reg operand in the next slot
--CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
-+static inline void MCOperand_InitReg(MCOperand *op, unsigned Reg)
+@@ -149,7 +149,6 @@ struct MCInst {
+ 	uint8_t op1_size; // size of 1st operand - for X86 Intel syntax
+ 	uint8_t tied_op_idx_size; // Upper bound of populated tied_op_idx slots
+ 	unsigned Opcode; // private opcode
+-	MCOperand Operands[MAX_MC_OPS];
+ 	cs_insn *flat_insn; // insn to be exposed to public
+ 	uint64_t address; // address of this insn
+ 	cs_struct *csh; // save the main csh
+@@ -166,6 +165,7 @@ struct MCInst {
+ 	uint8_t x86_prefix[4];
+ 	uint8_t imm_size; // immediate size for X86_OP_IMM operand
+ 	bool writeback; // writeback for ARM
++	MCOperand Operands[MAX_MC_OPS];
+ 	int8_t tied_op_idx
+ 		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
+ 	// operand access index for list of registers sharing the same access right (for ARM)
+@@ -250,8 +250,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+ static inline void MCInst_InitX86(MCInst *inst)
  {
--	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
--	MCOperand *op = &(mcInst->Operands[mcInst->size]);
--	mcInst->size++;
--
- #ifdef __cplusplus
- 	op->MachineOperandType = MCOperand::kRegister;
- #else
-@@ -199,13 +194,18 @@ CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
- 	op->RegVal = Reg;
- }
+ 	memset(inst, 0, offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
+-	memset((char *)inst + offsetof(MCInst, flat_insn), 0,
+-	       offsetof(MCInst, tied_op_idx) - offsetof(MCInst, flat_insn));
  
--// create Imm operand in the next slot
--CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
-+// create Reg operand in the next slot
-+CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
- {
- 	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
- 	MCOperand *op = &(mcInst->Operands[mcInst->size]);
- 	mcInst->size++;
- 
-+	MCOperand_InitReg(op, Reg);
-+}
-+
-+static inline void MCOperand_InitImm(MCOperand *op, int64_t Val)
-+{
- #ifdef __cplusplus
- 	op->MachineOperandType = MCOperand::kImmediate;
- #else
-@@ -215,6 +215,16 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
- 	op->ImmVal = Val;
- }
- 
-+// create Imm operand in the next slot
-+CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
-+{
-+	CS_ASSERT_RET(mcInst->size < MAX_MC_OPS);
-+	MCOperand *op = &(mcInst->Operands[mcInst->size]);
-+	mcInst->size++;
-+
-+	MCOperand_InitImm(op, Val);
-+}
-+
- /* Callers that construct every operand before reading it may leave unused
-  * slots untouched. MCInst_Init retains complete initialization. */
- static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
-diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
-index bddcd8fa..5036307f 100644
---- a/arch/X86/X86DisassemblerTranslator.h
-+++ b/arch/X86/X86DisassemblerTranslator.h
-@@ -1204,12 +1204,26 @@ X86_TRANSLATE_INLINE bool translateRMMemoryImpl(MCInst *mcInst,
- 		scaleAmount = 1;
- 	}
- 
--	createImmediateOperand(mcInst, scaleAmount, emitOperands);
--	createRegisterOperand(mcInst, indexReg, emitOperands);
--	createImmediateOperand(mcInst, insn->displacement, emitOperands);
-+	if (!emitOperands)
-+		return false;
- 
--	createRegisterOperand(mcInst, segmentRegnums[insn->segmentOverride],
--			      emitOperands);
-+	const unsigned segment = segmentRegnums[insn->segmentOverride];
-+	const unsigned start = mcInst->size;
-+	if (start <= MAX_MC_OPS - 4) {
-+		/* Scale, index, displacement and segment occupy consecutive slots. */
-+		MCOperand *tail = &mcInst->Operands[start];
-+		MCOperand_InitImm(&tail[0], scaleAmount);
-+		MCOperand_InitReg(&tail[1], indexReg);
-+		MCOperand_InitImm(&tail[2], insn->displacement);
-+		MCOperand_InitReg(&tail[3], segment);
-+		mcInst->size = (uint8_t)(start + 4);
-+	} else {
-+		/* Preserve the per-operand capacity checks for a partial record. */
-+		MCOperand_CreateImm0(mcInst, scaleAmount);
-+		MCOperand_CreateReg0(mcInst, indexReg);
-+		MCOperand_CreateImm0(mcInst, insn->displacement);
-+		MCOperand_CreateReg0(mcInst, segment);
-+	}
- 
- 	return false;
- }
+ 	memset((char *)inst + offsetof(MCInst, ac_idx), 0,
+ 	       offsetof(MCInst, evm_data) - offsetof(MCInst, ac_idx));

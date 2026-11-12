@@ -21,8 +21,8 @@ ROOT = SOURCE.parent
 WORK = ROOT / '.capstone-intel-work'
 EVIDENCE = ROOT / 'capstone-evidence'
 PROFILE = os.environ['COMPARE_BASE']
-assert PROFILE in ('neverd-four', 'x86')
-ARCHES = ('X86','ARM','AARCH64','MIPS') if PROFILE == 'neverd-four' else ('X86',)
+assert PROFILE in ('neverd-four', 'all')
+ARCHES = ('X86','ARM','AARCH64','MIPS') if PROFILE == 'neverd-four' else ('X86','ARM','AARCH64','MIPS','SPARC','RISCV','LOONGARCH')
 MODES = {'scan': 0, 'format': 1, 'detail': 2}
 
 
@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Construct the four trailing x86 address operands with one capacity check'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Keep common MCInst metadata ahead of the operand array'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -200,7 +200,7 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','flags-state','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
+    for unit in ['mapping','api','sstream','detail_option','mcinst','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
         source = SOURCE / (unit + '.c') if (unit.startswith('check-') or unit == 'flags-state') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
@@ -210,6 +210,20 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    flag_records = []
+    for label in ('base','new'):
+        tree = WORK / label
+        target = WORK / ('layout-flags-'+label)
+        command(['clang','-O3','-DNDEBUG',*defs,'-I',tree,'-I',tree/'include',
+                 SOURCE/'layout-flags.c', WORK/(label+'-build/libcapstone.a'),
+                 '-o',target], 'build-layout-flags-'+label)
+        # Each executable owns the matching private layout. Compare normalized
+        # logical fields, never pass an MCInst across different private ABIs.
+        raw = subprocess.check_output([target])
+        assert len(raw) == 12 * 1572864
+        flag_records.append(dict(records=len(raw)//12,sha256=hashlib.sha256(raw).hexdigest()))
+    assert flag_records[0] == flag_records[1]
+    write('private-layout-flags.json', flag_records[0])
     # The new callback regression also passes against the published implementation.
     command(['clang', '-O3', '-DNDEBUG', *defs, *includes,
              WORK / 'new/tests/unit/x86_encoding_accuracy.c', WORK / 'base-build/libcapstone.a',
@@ -232,7 +246,7 @@ panic = "abort"
             ('legacy_memory', 'legacy_without_memory', 'full_repair'))
         repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
     write('repair-census.json', repair_counts)
-    inputs = [item for item in inputs if item['selector'] >= 16 or
+    inputs = [item for item in inputs if item['selector'] >= 16 or PROFILE == 'all' or
               (PROFILE == 'neverd-four' and item['selector'] in (0,1,4,13))]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
