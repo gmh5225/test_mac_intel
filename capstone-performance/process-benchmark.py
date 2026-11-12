@@ -17,13 +17,13 @@ def main(root):
 '''+''.join('    '+n+'=reinterpret_cast<decltype('+n+')>(dlsym(library,"'+n+'")); if (!'+n+') throw std::runtime_error("'+n+'");\n' for n in names)+cpp[z:]
  cpp=cpp[:cpp.index('int main(int argc')]+(src/'register_pair.cpp').read_text()
  (root/'pair.cpp').write_text(cpp)
- consumer=root/'pair';run.command(['clang++','-DNDEBUG','-O3','-std=c++17','-I',w/'include',root/'pair.cpp','-o',consumer,*(['-ldl'] if platform.system()=='Linux' else [])],'consumer')
+ consumer=root/'pair';run.command(['g++','-DNDEBUG','-O3','-std=c++17','-I',w/'include',root/'pair.cpp','-o',consumer,*(['-ldl'] if platform.system()=='Linux' else [])],'consumer')
  b=root/'build';bins={}
  for label,patch in [('base',False),('new',True)]:
   if patch:run.command(['git','apply',f],'apply',w)
   # Verify the exact objects produced for the unaffected mixed build.
   mixed=root/'mixed'
-  run.command(['cmake','-S',w,'-B',mixed,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('ARM','AARCH64','X86','MIPS','SPARC','LOONGARCH')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'mixed-config-'+label)
+  run.command(['cmake','-S',w,'-B',mixed,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('ARM','AARCH64','X86','MIPS','SPARC','LOONGARCH')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'mixed-config-'+label)
   run.command(['cmake','--build',mixed,'--target','capstone_static','--parallel','4'],'mixed-build-'+label)
   digest={str(f.relative_to(mixed)):run.sha(f) for f in (mixed/'CMakeFiles/capstone.dir').rglob('*.o')}
   assert len(digest)>20
@@ -31,7 +31,7 @@ def main(root):
   else:
    assert digest==control,[k for k,v in digest.items() if control.get(k)!=v]
    run.write('mixed-objects.json',digest)
-  run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SPARC_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
+  run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SPARC_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
   run.command(['cmake','--build',b,'--target','capstone_shared','--parallel','4'],'build-'+label)
   if label=='new':
    run.command(['python3',w/'suite/synctools/sparc_state_register_names.py','--check'],'check-state-name-projection')
