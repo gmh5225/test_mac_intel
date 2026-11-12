@@ -22,6 +22,12 @@ static void walk_signal(const arm_thread_state64_t *regs, uintptr_t interrupted,
         !strcmp(symbol.dli_sname, "_sigtramp")) {
       static const char trampoline[] = "trampoline\n";
       write(2, trampoline, sizeof(trampoline) - 1);
+      // Darwin authenticates the cursor's old IP with its current SP
+      // while installing a new IP. Preserve that pair until lookup completes.
+      trace_set(32);
+      const uintptr_t target = parent_seed ? caller : interrupted;
+      const void *signed_ip = ptrauth_sign_unauthenticated((void *)target, ptrauth_key_function_pointer, 0);
+      if (unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)signed_ip)) _exit(52);
       for (unsigned r = 0; r < UNW_ARM64_FP; ++r) {
         trace_set(r);
         if (unw_set_reg(&cursor, UNW_ARM64_X0 + r, regs->__x[r])) _exit(51);
@@ -33,10 +39,6 @@ static void walk_signal(const arm_thread_state64_t *regs, uintptr_t interrupted,
       if (unw_set_reg(&cursor, UNW_ARM64_LR, arm_thread_state64_get_lr(*regs))) _exit(57);
       trace_set(31);
       if (unw_set_reg(&cursor, UNW_REG_SP, parent_seed ? cfa : arm_thread_state64_get_sp(*regs))) _exit(58);
-      trace_set(32);
-      const uintptr_t target = parent_seed ? caller : interrupted;
-      const void *signed_ip = ptrauth_sign_unauthenticated((void *)target, ptrauth_key_function_pointer, 0);
-      if (unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)signed_ip)) _exit(52);
       trace_set(33);
       if (unw_get_reg(&cursor, UNW_REG_IP, &ip) ||
           (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_function_pointer) != target) _exit(53);
