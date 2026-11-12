@@ -152,7 +152,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='Complete register-immediate group-1 text and details on 32/64-bit encodings'))
+    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='Compute the public scalar scan terminal extent from a single validated operand descriptor'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -205,7 +205,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    assert diffs==['arch/X86/X86DisassemblerDecoder.c.o'],diffs
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
