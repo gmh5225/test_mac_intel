@@ -1,0 +1,59 @@
+#include <string.h>
+static int target_stage, walk_mode;
+static void trace_cursor(unsigned step, unw_cursor_t *cursor) {
+  unw_word_t ip = 0, sp = 0;
+  unw_get_reg(cursor, UNW_REG_IP, &ip);
+  unw_get_reg(cursor, UNW_REG_SP, &sp);
+  Dl_info info = {0};
+  uintptr_t pc = (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_return_address);
+  dladdr((void *)pc, &info);
+  dprintf(2, "%u pc=%lx sp=%lx %s\n", step, pc, (uintptr_t)sp,
+          info.dli_sname ? info.dli_sname : "?");
+}
+static void walk_signal(const arm_thread_state64_t *regs, uintptr_t interrupted,
+                        uintptr_t caller, uintptr_t cfa) {
+  unw_context_t context;
+  unw_cursor_t cursor;
+  if (unw_getcontext(&context) || unw_init_local(&cursor, &context)) _exit(40);
+  for (unsigned i = 0; i != 24; ++i) {
+    unw_word_t ip;
+    if (unw_get_reg(&cursor, UNW_REG_IP, &ip)) _exit(41);
+    uintptr_t pc = (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_return_address);
+    Dl_info symbol = {0};
+    trace_cursor(i, &cursor);
+    if (dladdr((void *)pc, &symbol) && symbol.dli_sname &&
+        !strcmp(symbol.dli_sname, "_sigtramp")) {
+      if (walk_mode == 1) {
+        int result = unw_step(&cursor);
+        dprintf(2, "system-step=%d\n", result);
+        if (result <= 0) _exit(42);
+      } else {
+        const uintptr_t sp = walk_mode == 3 ? cfa : arm_thread_state64_get_sp(*regs);
+        const uintptr_t target = walk_mode == 3 ? caller : interrupted;
+        if (unw_set_reg(&cursor, UNW_REG_SP, sp)) _exit(50);
+        for (unsigned r = 0; r < UNW_ARM64_FP; ++r)
+          if (unw_set_reg(&cursor, UNW_ARM64_X0 + r, regs->__x[r])) _exit(51);
+        if (unw_set_reg(&cursor, UNW_ARM64_FP, arm_thread_state64_get_fp(*regs))) _exit(52);
+        if (unw_set_reg(&cursor, UNW_ARM64_LR, arm_thread_state64_get_lr(*regs))) _exit(53);
+        void *signed_ip = ptrauth_sign_unauthenticated((void *)target,
+                           ptrauth_key_return_address, sp);
+        dprintf(2, "set-ip=%lx modifier=%lx\n", target, sp);
+        if (unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)signed_ip)) _exit(54);
+      }
+      trace_cursor(24, &cursor);
+      if (unw_get_reg(&cursor, UNW_REG_IP, &ip)) _exit(55);
+      pc = (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_return_address);
+      if (pc != (walk_mode == 3 ? caller : interrupted)) _exit(56);
+      int result = unw_step(&cursor);
+      dprintf(2, "parent-step=%d\n", result);
+      if (result <= 0) _exit(57);
+      trace_cursor(25, &cursor);
+      if (unw_get_reg(&cursor, UNW_REG_IP, &ip)) _exit(58);
+      pc = (uintptr_t)ptrauth_strip((void *)ip, ptrauth_key_return_address);
+      if (pc != (walk_mode == 3 ? expected_outer : expected_return)) _exit(59);
+      return;
+    }
+    if (unw_step(&cursor) <= 0) _exit(43);
+  }
+  _exit(44);
+}

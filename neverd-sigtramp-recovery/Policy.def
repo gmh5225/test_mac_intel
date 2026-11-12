@@ -1,0 +1,11 @@
+{
+  "source": "42e241cee0d12771d6accf198f0ca23f9b6799bc",
+  "fixture": "unittests/lift/aarch64/AArch64AsyncUnwindFixtures.def",
+  "compiler": "/usr/bin/clang",
+  "flags": ["-target", "arm64e-apple-macosx15.0", "-O2"],
+  "report": "sigtramp-recovery.json",
+  "native_timeout": 30,
+  "stages": [1, 2, 3, 4, 5],
+  "modes": {"direct": 1, "interrupted": 2, "parent": 3},
+  "rules": "7\n0 0 0 0\n28 0 0 1\n56 16 0 1\n60 16 1 1\n88 16 0 1\n92 0 0 1\n120 0 0 0\n"
+}
