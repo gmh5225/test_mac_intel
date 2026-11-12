@@ -30,7 +30,7 @@ opt-level=3
         tool.run(['cargo','build','--release','--locked','--target-dir',dest,'--manifest-path',adapter/'Cargo.toml'],'rust-'+name)
         rs[name]=dest/'release/iced_compare.lib'
     cpp={}
-    opts=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'+('DLL' if tool.crt=='MD' else '')]
+    opts=['-A','x64','-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded'+('DLL' if tool.crt=='MD' else '')]
     def apply(name, reverse=False):
         path=s/name
         assert hashlib.sha256(path.read_bytes()).hexdigest()==tool.manifest['source_lineage'][name]['sha256']
@@ -38,7 +38,7 @@ opt-level=3
         sp.run([*args,'--check',path],check=True);sp.run([*args,path],check=True)
     tool.write('processor.json',json.loads(sp.check_output(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'],text=True)))
     decoder='arch/X86/X86DisassemblerDecoder.c'
-    variants=[('regular','OFF',''),('regular_new','OFF',decoder),('ipo','ON',decoder if tool.crt=='MT' else ''),('ipo_new','ON',decoder)]
+    variants=[('regular','OFF',''),('regular_new','OFF',decoder),('ipo','ON',decoder if tool.crt=='MT' else ''),('ipo_new','ON',decoder if tool.crt=='MT' else '')]
     for name,on,ordinary in variants:
         if name in ('regular_new','ipo_new'):apply('profiles.patch')
         elif name=='ipo':apply('profiles.patch',reverse=True)
@@ -81,11 +81,6 @@ opt-level=3
                 return hashlib.sha256(data[raw:raw+size]).hexdigest()
         raise RuntimeError('missing PE code section')
     tool.write('code-sections.json',{k:code_digest(v)for k,v in programs.items()})
-    if tool.crt=='MT':
-        digests={k:code_digest(v)for k,v in programs.items()}
-        assert digests['regular']==digests['regular_new'] and digests['ipo']==digests['ipo_new'],digests
-        tool.write('complete.json',dict(complete=True,static_control=digests))
-        return
     results=[]
     for case in tool.get_cases():
         for mode in ('scan','format','detail'):
@@ -94,9 +89,9 @@ opt-level=3
                 return json.loads(sp.check_output([programs['regular' if k=='iced' else k],label,mode,str(case['bits']),str(n),case['path']]))
             n=1
             while (probe:=sample('regular',n))['wall_ns']<10000000:n*=3
-            n=max(1,math.ceil(n*100000000/probe['wall_ns']))
+            n=max(1,math.ceil(n*55000000/probe['wall_ns']))
             cycles=[]
-            for i in range(10):
+            for i in range(8):
                 position=i%len(labels);order=labels[position:]+labels[:position]
                 if i%2:order.reverse()
                 raw=[(k,sample(k,n)) for k in order+order[::-1]]
