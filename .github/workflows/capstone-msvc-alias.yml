@@ -1,7 +1,7 @@
-name: Check dedicated AArch64 register output on native Windows in four Release builds
+name: Check dedicated SPARC V9 register output on native Windows in four Release builds
 on:
   push:
-    branches: [codex/capstone-aarch64-registers-windows]
+    branches: [codex/capstone-sparc-v9-windows]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-register-${{ matrix.crt }}-${{ matrix.order }}
+          name: sparc-register-${{ matrix.crt }}-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14
