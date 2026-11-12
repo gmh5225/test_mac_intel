@@ -1,8 +1,8 @@
-name: Verify legacy first-memory repairs
+name: Verify outlined x86 repairs
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-legacy-memory-configurations]
+    branches: [codex/capstone-outlined-repairs-windows]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-memory-config-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: outlined-repair-config-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
