@@ -249,12 +249,13 @@ panic = "abort"
     # Compile the previous caller-gate prototype only for code-generation analysis.
     # Its object is never linked into a measured executable.
     diagnostic = WORK / 'caller-gate-diagnostic'
-    diagnostic.mkdir()
+    command(['git', 'init', diagnostic], 'diagnostic-init')
     shutil.copyfile(base / 'cs.c', diagnostic / 'cs.c')
     command(['git', 'apply', '--include=cs.c', '--check', SOURCE / 'caller-gate-diagnostic.patch'],
             'diagnostic-patch-check', diagnostic)
     command(['git', 'apply', '--include=cs.c', SOURCE / 'caller-gate-diagnostic.patch'],
             'diagnostic-patch-apply', diagnostic)
+    assert (diagnostic / 'cs.c').read_bytes() != (base / 'cs.c').read_bytes()
     commands = json.loads((WORK / 'base-build/compile_commands.json').read_text())
     original = next(row for row in commands if row['file'] == str(base / 'cs.c'))
     for label, filename in [('base', base / 'cs.c'), ('caller-gate', diagnostic / 'cs.c')]:
