@@ -28,7 +28,7 @@ def inspect(executable, map_file, evidence):
                 if first and last>first:end_for[imagebase+first]=imagebase+last
     assert end_for
     starts = sorted(symbols)
-    selected = {'cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull'}
+    selected = {'X86_Intel_printInst','X86_ATT_printInst','X86_reg_access','X86_get_insn_id','get_op_access','X86_insn_reg_intel2','X86_insn_reg_att2','X86_insn_reg_intel_h','X86_insn_reg_att_h','cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull'}
     seen = set()
     result = {}
     objdump = shutil.which('llvm-objdump') or str(Path(os.environ['ProgramFiles'])/'LLVM/bin/llvm-objdump.exe')
@@ -38,7 +38,7 @@ def inspect(executable, map_file, evidence):
             continue
         name=sorted(names)[0];seen.update(names)
         end=end_for.get(address,min(starts[i+1],address+32768))
-        listing=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(address),'--stop-address='+hex(min(end,address+320)),executable],text=True,errors='replace')
+        listing=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(address),'--stop-address='+hex(min(end,address+(65536 if name in {'X86_Intel_printInst','X86_ATT_printInst','X86_reg_access','X86_get_insn_id','get_op_access','X86_insn_reg_intel2','X86_insn_reg_att2','X86_insn_reg_intel_h','X86_insn_reg_att_h'} else 320))),executable],text=True,errors='replace')
         lines=[];calls={}
         for line in listing.splitlines():
             match=re.match(r'^\s*([\da-f]+):\s+([a-z][a-z0-9]*)\s*(.*)$',line)
@@ -51,6 +51,7 @@ def inspect(executable, map_file, evidence):
                     if match[2].startswith('call'):calls[target_name]=calls.get(target_name,0)+1
             lines.append(hex(int(match[1],16)-address)+' '+asm)
         assert lines, (name,hex(address),hex(end))
+        (evidence/(executable.stem+'-'+name+'.asm')).write_text('\n'.join(lines)+'\n')
         listing_hash=hashlib.sha256('\n'.join(lines).encode()).hexdigest()
         result[name]=dict(start=hex(address),span=end-address,decoded_prefix_instructions=len(lines),unwind_extent=address in end_for,sha256=listing_hash,calls=calls,entry=lines[:35])
     assert 'cs_disasm_iter' in seen, seen

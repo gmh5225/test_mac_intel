@@ -2,7 +2,7 @@ name: Measure direct x86 relative text and details against current Capstone and 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-embedded-pairs-windows]
+    branches: [codex/capstone-pair-ltcg-attribution]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -12,8 +12,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { crt: MD, image: windows-2022 }
-          - { crt: MD, image: windows-2025 }
           - { crt: MT, image: windows-2022 }
     runs-on: ${{ matrix.image }}
     timeout-minutes: 100
@@ -28,6 +26,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: embedded-pairs-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: pair-ltcg-attribution-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
