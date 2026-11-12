@@ -1,7 +1,7 @@
 name: Measure ARM, Thumb, AArch64 and MIPS on the integrated Windows x86 change on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-fixed-base-ltcg]
+    branches: [codex/capstone-consumer-ltcg]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -20,11 +20,11 @@ jobs:
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
-      - name: Check real outputs, count allocations and compare throughputs
-        run: python capstone-performance/fixed-base.py ${{ matrix.crt }} ${{ matrix.order }}
+      - name: Compare ordinary and LTCG consumers with controlled image bases
+        run: python capstone-performance/consumer-ltcg.py ${{ matrix.crt }} ${{ matrix.order }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-base-ltcg-${{ matrix.image }}
+          name: consumer-ltcg-${{ matrix.image }}
           path: capstone-evidence/
           retention-days: 14
