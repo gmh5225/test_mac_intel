@@ -24,7 +24,7 @@ def main():
     capstone = run.fetch('base', 'https://github.com/NeverSight/capstone.git', manifest['capstone_revision'])
     patch = source / 'same-image.patch'
     run.write('inputs.json', dict(revision=manifest['capstone_revision'], patch_sha256=run.sha(patch),
-                                purpose='One image, common tables and output storage, controlled stack offsets'))
+                                purpose='One image, common tables and handle, controlled instruction and detail addresses'))
     run.write('processor.json', json.loads(subprocess.check_output([
         'powershell', '-NoProfile', '-Command',
         'Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'], text=True)))
@@ -113,11 +113,14 @@ def main():
             assert all(value == outputs[0] for value in outputs)
 
     def measure(case, mode, panel, pads, cycles, target_ns):
-        stable = None
+        stable = {}
+        fixed = None
 
         def sample(variant, padding, repeats):
-            nonlocal stable
-            process.stdin.write(f"{variants[variant]} {padding} {case['selector']} {mode} {json.dumps(case['path'])} {repeats}\n")
+            nonlocal stable, fixed
+            output_offset = padding if panel == "output" else 0
+            detail_offset = padding if panel == "detail" else 0
+            process.stdin.write(f"{variants[variant]} 0 {case['selector']} {mode} {json.dumps(case['path'])} {repeats} {output_offset} {detail_offset}\n")
             process.stdin.flush()
             line = process.stdout.readline()
             if not line:
@@ -125,9 +128,13 @@ def main():
             value = json.loads(line)
             addresses = {key: value[key] for key in
                          ('image_base', 'output', 'detail_storage', 'input_storage', 'handle', 'stack')}
-            if stable is None:
-                stable = addresses
-            assert stable == addresses, (stable, addresses)
+            if padding not in stable:
+                stable[padding] = addresses
+            assert stable[padding] == addresses, (stable[padding], addresses)
+            invariant = {key: value[key] for key in ('image_base', 'input_storage', 'handle', 'stack', 'run_stack')}
+            if fixed is None:
+                fixed = invariant
+            assert fixed == invariant, (fixed, invariant)
             return value
 
         repeats = 1
@@ -160,9 +167,11 @@ def main():
             if mode == 0 and case['selector'] < 16:
                 continue
             measure(case, mode, 'normal', [0], 6, 40000000)
+    offsets = [index * 64 + (index % 4) * 16 for index in range(64)]
     for case in cases:
-        if case['name'] in ('putty-32-0.85', 'scalar32', 'scalar64', 'arm-ls'):
-            measure(case, 2, 'stack', list(range(0, 4096, 256)), 4, 20000000)
+        if case['name'] in ('putty-32-0.85', 'scalar64'):
+            for panel in ['output', 'detail']:
+                measure(case, 2, panel, offsets, 4, 20000000)
     run.write('complete.json', dict(complete=True))
 
 

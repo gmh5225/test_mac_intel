@@ -65,6 +65,8 @@ struct API {
   }
   ~API() { FreeLibrary(static_cast<HMODULE>(library)); }
 };
+static void *insn_storage = nullptr;
+static void *detail_storage = nullptr;
 static cs_insn *shared_insn = nullptr;
 static cs_detail *shared_detail = nullptr;
 
@@ -117,15 +119,13 @@ struct Session {
       api.cs_option(handle, CS_OPT_TEXT, mode ? CS_OPT_ON : CS_OPT_OFF) !=
           CS_ERR_OK)
     throw std::runtime_error("cs_option");
-  if (!shared_insn) {
-    if (api.cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) != CS_ERR_OK)
-      throw std::runtime_error("allocation detail option");
-    shared_insn = api.cs_malloc(handle);
-    if (!shared_insn || !shared_insn->detail) throw std::runtime_error("cs_malloc");
-    shared_detail = shared_insn->detail;
-    if (api.cs_option(handle, CS_OPT_DETAIL, mode == 2 ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK)
-      throw std::runtime_error("restore detail option");
+  if (!insn_storage) {
+    insn_storage = _aligned_malloc(sizeof(cs_insn) + 4096, 4096);
+    detail_storage = _aligned_malloc(sizeof(cs_detail) + 4096, 4096);
+    if (!insn_storage || !detail_storage) throw std::runtime_error("output storage");
   }
+  shared_insn = static_cast<cs_insn *>(insn_storage);
+  shared_detail = static_cast<cs_detail *>(detail_storage);
   insn = shared_insn;
   std::memset(insn, 0, sizeof(*insn));
   std::memset(shared_detail, 0, sizeof(*shared_detail));
@@ -230,16 +230,24 @@ int main(int argc, char **argv) {
     if (argc != 2) throw std::runtime_error("library argument");
     API api(argv[1]);
     std::unique_ptr<Session> active;
-    unsigned selector, mode, repeats, variant, padding;
+    unsigned selector, mode, repeats, variant, padding, output_offset, detail_offset;
     std::string corpus;
     std::map<std::string, std::vector<uint8_t>> inputs;
-    while (std::cin >> variant >> padding >> selector >> mode >> std::quoted(corpus) >> repeats) {
+    while (std::cin >> variant >> padding >> selector >> mode >> std::quoted(corpus) >> repeats >> output_offset >> detail_offset) {
     if (mode > 2 || variant > 3 || padding > 4096 || !repeats)
       throw std::runtime_error("request arguments");
+    if (output_offset >= 4096 || detail_offset >= 4096 ||
+        output_offset % 16 || detail_offset % 16) throw std::runtime_error("output offsets");
     api.select(variant);
     if (!active || active->bits != selector || active->mode != mode)
       active = std::make_unique<Session>(api, selector, mode);
     Session &session = *active;
+    shared_insn = reinterpret_cast<cs_insn *>(static_cast<char *>(insn_storage) + output_offset);
+    shared_detail = reinterpret_cast<cs_detail *>(static_cast<char *>(detail_storage) + detail_offset);
+    session.insn = shared_insn;
+    std::memset(shared_insn, 0, sizeof(*shared_insn));
+    std::memset(shared_detail, 0, sizeof(*shared_detail));
+    shared_insn->detail = mode == 2 ? shared_detail : nullptr;
     auto entry = inputs.find(corpus);
     if (entry == inputs.end()) {
       std::ifstream f(corpus, std::ios::binary);
@@ -279,7 +287,8 @@ int main(int argc, char **argv) {
     if (shared_insn) {
       active.reset();
       shared_insn->detail = shared_detail;
-      api.cs_free(shared_insn, 1);
+      _aligned_free(insn_storage);
+      _aligned_free(detail_storage);
     }
     return 0;
   } catch (const std::exception &e) {

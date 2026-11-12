@@ -1,7 +1,7 @@
 name: Measure ARM, Thumb, AArch64 and MIPS on the integrated Windows x86 change on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-same-image-boundary]
+    branches: [codex/capstone-output-placement]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -20,11 +20,11 @@ jobs:
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
-      - name: Compare original and outlined iterators inside one image with controlled stack offsets
+      - name: Compare controlled instruction and detail addresses in one image
         run: python capstone-performance/same-image-boundary.py ${{ matrix.crt }} ${{ matrix.order }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: same-image-boundary-${{ matrix.image }}
+          name: output-placement-${{ matrix.image }}
           path: capstone-evidence/
           retention-days: 14
