@@ -1,3 +1,5 @@
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index e21615a13d..22a8a215d3 100644
 --- a/lib/decode/Decoder.cpp
 +++ b/lib/decode/Decoder.cpp
 @@ -12,6 +12,7 @@
@@ -8,7 +10,7 @@
  
  #include "neverd/ArchSupport.h"
  #include "neverd/ir/intrinsics/Intrinsics.h"
-@@ -328,7 +329,8 @@
+@@ -328,7 +329,8 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
    const uint8_t *Code = Bytes;
    size_t Remaining = Len;
    uint64_t PC = Addr;
@@ -18,9 +20,11 @@
      return true;
    return !VectorPool && decodeArchitectureFallback(Bytes, Len, Addr);
  }
+diff --git a/lib/decode/X86/X86Decoder.cpp b/lib/decode/X86/X86Decoder.cpp
+index 1fd1004922..40b8339e88 100644
 --- a/lib/decode/X86/X86Decoder.cpp
 +++ b/lib/decode/X86/X86Decoder.cpp
-@@ -212,13 +212,29 @@
+@@ -212,13 +212,29 @@ Decoder::getX86ScalarOperandOccurrence() const {
  }
  
  void Decoder::fixupX86DecodeMetadata(cs_insn *I) const {
@@ -54,7 +58,7 @@
      return;
    const auto E =
        x86TransactionBeginEncoding({I->bytes, I->size}, I->address, false);
-@@ -247,8 +263,7 @@
+@@ -247,8 +263,7 @@ void Decoder::fixupX86DisplacementDetail(cs_insn *I) const {
    // Correct that metadata once, before relocation ownership and form audits
    // consume it. Do not reinterpret genuine i386 disp16, moffs, compressed
    // disp8 or an instruction decoded without populated operand detail.
@@ -64,9 +68,11 @@
      return;
    auto &X = I->detail->x86;
    auto &E = X.encoding;
+diff --git a/lib/decode/X86/X86MpxDecoder.cpp b/lib/decode/X86/X86MpxDecoder.cpp
+index 1fdf6fd0b4..c5fe10242f 100644
 --- a/lib/decode/X86/X86MpxDecoder.cpp
 +++ b/lib/decode/X86/X86MpxDecoder.cpp
-@@ -101,20 +101,6 @@
+@@ -101,20 +101,6 @@ bool Decoder::decodeX86MpxFallback(const uint8_t *Bytes, size_t Len,
  }
  
  void Decoder::fixupX86MpxDetail(cs_insn *Insn) const {

@@ -1,0 +1,131 @@
+diff --git a/include/neverd/decode/Decoder.h b/include/neverd/decode/Decoder.h
+index 93b59045bd..fc07574e62 100644
+--- a/include/neverd/decode/Decoder.h
++++ b/include/neverd/decode/Decoder.h
+@@ -362,7 +362,7 @@ private:
+   bool decodeMicroMIPSRelease6(const uint8_t *Bytes, size_t Len, va_t Addr);
+   bool decodeMIPSReservation(const uint8_t *Bytes, uint32_t Word, va_t Addr);
+   bool decodeMIPSASE(const uint8_t *Bytes, size_t Len, va_t Addr);
+-  bool decodeArchitectureFallback(const uint8_t *Bytes, size_t Len, va_t Addr);
++  bool decodeX86Physical(const uint8_t *Bytes, size_t Len, va_t Addr);
+ 
+   /// Use the AArch64 native decoder, returning zero when it declines.
+   int decodeAArch64ForLift(const uint8_t *Bytes, size_t Len, va_t Addr,
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index e21615a13d..bd057af5aa 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -295,14 +295,6 @@ bool Decoder::beginDecode(DecodedInsn &Out) {
+   return advanceAArch64DecodeGeneration();
+ }
+ 
+-bool Decoder::decodeArchitectureFallback(const uint8_t *Bytes, size_t Len,
+-                                         va_t Addr) {
+-  if (X86)
+-    return decodePrefixedX86Fence(Bytes, Len, Addr) ||
+-           decodeX86MpxFallback(Bytes, Len, Addr);
+-  return MIPS && decodeMIPSASE(Bytes, Len, Addr);
+-}
+-
+ LLVM_ATTRIBUTE_ALWAYS_INLINE bool
+ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   InsnBuf->illegal = false;
+@@ -325,12 +317,14 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+       Len >= 4 && (Bytes[archLittleEndian(TargetArch) ? 1 : 0] >> 2) == 0x16;
+   if (VectorPool && decodeMIPSASE(Bytes, Len, Addr))
+     return true;
++  if (X86)
++    return decodeX86Physical(Bytes, Len, Addr);
+   const uint8_t *Code = Bytes;
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+   if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf))
+     return true;
+-  return !VectorPool && decodeArchitectureFallback(Bytes, Len, Addr);
++  return !VectorPool && MIPS && decodeMIPSASE(Bytes, Len, Addr);
+ }
+ 
+ int Decoder::decodeOne(const uint8_t *Bytes, size_t Len, va_t Addr,
+diff --git a/lib/decode/X86/X86Decoder.cpp b/lib/decode/X86/X86Decoder.cpp
+index 1fd1004922..225022196d 100644
+--- a/lib/decode/X86/X86Decoder.cpp
++++ b/lib/decode/X86/X86Decoder.cpp
+@@ -211,14 +211,39 @@ Decoder::getX86ScalarOperandOccurrence() const {
+   return X86 ? X86->getLastScalarOperandOccurrence() : std::nullopt;
+ }
+ 
++bool Decoder::decodeX86Physical(const uint8_t *Bytes, size_t Len, va_t Addr) {
++  const uint8_t *Code = Bytes;
++  size_t Remaining = Len;
++  uint64_t PC = Addr;
++  return X86_disasmIter(Handle, &Code, &Remaining, &PC, InsnBuf) ||
++         decodePrefixedX86Fence(Bytes, Len, Addr) ||
++         decodeX86MpxFallback(Bytes, Len, Addr);
++}
++
+ void Decoder::fixupX86DecodeMetadata(cs_insn *I) const {
+-  fixupX86MpxDetail(I);
+-  fixupX86DisplacementDetail(I);
++  switch (I->id) {
++  case X86_INS_BNDCL:
++  case X86_INS_BNDCU:
++  case X86_INS_BNDCN:
++  case X86_INS_BNDMK:
++  case X86_INS_BNDMOV:
++  case X86_INS_BNDLDX:
++  case X86_INS_BNDSTX:
++    fixupX86MpxDetail(I);
++    break;
++  default:
++    break;
++  }
++  if (!Detail || !Text || !I->detail)
++    return;
++  if (TargetArch == Arch::X64) {
++    fixupX86DisplacementDetail(I);
++    return;
++  }
+   // The pinned Capstone sign-extends XBEGIN using the address size in i386,
+   // not the encoded immediate size. Normalize only that known decoder
+   // representation before CFG consumers or lifting see the fallback.
+-  if (TargetArch != Arch::X86 || !Detail || !Text || !I || !I->detail ||
+-      I->id != X86_INS_XBEGIN)
++  if (I->id != X86_INS_XBEGIN)
+     return;
+   const auto E =
+       x86TransactionBeginEncoding({I->bytes, I->size}, I->address, false);
+@@ -247,8 +272,7 @@ void Decoder::fixupX86DisplacementDetail(cs_insn *I) const {
+   // Correct that metadata once, before relocation ownership and form audits
+   // consume it. Do not reinterpret genuine i386 disp16, moffs, compressed
+   // disp8 or an instruction decoded without populated operand detail.
+-  if (TargetArch != Arch::X64 || !Detail || !Text || !I || !I->detail ||
+-      !I->size || I->size > 15)
++  if (!I->size || I->size > 15)
+     return;
+   auto &X = I->detail->x86;
+   auto &E = X.encoding;
+diff --git a/lib/decode/X86/X86MpxDecoder.cpp b/lib/decode/X86/X86MpxDecoder.cpp
+index 1fdf6fd0b4..c5fe10242f 100644
+--- a/lib/decode/X86/X86MpxDecoder.cpp
++++ b/lib/decode/X86/X86MpxDecoder.cpp
+@@ -101,20 +101,6 @@ bool Decoder::decodeX86MpxFallback(const uint8_t *Bytes, size_t Len,
+ }
+ 
+ void Decoder::fixupX86MpxDetail(cs_insn *Insn) const {
+-  if (!X86 || !Insn)
+-    return;
+-  switch (Insn->id) {
+-  case X86_INS_BNDCL:
+-  case X86_INS_BNDCU:
+-  case X86_INS_BNDCN:
+-  case X86_INS_BNDMK:
+-  case X86_INS_BNDMOV:
+-  case X86_INS_BNDLDX:
+-  case X86_INS_BNDSTX:
+-    break;
+-  default:
+-    return;
+-  }
+   if (Insn->size > sizeof(Insn->bytes))
+     return;
+   const auto E = decodeX86MpxEncoding({Insn->bytes, Insn->size}, TargetArch);

@@ -41,8 +41,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  command(['git','apply',r/'owner.patch'],'normalize-mpx-record',nd)
-  for label in ('base','direct','forward','arch'):
+  for label in ('base','arch','isolated'):
    if label!='base':
     command(['git','apply',r/(label+'.patch')],'select-'+label,nd)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
@@ -68,7 +67,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==4
+  write('products',identities);assert len(set(identities.values()))==3
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def measure(name,case,mode,reps):
@@ -77,16 +76,16 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert ticks>0 and signature[0]>0
    return ticks,signature
   results=[]
-  for case in cases:
+  for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2):
     cases_of_interest={'arm-cp':(0,1,2),'arm64-ls':(0,2),'arm64-sort':(0,),'mips64el-ls':(0,1),'putty-32-0.85':(0,1,2),'simd64':(2,)}
     if mode not in cases_of_interest.get(case['name'],()):continue
     # A long full text and a tiny compiler fixture have very different costs.
-    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(140000/start)))
+    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(200000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','direct','forward','arch')):
+    for idx,label in enumerate(('base-copy','arch','isolated')):
      plans=[]
-     for cycle in range(7):
+     for cycle in range(11):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
       times={'base':[],label:[]}
       for who in order:
