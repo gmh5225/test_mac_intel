@@ -1,112 +1,67 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..655d62fe 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -20,10 +20,13 @@
+ #include "../../MCRegisterInfo.h"
+ #include "X86DisassemblerDecoderCommon.h"
+ 
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
+-	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
++#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
+ #include "../../cs_priv.h"
++#define CAPSTONE_X86_DEDICATED_EVEX_SCAN
++#endif
++
++#if defined(CAPSTONE_X86_DEDICATED_EVEX_SCAN) && defined(__linux__) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
+ #define CAPSTONE_X86_DEDICATED_OUTPUT
+ CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+@@ -47,6 +50,11 @@ typedef struct X86ScanResult {
+ 	uint8_t popcode_adjust;
+ } X86ScanResult;
+ 
++#ifdef CAPSTONE_X86_DEDICATED_EVEX_SCAN
++CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
++				       X86ScanResult *result);
++#endif
++
+ bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+ 				  size_t code_len, cs_insn *insn,
+ 				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..fa0a0714 100644
+index 90ef6e93..505abf19 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3276,6 +3276,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
- X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 					 uint8_t prefix, X86ScanResult *result);
- 
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+static bool tryEvexTerminalScan(const uint8_t *code, size_t size,
-+				X86ScanResult *result);
-+#endif
-+
- /* Only generic and extension decoding need an MCInst in the core scan path. */
- #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -3312,13 +3317,20 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 			if (status != X86_SCAN_NOT_HANDLED)
- 				return status == X86_SCAN_COMPLETE;
+@@ -3358,6 +3358,13 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return true;
  		}
--		bool decoded = opcode == 0x62 ?
--				       X86_getInstructionAfterExtensions(
--					       ud, code, code_len, &instr,
--					       &size, opcode) :
--				       decodeGenericScan(code, code_len,
--							 handle->mode, &instr,
--							 &size);
-+		bool decoded;
-+		if (opcode == 0x62) {
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+			if (handle->mode == CS_MODE_64 &&
-+			    handle->insn_id == X86_get_insn_id &&
-+			    tryEvexTerminalScan(code, code_len, result))
-+				return true;
-+#endif
-+			decoded = X86_getInstructionAfterExtensions(
-+				ud, code, code_len, &instr, &size, opcode);
-+		} else {
-+			decoded = decodeGenericScan(
-+				code, code_len, handle->mode, &instr, &size);
-+		}
- 		if (!decoded)
- 			return false;
  	}
-@@ -3751,6 +3763,51 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
- 	return (uint16_t)insn.length;
- }
- 
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+#include "X86GenEvexScan.inc"
-+/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
-+ * public IDs of ordinary vector register or base/index addresses are used. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
 +#endif
-+static bool tryEvexTerminalScan(const uint8_t *code, size_t size,
-+				X86ScanResult *result)
-+{
-+	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) || (code[3] & 0x97) ||
-+	    (code[3] & 0x60) == 0x60)
-+		return false;
-+	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
-+	const struct X86EvexScanForm *form = evex_scan_form(key);
-+	if (!form ||
-+	    (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
-+		return false;
-+	bool reg = code[5] >= 0xc0;
-+	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
-+	if (!id)
-+		return false;
-+	size_t length = 6;
-+	if (!reg) {
-+		InternalInstruction insn = { 0 };
-+		initializeInstructionHeader(&insn, code, size, CS_MODE_64);
-+		insn.readerCursor = 5;
-+		insn.addressSize = 8;
-+		if (readModRMScan(&insn))
-+			return false;
-+		length = insn.readerCursor;
-+	}
-+	length += form->immediate;
-+	if (length > size)
-+		return false;
-+	result->opcode = 0;
-+	result->opcode_pub = id;
-+	result->length = (uint16_t)length;
-+	result->popcode_adjust = 0;
-+	return true;
-+}
-+#endif
-+
- #undef CS_DECODE_INLINE
- #undef CS_DECODE_LIKELY
- #undef CS_DECODE_UNLIKELY
++#ifdef CAPSTONE_X86_DEDICATED_EVEX_SCAN
++	/* Give an installed scan adapter the first opportunity to classify EVEX. */
++	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
++	    handle->insn_id == X86_get_insn_id &&
++	    X86_tryEvexScan(code, code_len, result))
++		return true;
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
 diff --git a/arch/X86/X86GenEvexOutput.inc b/arch/X86/X86GenEvexOutput.inc
 new file mode 100644
-index 00000000..d44a9bb0
+index 00000000..1f4f85b0
 --- /dev/null
 +++ b/arch/X86/X86GenEvexOutput.inc
-@@ -0,0 +1,64 @@
+@@ -0,0 +1,74 @@
 +/* Generated by suite/synctools/x86_evex_tables.cpp. */
-+struct EvexOutputRow {
++struct VectorOutputRow {
 +	uint16_t id;
 +	char mnemonic[16];
 +	uint8_t group_count, groups[4], access[4], immediate;
 +};
-+static const struct EvexOutputRow evex_output_rows[] = {
++static const struct VectorOutputRow evex_output_rows[] = {
 +	{ X86_INS_VPXORD, "vpxord", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
 +	{ X86_INS_VPXORQ, "vpxorq", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
 +	{ X86_INS_VPXORD, "vpxord", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
@@ -122,7 +77,7 @@ index 00000000..d44a9bb0
 +	{ X86_INS_VPADDD, "vpaddd", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
 +	{ X86_INS_VPADDD, "vpaddd", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
 +};
-+static const struct EvexOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
++static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
 +{
 +	switch (key) {
 +	case 0x1ef: {
@@ -164,6 +119,16 @@ index 00000000..d44a9bb0
 +	default: return NULL;
 +	}
 +}
++static const struct VectorOutputRow vex_indexed_rows[2][2] = {
++	{
++		{ X86_INS_VMOVAPS, "vmovaps", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++		{ X86_INS_VMOVAPS, "vmovaps", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	},
++	{
++		{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++		{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	},
++};
 diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
 new file mode 100644
 index 00000000..d4fb8658
@@ -237,35 +202,40 @@ index 00000000..d4fb8658
 +	}
 +}
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a3b33f5c..d4745fe5 100644
+index 68de7ad4..7fbfe235 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -11,7 +11,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
  			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
--			0, 0, 0, 0, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
+-			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
 +			0, 0, 0, 2, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
  			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -83,9 +83,9 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+@@ -83,13 +83,13 @@ static const uint16_t x86_simple_plans[2][4][256] = {
  			537, 541, 538, 542, 0, 0, 0, 0, 545, 549, 546, 550, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
 -			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
--			0, 0, 0, 0, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
+-			0, 0, 0, 65534, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
 +			0, 0, 0, 2, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
  			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 760, 0, 0, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
++			0, 0, 0, 760, 3, 3, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
+ 			0, 0, 0, 0, 0, 0, 0, 780, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 787, 791, 0, 795, 796, 800, 804, 808,
+ 			0, 0, 0, 0, 812, 816, 0, 0, 820, 824, 828, 832, 836, 840, 0, 0,
 @@ -103,7 +103,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
+-			0, 0, 0, 65534, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
 +			0, 0, 0, 2, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -274,16 +244,135 @@ index a3b33f5c..d4745fe5 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
+-			0, 0, 0, 65534, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
 +			0, 0, 0, 2, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 1387269e..b605a0c4 100644
+index 5a51035f..15eb8e52 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -94,6 +94,161 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+@@ -5,6 +5,66 @@
+ #include "../../cs_priv.h"
+ #include "X86ScanAdapter.h"
+ 
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	(defined(CAPSTONE_X86_ONLY) || \
++	 (defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	  !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	  !defined(_WIN32_WCE)))
++#include "X86Disassembler.h"
++#include "X86GenEvexScan.inc"
++/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
++ * public IDs of ordinary vector register or base/index addresses are used. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++#ifdef CAPSTONE_X86_ONLY
++CAPSTONE_INTERNAL
++#else
++static
++#endif
++	bool X86_tryEvexScan(const uint8_t *code, size_t size,
++			     X86ScanResult *result)
++{
++	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) || (code[3] & 0x97) ||
++	    (code[3] & 0x60) == 0x60)
++		return false;
++	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
++	const struct X86EvexScanForm *form = evex_scan_form(key);
++	if (!form ||
++	    (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
++		return false;
++	bool reg = code[5] >= 0xc0;
++	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
++	if (!id)
++		return false;
++	/* In 64-bit address mode the ModR/M mod and r/m fields determine the
++	 * extent, except for a no-base SIB with mod=0. Only that SIB is read. */
++	static const uint8_t extra[4][8] = {
++		{ 0, 0, 0, 0, 1, 4, 0, 0 },
++		{ 1, 1, 1, 1, 2, 1, 1, 1 },
++		{ 4, 4, 4, 4, 5, 4, 4, 4 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
++	};
++	unsigned length =
++		6 + extra[code[5] >> 6][code[5] & 7] + form->immediate;
++	if ((code[5] & 0xc7) == 4) {
++		if (size <= 6)
++			return false;
++		if ((code[6] & 7) == 5)
++			length += 4;
++	}
++	if (length > size)
++		return false;
++	result->opcode = 0;
++	result->opcode_pub = id;
++	result->length = (uint16_t)length;
++	result->popcode_adjust = 0;
++	return true;
++}
++#endif
++
+ #if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+@@ -17,6 +77,27 @@
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ 
++static inline char *writeDisp8(char *out, int displacement)
++{
++	if (displacement) {
++		const unsigned magnitude = displacement < 0 ? -displacement :
++							      displacement;
++		memcpy(out, displacement < 0 ? " - " : " + ", 3);
++		out += 3;
++		if (magnitude <= HEX_THRESHOLD) {
++			*out++ = (char)('0' + magnitude);
++		} else {
++			static const char digits[] = "0123456789abcdef";
++			memcpy(out, "0x", 2);
++			out += 2;
++			if (magnitude >= 16)
++				*out++ = digits[magnitude >> 4];
++			*out++ = digits[magnitude & 15];
++		}
++	}
++	return out;
++}
++
+ /* The admitted MOV forms share the register/register row's access and widths.
+  * The ModR/M byte selects an integer base without SIB, RIP or a disp32. */
+ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+@@ -54,22 +135,7 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+ 	}
+ 	memcpy(out, base->name, sizeof(base->name));
+ 	out += base->length;
+-	if (displacement) {
+-		const unsigned magnitude = displacement < 0 ? -displacement :
+-							      displacement;
+-		memcpy(out, displacement < 0 ? " - " : " + ", 3);
+-		out += 3;
+-		if (magnitude <= HEX_THRESHOLD) {
+-			*out++ = (char)('0' + magnitude);
+-		} else {
+-			static const char digits[] = "0123456789abcdef";
+-			memcpy(out, "0x", 2);
+-			out += 2;
+-			if (magnitude >= 16)
+-				*out++ = digits[magnitude >> 4];
+-			*out++ = digits[magnitude & 15];
+-		}
+-	}
++	out = writeDisp8(out, displacement);
+ 	*out++ = ']';
+ 	if (!load) {
+ 		memcpy(out, ", ", 2);
+@@ -94,6 +160,210 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
  	}
  }
  
@@ -313,7 +402,7 @@ index 1387269e..b605a0c4 100644
 +		return false;
 +	const unsigned ll = code[3] >> 5;
 +	const unsigned w = code[2] >> 7;
-+	const struct EvexOutputRow *row =
++	const struct VectorOutputRow *row =
 +		evexOutputRow(((code[1] & 15) << 8) | code[4], w, ll);
 +	if (!row || (row->immediate && size < 7))
 +		return false;
@@ -383,111 +472,249 @@ index 1387269e..b605a0c4 100644
 +	return true;
 +}
 +
-+/* The /digit selects the same flags and register access as the corresponding
-+ * ALU register pair. The immediate's public width follows the destination. */
-+static void writeGroup1Immediate(cs_insn *insn,
-+				 const struct X86SimpleOutput *row,
-+				 const uint8_t *code, uint8_t rex,
-+				 uint8_t modrm, uint16_t *insn_size)
++/* VEX packed loads and FMA with an ordinary base, index and optional disp8.
++ * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
++				  cs_insn *insn, uint16_t *insn_size)
 +{
-+	const unsigned offset = 2 + (rex != 0);
-+	const int immediate = (int8_t)code[offset];
-+	const unsigned group = (modrm >> 3) & 7;
-+	const bool logical = group == 1 || group == 4 || group == 6;
-+	const bool wide = (rex & 8) != 0;
-+	const bool negative = !logical && immediate < 0;
-+	const uint64_t value =
-+		logical ? (wide ? (uint64_t)(int64_t)immediate :
-+				  (uint32_t)immediate) :
-+			  (uint64_t)(negative ? -immediate : immediate);
-+	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
-+	const struct X86SimpleRegister *reg =
-+		&x86_simple_registers[wide ? 3 : 2][id];
++	const bool fma = code[0] == 0xc4;
++	const unsigned prefix = fma ? 3 : 2;
++	if (size < prefix + 3)
++		return false;
++	const uint8_t flags = code[prefix - 1];
++	if (fma) {
++		if ((code[1] & 0x1f) != 2 || (flags & 0x83) != 1 ||
++		    code[prefix] != 0xa8)
++			return false;
++	} else if ((flags & 0x7b) != 0x78 || code[prefix] != 0x28) {
++		return false;
++	}
++	const unsigned modrm = code[prefix + 1];
++	const unsigned sib = code[prefix + 2];
++	const bool has_disp = (modrm & 0x40) != 0;
++	const unsigned len = prefix + 3 + has_disp;
++	if ((modrm & 0x87) != 4 || len > size || (!has_disp && (sib & 7) == 5))
++		return false;
++	const unsigned rxb = (~(unsigned)code[1] >> 5) & (fma ? 7 : 4);
++	const unsigned index = ((rxb & 2) << 2) | ((sib >> 3) & 7);
++	if (index == 4)
++		return false;
++	const unsigned base = ((rxb & 1) << 3) | (sib & 7);
++	const unsigned scale = 1u << (sib >> 6);
++	const int disp = has_disp ? (int8_t)code[len - 1] : 0;
++	const unsigned ll = (flags >> 2) & 1;
++	const unsigned dst = ((rxb & 4) << 1) | ((modrm >> 3) & 7);
++	const unsigned src = (~(unsigned)flags >> 3) & 15;
++	const struct X86SimpleRegister *regs = x86_simple_registers[3];
++	const struct VectorOutputRow *row = &vex_indexed_rows[fma][ll];
++	*insn_size = insn->size = (uint16_t)len;
 +	insn->id = row->id;
-+	*insn_size = insn->size = (uint16_t)(offset + 1);
-+	memcpy(insn->bytes, code, insn->size);
++	memcpy(insn->bytes, code, len);
 +	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
 +	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
 +	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->op_str, reg->name, sizeof(reg->name));
-+	char *out = insn->op_str + reg->length;
-+	memcpy(out, ", ", 2);
-+	out += 2;
-+	if (negative)
-+		*out++ = '-';
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		char temp[16], *end = temp + sizeof(temp), *start = end;
-+		uint64_t n = value;
-+		do {
-+			*--start = digits[n & 15];
-+			n >>= 4;
-+		} while (n);
-+		memcpy(out, "0x", 2);
-+		memcpy(out + 2, start, end - start);
++	char *out = writeVectorRegister(insn->op_str, ll, dst);
++	if (fma) {
++		memcpy(out, ", ", 2);
++		out = writeVectorRegister(out + 2, ll, src);
 +	}
++	memcpy(out, ", xmmword ptr [", 15);
++	out[2] = "xy"[ll];
++	out += 15;
++	memcpy(out, regs[base].name, sizeof(regs[base].name));
++	out += regs[base].length;
++	memcpy(out, " + ", 3);
++	out += 3;
++	memcpy(out, regs[index].name, sizeof(regs[index].name));
++	out += regs[index].length;
++	if (scale != 1) {
++		*out++ = '*';
++		*out++ = (char)('0' + scale);
++	}
++	out = writeDisp8(out, disp);
++	*out = ']';
 +	if (insn->detail) {
-+		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
-+				      reg->reg, 0);
-+		cs_x86 *x = &insn->detail->x86;
-+		x->operands[1].type = X86_OP_IMM;
-+		x->operands[1].imm = logical && !wide ?
-+					     (int64_t)(uint32_t)immediate :
-+					     immediate;
-+		x->operands[1].access = 0;
-+		x->encoding.imm_offset = (uint8_t)offset;
-+		x->encoding.imm_size = 1;
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		memcpy(d->groups, row->groups, sizeof(row->groups));
++		d->groups_count = row->group_count;
++		cs_x86 *x = &d->x86;
++		memcpy(x->opcode, code, prefix);
++		x->addr_size = 8;
++		x->rex = (uint8_t)(0x40 | rxb);
++		x->modrm = (uint8_t)modrm;
++		x->sib = (uint8_t)sib;
++		x->sib_base = (x86_reg)regs[base].reg;
++		x->sib_index = (x86_reg)regs[index].reg;
++		x->sib_scale = (int8_t)scale;
++		x->disp = disp;
++		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
++		if (has_disp) {
++			x->encoding.disp_offset = (uint8_t)(len - 1);
++			x->encoding.disp_size = 1;
++		}
++		x->op_count = (uint8_t)(2 + fma);
++		const x86_reg first = ll ? X86_REG_YMM0 : X86_REG_XMM0;
++		const unsigned reg_count = 1u + fma;
++		for (unsigned i = 0; i < reg_count; ++i) {
++			cs_x86_op *op = &x->operands[i];
++			op->type = X86_OP_REG;
++			op->reg = (x86_reg)(first + (i ? src : dst));
++			op->size = (uint8_t)(16u << ll);
++			op->access = (cs_ac_type)row->access[i];
++		}
++		cs_x86_op *op = &x->operands[reg_count];
++		op->type = X86_OP_MEM;
++		op->mem.base = x->sib_base;
++		op->mem.index = x->sib_index;
++		op->mem.scale = (int)scale;
++		op->mem.disp = disp;
++		op->size = (uint8_t)(16u << ll);
++		op->access = (cs_ac_type)row->access[reg_count];
 +	}
++	return true;
 +}
 +
- /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
-  * present. Memory admission below is limited to MOV with a base or base+disp8. */
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
-@@ -145,6 +300,18 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ /* The /digit selects the same flags and register access as the corresponding
+  * ALU register pair. The immediate's public width follows the destination. */
+ static void writeGroup1Immediate(cs_insn *insn,
+@@ -204,15 +474,20 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  	    cs_vsnprintf != cs_default_vsnprintf)
  		return false;
  
-+	if (plan <= X86_PLAN_EVEX) {
-+		if (plan == X86_PLAN_EVEX)
-+			return writeEvexRegisterOutput(code, size, insn,
-+						       insn_size);
-+		if (size < 3u + has_rex)
-+			return false;
+-	if (plan == X86_PLAN_GROUP1_IMM8) {
++	if (plan <= X86_PLAN_VECTOR) {
++		if (plan == X86_PLAN_VECTOR) {
++			if (opcode == 0x62)
++				return writeEvexRegisterOutput(code, size, insn,
++							       insn_size);
++			return writeVexIndexedOutput(code, size, insn,
++						     insn_size);
++		}
+ 		if (size < 3u + has_rex)
+ 			return false;
+-		unsigned reg_plan =
+-			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
+-		if (!reg_plan)
+-			return false;
+-		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
+-				     code, rex, modrm, insn_size);
 +		const unsigned alu = (modrm & 0x38) | 1;
 +		const unsigned pair = x86_simple_plans[wide][prefix_class][alu];
 +		writeGroup1Immediate(insn, &x86_simple_outputs[pair >> 2], code,
 +				     rex, modrm, insn_size);
-+		return true;
-+	}
+ 		return true;
+ 	}
  	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
- 	const bool relative = form == X86_SIMPLE_RELATIVE;
- 	if (relative && size < (size_t)row->imm_offset + row->imm_size)
+@@ -317,8 +592,29 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
+ {
+ #ifdef CS_DECODE_TRY_OUTPUT
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
+-	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
+-		return cs_disasm_iter_core(ud, code, size, address, insn);
++	if (handle && handle->arch == CS_ARCH_X86) {
++		if (!handle->no_text)
++			return cs_disasm_iter_core(ud, code, size, address,
++						   insn);
++#ifndef CAPSTONE_X86_ONLY
++		X86ScanResult result;
++		if (handle->mode == CS_MODE_64 && *size >= 6 &&
++		    **code == 0x62 && !handle->detail_opt &&
++		    handle->insn_id == X86_get_insn_id &&
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++		    !handle->x86_scan_adapter &&
++#endif
++		    X86_tryEvexScan(*code, *size, &result)) {
++			handle->errnum = CS_ERR_OK;
++			insn->address = *address;
++			finish_x86_scan(handle, insn, &result, *code, false,
++					true);
++			cs_disasm_iter_advance(code, size, address,
++					       result.length);
++			return true;
++		}
++#endif
++	}
+ #endif
+ 	return cs_disasm_iter(ud, code, size, address, insn);
+ }
+diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
+index ff9a2542..11e5b3a6 100644
+--- a/arch/X86/X86ScanAdapter.h
++++ b/arch/X86/X86ScanAdapter.h
+@@ -34,9 +34,9 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
+ uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
+ 			    uint64_t address, uint64_t *target);
+ 
+-/* Private static-link iterator for x86 consumers that request text. Uses the
++/* Private static-link iterator for x86 consumers. Uses the
+  * same options, cursor, errors, callbacks and public records as cs_disasm_iter.
+- * Other architectures and text-free scans use cs_disasm_iter directly. */
++ * Other architectures use cs_disasm_iter directly. */
+ bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
+ 		    uint64_t *address, cs_insn *insn);
+ 
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 25a1e8ce..ec3e886b 100644
+index 5d8916a4..a90624a8 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -43,6 +43,13 @@ enum X86SimpleForm {
+@@ -43,9 +43,12 @@ enum X86SimpleForm {
  	X86_SIMPLE_RELATIVE,
  };
  
+-/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
+- * same register-only operand check as a register pair. */
+-#define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
 +/* Row zero has no instruction. Its nonzero form bits dispatch encodings
 + * whose opcode or operand kind also depends on later bytes. */
 +enum X86SpecialOutputPlan {
 +	X86_PLAN_GROUP1_IMM8 = X86_SIMPLE_REG_RM,
-+	X86_PLAN_EVEX = X86_SIMPLE_RELATIVE,
++	X86_PLAN_VECTOR = X86_SIMPLE_RELATIVE,
 +};
-+
+ 
  static inline void X86_writeSimpleDetail(cs_detail *detail,
  					 const struct X86SimpleOutput *row,
- 					 uint8_t opcode, uint8_t rex,
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..3b555da5 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -167,6 +167,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ }
+ #undef CS_DECODE_SCAN
+ 
++CS_DECODE_INLINE void cs_disasm_iter_advance(const uint8_t **code, size_t *size,
++					     uint64_t *address, uint16_t length)
++{
++	*code += length;
++	*size -= length;
++	*address += length;
++}
++
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+ 					  uint64_t *address, cs_insn *insn)
+@@ -186,9 +194,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
+ 	if (CS_DECODE_LIKELY(r)) {
+-		*code += insn_size;
+-		*size -= insn_size;
+-		*address += insn_size;
++		cs_disasm_iter_advance(code, size, address, insn_size);
+ 	} else {
+ 		return cs_disasm_iter_skipdata(handle, code, size, address,
+ 					       insn);
 diff --git a/suite/synctools/x86_evex_tables.cpp b/suite/synctools/x86_evex_tables.cpp
 new file mode 100644
-index 00000000..ad0bd09e
+index 00000000..d138d08a
 --- /dev/null
 +++ b/suite/synctools/x86_evex_tables.cpp
-@@ -0,0 +1,341 @@
+@@ -0,0 +1,399 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -766,6 +993,63 @@ index 00000000..ad0bd09e
 +	       " }";
 +}
 +
++void emit_vex_indexed(Decoder &decoder)
++{
++	std::puts(
++		"static const struct VectorOutputRow vex_indexed_rows[2][2] = {");
++	for (unsigned fma = 0; fma < 2; ++fma) {
++		std::puts("\t{");
++		for (unsigned ll = 0; ll < 2; ++ll) {
++			const uint8_t move[] = { 0xc5, uint8_t(0xf8 | ll << 2),
++						 0x28, 0x44,
++						 0x17, 0xa0 };
++			const uint8_t add[] = {
++				0xc4, 0xe2, uint8_t(0x71 | ll << 2), 0xa8, 0x44,
++				0x17, 0xa0
++			};
++			const auto id = decoder.decode(fma ? add : move,
++						       fma ? sizeof(add) :
++							     sizeof(move));
++			if (!id)
++				throw std::runtime_error(
++					"missing VEX indexed operand");
++			const auto &insn = *decoder.insn;
++			const auto &d = *insn.detail;
++			const auto &x = d.x86;
++			const std::string vec = ll ? "ymm" : "xmm";
++			const auto text = vec + "0, " +
++					  (fma ? vec + "1, " : "") + vec +
++					  "word ptr [rdi + rdx - 0x60]";
++			if (insn.op_str != text ||
++			    std::strlen(insn.mnemonic) >= 16 ||
++			    d.regs_read_count || d.regs_write_count ||
++			    d.groups_count > 4 || x.eflags ||
++			    x.op_count != 2 + fma)
++				throw std::runtime_error(
++					"unexpected VEX indexed output");
++			Bytes4 groups{}, access{};
++			std::copy_n(d.groups, d.groups_count, groups.begin());
++			for (unsigned i = 0; i < x.op_count; ++i) {
++				const auto &op = x.operands[i];
++				if (op.size != (16u << ll) ||
++				    op.type != (i + 1 == x.op_count ?
++							X86_OP_MEM :
++							X86_OP_REG))
++					throw std::runtime_error(
++						"unexpected VEX indexed operand");
++				access[i] = unsigned(op.access);
++			}
++			std::printf("\t\t{ %s, \"%s\", %u, %s, %s, 0 },\n",
++				    decoder.symbol(id).c_str(), insn.mnemonic,
++				    unsigned(d.groups_count),
++				    fields(groups).c_str(),
++				    fields(access).c_str());
++		}
++		std::puts("\t},");
++	}
++	std::puts("};");
++}
++
 +void emit_output(Decoder &decoder)
 +{
 +	std::vector<std::string> records;
@@ -795,11 +1079,11 @@ index 00000000..ad0bd09e
 +		}
 +	}
 +	std::puts(
-+		"struct EvexOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], immediate;\n};\nstatic const struct EvexOutputRow evex_output_rows[] = {");
++		"struct VectorOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], immediate;\n};\nstatic const struct VectorOutputRow evex_output_rows[] = {");
 +	for (const auto &row : records)
 +		std::printf("\t%s,\n", row.c_str());
 +	std::puts(
-+		"};\nstatic const struct EvexOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)\n{\n\tswitch (key) {");
++		"};\nstatic const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)\n{\n\tswitch (key) {");
 +	for (auto &[key, rows] : plans) {
 +		std::printf(
 +			"\tcase 0x%x: {\n\t\tstatic const uint8_t rows[2][3] = { { %u, %u, %u }, { %u, %u, %u } };\n",
@@ -809,6 +1093,7 @@ index 00000000..ad0bd09e
 +			"\t\treturn rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];\n\t}");
 +	}
 +	std::puts("\tdefault: return NULL;\n\t}\n}");
++	emit_vex_indexed(decoder);
 +}
 +}
 +
@@ -830,63 +1115,139 @@ index 00000000..ad0bd09e
 +		     static_cast<unsigned long long>(decoder.probes));
 +}
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index 076e9ca9..666ca168 100644
+index 1d3b62a0..8c9d7a7f 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -410,6 +410,17 @@ int main()
+@@ -401,7 +401,7 @@ int main()
+ 					rows.begin());
+ 				if (index == rows.size())
+ 					rows.push_back(row.fields);
+-				if (index >= UINT16_MAX >> 2)
++				if (index > UINT16_MAX >> 2)
+ 					return 1;
+ 				plans[wide][cls][op] = static_cast<uint16_t>(
+ 					(index << 2) | form);
+@@ -410,9 +410,20 @@ int main()
  			}
  		}
  	}
+-	for (unsigned wide = 0; wide < 2; ++wide)
+-		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls)
 +	// Reserve unprefixed EVEX for its own verified vector output records.
-+	plans[1][0][0x62] = X86_PLAN_EVEX;
++	plans[1][0][0x62] = X86_PLAN_VECTOR;
++	plans[1][0][0xc4] = X86_PLAN_VECTOR;
++	plans[1][0][0xc5] = X86_PLAN_VECTOR;
 +	for (unsigned wide = 0; wide < 2; ++wide) {
 +		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
 +			for (unsigned alu = 1; alu < 0x40; alu += 8) {
 +				if (!plans[wide][cls][alu])
-+					throw std::runtime_error("missing group-1 register row");
++					throw std::runtime_error(
++						"missing group-1 register row");
 +			}
-+			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
+ 			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
 +		}
 +	}
  	emit_tables(plans, regs, rows);
  	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
  		  << " encodings_checked=" << checked << " table_bytes="
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 7b20bb9d..d7c2d24d 100644
+index d7c2d24d..e69eb314 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -123,6 +123,24 @@ static bool check_memory(csh handles[2], cs_mode mode)
+@@ -141,6 +141,85 @@ static bool check_group1(csh handles[2], cs_mode mode)
  	return true;
  }
  
-+static bool check_group1(csh handles[2], cs_mode mode)
++static bool check_evex(csh handles[2])
 +{
-+	uint8_t bytes[4];
-+	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
-+		bytes[0] = p ? (uint8_t)(0x3f + p) : 0;
-+		bytes[1] = 0x83;
-+		for (unsigned mr = 0xc0; mr < 256; ++mr)
-+			for (unsigned imm = 0; imm < 256; ++imm) {
-+				bytes[2] = (uint8_t)mr;
-+				bytes[3] = (uint8_t)imm;
-+				if (!compare(handles, bytes + !p, 3 + !!p,
-+					     imm ^ mr ^ p))
-+					return false;
-+			}
-+	}
++	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
++					  0x344, 0x325, 0x1fe, 0x200 };
++	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
++					 0xc0, 0xcb, 0xf7, 0xff };
++	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
++		for (unsigned reg = 0; reg < 32; ++reg)
++			for (unsigned wl = 0; wl < 8; ++wl)
++				for (unsigned j = 0; j < sizeof(tails); ++j) {
++					uint8_t bytes[12] = {
++						0x62,
++						(uint8_t)((reg << 4) |
++							  (forms[i] >> 8)),
++						(uint8_t)(((wl & 4) << 5) |
++							  ((reg & 15) << 3) |
++							  5),
++						(uint8_t)(((wl & 3) << 5) |
++							  ((reg >> 4) << 3)),
++						(uint8_t)forms[i],
++						tails[j],
++						5,
++						0x80,
++						0xff,
++						9,
++						0,
++						0x7f
++					};
++					for (size_t n = 5; n <= sizeof(bytes);
++					     ++n)
++						if (!compare(handles, bytes, n,
++							     reg ^ wl ^ j))
++							return false;
++				}
++	return true;
++}
++
++static bool check_vex_indexed(csh handles[2])
++{
++	for (unsigned fma = 0; fma < 2; ++fma)
++		for (unsigned p = 0; p < (fma ? 128u : 4u); ++p)
++			for (unsigned m = 0; m < 16; ++m)
++				for (unsigned sib = 0; sib < 256; ++sib) {
++					const unsigned rxb = p & 7;
++					uint8_t bytes[] = {
++						0xc4,
++						(uint8_t)((rxb << 5) | 2),
++						(uint8_t)(((p >> 3) << 3) |
++							  ((m & 1) << 2) | 1),
++						0xa8,
++						(uint8_t)(((m & 8) << 3) |
++							  ((m & 7) << 3) | 4),
++						(uint8_t)sib,
++						(uint8_t)(sib ^ p ^ m),
++						0x80,
++						1,
++						0xff,
++						0
++					};
++					if (!fma) {
++						bytes[1] = 0xc5;
++						bytes[2] = (uint8_t)(0x78 |
++								     ((p & 1)
++								      << 7) |
++								     ((p & 2)
++								      << 1));
++						bytes[3] = 0x28;
++					}
++					const uint8_t *start = bytes + !fma;
++					const size_t len = sizeof(bytes) - !fma;
++					if (!compare(handles, start, len,
++						     sib ^ p) ||
++					    !compare(handles, start,
++						     (sib + p + m) % len, m))
++						return false;
++				}
 +	return true;
 +}
 +
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -138,7 +156,8 @@ static bool check_mode(cs_mode mode)
- 			if (cs_option(handles[side], CS_OPT_DETAIL,
+@@ -157,7 +236,9 @@ static bool check_mode(cs_mode mode)
  				      detail ? CS_OPT_ON : CS_OPT_OFF))
  				goto done;
--		if (!check_branches(handles) || !check_memory(handles, mode))
-+		if (!check_branches(handles) || !check_memory(handles, mode) ||
-+		    !check_group1(handles, mode))
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+-		    !check_group1(handles, mode))
++		    !check_group1(handles, mode) ||
++		    (mode == CS_MODE_64 &&
++		     (!check_evex(handles) || !check_vex_indexed(handles))))
  			goto done;
  		for (unsigned op = 0; op < 256; ++op) {
  			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

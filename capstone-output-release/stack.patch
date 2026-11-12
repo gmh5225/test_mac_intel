@@ -1,0 +1,104 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 5a51035f..2e62e65d 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -17,15 +17,15 @@
+ #include "X86SimpleOutput.h"
+ #include "X86GenSimpleOutput.inc"
+ 
+-/* The admitted MOV forms share the register/register row's access and widths.
+- * The ModR/M byte selects an integer base without SIB, RIP or a disp32. */
++/* The admitted MOV forms have a single integer base and at most a disp8. */
+ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+ 			     const uint8_t *code, uint8_t opcode, uint8_t rex,
+ 			     uint8_t modrm, bool load, bool wide,
+ 			     uint16_t *insn_size)
+ {
+ 	const bool has_disp = (modrm >> 6) == 1;
+-	const unsigned offset = 2 + (rex != 0);
++	const bool has_sib = (modrm & 7) == 4;
++	const unsigned offset = 2 + (rex != 0) + has_sib;
+ 	const int displacement = has_disp ? (int8_t)code[offset] : 0;
+ 	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
+ 						  rex != 0;
+@@ -81,6 +81,11 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+ 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+ 				      load ? reg->reg : 0, load ? 0 : reg->reg);
+ 		cs_x86 *x = &insn->detail->x86;
++		if (has_sib) {
++			x->sib = code[offset - 1];
++			x->sib_base = (x86_reg)base->reg;
++			x->sib_scale = 1;
++		}
+ 		x->disp = displacement;
+ 		if (has_disp) {
+ 			x->encoding.disp_offset = (uint8_t)offset;
+@@ -186,9 +191,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		modrm = code[1 + has_rex];
+ 		if (modrm < 0xc0) {
+ 			unsigned rm = modrm & 7;
+-			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80 ||
+-			    rm == 4 || (modrm < 0x40 && rm == 5) ||
+-			    (modrm >= 0x40 && size < 3u + has_rex))
++			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80)
++				return false;
++			/* ESP, RSP and R12 always need a SIB byte.  Other
++             * no-index encodings can expose EIZ or RIZ. */
++			if (rm == 4 && (size < 3u + has_rex || (rex & 2) ||
++					code[2 + has_rex] != 0x24))
++				return false;
++			if ((modrm < 0x40 && rm == 5) ||
++			    (modrm >= 0x40 && size < 3u + has_rex + (rm == 4)))
+ 				return false;
+ 			base_memory = true;
+ 		}
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index d7c2d24d..c1c3255d 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -123,6 +123,35 @@ static bool check_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_sib_base_mov(csh handles[2], cs_mode mode)
++{
++	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p)
++		for (unsigned opcode = 0x88; opcode <= 0x8b; ++opcode)
++			for (unsigned reg_mod = 0; reg_mod < 16; ++reg_mod)
++				for (unsigned sib = 0; sib < 256; ++sib) {
++					uint8_t bytes[] = {
++						(uint8_t)(0x3f + p),
++						(uint8_t)opcode,
++						(uint8_t)(((reg_mod & 8) << 3) |
++							  ((reg_mod & 7) << 3) |
++							  4),
++						(uint8_t)sib,
++						(uint8_t)(sib ^ reg_mod ^ p),
++						0xfe,
++						0xff,
++						0
++					};
++					const uint8_t *code = bytes + !p;
++					size_t len = sizeof(bytes) - !p;
++					if (!compare(handles, code, len, sib) ||
++					    !compare(handles, code,
++						     (reg_mod + sib + p) % len,
++						     opcode))
++						return false;
++				}
++	return true;
++}
++
+ static bool check_group1(csh handles[2], cs_mode mode)
+ {
+ 	uint8_t bytes[4];
+@@ -157,7 +186,8 @@ static bool check_mode(cs_mode mode)
+ 				      detail ? CS_OPT_ON : CS_OPT_OFF))
+ 				goto done;
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+-		    !check_group1(handles, mode))
++		    !check_group1(handles, mode) ||
++		    !check_sib_base_mov(handles, mode))
+ 			goto done;
+ 		for (unsigned op = 0; op < 256; ++op) {
+ 			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

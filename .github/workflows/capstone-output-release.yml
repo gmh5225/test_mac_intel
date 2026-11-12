@@ -1,7 +1,7 @@
-name: Verify isolated vector decoding against published group-1 release in profiles profiles
+name: Validate dedicated GCC scan and complete vector and stack output under MSVC, DIET, reduced, adapters and sanitizers
 on:
   push:
-    branches: [codex/capstone-isolated-vector-release]
+    branches: [codex/capstone-gcc-and-vex-release-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -11,12 +11,23 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cc: MD, profile: dedicated, forms: isolated }
-          - { cc: MT, profile: four, forms: isolated }
-          - { cc: MD, profile: intel, forms: isolated }
-          - { cc: MD, profile: reduced, forms: isolated }
-          - { cc: MT, profile: diet, forms: isolated }
-    runs-on: windows-2022
+          - { cc: MD, profile: dedicated, forms: vector, host: windows-2022 }
+          - { cc: MT, profile: four, forms: vector, host: windows-2022 }
+          - { cc: MD, profile: intel, forms: vector, host: windows-2022 }
+          - { cc: MD, profile: reduced, forms: vector, host: windows-2022 }
+          - { cc: MT, profile: diet, forms: vector, host: windows-2022 }
+          - { cc: gcc, profile: diet, forms: gcc, host: ubuntu-24.04 }
+          - { cc: gcc, profile: diet, forms: gcc, host: ubuntu-24.04-arm }
+          - { cc: gcc, profile: reduced, forms: gcc, host: ubuntu-24.04 }
+          - { cc: gcc, profile: reduced, forms: gcc, host: ubuntu-24.04-arm }
+          - { cc: gcc, profile: adapter, forms: gcc, host: ubuntu-24.04 }
+          - { cc: gcc, profile: adapter, forms: gcc, host: ubuntu-24.04-arm }
+          - { cc: gcc, profile: sanitize, forms: gcc, host: ubuntu-24.04 }
+          - { cc: gcc, profile: sanitize, forms: gcc, host: ubuntu-24.04-arm }
+          - { cc: clang, profile: sanitize, forms: vector, host: ubuntu-24.04 }
+          - { cc: gcc, profile: sanitize, forms: stack, host: ubuntu-24.04 }
+          - { cc: MD, profile: four, forms: stack, host: windows-2022 }
+    runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
       TOOLCHAIN: ${{ matrix.cc }}
@@ -37,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: output-release-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: qualified-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
