@@ -1,7 +1,7 @@
 name: Measure ARM, Thumb, AArch64 and MIPS on the integrated Windows x86 change on independent Windows runners
 on:
   push:
-    branches: [codex/capstone-consumer-ltcg]
+    branches: [codex/capstone-mixed-scan-boundary]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -20,11 +20,11 @@ jobs:
         with:
           sparse-checkout: capstone-performance
           persist-credentials: false
-      - name: Compare ordinary and LTCG consumers with controlled image bases
-        run: python capstone-performance/consumer-ltcg.py ${{ matrix.crt }} ${{ matrix.order }}
+      - name: Compare the narrow scan fallback boundary in persistent consumers
+        run: python capstone-performance/scan-boundary.py ${{ matrix.crt }} ${{ matrix.order }}
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: consumer-ltcg-${{ matrix.image }}
+          name: scan-boundary-${{ matrix.image }}
           path: capstone-evidence/
           retention-days: 14
