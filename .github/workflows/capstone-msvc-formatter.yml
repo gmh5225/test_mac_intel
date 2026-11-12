@@ -2,7 +2,7 @@ name: Measure the mixed dynamic CRT Release iterator and native iced
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-mixed-dynamic-ltcg]
+    branches: [codex/capstone-windows-image-controls]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -22,11 +22,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/ipo.py ${{ matrix.crt }}
+        run: python capstone-performance/msvc/image_controls.py ${{ matrix.crt }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-dynamic-ltcg-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: windows-image-controls-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
