@@ -1,9 +1,9 @@
-name: Capstone fixed CPU performance control
+name: Measure x86 post-processing in dedicated and NeverD four-backend configurations
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-legacy-memory-repair]
+    branches: [codex/capstone-x86-postprinter-product-configurations]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-legacy-memory-repair
+  group: capstone-x86-product-configurations
   cancel-in-progress: false
 
 jobs:
@@ -21,10 +21,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: combined }
-          - { host: ubuntu-24.04-arm, baseline: combined }
-          - { host: macos-15, baseline: combined }
-          - { host: macos-15-intel, baseline: combined }
+          - { host: ubuntu-24.04, baseline: x86 }
+          - { host: ubuntu-24.04, baseline: neverd-four }
+          - { host: ubuntu-24.04-arm, baseline: x86 }
+          - { host: ubuntu-24.04-arm, baseline: neverd-four }
+          - { host: macos-15-intel, baseline: x86 }
+          - { host: macos-15-intel, baseline: neverd-four }
+          - { host: macos-15, baseline: x86 }
+          - { host: macos-15, baseline: neverd-four }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -51,7 +55,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-memory-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: product-x86-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

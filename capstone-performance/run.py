@@ -20,6 +20,9 @@ SOURCE = Path(__file__).resolve().parent
 ROOT = SOURCE.parent
 WORK = ROOT / '.capstone-intel-work'
 EVIDENCE = ROOT / 'capstone-evidence'
+PROFILE = os.environ['COMPARE_BASE']
+assert PROFILE in ('neverd-four', 'x86')
+ARCHES = ('X86','ARM','AARCH64','MIPS') if PROFILE == 'neverd-four' else ('X86',)
 MODES = {'scan': 0, 'format': 1, 'detail': 2}
 
 
@@ -60,7 +63,10 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang',
+             '-DCMAKE_C_COMPILER=clang', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
+             *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES],
+             *(['-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers']
+               if PROFILE == 'neverd-four' else []),
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
@@ -149,6 +155,11 @@ def prepare():
     write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Limit legacy post-printer repairs to the first memory operand'))
     for label in ['base', 'new']:
         build(label)
+    for label in ['base', 'new']:
+        fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
+        selected = {line.split(':')[0] for line in fields if line.startswith('CAPSTONE_')
+                    and line.endswith('_SUPPORT:BOOL=ON')}
+        assert selected == {'CAPSTONE_'+arch+'_SUPPORT' for arch in ARCHES}, selected
     adapter = WORK / 'adapter'
     adapter.mkdir()
     shutil.copyfile(SOURCE / 'iced.rs', adapter / 'iced.rs')
@@ -189,7 +200,7 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','flags-state','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
+    for unit in ['mapping','api','sstream','detail_option','flags-state','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
         source = SOURCE / (unit + '.c') if (unit.startswith('check-') or unit == 'flags-state') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
@@ -221,6 +232,8 @@ panic = "abort"
             ('legacy_memory', 'legacy_without_memory', 'full_repair'))
         repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
     write('repair-census.json', repair_counts)
+    inputs = [item for item in inputs if item['selector'] >= 16 or
+              (PROFILE == 'neverd-four' and item['selector'] in (0,1,4,13))]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -326,6 +339,8 @@ def measure():
     measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
     for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
         choices=[c for c in cases if c['consumer']==consumer]
+        if not choices:
+            continue
         variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
         measure_panel(panel,choices,cycles,variants,duration)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
