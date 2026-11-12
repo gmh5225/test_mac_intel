@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='compact initial public terminal on dedicated GCC, existing generated reader elsewhere'))
+    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='public terminal on AArch64 GCC, byte-identical existing readers elsewhere'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -214,7 +214,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    expected = ['arch/X86/X86DisassemblerDecoder.c.o'] if os.environ['COMPARE_BASE']=='gcc' else []
+    expected = ['arch/X86/X86DisassemblerDecoder.c.o'] if os.environ['COMPARE_BASE']=='gcc' and platform.machine()=='aarch64' else []
     assert diffs==expected,(diffs,expected)
     if expected:
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
