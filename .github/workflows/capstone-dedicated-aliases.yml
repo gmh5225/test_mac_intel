@@ -1,7 +1,7 @@
-name: Measure fixed register storage in dedicated AArch64; verify exact mixed-build objects
+name: Check dedicated and mixed AArch64 register objects and timings with GCC
 on:
   push:
-    branches: [codex/capstone-aarch64-compact-name-storage]
+    branches: [codex/capstone-aarch64-registers-gcc]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -14,8 +14,6 @@ jobs:
         include:
           - {host: ubuntu-24.04, plan: "AARCH64,ARM"}
           - {host: ubuntu-24.04-arm, plan: "AARCH64,ARM"}
-          - {host: macos-15, plan: "AARCH64,ARM"}
-          - {host: macos-15-intel, plan: "AARCH64,ARM"}
     env:
       ARCH_PLAN: ${{ matrix.plan }}
     runs-on: ${{ matrix.host }}
@@ -30,7 +28,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: compact-register-${{ matrix.host }}-${{ github.run_attempt }}
+          name: gcc-compact-register-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14

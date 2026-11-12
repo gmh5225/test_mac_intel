@@ -1,17 +1,22 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 11eefc2f..49db5c06 100644
+index 11eefc2f..524218e6 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -148,8 +148,15 @@ foreach(i RANGE ${count})
+@@ -144,12 +144,20 @@ endif()
+ list(LENGTH SUPPORTED_ARCHITECTURES count)
+ math(EXPR count "${count}-1")
+ # create options controlling whether support for a particular architecture is needed
++set(capstone_enabled_architectures)
+ foreach(i RANGE ${count})
      list(GET SUPPORTED_ARCHITECTURES ${i} supported_architecture)
      list(GET SUPPORTED_ARCHITECTURE_LABELS ${i} supported_architecture_label)
      option("CAPSTONE_${supported_architecture}_SUPPORT" "${supported_architecture_label} support" ${CAPSTONE_ARCHITECTURE_DEFAULT})
 +    if(CAPSTONE_${supported_architecture}_SUPPORT)
-+        list(APPEND enabled_architectures "${supported_architecture}")
++        list(APPEND capstone_enabled_architectures "${supported_architecture}")
 +    endif()
  endforeach()
  
-+if(enabled_architectures STREQUAL "AARCH64")
++if(capstone_enabled_architectures STREQUAL "AARCH64")
 +    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
 +endif()
 +
@@ -260,13 +265,14 @@ index 8b703760..b75a84fa 100644
  The generated immediate-size lookup preserves the original metadata and uses
 diff --git a/suite/synctools/aarch64_register_names.py b/suite/synctools/aarch64_register_names.py
 new file mode 100644
-index 00000000..9a25e36a
+index 00000000..e47c2bbf
 --- /dev/null
 +++ b/suite/synctools/aarch64_register_names.py
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,96 @@
 +#!/usr/bin/env python3
 +# SPDX-License-Identifier: BSD-3-Clause
 +"""Project short AArch64 register spellings from the generated default name pool."""
++
 +import argparse
 +import ast
 +import json
@@ -288,11 +294,20 @@ index 00000000..9a25e36a
 +	}
 +#endif
 +"""
++REGISTER_BODY = """	SStream_concat2(OS, markup("<reg:"),
++			getRegisterName(Reg, AArch64_NoRegAltName));
++	SStream_concat0(OS, markup(">"));
++}"""
++
 +
 +
 +def generate(writer):
-+    strings = re.search(r"static const char AsmStrsNoRegAltName\[\] = \{(.*?)\};", writer, re.S)
-+    offsets = re.search(r"static const uint16_t RegAsmOffsetNoRegAltName\[\] = \{([\s\d,]+)\};", writer)
++    strings = re.search(
++        r"static const char AsmStrsNoRegAltName\[\] = \{(.*?)\};", writer, re.S
++    )
++    offsets = re.search(
++        r"static const uint16_t RegAsmOffsetNoRegAltName\[\] = \{([\s\d,]+)\};", writer
++    )
 +    if not strings or not offsets:
 +        raise ValueError("Missing the default AArch64 register tables")
 +    body = re.sub(r"/\*.*?\*/", "", strings[1], flags=re.S)
@@ -303,7 +318,7 @@ index 00000000..9a25e36a
 +    names = []
 +    for token in filter(None, (s.strip() for s in offsets[1].split(","))):
 +        start = int(token)
-+        name = pool[start:pool.index(0, start)].decode("ascii")
++        name = pool[start : pool.index(0, start)].decode("ascii")
 +        names.append(name if 0 < len(name) <= 6 else "")
 +    header = [
 +        "/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */",
@@ -320,7 +335,9 @@ index 00000000..9a25e36a
 +    if not names:
 +        raise ValueError("No short AArch64 registers")
 +    entries = [f"{{ {json.dumps(name)}, {len(name)} }}" for name in names]
-+    rows = ["\t" + ", ".join(entries[i:i+4]) + "," for i in range(0, len(entries), 4)]
++    rows = [
++        "\t" + ", ".join(entries[i : i + 4]) + "," for i in range(0, len(entries), 4)
++    ]
 +    return "\n".join([*header, *rows, "};", ""])
 +
 +
@@ -330,12 +347,13 @@ index 00000000..9a25e36a
 +    args = parser.parse_args()
 +    printer = ARCH / "AArch64InstPrinter.c"
 +    source = printer.read_text()
-+    if source.count(PRINT_REG) != 1:
-+        raise ValueError("Cannot locate the translated register printer")
 +    # Restore the hook after auto-sync replaces the translated printer.
 +    source = source.replace(PRINT_REG + SHORT_REG, PRINT_REG)
++    if source.count(PRINT_REG + REGISTER_BODY) != 1:
++        raise ValueError("The default register printer has changed")
++    writer = (ARCH / "AArch64GenAsmWriter.inc").read_text()
 +    outputs = {
-+        ARCH / "AArch64GenShortRegisterNames.inc": generate((ARCH / "AArch64GenAsmWriter.inc").read_text()),
++        ARCH / "AArch64GenShortRegisterNames.inc": generate(writer),
 +        printer: source.replace(PRINT_REG, PRINT_REG + SHORT_REG),
 +    }
 +    for path, text in outputs.items():
@@ -347,3 +365,16 @@ index 00000000..9a25e36a
 +
 +if __name__ == "__main__":
 +    main()
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index c29d1903..4c35a135 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -61,6 +61,8 @@ endif()
+ if(CAPSTONE_AARCH64_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c)
+     if(Python3_Interpreter_FOUND)
++        add_test(NAME unit_aarch64_register_names_generator
++            COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_register_names.py" --check)
+         add_test(NAME unit_aarch64_postprocess_generator
+             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_postprocess.py" --check)
+         add_test(NAME unit_aarch64_postprocess_newlines
