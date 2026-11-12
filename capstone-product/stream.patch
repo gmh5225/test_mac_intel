@@ -1,0 +1,17 @@
+--- a/SStream.h
++++ b/SStream.h
+@@ -19,12 +19,12 @@
+ #define SSTREAM_BUF_LEN 512
+ 
+ typedef struct SStream {
+-	char buffer[SSTREAM_BUF_LEN];
+-	size_t index;
+ 	bool is_closed;
+ 	bool markup_stream; ///< If true, markups to the stream are allowed.
+ 	bool prefixed_by_markup; ///< Set after the stream wrote a markup for an operand.
+ 	bool unsigned_num; ///< Print all numbers as unsigned. Set with CS_OPT_UNSIGNED.
++	size_t index;
++	char buffer[SSTREAM_BUF_LEN];
+ } SStream;
+ 
+ #define SSTREAM_RETURN_IF_CLOSED(OS) \
