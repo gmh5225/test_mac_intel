@@ -6,8 +6,8 @@ def main(root):
  run.WORK=root;man=json.loads((src/'manifest.json').read_text());w=run.fetch('capstone','https://github.com/NeverSight/capstone.git',man['capstone_revision'])
  inputs={row['name'] for row in man['inputs']}
  cases=[row for row in corpus.prepare(src,root,run.EVIDENCE,run.command) if row['name'] in inputs]
- assert len(cases)==len(inputs)==3 and {row['name'] for row in cases}==inputs
- cases=[c for c in cases if c['name'].startswith('sparc64-')];assert len(cases)==3
+ assert len(cases)==len(inputs)==2 and {row['name'] for row in cases}==inputs
+ cases=[c for c in cases if c['name'].startswith('riscv64-')];assert len(cases)==2
  f=src/'alias-trie.patch';assert run.sha(f)==(src/'alias-trie.sha256').read_text().strip()
  cpp=(src/'single.cpp').read_text();a=cpp.index('  API() {');z=cpp.index('\n  }',a)
  names=['cs_open','cs_option','cs_malloc','cs_disasm_iter','cs_regs_access','cs_free','cs_close']
@@ -23,7 +23,7 @@ def main(root):
   if patch:run.command(['git','apply',f],'apply',w)
   # Verify the exact objects produced for the unaffected mixed build.
   mixed=root/'mixed'
-  run.command(['cmake','-S',w,'-B',mixed,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('ARM','AARCH64','X86','MIPS','SPARC','LOONGARCH')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'mixed-config-'+label)
+  run.command(['cmake','-S',w,'-B',mixed,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('ARM','AARCH64','X86','MIPS','SPARC','LOONGARCH','RISCV')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'mixed-config-'+label)
   run.command(['cmake','--build',mixed,'--target','capstone_static','--parallel','4'],'mixed-build-'+label)
   digest={str(f.relative_to(mixed)):run.sha(f) for f in (mixed/'CMakeFiles/capstone.dir').rglob('*.o')}
   assert len(digest)>20
@@ -31,11 +31,15 @@ def main(root):
   else:
    assert digest==control,[k for k,v in digest.items() if control.get(k)!=v]
    run.write('mixed-objects.json',digest)
-  run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SPARC_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
+  run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_RISCV_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
   run.command(['cmake','--build',b,'--target','capstone_shared','--parallel','4'],'build-'+label)
   if label=='new':
-   run.command(['python3',w/'suite/synctools/sparc_state_register_names.py','--check'],'check-state-name-projection')
+   assert 'CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS' in (b/'build.ninja').read_text()
+   assert 'CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS' not in (mixed/'build.ninja').read_text()
   lib='libcapstone.' +('dylib' if platform.system()=='Darwin' else 'so');out=root/(label+'-'+lib);shutil.copyfile(b/lib,out);bins[label]=out
+ for label, lib in list(bins.items()):
+  twin=root/('aa-'+lib.name); shutil.copyfile(lib,twin); assert run.sha(twin)==run.sha(lib)
+  bins[label+'_aa']=twin
  run.write('inputs.json',dict(capstone=man['capstone_revision'],patch=run.sha(f),consumer=run.sha(consumer),libraries={k:run.sha(v)for k,v in bins.items()}))
  if platform.system()=='Linux':os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
  results=[]
@@ -49,7 +53,13 @@ def main(root):
     values=[(sum(t[::2])/sum(t[1::2]) if i%2==0 else sum(t[1::2])/sum(t[::2])) for i,t in enumerate(raw)]
     if rev:values=[1/x for x in values]
     orders.append(dict(raw=data,gain=st.median(values),pairs=values))
-   results.append(dict(case=row['name'],mode=('scan','format','detail')[m],orders=orders,gain=st.median(p for v in orders for p in v['pairs'])))
+   aa=[]
+   for label in ['base','new']:
+    data=json.loads(sp.check_output([consumer,bins[label],bins[label+'_aa'],str(row['selector']),str(m),row['path']],text=True))
+    assert len(data['ticks'])==9
+    values=[(sum(t[::2])/sum(t[1::2]) if i%2==0 else sum(t[1::2])/sum(t[::2])) for i,t in enumerate(data['ticks'])]
+    aa.append(dict(label=label,raw=data,gain=st.median(values),pairs=values))
+   results.append(dict(aa=aa,case=row['name'],mode=('scan','format','detail')[m],orders=orders,gain=st.median(p for v in orders for p in v['pairs'])))
    run.write('measurements.json',results)
 if __name__=='__main__':
  run.EVIDENCE.mkdir(exist_ok=True)

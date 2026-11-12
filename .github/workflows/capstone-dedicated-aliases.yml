@@ -1,7 +1,7 @@
-name: Measure fixed register storage in dedicated SPARC V9; verify exact mixed-build objects
+name: Measure dedicated RISC-V initialization and verify unchanged mixed objects
 on:
   push:
-    branches: [codex/capstone-dedicated-sparc-v9]
+    branches: [codex/capstone-dedicated-riscv-initialization]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: sparc-v9-register-${{ matrix.host }}-${{ github.run_attempt }}
+          name: dedicated-riscv-init-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
