@@ -1,0 +1,36 @@
+name: Measure bounded position-independent record reuse on cold x86 text
+on:
+  push:
+    branches: [codex/capstone-cold-record-reuse]
+    paths: [capstone-records/**, .github/workflows/capstone-records.yml]
+permissions:
+  contents: read
+jobs:
+  cost:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, ubuntu-24.04-arm, macos-15-intel, macos-15]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-records
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: f6054796e7ecf52e174edf336c564facb1d762e0
+          path: source
+          persist-credentials: false
+      - name: Compare public bytes and time cold input traversals
+        run: python3 capstone-records/measure.py source evidence
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: cold-records-${{ matrix.host }}-${{ github.run_id }}
+          path: evidence/
+          retention-days: 14
