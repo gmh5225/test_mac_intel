@@ -43,7 +43,7 @@ def main():
     capstone = run.fetch('base', 'https://github.com/NeverSight/capstone.git', manifest['capstone_revision'])
     patch = source / 'msvc-alias.patch'
     assert run.sha(patch) == manifest['source_lineage']['msvc-alias.patch']['sha256']
-    layout = sys.argv[1]
+    layout = sys.argv[2]
     assert layout in ('fixed', 'aslr')
     variants = {'base': (False, False), 'outline': (True, False),
                 'mask': (False, True), 'both': (True, True)}
