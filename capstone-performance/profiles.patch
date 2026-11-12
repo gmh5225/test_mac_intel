@@ -1,39 +1,18 @@
---- a/cs.c
-+++ b/cs.c
-@@ -78,6 +78,7 @@
- #include "arch/WASM/WASMModule.h"
- #ifdef CAPSTONE_HAS_X86
- #include "arch/X86/X86Mapping.h"
-+#include "arch/X86/X86InstPrinter.h"
- #include "arch/X86/X86Disassembler.h"
- #endif
- #include "arch/X86/X86Module.h"
-@@ -1085,11 +1086,20 @@
- 			ss.prefixed_by_markup = false;
- 			ss.unsigned_num = false;
- 			SStream_opt_unum(&ss, handle->imm_unsigned);
--			handle->printer(&mci, &ss, handle->printer_info);
--			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
--				  code,
--				  !mci.assembly[0] && handle->post_printer ==
--							      X86_postprinter);
-+			Printer_t printer = handle->printer;
-+			printer(&mci, &ss, handle->printer_info);
-+			PostPrinter_t post = handle->post_printer;
-+			bool exact = !mci.assembly[0] && post == X86_postprinter;
-+			if (exact && insn->detail && printer == X86_Intel_printInst) {
-+				const uint8_t opcode = insn->detail->x86.opcode[0];
-+				/* The default printer needs repairs for VEX/EVEX,
-+				 * x87 environments and RCL. C0-DF includes the VEX
-+				 * prefixes and every legacy opcode in those families.
-+				 * Custom formatters retain their text-driven repairs. */
-+				if ((opcode & 0xe0) != 0xc0 && opcode != 0x62)
-+					post = NULL;
-+			}
-+			fill_insn(handle, insn, &ss, &mci, post, code, exact);
- 		} else
- #endif
- 		{
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12698,6 +12698,12 @@
+ 		return;
+ 
+ 	cs_x86 *x86 = &insn->detail->x86;
++	/* VEX/EVEX, x87 environments and RCL retain their operand repairs.
++	 * A custom formatter can add a broadcast decorator to a legacy memory
++	 * operand, including while restoring the default formatter callback. */
++	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62 &&
++	    strchr(mnem->buffer, '{') == NULL)
++		return;
+ 	// Find the operands that these repairs can change once, in output order.
+ 	for (i = 0; i < x86->op_count; ++i) {
+ 		cs_x86_op *operand = &x86->operands[i];
 --- a/tests/unit/x86_encoding_accuracy.c
 +++ b/tests/unit/x86_encoding_accuracy.c
 @@ -830,6 +830,58 @@
