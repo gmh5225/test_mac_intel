@@ -2,7 +2,7 @@ name: Measure direct x86 relative text and details against current Capstone and 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-pair-ltcg-attribution]
+    branches: [codex/capstone-ltcg-function-fragments]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -26,6 +26,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pair-ltcg-attribution-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: ltcg-function-fragments-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

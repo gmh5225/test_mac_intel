@@ -1,5 +1,6 @@
 """Read the actual linked iterator, including its direct callees and stack probes."""
 import re
+import bisect
 import shutil
 import subprocess
 from pathlib import Path
@@ -38,7 +39,28 @@ def inspect(executable, map_file, evidence):
             continue
         name=sorted(names)[0];seen.update(names)
         end=end_for.get(address,min(starts[i+1],address+32768))
-        listing=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(address),'--stop-address='+hex(min(end,address+(65536 if name in {'X86_Intel_printInst','X86_ATT_printInst','X86_reg_access','X86_get_insn_id','get_op_access','X86_insn_reg_intel2','X86_insn_reg_att2','X86_insn_reg_intel_h','X86_insn_reg_att_h'} else 320))),executable],text=True,errors='replace')
+        detailed = name in {'X86_Intel_printInst','X86_ATT_printInst','X86_reg_access','X86_get_insn_id','get_op_access','X86_insn_reg_intel2','X86_insn_reg_att2','X86_insn_reg_intel_h','X86_insn_reg_att_h'}
+        pending=[address];visited=set();listings=[];fragments=[]
+        runtime_starts=sorted(end_for)
+        while pending:
+            begin=pending.pop()
+            if begin in visited:continue
+            visited.add(begin)
+            finish=end_for.get(begin,begin+320)
+            stop=min(finish,begin+(65536 if detailed else 320))
+            part=subprocess.check_output([objdump,'-d','--no-show-raw-insn','--start-address='+hex(begin),'--stop-address='+hex(stop),executable],text=True,errors='replace')
+            listings.append(part);fragments.append(dict(start=hex(begin),end=hex(finish),symbols=symbols.get(begin,[])))
+            if not detailed:continue
+            for target in re.findall(r'^\s*[0-9a-f]+:\s+j[a-z]+\s+0x([0-9a-f]+)',part,re.M):
+                target=int(target,16);j=bisect.bisect_right(runtime_starts,target)-1
+                if j<0:continue
+                block=runtime_starts[j]
+                if target>=end_for[block] or block in visited:continue
+                owner=symbols.get(block,[])
+                if owner and not any(v==name or v.startswith(name+'$') for v in owner):continue
+                pending.append(block)
+            if len(visited)>128:raise RuntimeError('unexpected LTCG fragment graph')
+        listing='\n'.join(listings)
         lines=[];calls={}
         for line in listing.splitlines():
             match=re.match(r'^\s*([\da-f]+):\s+([a-z][a-z0-9]*)\s*(.*)$',line)
@@ -53,6 +75,6 @@ def inspect(executable, map_file, evidence):
         assert lines, (name,hex(address),hex(end))
         (evidence/(executable.stem+'-'+name+'.asm')).write_text('\n'.join(lines)+'\n')
         listing_hash=hashlib.sha256('\n'.join(lines).encode()).hexdigest()
-        result[name]=dict(start=hex(address),span=end-address,decoded_prefix_instructions=len(lines),unwind_extent=address in end_for,sha256=listing_hash,calls=calls,entry=lines[:35])
+        result[name]=dict(start=hex(address),span=end-address,fragments=fragments,decoded_prefix_instructions=len(lines),unwind_extent=address in end_for,sha256=listing_hash,calls=calls,entry=lines[:35])
     assert 'cs_disasm_iter' in seen, seen
     return result

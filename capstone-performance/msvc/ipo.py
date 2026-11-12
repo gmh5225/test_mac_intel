@@ -38,10 +38,9 @@ opt-level=3
         sp.run([*args,'--check',path],check=True);sp.run([*args,path],check=True)
     tool.write('processor.json',json.loads(sp.check_output(['powershell','-NoProfile','-Command','Get-CimInstance Win32_Processor | Select-Object Name,Manufacturer,NumberOfCores,NumberOfLogicalProcessors | ConvertTo-Json -Compress'],text=True)))
     decoder='arch/X86/X86DisassemblerDecoder.c'
-    variants=[('regular','OFF',''),('regular_new','OFF',decoder),('ipo','ON',decoder if tool.crt=='MT' else ''),('ipo_new','ON',decoder if tool.crt=='MT' else '')]
+    variants=[('ipo','ON',decoder),('ipo_new','ON',decoder)]
     for name,on,ordinary in variants:
         if name in ('regular_new','ipo_new'):apply('profiles.patch')
-        elif name=='ipo':apply('profiles.patch',reverse=True)
         b=w/('regular-build' if on=='OFF' else 'mixed-build')
         args=['-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+on,'-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('X86','ARM','AARCH64','MIPS')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if tool.crt=='MT' else 'OFF')]
         tool.run(['cmake','-S',c,'-B',b,*opts,*args],'configure-'+name)
@@ -71,38 +70,7 @@ opt-level=3
     for name,exe in programs.items():
         linker_map,=b.rglob(name+'.map')
         assembly[name]=inspect(exe,linker_map,tool.evidence);tool.write('linked-functions.json',assembly)
-    def code_digest(exe):
-        data=exe.read_bytes();pe=struct.unpack_from('<I',data,60)[0]
-        count=struct.unpack_from('<H',data,pe+6)[0];offs=pe+24+struct.unpack_from('<H',data,pe+20)[0]
-        for i in range(count):
-            off=offs+40*i
-            if data[off:off+8].rstrip(b'\x00')==b'.text':
-                size,raw=struct.unpack_from('<II',data,off+16)
-                return hashlib.sha256(data[raw:raw+size]).hexdigest()
-        raise RuntimeError('missing PE code section')
-    tool.write('code-sections.json',{k:code_digest(v)for k,v in programs.items()})
-    results=[]
-    for case in tool.get_cases():
-        for mode in ('scan','format','detail'):
-            def sample(k,n):
-                label='iced' if k.startswith('iced') else 'capstone'
-                return json.loads(sp.check_output([programs['regular' if k=='iced' else k],label,mode,str(case['bits']),str(n),case['path']]))
-            n=1
-            while (probe:=sample('regular',n))['wall_ns']<10000000:n*=3
-            n=max(1,math.ceil(n*55000000/probe['wall_ns']))
-            cycles=[]
-            for i in range(8):
-                position=i%len(labels);order=labels[position:]+labels[:position]
-                if i%2:order.reverse()
-                raw=[(k,sample(k,n)) for k in order+order[::-1]]
-                assert len({tuple(t[key] for key in ('instructions','rejected','boundary_hash','value_hash')) for k,t in raw if k!='iced'})==1
-                matched=len({tuple(t[key] for key in ('instructions','rejected','boundary_hash')) for _,t in raw})==1
-                times={k:[t['thread_cycles'] for lab,t in raw if lab==k] for k in labels}
-                avg={k:statistics.mean(v) for k,v in times.items()}
-                cycles.append(dict(raw=raw,matched=matched,relative={k:avg['regular']/avg[k] for k in labels},aa={k:a[0]/a[1] for k,a in times.items()}))
-            results.append(dict(case=case['name'],mode=mode,cycles=cycles))
-            tool.write('measurements.json',results)
-    tool.write('complete.json',dict(complete=True))
+    tool.write('complete.json',dict(complete=True,diagnostic_only=True))
 try:main()
 finally:
     size=sum(a.stat().st_size for a in w.rglob('*') if a.is_file())
