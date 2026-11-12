@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Check inapplicable legacy repairs inside the owning x86 post-printer'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Limit legacy post-printer repairs to the first memory operand'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -206,6 +206,21 @@ panic = "abort"
              '-o', WORK / 'x86_encoding_accuracy-base'], 'compile-x86_encoding_accuracy-base')
     command([WORK / 'x86_encoding_accuracy-base'], 'verify-x86_encoding_accuracy-base')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
+    command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
+             SOURCE / 'repair_census.cpp', WORK / 'base-build/libcapstone.a',
+             *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
+             '-o', WORK / 'repair-census'], 'compile-repair-census')
+    repair_counts = []
+    for item in inputs:
+        if item['selector'] < 16:
+            continue
+        command([WORK / 'repair-census', item['selector'], item['path']],
+                'repair-census-' + item['name'])
+        counts = json.loads((EVIDENCE / ('repair-census-' + item['name'] + '.log')).read_text())
+        assert counts['instructions'] == sum(counts[key] for key in
+            ('legacy_memory', 'legacy_without_memory', 'full_repair'))
+        repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
+    write('repair-census.json', repair_counts)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -246,25 +261,6 @@ panic = "abort"
     allowed = required
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
-    # Compile the previous caller-gate prototype only for code-generation analysis.
-    # Its object is never linked into a measured executable.
-    diagnostic = WORK / 'caller-gate-diagnostic'
-    command(['git', 'init', diagnostic], 'diagnostic-init')
-    shutil.copyfile(base / 'cs.c', diagnostic / 'cs.c')
-    command(['git', 'apply', '--include=cs.c', '--check', SOURCE / 'caller-gate-diagnostic.patch'],
-            'diagnostic-patch-check', diagnostic)
-    command(['git', 'apply', '--include=cs.c', SOURCE / 'caller-gate-diagnostic.patch'],
-            'diagnostic-patch-apply', diagnostic)
-    assert (diagnostic / 'cs.c').read_bytes() != (base / 'cs.c').read_bytes()
-    commands = json.loads((WORK / 'base-build/compile_commands.json').read_text())
-    original = next(row for row in commands if row['file'] == str(base / 'cs.c'))
-    for label, filename in [('base', base / 'cs.c'), ('caller-gate', diagnostic / 'cs.c')]:
-        args = shlex.split(original['command'])
-        args[args.index('-o') + 1] = str(EVIDENCE / (label + '-cs.s'))
-        args[args.index('-c')] = '-S'
-        args[args.index(original['file'])] = str(filename)
-        args += ['-I', str(base)]
-        command(args, label + '-shared-output-assembly', original['directory'])
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
     binaries += list(libraries.values()) + [iced_library]
@@ -383,7 +379,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# X86-owned post-printer eligibility', '',
+    lines = ['# Legacy first-memory repair', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
