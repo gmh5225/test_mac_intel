@@ -1,9 +1,9 @@
-name: Verify compact common instruction metadata with complete public records
+name: Check trimmed formatter cursor and real decoder output
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-compact-common-metadata]
+    branches: [codex/capstone-trim-cursor-qualification]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-compact-common-metadata
+  group: capstone-trim-cursor-validation
   cancel-in-progress: false
 
 jobs:
@@ -23,9 +23,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, baseline: neverd-four }
           - { host: ubuntu-24.04-arm, baseline: neverd-four }
-          - { host: ubuntu-24.04, baseline: all }
-          - { host: ubuntu-24.04-arm, baseline: all }
-          - { host: macos-15-intel, baseline: neverd-four }
           - { host: macos-15, baseline: neverd-four }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
@@ -53,7 +50,38 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-metadata-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: trim-cursor-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
+  windows:
+    runs-on: windows-2025
+    timeout-minutes: 32
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-performance
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 0ceacc58a612b3b3b2426459e734dcea7aab00ea
+          path: capstone
+          persist-credentials: false
+      - name: Test native MSVC formatter state
+        shell: pwsh
+        run: |
+          git -C capstone apply --ignore-space-change ../capstone-performance/candidate.patch
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake -S capstone -B build -A x64 -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF -DCAPSTONE_X86_SUPPORT=ON -DCAPSTONE_BUILD_CSTEST=ON -DCAPSTONE_BUILD_CSTOOL=OFF -DCAPSTONE_BUILD_LEGACY_TESTS=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build --config Release --target sstream --parallel 4
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir build -C Release --no-tests=error --output-on-failure -R '^unit_sstream$'
+          exit $LASTEXITCODE
+      - name: Retire disposable products
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path build) { Remove-Item -Recurse -Force build }
+          if (Test-Path capstone) { Remove-Item -Recurse -Force capstone }

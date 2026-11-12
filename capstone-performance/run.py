@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Place active MCInst metadata before the operand array without increasing the native structure size'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Keep the append cursor in the visible suffix after trimming a short-reported format result'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -298,11 +298,7 @@ panic = "abort"
     write('objects.json', objects)
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
-    prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix + 'arch/X86/X86Disassembler.c.o'}
-    allowed = set(objects['base'])
-    if not required <= set(changed) <= allowed:
-        raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
+    assert changed == ['CMakeFiles/capstone.dir/SStream.c.o'],changed
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
     binaries += list(libraries.values()) + [iced_library]

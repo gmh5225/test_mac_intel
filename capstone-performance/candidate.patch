@@ -1,42 +1,79 @@
-diff --git a/MCInst.h b/MCInst.h
-index 641480ed..015d9b52 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -149,16 +149,14 @@ struct MCInst {
- 	uint8_t op1_size; // size of 1st operand - for X86 Intel syntax
- 	uint8_t tied_op_idx_size; // Upper bound of populated tied_op_idx slots
- 	unsigned Opcode; // private opcode
--	MCOperand Operands[MAX_MC_OPS];
--	cs_insn *flat_insn; // insn to be exposed to public
--	uint64_t address; // address of this insn
--	cs_struct *csh; // save the main csh
--	uint8_t x86opsize; // opsize for [mem] operand
--
- 	// These flags could be used to pass some info from one target subcomponent
- 	// to another, for example, from disassembler to asm printer. The values of
- 	// the flags have any sense on target level only (e.g. prefixes on x86).
- 	unsigned flags;
-+	cs_insn *flat_insn; // insn to be exposed to public
-+	uint64_t address; // address of this insn
-+	cs_struct *csh; // save the main csh
-+	uint8_t x86opsize; // opsize for [mem] operand
+diff --git a/SStream.c b/SStream.c
+index f1fd1246..5d387fb0 100644
+--- a/SStream.c
++++ b/SStream.c
+@@ -145,6 +145,14 @@ void SStream_trimls(SStream *ss)
+ 		buf_off++;
+ 	}
+ 	if (buf_off > 0) {
++		// Keep an overreported cursor, but do not let an underreported
++		// count move the next write into the visible suffix.
++		if (ss->index < buf_off ||
++		    (ss->index < sizeof(ss->buffer) && ss->buffer[ss->index])) {
++			size_t written = buf_off + strlen(ss->buffer + buf_off);
++			if (ss->index < written)
++				ss->index = written;
++		}
+ 		memmove(ss->buffer, ss->buffer + buf_off,
+ 			SSTREAM_BUF_LEN - buf_off);
+ 		ss->index -= buf_off;
+diff --git a/tests/unit/sstream.c b/tests/unit/sstream.c
+index 8652b720..b6bfb228 100644
+--- a/tests/unit/sstream.c
++++ b/tests/unit/sstream.c
+@@ -1206,9 +1206,18 @@ bool test_printuint64_bang()
+ 	return true;
+ }
  
- 	// (Optional) instruction prefix, which can be up to 4 bytes.
- 	// A prefix byte gets value 0 when irrelevant.
-@@ -166,6 +164,7 @@ struct MCInst {
- 	uint8_t x86_prefix[4];
- 	uint8_t imm_size; // immediate size for X86_OP_IMM operand
- 	bool writeback; // writeback for ARM
-+	MCOperand Operands[MAX_MC_OPS];
- 	int8_t tied_op_idx
- 		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
- 	// operand access index for list of registers sharing the same access right (for ARM)
-@@ -250,8 +249,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
- static inline void MCInst_InitX86(MCInst *inst)
++static int trim_reported_length;
++
++static int report_trim_length(char *out, size_t size, const char *fmt,
++			      va_list args)
++{
++	vsnprintf(out, size, fmt, args);
++	return trim_reported_length;
++}
++
+ bool test_trimls()
  {
- 	memset(inst, 0, offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
--	memset((char *)inst + offsetof(MCInst, flat_insn), 0,
--	       offsetof(MCInst, tied_op_idx) - offsetof(MCInst, flat_insn));
+-	printf("Test test_replc\n");
++	printf("Test test_trimls\n");
  
- 	memset((char *)inst + offsetof(MCInst, ac_idx), 0,
- 	       offsetof(MCInst, evm_data) - offsetof(MCInst, ac_idx));
+ 	SStream OS = { 0 };
+ 	SStream_Init(&OS);
+@@ -1232,11 +1241,33 @@ bool test_trimls()
+ 	CHECK_OS_EQUAL_RET_FALSE(OS, "");
+ 
+ 	// Everywhere tabs
+-	char cmp_buf[SSTREAM_BUF_LEN] = { 0 };
+-	memset(cmp_buf, '\t', sizeof(cmp_buf) - 1);
++	memset(OS.buffer, '\t', sizeof(OS.buffer) - 1);
++	OS.buffer[sizeof(OS.buffer) - 1] = '\0';
++	OS.index = sizeof(OS.buffer) - 1;
+ 	SStream_trimls(&OS);
+ 	CHECK_OS_EQUAL_RET_FALSE(OS, "");
+ 	CHECK_INT_EQUAL_RET_FALSE(OS.index, 0);
++
++	// Preserve the visible suffix for underestimated counts, and keep a
++	// longer reported position for custom writers that use it to append.
++	for (trim_reported_length = 0; trim_reported_length <= 7;
++	     ++trim_reported_length) {
++		SStream_Init(&OS);
++		cs_vsnprintf_t saved = cs_vsnprintf;
++		cs_vsnprintf = report_trim_length;
++		SStream_concat(&OS, "%s", " \tadd");
++		cs_vsnprintf = saved;
++		SStream_trimls(&OS);
++		int expected = trim_reported_length <= 5 ?
++					  3 :
++					  trim_reported_length - 2;
++		CHECK_OS_EQUAL_RET_FALSE(OS, "add");
++		CHECK_INT_EQUAL_RET_FALSE(OS.index, expected);
++		SStream_concat1(&OS, 'q');
++		if (OS.buffer[expected] != 'q')
++			return false;
++		CHECK_INT_EQUAL_RET_FALSE(OS.index, expected + 1);
++	}
+ 	return true;
+ }
+ 
