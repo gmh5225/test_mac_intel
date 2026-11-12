@@ -1,0 +1,125 @@
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3276,6 +3276,111 @@
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 					 uint8_t prefix, X86ScanResult *result);
+ 
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_DIET)
++/* Generated from the ordinary x86 decoder, with standard unmasked EVEX addressing. */
++struct X86EvexScanForm {
++	uint16_t ids[2][3][2];
++	bool immediate;
++	bool reserved_v;
++};
++static const struct X86EvexScanForm x86_evex_scan_forms[] = {
++	{ { { { X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORD, X86_INS_VPXORD } }, { { X86_INS_VPXORQ, X86_INS_VPXORQ }, { X86_INS_VPXORQ, X86_INS_VPXORQ }, { X86_INS_VPXORQ, X86_INS_VPXORQ } } }, false, false },
++	{ { { { X86_INS_VAESENC, X86_INS_VAESENC }, { X86_INS_VAESENC, X86_INS_VAESENC }, { X86_INS_VAESENC, X86_INS_VAESENC } }, { { X86_INS_VAESENC, X86_INS_VAESENC }, { X86_INS_VAESENC, X86_INS_VAESENC }, { X86_INS_VAESENC, X86_INS_VAESENC } } }, false, false },
++	{ { { { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST }, { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST }, { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST } }, { { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST }, { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST }, { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST } } }, false, false },
++	{ { { { X86_INS_VAESDEC, X86_INS_VAESDEC }, { X86_INS_VAESDEC, X86_INS_VAESDEC }, { X86_INS_VAESDEC, X86_INS_VAESDEC } }, { { X86_INS_VAESDEC, X86_INS_VAESDEC }, { X86_INS_VAESDEC, X86_INS_VAESDEC }, { X86_INS_VAESDEC, X86_INS_VAESDEC } } }, false, false },
++	{ { { { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST }, { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST }, { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST } }, { { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST }, { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST }, { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST } } }, false, false },
++	{ { { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } }, { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } } }, true, false },
++	{ { { { X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD }, { X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD }, { X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD } }, { { X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ }, { X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ }, { X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ } } }, true, false },
++	{ { { { 0, 0 }, { X86_INS_VBROADCASTF32X4, 0 }, { X86_INS_VBROADCASTF32X4, 0 } }, { { 0, 0 }, { X86_INS_VBROADCASTF64X2, 0 }, { X86_INS_VBROADCASTF64X2, 0 } } }, false, true },
++	{ { { { 0, 0 }, { X86_INS_VBROADCASTI32X4, 0 }, { X86_INS_VBROADCASTI32X4, 0 } }, { { 0, 0 }, { X86_INS_VBROADCASTI64X2, 0 }, { X86_INS_VBROADCASTI64X2, 0 } } }, false, true },
++	{ { { { X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 }, { X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 }, { X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 } }, { { X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 }, { X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 }, { X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 } } }, false, true },
++	{ { { { X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 }, { X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 }, { X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 } }, { { X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 }, { X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 }, { X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 } } }, false, true },
++	{ { { { X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 }, { X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 }, { X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 } }, { { X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 }, { X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 }, { X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 } } }, false, true },
++	{ { { { X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 }, { X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 }, { X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 } }, { { X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 }, { X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 }, { X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 } } }, false, true },
++	{ { { { X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 }, { X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 }, { X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 } }, { { X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 }, { X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 }, { X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 } } }, false, true },
++	{ { { { X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 }, { X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 }, { X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 } }, { { X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 }, { X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 }, { X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 } } }, false, true },
++	{ { { { 0, 0 }, { X86_INS_VEXTRACTI32X4, X86_INS_VEXTRACTI32X4 }, { X86_INS_VEXTRACTI32X4, X86_INS_VEXTRACTI32X4 } }, { { 0, 0 }, { X86_INS_VEXTRACTI64X2, X86_INS_VEXTRACTI64X2 }, { X86_INS_VEXTRACTI64X2, X86_INS_VEXTRACTI64X2 } } }, true, true },
++	{ { { { 0, 0 }, { 0, 0 }, { X86_INS_VEXTRACTI32X8, X86_INS_VEXTRACTI32X8 } }, { { 0, 0 }, { 0, 0 }, { X86_INS_VEXTRACTI64X4, X86_INS_VEXTRACTI64X4 } } }, true, true },
++	{ { { { X86_INS_VPSHUFB, X86_INS_VPSHUFB }, { X86_INS_VPSHUFB, X86_INS_VPSHUFB }, { X86_INS_VPSHUFB, X86_INS_VPSHUFB } }, { { X86_INS_VPSHUFB, X86_INS_VPSHUFB }, { X86_INS_VPSHUFB, X86_INS_VPSHUFB }, { X86_INS_VPSHUFB, X86_INS_VPSHUFB } } }, false, false },
++	{ { { { X86_INS_VPADDD, X86_INS_VPADDD }, { X86_INS_VPADDD, X86_INS_VPADDD }, { X86_INS_VPADDD, X86_INS_VPADDD } }, { { 0, 0 }, { 0, 0 }, { 0, 0 } } }, false, false },
++	{ { { { 0, 0 }, { 0, 0 }, { 0, 0 } }, { { X86_INS_VPADDQ, X86_INS_VPADDQ }, { X86_INS_VPADDQ, X86_INS_VPADDQ }, { X86_INS_VPADDQ, X86_INS_VPADDQ } } }, false, false },
++	{ { { { 0, 0 }, { X86_INS_VSHUFI32X4, X86_INS_VSHUFI32X4 }, { X86_INS_VSHUFI32X4, X86_INS_VSHUFI32X4 } }, { { 0, 0 }, { X86_INS_VSHUFI64X2, X86_INS_VSHUFI64X2 }, { X86_INS_VSHUFI64X2, X86_INS_VSHUFI64X2 } } }, true, false },
++	{ { { { 0, 0 }, { 0, 0 }, { 0, 0 } }, { { X86_INS_VPMADD52LUQ, X86_INS_VPMADD52LUQ }, { X86_INS_VPMADD52LUQ, X86_INS_VPMADD52LUQ }, { X86_INS_VPMADD52LUQ, X86_INS_VPMADD52LUQ } } }, false, false },
++	{ { { { 0, 0 }, { 0, 0 }, { 0, 0 } }, { { X86_INS_VPMADD52HUQ, X86_INS_VPMADD52HUQ }, { X86_INS_VPMADD52HUQ, X86_INS_VPMADD52HUQ }, { X86_INS_VPMADD52HUQ, X86_INS_VPMADD52HUQ } } }, false, false },
++	{ { { { 0, 0 }, { X86_INS_VINSERTI32X4, X86_INS_VINSERTI32X4 }, { X86_INS_VINSERTI32X4, X86_INS_VINSERTI32X4 } }, { { 0, 0 }, { X86_INS_VINSERTI64X2, X86_INS_VINSERTI64X2 }, { X86_INS_VINSERTI64X2, X86_INS_VINSERTI64X2 } } }, true, false },
++	{ { { { X86_INS_VALIGND, X86_INS_VALIGND }, { X86_INS_VALIGND, X86_INS_VALIGND }, { X86_INS_VALIGND, X86_INS_VALIGND } }, { { X86_INS_VALIGNQ, X86_INS_VALIGNQ }, { X86_INS_VALIGNQ, X86_INS_VALIGNQ }, { X86_INS_VALIGNQ, X86_INS_VALIGNQ } } }, true, false },
++	{ { { { X86_INS_VPANDD, X86_INS_VPANDD }, { X86_INS_VPANDD, X86_INS_VPANDD }, { X86_INS_VPANDD, X86_INS_VPANDD } }, { { X86_INS_VPANDQ, X86_INS_VPANDQ }, { X86_INS_VPANDQ, X86_INS_VPANDQ }, { X86_INS_VPANDQ, X86_INS_VPANDQ } } }, false, false },
++};
++static const struct X86EvexScanForm *evex_scan_form(unsigned key)
++{
++	switch (key) {
++	case 0x5ef: return &x86_evex_scan_forms[0];
++	case 0x9dc: return &x86_evex_scan_forms[1];
++	case 0x9dd: return &x86_evex_scan_forms[2];
++	case 0x9de: return &x86_evex_scan_forms[3];
++	case 0x9df: return &x86_evex_scan_forms[4];
++	case 0xd44: return &x86_evex_scan_forms[5];
++	case 0xd25: return &x86_evex_scan_forms[6];
++	case 0x91a: return &x86_evex_scan_forms[7];
++	case 0x95a: return &x86_evex_scan_forms[8];
++	case 0x56f: return &x86_evex_scan_forms[9];
++	case 0x66f: return &x86_evex_scan_forms[10];
++	case 0x76f: return &x86_evex_scan_forms[11];
++	case 0x57f: return &x86_evex_scan_forms[12];
++	case 0x67f: return &x86_evex_scan_forms[13];
++	case 0x77f: return &x86_evex_scan_forms[14];
++	case 0xd39: return &x86_evex_scan_forms[15];
++	case 0xd3b: return &x86_evex_scan_forms[16];
++	case 0x900: return &x86_evex_scan_forms[17];
++	case 0x5fe: return &x86_evex_scan_forms[18];
++	case 0x5d4: return &x86_evex_scan_forms[19];
++	case 0xd43: return &x86_evex_scan_forms[20];
++	case 0x9b4: return &x86_evex_scan_forms[21];
++	case 0x9b5: return &x86_evex_scan_forms[22];
++	case 0xd38: return &x86_evex_scan_forms[23];
++	case 0xd03: return &x86_evex_scan_forms[24];
++	case 0x5db: return &x86_evex_scan_forms[25];
++	default: return NULL;
++	}
++}
++
++/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
++ * public IDs of ordinary vector register or base/index addresses are used. */
++static bool tryEvexTerminalScan(const uint8_t *code, size_t size,
++                                X86ScanResult *result)
++{
++	if (size < 6 || code[0] != 0x62 || !(code[2] & 4) ||
++	    (code[3] & 0x97) || (code[3] & 0x60) == 0x60)
++		return false;
++	unsigned key = ((code[1] & 15) << 10) | ((code[2] & 3) << 8) | code[4];
++	const struct X86EvexScanForm *form = evex_scan_form(key);
++	if (!form || (form->reserved_v && ((code[2] & 0x78) != 0x78 || !(code[3] & 8))))
++		return false;
++	bool reg = code[5] >= 0xc0;
++	unsigned id = form->ids[code[2] >> 7][code[3] >> 5][reg];
++	if (!id)
++		return false;
++	size_t length = 6;
++	if (!reg) {
++		InternalInstruction insn = { 0 };
++		initializeInstructionHeader(&insn, code, size, CS_MODE_64);
++		insn.readerCursor = 5;
++		insn.addressSize = 8;
++		if (readModRMScan(&insn))
++			return false;
++		length = insn.readerCursor;
++	}
++	length += form->immediate;
++	if (length > size)
++		return false;
++	result->opcode = 0;
++	result->opcode_pub = id;
++	result->length = (uint16_t)length;
++	result->popcode_adjust = 0;
++	return true;
++}
++#endif
++
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+@@ -3358,6 +3463,10 @@
+ 			return true;
+ 		}
+ 	}
++#endif
++#if !defined(CAPSTONE_X86_REDUCE) && !defined(CAPSTONE_DIET)
++	if (opcode == 0x62 && handle->mode == CS_MODE_64 && handle->insn_id == X86_get_insn_id && tryEvexTerminalScan(code, code_len, result))
++		return true;
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
