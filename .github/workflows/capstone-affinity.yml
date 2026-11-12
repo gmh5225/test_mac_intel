@@ -1,9 +1,9 @@
-name: Verify AArch64 initialization on native mixed architecture products
+name: Qualify AArch64 initialization on the released formatter and unchanged x86 workloads
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-constructed-aarch64-products]
+    branches: [codex/capstone-aarch64-current-release]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-constructed-aarch64-products
+  group: capstone-aarch64-current-release
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,52 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aarch64-products-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: aarch64-current-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
+
+  compiler:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [windows-2025, ubuntu-24.04]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-performance
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: f6054796e7ecf52e174edf336c564facb1d762e0
+          path: source
+          persist-credentials: false
+      - name: Check the full MC suite and public decoder units
+        shell: pwsh
+        run: |
+          git -C source apply --ignore-space-change ../capstone-performance/candidate.patch
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $config = @('-G', 'Ninja', '-DCMAKE_C_COMPILER=gcc', '-DCMAKE_CXX_COMPILER=g++')
+          if ($IsWindows) { $config = @('-A', 'x64') }
+          cmake -S source -B build @config -DCMAKE_BUILD_TYPE=Release -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF -DCAPSTONE_AARCH64_SUPPORT=ON -DCAPSTONE_X86_SUPPORT=ON -DCAPSTONE_BUILD_CSTEST=ON -DCAPSTONE_BUILD_CSTOOL=OFF -DCAPSTONE_BUILD_LEGACY_TESTS=OFF
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build --config Release --target cstest mcinst aarch64_postprocess x86_encoding_accuracy sstream --parallel 4
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir build -C Release --no-tests=error --output-on-failure -R '^unit_(mcinst|aarch64_postprocess|x86_encoding_accuracy|sstream)$'
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $name = if ($IsWindows) { 'cstest.exe' } else { 'cstest' }
+          $bin = Get-ChildItem build -File -Recurse -Filter $name | Select-Object -First 1
+          if (!$bin) { throw 'MC test runner missing' }
+          & $bin.FullName source/tests/MC/AArch64 source/tests/MC/X86 > mc.log
+          $result = $LASTEXITCODE
+          Get-Content mc.log -Tail 18
+          exit $result
+      - if: always()
+        shell: pwsh
+        run: |
+          foreach ($path in 'build','source','mc.log') {
+            if (Test-Path $path) { Remove-Item -Recurse -Force $path }
+          }
