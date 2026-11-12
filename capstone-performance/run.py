@@ -381,10 +381,14 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
+    for label in ('base','new'):
+        binary=WORK/('decoder-'+label)
+        command(['nm','-n','-S','--defined-only',binary],'linked-symbols-'+label)
+        command(['objdump','-d','--disassemble=cs_disasm_iter',binary],'linked-cs_disasm_iter-'+label)
     selected={('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('simd64','format'),('simd64','detail'),('amd64-ls','detail')}
     checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
     measure_panel('null',[c for c in checks if c['mode']=='detail' and c['name']!='amd64-ls'],9,['base','new','base_aa','new_aa'],350000000)
-    measure_panel('other',checks,23,['base','new','base_aa','new_aa'],350000000)
+    measure_panel('x86',checks,17,['base','new','base_aa','new_aa','iced','iced_aa'],280000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 

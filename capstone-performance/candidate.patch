@@ -117,7 +117,7 @@ index 97b899b5..ae1554b0 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..33554c1b 100644
+index 90ef6e93..30fe4931 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2942,6 +2942,12 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -240,6 +240,41 @@ index 90ef6e93..33554c1b 100644
  	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
  				   instructionID, size, true, readerFlags);
  }
+@@ -3633,7 +3732,15 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
+ 					false);
+ }
+ 
+-X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
++/* The legacy scan uses substantially more local storage than text output.
++ * Keep that storage in the scan arm of the public iterator on x64 GCC. */
++#if defined(X86_COMPACT_PUBLIC_HEADER) && defined(__x86_64__)
++#define X86_ITERATOR_SCAN static __attribute__((noinline))
++#else
++#define X86_ITERATOR_SCAN X86_DECODE_INLINE
++#endif
++
++X86_ITERATOR_SCAN bool decodeIteratorScan(cs_struct *handle,
+ 					  const uint8_t *code, size_t size,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch);
+@@ -3645,7 +3752,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ /* Keep the admitted terminal's public ID and zero alias adjustment visible
+  * through output completion. Cold helpers can take the fallback result's
+  * address without forcing terminal output through that escaped object. */
+-X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
++X86_ITERATOR_SCAN bool decodeIteratorScan(cs_struct *handle,
+ 					  const uint8_t *code, size_t size,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch)
+@@ -3672,6 +3779,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
+ 
++#undef X86_ITERATOR_SCAN
++
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
 index 5627f249..dcaf2508 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc
