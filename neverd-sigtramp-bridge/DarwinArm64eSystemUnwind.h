@@ -53,6 +53,11 @@ static inline bool ndDarwinArm64eCrossSignalTrampoline(
       return false;
     Seen |= 1u << Index;
   }
+  // Setting IP can apply the old frame's GNU argument-size adjustment. The
+  // interrupted row has already established the exact caller SP.
+  unw_proc_info_t Info;
+  if (unw_get_proc_info(System, &Info) || Info.gp)
+    return false;
   if (unw_set_reg(System, UNW_REG_SP, Caller.SP) ||
       unw_set_reg(System, UNW_ARM64_FP, Caller.FP) ||
       unw_set_reg(System, UNW_ARM64_LR, Caller.LR))
@@ -64,7 +69,14 @@ static inline bool ndDarwinArm64eCrossSignalTrampoline(
   // cursor's current SP. A function-pointer signature uses a different schema.
   const void *PC = ptrauth_sign_unauthenticated(
       (void *)Caller.PC, ptrauth_key_return_address, Caller.SP);
-  return unw_set_reg(System, UNW_REG_IP, (uintptr_t)PC) == 0;
+  unw_word_t SP;
+  if (unw_set_reg(System, UNW_REG_IP, (uintptr_t)PC) ||
+      unw_get_reg(System, UNW_REG_SP, &SP) || SP != Caller.SP ||
+      unw_get_proc_info(System, &Info))
+    return false;
+  // Darwin's setter looks up an exact PC. If a call ends at the start of
+  // another function, that record cannot unwind the call site.
+  return Info.start_ip < Caller.PC && Caller.PC <= Info.end_ip;
 }
 #endif // defined(__APPLE__) && defined(__arm64e__)
 
