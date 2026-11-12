@@ -1,8 +1,8 @@
-name: Measure direct x86 relative text and details against current Capstone and native iced
+name: Validate portable integer output with MSVC and time eight real Windows PE programs
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-relative-details-windows]
+    branches: [codex/capstone-windows-integer-output]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -11,9 +11,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { crt: MD, image: windows-2022 }
-          - { crt: MT, image: windows-2022 }
+        crt: [MD, MT]
+        product: [dedicated, four]
+        image: [windows-2022]
+    env:
+      PRODUCT: ${{ matrix.product }}
     runs-on: ${{ matrix.image }}
     timeout-minutes: 100
     steps:
@@ -22,11 +24,11 @@ jobs:
           persist-credentials: false
           sparse-checkout: capstone-performance
       - name: Build sources, compare snapshots and measure
-        run: python capstone-performance/msvc/ipo.py ${{ matrix.crt }}
+        run: python capstone-performance/msvc/run.py ${{ matrix.crt }}
       - name: Retain exact inputs, control measurements and cleanup receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: relative-details-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: windows-integer-${{ matrix.image }}-${{ matrix.crt }}-${{ matrix.product }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14

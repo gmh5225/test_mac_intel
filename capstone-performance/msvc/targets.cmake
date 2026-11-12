@@ -14,3 +14,8 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
 
 add_executable(native_checked "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/x86_printer_prechecked.c")
 target_link_libraries(native_checked PRIVATE capstone_static)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/x86_simple_output.c")
+  add_executable(native_simple "${CMAKE_CURRENT_SOURCE_DIR}/tests/unit/x86_simple_output.c")
+  target_link_libraries(native_simple PRIVATE capstone_static)
+endif()

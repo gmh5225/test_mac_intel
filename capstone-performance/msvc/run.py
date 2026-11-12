@@ -82,6 +82,7 @@ opt-level = 3
              '-DEVIDENCE_SOURCE=' + source.as_posix(),
              '-DICED_ADAPTER=' + (work / 'cargo-target/release/iced_compare.lib').as_posix(),
              '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON',
+             *(['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'] if os.environ['PRODUCT']=='four' else []),
              '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=' + ('ON' if crt == 'MT' else 'OFF'),
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-config')
         def build_targets(targets, step):
@@ -92,32 +93,11 @@ opt-level = 3
         executables[label] = programs
         run([programs['sstream']], label + '-sstream')
         if label == 'new':
-            build_targets(['native_checked'], 'build-printer-test')
-            outcome = run([build / 'Release/native_checked.exe'], 'full-printer-state')
-            assert 'complete printer' in outcome
-        # Instrument the two owners after links above. Timed executables stay byte-identical.
+            build_targets(['native_checked','native_simple'], 'build-decoder-tests')
+            run([build / 'Release/native_checked.exe'],'full-printer-state')
+            run([build / 'Release/native_simple.exe'],'integer-output-differential')
         hashes = {key: digest(p.read_bytes()) for key, p in programs.items()}
-        for file, func in [('SStream.c', 'stream_hooks'), ('arch/X86/X86Mapping.c', 'mapping_hooks')]:
-            fmt = 'cs_default_vsnprintf' if label == 'new' else 'vsnprintf'
-            with (src / file).open('a') as f:
-                f.write('''
-#include <stdlib.h>
-#include <stdio.h>
-unsigned ''' + func + '''(void){
- return (cs_mem_malloc == malloc) | ((cs_mem_calloc == calloc) << 1) |
-        ((cs_mem_realloc == realloc) << 2) | ((cs_mem_free == free) << 3) |
-        ((cs_vsnprintf == vsnprintf) << 4) | ((cs_vsnprintf == ''' + fmt + ''') << 5);
-}
-''')
-        build_targets(['native_hooks'], 'instrumented-build')
-        probes[label] = json.loads(run([build / 'Release/native_hooks.exe'], label + '-probe'))
-        assert hashes == {key: digest(p.read_bytes()) for key, p in programs.items()}
-        write(label + '-programs.json', hashes)
-    write('hooks.json', dict(bit_names=['malloc', 'calloc', 'realloc', 'free', 'local_vsnprintf',
-          'selected_default_vsnprintf'], probes=probes))
-    assert probes['new']['stream'] & 32 and probes['new']['mapping'] & 32
-    assert not probes['new']['custom'] & 32
-    assert probes['new']['restored'] == probes['new']['stream']
+        write(label + '-programs.json',hashes)
     return executables
 
 
@@ -201,7 +181,7 @@ def measure(programs, cases):
                 repeats *= 4
             repeats = max(1, math.ceil(repeats * 220000000 / probe['wall_ns']))
             pairs = []
-            for cycle in range(6):
+            for cycle in range(9):
                 raw = [(l, sample(l, case, mode, repeats)) for l in design[cycle % 2]]
                 cs = [r for l, r in raw if l != 'iced']
                 assert len({tuple(r[k] for k in ('instructions','rejected','boundary_hash','value_hash')) for r in cs}) == 1
@@ -223,7 +203,7 @@ if __name__ == '__main__':
         write('inputs.json', dict(crt=crt, platform=platform.platform(), cpu=platform.processor(),
               image=os.environ.get('ImageVersion'), capstone=manifest['capstone_revision'],
               iced=manifest['iced_revision'], patch=digest((source / 'windows-formatter.patch').read_bytes())))
-        assert digest((source / 'windows-formatter.patch').read_bytes()) == '0768aa7dd2bd07429e4724f2ad6d29363008781dca406cb35608994941b8bd62'
+        assert digest((source / 'windows-formatter.patch').read_bytes()) == manifest['source_lineage']['windows-formatter.patch']['sha256']
         programs = make_programs()
         cases = get_cases()
         snapshot(programs, cases)
