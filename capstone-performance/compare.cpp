@@ -128,9 +128,10 @@ static Result capstone_run(const uint8_t *bytes, size_t count, unsigned bits,
       size_t offset = cursor - bytes;
       bool ok =
 #ifdef USE_X86_OUTPUT_ITERATOR
-          mode ? X86_disasmIter(handle, &cursor, &left, &ip, insn) :
-#endif
+          X86_disasmIter(handle, &cursor, &left, &ip, insn);
+#else
           cs_disasm_iter(handle, &cursor, &left, &ip, insn);
+#endif
       record(result, offset, ok ? insn->size : 1, ok);
       if (!ok) {
         ++cursor;
