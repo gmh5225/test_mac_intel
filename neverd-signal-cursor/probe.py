@@ -27,7 +27,7 @@ compile_only = os.environ.get('NEVERD_CURSOR_COMPILE_ONLY') == '1'
 rev = subprocess.check_output(['git', '-C', source, 'rev-parse', p['source']], text=True).strip()
 assert rev == p['source']
 report = {'source': rev, 'fixture_sha256': hashlib.sha256(fixture.encode()).hexdigest(),
-          'results': [], 'ucontext_cursor_qualified': False}
+          'results': [], 'signal_handoff_qualified': False}
 try:
     with tempfile.TemporaryDirectory() as td:
         td = Path(td)
@@ -39,7 +39,7 @@ try:
         driver = driver.replace('static void observe(', (base / p['unwind']).read_text() + '\nstatic void observe(')
         driver = driver.replace('  atomic_store(&state.done, stage);',
                                 '  if (stage == target_stage) walk_signal(regs, s->pc, caller, entry_sp);\n  atomic_store(&state.done, stage);')
-        driver = driver.replace('if (argc != 5)', 'if (argc != 7)').replace('  alarm(20);','  target_stage = atoi(argv[5]); parent_seed = atoi(argv[6]);\n  alarm(20);')
+        driver = driver.replace('if (argc != 5)', 'if (argc != 7)').replace('  alarm(20);','  target_stage = atoi(argv[5]); framed_entry = atoi(argv[6]);\n  alarm(20);')
         for name, text in [('stages.S', body('kAssembly')), ('companion.S', body('kOriginalCompanion')),
                            ('caller.S', wrapper), ('driver.c', driver)]:
             (td/name).write_text(text)
@@ -60,14 +60,14 @@ try:
             if compile_only:
                 continue
             # Zero exercises the compiler-original hardware control without a cursor.
-            for stage, parent in [(0, 0), *((v, m) for v in p['stages'] for m in [0, 1])]:
-                r = run([td/'driver', image, 0, 3, td/'samples', stage, parent], td)
-                report['results'].append({'profile': profile, 'stage': stage, 'parent_seed': bool(parent),
+            for stage in [0, *p['stages']]:
+                r = run([td/'driver', image, 0, 3, td/'samples', stage, int(framed)], td)
+                report['results'].append({'profile': profile, 'stage': stage,
                                           'exit': r.returncode, 'trace': r.stderr[-2048:]})
                 if stage == 0:
                     r.check_returncode()
-        report['ucontext_cursor_qualified'] = not compile_only and all(r['exit'] == 0 for r in report['results'])
+        report['signal_handoff_qualified'] = not compile_only and all(r['exit'] == 0 for r in report['results'])
 finally:
     Path(p['report']).write_text(json.dumps(report, indent=2) + '\n')
-if not compile_only and not report['ucontext_cursor_qualified']:
+if not compile_only and not report['signal_handoff_qualified']:
     raise SystemExit(1)
