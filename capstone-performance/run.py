@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Place active MCInst metadata before the operand array without increasing the native structure size'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Place common formatter flags and cursor before the aligned inline buffer'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -210,6 +210,21 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    blackbox = {}
+    for variant in ('base','new'):
+        tree = WORK / variant
+        exe = WORK / ('stream-state-'+variant)
+        command(['clang','-std=c11','-O3','-DNDEBUG',*defs,'-I',tree,'-I',tree/'include',
+                 SOURCE/'stream-state.c', WORK/(variant+'-build/libcapstone.a'),'-o',exe],
+                'compile-stream-state-'+variant)
+        layout = list(map(int,subprocess.check_output([exe,'layout'],text=True).split()))
+        state = subprocess.check_output([exe])
+        assert len(state)==16*512*3*(8+4+512)
+        blackbox[variant]=dict(layout=layout,states=16*512*3,sha256=hashlib.sha256(state).hexdigest())
+    assert blackbox['base']['layout'][0]==blackbox['new']['layout'][0]
+    assert blackbox['base']['layout'][1] == 0 and blackbox['new']['layout'][1] == 16
+    assert blackbox['base']['sha256']==blackbox['new']['sha256']
+    write('stream-state.json',blackbox)
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label

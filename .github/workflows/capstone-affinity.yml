@@ -1,9 +1,9 @@
-name: Verify compact common instruction metadata with complete public records
+name: Qualify the output stream layout on real formatter and detail workloads
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-compact-common-metadata]
+    branches: [codex/capstone-formatter-stream-header]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-compact-common-metadata
+  group: capstone-formatter-stream-header
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-metadata-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: formatter-stream-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
