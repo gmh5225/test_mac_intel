@@ -60,7 +60,7 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang',
+             '-DCMAKE_C_COMPILER=gcc',
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
@@ -131,7 +131,7 @@ def prepare():
     else:
         command(['uname', '-a'], 'os')
         command(['lscpu', '--json'], 'host')
-    for tool in ['clang', 'clang++', 'rustc', 'cargo', 'cmake', 'ninja']:
+    for tool in ['gcc', 'clang', 'clang++', 'rustc', 'cargo', 'cmake', 'ninja']:
         command([tool, '--version'], 'version-' + tool.replace('+', 'p'))
     write('environment.json', dict(uname=list(platform.uname()),
           runner_image=os.environ.get('ImageVersion'), runner_os=os.environ.get('RUNNER_OS'),
@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='construct public Intel relative targets and operand details from terminal descriptors'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='write prechecked hexadecimal digits with word-parallel arithmetic'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
