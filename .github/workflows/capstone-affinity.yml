@@ -1,9 +1,9 @@
-name: Validate relative branches and MOV base addressing against the integer release in dedicated builds
+name: Verify group-1 immediate output on PE, ELF and other architecture controls in dedicated builds
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-base-memory-dedicated]
+    branches: [codex/capstone-group1-recheck-dedicated]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-base-memory-dedicated
+  group: capstone-group1-recheck-dedicated
   cancel-in-progress: false
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mov-base-dedicated-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: immediate-output-dedicated-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
