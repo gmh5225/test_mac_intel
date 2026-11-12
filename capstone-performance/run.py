@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='isolated EVEX scanner and nine register output families'))
+    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='compact initial public terminal on dedicated GCC, existing generated reader elsewhere'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -214,7 +214,13 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    expected = ['arch/X86/X86DisassemblerDecoder.c.o'] if os.environ['COMPARE_BASE']=='gcc' else []
+    assert diffs==expected,(diffs,expected)
+    if expected:
+        command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
+        command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
+    else:
+        assert sha(WORK/'decoder-base')==sha(WORK/'decoder-new')
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
@@ -375,9 +381,9 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    selected={'putty-32-0.85','putty-64-0.85','simd64','scalar32','scalar64','amd64-ls'}
-    checks=[v for v in cases if v['name'] in selected and v['consumer']=='decoder']
-    assert len(checks)==18
+    selected={'putty-32-0.85','putty-64-0.85','simd64','scalar32','scalar64','amd64-ls','amd64-cp','amd64-sort'}
+    checks=[v for v in cases if v['name'] in selected and v['consumer']=='decoder' and (v['mode']=='scan' or v['name'] in ('putty-32-0.85','simd64'))]
+    assert len(checks)==12
     for label in ('base','new'):
         binary=WORK/('decoder-'+label);command(['nm','-n','-S','--defined-only',binary],'linked-symbols-'+label)
         for symbol in ('cs_disasm_iter','cs_decode_full_insn','X86_trySimpleOutput','decodeScanResultGeneric','decodeScanResultFallback','tryEvexTerminalScan','writeEvexRegisterOutput'):
