@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Limit legacy post-printer repairs to the first memory operand'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Construct the four trailing x86 address operands with one capacity check'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -270,8 +270,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix + 'arch/X86/X86Mapping.c.o'}
-    allowed = required
+    required = {prefix + 'arch/X86/X86Disassembler.c.o'}
+    allowed = set(objects['base'])
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
