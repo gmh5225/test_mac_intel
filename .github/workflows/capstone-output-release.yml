@@ -1,0 +1,37 @@
+name: Run the final x86 release and unit tests in ten independent native MSVC configurations
+on:
+  push:
+    branches: [codex/capstone-msvc-output-release-units]
+    paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [MD, MT]
+        profile: [four, dedicated, diet, reduced, intel]
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      TOOLCHAIN: ${{ matrix.cc }}
+      PROFILE: ${{ matrix.profile }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-output-release
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 64cce0a934f99ae582d30ffe2ba265d12ec823bb
+          path: source
+          persist-credentials: false
+      - run: python capstone-output-release/verify.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: output-release-${{ matrix.profile }}-${{ matrix.cc }}
+          path: evidence/
+          retention-days: 14
