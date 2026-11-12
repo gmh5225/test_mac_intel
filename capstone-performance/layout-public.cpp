@@ -35,7 +35,7 @@ const Config configs[] = {
   {CS_ARCH_ARM, CS_MODE_ARM, CS_OPT_SYNTAX_DEFAULT,"arm-ls","arm-ls.text"},
   {CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN, CS_OPT_SYNTAX_DEFAULT,"arm64-ls","arm64-ls.text"},
   {CS_ARCH_MIPS, CS_MODE_MIPS64, CS_OPT_SYNTAX_DEFAULT,"mips64el-ls","mips64el-ls.text"},
-  {CS_ARCH_RISCV, cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCVC), CS_OPT_SYNTAX_DEFAULT,"riscv64-ls","riscv64-ls.text"},
+  {CS_ARCH_RISCV, cs_mode(CS_MODE_RISCV64 | CS_MODE_RISCV_C), CS_OPT_SYNTAX_DEFAULT,"riscv64-ls","riscv64-ls.text"},
   {CS_ARCH_SPARC, cs_mode(CS_MODE_V9 | CS_MODE_BIG_ENDIAN), CS_OPT_SYNTAX_DEFAULT,"sparc64-ls","sparc64-ls.text"},
   {CS_ARCH_LOONGARCH, CS_MODE_LOONGARCH64, CS_OPT_SYNTAX_DEFAULT,"loong64-ls","loong64-ls.text"},
   {CS_ARCH_X86, CS_MODE_16, CS_OPT_SYNTAX_DEFAULT,"putty-32-0.85-16-DEFAULT","putty-32-0.85.text"},
