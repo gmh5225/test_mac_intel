@@ -216,8 +216,22 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     difference=sorted(n for n in changed[0] if changed[0][n]!=changed[1][n])
-    assert difference==['cs.c.o'],difference
+    assert difference==['MCInst.c.o','cs.c.o'],difference
     write('object-difference.json',dict(changed=difference,total=len(changed[0])))
+    import re, shlex
+    bodies=[]
+    for label in ('base','new'):
+        spec=json.loads((WORK/(label+'-build/compile_commands.json')).read_text())
+        source=next(q for q in spec if q['file'].endswith('/cs.c'))
+        args=shlex.split(source['command'])
+        idx=args.index('-o');del args[idx:idx+2];args.remove('-c')
+        asm=WORK/(label+'-cs.s')
+        command(args+['-S','-o',asm],'decoder-assembly-'+label,Path(source['directory']))
+        match=re.search(r'^_?cs_decode_full_insn:[^\n]*\n(.*?^\s*\.cfi_endproc)',asm.read_text(),re.M|re.S)
+        assert match and 'MCInst_Init' in match[1]
+        bodies.append(match[1].replace('MCInst_InitForDecode','MCInst_Init'))
+    assert bodies[0]==bodies[1], 'full decoder assembly changed beyond the fallback call target'
+    write('decoder-assembly.json',dict(same_except_call_target=True,sha256=hashlib.sha256(bodies[0].encode()).hexdigest()))
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label

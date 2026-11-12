@@ -1,17 +1,43 @@
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..a3aad8c1 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -206,3 +206,11 @@ void MCInst_setSoftFail(MCInst *MI)
+ 	assert(MI && MI->flat_insn);
+ 	MI->flat_insn->illegal = true;
+ }
++
++#ifdef CAPSTONE_HAS_AARCH64
++void MCInst_InitForDecode(MCInst *inst, cs_arch arch)
++{
++	/* The AArch64 decoder constructs its operands before printing. */
++	MCInst_InitStorage(inst, arch, arch != CS_ARCH_AARCH64);
++}
++#endif
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..ad98aaaf 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -262,6 +262,9 @@ static inline void MCInst_InitX86(MCInst *inst)
+ }
+ 
+ void MCInst_Init(MCInst *inst, cs_arch arch);
++#ifdef CAPSTONE_HAS_AARCH64
++void MCInst_InitForDecode(MCInst *inst, cs_arch arch);
++#endif
+ 
+ CS_MCINST_INLINE void MCInst_clear(MCInst *inst)
+ {
 diff --git a/cs.c b/cs.c
-index 8db01e0d..29db990d 100644
+index 8db01e0d..e2cd5237 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1049,6 +1049,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitX86(&mci);
- 	else
+@@ -1059,6 +1059,8 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ #ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+ 	/* The RISC-V decoder constructs each operand before reading it. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
++#elif defined(CAPSTONE_HAS_AARCH64)
++		MCInst_InitForDecode(&mci, handle->arch);
+ #else
+ 		MCInst_Init(&mci, handle->arch);
  #endif
-+#ifdef CAPSTONE_HAS_AARCH64
-+	if (handle->arch == CS_ARCH_AARCH64)
-+		/* The AArch64 decoder constructs its operands before printing. */
-+		MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+	else
-+#endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
- 		/* MIPS constructs each MCOperand before reading it. The public
