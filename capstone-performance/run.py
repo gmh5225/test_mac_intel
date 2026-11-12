@@ -199,6 +199,15 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    digests={}
+    for label in ('base','new'):
+        run_source=WORK/label
+        command(['clang','-O2','-std=c99','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',run_source,'-I',run_source/'include',SOURCE/'pair-state.c',WORK/(label+'-build/libcapstone.a'),'-o',WORK/(label+'-pairs')],label+'-pair-compile')
+        trace=WORK/(label+'.pairs')
+        with trace.open('wb') as sink:subprocess.run([WORK/(label+'-pairs')],stdout=sink,check=True)
+        assert trace.stat().st_size==65537*2*2*8*10
+        digests[label]=sha(trace);trace.unlink()
+    assert digests['base']==digests['new'];write('pair-states.json',dict(states=65537*2*2*8,digests=digests))
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
@@ -236,8 +245,8 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix+'cs.c.o',prefix+'arch/X86/X86DisassemblerDecoder.c.o',prefix+'arch/X86/X86IntelInstPrinter.c.o'}
-    allowed = required | {prefix+'SStream.c.o',prefix+'arch/X86/X86IntelInstPrinterPrechecked.c.o',prefix+'arch/X86/X86IntelInstPrinterNumbers.c.o'}
+    required = {prefix+'arch/X86/X86IntelInstPrinter.c.o',prefix+'arch/X86/X86ATTInstPrinter.c.o',prefix+'arch/X86/X86Mapping.c.o'}
+    allowed = required | {prefix+'arch/X86/X86IntelInstPrinterPrechecked.c.o'}
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
