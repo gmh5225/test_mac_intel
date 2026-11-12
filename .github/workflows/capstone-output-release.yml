@@ -1,7 +1,7 @@
-name: Validate group-1, regenerated EVEX output and isolated AArch64 scan in Windows Release and DIET
+name: Verify isolated vector decoding against published group-1 release in profiles profiles
 on:
   push:
-    branches: [codex/capstone-x86-group1-and-aarch64-release]
+    branches: [codex/capstone-isolated-vector-release]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -11,11 +11,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cc: MD, profile: dedicated, forms: group1 }
-          - { cc: MT, profile: four, forms: group1 }
-          - { cc: MD, profile: aarch64, forms: arm64 }
-          - { cc: MT, profile: arm64-diet, forms: arm64 }
-          - { cc: MT, profile: dedicated, forms: vector }
+          - { cc: MD, profile: dedicated, forms: isolated }
+          - { cc: MT, profile: four, forms: isolated }
+          - { cc: MD, profile: intel, forms: isolated }
+          - { cc: MD, profile: reduced, forms: isolated }
+          - { cc: MT, profile: diet, forms: isolated }
     runs-on: windows-2022
     timeout-minutes: 60
     env:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: e2bfdc5ca6c847404c2c60e24fcb2567ac835ec6
+          ref: f53af83fd00b3403be328033a285915da723d8dc
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py

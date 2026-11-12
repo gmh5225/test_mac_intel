@@ -11,7 +11,7 @@ def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 def clean(path):
  def writable(fn,v,exc):os.chmod(v,0o700);fn(v)
  shutil.rmtree(path,onerror=writable)
-assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()=='e2bfdc5ca6c847404c2c60e24fcb2567ac835ec6'
+assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()=='f53af83fd00b3403be328033a285915da723d8dc'
 t=Path(tempfile.mkdtemp(prefix='capstone-x86-record-release-'));done={}
 try:
  configs={'four':(['X86','ARM','AARCH64','MIPS'],[]),'dedicated':(['X86'],[]),'diet':(['X86'],['-DCAPSTONE_BUILD_DIET=ON']),'reduced':(['X86'],['-DCAPSTONE_X86_REDUCE=ON']),'intel':(['X86'],['-DCAPSTONE_X86_ATT_DISABLE=ON']),'seven':(['X86','ARM','AARCH64','MIPS','SPARC','RISCV','LOONGARCH'],[])}
@@ -28,6 +28,8 @@ try:
    run(['cmake','-S',s,'-B',b,*args,'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON'for a in arches],*opts],'configure-'+label+'-'+name)
    targets=['capstone_static']
    if label=='release' and name!='arm-only':targets+=['api','x86_encoding_accuracy','x86_relative_jump','x86_printer_prechecked','sstream','detail_option']+(['x86_simple_output']if name not in ('diet','reduced')else [])
+   if name in ('diet','reduced'):targets=['capstone_static','api','x86_scan_batch']
+   else:targets+=['x86_scan_batch','x86_evex_reserved_fields','x86_reg_access']
    if os.environ['FORMS']=='arm64':targets=['capstone_static','aarch64_scan']
    run(['cmake','--build',b,'--config','Release','--target',*targets,'--parallel','4'],'build-'+label+'-'+name)
    key=label+'-'+name
