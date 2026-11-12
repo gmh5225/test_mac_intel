@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld','-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=OFF','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   products={}
-  for label in ('base','stream','operands'):
+  for label in ('base','full','iterator'):
    if label!='base':command(['git','apply',r/(label+'.patch')],'apply-'+label,cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','--parallel','4'],'product-'+label,nd)
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
@@ -50,7 +50,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(100000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','stream','operands')):
+    for idx,label in enumerate(('base-copy','full','iterator')):
      plans=[]
      for cycle in range(9):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)

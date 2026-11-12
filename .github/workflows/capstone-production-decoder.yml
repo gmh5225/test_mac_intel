@@ -1,7 +1,7 @@
-name: Measure actual NeverD Decoder entry points with current source-built LLVM
+name: Compare the two x86 integer implementations in NeverD with latest source-built LLVM
 on:
   push:
-    branches: [codex/capstone-production-decoder]
+    branches: [codex/capstone-integer-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: cee06981844f5597004da9be6bcc778db813d6b2
+          ref: b15f6bdf05f81020286e1dc65f45a38534c83491
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-decoder-product
+          name: integer-decoder-product
           path: product-evidence/
           retention-days: 14
