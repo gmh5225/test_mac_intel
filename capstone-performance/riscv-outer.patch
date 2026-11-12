@@ -1,16 +1,41 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -153,6 +153,10 @@
+         list(APPEND capstone_enabled_architectures "${supported_architecture}")
+     endif()
+ endforeach()
++
++if(capstone_enabled_architectures STREQUAL "RISCV")
++    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "SPARC")
+     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
+--- a/Makefile
++++ b/Makefile
+@@ -115,6 +115,10 @@
+ 
+ LIBNAME = capstone
+ 
++
++ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
++CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
 --- a/cs.c
 +++ b/cs.c
-@@ -1054,6 +1054,13 @@
- 		/* MIPS constructs each MCOperand before reading it. The public
- 		 * detail and alias records are reset by the MIPS decoder. */
+@@ -1056,7 +1056,12 @@
  		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
-+	else
-+#endif
-+#ifdef CAPSTONE_HAS_RISCV
-+	if (handle->arch == CS_ARCH_RISCV)
-+		/* RISC-V constructs each operand before reading it, including
-+		 * retries after incomplete decodes. */
-+		MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
  	else
  #endif
++#ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++	/* The RISC-V decoder constructs each operand before reading it. */
++	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
++#else
  		MCInst_Init(&mci, handle->arch);
++#endif
+ 	mci.csh = handle;
+ 	mci.address = insn->address;
+ 	mci.flat_insn = insn;

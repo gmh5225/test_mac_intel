@@ -1,13 +1,13 @@
-name: Capstone RISC-V outer operand initialization
+name: Capstone dedicated RISC-V operand initialization
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-riscv-outer-initialization]
+    branches: [codex/capstone-dedicated-riscv-initialization-checks]
     paths: [capstone-performance/**, .github/workflows/capstone-riscv-outer.yml]
 permissions:
   contents: read
 concurrency:
-  group: capstone-riscv-outer-initialization
+  group: capstone-dedicated-riscv-initialization-checks
   cancel-in-progress: false
 jobs:
   verify:
@@ -31,7 +31,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: riscv-outer-${{ matrix.host }}-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: dedicated-riscv-checks-${{ matrix.host }}-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

@@ -110,6 +110,8 @@ def build(tree, label, units=False):
     if units:
         command(['ctest', '--test-dir', build_dir, '--no-tests=error', '--output-on-failure',
                  '-R', '^unit_(' + '|'.join(tests) + ')$'], label + '-tests')
+    flags = (build_dir / 'build.ninja').read_text()
+    assert ('-DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS' in flags) == (label != 'base')
     return build_dir / 'libcapstone.so.6.0.0'
 
 
