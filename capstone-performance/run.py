@@ -149,9 +149,10 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
+    command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Architecture-owned iterator in a separately linked archive member; ordinary public decoder objects unchanged'))
+    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='Add direct Jcc/CALL/JMP rel8/rel32 records within that archive member'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -180,7 +181,7 @@ panic = "abort"
     iced_library = adapter / 'target/release/libiced_compare.a'
     for label in ('base','new'):
         for consumer,src in [('decoder','compare.cpp'),('single','single.cpp'),('windows','windows.cpp')]:
-            flags=['-DUSE_X86_OUTPUT_ITERATOR','-I',WORK/'new/arch/X86'] if label=='new' and consumer!='single' else []
+            flags=['-DUSE_X86_OUTPUT_ITERATOR','-I',WORK/'new/arch/X86'] if consumer!='single' else []
             command(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',*flags,SOURCE/src,WORK/(label+'-build/libcapstone.a'),*([iced_library] if consumer!='single' else []),'-lpthread','-ldl','-lm','-o',WORK/(consumer+'-'+label)],consumer+'-'+label+'-link')
     commands = json.loads((WORK / 'new-build/compile_commands.json').read_text())
     args = shlex.split(next(c['command'] for c in commands if c['file'].endswith('/Mapping.c')))
@@ -202,9 +203,10 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    introduced=set(changed[1])-set(changed[0]);assert introduced=={'arch/X86/X86OutputIterator.c.o'},introduced
-    assert all(changed[0][k]==changed[1][k] for k in changed[0])
-    write('object-difference.json',dict(new=sorted(introduced),identical=len(changed[0]),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
+    assert changed[0].keys()==changed[1].keys()
+    diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
     flag_records = []
@@ -293,7 +295,7 @@ panic = "abort"
         objects[label] = {str(p.relative_to(build_dir)): sha(p)
                           for p in (build_dir / 'CMakeFiles/capstone.dir').rglob('*.o')}
     write('objects.json', objects)
-    changed = list(set(objects['new'])-set(objects['base']))
+    changed = [k for k in objects['base'] if objects['base'][k]!=objects['new'][k]]
     write('changed-objects.json', changed)
     # The common decoder object was independently verified above.
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]

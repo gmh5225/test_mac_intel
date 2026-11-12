@@ -1,9 +1,9 @@
-name: Measure the private x86 full iterator while checking every original archive member
+name: Paired incremental cost of isolated relative branches in mixed x86 output
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-x86-output-iterator]
+    branches: [codex/capstone-branch-output-mixed]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-x86-output-iterator
+  group: capstone-branch-output-mixed
   cancel-in-progress: false
 
 jobs:
@@ -23,8 +23,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, baseline: neverd-four }
           - { host: ubuntu-24.04-arm, baseline: neverd-four }
-          - { host: ubuntu-24.04, baseline: all }
-          - { host: ubuntu-24.04-arm, baseline: all }
           - { host: macos-15-intel, baseline: neverd-four }
           - { host: macos-15, baseline: neverd-four }
     env:
@@ -53,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: owned-iterator-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: relative-mixed-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

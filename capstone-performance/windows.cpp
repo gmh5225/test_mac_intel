@@ -32,7 +32,7 @@ static void save_spans(const char *input, unsigned bits, unsigned width, const c
   unsigned accepted = 0;
   std::vector<Span> all;
   while (left) {
-    if (!cs_disasm_iter(handle, &cursor, &left, &ip, insn)) {
+    if (!X86_disasmIter(handle, &cursor, &left, &ip, insn)) {
       ++cursor; --left; ++ip;
       accepted = 0;
     } else {
