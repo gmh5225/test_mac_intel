@@ -44,75 +44,10 @@ index 97b899b5..ae1554b0 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..672ba7d8 100644
+index 90ef6e93..fa0a0714 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1132,7 +1132,8 @@ static uint16_t resolveMandatoryPrefixConflict(struct InternalInstruction *insn,
- 
- 			// Group 8 (BT/BTS/BTR/BTC immediate), BTC register.
- 			// F2/F3 may select HLE, but 66 still sets operand size.
--			|| insn->opcode == 0xBA || insn->opcode == 0xBB
-+			|| insn->opcode == 0xBA ||
-+			insn->opcode == 0xBB
- 
- 			// Group 16, various NOPs
- 			|| (insn->opcode & 0xF8) == 0x18
-@@ -2280,7 +2281,7 @@ static int readMaskRegister(struct InternalInstruction *insn)
- 
- /* The caller has already consumed ModR/M and any addressing bytes. */
- X86_DECODE_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
--					    OperandType type)
-+					   OperandType type)
- {
- 	uint8_t valid;
- 	insn->reg = (Reg)fixupRegValue(insn, type, insn->reg - insn->regBase,
-@@ -2291,8 +2292,7 @@ X86_DECODE_INLINE int fixupRegisterOperand(struct InternalInstruction *insn,
- }
- 
- X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
--				      OperandType type,
--				      OperandEncoding encoding)
-+				     OperandType type, OperandEncoding encoding)
- {
- 	uint8_t valid;
- 	if (insn->eaBase >= insn->eaRegBase) {
-@@ -2309,9 +2309,9 @@ X86_DECODE_INLINE int fixupRMOperand(struct InternalInstruction *insn,
- }
- 
- X86_DECODE_INLINE int readVSIBOperand(struct InternalInstruction *insn,
--				       OperandType type,
--				       OperandEncoding encoding, int hasVVVV,
--				       int *needVVVV)
-+				      OperandType type,
-+				      OperandEncoding encoding, int hasVVVV,
-+				      int *needVVVV)
- {
- 	// VSIB can use the V2 bit so check only the other bits.
- 	if (*needVVVV)
-@@ -2364,8 +2364,8 @@ X86_DECODE_INLINE int readVSIBOperand(struct InternalInstruction *insn,
- }
- 
- X86_DECODE_INLINE int readVVVVOperand(struct InternalInstruction *insn,
--				       OperandType type, int hasVVVV,
--				       int *needVVVV)
-+				      OperandType type, int hasVVVV,
-+				      int *needVVVV)
- {
- 	uint8_t valid;
- 
-@@ -3007,8 +3007,9 @@ legacyTerminalDecision(const struct InternalInstruction *insn,
- 	} else if (insn->mode == MODE_64BIT)
- 		row = X86_TERMINAL_64 + wFromREX(insn->rexPrefix);
- 	else if (insn->mode == MODE_16BIT)
--		row = (sizePrefixes && insn->hasAdSize ? X86_TERMINAL_16_ADSIZE :
--					 X86_TERMINAL_16) +
-+		row = (sizePrefixes && insn->hasAdSize ?
-+			       X86_TERMINAL_16_ADSIZE :
-+			       X86_TERMINAL_16) +
- 		      (sizePrefixes && insn->hasOpSize);
- 	else
- 		row = X86_TERMINAL_32;
-@@ -3276,6 +3277,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+@@ -3276,6 +3276,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
  X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
  					 uint8_t prefix, X86ScanResult *result);
  
@@ -124,7 +59,7 @@ index 90ef6e93..672ba7d8 100644
  /* Only generic and extension decoding need an MCInst in the core scan path. */
  #if defined(_MSC_VER)
  __declspec(noinline)
-@@ -3312,13 +3318,20 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+@@ -3312,13 +3317,20 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
  			if (status != X86_SCAN_NOT_HANDLED)
  				return status == X86_SCAN_COMPLETE;
  		}
@@ -152,17 +87,7 @@ index 90ef6e93..672ba7d8 100644
  		if (!decoded)
  			return false;
  	}
-@@ -3727,7 +3740,8 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
- 		if (consumeInt32(&insn, &displacement))
- 			return 0;
- 		const uint16_t length = (uint16_t)insn.readerCursor;
--		*target = X86_relativeBranchTarget(handle->mode, address, length,
-+		*target = X86_relativeBranchTarget(handle->mode, address,
-+						   length,
- 						   (uint64_t)displacement,
- 						   sizeof(displacement));
- 		return length;
-@@ -3751,6 +3765,51 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
+@@ -3751,6 +3763,51 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
  	return (uint16_t)insn.length;
  }
  
@@ -396,7 +321,7 @@ index 00000000..36299f96
 +}
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 new file mode 100644
-index 00000000..0979f140
+index 00000000..d4745fe5
 --- /dev/null
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -0,0 +1,490 @@
@@ -413,7 +338,7 @@ index 00000000..0979f140
 +			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
-+			0, 0, 0, 0, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
++			0, 0, 0, 2, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
 +			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -485,9 +410,9 @@ index 00000000..0979f140
 +			537, 541, 538, 542, 0, 0, 0, 0, 545, 549, 546, 550, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
-+			0, 0, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
-+			0, 0, 0, 0, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
++			0, 0, 0, 2, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
 +			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -505,7 +430,7 @@ index 00000000..0979f140
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
++			0, 0, 0, 2, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -523,7 +448,7 @@ index 00000000..0979f140
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
++			0, 0, 0, 2, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -892,10 +817,10 @@ index 00000000..0979f140
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..6bb63816
+index 00000000..b605a0c4
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,353 @@
+@@ -0,0 +1,422 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1088,6 +1013,65 @@ index 00000000..6bb63816
 +	return true;
 +}
 +
++/* The /digit selects the same flags and register access as the corresponding
++ * ALU register pair. The immediate's public width follows the destination. */
++static void writeGroup1Immediate(cs_insn *insn,
++				 const struct X86SimpleOutput *row,
++				 const uint8_t *code, uint8_t rex,
++				 uint8_t modrm, uint16_t *insn_size)
++{
++	const unsigned offset = 2 + (rex != 0);
++	const int immediate = (int8_t)code[offset];
++	const unsigned group = (modrm >> 3) & 7;
++	const bool logical = group == 1 || group == 4 || group == 6;
++	const bool wide = (rex & 8) != 0;
++	const bool negative = !logical && immediate < 0;
++	const uint64_t value =
++		logical ? (wide ? (uint64_t)(int64_t)immediate :
++				  (uint32_t)immediate) :
++			  (uint64_t)(negative ? -immediate : immediate);
++	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
++	const struct X86SimpleRegister *reg =
++		&x86_simple_registers[wide ? 3 : 2][id];
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(offset + 1);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	char *out = insn->op_str + reg->length;
++	memcpy(out, ", ", 2);
++	out += 2;
++	if (negative)
++		*out++ = '-';
++	if (value <= HEX_THRESHOLD) {
++		*out = (char)('0' + value);
++	} else {
++		static const char digits[] = "0123456789abcdef";
++		char temp[16], *end = temp + sizeof(temp), *start = end;
++		uint64_t n = value;
++		do {
++			*--start = digits[n & 15];
++			n >>= 4;
++		} while (n);
++		memcpy(out, "0x", 2);
++		memcpy(out + 2, start, end - start);
++	}
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
++				      reg->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->operands[1].type = X86_OP_IMM;
++		x->operands[1].imm = logical && !wide ?
++					     (int64_t)(uint32_t)immediate :
++					     immediate;
++		x->operands[1].access = 0;
++		x->encoding.imm_offset = (uint8_t)offset;
++		x->encoding.imm_size = 1;
++	}
++}
++
 +/* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
 + * present. Memory admission below is limited to MOV with a base or base+disp8. */
 +#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
@@ -1139,8 +1123,18 @@ index 00000000..6bb63816
 +	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
 +
-+	if (plan == UINT16_MAX)
-+		return writeEvexRegisterOutput(code, size, insn, insn_size);
++	if (plan <= X86_PLAN_EVEX) {
++		if (plan == X86_PLAN_EVEX)
++			return writeEvexRegisterOutput(code, size, insn,
++						       insn_size);
++		if (size < 3u + has_rex)
++			return false;
++		const unsigned alu = (modrm & 0x38) | 1;
++		const unsigned pair = x86_simple_plans[wide][prefix_class][alu];
++		writeGroup1Immediate(insn, &x86_simple_outputs[pair >> 2], code,
++				     rex, modrm, insn_size);
++		return true;
++	}
 +	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
 +	const bool relative = form == X86_SIMPLE_RELATIVE;
 +	if (relative && size < (size_t)row->imm_offset + row->imm_size)
@@ -1268,10 +1262,10 @@ index 99a0800e..ff9a2542 100644
   * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 new file mode 100644
-index 00000000..25a1e8ce
+index 00000000..ec3e886b
 --- /dev/null
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,85 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1315,6 +1309,13 @@ index 00000000..25a1e8ce
 +	X86_SIMPLE_RM_REG,
 +	X86_SIMPLE_REG_RM,
 +	X86_SIMPLE_RELATIVE,
++};
++
++/* Row zero has no instruction. Its nonzero form bits dispatch encodings
++ * whose opcode or operand kind also depends on later bytes. */
++enum X86SpecialOutputPlan {
++	X86_PLAN_GROUP1_IMM8 = X86_SIMPLE_REG_RM,
++	X86_PLAN_EVEX = X86_SIMPLE_RELATIVE,
 +};
 +
 +static inline void X86_writeSimpleDetail(cs_detail *detail,
@@ -1391,10 +1392,10 @@ index 0a4c959f..b883b547 100644
  }
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 new file mode 100644
-index 00000000..d749f994
+index 00000000..666ca168
 --- /dev/null
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -0,0 +1,421 @@
+@@ -0,0 +1,430 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1808,7 +1809,16 @@ index 00000000..d749f994
 +		}
 +	}
 +	// Reserve unprefixed EVEX for its own verified vector output records.
-+	plans[1][0][0x62] = UINT16_MAX;
++	plans[1][0][0x62] = X86_PLAN_EVEX;
++	for (unsigned wide = 0; wide < 2; ++wide) {
++		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
++			for (unsigned alu = 1; alu < 0x40; alu += 8) {
++				if (!plans[wide][cls][alu])
++					throw std::runtime_error("missing group-1 register row");
++			}
++			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
++		}
++	}
 +	emit_tables(plans, regs, rows);
 +	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 +		  << " encodings_checked=" << checked << " table_bytes="
@@ -1832,10 +1842,10 @@ index e42caf08..67acfcb5 100644
      list(APPEND UNIT_TEST_SOURCES x86_bextr_flags.c)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
-index 00000000..7b20bb9d
+index 00000000..d7c2d24d
 --- /dev/null
 +++ b/tests/unit/x86_simple_output.c
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,195 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1961,6 +1971,24 @@ index 00000000..7b20bb9d
 +	return true;
 +}
 +
++static bool check_group1(csh handles[2], cs_mode mode)
++{
++	uint8_t bytes[4];
++	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
++		bytes[0] = p ? (uint8_t)(0x3f + p) : 0;
++		bytes[1] = 0x83;
++		for (unsigned mr = 0xc0; mr < 256; ++mr)
++			for (unsigned imm = 0; imm < 256; ++imm) {
++				bytes[2] = (uint8_t)mr;
++				bytes[3] = (uint8_t)imm;
++				if (!compare(handles, bytes + !p, 3 + !!p,
++					     imm ^ mr ^ p))
++					return false;
++			}
++	}
++	return true;
++}
++
 +static bool check_mode(cs_mode mode)
 +{
 +	csh handles[2] = { 0 };
@@ -1976,7 +2004,8 @@ index 00000000..7b20bb9d
 +			if (cs_option(handles[side], CS_OPT_DETAIL,
 +				      detail ? CS_OPT_ON : CS_OPT_OFF))
 +				goto done;
-+		if (!check_branches(handles) || !check_memory(handles, mode))
++		if (!check_branches(handles) || !check_memory(handles, mode) ||
++		    !check_group1(handles, mode))
 +			goto done;
 +		for (unsigned op = 0; op < 256; ++op) {
 +			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };
