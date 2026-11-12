@@ -1,62 +1,44 @@
 from pathlib import Path
-import hashlib,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
+import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
-r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source'
+r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
+sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def run(args,label,cwd=None):
  print(label,flush=True)
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
- if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1000:]))
+ if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-mac=platform.system()=='Darwin'
-with tempfile.TemporaryDirectory(prefix='capstone-pe32-order-') as tmp:
- t=Path(tmp)
+with tempfile.TemporaryDirectory(prefix='capstone-static-a64-') as tmp:
+ t=Path(tmp);b=t/'build'
  try:
-  cases=corpus.prepare(r,t,e,run)
-  cases=[x for x in cases if x['name'].startswith('arm64-')]
-  assert len(cases)==3
-  arches=['AARCH64'];cc=os.environ['MEASURE_CC'];mixed=['X86','AARCH64','ARM','MIPS','LOONGARCH','RISCV','SPARC']
-  def configure(name,architectures,extra):
-   opts=['-DCAPSTONE_'+x+'_SUPPORT=ON' for x in architectures]
-   build=t/name
-   run(['cmake','-S',s,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*opts,*extra],'config-'+name+'-'+label)
-   return build
-  suffix='.dylib' if mac else '.so';products={};controls={}
-  for label in ['base','new']:
-   if label=='new':run(['git','apply',r/'product.patch'],'apply',s)
-   for key,subset in [('four',mixed[:4]),('seven',mixed)]:
-    mb=configure(key,subset,[]);run(['cmake','--build',mb,'--target','capstone_static','--parallel','4'],'mixed-'+key+'-'+label)
-    assert 'CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS' not in (mb/'build.ninja').read_text()
-    hashes={str(x.relative_to(mb)):hashlib.sha256(x.read_bytes()).hexdigest()for x in (mb/'CMakeFiles/capstone.dir').rglob('*.o')}
-    assert len(hashes)>25
-    if label=='new':assert controls[key]==hashes
-    controls[key]=hashes;write('mixed-objects',controls)
-   b=configure('build',arches,['-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON'])
-   assert ('CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS' in (b/'build.ninja').read_text())==(label=='new')
-   run(['cmake','--build',b,'--target','capstone_shared','cstest','mcinst','aarch64_postprocess','--parallel','4'],'build-'+label)
-   run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(mcinst|aarch64_postprocess)$'],'units-'+label)
-   exe=next(x for x in b.rglob('cstest') if x.is_file());run([exe,s/'tests/MC/AArch64'],'mc-'+label)
-   log=e/('mc-'+label+'.log');data=log.read_bytes();log.unlink();write('mc-'+label,dict(digest=hashlib.sha256(data).hexdigest(),summary=data[-600:].decode()))
-   if label=='base':reference=data
-   else:assert data==reference
-   lib=t/'build'/('libcapstone.6.0.0.dylib' if mac else 'libcapstone.so.6.0.0')
-   for key in (label,label+'-aa'):
-    f=t/(key+suffix);shutil.copyfile(lib,f);products[key]=f
-  identities={k:hashlib.sha256(v.read_bytes()).hexdigest()for k,v in products.items()}
-  assert identities['base']==identities['base-aa'] and identities['new']==identities['new-aa'] and identities['base']!=identities['new'];write('images',identities)
+  cases=[x for x in corpus.prepare(r,t,e,run) if x['name'].startswith('arm64-')];assert len(cases)==3
+  run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
+  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  bins={}
+  for key in ('base','inline','outline'):
+   if key!='base':run(['git','apply',r/(key+'.patch')],'apply-'+key,s)
+   run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+key)
+   f=t/key;run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',f],'link-'+key);bins[key]=f
+   if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  run(['clang++','-std=c++17','-O3','-DNDEBUG','-I',s/'include',r/'pair.cpp','-ldl','-o',t/'pair'],'pair')
+  def sample(key,x,mode,reps):
+   return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    row=dict(case=x['name'],mode=mode,plans={})
-    for left,right,key in [('base','new','forward'),('new','base','reverse'),('base','base-aa','base-aa'),('new','new-aa','new-aa')]:
-     raw=json.loads(sp.check_output(list(map(str,[t/'pair',products[left],products[right],x['selector'],mode,x['path']])),text=True));assert len(raw['ticks'])==11
-     ratios=[sum(t[::2])/sum(t[1::2]) if i%2==0 else sum(t[1::2])/sum(t[::2]) for i,t in enumerate(raw['ticks'])]
-     if key=='reverse':ratios=[1/q for q in ratios]
-     row['plans'][key]=dict(raw=raw,ratios=ratios,median=st.median(ratios))
-    q=row['plans']['forward']['ratios']+row['plans']['reverse']['ratios'];row['median']=st.median(q);row['wins']=sum(n>1 for n in q)
-    data.append(row);write('timings',data)
-  write('complete',dict(host=platform.platform(),arches=arches,cases=len(data)))
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+    runs=[];reference=None;keys=['base','inline','outline','aa']
+    for k in range(10):
+     seq=keys[k%4:]+keys[:k%4];ticks={v:[] for v in keys}
+     for v in seq+seq[::-1]:
+      vout=sample(v,x,mode,n)
+      if reference is None:reference=(vout['first'],vout['result'])
+      assert reference==(vout['first'],vout['result'])
+      ticks[v].append(vout['cpu_ns'])
+     runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
+    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
  finally:
-  size=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
+  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

@@ -1,0 +1,34 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -167,7 +167,7 @@
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "AARCH64")
+-    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
++    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+ 
+ # Dedicated builds of these backends use their generated mnemonic tries.
+--- a/Makefile
++++ b/Makefile
+@@ -128,7 +128,7 @@
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
+-CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES
++CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS
+ endif
+ 
+ ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
+--- a/cs.c
++++ b/cs.c
+@@ -1059,6 +1059,9 @@
+ #ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+ 	/* The RISC-V decoder constructs each operand before reading it. */
+ 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
++#elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
++	/* The AArch64 decoder constructs each operand before reading it. */
++	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
+ #else
+ 		MCInst_Init(&mci, handle->arch);
+ #endif

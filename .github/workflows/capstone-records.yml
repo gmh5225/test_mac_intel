@@ -1,7 +1,7 @@
-name: Check dedicated AArch64 decoder gains and mixed build object identity
+name: Compare GCC and Clang on real statically linked AArch64 decoders with identical controls
 on:
   push:
-    branches: [codex/capstone-dedicated-aarch64-operands]
+    branches: [codex/capstone-dedicated-aarch64-static]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -12,7 +12,7 @@ jobs:
       matrix:
         include:
           - { host: macos-15, cc: clang }
-          - { host: macos-15-intel, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-24.04-arm, cc: clang }
@@ -31,13 +31,13 @@ jobs:
           ref: f6054796e7ecf52e174edf336c564facb1d762e0
           path: source
           persist-credentials: false
-      - name: Check mixed object identity and measure three native AArch64 ELF workloads
+      - name: Measure independent static executables with both initializer placements
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: static-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
