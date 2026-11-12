@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-iced-warm-profile]
+    branches: [codex/capstone-x86-profile-lines]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-iced-warm-profile
+  group: capstone-x86-profile-lines
   cancel-in-progress: false
 
 jobs:

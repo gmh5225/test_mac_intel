@@ -42,12 +42,12 @@ extern "C" void stop_profile(){ if(measuring) { CALLGRIND_STOP_INSTRUMENTATION; 
  run.command(['clang++','-O3','-gline-tables-only','-DNDEBUG','-std=c++17','-I',cs/'include',w/'profile.cpp',b/'libcapstone.a',adapter/'target/release/libiced_compare.a','-pthread','-ldl','-lm','-o',w/'profile'],'build-consumer')
  rows=[]
  for case in fixtures:
-  if case['name'] not in ('putty-32-0.85','scalar32','simd64'):continue
+  if case['name'] not in ('putty-32-0.85','simd64'):continue
   for mode in ('scan','format','detail'):
    boundary=None
-   for engine in ('capstone','iced'):
+   for engine in ('capstone',):
     tag='-'.join([case['name'],mode,engine]);dest=w/(tag+'.out')
-    run.command(['valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(dest),w/'profile',engine,mode,case['selector'],1,case['path']],tag)
+    run.command(['valgrind','--tool=callgrind','--instr-atstart=no','--dump-instr=yes','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(dest),w/'profile',engine,mode,case['selector'],1,case['path']],tag)
     res=next(json.loads(x) for x in (e/(tag+'.log')).read_text().splitlines() if x.startswith('{'));pairs=tuple(res[k] for k in ('instructions','rejected','boundary_hash'))
     if boundary is None:boundary=pairs
     assert pairs==boundary,(case['name'],mode,engine,res,boundary)
@@ -55,7 +55,7 @@ extern "C" void stop_profile(){ if(measuring) { CALLGRIND_STOP_INSTRUMENTATION; 
     assert counts['Ir']>res['instructions']*45
     (e/(tag+'.callgrind.gz')).write_bytes(gzip.compress(raw));dest.unlink()
     rows.append(dict(case=case['name'],engine=engine,mode=mode,public=res,counters=counts));run.write('counters.json',rows)
- assert len(rows)==18;run.write('complete.json',dict(rows=len(rows),capstone=m['capstone_revision'],iced=m['iced_revision']))
+ assert len(rows)==6;run.write('complete.json',dict(rows=len(rows),capstone=m['capstone_revision'],iced=m['iced_revision']))
 if __name__=='__main__':
  try:main()
  finally:
