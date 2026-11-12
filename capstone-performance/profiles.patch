@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 9d44ec7d..9b3880e7 100644
+index 9d44ec7d..5eb557ae 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -442,7 +442,7 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -442,13 +442,17 @@ if(CAPSTONE_X86_SUPPORT)
      if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
          if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME)
              set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
@@ -11,3 +11,31 @@ index 9d44ec7d..9b3880e7 100644
              set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION})
              if(DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
                  set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE})
+             endif()
+             if(x86_release_ipo)
+-                set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:/GL->")
++                if(capstone_enabled_architectures STREQUAL "X86")
++                    set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:/GL->")
++                else()
++                    set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_X86_LTCG_OUTLINE_SCAN>")
++                endif()
+                 set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_X86_LTCG_WRITEMASK>")
+             endif()
+         endif()
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 90ef6e93..771e6504 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3558,7 +3558,12 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 	return initial;
+ }
+ 
++/* Keep the fallback decoder's frame out of the compact iterator under LTCG. */
++#ifdef CAPSTONE_X86_LTCG_OUTLINE_SCAN
++static __declspec(noinline) bool
++#else
+ X86_DECODE_INLINE bool
++#endif
+ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 				     size_t code_len, cs_insn *insn,
+ 				     X86ScanResult *result, bool readerFlags)

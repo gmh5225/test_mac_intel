@@ -35,6 +35,7 @@ def main():
         flags=[p.read_text(encoding='utf-16',errors='ignore').upper() for p in b.rglob('CL.command.1.tlog')]
         assert any('/MD ' in text and 'X86DISASSEMBLER.C' in text for text in flags)
         assert any('CAPSTONE_X86_LTCG_WRITEMASK' in text and 'X86DISASSEMBLER.C' in text for text in flags)==(label=='new')
+        assert any('CAPSTONE_X86_LTCG_OUTLINE_SCAN' in text and 'X86DISASSEMBLERDECODER.C' in text for text in flags)==(label=='new')
         if label=='new':
             perf.run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(tests)+')$'],'unit-tests')
         out=w/('capstone-'+label+'.dll');shutil.copyfile(next(b.rglob('capstone.dll')),out);dlls.append(out)
