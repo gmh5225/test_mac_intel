@@ -16,6 +16,8 @@ def main(w):
   impls=[]
   for name,text in [('original',old),('grouped',new)]:
    part=text[text.index(a):text.index(z,text.index(a))].replace('translateRMMemoryImpl','memory_impl_'+name).replace(b,'static __attribute__((noinline)) bool memory_full_'+name+'(')
+   slot='a' if (name=='original') != reverse else 'z'
+   part=part.replace('__attribute__((noinline))','__attribute__((noinline, section(".text.cs_memory_'+slot+'")))')
    impls.append(part)
   if reverse:impls.reverse()
   selector='''extern unsigned cs_probe_memory_variant;
@@ -29,10 +31,14 @@ static bool translateRMMemoryFull(MCInst *m, InternalInstruction *i, OperandType
   tag='reversed' if reverse else 'forward'
   run.command(['cmake','--build',bdir,'--target','capstone_static','--parallel','4'],'build-'+tag)
   binary=w/tag
-  run.command(['clang++','-DNDEBUG','-O3','-std=c++17','-fno-pie','-no-pie','-I',src/'include',w/'consumer.cpp',bdir/'libcapstone.a','-ldl','-o',binary],'link-'+tag)
+  run.command(['clang++','-DNDEBUG','-O3','-std=c++17','-fno-pie','-no-pie','-Wl,--sort-section=name','-I',src/'include',w/'consumer.cpp',bdir/'libcapstone.a','-ldl','-o',binary],'link-'+tag)
   nm=sp.check_output(['nm','-an',binary],text=True)
   funcs=[v for v in nm.splitlines()if v.endswith((' memory_full_original',' memory_full_grouped'))];assert len(funcs)>=2 and len({v.split()[0] for v in funcs})==len(funcs),funcs
-  trees.append(dict(binary=binary,tag=tag,symbols=funcs))
+  trees.append(dict(binary=binary,tag=tag,symbols=funcs,sha256=run.sha(binary)))
+  original_addresses=sorted(int(v.split()[0],16)for v in funcs if v.endswith('memory_full_original'))
+  grouped_addresses=sorted(int(v.split()[0],16)for v in funcs if v.endswith('memory_full_grouped'))
+  assert len(original_addresses)==len(grouped_addresses)==2
+  assert all((a<b)!=reverse for a,b in zip(original_addresses,grouped_addresses)),funcs
  os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
  out=[];profiles=[]
  for tree in trees:
@@ -41,16 +47,9 @@ static bool translateRMMemoryFull(MCInst *m, InternalInstruction *i, OperandType
     args=[str(row['selector']),str(mode),row['path']]
     for plan,start in ((0,0),(0,1),(1,0),(2,1)):
      data=json.loads(sp.check_output([tree['binary'],str(plan),str(start),*args],text=True));assert len(data['ratios'])==11
-     out.append(dict(image=tree['tag'],symbols=tree['symbols'],case=row['name'],mode=mode,plan=plan,start=start,median=statistics.median(data['ratios']),**data))
+     out.append(dict(image=tree['tag'],binary_sha256=tree['sha256'],symbols=tree['symbols'],case=row['name'],mode=mode,plan=plan,start=start,median=statistics.median(data['ratios']),**data))
      run.write('rows.json',out)
-    if tree['tag']=='forward' and row['name']in('putty-32-0.85','simd64'):
-     for variant in (0,1):
-      name=row['name']+'-'+str(mode)+'-'+str(variant);trace=w/'callgrind.out'
-      run.command(['valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(trace),tree['binary'],'3',str(variant),*args],name)
-      raw=trace.read_bytes();events=next(l.split()[1:]for l in raw.splitlines() if l.startswith(b'events:'));tot=next(l.split()[1:]for l in raw.splitlines()if l.startswith(b'totals:'));counters={k.decode():int(v)for k,v in zip(events,tot)};assert counters['Ir']>500000
-      (run.EVIDENCE/(name+'.callgrind.gz')).write_bytes(gzip.compress(raw));trace.unlink()
-      profiles.append(dict(case=row['name'],mode=mode,variant=variant,counters=counters));run.write('events.json',profiles)
- assert len(out)==64 and len(profiles)==8,(len(out),len(profiles))
+ assert len(out)==64,len(out)
 if __name__=='__main__':
  run.EVIDENCE.mkdir(exist_ok=True)
  with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP'])as temp:

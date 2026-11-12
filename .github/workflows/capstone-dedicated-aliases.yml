@@ -1,7 +1,7 @@
-name: Compare the two x86 memory constructors in one process
+name: Verify both physical orders for same-image memory constructors
 on:
   push:
-    branches: [codex/capstone-same-image-memory-construction]
+    branches: [codex/capstone-memory-constructor-ordered-sections]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: memory-construction-profile-${{ matrix.host }}-${{ github.run_attempt }}
+          name: memory-construction-order-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
