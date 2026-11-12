@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Use the ordinary Clang calling convention for the full output owner'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Skip inapplicable x86 post-printer repairs using decoded legacy opcodes'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -189,7 +189,7 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','flags-state']:
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index','flags-state','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
         source = SOURCE / (unit + '.c') if (unit.startswith('check-') or unit == 'flags-state') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
@@ -199,6 +199,12 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    # The new callback regression also passes against the published implementation.
+    command(['clang', '-O3', '-DNDEBUG', *defs, *includes,
+             WORK / 'new/tests/unit/x86_encoding_accuracy.c', WORK / 'base-build/libcapstone.a',
+             *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
+             '-o', WORK / 'x86_encoding_accuracy-base'], 'compile-x86_encoding_accuracy-base')
+    command([WORK / 'x86_encoding_accuracy-base'], 'verify-x86_encoding_accuracy-base')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
@@ -236,7 +242,7 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix + 'cs.c.o', prefix + 'arch/X86/X86DisassemblerDecoder.c.o'}
+    required = {prefix + 'cs.c.o'}
     allowed = required
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
@@ -358,7 +364,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Full decoding of direct relative branches', '',
+    lines = ['# Decoded x86 post-printer eligibility', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
