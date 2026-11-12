@@ -92,7 +92,7 @@ def check_outputs(rows, case):
 
 
 def invoke(case, variant, repeats):
-    label = 'new' if variant.startswith('new') else 'base'
+    label = 'inline' if variant.startswith('inline') else 'new' if variant.startswith('new') else 'base'
     library = 'iced' if variant.startswith('iced') else 'capstone'
     binary = WORK / f'{case["consumer"]}-{label}'
     if case['consumer'] in ('window', 'open'):
@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Limit legacy post-printer repairs to the first memory operand'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Initialize constructed RISC-V decoder operands on demand'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -189,7 +189,7 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','arm_post_index','flags-state','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index','flags-state','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump','riscv_instruction_groups','riscv_reg_access','riscv_op_count_iter']:
         source = SOURCE / (unit + '.c') if (unit.startswith('check-') or unit == 'flags-state') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
@@ -206,21 +206,6 @@ panic = "abort"
              '-o', WORK / 'x86_encoding_accuracy-base'], 'compile-x86_encoding_accuracy-base')
     command([WORK / 'x86_encoding_accuracy-base'], 'verify-x86_encoding_accuracy-base')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
-    command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
-             SOURCE / 'repair_census.cpp', WORK / 'base-build/libcapstone.a',
-             *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
-             '-o', WORK / 'repair-census'], 'compile-repair-census')
-    repair_counts = []
-    for item in inputs:
-        if item['selector'] < 16:
-            continue
-        command([WORK / 'repair-census', item['selector'], item['path']],
-                'repair-census-' + item['name'])
-        counts = json.loads((EVIDENCE / ('repair-census-' + item['name'] + '.log')).read_text())
-        assert counts['instructions'] == sum(counts[key] for key in
-            ('legacy_memory', 'legacy_without_memory', 'full_repair'))
-        repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
-    write('repair-census.json', repair_counts)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -257,13 +242,54 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix + 'arch/X86/X86Mapping.c.o'}
+    required = {prefix + 'cs.c.o'}
     allowed = required
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
+    # An inline-full control isolates omitted clearing from initializer inlining.
+    control_dir = WORK / 'inline-control'
+    control_dir.mkdir()
+    control_source = control_dir / 'cs.c'
+    code = (WORK / 'new/cs.c').read_text()
+    partial = 'MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);'
+    assert code.count(partial) == 1
+    control_source.write_text(code.replace(partial, 'MCInst_InitStorage(&mci, CS_ARCH_RISCV, true);'))
+    commands = json.loads((WORK / 'new-build/compile_commands.json').read_text())
+    original = next(row for row in commands if row['file'] == str(WORK / 'new/cs.c'))
+    args = shlex.split(original['command'])
+    control_object = control_dir / 'cs.c.o'
+    args[args.index('-o') + 1] = str(control_object)
+    args[args.index(original['file'])] = str(control_source)
+    args += ['-I', str(WORK / 'new')]
+    command(args, 'inline-control-compile', original['directory'])
+    cache = (WORK / 'new-build/CMakeCache.txt').read_text().splitlines()
+    ar = next(line.split('=', 1)[1] for line in cache if line.startswith('CMAKE_AR:FILEPATH='))
+    ranlib = next(line.split('=', 1)[1] for line in cache if line.startswith('CMAKE_RANLIB:FILEPATH='))
+    archive = control_dir / 'libcapstone.a'
+    shutil.copyfile(WORK / 'base-build/libcapstone.a', archive)
+    before = subprocess.check_output([ar, 't', archive], text=True).splitlines()
+    assert before.count('cs.c.o') == 1
+    command([ar, 'r', archive, control_object], 'inline-control-archive')
+    command([ranlib, archive], 'inline-control-index')
+    after = subprocess.check_output([ar, 't', archive], text=True).splitlines()
+    assert before == after
+    command(['clang++', WORK / 'single.o', archive, '-lpthread',
+             *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
+             '-o', WORK / 'single-inline'], 'inline-control-link')
+    checks = []
+    for case in cases:
+        if case['consumer'] != 'single' or not case['name'].startswith('riscv64-'):
+            continue
+        rows = [invoke(case, variant, 1) for variant in ['base', 'new', 'inline']]
+        assert check_outputs(rows, case)
+        checks.append(dict(case=case['name'], mode=case['mode'], rows=rows))
+    assert len(checks) == 4
+    write('inline-control-preflight.json', checks)
+    for label in ['base', 'new', 'inline']:
+        command(['nm', '-n', WORK / ('single-' + label)], label + '-single-symbols')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
-    binaries += list(libraries.values()) + [iced_library]
+    binaries += list(libraries.values()) + [iced_library, WORK / 'single-inline', archive]
     write('binaries.json', {str(p.relative_to(WORK)): sha(p) for p in binaries})
     write('ready.json', dict(semantic_checks='native tests and traversal checks passed; not full qualification',
                              cases=len(cases), runtime_objects_changed=changed))
@@ -328,6 +354,8 @@ def measure():
         choices=[c for c in cases if c['consumer']==consumer]
         variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
         measure_panel(panel,choices,cycles,variants,duration)
+    controls = [c for c in cases if c['consumer'] == 'single' and c['name'].startswith('riscv64-')]
+    measure_panel('riscv-control', controls, cycles, ['base','new','base_aa','new_aa','inline','inline_aa'], duration)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
@@ -355,6 +383,10 @@ def summarize_panel(name):
                 pair[timer + '_gain'] = math.sqrt(t['base'] * t['base_aa'] / (t['new'] * t['new_aa']))
                 for label in ['base', 'new'] + (['iced'] if 'iced' in t else []):
                     pair[timer + '_' + label + '_aa'] = t[label] / t[label + '_aa']
+                if 'inline' in t:
+                    pair[timer + '_inline_gain'] = math.sqrt(t['base'] * t['base_aa'] / (t['inline'] * t['inline_aa']))
+                    pair[timer + '_new_over_inline'] = math.sqrt(t['inline'] * t['inline_aa'] / (t['new'] * t['new_aa']))
+                    pair[timer + '_inline_aa'] = t['inline'] / t['inline_aa']
                 if 'iced' in t:
                     agree = all(values['base'][k] == values['iced'][k] for k in ['instructions', 'rejected', 'boundary_hash'])
                     pair['cross_decoder_boundaries_agree'] = agree
@@ -375,11 +407,11 @@ def summarize_panel(name):
 
 def finish():
     EVIDENCE.mkdir(exist_ok=True)
-    panels = {name: summarize_panel(name) for name in ['null', 'x86', 'other', 'window', 'open']}
+    panels = {name: summarize_panel(name) for name in ['null', 'x86', 'other', 'window', 'open', 'riscv-control']}
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Legacy first-memory repair', '',
+    lines = ['# RISC-V outer operand initialization', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
