@@ -1,7 +1,7 @@
-name: Confirm AArch64 and PE32 with within-process controls
+name: Check dedicated AArch64 decoder gains and mixed build object identity
 on:
   push:
-    branches: [codex/capstone-aarch64-pe32-orders]
+    branches: [codex/capstone-dedicated-aarch64-operands]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,15 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, product: four }
-          - { host: macos-15-intel, product: four }
-          - { host: ubuntu-24.04-arm, product: four }
-          - { host: ubuntu-24.04-arm, product: seven }
-          - { host: ubuntu-24.04, product: four }
+          - { host: macos-15, cc: clang }
+          - { host: macos-15-intel, cc: clang }
+          - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-24.04, cc: gcc }
+          - { host: ubuntu-24.04-arm, cc: clang }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
-      PRODUCT: ${{ matrix.product }}
+      MEASURE_CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,13 +31,13 @@ jobs:
           ref: f6054796e7ecf52e174edf336c564facb1d762e0
           path: source
           persist-credentials: false
-      - name: Measure both image orders and identical controls on the same running thread
+      - name: Check mixed object identity and measure three native AArch64 ELF workloads
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pe32-orders-${{ matrix.host }}-${{ matrix.product }}-${{ github.run_id }}
+          name: dedicated-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

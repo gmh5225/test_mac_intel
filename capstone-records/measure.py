@@ -13,16 +13,32 @@ with tempfile.TemporaryDirectory(prefix='capstone-pe32-order-') as tmp:
  t=Path(tmp)
  try:
   cases=corpus.prepare(r,t,e,run)
-  cases=[x for x in cases if x['name'] in ('putty-32-0.85','arm64-ls','amd64-ls','scalar64','arm-sort')]
-  assert len(cases)==5
-  arches=['X86','ARM','AARCH64','MIPS'];wide=os.environ['PRODUCT']=='seven'
-  if wide:arches+=['SPARC','RISCV','LOONGARCH']
-  args=['cmake','-S',s,'-B',t/'build','-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in arches]]
-  if not wide:args.append('-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers')
-  run(args,'configure');suffix='.dylib' if mac else '.so';products={}
+  cases=[x for x in cases if x['name'].startswith('arm64-')]
+  assert len(cases)==3
+  arches=['AARCH64'];cc=os.environ['MEASURE_CC'];mixed=['X86','AARCH64','ARM','MIPS','LOONGARCH','RISCV','SPARC']
+  def configure(name,architectures,extra):
+   opts=['-DCAPSTONE_'+x+'_SUPPORT=ON' for x in architectures]
+   build=t/name
+   run(['cmake','-S',s,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*opts,*extra],'config-'+name+'-'+label)
+   return build
+  suffix='.dylib' if mac else '.so';products={};controls={}
   for label in ['base','new']:
    if label=='new':run(['git','apply',r/'product.patch'],'apply',s)
-   run(['cmake','--build',t/'build','--target','capstone_shared','--parallel','4'],'build-'+label)
+   for key,subset in [('four',mixed[:4]),('seven',mixed)]:
+    mb=configure(key,subset,[]);run(['cmake','--build',mb,'--target','capstone_static','--parallel','4'],'mixed-'+key+'-'+label)
+    assert 'CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS' not in (mb/'build.ninja').read_text()
+    hashes={str(x.relative_to(mb)):hashlib.sha256(x.read_bytes()).hexdigest()for x in (mb/'CMakeFiles/capstone.dir').rglob('*.o')}
+    assert len(hashes)>25
+    if label=='new':assert controls[key]==hashes
+    controls[key]=hashes;write('mixed-objects',controls)
+   b=configure('build',arches,['-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON'])
+   assert ('CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS' in (b/'build.ninja').read_text())==(label=='new')
+   run(['cmake','--build',b,'--target','capstone_shared','cstest','mcinst','aarch64_postprocess','--parallel','4'],'build-'+label)
+   run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_(mcinst|aarch64_postprocess)$'],'units-'+label)
+   exe=next(x for x in b.rglob('cstest') if x.is_file());run([exe,s/'tests/MC/AArch64'],'mc-'+label)
+   log=e/('mc-'+label+'.log');data=log.read_bytes();log.unlink();write('mc-'+label,dict(digest=hashlib.sha256(data).hexdigest(),summary=data[-600:].decode()))
+   if label=='base':reference=data
+   else:assert data==reference
    lib=t/'build'/('libcapstone.6.0.0.dylib' if mac else 'libcapstone.so.6.0.0')
    for key in (label,label+'-aa'):
     f=t/(key+suffix);shutil.copyfile(lib,f);products[key]=f
@@ -32,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-pe32-order-') as tmp:
   run(['clang++','-std=c++17','-O3','-DNDEBUG','-I',s/'include',r/'pair.cpp','-ldl','-o',t/'pair'],'pair')
   data=[]
   for x in cases:
-   for mode in (1,2):
+   for mode in (0,1,2):
     row=dict(case=x['name'],mode=mode,plans={})
     for left,right,key in [('base','new','forward'),('new','base','reverse'),('base','base-aa','base-aa'),('new','new-aa','new-aa')]:
      raw=json.loads(sp.check_output(list(map(str,[t/'pair',products[left],products[right],x['selector'],mode,x['path']])),text=True));assert len(raw['ticks'])==11
