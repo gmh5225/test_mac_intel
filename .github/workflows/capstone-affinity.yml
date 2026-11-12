@@ -1,9 +1,9 @@
-name: Verify isolated decoder layout on mixed controls and exact application paths
+name: Verify the complete mapped Mach-O code and constants and measure native mixed controls
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-separated-evex-other-isas]
+    branches: [codex/capstone-separated-evex-macho]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-separated-evex-other-isas
+  group: capstone-separated-evex-macho
   cancel-in-progress: false
 
 jobs:
@@ -21,8 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: neverd-four }
-          - { host: ubuntu-24.04-arm, baseline: neverd-four }
           - { host: macos-15-intel, baseline: neverd-four }
           - { host: macos-15, baseline: neverd-four }
     env:
@@ -51,7 +49,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: separate-vector-mixed-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: separate-vector-macho-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

@@ -206,7 +206,33 @@ panic = "abort"
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
     assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
-    assert sha(WORK/'single-base')==sha(WORK/'single-new')
+    # Mach-O build UUIDs and linker signatures depend on the output name.
+    # Compare the mapped code and constants and time the actual linked files.
+    import struct
+    def mapped_sections(binary):
+        raw=binary.read_bytes()
+        assert raw[:4]==bytes.fromhex('cffaedfe')
+        count=struct.unpack_from('<I',raw,16)[0]
+        at=32
+        sections={}
+        for _ in range(count):
+            cmd,size=struct.unpack_from('<II',raw,at)
+            if cmd==0x19:
+                nsec=struct.unpack_from('<I',raw,at+64)[0]
+                for i in range(nsec):
+                    sec=at+72+i*80
+                    section=raw[sec:sec+16].split(bytes(1))[0].decode()
+                    segment=raw[sec+16:sec+32].split(bytes(1))[0].decode()
+                    if segment=='__TEXT' or (segment=='__DATA_CONST' and section=='__const'):
+                        length,off=struct.unpack_from('<QI',raw,sec+40)
+                        sections[segment+','+section]=hashlib.sha256(raw[off:off+length]).hexdigest()
+            at+=size
+        assert '__TEXT,__text' in sections
+        return sections
+    images=[mapped_sections(WORK/('single-'+label))for label in ('base','new')]
+    write('mapped-code-and-constants.json',images)
+    assert images[0]==images[1], [k for k in images[0] if images[0][k]!=images[1].get(k)]
+
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
