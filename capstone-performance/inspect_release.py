@@ -28,7 +28,7 @@ def inspect(executable, map_file, evidence):
                 if first and last>first:end_for[imagebase+first]=imagebase+last
     assert end_for
     starts = sorted(symbols)
-    selected = {'X86_Intel_printInst','X86_ATT_printInst','X86_reg_access','X86_get_insn_id','get_op_access','X86_insn_reg_intel2','X86_insn_reg_att2','X86_insn_reg_intel_h','X86_insn_reg_att_h','cs_disasm_iter','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull'}
+    selected = {'X86_Intel_printInst','X86_ATT_printInst','X86_reg_access','X86_get_insn_id','get_op_access','X86_insn_reg_intel2','X86_insn_reg_att2','X86_insn_reg_intel_h','X86_insn_reg_att_h','cs_disasm_iter','cs_disasm_iter_outlined','diagnosticScanFallback','cs_decode_full_insn','X86_getInstruction','X86_getInstructionScanResult','X86_getInstructionAfterExtensions','X86_decodeScanBatch','X86_scanBatch','decodeInstructionScan','decodeInstructionFull'}
     selected.update(name for names in symbols.values() for name in names if name.startswith('?run@@') or name == 'main')
     seen = set()
     result = {}

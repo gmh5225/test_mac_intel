@@ -1,0 +1,113 @@
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3680,6 +3680,73 @@
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
++
++/* Diagnostic-only second entry. Both paths share one image and all tables. */
++static __declspec(noinline) bool diagnosticScanFallback(
++    csh ud, const uint8_t *code, size_t size, cs_insn *insn,
++    X86ScanResult *result, bool readerFlags)
++{
++    return getInstructionScanResultAfterInitial(ud, code, size, insn, result, readerFlags);
++}
++X86_DECODE_INLINE bool diagnosticIteratorScan(cs_struct *handle,
++					  const uint8_t *code, size_t size,
++					  cs_insn *insn, uint16_t *insn_size,
++					  bool batch);
++#define map_insn_id diagnostic_map_insn_id
++#define use_x86_scan diagnostic_use_x86_scan
++#define copy_insn_bytes diagnostic_copy_insn_bytes
++#define fill_insn_without_text diagnostic_fill_insn_without_text
++#define finish_x86_scan diagnostic_finish_x86_scan
++#define decode_insn diagnostic_decode_insn
++#define cs_disasm_iter_body diagnostic_cs_disasm_iter_body
++#define cs_disasm_iter_core diagnostic_cs_disasm_iter_core
++#define CS_DECODE_SCAN_IMPL diagnosticIteratorScan
++#undef CS_DISASM_INTERNAL_H
++#include "../../cs_disasm_internal.h"
++#undef CS_DECODE_SCAN_IMPL
++X86_DECODE_INLINE bool diagnosticIteratorScan(cs_struct *handle,
++					  const uint8_t *code, size_t size,
++					  cs_insn *insn, uint16_t *insn_size,
++					  bool batch)
++{
++	unsigned instructionID = 0;
++	uint16_t length;
++	int initial = tryInitialScanResult(handle, code, size, &instructionID,
++					   &length, true);
++	if (initial == X86_SCAN_NOT_HANDLED) {
++		X86ScanResult result;
++		if (!diagnosticScanFallback(
++			    (csh)(uintptr_t)handle, code, size, insn, &result,
++			    true))
++			return false;
++		*insn_size = result.length;
++		finish_x86_scan(handle, insn, &result, code, batch, true);
++		return true;
++	}
++	if (initial != X86_SCAN_COMPLETE)
++		return false;
++	X86ScanResult result = { 0, instructionID, length, 0 };
++	*insn_size = length;
++	finish_x86_scan(handle, insn, &result, code, batch, true);
++	return true;
++}
++
++CAPSTONE_EXPORT
++X86_DECODE_ALIGN
++bool CAPSTONE_API cs_disasm_iter_outlined(csh ud, const uint8_t **code, size_t *size,
++                                        uint64_t *address, cs_insn *insn)
++{
++    return cs_disasm_iter_core(ud, code, size, address, insn);
++}
++#undef map_insn_id
++#undef use_x86_scan
++#undef copy_insn_bytes
++#undef fill_insn_without_text
++#undef finish_x86_scan
++#undef decode_insn
++#undef cs_disasm_iter_body
++#undef cs_disasm_iter_core
++
+ X86_DECODE_ALIGN
+ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 						   size_t size,
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -602,6 +602,12 @@
+ 	return 0;
+ }
+ 
++static bool diagnosticWritemask;
++CAPSTONE_EXPORT void CAPSTONE_API cs_test_set_writemask(unsigned enabled)
++{
++    diagnosticWritemask = enabled != 0;
++}
++
+ static void prepareTranslation(InternalInstruction *insn)
+ {
+ #ifndef CAPSTONE_X86_REDUCE
+@@ -702,10 +708,10 @@
+ 			if (insn.hasLockPrefix)
+ 				Flags |= X86_IP_HAS_LOCK;
+ 
+-#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
++			if (diagnosticWritemask) {
+ 			if (x86HasWritemaskOperand(insn.instructionID))
+ 				Flags |= X86_IP_HAS_EVEX_OPMASK;
+-#else
++			} else {
+ 			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
+ 				if (insn.operands[i].encoding ==
+ 				    ENCODING_WRITEMASK) {
+@@ -713,7 +719,7 @@
+ 					break;
+ 				}
+ 			}
+-#endif
++			}
+ 
+ 			instr->flags = Flags;
+ 		}
