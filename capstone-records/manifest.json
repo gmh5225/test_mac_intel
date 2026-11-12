@@ -1,5 +1,93 @@
 {
   "capstone_revision": "f6054796e7ecf52e174edf336c564facb1d762e0",
+  "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
+  "source_lineage": {
+    "single.cpp": {
+      "experiment": "round363 real ARC/LoongArch consumer",
+      "sha256": "bfe697a0b2388f0ff1a195986b3b2c48b907fbb4d7ae0292e33a8c0ec852f87f"
+    },
+    "iced.rs": {
+      "experiment": "round145-current-x86-check/iced-source/iced.rs",
+      "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
+    },
+    "candidate.patch": {
+      "experiment": "round594-aarch64-constructed-operands",
+      "sha256": "b8be0e0735a2b6113326386f62b60b8975f98535227b8785da2c9db4fbf0de61"
+    },
+    "check-hint.c": {
+      "experiment": "round357-x86-handle-lookup/check-lookup.c",
+      "sha256": "fc39f027a29d2130f882586b1b29940dde34f2949c3464e75b9fa309cc40ee51"
+    },
+    "check-callback.c": {
+      "experiment": "round348-ppc-hint-owner/check-callback.c",
+      "sha256": "7f6010c40e6be9926a8b2a5ee2570a8a67d64a2654a54142ebc0e0b4c673cb7d"
+    },
+    "scalar.c": {
+      "experiment": "inputs/scalar.c",
+      "sha256": "98e97b880dd6374552a6abfde363a018c3ad033117785e34e375a99c55f551cb"
+    },
+    "simd.c": {
+      "experiment": "inputs/simd.c",
+      "sha256": "c0c4708476c48bb25a34037461ce232e7c02e48fd270582f6054e06878f68d02"
+    },
+    "windows.cpp": {
+      "experiment": "round357-x86-handle-lookup/windows.cpp",
+      "sha256": "d682a07455e5c53731b8e5ce7edc4bf6815642f1fd9d0077403f75ff9bb53b7e"
+    },
+    "check-ppc.c": {
+      "experiment": "round354-ppc-single-row/check-single-row.c",
+      "sha256": "ac6d65ae7a053c8501a395728b9e850823e976321c6e7a47f31998cd2fd40048"
+    },
+    "check-defaults.c": {
+      "experiment": "round356-arm-detail-defaults/check-defaults.c",
+      "sha256": "8b3f83492871103aaaf874cdcb1d31af21574b5b9260c42e123659797790d4dd"
+    },
+    "check-shared.c": {
+      "experiment": "round359-x86-shared-lookups/check-shared.c",
+      "sha256": "24d314d758024b8d329f68fbb79fae2f8d4e63ee43b7bb9e66f34b9bd7ef9c31"
+    },
+    "prior-combined.patch": {
+      "experiment": "round431-printer-and-group-release/product.patch",
+      "sha256": "4232d1508318ffb7e9153e08d9da3b5ae1193025b2c5e1615b8edb119c91c1bc"
+    },
+    "check-post.c": {
+      "experiment": "round362-legacy-postprinter/check-post.c",
+      "sha256": "5b04af15f5558a5df252b4477b1d12a8f953571b546453925c7d7a61e123744c"
+    },
+    "check-arc-loongarch.c": {
+      "experiment": "round363 storage comparison",
+      "sha256": "f056d344b12fe597b82bd081ef14d164eeec933f9e2b380c7af1e2ff5f17d49d"
+    },
+    "check-final.c": {
+      "experiment": "round364-intel-mapped-details/check-final.c",
+      "sha256": "a014b34ab5e305ceab3349477234f84ac0fe91cb524ee976c55e420f652db6f0"
+    },
+    "check-metadata.c": {
+      "experiment": "round370-common-mapping/check-metadata.c",
+      "sha256": "46393d66f8c87504616920db397c3ce5cf61613f9fd059ec339ae3bf34c186ef"
+    },
+    "check-dense.c": {
+      "experiment": "round377-arc-compact-metadata/check-dense.c",
+      "sha256": "60e27cc76c0dd46d3ee5980736f6bb71d4bee533f9c465f5cbff4fefcd77d069"
+    },
+    "check-systemz.c": {
+      "experiment": "round385-systemz-form/check-systemz.c",
+      "sha256": "bda02cbb6e991d5551c0754ef0296fa8d8e744a3ecd5d3c2f96d3eee79bfb433"
+    },
+    "check-mips-alias.c": {
+      "experiment": "round430-large-alias-lookups/check-mips-alias.c",
+      "sha256": "398415019d79a86aa0fbb27e44aba453461d7a25a04d9230e81e5e9be7e24170"
+    },
+    "flags-state.c": {
+      "experiment": "round463-decoded-mask-presence",
+      "sha256": "a203a3a976a8da81e629d0807461cde54bc2cea484563f395d2c320d5a57b730"
+    },
+    "repair_census.cpp": {
+      "sha256": "26d778aaa200a15f3881d732122b3fa3ede9ab790d8dc10ac721a16f6006be10",
+      "experiment": "round574-legacy-memory-repair"
+    }
+  },
+  "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
   "inputs": [
     {
       "name": "putty-32-0.85",
@@ -10,14 +98,6 @@
       "text_sha256": "f9269b449a06aac5daf0082b2fd07fbb6bfad5d99a6864b6a584e3b71c010953"
     },
     {
-      "name": "putty-64-0.85",
-      "selector": 64,
-      "url": "https://the.earth.li/~sgtatham/putty/0.85/w64/putty.exe",
-      "package_sha256": "d01fdb5aae8f112526040a39b0bfb9e27d813003178645e65f8d1cfdb2a26c87",
-      "kind": "pe",
-      "text_sha256": "c000443a8b8924ed28e75eec48a68f7a77dbb09b41244c60313d4c84237d32ab"
-    },
-    {
       "name": "amd64-ls",
       "selector": 64,
       "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
@@ -26,18 +106,19 @@
       "command": "ls"
     },
     {
-      "name": "amd64-cp",
-      "selector": 64,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
-      "package_sha256": "1299ab6f9389a288eb2f5f3dd222c26cc777b9a2d5ecb6ee4cbd340cebcdada2",
+      "name": "arm64-ls",
+      "selector": 0,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
+      "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
       "kind": "deb",
-      "command": "cp"
+      "command": "ls",
+      "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
     },
     {
-      "name": "amd64-sort",
-      "selector": 64,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
-      "package_sha256": "1299ab6f9389a288eb2f5f3dd222c26cc777b9a2d5ecb6ee4cbd340cebcdada2",
+      "name": "arm-sort",
+      "selector": 1,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
+      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
       "kind": "deb",
       "command": "sort"
     }
