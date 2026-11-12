@@ -1,7 +1,7 @@
-name: Validate dedicated GCC scan and complete vector and stack output under MSVC, DIET, reduced, adapters and sanitizers
+name: Verify integrated x86 scalar and vector output with current published Capstone profiles
 on:
   push:
-    branches: [codex/capstone-gcc-and-vex-release-profiles]
+    branches: [codex/capstone-integrated-records-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -11,22 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cc: MD, profile: dedicated, forms: vector, host: windows-2022 }
-          - { cc: MT, profile: four, forms: vector, host: windows-2022 }
-          - { cc: MD, profile: intel, forms: vector, host: windows-2022 }
-          - { cc: MD, profile: reduced, forms: vector, host: windows-2022 }
-          - { cc: MT, profile: diet, forms: vector, host: windows-2022 }
-          - { cc: gcc, profile: diet, forms: gcc, host: ubuntu-24.04 }
-          - { cc: gcc, profile: diet, forms: gcc, host: ubuntu-24.04-arm }
-          - { cc: gcc, profile: reduced, forms: gcc, host: ubuntu-24.04 }
-          - { cc: gcc, profile: reduced, forms: gcc, host: ubuntu-24.04-arm }
-          - { cc: gcc, profile: adapter, forms: gcc, host: ubuntu-24.04 }
-          - { cc: gcc, profile: adapter, forms: gcc, host: ubuntu-24.04-arm }
-          - { cc: gcc, profile: sanitize, forms: gcc, host: ubuntu-24.04 }
-          - { cc: gcc, profile: sanitize, forms: gcc, host: ubuntu-24.04-arm }
-          - { cc: clang, profile: sanitize, forms: vector, host: ubuntu-24.04 }
-          - { cc: gcc, profile: sanitize, forms: stack, host: ubuntu-24.04 }
-          - { cc: MD, profile: four, forms: stack, host: windows-2022 }
+          - { cc: MD, profile: dedicated, forms: combined, host: windows-2022 }
+          - { cc: MT, profile: four, forms: combined, host: windows-2022 }
+          - { cc: MD, profile: intel, forms: combined, host: windows-2022 }
+          - { cc: MD, profile: reduced, forms: combined, host: windows-2022 }
+          - { cc: MT, profile: diet, forms: combined, host: windows-2022 }
+          - { cc: gcc, profile: adapter, forms: combined, host: ubuntu-24.04 }
+          - { cc: clang, profile: sanitize, forms: combined, host: ubuntu-24.04 }
+          - { cc: gcc, profile: reduced, forms: combined, host: ubuntu-24.04-arm }
+          - { cc: gcc, profile: diet, forms: combined, host: ubuntu-24.04-arm }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -41,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: f53af83fd00b3403be328033a285915da723d8dc
+          ref: b70c7e94528f1d9f4c7c424f65bbd513bbf32d47
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: qualified-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: integrated-profile-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
