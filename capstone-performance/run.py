@@ -246,8 +246,8 @@ panic = "abort"
             ('legacy_memory', 'legacy_without_memory', 'full_repair'))
         repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
     write('repair-census.json', repair_counts)
-    inputs = [item for item in inputs if item['selector'] >= 16 or PROFILE == 'all' or
-              (PROFILE == 'neverd-four' and item['selector'] in (0,1,4,13))]
+    selectors = {0,1,4,13} if PROFILE == 'neverd-four' else {0,1,2,4,10,11,13}
+    inputs = [item for item in inputs if item['selector'] >= 16 or item['selector'] in selectors]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -408,7 +408,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Legacy first-memory repair', '',
+    lines = ['# Common MCInst metadata layout', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
