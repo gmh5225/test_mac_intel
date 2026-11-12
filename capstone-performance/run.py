@@ -7,6 +7,7 @@ import math
 import os
 from pathlib import Path
 import platform
+import re
 import shlex
 import shutil
 import statistics
@@ -218,7 +219,6 @@ panic = "abort"
     difference=sorted(n for n in changed[0] if changed[0][n]!=changed[1][n])
     assert difference==['MCInst.c.o','cs.c.o'],difference
     write('object-difference.json',dict(changed=difference,total=len(changed[0])))
-    import re, shlex
     bodies=[]
     for label in ('base','new'):
         spec=json.loads((WORK/(label+'-build/compile_commands.json')).read_text())
