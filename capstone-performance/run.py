@@ -377,7 +377,7 @@ def measure():
     for label in ('base','new'):
         command(['objdump','-d','--disassemble=cs_disasm_iter',WORK/('decoder-'+label)],'iterator-'+label)
     assert sha(WORK/'decoder-base') != sha(WORK/'decoder-new')
-    measure_panel('null',controls,5,['base','new','base_aa','new_aa'],420000000)
+    measure_panel('null',controls,13,['base','new','base_aa','new_aa'],420000000)
     measure_panel('other',controls,23,['base','new','base_aa','new_aa'],420000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 

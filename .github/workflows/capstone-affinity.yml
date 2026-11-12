@@ -1,9 +1,9 @@
-name: Pair the actual group-1 binary against baseline for PE and scalar scan and keep the separate null panel
+name: Verify isolated decoder layout on gcc controls and exact application paths
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-group1-paired-scan]
+    branches: [codex/capstone-group1-x64-replication]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-group1-paired-scan
+  group: capstone-group1-x64-replication
   cancel-in-progress: false
 
 jobs:
@@ -21,10 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: clang }
-          - { host: ubuntu-24.04-arm, baseline: clang }
-          - { host: ubuntu-24.04, baseline: gcc }
-          - { host: ubuntu-24.04-arm, baseline: gcc }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 1 }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 2 }
+          - { host: ubuntu-22.04, baseline: gcc, trial: 3 }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -51,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: group1-paired-scan-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: replicate-gcc-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
