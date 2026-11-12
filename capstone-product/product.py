@@ -25,14 +25,32 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld','-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=OFF','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   products={}
-  for label in ('base','direct','cached','forward','arch'):
+  import struct,collections
+  def compare(left,right,label):
+   with left.open('rb') as a,right.open('rb')as b:
+    fmt=struct.Struct('=9I');head=a.read(fmt.size);assert head==b.read(fmt.size);layout=fmt.unpack(head);result={};counts=collections.Counter();samples=0
+    length=32+layout[0]+layout[1]
+    while True:
+     x=a.read(length);y=b.read(length);assert len(x)==len(y)
+     if not x:break
+     assert len(x)==length
+     samples+=1
+     if x==y:continue
+     ctx=struct.unpack('=8I',x[:32]);which=(ctx[0],ctx[4],ctx[1]);counts[which]+=1
+     if which not in result:
+      diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
+      result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
+    write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
+  for label in ('base','direct','forward','arch'):
    if label!='base':
     command(['git','apply',r/(label+'.patch')],'select-'+label,nd)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','--parallel','4'],'product-'+label,nd)
-   signature=sp.check_output([next(build.rglob('capstone-route'))],text=True).strip()
-   write(label+'-public-state',signature)
-   if label!='base':assert json.loads((out/'base-public-state.json').read_text())==signature
-
+   tool=next(build.rglob('capstone-route'));trace=t/(label+'.trace')
+   signature=sp.check_output([tool,trace],text=True).strip();write(label+'-public-state',signature)
+   if label=='base':
+    rep=t/'repeat.trace';again=sp.check_output([tool,rep],text=True).strip();write('base-repeat-state',again);compare(trace,rep,'base-repeat');rep.unlink()
+   else:
+    compare(t/'base.trace',trace,label);trace.unlink()
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
@@ -48,7 +66,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==5
+  write('products',identities);assert len(set(identities.values()))==4
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def measure(name,case,mode,reps):
@@ -64,7 +82,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(230000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','direct','cached','forward','arch')):
+    for idx,label in enumerate(('base-copy','direct','forward','arch')):
      plans=[]
      for cycle in range(13):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)

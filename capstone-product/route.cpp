@@ -6,7 +6,13 @@
 using namespace neverd;
 static uint64_t hash=14695981039346656037ull;
 static void observe(const void* data,size_t n){ const auto*b=static_cast<const uint8_t*>(data);while(n--)hash=(hash^*b++)*1099511628211ull; }
-int main() {
+int main(int argc,char**argv) {
+  FILE* trace=argc>1?std::fopen(argv[1],"wb"):nullptr;
+  if(argc>1&&!trace)return 5;
+  if(trace) {
+    uint32_t meta[]={sizeof(cs_insn),sizeof(cs_detail),offsetof(cs_detail,x86),sizeof(cs_x86),offsetof(cs_x86,operands),sizeof(cs_x86_op),offsetof(cs_insn,mnemonic),offsetof(cs_insn,op_str),offsetof(cs_insn,detail)};
+    std::fwrite(meta,sizeof(meta),1,trace);
+  }
   Decoder d;size_t samples=0;
   for(auto arch:{Arch::X86,Arch::X64,Arch::X86}) {
     if(!d.init(arch))return 1;
@@ -27,10 +33,14 @@ int main() {
               DecodedInsn out{};int length=route==0?d.decodeOne(bytes.data(),size,ip,out):route==1?d.decodeOneLight(bytes.data(),size,ip,out):d.decodeOneForLift(bytes.data(),size,ip,out);
               observe(&length,sizeof(length));
               if(length){if(!out.Raw||out.Raw!=record||out.Raw->detail!=detail)return 4;observe(&out.Id,sizeof(out.Id));observe(&out.Addr,sizeof(out.Addr));}
-              record->detail=nullptr;observe(record,sizeof(*record));observe(detail,sizeof(*detail));record->detail=detail;++samples;
+              record->detail=nullptr;
+              if(trace){uint32_t id[]={unsigned(arch),flags,unsigned(syntax),route,unsigned(&bytes-&enc.front()),unsigned(size),unsigned(ip),unsigned(length)};
+               std::fwrite(id,sizeof(id),1,trace);std::fwrite(record,sizeof(*record),1,trace);std::fwrite(detail,sizeof(*detail),1,trace);}
+              observe(record,sizeof(*record));observe(detail,sizeof(*detail));record->detail=detail;++samples;
             }
       }
     }
   }
+  if(trace)std::fclose(trace);
   std::printf("%zu %llu\n",samples,(unsigned long long)hash);return 0;
 }

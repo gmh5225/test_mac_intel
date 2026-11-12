@@ -1,7 +1,7 @@
-name: Recheck production ARM, MIPS and PE32 with long paired CPU samples on the published NeverD pin
+name: Locate every public record difference by instruction, option, byte offset and duplicate process, then time production routes
 on:
   push:
-    branches: [codex/capstone-neverd-selection-controls]
+    branches: [codex/capstone-neverd-record-offsets]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-selection-controls
+          name: neverd-record-offsets
           path: product-evidence/
           retention-days: 14
