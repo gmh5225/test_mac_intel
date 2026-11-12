@@ -1,9 +1,9 @@
-name: Verify dedicated GCC public scanning, prove Clang binaries unchanged and measure real x86 streams
+name: Replicate formatter and detail costs with dedicated GCC public scanning
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-gcc-public-projection]
+    branches: [codex/capstone-gcc-published-controls]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-gcc-public-projection
+  group: capstone-gcc-published-controls
   cancel-in-progress: false
 
 jobs:
@@ -21,10 +21,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: clang }
-          - { host: ubuntu-24.04-arm, baseline: clang }
-          - { host: ubuntu-24.04, baseline: gcc }
-          - { host: ubuntu-24.04-arm, baseline: gcc }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 1 }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 2 }
+          - { host: ubuntu-22.04, baseline: gcc, trial: 3 }
+          - { host: ubuntu-24.04-arm, baseline: gcc, trial: 4 }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gcc-projection-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: gcc-controls-trial-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

@@ -381,16 +381,10 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    selected={'putty-32-0.85','putty-64-0.85','simd64','scalar32','scalar64','amd64-ls','amd64-cp','amd64-sort'}
-    checks=[v for v in cases if v['name'] in selected and v['consumer']=='decoder' and (v['mode']=='scan' or v['name'] in ('putty-32-0.85','simd64'))]
-    assert len(checks)==12
-    for label in ('base','new'):
-        binary=WORK/('decoder-'+label);command(['nm','-n','-S','--defined-only',binary],'linked-symbols-'+label)
-        for symbol in ('cs_disasm_iter','cs_decode_full_insn','X86_trySimpleOutput','decodeScanResultGeneric','decodeScanResultFallback','tryEvexTerminalScan','writeEvexRegisterOutput'):
-            command(['objdump','-d','--disassemble='+symbol,binary],'linked-'+symbol+'-'+label)
-    controls=[c for c in checks if (c['name'],c['mode']) in [('putty-32-0.85','scan'),('simd64','detail')]]
-    measure_panel('null',controls,9,['base','new','base_aa','new_aa'],300000000)
-    measure_panel('x86',checks,13,['base','new','base_aa','new_aa','iced','iced_aa'],240000000)
+    selected={('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('simd64','format'),('simd64','detail'),('amd64-ls','detail')}
+    checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
+    measure_panel('null',[c for c in checks if c['mode']=='detail' and c['name']!='amd64-ls'],9,['base','new','base_aa','new_aa'],350000000)
+    measure_panel('other',checks,23,['base','new','base_aa','new_aa'],350000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
