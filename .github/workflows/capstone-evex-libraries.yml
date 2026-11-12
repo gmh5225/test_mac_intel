@@ -1,7 +1,7 @@
-name: Verify isolated decoder layout on vector controls and exact application paths
+name: Measure indexed VEX memory rendering and full details in libraries and count unmet output forms
 on:
   push:
-    branches: [codex/capstone-separated-evex-libraries]
+    branches: [codex/capstone-vex-indexed-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: separate-vector-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex-indexed-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
