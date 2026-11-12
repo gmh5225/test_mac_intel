@@ -1,256 +1,119 @@
-diff --git a/SStream.c b/SStream.c
-index f1fd1246..687a587b 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -347,11 +347,7 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
- 		SSTREAM_RETURN_IF_CLOSED(ss);
- 		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
- 		char *end = buffer + sizeof(buffer);
--		char *p = end;
--		do {
--			*--p = "0123456789abcdef"[value & 15];
--			value >>= 4;
--		} while (value);
-+		char *p = SStream_hex_digits(end, value);
- 		*--p = 'x';
- 		*--p = '0';
- 		if (negative)
-diff --git a/SStream.h b/SStream.h
-index 2c9bc2c3..9f82244c 100644
---- a/SStream.h
-+++ b/SStream.h
-@@ -60,6 +60,16 @@ void SStream_concat(SStream *ss, const char *fmt, ...);
- // Source strings must not overlap the destination append range.
- void SStream_concat2(SStream *ss, const char *first, const char *second);
+diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
+index 6fcbe3f4..c2d02cd6 100644
+--- a/arch/X86/X86Module.c
++++ b/arch/X86/X86Module.c
+@@ -10,6 +10,10 @@
+ #include "X86Mapping.h"
+ #include "X86Module.h"
  
-+/* Write the digits backward so the caller can append or copy them as a span. */
-+static inline char *SStream_hex_digits(char *end, uint64_t value)
-+{
-+	do {
-+		*--end = "0123456789abcdef"[value & 15];
-+		value >>= 4;
-+	} while (value);
-+	return end;
-+}
++#ifdef CS_X86_SHARED_LOOKUPS
++static bool initializeSharedLookups(cs_struct *handle);
++#endif
 +
- // Append a lowercase 0x-prefixed magnitude, optionally preceded by a minus sign.
- void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
+ cs_err X86_global_init(cs_struct *ud)
+ {
+ 	MCRegisterInfo *mri;
+@@ -42,7 +46,10 @@ cs_err X86_global_init(cs_struct *ud)
+ 	else
+ 		ud->regsize_map = regsize_map_32;
  
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..029db920 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3757,4 +3757,85 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
+-	X86_build_lookup_tables(ud);
++#ifdef CS_X86_SHARED_LOOKUPS
++	if (!initializeSharedLookups(ud))
++#endif
++		X86_build_lookup_tables(ud);
  
- #undef X86_DECODE_INLINE
+ 	return CS_ERR_OK;
+ }
+@@ -105,4 +112,43 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 	return CS_ERR_OK;
+ }
  
-+#ifdef CS_X86_FORMAT_RELATIVE
-+static bool formatRelative(cs_struct *handle, const uint8_t *code,
-+					 size_t length, cs_insn *insn, uint16_t *size)
++#ifdef CS_X86_SHARED_LOOKUPS
++/* Keep the canonical lookup builder and all hot mapping functions unchanged.
++ * The initial owner publishes its ordinary heap tables for later handles. */
++static bool initializeSharedLookups(cs_struct *handle)
 +{
-+	InternalInstruction header;
-+	initializeInstructionHeader(&header, code, length, handle->mode);
-+	header.rexPrefix = 0;
-+	setInstructionSizes(&header, false, false);
-+	const bool escaped = code[0] == 0x0f;
-+	const unsigned int offset = escaped ? 2 : 1;
-+	const uint8_t opcode = code[offset - 1];
-+	header.readerCursor = offset;
-+	int64_t displacement;
-+	if (!escaped && ((opcode & 0xf0) == 0x70 || opcode == 0xeb)) {
-+		int8_t rel8;
-+		if (consumeInt8(&header, &rel8))
-+			return false;
-+		displacement = rel8;
-+	} else if (header.mode == MODE_16BIT) {
-+		int16_t rel16;
-+		if (consumeInt16(&header, &rel16))
-+			return false;
-+		displacement = rel16;
-+	} else {
-+		int32_t rel32;
-+		if (consumeInt32(&header, &rel32))
-+			return false;
-+		displacement = rel32;
-+	}
-+	const unsigned row = header.mode == MODE_16BIT ? X86_TERMINAL_16 :
-+			     header.mode == MODE_32BIT ? X86_TERMINAL_32 :
-+							 X86_TERMINAL_64;
-+	const uint64_t decision = insn->detail ? x86LegacyDecisions[row][escaped][opcode] :
-+						 x86LegacyPublicDecisions[row][escaped][opcode];
-+	const unsigned id = decision & X86_TERMINAL_UID_MASK;
-+	if (!id)
++	static uint32_t *insn_lookup, *reg_lookup;
++	static unsigned int maximum;
++	enum { empty, building, ready };
++	static unsigned int state;
++
++	if (cs_mem_malloc != malloc || cs_mem_calloc != calloc ||
++	    cs_mem_realloc != realloc || cs_mem_free != free ||
++	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
-+	*size = (uint16_t)header.readerCursor;
-+	insn->size = *size;
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		memset(insn->detail, 0, offsetof(cs_detail, x86) + sizeof(*x86));
-+		memcpy(x86->opcode, code, offset);
-+		x86->addr_size = header.addressSize;
-+		x86->encoding.imm_offset = offset;
-+		x86->encoding.imm_size = *size - offset;
-+		X86_get_insn_id(handle, insn, id);
-+	} else {
-+		insn->id = id;
++
++	if (__atomic_load_n(&state, __ATOMIC_ACQUIRE) != ready) {
++		unsigned int expected = empty;
++		if (!__atomic_compare_exchange_n(&state, &expected, building,
++						 false, __ATOMIC_RELAXED,
++						 __ATOMIC_RELAXED))
++			return false;
++		X86_build_lookup_tables(handle);
++		if (!handle->x86_insn_lut || !handle->x86_insn_reg_lut) {
++			__atomic_store_n(&state, empty, __ATOMIC_RELEASE);
++			return true;
++		}
++		insn_lookup = handle->x86_insn_lut;
++		reg_lookup = handle->x86_insn_reg_lut;
++		maximum = handle->x86_insn_lut_max;
++		__atomic_store_n(&state, ready, __ATOMIC_RELEASE);
 +	}
-+	uint64_t target = X86_relativeBranchTarget(handle->mode, insn->address,
-+						  *size, displacement, header.immSize);
-+	X86_writeRelativeIntel(handle, insn, target, id, header.immSize);
++	handle->x86_insn_lut = insn_lookup;
++	handle->x86_insn_reg_lut = reg_lookup;
++	handle->x86_insn_lut_max = maximum;
++	handle->x86_shared_lookups = true;
 +	return true;
 +}
-+
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeFull(cs_struct *handle, const uint8_t *code, size_t size,
-+	       cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+	/* These unprefixed relative branches have one immediate. The
-+	 * default Intel spelling can be written to the two public fields. */
-+	if (!handle->no_text && size >= 2 &&
-+	    (insn->detail != NULL) == (handle->detail_opt != 0) &&
-+	    ((code[0] & 0xf0) == 0x70 || (code[0] & 0xfe) == 0xe8 ||
-+	     code[0] == 0xeb || (code[0] == 0x0f && (code[1] & 0xf0) == 0x80)) &&
-+	    handle->syntax == CS_OPT_SYNTAX_INTEL && !handle->mnem_list &&
-+	    cs_vsnprintf == cs_default_vsnprintf &&
-+	    formatRelative(handle, code, size, insn, insn_size)) {
-+		copy_insn_bytes(insn, code, true);
-+		return true;
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
-+}
 +#endif
 +
  #endif
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..c71d063e 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -924,6 +924,45 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
- 
- #endif // CAPSTONE_SSTREAM_PRECHECKED
- 
-+static inline void setRelativeOperand(cs_x86 *x86, int64_t target, uint8_t table_size,
-+				      uint8_t immediate_size)
-+{
-+	cs_x86_op *op = &x86->operands[x86->op_count];
-+	op->type = X86_OP_IMM;
-+	op->size = x86->op_count ? x86->operands[0].size :
-+				   (table_size ? table_size : immediate_size);
-+	op->imm = target;
-+}
-+
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_SSTREAM_PRECHECKED)
-+void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target,
-+			    unsigned uid, uint8_t immediate_size)
-+{
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+		setRelativeOperand(x86, (int64_t)target, X86_immediate_size(uid, NULL),
-+				   immediate_size);
-+		get_op_access(handle, uid, access, &x86->eflags);
-+		x86->operands[0].access = access[0];
-+		x86->op_count = 1;
-+	}
-+	const char *mnemonic = X86_insn_name((csh)(uintptr_t)handle, insn->id);
-+	strncpy(insn->mnemonic, mnemonic, sizeof(insn->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (target <= HEX_THRESHOLD) {
-+		insn->op_str[0] = (char)('0' + target);
-+	} else {
-+		char digits[16];
-+		char *end = digits + sizeof(digits);
-+		char *first = SStream_hex_digits(end, target);
-+		insn->op_str[0] = '0';
-+		insn->op_str[1] = 'x';
-+		memcpy(insn->op_str + 2, first, (size_t)(end - first));
-+	}
-+}
-+#endif
-+
- /// printPCRelImm - This is used to print an immediate value that ends up
- /// being encoded as a pc-relative value.
- static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
-@@ -938,31 +977,8 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
- 		printImm(MI, O, imm, true);
- 
- 		if (MI->csh->detail_opt) {
--			MI->flat_insn->detail->x86
--				.operands[MI->flat_insn->detail->x86.op_count]
--				.type = X86_OP_IMM;
--			// if op_count > 0, then this operand's size is taken from the destination op
--			if (MI->flat_insn->detail->x86.op_count > 0)
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size =
--					MI->flat_insn->detail->x86.operands[0]
--						.size;
--			else if (opsize > 0)
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size = opsize;
--			else
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size = MI->imm_size;
--			MI->flat_insn->detail->x86
--				.operands[MI->flat_insn->detail->x86.op_count]
--				.imm = imm;
--
-+			setRelativeOperand(&MI->flat_insn->detail->x86, imm, opsize,
-+					   MI->imm_size);
- #ifndef CAPSTONE_DIET
- 			set_early_operand_access(MI);
- #endif
-diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..96606ac9 100644
---- a/arch/X86/X86Mapping.h
-+++ b/arch/X86/X86Mapping.h
-@@ -54,6 +54,8 @@ static inline bool X86_get_insn_id_no_detail(const cs_struct *h, cs_insn *insn,
- 	return true;
- }
- 
-+void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target,
-+			    unsigned uid, uint8_t immediate_size);
- // return insn name, given insn id
- const char *X86_insn_name(csh handle, unsigned int id);
- 
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..569ef281 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -29,6 +29,15 @@ CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
- 					 size_t size);
- #endif
- 
-+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CS_X86_FORMAT_RELATIVE
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeFull(cs_struct *handle, const uint8_t *code, size_t size,
-+	       cs_insn *insn, uint16_t *insn_size, bool batch);
-+#endif
-+
- /* Keep successful compact decoding contiguous with cached mapping and
-  * short copies; cold fallback blocks otherwise split the inline path. */
- #if defined(__GNUC__)
-@@ -158,6 +167,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 		return true;
- #endif
+diff --git a/cs.c b/cs.c
+index ea7b0e42..b432f926 100644
+--- a/cs.c
++++ b/cs.c
+@@ -896,8 +896,13 @@ cs_err CAPSTONE_API cs_close(csh *handle)
  	}
+ 
+ 	cs_mem_free(ud->insn_cache);
+-	cs_mem_free(ud->x86_insn_lut);
+-	cs_mem_free(ud->x86_insn_reg_lut);
++#ifdef CS_X86_SHARED_LOOKUPS
++	if (!ud->x86_shared_lookups)
 +#endif
-+#ifdef CS_X86_FORMAT_RELATIVE
-+	if (handle->arch == CS_ARCH_X86)
-+		return X86_decodeFull(handle, code, size, insn, insn_size, batch);
++	{
++		cs_mem_free(ud->x86_insn_lut);
++		cs_mem_free(ud->x86_insn_reg_lut);
++	}
+ 
+ 	memset(ud, 0, sizeof(*ud));
+ 	cs_mem_free(ud);
+diff --git a/cs_priv.h b/cs_priv.h
+index 903415e8..d0f084f4 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -101,6 +101,13 @@ typedef struct insn_map {
  #endif
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
+ } insn_map;
+ 
++#if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE) && defined(__GCC_ATOMIC_INT_LOCK_FREE) && \
++	__GCC_ATOMIC_INT_LOCK_FREE == 2
++#define CS_X86_SHARED_LOOKUPS
++#endif
++
+ struct cs_struct {
+ 	cs_arch arch;
+ 	cs_mode mode;
+@@ -122,6 +129,9 @@ struct cs_struct {
+ 	int syntax; // asm syntax for simple printer such as ARM, Mips & PPC
+ 	bool doing_mem; // handling memory operand in InstPrinter code
+ 	bool doing_SME_Index; // handling a SME instruction that has index
++#ifdef CS_X86_SHARED_LOOKUPS
++	bool x86_shared_lookups;
++#endif
+ 	unsigned short *insn_cache; // index caching for mapping.c
+ 	uint32_t *x86_insn_lut; // x86 id -> public id (high 16) and insns[] index
+ 	uint32_t *x86_insn_reg_lut; // x86 packed Intel/ATT implicit register entries
