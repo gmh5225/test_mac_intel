@@ -102,14 +102,15 @@ index 00000000..7eafdf5d
 +	{ "%o6", 3 },
 +};
 diff --git a/arch/Sparc/SparcInstPrinter.c b/arch/Sparc/SparcInstPrinter.c
-index 7a33d2b5..e1bfdbcc 100644
+index 7a33d2b5..980914ca 100644
 --- a/arch/Sparc/SparcInstPrinter.c
 +++ b/arch/Sparc/SparcInstPrinter.c
-@@ -61,6 +61,17 @@ static void printRegName(SStream *OS, MCRegister Reg)
+@@ -61,6 +61,18 @@ static void printRegName(SStream *OS, MCRegister Reg)
  
  static void printRegNameAlt(SStream *OS, MCRegister Reg, unsigned AltIdx)
  {
-+#if defined(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES) && !defined(CAPSTONE_DIET)
++#if defined(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
++	(defined(__clang__) || defined(_MSC_VER))
 +#include "SparcGenShortStateRegisterNames.inc"
 +	if (AltIdx == Sparc_RegNamesStateReg && Reg &&
 +	    Reg <= ARR_SIZE(short_names) && short_names[Reg - 1].length &&
@@ -140,10 +141,10 @@ index b75a84fa..276f5eca 100644
  The generated immediate-size lookup preserves the original metadata and uses
 diff --git a/suite/synctools/sparc_state_register_names.py b/suite/synctools/sparc_state_register_names.py
 new file mode 100644
-index 00000000..40e6245f
+index 00000000..bbba5919
 --- /dev/null
 +++ b/suite/synctools/sparc_state_register_names.py
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,100 @@
 +#!/usr/bin/env python3
 +# SPDX-License-Identifier: BSD-3-Clause
 +"""Project SPARC V9 state register spellings with their percent prefix."""
@@ -159,7 +160,8 @@ index 00000000..40e6245f
 +REGISTER_BODY = """\tSStream_concat1(OS, '%');
 +\tSStream_concat0(OS, getRegisterName(Reg, AltIdx));
 +}"""
-+SHORT_REG = """#if defined(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES) && !defined(CAPSTONE_DIET)
++SHORT_REG = """#if defined(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \\
++	(defined(__clang__) || defined(_MSC_VER))
 +#include "SparcGenShortStateRegisterNames.inc"
 +\tif (AltIdx == Sparc_RegNamesStateReg && Reg &&
 +\t    Reg <= ARR_SIZE(short_names) && short_names[Reg - 1].length &&

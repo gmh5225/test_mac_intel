@@ -33,24 +33,16 @@ def main(root):
    run.write('mixed-objects.json',digest)
   run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SPARC_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
   run.command(['cmake','--build',b,'--target','capstone_shared','--parallel','4'],'build-'+label)
+  hashes={str(q.relative_to(b)):run.sha(q) for q in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+  if label=='base':dedicated_control=hashes
+  else:
+   assert hashes==dedicated_control
+   run.write('dedicated-unchanged.json',hashes)
   if label=='new':
-   run.command(['python3',w/'suite/synctools/sparc_state_register_names.py','--check'],'check-state-name-projection')
+   run.command(['python3' ,w/'suite/synctools/sparc_state_register_names.py','--check'],'check-state-name-projection')
   lib='libcapstone.' +('dylib' if platform.system()=='Darwin' else 'so');out=root/(label+'-'+lib);shutil.copyfile(b/lib,out);bins[label]=out
  run.write('inputs.json',dict(capstone=man['capstone_revision'],patch=run.sha(f),consumer=run.sha(consumer),libraries={k:run.sha(v)for k,v in bins.items()}))
- if platform.system()=='Linux':os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
- results=[]
- for row in cases:
-  for m in (1,2):
-   orders=[]
-   for rev in (0,1):
-    libs=[bins['base'],bins['new']];libs=libs[::-1] if rev else libs
-    data=json.loads(sp.check_output([consumer,*libs,str(row['selector']),str(m),row['path']],text=True))
-    raw=data['ticks'];assert len(raw)==9
-    values=[(sum(t[::2])/sum(t[1::2]) if i%2==0 else sum(t[1::2])/sum(t[::2])) for i,t in enumerate(raw)]
-    if rev:values=[1/x for x in values]
-    orders.append(dict(raw=data,gain=st.median(values),pairs=values))
-   results.append(dict(case=row['name'],mode=('scan','format','detail')[m],orders=orders,gain=st.median(p for v in orders for p in v['pairs'])))
-   run.write('measurements.json',results)
+ run.write('complete.json',dict(mixed_and_dedicated_objects_equal=True))
 if __name__=='__main__':
  run.EVIDENCE.mkdir(exist_ok=True)
  with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
