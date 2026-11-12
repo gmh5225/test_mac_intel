@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='isolated EVEX scanner and nine register output families'))
+    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='single stack base with at most one displacement byte'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -214,7 +214,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
