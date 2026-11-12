@@ -1,9 +1,9 @@
-name: Capstone post-printer linked text control
+name: Isolate MIPS timing differences with stable ELF image slots
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-postprinter-link-layout]
+    branches: [codex/capstone-mips-image-crossover]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-postprinter-link-layout
+  group: capstone-mips-image-crossover
   cancel-in-progress: false
 
 jobs:
@@ -39,17 +39,17 @@ jobs:
       - name: Build immutable sources and verify outputs
         timeout-minutes: 27
         run: python3 capstone-performance/run.py prepare
-      - name: Compare ordinary and matched text extents
+      - name: Cross identical executable slots and observe decoder record locations
         timeout-minutes: 37
-        run: python3 capstone-performance/layout_probe.py
+        run: python3 capstone-performance/image_crossover.py
       - name: Retire disposable products and summarize evidence
         if: always()
-        run: python3 capstone-performance/layout_probe.py cleanup
+        run: python3 capstone-performance/image_crossover.py cleanup
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: postprinter-layout-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: mips-crossover-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
