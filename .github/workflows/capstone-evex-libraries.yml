@@ -1,7 +1,7 @@
-name: Compare Capstone EVEX scan and complete output with both iced formatters on real i386 and AMD64 library functions
+name: Measure joint EVEX and immediate dispatch through real vector workloads
 on:
   push:
-    branches: [codex/capstone-vector-library-comparison]
+    branches: [codex/capstone-vector-group1-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: combined-vectors-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
