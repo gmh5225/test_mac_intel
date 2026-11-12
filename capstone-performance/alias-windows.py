@@ -78,7 +78,7 @@ target_include_directories(native_sstream PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/t
 target_link_libraries(native_sstream PRIVATE capstone_static)
 '''
         with (tree/'CMakeLists.txt').open('a') as f: f.write('\n'+targets)
-        command(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
+        command(['cmake','-S',tree,'-B',build,'-A','x64',
                  '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+('ON' if sys.argv[2]=='first' else 'OFF'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
                  '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')], label+'-configure')
         def build_targets(step,*names):
