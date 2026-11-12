@@ -383,8 +383,8 @@ def measure():
         for symbol in ('cs_disasm_iter','cs_decode_full_insn','X86_trySimpleOutput','decodeScanResultGeneric','decodeScanResultFallback','tryEvexTerminalScan','writeEvexRegisterOutput'):
             command(['objdump','-d','--disassemble='+symbol,binary],'linked-'+symbol+'-'+label)
     controls=[c for c in checks if (c['name'],c['mode']) in [('putty-32-0.85','scan'),('simd64','detail')]]
-    measure_panel('null',controls,12,['base','new','base_aa','new_aa'],240000000)
-    measure_panel('x86',checks,12,['base','new','base_aa','new_aa','iced','iced_aa'],240000000)
+    measure_panel('null',checks,17,['base','new','base_aa','new_aa'],300000000)
+    measure_panel('x86',checks,10,['base','new','base_aa','new_aa','iced','iced_aa'],240000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
