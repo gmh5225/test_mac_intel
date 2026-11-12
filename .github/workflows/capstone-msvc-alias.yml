@@ -1,7 +1,7 @@
-name: Measure ARM, Thumb, AArch64 and MIPS on the integrated Windows x86 change on independent Windows runners
+name: Check dedicated AArch64 register output on native Windows in four Release builds
 on:
   push:
-    branches: [codex/capstone-dynamic-crt-other-architectures]
+    branches: [codex/capstone-aarch64-registers-windows]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD]
+        crt: [MD, MT]
         order: [first, second]
     runs-on: windows-2022
     timeout-minutes: 72
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dynamic-mixed-arch-${{ matrix.order }}
+          name: compact-register-${{ matrix.crt }}-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14

@@ -79,18 +79,21 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
 '''
         with (tree/'CMakeLists.txt').open('a') as f: f.write('\n'+targets)
         command(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
-                 '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+('ON' if sys.argv[2]=='first' else 'OFF'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
+                 '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+('ON' if sys.argv[2]=='first' else 'OFF'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
                  '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')], label+'-configure')
         def build_targets(step,*names):
             command(['cmake','--build',build,'--config','Release','--parallel','4','--target',*names],label+step)
         build_targets('-timed','native_single','native_sstream')
+        flags=[f.read_text(encoding='utf-16',errors='replace').upper() for f in build.rglob('CL.command.1.tlog')]
+        assert any('/'+crt+' ' in line and 'AARCH64INSTPRINTER.C' in line for line in flags)
+        assert any('CAPSTONE_AARCH64_SHORT_REGISTER_NAMES' in line for line in flags)==(label=='new')
         timed=build/'Release/native_single.exe'
         command([build/'Release/native_sstream.exe'],label+'-sstream')
         compiled[label]=digest(timed.read_bytes())
         programs[label]=timed
     write('binaries.json',compiled)
-    selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm-ls','arm-cp','arm-sort','thumb-ls','thumb-cp','thumb-sort','mips64el-ls','arm64-ls','arm64-cp','arm64-sort','putty-32-0.85')}
-    assert len(selected)==11
+    selected = {r['name']:r for r in manifest['inputs'] if r['name'] in ('arm64-ls','arm64-cp','arm64-sort')}
+    assert len(selected)==3
     cache={};cases=[fixture(r,cache) for r in selected.values()]
     write('cases.json',cases)
     snapshots=[]; measurements=[]
