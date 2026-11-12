@@ -1,7 +1,7 @@
-name: Compare the two x86 integer implementations in NeverD with latest source-built LLVM
+name: Verify NeverD x86 iterator integration with real PE and multi-architecture controls and latest LLVM source
 on:
   push:
-    branches: [codex/capstone-integer-product]
+    branches: [codex/capstone-neverd-output-iterator]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integer-decoder-product
+          name: owned-iterator-product
           path: product-evidence/
           retention-days: 14

@@ -16,15 +16,17 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
   cases=corpus.prepare(r,t,out,command)
-  cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','simd64')]
-  assert len(cases)==6
+  cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','simd64','arm-cp','mips64el-ls','arm64-sort')]
+  assert len(cases)==9
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld','-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=OFF','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   products={}
-  for label in ('base','full','iterator'):
-   if label!='base':command(['git','apply',r/(label+'.patch')],'apply-'+label,cs)
+  for label in ('base','owned'):
+   if label!='base':
+    command(['git','apply',r/(label+'.patch')],'apply-'+label,cs)
+    command(['git','apply',r/'client.patch'],'use-x86-iterator',nd)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','--parallel','4'],'product-'+label,nd)
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
@@ -33,14 +35,18 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':command(['git','apply','-R',r/(label+'.patch')],'restore-'+label,cs)
    snapshot=json.loads((build/'.neverd-deps/snapshot.json').read_text())
    write(label+'-snapshot',snapshot)
+   roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
+   objects={str(f.relative_to(roots[0])):hashlib.sha256(f.read_bytes()).hexdigest() for f in roots[0].rglob('*.o')};write(label+'-objects',objects)
+   if label=='owned':
+    base_objects=json.loads((out/'base-objects.json').read_text());assert all(objects[k]==v for k,v in base_objects.items()) and len(objects)==len(base_objects)+1
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==3
+  write('products',identities);assert len(set(identities.values()))==2
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def measure(name,case,mode,reps):
-   sel=case['selector'] if case['selector'] in (32,64) else 'arm64'
+   sel=case['selector'] if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
    ticks,*signature=map(int,sp.check_output(list(map(str,[products[name],case['path'],sel,mode,reps])),text=True).split())
    assert ticks>0 and signature[0]>0
    return ticks,signature
@@ -50,7 +56,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(100000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','full','iterator')):
+    for idx,label in enumerate(('base-copy','owned')):
      plans=[]
      for cycle in range(9):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
@@ -62,6 +68,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
     row['signature']=oracle;results.append(row);write('timings',results)
-  assert len(results)==18;write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
+  assert len(results)==27;write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))

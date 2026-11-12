@@ -1,0 +1,22 @@
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -12,6 +12,7 @@
+ #include "neverd/decode/Decoder.h"
+ 
+ #include "DecoderDetail.h"
++#include "X86ScanAdapter.h"
+ 
+ #include "neverd/ArchSupport.h"
+ #include "neverd/ir/intrinsics/Intrinsics.h"
+@@ -328,7 +329,10 @@
+   const uint8_t *Code = Bytes;
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+-  if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf))
++  if (X86 && Text) {
++    if (X86_disasmIter(Handle, &Code, &Remaining, &PC, InsnBuf))
++      return true;
++  } else if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf))
+     return true;
+   return !VectorPool && decodeArchitectureFallback(Bytes, Len, Addr);
+ }
