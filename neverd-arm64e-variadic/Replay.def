@@ -1,7 +1,7 @@
 {
-  "revision": "c8ebcd7dbf2189adccb11461e1b853beeaea98b5",
+  "revision": "39658ddf9d646b82118bc7321ddf79d70ae059bf",
   "package": "neverd-llvm-v23.0.0-r6",
-  "tag": "neverd-structured-r6-c8ebcd7dbf",
+  "tag": "neverd-darwin-registers-r6-39658ddf9d",
   "host": "NeverDArm64eLiftedImageTests",
   "asset": "neverd-variadic-host.tgz",
   "run_env": {
@@ -13,7 +13,19 @@
     "UnoptimizedCalleeHomesItsNativeArgumentCursor": 4,
     "FramelessStackLoadsSurviveImagePublication": 2,
     "CompactLeavesElideOnlyTheUnusedStackReservation": 2,
-    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2
+    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2,
+    "UnoptimizedImagePreservesReturnedRegisters": {
+      "executed_native_images": 2,
+      "native_register_entries_compared": 9,
+      "native_register_input_comparisons": 27,
+      "installed_register_entries": 9
+    },
+    "OptimizedImagePreservesReturnedRegisters": {
+      "executed_native_images": 2,
+      "native_register_entries_compared": 9,
+      "native_register_input_comparisons": 27,
+      "installed_register_entries": 9
+    }
   },
   "environment": {
     "hardware": [
@@ -39,29 +51,9 @@
       "--version"
     ]
   },
-  "archive_sha256": "6939ab33571c716f31fff93676b43dceee4889e69530ae579ae588b890f68003",
-  "host_sha256": "d758b84ba90f4d77a44a6b859321349d55929a0448906352c59721d6a2f97d2b",
+  "archive_sha256": "d9e04760ea5833a51591e089617087d4518aae6bb76d7fc7dce41f87661fe702",
+  "host_sha256": "fbf2d6651a5dab9e61cafdf2ed647534ad07a30e0bb4e734a01f4ed88f4a8088",
   "xml": "results.xml",
   "log": "runtime.log",
-  "image_count": "executed_native_images",
-  "installation": {
-    "host": "NeverDArm64eAnalysisTests",
-    "host_sha256": "7f4aef594ff25db544ef6b2acede70be9afa89cd90e1b3fec2c1202cb29ffb6e",
-    "fixtures": {
-      "legacy/report.json": "8ec1a7c5ce74ac6bf3e5a8a1abc0de58b983873087cabce577efa42a29c0b361",
-      "legacy/-O0-compact.dylib": "12c5533841c05f1973e27ca90806fa1f15a51d24594060a49eba9493545bb1ff",
-      "legacy/-O0-dwarf.dylib": "b8cacdeff46e5aa12815823a441463c781ba247f56f9cf6a8978c9149695d8b2",
-      "legacy/-O2-compact.dylib": "ff6d4909cd303159b0bafe3a710db67b8d60b7d10505f2a722f2446807168b88",
-      "legacy/-O2-dwarf.dylib": "eced87d5eccf65db2905459dd8704dda1ce3ba958b14513aee6accac3c4267d3"
-    },
-    "legacy": "legacy",
-    "build": "ctest",
-    "driver": "neverd/scripts/verify_arm64e_native.py",
-    "probe": "original-controls/report.json",
-    "report": "report.json",
-    "modes": {
-      "run": 20,
-      "run-default-executable": 4
-    }
-  }
+  "image_count": "executed_native_images"
 }
