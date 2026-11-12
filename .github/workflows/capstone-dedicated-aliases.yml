@@ -1,7 +1,7 @@
-name: Measure dedicated RISC-V initialization and verify unchanged mixed objects
+name: Measure dedicated x86 repair by swapping library load order and verify mixed objects
 on:
   push:
-    branches: [codex/capstone-dedicated-riscv-initialization]
+    branches: [codex/capstone-dedicated-x86-legacy-memory-repair]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-riscv-init-${{ matrix.host }}-${{ github.run_attempt }}
+          name: dedicated-x86-memory-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14

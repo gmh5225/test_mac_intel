@@ -5,12 +5,12 @@
      endif()
  endforeach()
 +
-+if(capstone_enabled_architectures STREQUAL "RISCV")
-+    add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
++if(capstone_enabled_architectures STREQUAL "X86")
++    add_compile_definitions(CAPSTONE_X86_LEGACY_MEMORY_REPAIR)
 +endif()
  
- if(capstone_enabled_architectures STREQUAL "SPARC")
-     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
 --- a/Makefile
 +++ b/Makefile
 @@ -115,6 +115,10 @@
@@ -18,24 +18,33 @@
  LIBNAME = capstone
  
 +
-+ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
-+CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
++ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++CFLAGS += -DCAPSTONE_X86_LEGACY_MEMORY_REPAIR
 +endif
  
- ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
- CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
---- a/cs.c
-+++ b/cs.c
-@@ -1056,7 +1056,12 @@
- 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
- 	else
- #endif
-+#ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
-+	/* The RISC-V decoder constructs each operand before reading it. */
-+	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
-+#else
- 		MCInst_Init(&mci, handle->arch);
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -12698,6 +12698,21 @@
+ 		return;
+ 
+ 	cs_x86 *x86 = &insn->detail->x86;
++#ifdef CAPSTONE_X86_LEGACY_MEMORY_REPAIR
++	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
++	 * Other encodings can only need the first memory operand's broadcast
++	 * repair, including decorators introduced by a custom formatter. */
++	if ((x86->opcode[0] & 0xe0) != 0xc0 && x86->opcode[0] != 0x62) {
++		for (i = 0; i < x86->op_count; ++i) {
++			cs_x86_op *operand = &x86->operands[i];
++			if (operand->type == X86_OP_MEM) {
++				repair_avx_broadcast(operand, mnem);
++				break;
++			}
++		}
++		return;
++	}
 +#endif
- 	mci.csh = handle;
- 	mci.address = insn->address;
- 	mci.flat_insn = insn;
+ 	// Find the operands that these repairs can change once, in output order.
+ 	for (i = 0; i < x86->op_count; ++i) {
+ 		cs_x86_op *operand = &x86->operands[i];
