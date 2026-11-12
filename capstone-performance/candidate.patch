@@ -1,131 +1,22 @@
-diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
-index 1cc3d3a9..a89e9a48 100644
---- a/arch/X86/X86ATTInstPrinter.c
-+++ b/arch/X86/X86ATTInstPrinter.c
-@@ -59,6 +59,7 @@
- 
- #define GET_REGINFO_ENUM
- #include "X86GenRegisterInfo.inc"
-+#include "X86ImplicitRegPair.h"
- 
- static void printMemReference(MCInst *MI, unsigned Op, SStream *O);
- static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
-@@ -1230,8 +1231,9 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
- 
- 			MI->flat_insn->detail->x86.op_count++;
- 		} else {
--			if (X86_insn_reg_att2(MCInst_getOpcode(MI), &reg,
--					      &access1, &reg2, &access2)) {
-+			if (X86_getImplicitRegPair(MCInst_getOpcode(MI), true,
-+						   &reg, &access1, &reg2,
-+						   &access2)) {
- 				MI->flat_insn->detail->x86.operands[0].type =
- 					X86_OP_REG;
- 				MI->flat_insn->detail->x86.operands[0].reg =
-diff --git a/arch/X86/X86ImplicitRegPair.h b/arch/X86/X86ImplicitRegPair.h
-new file mode 100644
-index 00000000..09b417ba
---- /dev/null
-+++ b/arch/X86/X86ImplicitRegPair.h
-@@ -0,0 +1,38 @@
-+/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
-+#ifndef CS_X86_IMPLICIT_REG_PAIR_H
-+#define CS_X86_IMPLICIT_REG_PAIR_H
-+
-+/* These encodings embed both registers in the generated assembly string. */
-+static inline bool X86_getImplicitRegPair(unsigned int opcode, bool att,
-+					  x86_reg *reg1,
-+					  enum cs_ac_type *access1,
-+					  x86_reg *reg2,
-+					  enum cs_ac_type *access2)
-+{
-+	x86_reg first, second;
-+	enum cs_ac_type first_access, second_access;
-+
-+#define X86_REG_PAIR(op, r1, r2, a1, a2) \
-+	case X86_##op: \
-+		first = X86_REG_##r1; \
-+		second = X86_REG_##r2; \
-+		first_access = CS_AC_##a1; \
-+		second_access = CS_AC_##a2; \
-+		break;
-+	switch (opcode) {
-+#include "X86ImplicitRegPair.inc"
-+	default:
-+		return false;
-+	}
-+#undef X86_REG_PAIR
-+
-+	*reg1 = att ? second : first;
-+	*reg2 = att ? first : second;
-+	if (access1)
-+		*access1 = att ? second_access : first_access;
-+	if (access2)
-+		*access2 = att ? first_access : second_access;
-+	return true;
-+}
-+
-+#endif
-diff --git a/arch/X86/X86ImplicitRegPair.inc b/arch/X86/X86ImplicitRegPair.inc
-new file mode 100644
-index 00000000..69001b93
---- /dev/null
-+++ b/arch/X86/X86ImplicitRegPair.inc
-@@ -0,0 +1,10 @@
-+/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
-+/* Instructions with both registers embedded in the assembly string. */
-+X86_REG_PAIR(IN16rr, AX, DX, WRITE, READ)
-+X86_REG_PAIR(IN32rr, EAX, DX, WRITE, READ)
-+X86_REG_PAIR(IN8rr, AL, DX, WRITE, READ)
-+X86_REG_PAIR(INVLPGA32, EAX, ECX, READ, READ)
-+X86_REG_PAIR(INVLPGA64, RAX, ECX, READ, READ)
-+X86_REG_PAIR(OUT16rr, DX, AX, READ, READ)
-+X86_REG_PAIR(OUT32rr, DX, EAX, READ, READ)
-+X86_REG_PAIR(OUT8rr, DX, AL, READ, READ)
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..6324a742 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -57,6 +57,7 @@
- 
- #define GET_REGINFO_ENUM
- #include "X86GenRegisterInfo.inc"
-+#include "X86ImplicitRegPair.h"
- 
- #include "X86BaseInfo.h"
- 
-@@ -883,8 +884,9 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
- 			MI->flat_insn->detail->x86.operands[0].access = access1;
- 			MI->flat_insn->detail->x86.op_count++;
- 		} else {
--			if (X86_insn_reg_intel2(MCInst_getOpcode(MI), &reg,
--						&access1, &reg2, &access2)) {
-+			if (X86_getImplicitRegPair(MCInst_getOpcode(MI), false,
-+						   &reg, &access1, &reg2,
-+						   &access2)) {
- 				MI->flat_insn->detail->x86.operands[0].type =
- 					X86_OP_REG;
- 				MI->flat_insn->detail->x86.operands[0].reg =
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index e2c0eb9e..5fcd9a1c 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -11097,14 +11097,10 @@ static const struct insn_reg insn_regs_intel_extra[] = {
- };
- 
- static const struct insn_reg2 insn_regs_intel2[] = {
--	{ X86_IN16rr, X86_REG_AX, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
--	{ X86_IN32rr, X86_REG_EAX, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
--	{ X86_IN8rr, X86_REG_AL, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
--	{ X86_INVLPGA32, X86_REG_EAX, X86_REG_ECX, CS_AC_READ, CS_AC_READ },
--	{ X86_INVLPGA64, X86_REG_RAX, X86_REG_ECX, CS_AC_READ, CS_AC_READ },
--	{ X86_OUT16rr, X86_REG_DX, X86_REG_AX, CS_AC_READ, CS_AC_READ },
--	{ X86_OUT32rr, X86_REG_DX, X86_REG_EAX, CS_AC_READ, CS_AC_READ },
--	{ X86_OUT8rr, X86_REG_DX, X86_REG_AL, CS_AC_READ, CS_AC_READ },
-+#define X86_REG_PAIR(op, r1, r2, a1, a2) \
-+	{ X86_##op, X86_REG_##r1, X86_REG_##r2, CS_AC_##a1, CS_AC_##a2 },
-+#include "X86ImplicitRegPair.inc"
-+#undef X86_REG_PAIR
- };
- 
- static int binary_search1(const struct insn_reg *insns, unsigned int max,
+--- a/cs.c
++++ b/cs.c
+@@ -1039,7 +1039,7 @@
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-CS_PRESERVE_MOST bool
++bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -18,7 +18,7 @@
+  * the compiler can combine scan and output state without an extra boundary.
+  * Otherwise cs.c instantiates the same iterator. Input validation, option
+  * selection and callbacks keep their original order. */
+-CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
++CAPSTONE_INTERNAL bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
