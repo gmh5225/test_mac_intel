@@ -1,7 +1,16 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 33536219..852e9455 100644
+index 33536219..a608d28f 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
+@@ -167,7 +167,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "AARCH64")
+-    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
++    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN)
+ endif()
+ 
+ # Dedicated builds of these backends use their generated mnemonic tries.
 @@ -444,6 +444,7 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86InstPrinterCommon.c
          arch/X86/X86Mapping.c
@@ -11,9 +20,18 @@ index 33536219..852e9455 100644
      # MSVC can inline the decoder into the public iterator under LTCG, giving
      # even a compact scan a very large probed stack frame.
 diff --git a/Makefile b/Makefile
-index d7536526..d2d5c638 100644
+index d7536526..636d0411 100644
 --- a/Makefile
 +++ b/Makefile
+@@ -128,7 +128,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
+-CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS
++CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN
+ endif
+ 
+ ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
 @@ -248,6 +248,7 @@ endif
  endif
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
@@ -22,6 +40,61 @@ index d7536526..d2d5c638 100644
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
  
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index 0d9018a8..a269b603 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -873,10 +873,50 @@ void AArch64_set_instr_map_data(MCInst *MI)
+ 	map_groups(MI, aarch64_insns);
+ }
+ 
++#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
++/* These A64 classes have no reserved operand encodings. For a text-free
++ * scan, the table's internal opcode suffices for the normal public mapper. */
++static unsigned scanImmediateOpcode(uint32_t word)
++{
++	if ((word & 0x7c000000) == 0x14000000)
++		return word >> 31 ? AArch64_BL : AArch64_B;
++	if ((word & 0x1f000000) == 0x10000000)
++		return word >> 31 ? AArch64_ADRP : AArch64_ADR;
++	if ((word & 0x7e000000) == 0x34000000) {
++		static const unsigned opcodes[2][2] = {
++			{ AArch64_CBZW, AArch64_CBNZW },
++			{ AArch64_CBZX, AArch64_CBNZX },
++		};
++		return opcodes[word >> 31][(word >> 24) & 1];
++	}
++	if ((word & 0x1f800000) == 0x11000000) {
++		static const unsigned opcodes[8] = {
++			AArch64_ADDWri,	 AArch64_ADDSWri, AArch64_SUBWri,
++			AArch64_SUBSWri, AArch64_ADDXri,  AArch64_ADDSXri,
++			AArch64_SUBXri,	 AArch64_SUBSXri,
++		};
++		return opcodes[word >> 29];
++	}
++	return 0;
++}
++#endif
++
+ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			    MCInst *MI, uint16_t *size, uint64_t address,
+ 			    void *info)
+ {
++#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
++	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
++	    MI->csh->disasm == AArch64_getInstruction) {
++		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));
++		if (opcode) {
++			MCInst_setOpcode(MI, opcode);
++			map_cs_id(MI, aarch64_insns, ARR_SIZE(aarch64_insns));
++			*size = 4;
++			return true;
++		}
++	}
++#endif
+ 	AArch64_init_cs_detail(MI);
+ 	DecodeStatus Result = AArch64_LLVM_getInstruction(
+ 		handle, code, code_len, MI, size, address, info);
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index 97b899b5..ae1554b0 100644
 --- a/arch/X86/X86Disassembler.h
@@ -45,7 +118,7 @@ index 97b899b5..ae1554b0 100644
  			void *info);
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 new file mode 100644
-index 00000000..a3b33f5c
+index 00000000..68de7ad4
 --- /dev/null
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -0,0 +1,490 @@
@@ -62,7 +135,7 @@ index 00000000..a3b33f5c
 +			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
-+			0, 0, 0, 0, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
++			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
 +			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -136,7 +209,7 @@ index 00000000..a3b33f5c
 +			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
-+			0, 0, 0, 0, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
++			0, 0, 0, 65534, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
 +			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -154,7 +227,7 @@ index 00000000..a3b33f5c
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
++			0, 0, 0, 65534, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -172,7 +245,7 @@ index 00000000..a3b33f5c
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
++			0, 0, 0, 65534, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -541,10 +614,10 @@ index 00000000..a3b33f5c
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..f8811b4e
+index 00000000..5a51035f
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,325 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -641,9 +714,67 @@ index 00000000..f8811b4e
 +	}
 +}
 +
-+/* A leading legacy prefix or a memory ModR/M encoding goes through the full
-+ * decoder. The register rows distinguish the high byte registers from SPL,
-+ * BPL, SIL and DIL as soon as any REX prefix is present. */
++/* The /digit selects the same flags and register access as the corresponding
++ * ALU register pair. The immediate's public width follows the destination. */
++static void writeGroup1Immediate(cs_insn *insn,
++				 const struct X86SimpleOutput *row,
++				 const uint8_t *code, uint8_t rex,
++				 uint8_t modrm, uint16_t *insn_size)
++{
++	const unsigned offset = 2 + (rex != 0);
++	const int immediate = (int8_t)code[offset];
++	const unsigned group = (modrm >> 3) & 7;
++	const bool logical = group == 1 || group == 4 || group == 6;
++	const bool wide = (rex & 8) != 0;
++	const bool negative = !logical && immediate < 0;
++	const uint64_t value =
++		logical ? (wide ? (uint64_t)(int64_t)immediate :
++				  (uint32_t)immediate) :
++			  (uint64_t)(negative ? -immediate : immediate);
++	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
++	const struct X86SimpleRegister *reg =
++		&x86_simple_registers[wide ? 3 : 2][id];
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(offset + 1);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	char *out = insn->op_str + reg->length;
++	memcpy(out, ", ", 2);
++	out += 2;
++	if (negative)
++		*out++ = '-';
++	if (value <= HEX_THRESHOLD) {
++		*out = (char)('0' + value);
++	} else {
++		static const char digits[] = "0123456789abcdef";
++		char temp[16], *end = temp + sizeof(temp), *start = end;
++		uint64_t n = value;
++		do {
++			*--start = digits[n & 15];
++			n >>= 4;
++		} while (n);
++		memcpy(out, "0x", 2);
++		memcpy(out + 2, start, end - start);
++	}
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
++				      reg->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->operands[1].type = X86_OP_IMM;
++		x->operands[1].imm = logical && !wide ?
++					     (int64_t)(uint32_t)immediate :
++					     immediate;
++		x->operands[1].access = 0;
++		x->encoding.imm_offset = (uint8_t)offset;
++		x->encoding.imm_size = 1;
++	}
++}
++
++/* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
++ * present. Memory admission below is limited to MOV with a base or base+disp8. */
 +#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +CAPSTONE_INTERNAL
 +#else
@@ -693,6 +824,17 @@ index 00000000..f8811b4e
 +	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
 +
++	if (plan == X86_PLAN_GROUP1_IMM8) {
++		if (size < 3u + has_rex)
++			return false;
++		unsigned reg_plan =
++			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
++		if (!reg_plan)
++			return false;
++		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
++				     code, rex, modrm, insn_size);
++		return true;
++	}
 +	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
 +	const bool relative = form == X86_SIMPLE_RELATIVE;
 +	if (relative && size < (size_t)row->imm_offset + row->imm_size)
@@ -820,10 +962,10 @@ index 99a0800e..ff9a2542 100644
   * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 new file mode 100644
-index 00000000..25a1e8ce
+index 00000000..5d8916a4
 --- /dev/null
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,82 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -868,6 +1010,10 @@ index 00000000..25a1e8ce
 +	X86_SIMPLE_REG_RM,
 +	X86_SIMPLE_RELATIVE,
 +};
++
++/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
++ * same register-only operand check as a register pair. */
++#define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
 +
 +static inline void X86_writeSimpleDetail(cs_detail *detail,
 +					 const struct X86SimpleOutput *row,
@@ -943,10 +1089,10 @@ index 0a4c959f..b883b547 100644
  }
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 new file mode 100644
-index 00000000..076e9ca9
+index 00000000..1d3b62a0
 --- /dev/null
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -0,0 +1,419 @@
+@@ -0,0 +1,422 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1350,7 +1496,7 @@ index 00000000..076e9ca9
 +					rows.begin());
 +				if (index == rows.size())
 +					rows.push_back(row.fields);
-+				if (index > UINT16_MAX >> 2)
++				if (index >= UINT16_MAX >> 2)
 +					return 1;
 +				plans[wide][cls][op] = static_cast<uint16_t>(
 +					(index << 2) | form);
@@ -1359,6 +1505,9 @@ index 00000000..076e9ca9
 +			}
 +		}
 +	}
++	for (unsigned wide = 0; wide < 2; ++wide)
++		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls)
++			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
 +	emit_tables(plans, regs, rows);
 +	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 +		  << " encodings_checked=" << checked << " table_bytes="
@@ -1367,9 +1516,18 @@ index 00000000..076e9ca9
 +		  << '\n';
 +}
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index e42caf08..67acfcb5 100644
+index e42caf08..908b0266 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
+@@ -63,7 +63,7 @@ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
+     list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
+ endif()
+ if(CAPSTONE_AARCH64_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c)
++    list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c aarch64_scan.c)
+     if(Python3_Interpreter_FOUND)
+         add_test(NAME unit_aarch64_register_names_generator
+             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_register_names.py" --check)
 @@ -76,6 +76,9 @@ endif()
  if(CAPSTONE_X86_SUPPORT)
      list(APPEND UNIT_TEST_SOURCES x86_scan_batch.c x86_call_target.c x86_immediate_size.c)
@@ -1380,12 +1538,144 @@ index e42caf08..67acfcb5 100644
      list(APPEND UNIT_TEST_SOURCES x86_memory_scale.c)
      list(APPEND UNIT_TEST_SOURCES x86_reg_access.c)
      list(APPEND UNIT_TEST_SOURCES x86_bextr_flags.c)
+diff --git a/tests/unit/aarch64_scan.c b/tests/unit/aarch64_scan.c
+new file mode 100644
+index 00000000..0f827721
+--- /dev/null
++++ b/tests/unit/aarch64_scan.c
+@@ -0,0 +1,126 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <stdio.h>
++#include <string.h>
++#include "../../cs_priv.h"
++
++/* An installed decoder callback can inspect the decoded MC operands. It
++ * also gives these tests the ordinary table decoder as an independent path. */
++static Disasm_t ordinary;
++static unsigned operand_count;
++
++static bool inspect_operands(csh handle, const uint8_t *code, size_t length,
++			     MCInst *inst, uint16_t *size, uint64_t address,
++			     void *info)
++{
++	bool ok = ordinary(handle, code, length, inst, size, address, info);
++	operand_count = MCInst_getNumOperands(inst);
++	return ok;
++}
++
++static bool compare(csh handles[2], uint32_t word, bool big_endian,
++		    size_t length, bool has_operands)
++{
++	uint8_t code[4];
++	for (unsigned i = 0; i < 4; ++i)
++		code[big_endian ? 3 - i : i] = (uint8_t)(word >> (8 * i));
++	const uint8_t *cursor[2] = { code, code };
++	size_t left[2] = { length, length };
++	uint64_t pc[2] = { UINT64_MAX - 2, UINT64_MAX - 2 };
++	cs_insn insn[2];
++	cs_detail detail[2];
++	bool ok[2];
++	for (unsigned i = 0; i < 2; ++i) {
++		memset(&insn[i], 0xa5, sizeof(insn[i]));
++		memset(&detail[i], 0x5a, sizeof(detail[i]));
++		insn[i].is_alias = insn[i].usesAliasDetails = insn[i].illegal =
++			false;
++		insn[i].detail = &detail[i];
++		ok[i] = cs_disasm_iter(handles[i], &cursor[i], &left[i], &pc[i],
++				       &insn[i]);
++		if (insn[i].detail != &detail[i])
++			return false;
++		insn[i].detail = NULL;
++	}
++	if (ok[0] == ok[1] && left[0] == left[1] && pc[0] == pc[1] &&
++	    cursor[0] == cursor[1] &&
++	    cs_errno(handles[0]) == cs_errno(handles[1]) &&
++	    !memcmp(&insn[0], &insn[1], sizeof(cs_insn)) &&
++	    !memcmp(&detail[0], &detail[1], sizeof(cs_detail)) &&
++	    (!has_operands || (ok[1] && operand_count > 0)))
++		return true;
++	fprintf(stderr,
++		"AArch64 scan mismatch for %08x, length %zu, %s-endian\n",
++		(unsigned)word, length, big_endian ? "big" : "little");
++	return false;
++}
++
++static bool check_mode(cs_mode mode)
++{
++	static const uint32_t words[] = {
++		/* B/BL, ADR/ADRP and 32/64-bit compare-and-branch. */
++		0x17ffffff,
++		0x94000001,
++		0x70ffffe1,
++		0x9000001f,
++		0x34ffffe0,
++		0x3500001f,
++		0xb4000021,
++		0xb5fffffe,
++		/* Immediate arithmetic, both widths, with flags, SP/ZR and LSL. */
++		0x117fffff,
++		0x3100001f,
++		0x51000000,
++		0x717fffe0,
++		0x9100001f,
++		0xb17fffe0,
++		0xd1000000,
++		0xf17fffff,
++	};
++	static const uint32_t others[] = {
++		0x12000001,
++		0x11800000,
++		0xd503201f,
++		0xffffffff,
++	};
++	csh handles[2] = { 0 };
++	bool success = false, big_endian = mode == CS_MODE_BIG_ENDIAN;
++	for (unsigned i = 0; i < 2; ++i)
++		if (cs_open(CS_ARCH_AARCH64, mode, &handles[i]))
++			goto done;
++	cs_struct *reference = (cs_struct *)(uintptr_t)handles[1];
++	ordinary = reference->disasm;
++	reference->disasm = inspect_operands;
++	for (unsigned options = 0; options < 4; ++options) {
++		for (unsigned i = 0; i < 2; ++i)
++			if (cs_option(handles[i], CS_OPT_TEXT,
++				      options & 1 ? CS_OPT_ON : CS_OPT_OFF) ||
++			    cs_option(handles[i], CS_OPT_DETAIL,
++				      options & 2 ? CS_OPT_ON : CS_OPT_OFF))
++				goto done;
++		for (unsigned i = 0; i < sizeof(words) / sizeof(words[0]); ++i)
++			for (size_t length = 0; length <= 4; ++length)
++				if (!compare(handles, words[i], big_endian,
++					     length, length == 4))
++					goto done;
++		for (unsigned i = 0; i < sizeof(others) / sizeof(others[0]);
++		     ++i)
++			if (!compare(handles, others[i], big_endian, 4, false))
++				goto done;
++	}
++	success = true;
++done:
++	for (unsigned i = 0; i < 2; ++i)
++		if (handles[i])
++			cs_close(&handles[i]);
++	return success;
++}
++
++int main(void)
++{
++	return check_mode(CS_MODE_LITTLE_ENDIAN) &&
++			       check_mode(CS_MODE_BIG_ENDIAN) ?
++		       0 :
++		       1;
++}
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
-index 00000000..7b20bb9d
+index 00000000..d7c2d24d
 --- /dev/null
 +++ b/tests/unit/x86_simple_output.c
-@@ -0,0 +1,176 @@
+@@ -0,0 +1,195 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1511,6 +1801,24 @@ index 00000000..7b20bb9d
 +	return true;
 +}
 +
++static bool check_group1(csh handles[2], cs_mode mode)
++{
++	uint8_t bytes[4];
++	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
++		bytes[0] = p ? (uint8_t)(0x3f + p) : 0;
++		bytes[1] = 0x83;
++		for (unsigned mr = 0xc0; mr < 256; ++mr)
++			for (unsigned imm = 0; imm < 256; ++imm) {
++				bytes[2] = (uint8_t)mr;
++				bytes[3] = (uint8_t)imm;
++				if (!compare(handles, bytes + !p, 3 + !!p,
++					     imm ^ mr ^ p))
++					return false;
++			}
++	}
++	return true;
++}
++
 +static bool check_mode(cs_mode mode)
 +{
 +	csh handles[2] = { 0 };
@@ -1526,7 +1834,8 @@ index 00000000..7b20bb9d
 +			if (cs_option(handles[side], CS_OPT_DETAIL,
 +				      detail ? CS_OPT_ON : CS_OPT_OFF))
 +				goto done;
-+		if (!check_branches(handles) || !check_memory(handles, mode))
++		if (!check_branches(handles) || !check_memory(handles, mode) ||
++		    !check_group1(handles, mode))
 +			goto done;
 +		for (unsigned op = 0; op < 256; ++op) {
 +			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };

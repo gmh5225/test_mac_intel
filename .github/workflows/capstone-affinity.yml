@@ -1,9 +1,9 @@
-name: Isolate EVEX frame and addressing cost on real control workloads
+name: Verify isolated vector decoding against published group-1 release in dedicated profiles
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-evex-length-pe32]
+    branches: [codex/capstone-isolated-vector-release-controls]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-evex-length-pe32
+  group: capstone-isolated-vector-release-controls
   cancel-in-progress: false
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: early-evex-controls-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: isolated-evex-controls-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
