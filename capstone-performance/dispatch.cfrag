@@ -1,0 +1,23 @@
+bool X86_tryFixedOutput(cs_struct *handle, uint8_t opcode, cs_insn *insn,
+			uint16_t *insn_size)
+{
+	const unsigned slot = fixed_output_index[handle->mode == CS_MODE_64][opcode];
+	if (!slot || (handle->mode != CS_MODE_32 && handle->mode != CS_MODE_64) ||
+	    handle->no_text || handle->imm_unsigned || handle->mnem_list ||
+	    handle->doing_mem || (handle->syntax != CS_OPT_SYNTAX_DEFAULT &&
+				  handle->syntax != CS_OPT_SYNTAX_INTEL) ||
+	    handle->disasm != X86_getInstruction || handle->printer != X86_Intel_printInst ||
+	    handle->post_printer != X86_postprinter || cs_vsnprintf != cs_default_vsnprintf)
+		return false;
+	const struct X86FixedOutput *row = &fixed_outputs[slot];
+	*insn_size = insn->size = 1;
+	insn->bytes[0] = opcode;
+	insn->id = row->id;
+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+	memset(insn->op_str, 0, sizeof(insn->op_str));
+	memcpy(insn->op_str, row->operands, sizeof(row->operands));
+	if (insn->detail)
+		X86_writeFixedDetail(insn->detail, row, opcode);
+	return true;
+}
