@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-relative-dispatch-counters]
+    branches: [codex/capstone-published-unit-suites]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-relative-dispatch-counters
+  group: capstone-published-unit-suites
   cancel-in-progress: false
 
 jobs:
@@ -21,9 +21,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: combined }
-    env:
-      COMPARE_BASE: ${{ matrix.baseline }}
+          - { host: ubuntu-24.04, target: mixed }
+          - { host: ubuntu-24.04-arm, target: aarch64 }
+          - { host: macos-15-intel, target: x86 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 52
     steps:
@@ -31,15 +31,13 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Install Linux instruction profiler
-        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends valgrind
-      - name: Count warm workload instructions, memory, branches and simulated cache misses
-        run: python3 capstone-performance/instructions.py
+      - name: Run the registered native unit suites on the published revision
+        run: python3 capstone-performance/published.py ${{ matrix.target }}
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-arch-relative-dispatch-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: published-units-${{ matrix.host }}-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
