@@ -1,378 +1,131 @@
-diff --git a/SStream.c b/SStream.c
-index f1fd1246..687a587b 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -347,11 +347,7 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
- 		SSTREAM_RETURN_IF_CLOSED(ss);
- 		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
- 		char *end = buffer + sizeof(buffer);
--		char *p = end;
--		do {
--			*--p = "0123456789abcdef"[value & 15];
--			value >>= 4;
--		} while (value);
-+		char *p = SStream_hex_digits(end, value);
- 		*--p = 'x';
- 		*--p = '0';
- 		if (negative)
-diff --git a/SStream.h b/SStream.h
-index 2c9bc2c3..9f82244c 100644
---- a/SStream.h
-+++ b/SStream.h
-@@ -60,6 +60,16 @@ void SStream_concat(SStream *ss, const char *fmt, ...);
- // Source strings must not overlap the destination append range.
- void SStream_concat2(SStream *ss, const char *first, const char *second);
+diff --git a/arch/X86/X86ATTInstPrinter.c b/arch/X86/X86ATTInstPrinter.c
+index 1cc3d3a9..a89e9a48 100644
+--- a/arch/X86/X86ATTInstPrinter.c
++++ b/arch/X86/X86ATTInstPrinter.c
+@@ -59,6 +59,7 @@
  
-+/* Write the digits backward so the caller can append or copy them as a span. */
-+static inline char *SStream_hex_digits(char *end, uint64_t value)
-+{
-+	do {
-+		*--end = "0123456789abcdef"[value & 15];
-+		value >>= 4;
-+	} while (value);
-+	return end;
-+}
+ #define GET_REGINFO_ENUM
+ #include "X86GenRegisterInfo.inc"
++#include "X86ImplicitRegPair.h"
+ 
+ static void printMemReference(MCInst *MI, unsigned Op, SStream *O);
+ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O);
+@@ -1230,8 +1231,9 @@ void X86_ATT_printInst(MCInst *MI, SStream *OS, void *info)
+ 
+ 			MI->flat_insn->detail->x86.op_count++;
+ 		} else {
+-			if (X86_insn_reg_att2(MCInst_getOpcode(MI), &reg,
+-					      &access1, &reg2, &access2)) {
++			if (X86_getImplicitRegPair(MCInst_getOpcode(MI), true,
++						   &reg, &access1, &reg2,
++						   &access2)) {
+ 				MI->flat_insn->detail->x86.operands[0].type =
+ 					X86_OP_REG;
+ 				MI->flat_insn->detail->x86.operands[0].reg =
+diff --git a/arch/X86/X86ImplicitRegPair.h b/arch/X86/X86ImplicitRegPair.h
+new file mode 100644
+index 00000000..09b417ba
+--- /dev/null
++++ b/arch/X86/X86ImplicitRegPair.h
+@@ -0,0 +1,38 @@
++/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
++#ifndef CS_X86_IMPLICIT_REG_PAIR_H
++#define CS_X86_IMPLICIT_REG_PAIR_H
 +
- // Append a lowercase 0x-prefixed magnitude, optionally preceded by a minus sign.
- void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
- 
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..6f99ff43 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3757,4 +3757,123 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
- 
- #undef X86_DECODE_INLINE
- 
-+#ifdef CS_X86_FORMAT_TERMINAL
-+static bool formatTerminal(cs_struct *handle, const uint8_t *code,
-+					 size_t length, cs_insn *insn, uint16_t *size)
++/* These encodings embed both registers in the generated assembly string. */
++static inline bool X86_getImplicitRegPair(unsigned int opcode, bool att,
++					  x86_reg *reg1,
++					  enum cs_ac_type *access1,
++					  x86_reg *reg2,
++					  enum cs_ac_type *access2)
 +{
-+	InternalInstruction header;
-+	initializeInstructionHeader(&header, code, length, handle->mode);
-+	const unsigned prefix = (code[0] & 0xf0) == 0x40;
-+	if (prefix && header.mode != MODE_64BIT)
++	x86_reg first, second;
++	enum cs_ac_type first_access, second_access;
++
++#define X86_REG_PAIR(op, r1, r2, a1, a2) \
++	case X86_##op: \
++		first = X86_REG_##r1; \
++		second = X86_REG_##r2; \
++		first_access = CS_AC_##a1; \
++		second_access = CS_AC_##a2; \
++		break;
++	switch (opcode) {
++#include "X86ImplicitRegPair.inc"
++	default:
 +		return false;
-+	header.rexPrefix = prefix ? code[0] : 0;
-+	const uint8_t *opcode_bytes = code + prefix;
-+	setInstructionSizes(&header, false, false);
-+	const bool move = (opcode_bytes[0] & 0xfc) == 0x88;
-+	const bool stack_reg = (opcode_bytes[0] & 0xf0) == 0x50;
-+	const bool escaped = opcode_bytes[0] == 0x0f;
-+	const unsigned int offset = escaped ? 2 : 1;
-+	const uint8_t opcode = opcode_bytes[offset - 1];
-+	header.readerCursor = prefix + offset;
-+	int64_t displacement = 0;
-+	if (move) {
-+		header.readerCursor++;
-+	} else if (stack_reg) {
-+		header.opcode = opcode;
-+		readOpcodeRegister(&header, header.addressSize);
-+	} else if (!escaped && ((opcode & 0xf0) == 0x70 || opcode == 0xeb)) {
-+		int8_t rel8;
-+		if (consumeInt8(&header, &rel8))
-+			return false;
-+		displacement = rel8;
-+	} else if (header.mode == MODE_16BIT) {
-+		int16_t rel16;
-+		if (consumeInt16(&header, &rel16))
-+			return false;
-+		displacement = rel16;
-+	} else {
-+		int32_t rel32;
-+		if (consumeInt32(&header, &rel32))
-+			return false;
-+		displacement = rel32;
 +	}
-+	header.opcode = opcode;
-+	header.opcodeType = escaped ? TWOBYTE : ONEBYTE;
-+	const uint64_t decision = legacyTerminalDecision(&header, false, !insn->detail);
-+	if (decision & X86_TERMINAL_INDEXED)
-+		return false;
-+	const unsigned shift = move && (decision & X86_TERMINAL_SPLIT) ?
-+				       X86_TERMINAL_REGISTER_SHIFT : 0;
-+	const unsigned id = (decision >> shift) & X86_TERMINAL_UID_MASK;
-+	if (!id)
-+		return false;
-+	*size = (uint16_t)header.readerCursor;
-+	insn->size = *size;
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		memset(insn->detail, 0, offsetof(cs_detail, x86) + sizeof(*x86));
-+		memcpy(x86->opcode, opcode_bytes, offset);
-+		x86->rex = header.rexPrefix;
-+		x86->addr_size = header.addressSize;
-+		if (move) {
-+			x86->modrm = opcode_bytes[1];
-+			x86->encoding.modrm_offset = prefix + 1;
-+		} else if (!stack_reg) {
-+			x86->encoding.imm_offset = offset;
-+			x86->encoding.imm_size = *size - offset;
-+		}
-+		X86_get_insn_id(handle, insn, id);
-+	} else {
-+		insn->id = id;
-+	}
-+	if (move) {
-+		const uint8_t rm = rmFromModRM(opcode_bytes[1]) | (bFromREX(header.rexPrefix) << 3);
-+		const uint8_t reg = regFromModRM(opcode_bytes[1]) | (rFromREX(header.rexPrefix) << 3);
-+		const OperandType type = !(opcode & 1) ? TYPE_R8 :
-+					 header.registerSize == 2 ? TYPE_R16 :
-+					 header.registerSize == 4 ? TYPE_R32 : TYPE_R64;
-+		uint8_t valid;
-+		unsigned dst = llvmRegisterNumber((Reg)fixupRegValue(
-+			&header, type, opcode & 2 ? reg : rm, &valid));
-+		unsigned src = llvmRegisterNumber((Reg)fixupRegValue(
-+			&header, type, opcode & 2 ? rm : reg, &valid));
-+		X86_writeRegistersIntel(handle, insn, id, dst, src);
-+	} else if (stack_reg) {
-+		X86_writeRegistersIntel(handle, insn, id,
-+					   llvmRegisterNumber(header.opcodeRegister), 0);
-+	} else {
-+		uint64_t target = X86_relativeBranchTarget(handle->mode, insn->address,
-+							  *size, displacement, header.immSize);
-+		X86_writeRelativeIntel(handle, insn, target, id, header.immSize);
-+	}
++#undef X86_REG_PAIR
++
++	*reg1 = att ? second : first;
++	*reg2 = att ? first : second;
++	if (access1)
++		*access1 = att ? second_access : first_access;
++	if (access2)
++		*access2 = att ? first_access : second_access;
 +	return true;
 +}
 +
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
 +#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_tryWriteTerminal(cs_struct *handle, const uint8_t *code, size_t size,
-+	       cs_insn *insn, uint16_t *insn_size)
-+{
-+	/* The register and relative terminals below have fixed Intel operand layouts. */
-+	if (!handle->no_text && size &&
-+	    (insn->detail != NULL) == (handle->detail_opt != 0) &&
-+	    (((code[0] & 0xf0) == 0x40 && size >= 3 && (code[1] & 0xfc) == 0x88 && code[2] >= 0xc0) ||
-+	     ((code[0] & 0xfc) == 0x88 && size >= 2 && code[1] >= 0xc0) ||
-+	     (code[0] & 0xf0) == 0x50 || (code[0] & 0xf0) == 0x70 ||
-+	     (code[0] & 0xfe) == 0xe8 || code[0] == 0xeb ||
-+	     (code[0] == 0x0f && size >= 2 && (code[1] & 0xf0) == 0x80)) &&
-+	    handle->syntax == CS_OPT_SYNTAX_INTEL && !handle->mnem_list &&
-+	    cs_vsnprintf == cs_default_vsnprintf &&
-+	    formatTerminal(handle, code, size, insn, insn_size)) {
-+		copy_insn_bytes(insn, code, true);
-+		return true;
-+	}
-+	return false;
-+}
-+#endif
-+
- #endif
-diff --git a/arch/X86/X86DisassemblerTranslator.h b/arch/X86/X86DisassemblerTranslator.h
-index bddcd8fa..9548d8bd 100644
---- a/arch/X86/X86DisassemblerTranslator.h
-+++ b/arch/X86/X86DisassemblerTranslator.h
-@@ -66,6 +66,15 @@ X86_TRANSLATE_INLINE void createImmediateOperand(MCInst *mcInst, int64_t value,
- 		MCOperand_CreateImm0(mcInst, value);
- }
- 
-+X86_TRANSLATE_INLINE uint16_t llvmRegisterNumber(Reg reg)
-+{
-+#define ENTRY(x) X86_##x,
-+	static const uint16_t llvmRegnums[] = { ALL_REGS 0 };
-+#undef ENTRY
-+
-+	return llvmRegnums[reg];
-+}
-+
- /// translateRegister - Translates an internal register to the appropriate LLVM
- ///   register, and appends it as an operand to an MCInst.
- ///
-@@ -74,12 +83,7 @@ X86_TRANSLATE_INLINE void createImmediateOperand(MCInst *mcInst, int64_t value,
- X86_TRANSLATE_INLINE void translateRegister(MCInst *mcInst, Reg reg,
- 					    bool emitOperands)
- {
--#define ENTRY(x) X86_##x,
--	static const uint16_t llvmRegnums[] = { ALL_REGS 0 };
--#undef ENTRY
--
--	uint16_t llvmRegnum = llvmRegnums[reg];
--	createRegisterOperand(mcInst, llvmRegnum, emitOperands);
-+	createRegisterOperand(mcInst, llvmRegisterNumber(reg), emitOperands);
- }
- 
- X86_TRANSLATE_INLINE uint8_t gprOperandWidth(const InternalInstruction *insn,
+diff --git a/arch/X86/X86ImplicitRegPair.inc b/arch/X86/X86ImplicitRegPair.inc
+new file mode 100644
+index 00000000..69001b93
+--- /dev/null
++++ b/arch/X86/X86ImplicitRegPair.inc
+@@ -0,0 +1,10 @@
++/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
++/* Instructions with both registers embedded in the assembly string. */
++X86_REG_PAIR(IN16rr, AX, DX, WRITE, READ)
++X86_REG_PAIR(IN32rr, EAX, DX, WRITE, READ)
++X86_REG_PAIR(IN8rr, AL, DX, WRITE, READ)
++X86_REG_PAIR(INVLPGA32, EAX, ECX, READ, READ)
++X86_REG_PAIR(INVLPGA64, RAX, ECX, READ, READ)
++X86_REG_PAIR(OUT16rr, DX, AX, READ, READ)
++X86_REG_PAIR(OUT32rr, DX, EAX, READ, READ)
++X86_REG_PAIR(OUT8rr, DX, AL, READ, READ)
 diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..3b26e8bd 100644
+index 457485ab..6324a742 100644
 --- a/arch/X86/X86IntelInstPrinter.c
 +++ b/arch/X86/X86IntelInstPrinter.c
-@@ -924,6 +924,84 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+@@ -57,6 +57,7 @@
  
- #endif // CAPSTONE_SSTREAM_PRECHECKED
+ #define GET_REGINFO_ENUM
+ #include "X86GenRegisterInfo.inc"
++#include "X86ImplicitRegPair.h"
  
-+static inline void setRelativeOperand(cs_x86 *x86, int64_t target, uint8_t table_size,
-+				      uint8_t immediate_size)
-+{
-+	cs_x86_op *op = &x86->operands[x86->op_count];
-+	op->type = X86_OP_IMM;
-+	op->size = x86->op_count ? x86->operands[0].size :
-+				   (table_size ? table_size : immediate_size);
-+	op->imm = target;
-+}
-+
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_SSTREAM_PRECHECKED)
-+static inline void writeIntelMnemonic(cs_struct *handle, cs_insn *insn)
-+{
-+	const char *mnemonic = X86_insn_name((csh)(uintptr_t)handle, insn->id);
-+	strncpy(insn->mnemonic, mnemonic, sizeof(insn->mnemonic));
-+}
-+
-+static inline void setRegisterOperand(cs_struct *handle, cs_x86_op *op,
-+				      unsigned mc_reg, uint8_t access)
-+{
-+	op->type = X86_OP_REG;
-+	op->reg = X86_register_map(mc_reg);
-+	op->size = handle->regsize_map[op->reg];
-+	op->access = access;
-+}
-+
-+void X86_writeRegistersIntel(cs_struct *handle, cs_insn *insn, unsigned uid,
-+			     unsigned first, unsigned second)
-+{
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+		get_op_access(handle, uid, access, &x86->eflags);
-+		setRegisterOperand(handle, &x86->operands[0], first, access[0]);
-+		if (second)
-+			setRegisterOperand(handle, &x86->operands[1], second, access[1]);
-+		x86->op_count = second ? 2 : 1;
-+	}
-+	writeIntelMnemonic(handle, insn);
-+	if (!second) {
-+		strncpy(insn->op_str, getRegisterName(first), sizeof(insn->op_str));
-+		return;
-+	}
-+	unsigned n = getRegisterNameLength(first);
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->op_str, getRegisterName(first), n);
-+	insn->op_str[n] = ',';
-+	insn->op_str[n + 1] = ' ';
-+	memcpy(insn->op_str + n + 2, getRegisterName(second), getRegisterNameLength(second));
-+}
-+
-+void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target,
-+			    unsigned uid, uint8_t immediate_size)
-+{
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+		setRelativeOperand(x86, (int64_t)target, X86_immediate_size(uid, NULL),
-+				   immediate_size);
-+		get_op_access(handle, uid, access, &x86->eflags);
-+		x86->operands[0].access = access[0];
-+		x86->op_count = 1;
-+	}
-+	writeIntelMnemonic(handle, insn);
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (target <= HEX_THRESHOLD) {
-+		insn->op_str[0] = (char)('0' + target);
-+	} else {
-+		char digits[16];
-+		char *end = digits + sizeof(digits);
-+		char *first = SStream_hex_digits(end, target);
-+		insn->op_str[0] = '0';
-+		insn->op_str[1] = 'x';
-+		memcpy(insn->op_str + 2, first, (size_t)(end - first));
-+	}
-+}
-+#endif
-+
- /// printPCRelImm - This is used to print an immediate value that ends up
- /// being encoded as a pc-relative value.
- static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
-@@ -938,31 +1016,8 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
- 		printImm(MI, O, imm, true);
+ #include "X86BaseInfo.h"
  
- 		if (MI->csh->detail_opt) {
--			MI->flat_insn->detail->x86
--				.operands[MI->flat_insn->detail->x86.op_count]
--				.type = X86_OP_IMM;
--			// if op_count > 0, then this operand's size is taken from the destination op
--			if (MI->flat_insn->detail->x86.op_count > 0)
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size =
--					MI->flat_insn->detail->x86.operands[0]
--						.size;
--			else if (opsize > 0)
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size = opsize;
--			else
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size = MI->imm_size;
--			MI->flat_insn->detail->x86
--				.operands[MI->flat_insn->detail->x86.op_count]
--				.imm = imm;
--
-+			setRelativeOperand(&MI->flat_insn->detail->x86, imm, opsize,
-+					   MI->imm_size);
- #ifndef CAPSTONE_DIET
- 			set_early_operand_access(MI);
- #endif
-diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..dfc491d7 100644
---- a/arch/X86/X86Mapping.h
-+++ b/arch/X86/X86Mapping.h
-@@ -54,6 +54,10 @@ static inline bool X86_get_insn_id_no_detail(const cs_struct *h, cs_insn *insn,
- 	return true;
- }
+@@ -883,8 +884,9 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
+ 			MI->flat_insn->detail->x86.operands[0].access = access1;
+ 			MI->flat_insn->detail->x86.op_count++;
+ 		} else {
+-			if (X86_insn_reg_intel2(MCInst_getOpcode(MI), &reg,
+-						&access1, &reg2, &access2)) {
++			if (X86_getImplicitRegPair(MCInst_getOpcode(MI), false,
++						   &reg, &access1, &reg2,
++						   &access2)) {
+ 				MI->flat_insn->detail->x86.operands[0].type =
+ 					X86_OP_REG;
+ 				MI->flat_insn->detail->x86.operands[0].reg =
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index e2c0eb9e..5fcd9a1c 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11097,14 +11097,10 @@ static const struct insn_reg insn_regs_intel_extra[] = {
+ };
  
-+void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target,
-+			    unsigned uid, uint8_t immediate_size);
-+void X86_writeRegistersIntel(cs_struct *handle, cs_insn *insn, unsigned uid,
-+			     unsigned first, unsigned second);
- // return insn name, given insn id
- const char *X86_insn_name(csh handle, unsigned int id);
+ static const struct insn_reg2 insn_regs_intel2[] = {
+-	{ X86_IN16rr, X86_REG_AX, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
+-	{ X86_IN32rr, X86_REG_EAX, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
+-	{ X86_IN8rr, X86_REG_AL, X86_REG_DX, CS_AC_WRITE, CS_AC_READ },
+-	{ X86_INVLPGA32, X86_REG_EAX, X86_REG_ECX, CS_AC_READ, CS_AC_READ },
+-	{ X86_INVLPGA64, X86_REG_RAX, X86_REG_ECX, CS_AC_READ, CS_AC_READ },
+-	{ X86_OUT16rr, X86_REG_DX, X86_REG_AX, CS_AC_READ, CS_AC_READ },
+-	{ X86_OUT32rr, X86_REG_DX, X86_REG_EAX, CS_AC_READ, CS_AC_READ },
+-	{ X86_OUT8rr, X86_REG_DX, X86_REG_AL, CS_AC_READ, CS_AC_READ },
++#define X86_REG_PAIR(op, r1, r2, a1, a2) \
++	{ X86_##op, X86_REG_##r1, X86_REG_##r2, CS_AC_##a1, CS_AC_##a2 },
++#include "X86ImplicitRegPair.inc"
++#undef X86_REG_PAIR
+ };
  
-diff --git a/cs.c b/cs.c
-index ea7b0e42..321c038a 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1045,9 +1045,13 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- {
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
--	if (handle->arch == CS_ARCH_X86)
-+	if (handle->arch == CS_ARCH_X86) {
-+#ifdef CS_X86_FORMAT_TERMINAL
-+		if (X86_tryWriteTerminal(handle, code, size, insn, insn_size))
-+			return true;
-+#endif
- 		MCInst_InitX86(&mci);
--	else
-+	} else
- #endif
- 		MCInst_Init(&mci, handle->arch);
- 	mci.csh = handle;
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..0b101ac5 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -29,6 +29,15 @@ CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
- 					 size_t size);
- #endif
- 
-+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CS_X86_FORMAT_TERMINAL
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_tryWriteTerminal(cs_struct *handle, const uint8_t *code, size_t size,
-+	       cs_insn *insn, uint16_t *insn_size);
-+#endif
-+
- /* Keep successful compact decoding contiguous with cached mapping and
-  * short copies; cold fallback blocks otherwise split the inline path. */
- #if defined(__GNUC__)
+ static int binary_search1(const struct insn_reg *insns, unsigned int max,
