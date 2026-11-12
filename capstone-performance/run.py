@@ -149,10 +149,8 @@ def prepare():
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
-    import install
-    dimensions=install.install(base, WORK/'new', SOURCE, WORK)
-    write('fixed-output.json',dimensions)
-    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Use verified portable public fields for fixed and register-register integer instructions'))
+    command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
+    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Default Linux x86-only build with a separately compiled integer output decoder'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,10 +211,15 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert changed[0].keys()==changed[1].keys()
-    difference=sorted(n for n in changed[0] if changed[0][n]!=changed[1][n])
-    assert difference==['arch/X86/X86Disassembler.c.o','cs.c.o'],difference
-    write('object-difference.json',dict(changed=difference,total=len(changed[0])))
+    introduced=set(changed[1])-set(changed[0]);assert introduced=={'arch/X86/X86OutputIterator.c.o'},introduced
+    diff=[k for k,v in changed[0].items() if changed[1][k]!=v];assert diff==['cs.c.o'],diff
+    write('object-difference.json',dict(introduced=sorted(introduced),changed=diff,identical=len(changed[0])-1))
+    command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
+    command([WORK/'output-unit'],'verify-output-unit')
+    command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',WORK/'new/suite/synctools/x86_simple_output.cpp',WORK/'new-build/libcapstone.a','-o',WORK/'generate-output'],'build-generator')
+    result=subprocess.run([WORK/'generate-output'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
+    assert result.stdout==(WORK/'new/arch/X86/X86GenSimpleOutput.inc').read_bytes()
+    write('regeneration',dict(sha256=hashlib.sha256(result.stdout).hexdigest(),summary=result.stderr.decode().strip()))
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
