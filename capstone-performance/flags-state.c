@@ -1,6 +1,7 @@
 #include <capstone/capstone.h>
 #include "cs_priv.h"
 #include "MCInst.h"
+#include "arch/X86/X86BaseInfo.h"
 #include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +14,7 @@ typedef struct {
  cs_err (*close)(csh *);
  bool (*decode)(csh, const uint8_t *, size_t, MCInst *, uint16_t *, uint64_t, void *);
 } Api;
-static uint64_t compared, rng=0x5a37f8021bc9d4e6ULL;
+static uint64_t marked, compared, rng=0x5a37f8021bc9d4e6ULL;
 static unsigned random32(void) { rng^=rng<<13; rng^=rng>>7; rng^=rng<<17; return (unsigned)rng; }
 static void load(Api *a, const char *path) {
  a->lib=dlopen(path,RTLD_NOW|RTLD_LOCAL); if(!a->lib){fprintf(stderr,"%s\n",dlerror());exit(2);}
@@ -29,6 +30,18 @@ static void check(Api *a, Api *b, const uint8_t *code, size_t length) {
   pub[n].detail=&detail[n];pub[n].address=0x140001000ULL;pub[n].size=0;
   mi[n].flat_insn=&pub[n];mi[n].csh=(cs_struct *)(uintptr_t)api[n]->handle;mi[n].address=pub[n].address;
   ok[n]=api[n]->decode(api[n]->handle,code,length,&mi[n],&size[n],pub[n].address,mi[n].csh->getinsn_info);
+ }
+ /* The test configures the stock Intel printer and default memory callbacks. */
+ bool short_relative=length>=1 && ((code[0]>=0x70 && code[0]<=0x7f) || code[0]==0xeb);
+ bool long_relative=length>=1 && (code[0]==0xe8 || code[0]==0xe9);
+ bool escaped=length>=2 && code[0]==0x0f && (code[1]&0xf0)==0x80;
+ bool tagged=ok[0] && (short_relative || long_relative || escaped);
+ if (tagged) {
+  unsigned expected=short_relative?2:(escaped?2:1)+((mi[0].csh->mode & CS_MODE_16)?2:4);
+  if(size[0]!=expected || size[1]!=expected || mi[0].flags!=X86_IP_NO_PREFIX || mi[1].flags!=X86_IP_DIRECT_RELATIVE) {
+   fprintf(stderr,"relative route mismatch length %zu flags %u/%u\n",length,mi[0].flags,mi[1].flags);exit(1);
+  }
+  mi[1].flags=mi[0].flags; ++marked;
  }
  bool pointers=(mi[0].MRI!=NULL)==(mi[1].MRI!=NULL);
  mi[0].flat_insn=mi[1].flat_insn=NULL;mi[0].csh=mi[1].csh=NULL;mi[0].MRI=mi[1].MRI=NULL;
@@ -66,5 +79,6 @@ int main(int argc,char **argv) {
   if(a.close(&a.handle)||b.close(&b.handle))return 2;
  }
  printf("%llu complete private decoder states matched, including flags, failed decodes, poison tails and EVEX aaa=0..7\n",(unsigned long long)compared);
+ if(!marked)return 2;printf("%llu verified direct relative routing markers\n",(unsigned long long)marked);
  dlclose(a.lib);dlclose(b.lib);return 0;
 }
