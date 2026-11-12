@@ -1,7 +1,7 @@
-name: Run the final x86 release and unit tests in ten independent native MSVC configurations
+name: Verify final branch, memory and vector public output on the native MSVC CRTs
 on:
   push:
-    branches: [codex/capstone-msvc-output-release-units]
+    branches: [codex/capstone-msvc-branch-memory-vectors]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -10,12 +10,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        cc: [MD, MT]
-        profile: [four, dedicated, diet, reduced, intel]
+        include:
+          - { cc: MD, profile: dedicated, forms: release }
+          - { cc: MT, profile: four, forms: release }
+          - { cc: MD, profile: four, forms: vector }
+          - { cc: MT, profile: dedicated, forms: vector }
     runs-on: windows-2022
     timeout-minutes: 60
     env:
       TOOLCHAIN: ${{ matrix.cc }}
+      FORMS: ${{ matrix.forms }}
       PROFILE: ${{ matrix.profile }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -32,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: output-release-${{ matrix.profile }}-${{ matrix.cc }}
+          name: output-release-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

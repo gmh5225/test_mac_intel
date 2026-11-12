@@ -18,7 +18,9 @@ try:
  if win:configs={os.environ['PROFILE']:configs[os.environ['PROFILE']]}
  if not win:configs['arm-only']=(['AARCH64'],[])
  for label in ('release',):
-  if label!='base':run(['git','-c','core.autocrlf=false','apply',r/(label+'.patch')],'apply-'+label,s)
+  if label!='base':run(['git','-c','core.autocrlf=false','apply',r/(os.environ['FORMS']+'.patch')],'apply-'+label,s)
+  if os.environ['FORMS']=='vector':
+   unit=s/'tests/unit/x86_simple_output.c';v=unit.read_text();unit.write_text(v[:v.index('int main(void)')]+(r/'checked-evex.cfrag').read_text())
   for name,(arches,opts) in configs.items():
    b=t/name
    args=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if cc=='MT' else 'OFF')]if win else ['-G','Ninja','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_BUILD_MACOS_THIN=ON']
@@ -37,7 +39,7 @@ try:
     run(['ctest','--test-dir',b,'--build-config','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(targets[1:])+')$'],'tests-'+name)
     if win:done[name]=dict(tests=targets[1:])
    write('progress',done)
-  if label!='base':run(['git','-c','core.autocrlf=false','apply','-R',r/(label+'.patch')],'restore-'+label,s)
+
  write('complete',dict(host=platform.platform(),compiler=cc,configs=done))
 finally:
  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());clean(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
