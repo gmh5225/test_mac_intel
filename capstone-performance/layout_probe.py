@@ -8,6 +8,7 @@ import platform
 import re
 import shutil
 import statistics
+import struct
 import subprocess
 import sys
 
@@ -20,6 +21,34 @@ MEMBER = 'X86Mapping.c.o'
 
 def output(args):
     return subprocess.check_output(list(map(str, args)), text=True)
+
+
+def relocated_text_section(original, changed, text):
+    # Retain the symbol and relocation tables with their original section
+    # indexes. Move only the bytes of .text to an aligned offset after the
+    # ELF64 relocatable object and update its section header.
+    data = bytearray(original.read_bytes())
+    assert data[:6] == b"\x7fELF\x02\x01" and struct.unpack_from("<H", data, 16)[0] == 1
+    table, = struct.unpack_from("<Q", data, 40)
+    entry, count, names_index = struct.unpack_from("<HHH", data, 58)
+    assert entry == 64 and 0 < names_index < count
+    names_offset, names_size = struct.unpack_from("<QQ", data, table + entry * names_index + 24)
+    names = data[names_offset:names_offset + names_size]
+    for index in range(count):
+        header = table + entry * index
+        name, = struct.unpack_from("<I", data, header)
+        if names[name:names.index(0, name)] == b".text":
+            break
+    else:
+        raise AssertionError("missing .text")
+    start, size = struct.unpack_from("<QQ", data, header + 24)
+    assert data[start:start + size] == text[:size] and size < len(text)
+    align, = struct.unpack_from("<Q", data, header + 48)
+    assert align and (align & (align - 1)) == 0
+    data.extend(b"\0" * (-len(data) % align))
+    struct.pack_into("<QQ", data, header + 24, len(data), len(text))
+    data.extend(text)
+    changed.write_bytes(data)
 
 
 def build_controls():
@@ -50,8 +79,23 @@ def build_controls():
         raw = directory / 'padded-text.bin'
         raw.write_bytes(texts[label] + nop * (padding // len(nop)))
         if padding:
-            run.command([objcopy, '--update-section', '.text=' + str(raw), objects[label], padded],
-                        label + '-extend-text')
+            # Record exactly what GNU objcopy changed in the first experiment.
+            prior = directory / 'objcopy-control.o'
+            run.command([objcopy, '--update-section', '.text=' + str(raw), objects[label], prior],
+                        label + '-reproduce-objcopy')
+            relocated_text_section(objects[label], padded, raw.read_bytes())
+            records = {}
+            for method, path in [('original', objects[label]), ('objcopy', prior), ('preserved', padded)]:
+                relocations = output(['readelf', '-Wr', path])
+                symbols = output(['readelf', '-Ws', path])
+                # Section file offsets printed in heading lines need not match.
+                rows = [line for line in relocations.splitlines() if re.match(r'^[a-fA-F0-9]+\s', line)]
+                records[method] = dict(relocations=len(rows), relocation_sha256=hashlib.sha256(
+                    '\n'.join(rows).encode()).hexdigest(), symbol_sha256=hashlib.sha256(symbols.encode()).hexdigest(),
+                    relocation_sections=[line.split("'")[1] for line in relocations.splitlines()
+                                         if line.startswith('Relocation section')])
+            run.write('relocation-control.json', records)
+            assert records['preserved'] == records['original'] and records['original']['relocations'] > 0
         else:
             shutil.copyfile(objects[label], padded)
         roundtrip = directory / 'roundtrip.bin'
