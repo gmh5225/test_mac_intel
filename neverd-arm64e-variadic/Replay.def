@@ -1,14 +1,14 @@
 {
-  "revision": "73ff5a960d32f80e0bbd163e8f5dc4d087acd2b4",
-  "package": "neverd-llvm-v23.0.0-r6",
-  "tag": "neverd-darwin-registers-r6-73ff5a960d",
+  "revision": "7bf3d8571ab87cb8de5f20145e786621d3dc4659",
+  "package": "source LLVM 5676029e378c9e37adc16c8216a8e8453ffafcae",
+  "tag": "neverd-darwin-registers-fork-7bf3d8571a",
   "host": "NeverDArm64eLiftedImageTests",
   "asset": "neverd-variadic-host.tgz",
   "run_env": {
     "NEVERD_ARM64E_LIFTED_NATIVE": "1",
     "NEVERD_ARM64E_ASYNC_NATIVE": "1"
   },
-  "filter": "*-AArch64DarwinEntry.SignedCallReturnsTheUpdatedSwiftErrorRegister:AArch64DarwinEntry.IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister:AArch64DarwinEntry.AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn:AArch64DarwinEntry.SignedLeafUsesTheIncomingSPAtItsNewAddress:AArch64LiftedImage.SignedFrameCallsImportBeforeReadingOriginalGlobal",
+  "filter": "*",
   "tests": {
     "PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
       "native_interrupted_frames": 10,
@@ -26,12 +26,17 @@
     "DirectTailTransferPreservesItsInstalledCallee": 2,
     "EquivalentWAndXZeroingPreservesTheWholeRegister": 2,
     "OriginalGlobalAndAuthenticatedImportSurvivePublication": 2,
+    "SignedFrameCallsImportBeforeReadingOriginalGlobal": 2,
     "SwiftErrorReturnsBothTheOldValueAndTheUpdatedRegister": 2,
     "SwiftErrorCanClearTheRegisterWithoutReadingIt": 2,
     "TailCallForwardsTheWritableSwiftErrorRegister": 2,
+    "SignedCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn": 2,
     "SwiftContextSurvivesNativeLeafPublication": 2,
     "SwiftAsyncContextSurvivesNativeLeafPublication": 2,
     "ScalarFPParametersAndResultsSurvivePublication": 2,
+    "SignedLeafUsesTheIncomingSPAtItsNewAddress": 2,
     "BaseAndDisplacementRetainLoadAndStoreEffects": 2,
     "UnoptimizedImagePreservesReturnedRegisters": {
       "executed_native_images": 2,
@@ -72,8 +77,8 @@
       "--version"
     ]
   },
-  "archive_sha256": "d8547f965c81d2309b32f1254eda50065d7f55dce39efbae30d0a3a077852e8e",
-  "host_sha256": "8bbc108ecdcf0c357a71ebdbfc88948663ba15616f90d64c2fec1504c5349930",
+  "archive_sha256": "86b8282ac9e87ecad66992f32ea40baa31089a9f6f33d8273c9f1641eb834f0a",
+  "host_sha256": "acf3c4819efb724070dd1855ac1c0fc0d11b7bd6259df5aa7cac85d59721f952",
   "xml": "results.xml",
   "log": "runtime.log",
   "image_count": "executed_native_images"
