@@ -1,0 +1,24 @@
+int main(void)
+{
+	if (!check_mode(CS_MODE_64)) return 7;
+	csh h[2] = {0};
+	cs_opt_mnem custom = {X86_INS_UD2, "ud2"};
+	if (cs_open(CS_ARCH_X86,CS_MODE_64,&h[0]) || cs_open(CS_ARCH_X86,CS_MODE_64,&h[1]) ||
+	    cs_option(h[1], CS_OPT_MNEMONIC, (size_t)&custom))
+		return 2;
+	const unsigned forms[] = {0x1ef,0x2dc,0x2dd,0x2de,0x2df,0x344,0x325,0x1fe,0x200};
+	for (unsigned detail=0;detail<2;detail++) {
+		for(unsigned side=0;side<2;side++) cs_option(h[side], CS_OPT_DETAIL, detail?CS_OPT_ON:CS_OPT_OFF);
+		for(unsigned k=0;k<sizeof(forms)/sizeof(forms[0]);k++)
+		for(unsigned high=0;high<16;++high)for(unsigned v=0;v<32;++v)
+		for(unsigned w=0;w<2;++w)for(unsigned ll=0;ll<3;++ll)
+		for(unsigned mr=0xc0;mr<256;++mr){
+			uint8_t bytes[]={0x62,(uint8_t)(high<<4|forms[k]>>8),(uint8_t)(w<<7|((v&15)<<3)|5),
+				(uint8_t)(ll<<5|((v>>4)<<3)),(uint8_t)forms[k],(uint8_t)mr,(uint8_t)(mr+v+high)};
+			if(!compare(h,bytes,7,mr^high^v)) return 1;
+			if((forms[k]>>8)==3 && v==0 && high==0)
+				for(unsigned im=0;im<256;++im){bytes[6]=(uint8_t)im;if(!compare(h,bytes,7,im))return 1;}
+		}
+	}
+	cs_close(&h[0]);cs_close(&h[1]);return 0;
+}

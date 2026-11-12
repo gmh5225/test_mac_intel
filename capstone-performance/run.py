@@ -152,7 +152,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='Direct relative branches plus MOV GPR and unprefixed base or base+disp8, including REX fields; truncate/legacy/SIB/disp32 use the full decoder'))
+    write('comparison.json', dict(baseline='x86 scalar, branch and base memory output; identical consumer for both libraries', candidate='EVEX standard packed-vector terminals and full unmasked three-register output'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -205,10 +205,15 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
-    write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
+    assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
+    unit=(WORK/'new/tests/unit/x86_simple_output.c').read_text()
+    vector_unit=WORK/'new/tests/unit/checked_evex_records.c'
+    vector_unit.write_text(unit[:unit.index('int main(void)')]+(SOURCE/'checked-evex.cfrag').read_text())
+    command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',vector_unit,WORK/'new-build/libcapstone.a','-o',WORK/'evex-unit'],'build-full-vector-records')
+    command([WORK/'evex-unit'],'verify-full-vector-records')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
