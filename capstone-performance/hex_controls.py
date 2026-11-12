@@ -96,8 +96,9 @@ panic="abort"
                     if signature is None:
                         signature = current
                     assert current == signature
-                    row = dict(case=case['name'], mode=mode, cycle=cycle, ordinal=ordinal,
-                               variant=variant, **value)
+                    row = dict(value)
+                    row.update(case=case['name'], mode=mode, cycle=cycle,
+                               ordinal=ordinal, variant=variant)
                     rows.append(row)
                     output.write(json.dumps(row) + '\n')
             output.flush()
