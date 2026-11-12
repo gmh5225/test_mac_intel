@@ -16,14 +16,14 @@
 #if defined(__APPLE__) && defined(__arm64e__)
 #include <libunwind.h>
 
-/// Initialize System directly in its final storage; opaque system cursors must
-/// not be copied because their internal pointers can use address diversity.
-/// Saved describes every callee-saved GPR whose row differs from same-value.
-/// Undefined, register/expression and vector recovery require another row
-/// profile. This supplies a stack-walking cursor, not an exception-resume or
-/// register-restoration context. Discard System if a system API returns false.
-/// Unknown rows and invalid signatures fail before System is initialized.
-static inline bool ndDarwinArm64eInitSystemCaller(
+/// Move the system stack walker from a Darwin signal trampoline to the
+/// authenticated caller of the interrupted frame. System must be the cursor
+/// at that trampoline and Context its genuine signal ucontext. Never copy the
+/// opaque cursor; its internal pointers can use address diversity.
+/// Saved lists each preserved integer register whose row is not same-value.
+/// This supports stack walking, not exception resumption or vector recovery.
+/// Invalid rows fail before changing System. Discard it on a libunwind error.
+static inline bool ndDarwinArm64eCrossSignalTrampoline(
     unw_cursor_t *System, const ucontext_t *Context,
     NDDarwinArm64eUnwindRow Row, const NDDarwinArm64eSavedGPR *Saved,
     size_t Count, uintptr_t Low, uintptr_t High, bool HasPAuthLR) {
@@ -53,9 +53,6 @@ static inline bool ndDarwinArm64eInitSystemCaller(
       return false;
     Seen |= 1u << Index;
   }
-  unw_context_t Native;
-  if (unw_getcontext(&Native) || unw_init_local(System, &Native))
-    return false;
   if (unw_set_reg(System, UNW_REG_SP, Caller.SP) ||
       unw_set_reg(System, UNW_ARM64_FP, Caller.FP) ||
       unw_set_reg(System, UNW_ARM64_LR, Caller.LR))
