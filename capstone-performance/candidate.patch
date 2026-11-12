@@ -541,7 +541,7 @@ index 00000000..68de7ad4
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..beec3827
+index 00000000..5a51035f
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
 @@ -0,0 +1,325 @@
@@ -751,7 +751,7 @@ index 00000000..beec3827
 +	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
 +
-+	if (plan == UINT16_MAX - 1) {
++	if (plan == X86_PLAN_GROUP1_IMM8) {
 +		if (size < 3u + has_rex)
 +			return false;
 +		unsigned reg_plan =
@@ -889,10 +889,10 @@ index 99a0800e..ff9a2542 100644
   * must use the handle's exact 32/64-bit profile and return (public_id << 8) |
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 new file mode 100644
-index 00000000..25a1e8ce
+index 00000000..5d8916a4
 --- /dev/null
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -0,0 +1,78 @@
+@@ -0,0 +1,82 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -937,6 +937,10 @@ index 00000000..25a1e8ce
 +	X86_SIMPLE_REG_RM,
 +	X86_SIMPLE_RELATIVE,
 +};
++
++/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
++ * same register-only operand check as a register pair. */
++#define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
 +
 +static inline void X86_writeSimpleDetail(cs_detail *detail,
 +					 const struct X86SimpleOutput *row,
@@ -1012,7 +1016,7 @@ index 0a4c959f..b883b547 100644
  }
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 new file mode 100644
-index 00000000..d237239f
+index 00000000..1d3b62a0
 --- /dev/null
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -0,0 +1,422 @@
@@ -1419,7 +1423,7 @@ index 00000000..d237239f
 +					rows.begin());
 +				if (index == rows.size())
 +					rows.push_back(row.fields);
-+				if (index > UINT16_MAX >> 2)
++				if (index >= UINT16_MAX >> 2)
 +					return 1;
 +				plans[wide][cls][op] = static_cast<uint16_t>(
 +					(index << 2) | form);
@@ -1430,7 +1434,7 @@ index 00000000..d237239f
 +	}
 +	for (unsigned wide = 0; wide < 2; ++wide)
 +		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls)
-+			plans[wide][cls][0x83] = UINT16_MAX - 1;
++			plans[wide][cls][0x83] = X86_PLAN_GROUP1_IMM8;
 +	emit_tables(plans, regs, rows);
 +	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 +		  << " encodings_checked=" << checked << " table_bytes="

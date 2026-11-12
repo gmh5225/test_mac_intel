@@ -370,15 +370,12 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
-    cycles=10; duration=150_000_000
-    measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
-    for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
-        choices=[c for c in cases if c['consumer']==consumer]
-        if not choices:
-            continue
-        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
-        measure_panel(panel,choices,cycles,variants,duration)
+    selected={'putty-32-0.85','putty-64-0.85','scalar32','simd64'}
+    controls=[v for v in cases if v['name'] in selected and v['consumer']=='decoder' and v['mode']=='scan']
+    assert len(controls)==4
+    for label in ('base','new'):
+        command(['objdump','-d','--disassemble=cs_disasm_iter',WORK/('decoder-'+label)],'iterator-'+label)
+    measure_panel('null',controls,23,['base','new','base_aa','new_aa'],420000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 

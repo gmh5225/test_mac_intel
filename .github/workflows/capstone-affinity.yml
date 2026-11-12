@@ -1,9 +1,9 @@
-name: Verify group-1 immediate output on PE, ELF and other architecture controls in dedicated builds
+name: Recheck scalar32 and PE scan on exact release sources with duplicate controls and longer CPU samples
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-group1-recheck-dedicated]
+    branches: [codex/capstone-group1-pe32-scan-repeat]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-group1-recheck-dedicated
+  group: capstone-group1-pe32-scan-repeat
   cancel-in-progress: false
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: immediate-output-dedicated-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: group1-long-scan-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
