@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-same-image-hex]
+    branches: [codex/capstone-inprocess-hex]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-same-image-hex
+  group: capstone-inprocess-hex
   cancel-in-progress: false
 
 jobs:
@@ -20,11 +20,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { host: ubuntu-24.04, baseline: combined }
-          - { host: ubuntu-24.04-arm, baseline: combined }
+        host: [ubuntu-24.04, ubuntu-24.04-arm]
+        compiler: [clang, gcc]
     env:
-      COMPARE_BASE: ${{ matrix.baseline }}
+      HEX_COMPILER: ${{ matrix.compiler }}
     runs-on: ${{ matrix.host }}
     timeout-minutes: 62
     steps:
@@ -36,13 +35,13 @@ jobs:
         run: |
           uname -sm
           python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
-      - name: Compare both hexadecimal writers in one immutable decoder image
-        run: python3 capstone-performance/hex_controls.py
+      - name: Alternate hexadecimal writers within one process and decoder handle
+        run: python3 capstone-performance/inprocess.py
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: same-image-hex-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: inprocess-hex-${{ matrix.host }}-${{ matrix.compiler }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
