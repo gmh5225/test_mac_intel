@@ -1,7 +1,7 @@
-name: Measure production decoder iterator selection and format-specific detail fixups against the shipping product
+name: Recheck production ARM, MIPS and PE32 with long paired CPU samples on the published NeverD pin
 on:
   push:
-    branches: [codex/capstone-neverd-iterator-selection]
+    branches: [codex/capstone-neverd-selection-controls]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: df5522219fa734dce94fac2f1c1408727a4d0790
+          ref: fbf8125e3e2924986bf3125ca00c528498cc4ac4
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-selection-product
+          name: neverd-selection-controls
           path: product-evidence/
           retention-days: 14

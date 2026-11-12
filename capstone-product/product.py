@@ -20,31 +20,35 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   assert len(cases)==9
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+  shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
+  with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_CXX_COMPILER=clang++','-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld','-DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=OFF','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   products={}
-  for label in ('base','direct','cached','forward'):
+  for label in ('base','direct','cached','forward','arch'):
    if label!='base':
-    command(['git','apply',r/'memory.patch'],'apply-output-'+label,cs)
     command(['git','apply',r/(label+'.patch')],'select-'+label,nd)
-   command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','--parallel','4'],'product-'+label,nd)
+   command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','--parallel','4'],'product-'+label,nd)
+   signature=sp.check_output([next(build.rglob('capstone-route'))],text=True).strip()
+   write(label+'-public-state',signature)
+   if label!='base':assert json.loads((out/'base-public-state.json').read_text())==signature
+
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    if label!='base':
-    command(['git','apply','-R',r/'memory.patch'],'restore-'+label,cs)
     command(['git','apply','-R',r/(label+'.patch')],'restore-client-'+label,nd)
    snapshot=json.loads((build/'.neverd-deps/snapshot.json').read_text())
    write(label+'-snapshot',snapshot)
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
    objects={str(f.relative_to(roots[0])):hashlib.sha256(f.read_bytes()).hexdigest() for f in roots[0].rglob('*.o')};write(label+'-objects',objects)
    if label!='base':
-    base_objects=json.loads((out/'base-objects.json').read_text());assert all(objects[k]==v for k,v in base_objects.items()) and len(objects)==len(base_objects)+1
+    base_objects=json.loads((out/'base-objects.json').read_text());assert objects==base_objects
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==4
+  write('products',identities);assert len(set(identities.values()))==5
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def measure(name,case,mode,reps):
@@ -55,12 +59,14 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   results=[]
   for case in cases:
    for mode in (0,1,2):
+    cases_of_interest={'arm-cp':(0,1,2),'arm64-ls':(0,2),'arm64-sort':(0,),'mips64el-ls':(0,1),'putty-32-0.85':(0,1,2),'simd64':(2,)}
+    if mode not in cases_of_interest.get(case['name'],()):continue
     # A long full text and a tiny compiler fixture have very different costs.
-    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(65000/start)))
+    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(230000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','direct','cached','forward')):
+    for idx,label in enumerate(('base-copy','direct','cached','forward','arch')):
      plans=[]
-     for cycle in range(9):
+     for cycle in range(13):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
       times={'base':[],label:[]}
       for who in order:
@@ -70,6 +76,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
     row['signature']=oracle;results.append(row);write('timings',results)
-  assert len(results)==27;write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
+  assert len(results)==12;write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
