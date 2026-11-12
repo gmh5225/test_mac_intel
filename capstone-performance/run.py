@@ -200,6 +200,9 @@ panic = "abort"
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
+    for probe in ('batch','edges','move-edges','rex-edges'):
+        command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/(probe+'.cpp'),*(['-ldl'] if platform.system()=='Linux' else []),'-o',WORK/probe], 'compile-'+probe)
+        command([WORK/probe,libraries['base'],libraries['new']], 'verify-'+probe)
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -237,7 +240,7 @@ panic = "abort"
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
     required = {prefix+'cs.c.o',prefix+'arch/X86/X86DisassemblerDecoder.c.o',prefix+'arch/X86/X86IntelInstPrinter.c.o'}
-    allowed = required | {prefix+'SStream.c.o',prefix+'arch/X86/X86IntelInstPrinterPrechecked.c.o',prefix+'arch/X86/X86IntelInstPrinterNumbers.c.o'}
+    allowed = required | {prefix+'SStream.c.o',prefix+'arch/X86/X86Disassembler.c.o',prefix+'arch/X86/X86IntelInstPrinterPrechecked.c.o',prefix+'arch/X86/X86IntelInstPrinterNumbers.c.o'}
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
