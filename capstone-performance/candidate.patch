@@ -1,8 +1,8 @@
 diff --git a/MCInst.h b/MCInst.h
-index 641480ed..015d9b52 100644
+index 641480ed..08a88507 100644
 --- a/MCInst.h
 +++ b/MCInst.h
-@@ -149,16 +149,14 @@ struct MCInst {
+@@ -149,38 +149,36 @@ struct MCInst {
  	uint8_t op1_size; // size of 1st operand - for X86 Intel syntax
  	uint8_t tied_op_idx_size; // Upper bound of populated tied_op_idx slots
  	unsigned Opcode; // private opcode
@@ -16,27 +16,75 @@ index 641480ed..015d9b52 100644
  	// to another, for example, from disassembler to asm printer. The values of
  	// the flags have any sense on target level only (e.g. prefixes on x86).
  	unsigned flags;
+-
 +	cs_insn *flat_insn; // insn to be exposed to public
 +	uint64_t address; // address of this insn
 +	cs_struct *csh; // save the main csh
-+	uint8_t x86opsize; // opsize for [mem] operand
- 
++	MCRegisterInfo *MRI;
++	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
++	bool isAliasInstr; // Flag if this MCInst is an alias.
++	bool fillDetailOps; // If set, detail->operands gets filled.
++	bool writeback; // writeback for ARM
++	// operand access index for list of registers sharing the same access right (for ARM)
++	uint8_t ac_idx;
  	// (Optional) instruction prefix, which can be up to 4 bytes.
  	// A prefix byte gets value 0 when irrelevant.
-@@ -166,6 +164,7 @@ struct MCInst {
+ 	// This is copied from cs_x86 struct
  	uint8_t x86_prefix[4];
++	uint8_t x86opsize; // opsize for [mem] operand
  	uint8_t imm_size; // immediate size for X86_OP_IMM operand
- 	bool writeback; // writeback for ARM
+-	bool writeback; // writeback for ARM
+-	int8_t tied_op_idx
+-		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
+-	// operand access index for list of registers sharing the same access right (for ARM)
+-	uint8_t ac_idx;
+ 	uint8_t popcode_adjust; // Pseudo X86 instruction adjust
+-	char assembly[8]; // for special instruction, so that we don't need printer
+-	unsigned char evm_data[32]; // for EVM PUSH operand
+-	cs_wasm_op wasm_data; // for WASM operand
+-	MCRegisterInfo *MRI;
+ 	uint8_t xAcquireRelease; // X86 xacquire/xrelease
+ 	uint8_t x86Lock; // Set when the X86 LOCK prefix is present
+-	bool isAliasInstr; // Flag if this MCInst is an alias.
+-	bool fillDetailOps; // If set, detail->operands gets filled.
++	char assembly[8]; // for special instruction, so that we don't need printer
 +	MCOperand Operands[MAX_MC_OPS];
- 	int8_t tied_op_idx
- 		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
- 	// operand access index for list of registers sharing the same access right (for ARM)
-@@ -250,8 +249,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
++	int8_t tied_op_idx
++		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
+ 	hppa_ext hppa_ext; ///< for HPPA operand. Contains info about modifiers and their effect on the instruction
+-	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
++	unsigned char evm_data[32]; // for EVM PUSH operand
++	cs_wasm_op wasm_data; // for WASM operand
+ };
+ 
+ // create Reg operand in the next slot
+@@ -250,15 +248,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
  static inline void MCInst_InitX86(MCInst *inst)
  {
  	memset(inst, 0, offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
 -	memset((char *)inst + offsetof(MCInst, flat_insn), 0,
 -	       offsetof(MCInst, tied_op_idx) - offsetof(MCInst, flat_insn));
+-
+-	memset((char *)inst + offsetof(MCInst, ac_idx), 0,
+-	       offsetof(MCInst, evm_data) - offsetof(MCInst, ac_idx));
+-	memset((char *)inst + offsetof(MCInst, MRI), 0,
+-	       offsetof(MCInst, hppa_ext) - offsetof(MCInst, MRI));
+-	memset((char *)inst + offsetof(MCInst, MAI), 0,
+-	       sizeof(*inst) - offsetof(MCInst, MAI));
+ }
  
- 	memset((char *)inst + offsetof(MCInst, ac_idx), 0,
- 	       offsetof(MCInst, evm_data) - offsetof(MCInst, ac_idx));
+ void MCInst_Init(MCInst *inst, cs_arch arch);
+diff --git a/tests/unit/mcinst.c b/tests/unit/mcinst.c
+index 2d4478fd..397d7009 100644
+--- a/tests/unit/mcinst.c
++++ b/tests/unit/mcinst.c
+@@ -185,7 +185,8 @@ static bool check_x86_init_metadata(void)
+ 		       sizeof(full.tied_op_idx));
+ 		memcpy((char *)&full + offsetof(MCInst, evm_data),
+ 		       (char *)&partial + offsetof(MCInst, evm_data),
+-		       offsetof(MCInst, MRI) - offsetof(MCInst, evm_data));
++		       offsetof(MCInst, wasm_data) + sizeof(full.wasm_data) -
++			       offsetof(MCInst, evm_data));
+ 		memcpy(&full.hppa_ext, &partial.hppa_ext,
+ 		       sizeof(full.hppa_ext));
+ 		if (memcmp(&full, &partial, sizeof(full)) != 0)

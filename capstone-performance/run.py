@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Place active MCInst metadata before the operand array without increasing the native structure size'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Group common MCInst metadata and construct the x86 header in a single fixed clear'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -210,6 +210,19 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    # The private-oracle normalization must still detect a broken common flag.
+    tree = WORK / 'new'
+    raw = (tree/'MCInst.h').read_text()
+    a = raw.index('static inline void MCInst_InitX86(')
+    end = raw.index('\n}',a)
+    mutant = WORK / 'layout-mutant.h'
+    mutant.write_text(raw[:end]+'\n\tinst->isAliasInstr = true;'+raw[end:])
+    target = WORK / 'mcinst-mutant'
+    command(['clang','-O3','-DNDEBUG',*defs,*includes,'-include',mutant,tree/'tests/unit/mcinst.c',
+             WORK/'new-build/libcapstone.a','-o',target], 'compile-mcinst-negative')
+    result = subprocess.run([target],capture_output=True)
+    assert result.returncode == 1,result.returncode
+    write('mcinst-negative.json',{'changed':'isAliasInstr set after initialization','expected_exit':1,'actual_exit':result.returncode})
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
