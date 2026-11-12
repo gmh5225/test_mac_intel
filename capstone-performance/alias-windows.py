@@ -78,7 +78,7 @@ target_include_directories(native_sstream PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/t
 target_link_libraries(native_sstream PRIVATE capstone_static)
 '''
         with (tree/'CMakeLists.txt').open('a') as f: f.write('\n'+targets)
-        command(['cmake','-S',tree,'-B',build,'-G','Visual Studio 17 2022','-A','x64',
+        command(['cmake','-S',tree,'-B',build,'-A','x64',
                  '-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE='+('ON' if sys.argv[2]=='first' else 'OFF'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_C_FLAGS=/MP4','-DSOURCE='+SOURCE.as_posix(),'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
                  '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if crt=='MT' else 'OFF')], label+'-configure')
         def build_targets(step,*names):
@@ -104,9 +104,9 @@ target_link_libraries(native_sstream PRIVATE capstone_static)
                 return json.loads(subprocess.check_output([programs[label],*args,str(n)]))
             n=1
             while (probe:=sample('base',n))['wall_ns'] < 10000000: n *= 4
-            repeats=max(1,math.ceil(n*120000000/probe['wall_ns']))
+            repeats=max(1,math.ceil(n*240000000/probe['wall_ns']))
             pairs=[]
-            for cycle in range(8):
+            for cycle in range(12):
                 order=['base','new','new','base'] if cycle%2==(0 if sys.argv[2]=='first' else 1) else ['new','base','base','new']
                 rows=[(label,sample(label,repeats)) for label in order]
                 assert all(row['result']==rows[0][1]['result'] for _,row in rows)

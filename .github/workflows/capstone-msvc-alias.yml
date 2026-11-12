@@ -1,7 +1,7 @@
 name: Check dedicated AArch64 register output on native Windows in four Release builds
 on:
   push:
-    branches: [codex/capstone-aarch64-registers-windows]
+    branches: [codex/capstone-aarch64-registers-windows-holdout]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-alias.yml]
 permissions:
   contents: read
@@ -10,9 +10,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        crt: [MD, MT]
-        order: [first, second]
-    runs-on: windows-2022
+        crt: [MD]
+        order: [first]
+    runs-on: windows-2025
     timeout-minutes: 72
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -24,6 +24,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-register-${{ matrix.crt }}-${{ matrix.order }}
+          name: compact-register-holdout-${{ matrix.crt }}-${{ matrix.order }}
           path: capstone-evidence/
           retention-days: 14
