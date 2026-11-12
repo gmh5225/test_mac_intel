@@ -12,26 +12,26 @@ assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==jso
 with tempfile.TemporaryDirectory(prefix='capstone-static-a64-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
-  cases=[x for x in corpus.prepare(r,t,e,run) if x['name'].startswith('arm64-')];assert len(cases)==3
+  cases=[x for x in corpus.prepare(r,t,e,run) if x['name'].startswith('mips64el-')];assert len(cases)==3
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={}
-  for key in ('base','inline','outline'):
+  for key in ('base','major'):
    if key!='base':run(['git','apply',r/(key+'.patch')],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+key)
    f=t/key;run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',f],'link-'+key);bins[key]=f
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps):
    return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','inline','outline','aa']
-    for k in range(10):
-     seq=keys[k%4:]+keys[:k%4];ticks={v:[] for v in keys}
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
+    runs=[];reference=None;keys=['base','major','aa']
+    for k in range(15):
+     seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
       vout=sample(v,x,mode,n)
       if reference is None:reference=(vout['first'],vout['result'])

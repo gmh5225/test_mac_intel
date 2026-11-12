@@ -1,7 +1,7 @@
-name: Compare GCC and Clang on real statically linked AArch64 decoders with identical controls
+name: Compare standard MIPS register-immediate and load/store scans in standalone clients on Debian coreutils
 on:
   push:
-    branches: [codex/capstone-dedicated-aarch64-static]
+    branches: [codex/capstone-mips-major-scan]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: f6054796e7ecf52e174edf336c564facb1d762e0
+          ref: f53af83fd00b3403be328033a285915da723d8dc
           path: source
           persist-credentials: false
       - name: Measure independent static executables with both initializer placements
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: static-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: major-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
