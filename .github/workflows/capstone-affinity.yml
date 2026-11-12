@@ -1,9 +1,9 @@
-name: Validate relative branches and MOV base addressing against the integer release in mixed builds
+name: Retest AArch64 immediate scan on mixed PE32, x86 SIMD, ARM and MIPS controls
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-base-memory-mixed]
+    branches: [codex/capstone-aarch64-branch-controls]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-base-memory-mixed
+  group: capstone-aarch64-branch-controls
   cancel-in-progress: false
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mov-base-mixed-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: a64-cross-controls-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

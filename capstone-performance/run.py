@@ -205,10 +205,12 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    assert diffs==['arch/AArch64/AArch64Mapping.c.o'],diffs
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
+    command(['clang++','-O2','-std=c++17','-I',base/'include',SOURCE/'aarch64-records.cpp','-ldl','-o',WORK/'a64-records'],'compile-a64-records')
+    command([WORK/'a64-records',libraries['base'],libraries['new']],'verify-a64-records')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
@@ -358,15 +360,13 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
-    cycles=10; duration=150_000_000
-    measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
-    for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
-        choices=[c for c in cases if c['consumer']==consumer]
-        if not choices:
-            continue
-        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
-        measure_panel(panel,choices,cycles,variants,duration)
+    picked = {'putty-32-0.85','putty-64-0.85','simd64','scalar32','amd64-ls'}
+    xs=[c for c in cases if c['consumer']=='decoder' and c['name'] in picked]
+    others=[c for c in cases if c['consumer']=='single']
+    controls=[c for c in xs+others if (c['name'],c['mode']) in {('putty-32-0.85','scan'),('mips64el-ls','format'),('arm64-ls','detail')}]
+    measure_panel('null',controls,10,['base','new','base_aa','new_aa'],200000000)
+    measure_panel('x86',xs,10,['base','new','base_aa','new_aa'],200000000)
+    measure_panel('other',others,10,['base','new','base_aa','new_aa'],200000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
