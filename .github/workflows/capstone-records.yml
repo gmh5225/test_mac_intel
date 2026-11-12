@@ -1,7 +1,7 @@
-name: Compare GCC and Clang on real statically linked AArch64 decoders with identical controls
+name: Verify the exact AArch64 release objects for dedicated, DIET and mixed products
 on:
   push:
-    branches: [codex/capstone-dedicated-aarch64-static]
+    branches: [codex/capstone-aarch64-release-objects]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -31,13 +31,13 @@ jobs:
           ref: f6054796e7ecf52e174edf336c564facb1d762e0
           path: source
           persist-credentials: false
-      - name: Measure independent static executables with both initializer placements
-        run: python3 capstone-records/measure.py
+      - name: Confirm every release object against its qualified implementation and run public MC tests
+        run: python3 capstone-records/qualify.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: static-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: release-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
