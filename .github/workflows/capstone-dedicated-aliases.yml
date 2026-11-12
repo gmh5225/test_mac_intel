@@ -1,7 +1,7 @@
-name: Measure dedicated x86 repair by swapping library load order and verify mixed objects
+name: Verify dedicated Linux x86 repairs with GCC and Clang
 on:
   push:
-    branches: [codex/capstone-dedicated-x86-legacy-memory-repair]
+    branches: [codex/capstone-linux-dedicated-memory-repairs]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -12,12 +12,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {host: ubuntu-24.04, plan: "AARCH64,ARM"}
-          - {host: ubuntu-24.04-arm, plan: "AARCH64,ARM"}
-          - {host: macos-15, plan: "AARCH64,ARM"}
-          - {host: macos-15-intel, plan: "AARCH64,ARM"}
+          - {host: ubuntu-24.04, cc: clang}
+          - {host: ubuntu-24.04-arm, cc: clang}
+          - {host: ubuntu-24.04, cc: gcc}
+          - {host: ubuntu-24.04-arm, cc: gcc}
+          - {host: macos-15, cc: clang}
+          - {host: macos-15-intel, cc: clang}
     env:
-      ARCH_PLAN: ${{ matrix.plan }}
+      CC: ${{ matrix.cc }}
+      ARCH_PLAN: X86
     runs-on: ${{ matrix.host }}
     timeout-minutes: 58
     steps:
@@ -30,7 +33,7 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-x86-memory-${{ matrix.host }}-${{ github.run_attempt }}
+          name: linux-memory-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14

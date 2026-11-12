@@ -2,6 +2,7 @@ from pathlib import Path
 import json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import run,corpus
 src=run.SOURCE
+cc=os.environ['CC']
 def main(root):
  run.WORK=root;man=json.loads((src/'manifest.json').read_text());w=run.fetch('capstone','https://github.com/NeverSight/capstone.git',man['capstone_revision'])
  inputs={row['name'] for row in man['inputs']} | {'scalar32','scalar64','simd64'}
@@ -22,7 +23,7 @@ def main(root):
   if patch:run.command(['git','apply',f],'apply',w)
   # Verify the exact objects produced for the unaffected mixed build.
   mixed=root/'mixed'
-  run.command(['cmake','-S',w,'-B',mixed,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('ARM','AARCH64','X86','MIPS','SPARC','LOONGARCH','RISCV')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'mixed-config-'+label)
+  run.command(['cmake','-S',w,'-B',mixed,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+k+'_SUPPORT=ON' for k in ('ARM','AARCH64','X86','MIPS','SPARC','LOONGARCH','RISCV')],'-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'],'mixed-config-'+label)
   run.command(['cmake','--build',mixed,'--target','capstone_static','--parallel','4'],'mixed-build-'+label)
   digest={str(f.relative_to(mixed)):run.sha(f) for f in (mixed/'CMakeFiles/capstone.dir').rglob('*.o')}
   assert len(digest)>20
@@ -30,12 +31,26 @@ def main(root):
   else:
    assert digest==control,[k for k,v in digest.items() if control.get(k)!=v]
    run.write('mixed-objects.json',digest)
-  run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
+  run.command(['cmake','-S',w,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_SHARED_LIBS=ON'],'config-'+label)
   run.command(['cmake','--build',b,'--target','capstone_shared','--parallel','4'],'build-'+label)
   if label=='new':
-   assert 'CAPSTONE_X86_LEGACY_MEMORY_REPAIR' in (b/'build.ninja').read_text()
-   assert 'CAPSTONE_X86_LEGACY_MEMORY_REPAIR' not in (mixed/'build.ninja').read_text()
+   assert 'CAPSTONE_X86_ONLY' in (b/'build.ninja').read_text()
+   assert 'CAPSTONE_X86_ONLY' not in (mixed/'build.ninja').read_text()
   lib='libcapstone.' +('dylib' if platform.system()=='Darwin' else 'so');out=root/(label+'-'+lib);shutil.copyfile(b/lib,out);bins[label]=out
+  dedicated={str(f.relative_to(b)):run.sha(f) for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+  if label=='base': original=dedicated
+  else:
+   changed=[k for k in original if original[k]!=dedicated[k]]
+   expected=['CMakeFiles/capstone.dir/arch/X86/X86Mapping.c.o'] if platform.system()=='Linux' else []
+   assert changed==expected,changed
+   run.write('dedicated-objects.json',dict(changed=changed,base=original,new=dedicated))
+ if platform.system()!='Linux':return
+ # Make is a separate supported entry point. Compile the official encoding
+ # regression with the same allocator/architecture configuration as the lib.
+ make=root/'make'
+ run.command(['make','-j4','CAPSTONE_ARCHS=x86','CC='+cc,'BUILDDIR='+str(make),str(make/'libcapstone.a')],'gnu-make',w)
+ run.command([cc,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-I',w/'include','-I',w/'tests/unit/include',w/'tests/unit/x86_encoding_accuracy.c',make/'libcapstone.a','-o',root/'make-unit'],'make-unit-build')
+ run.command([root/'make-unit'],'make-unit')
  for label, lib in list(bins.items()):
   twin=root/('aa-'+lib.name); shutil.copyfile(lib,twin); assert run.sha(twin)==run.sha(lib)
   bins[label+'_aa']=twin

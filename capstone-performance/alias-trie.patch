@@ -1,36 +1,41 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 4110b67d..cab822d3 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -153,6 +153,10 @@
-         list(APPEND capstone_enabled_architectures "${supported_architecture}")
+@@ -154,6 +154,10 @@ foreach(i RANGE ${count})
      endif()
  endforeach()
-+
-+if(capstone_enabled_architectures STREQUAL "X86")
-+    add_compile_definitions(CAPSTONE_X86_LEGACY_MEMORY_REPAIR)
-+endif()
  
++if(capstone_enabled_architectures STREQUAL "X86")
++    add_compile_definitions(CAPSTONE_X86_ONLY)
++endif()
++
  if(capstone_enabled_architectures STREQUAL "RISCV")
      add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+diff --git a/Makefile b/Makefile
+index 4bd96a7c..02958776 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -115,6 +115,10 @@
+@@ -115,6 +115,9 @@ INSTALL_LIB ?= $(INSTALL_BIN) -m0755
  
  LIBNAME = capstone
  
-+
 +ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
-+CFLAGS += -DCAPSTONE_X86_LEGACY_MEMORY_REPAIR
++CFLAGS += -DCAPSTONE_X86_ONLY
 +endif
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
  CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index e2c0eb9e..461ae5e4 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -12698,6 +12698,21 @@
+@@ -12698,6 +12698,21 @@ void X86_postprinter(csh handle, cs_insn *insn, SStream *mnem, MCInst *mci)
  		return;
  
  	cs_x86 *x86 = &insn->detail->x86;
-+#ifdef CAPSTONE_X86_LEGACY_MEMORY_REPAIR
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__)
 +	/* VEX/EVEX, x87 environments and RCL retain all operand repairs.
 +	 * Other encodings can only need the first memory operand's broadcast
 +	 * repair, including decorators introduced by a custom formatter. */
