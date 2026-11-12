@@ -1,0 +1,28 @@
+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
+	defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && \
+	(defined(__GNUC__) || defined(__clang__))
+#define CS_X86_SHORT_MNEMONIC
+/* The caller supplies eight initialized bytes. The first low ASCII
+ * character can end the mnemonic. */
+static inline bool copy_short_x86_mnemonic(char *dst, const char *src,
+					   size_t *offset)
+{
+	const uint64_t high = UINT64_C(0x8080808080808080);
+	const uint64_t ones = UINT64_C(0x0101010101010101);
+	uint64_t word;
+	memcpy(&word, src, sizeof(word));
+	/* Set the high bit of each byte in the ASCII range 0 through 32. */
+	const uint64_t low = ~((word | high) - 33 * ones) & ~word & high;
+	const uint64_t bars = word ^ (ones * '|');
+	if (!low || ((bars - ones) & ~bars & high))
+		return false;
+	size_t end = (unsigned)__builtin_ctzll(low) / 8;
+	if (src[end] != '\0' && src[end] != ' ' && src[end] != '\t')
+		return false;
+	/* Keep all bytes before the first separator and zero the rest. */
+	word &= ((low & (0 - low)) >> 7) - 1;
+	memcpy(dst, &word, sizeof(word));
+	*offset = end;
+	return true;
+}
+#endif

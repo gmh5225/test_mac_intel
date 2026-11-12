@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Avoid clearing unused AArch64 operands in mixed four- and seven-backend products'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Use word operations to split the first Intel mnemonic when eight initialized bytes are available'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -210,6 +210,8 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    command(['clang','-O3',SOURCE/'words.c','-o',WORK/'words'],'compile-mnemonic-edges')
+    command([WORK/'words'],'mnemonic-edges')
     changed = []
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')

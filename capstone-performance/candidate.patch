@@ -1,17 +1,70 @@
 diff --git a/cs.c b/cs.c
-index 8db01e0d..29db990d 100644
+index 8db01e0d..a0ebdad3 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1049,6 +1049,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitX86(&mci);
- 	else
- #endif
-+#ifdef CAPSTONE_HAS_AARCH64
-+	if (handle->arch == CS_ARCH_AARCH64)
-+		/* The AArch64 decoder constructs its operands before printing. */
-+		MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+	else
+@@ -936,6 +936,35 @@ static int str_replace(char *result, char *target, const char *str1, char *str2)
+ 
+ #include "cs_disasm_internal.h"
+ 
++#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
++	defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__ && \
++	(defined(__GNUC__) || defined(__clang__))
++#define CS_X86_SHORT_MNEMONIC
++/* The caller supplies eight initialized bytes. The first low ASCII
++ * character can end the mnemonic. */
++static inline bool copy_short_x86_mnemonic(char *dst, const char *src,
++					   size_t *offset)
++{
++	const uint64_t high = UINT64_C(0x8080808080808080);
++	const uint64_t ones = UINT64_C(0x0101010101010101);
++	uint64_t word;
++	memcpy(&word, src, sizeof(word));
++	/* Set the high bit of each byte in the ASCII range 0 through 32. */
++	const uint64_t low = ~((word | high) - 33 * ones) & ~word & high;
++	const uint64_t bars = word ^ (ones * '|');
++	if (!low || ((bars - ones) & ~bars & high))
++		return false;
++	size_t end = (unsigned)__builtin_ctzll(low) / 8;
++	if (src[end] != '\0' && src[end] != ' ' && src[end] != '\t')
++		return false;
++	/* Keep all bytes before the first separator and zero the rest. */
++	word &= ((low & (0 - low)) >> 7) - 1;
++	memcpy(dst, &word, sizeof(word));
++	*offset = end;
++	return true;
++}
 +#endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
- 		/* MIPS constructs each MCOperand before reading it. The public
++
+ /* Keep the generic copy specialized without the private x86 length checks. */
+ #if defined(__GNUC__)
+ __attribute__((always_inline))
+@@ -963,15 +992,21 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
+ 	memset(insn->mnemonic, '\0', sizeof(insn->mnemonic));
+ 	memset(insn->op_str, '\0', sizeof(insn->op_str));
+ 	size_t off = 0;
+-	while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
+-	       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
+-		char c = OS->buffer[off];
+-		insn->mnemonic[off] = c == '|' ? ' ' : c;
+-		off++;
++#ifdef CS_X86_SHORT_MNEMONIC
++	if (!stream_length_valid || OS->index < sizeof(uint64_t) - 1 ||
++	    !copy_short_x86_mnemonic(insn->mnemonic, OS->buffer, &off))
++#endif
++	{
++		while (off < sizeof(insn->mnemonic) - 1 && OS->buffer[off] &&
++		       OS->buffer[off] != ' ' && OS->buffer[off] != '\t') {
++			char c = OS->buffer[off];
++			insn->mnemonic[off] = c == '|' ? ' ' : c;
++			off++;
++		}
++		while (OS->buffer[off] && OS->buffer[off] != ' ' &&
++		       OS->buffer[off] != '\t')
++			off++;
+ 	}
+-	while (OS->buffer[off] && OS->buffer[off] != ' ' &&
+-	       OS->buffer[off] != '\t')
+-		off++;
+ 	while (OS->buffer[off] == ' ' || OS->buffer[off] == '\t')
+ 		off++;
+ 	const char *operands = OS->buffer + off;
