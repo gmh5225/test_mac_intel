@@ -15,6 +15,76 @@ index 11eefc2f..68b25e9a 100644
          set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
      endif()
      set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
+diff --git a/Mapping.c b/Mapping.c
+index b2be73de..63d26ea9 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -509,7 +509,7 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
+ }
+ 
+-#ifdef CAPSTONE_USE_ALIAS_TRIE
++#ifdef CAPSTONE_MIPS_ALIAS_TRIE
+ void map_set_alias_id_trie(MCInst *MI, const SStream *O,
+ 			   const alias_trie_node *trie, size_t trie_size)
+ {
+diff --git a/Mapping.h b/Mapping.h
+index 6f7281cd..4da835c0 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -296,7 +296,14 @@ bool map_use_alias_details(const MCInst *MI);
+ void map_set_alias_id(MCInst *MI, const SStream *O,
+ 		      const name_map *alias_mnem_id_map, int map_size);
+ 
+-#ifdef CAPSTONE_USE_ALIAS_TRIE
++#if defined(CAPSTONE_USE_ALIAS_TRIE) || \
++	(defined(CAPSTONE_HAS_MIPS) && defined(CAPSTONE_HAS_X86) && \
++	 defined(_MSC_VER) && defined(_M_X64) && !defined(__clang__) && \
++	 !defined(_M_ARM64EC) && defined(_DLL))
++#define CAPSTONE_MIPS_ALIAS_TRIE
++#endif
++
++#ifdef CAPSTONE_MIPS_ALIAS_TRIE
+ typedef struct {
+ 	uint16_t offset;
+ 	uint16_t parent;
+@@ -306,6 +313,9 @@ typedef struct {
+ CAPSTONE_INTERNAL void map_set_alias_id_trie(MCInst *MI, const SStream *O,
+ 					    const alias_trie_node *trie,
+ 					    size_t trie_size);
++#endif
++
++#ifdef CAPSTONE_USE_ALIAS_TRIE
+ #define MAP_SET_ALIAS_ID(mi, stream, map, count, trie) \
+ 	map_set_alias_id_trie((mi), (stream), (trie), ARR_SIZE(trie))
+ #else
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 84222bfa..92b2ff2f 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -84,7 +84,7 @@ static const name_map insn_alias_mnem_map[] = {
+ 	{ MIPS_INS_ALIAS_END, NULL },
+ };
+ 
+-#ifdef CAPSTONE_USE_ALIAS_TRIE
++#ifdef CAPSTONE_MIPS_ALIAS_TRIE
+ static const alias_trie_node alias_trie[] = {
+ #include "MipsGenAliasTrie.inc"
+ };
+@@ -394,8 +394,11 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+ 	}
+ #endif
+ #ifndef CAPSTONE_DIET
+-	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
+-			ARR_SIZE(insn_alias_mnem_map), alias_trie);
++#ifdef CAPSTONE_MIPS_ALIAS_TRIE
++	map_set_alias_id_trie(MI, O, alias_trie, ARR_SIZE(alias_trie));
++#else
++	map_set_alias_id(MI, O, insn_alias_mnem_map, ARR_SIZE(insn_alias_mnem_map));
++#endif
+ #endif
+ }
+ 
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
 index 8c3dea2e..c41d245f 100644
 --- a/arch/X86/X86Disassembler.c
