@@ -1,7 +1,7 @@
-name: Measure production decoder iterator selection and format-specific detail fixups against the shipping product
+name: Check NeverD x86 output semantics on all routes, mode toggles, MPX, XBEGIN and displacement repairs
 on:
   push:
-    branches: [codex/capstone-neverd-iterator-selection]
+    branches: [codex/capstone-neverd-output-semantics]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-selection-product
+          name: neverd-output-semantics
           path: product-evidence/
           retention-days: 14
