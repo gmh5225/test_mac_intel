@@ -1,7 +1,7 @@
-name: Measure dedicated x86 repair by swapping library load order and verify mixed objects
+name: Compare the two x86 memory constructors in one process
 on:
   push:
-    branches: [codex/capstone-dedicated-x86-legacy-memory-repair]
+    branches: [codex/capstone-same-image-memory-construction]
     paths: [capstone-performance/**, .github/workflows/capstone-dedicated-aliases.yml]
   workflow_dispatch:
 permissions:
@@ -14,8 +14,6 @@ jobs:
         include:
           - {host: ubuntu-24.04, plan: "AARCH64,ARM"}
           - {host: ubuntu-24.04-arm, plan: "AARCH64,ARM"}
-          - {host: macos-15, plan: "AARCH64,ARM"}
-          - {host: macos-15-intel, plan: "AARCH64,ARM"}
     env:
       ARCH_PLAN: ${{ matrix.plan }}
     runs-on: ${{ matrix.host }}
@@ -25,12 +23,14 @@ jobs:
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
+      - name: Install Callgrind
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
       - name: Compare bounded outputs and paired CPU time with both libraries on the same thread
-        run: python3 capstone-performance/process-benchmark.py
+        run: python3 capstone-performance/profile.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dedicated-x86-memory-${{ matrix.host }}-${{ github.run_attempt }}
+          name: memory-construction-profile-${{ matrix.host }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: warn
           retention-days: 14
