@@ -1,13 +1,14 @@
 {
-  "revision": "39658ddf9d646b82118bc7321ddf79d70ae059bf",
+  "revision": "0c909767a28549e45fdf2bc681eb52c61750e44f",
   "package": "neverd-llvm-v23.0.0-r6",
-  "tag": "neverd-darwin-registers-r6-39658ddf9d",
+  "tag": "neverd-darwin-registers-r6-0c909767a2",
   "host": "NeverDArm64eLiftedImageTests",
   "asset": "neverd-variadic-host.tgz",
   "run_env": {
-    "NEVERD_ARM64E_LIFTED_NATIVE": "1"
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1",
+    "NEVERD_ARM64E_ASYNC_NATIVE": "1"
   },
-  "filter": "AArch64DarwinVariadic.*",
+  "filter": "AArch64DarwinVariadic.*:AArch64DarwinEntry.DirectCallerConsumesNonVariadicX8AndX9Results:AArch64AsyncUnwind.*",
   "tests": {
     "OptimizedCalleeWalksTheNativeArgumentArea": 4,
     "UnoptimizedCalleeHomesItsNativeArgumentCursor": 4,
@@ -25,6 +26,12 @@
       "native_register_entries_compared": 9,
       "native_register_input_comparisons": 27,
       "installed_register_entries": 9
+    },
+    "DirectCallerConsumesNonVariadicX8AndX9Results": 2,
+    "PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
+      "native_interrupted_frames": 10,
+      "native_authenticated_parent_frames": 10,
+      "native_sigtramp_context_handoffs": 10
     }
   },
   "environment": {
@@ -51,8 +58,8 @@
       "--version"
     ]
   },
-  "archive_sha256": "d9e04760ea5833a51591e089617087d4518aae6bb76d7fc7dce41f87661fe702",
-  "host_sha256": "fbf2d6651a5dab9e61cafdf2ed647534ad07a30e0bb4e734a01f4ed88f4a8088",
+  "archive_sha256": "4349101dd0fcde5d14af86c71adc882a89f94246d6c6883014ff592bac5844ef",
+  "host_sha256": "625d213e955cd487c477df196ea6db0b432dfb4b53cd905afe0a51c6738b9b8c",
   "xml": "results.xml",
   "log": "runtime.log",
   "image_count": "executed_native_images"

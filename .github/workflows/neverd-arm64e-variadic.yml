@@ -29,6 +29,7 @@ jobs:
           sparse-checkout: |
             scripts
             unittests/lift/format
+            include/neverd/runtime
       - name: Exercise the compiler-original four-key PAC and signed exception controls
         run: |
           ulimit -c 0
@@ -42,6 +43,7 @@ jobs:
       - name: Verify and execute the source-bound Release test host
         env:
           GH_TOKEN: ${{ github.token }}
+          NEVERD_ARM64E_TEST_INCLUDE_DIR: ${{ github.workspace }}/neverd/include
         run: |
           brew list --versions zstd || brew install zstd
           ulimit -c 0
