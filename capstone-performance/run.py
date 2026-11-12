@@ -149,12 +149,12 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
-    command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
-    command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
-    incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Avoid clearing unused AArch64 operands in mixed four- and seven-backend products'))
-    for label in ['base', 'new']:
-        build(label)
+    build('base')
+    import install
+    dimensions=install.install(base, WORK/'new', SOURCE, WORK)
+    write('fixed-output.json',dimensions)
+    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Materialize fixed one-byte outputs from immutable native tables inside the public decode path'))
+    build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
         selected = {line.split(':')[0] for line in fields if line.startswith('CAPSTONE_')
