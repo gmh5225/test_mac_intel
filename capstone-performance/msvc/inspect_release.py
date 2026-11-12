@@ -59,6 +59,10 @@ def inspect(executable, map_file, evidence):
                 owner=symbols.get(block,[])
                 if owner and not any(v==name or v.startswith(name+'$') for v in owner):continue
                 pending.append(block)
+            instructions=re.findall(r'^\s*[0-9a-f]+:\s+([a-z][a-z0-9]*)',part,re.M)
+            if instructions and not instructions[-1].startswith(('ret','jmp','int3','ud2')) and finish in end_for:
+                owner=symbols.get(finish,[])
+                if not owner or any(v==name or v.startswith(name+'$') for v in owner):pending.append(finish)
             if len(visited)>128:raise RuntimeError('unexpected LTCG fragment graph')
         listing='\n'.join(listings)
         lines=[];calls={}
