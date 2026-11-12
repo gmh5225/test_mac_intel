@@ -1,0 +1,39 @@
+name: Check portable x86 output records on i686 Linux and big-endian PowerPC64 Linux
+on:
+  push:
+    branches: [codex/capstone-record-cross-abi]
+    paths: [capstone-record-abi/**, .github/workflows/capstone-record-abi.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: i686-linux-gnu, emulator: qemu-i386 }
+          - { target: powerpc64-linux-gnu, emulator: qemu-ppc64 }
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      TARGET_TRIPLE: ${{ matrix.target }}
+      EMULATOR: ${{ matrix.emulator }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-record-abi
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 64cce0a934f99ae582d30ffe2ba265d12ec823bb
+          path: source
+          persist-credentials: false
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends "g++-$TARGET_TRIPLE" qemu-user
+      - run: python3 capstone-record-abi/verify.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: record-abi-${{ matrix.target }}
+          path: abi-evidence/
+          retention-days: 14
