@@ -45,7 +45,7 @@ index 97b899b5..ae1554b0 100644
  			void *info);
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 new file mode 100644
-index 00000000..68de7ad4
+index 00000000..a3b33f5c
 --- /dev/null
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -0,0 +1,490 @@
@@ -62,7 +62,7 @@ index 00000000..68de7ad4
 +			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
-+			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
++			0, 0, 0, 0, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
 +			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -136,7 +136,7 @@ index 00000000..68de7ad4
 +			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
-+			0, 0, 0, 65534, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
++			0, 0, 0, 0, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
 +			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -154,7 +154,7 @@ index 00000000..68de7ad4
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 65534, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
++			0, 0, 0, 0, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -172,7 +172,7 @@ index 00000000..68de7ad4
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 65534, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
++			0, 0, 0, 0, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -541,10 +541,10 @@ index 00000000..68de7ad4
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..beec3827
+index 00000000..f8811b4e
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,325 @@
+@@ -0,0 +1,256 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -641,67 +641,9 @@ index 00000000..beec3827
 +	}
 +}
 +
-+/* The /digit selects the same flags and register access as the corresponding
-+ * ALU register pair. The immediate's public width follows the destination. */
-+static void writeGroup1Immediate(cs_insn *insn,
-+				 const struct X86SimpleOutput *row,
-+				 const uint8_t *code, uint8_t rex,
-+				 uint8_t modrm, uint16_t *insn_size)
-+{
-+	const unsigned offset = 2 + (rex != 0);
-+	const int immediate = (int8_t)code[offset];
-+	const unsigned group = (modrm >> 3) & 7;
-+	const bool logical = group == 1 || group == 4 || group == 6;
-+	const bool wide = (rex & 8) != 0;
-+	const bool negative = !logical && immediate < 0;
-+	const uint64_t value =
-+		logical ? (wide ? (uint64_t)(int64_t)immediate :
-+				  (uint32_t)immediate) :
-+			  (uint64_t)(negative ? -immediate : immediate);
-+	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
-+	const struct X86SimpleRegister *reg =
-+		&x86_simple_registers[wide ? 3 : 2][id];
-+	insn->id = row->id;
-+	*insn_size = insn->size = (uint16_t)(offset + 1);
-+	memcpy(insn->bytes, code, insn->size);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	memcpy(insn->op_str, reg->name, sizeof(reg->name));
-+	char *out = insn->op_str + reg->length;
-+	memcpy(out, ", ", 2);
-+	out += 2;
-+	if (negative)
-+		*out++ = '-';
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		char temp[16], *end = temp + sizeof(temp), *start = end;
-+		uint64_t n = value;
-+		do {
-+			*--start = digits[n & 15];
-+			n >>= 4;
-+		} while (n);
-+		memcpy(out, "0x", 2);
-+		memcpy(out + 2, start, end - start);
-+	}
-+	if (insn->detail) {
-+		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
-+				      reg->reg, 0);
-+		cs_x86 *x = &insn->detail->x86;
-+		x->operands[1].type = X86_OP_IMM;
-+		x->operands[1].imm = logical && !wide ?
-+					     (int64_t)(uint32_t)immediate :
-+					     immediate;
-+		x->operands[1].access = 0;
-+		x->encoding.imm_offset = (uint8_t)offset;
-+		x->encoding.imm_size = 1;
-+	}
-+}
-+
-+/* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
-+ * present. Memory admission below is limited to MOV with a base or base+disp8. */
++/* A leading legacy prefix or a memory ModR/M encoding goes through the full
++ * decoder. The register rows distinguish the high byte registers from SPL,
++ * BPL, SIL and DIL as soon as any REX prefix is present. */
 +#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +CAPSTONE_INTERNAL
 +#else
@@ -751,17 +693,6 @@ index 00000000..beec3827
 +	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
 +
-+	if (plan == UINT16_MAX - 1) {
-+		if (size < 3u + has_rex)
-+			return false;
-+		unsigned reg_plan =
-+			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
-+		if (!reg_plan)
-+			return false;
-+		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
-+				     code, rex, modrm, insn_size);
-+		return true;
-+	}
 +	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
 +	const bool relative = form == X86_SIMPLE_RELATIVE;
 +	if (relative && size < (size_t)row->imm_offset + row->imm_size)
@@ -1012,10 +943,10 @@ index 0a4c959f..b883b547 100644
  }
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 new file mode 100644
-index 00000000..d237239f
+index 00000000..076e9ca9
 --- /dev/null
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -0,0 +1,422 @@
+@@ -0,0 +1,419 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1428,9 +1359,6 @@ index 00000000..d237239f
 +			}
 +		}
 +	}
-+	for (unsigned wide = 0; wide < 2; ++wide)
-+		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls)
-+			plans[wide][cls][0x83] = UINT16_MAX - 1;
 +	emit_tables(plans, regs, rows);
 +	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
 +		  << " encodings_checked=" << checked << " table_bytes="
@@ -1454,10 +1382,10 @@ index e42caf08..67acfcb5 100644
      list(APPEND UNIT_TEST_SOURCES x86_bextr_flags.c)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
-index 00000000..d7c2d24d
+index 00000000..7b20bb9d
 --- /dev/null
 +++ b/tests/unit/x86_simple_output.c
-@@ -0,0 +1,195 @@
+@@ -0,0 +1,176 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1583,24 +1511,6 @@ index 00000000..d7c2d24d
 +	return true;
 +}
 +
-+static bool check_group1(csh handles[2], cs_mode mode)
-+{
-+	uint8_t bytes[4];
-+	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
-+		bytes[0] = p ? (uint8_t)(0x3f + p) : 0;
-+		bytes[1] = 0x83;
-+		for (unsigned mr = 0xc0; mr < 256; ++mr)
-+			for (unsigned imm = 0; imm < 256; ++imm) {
-+				bytes[2] = (uint8_t)mr;
-+				bytes[3] = (uint8_t)imm;
-+				if (!compare(handles, bytes + !p, 3 + !!p,
-+					     imm ^ mr ^ p))
-+					return false;
-+			}
-+	}
-+	return true;
-+}
-+
 +static bool check_mode(cs_mode mode)
 +{
 +	csh handles[2] = { 0 };
@@ -1616,8 +1526,7 @@ index 00000000..d7c2d24d
 +			if (cs_option(handles[side], CS_OPT_DETAIL,
 +				      detail ? CS_OPT_ON : CS_OPT_OFF))
 +				goto done;
-+		if (!check_branches(handles) || !check_memory(handles, mode) ||
-+		    !check_group1(handles, mode))
++		if (!check_branches(handles) || !check_memory(handles, mode))
 +			goto done;
 +		for (unsigned op = 0; op < 256; ++op) {
 +			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };
@@ -1721,3 +1630,355 @@ index 6b36e1b7..f19dc990 100644
  				DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */,
  				DC474FA319DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
  				DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 90ef6e93..710a9ff7 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3506,6 +3506,82 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+ 					     prefix);
+ }
+ 
++/* This entry sees only a one- or two-byte legacy opcode and at most one
++ * REX. The generated descriptor supplies both public ID and operand shape. */
++X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code, size_t size,
++			cs_mode mode, uint8_t opcode, unsigned offset,
++			unsigned *id, uint16_t *length)
++{
++	const bool wide = mode == CS_MODE_64;
++	const uint8_t rex = offset ? code[0] : 0;
++	const unsigned rejected = FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
++		FEATURE_VEX2_XOP | (wide ? FEATURE_REX_PREFIX : 0);
++	if ((feature_prefix_flags[opcode] & rejected) ||
++	    (opcode == 0x90 && bFromREX(rex)))
++		return X86_SCAN_NOT_HANDLED;
++	bool escaped = opcode == 0x0f;
++	unsigned end = offset + 1;
++	if (escaped) {
++		if (end >= size)
++			return X86_SCAN_INVALID;
++		opcode = code[end++];
++		if (opcode == 0x38 || opcode == 0x3a || opcode == 0x0f)
++			return X86_SCAN_NOT_HANDLED;
++	}
++	const unsigned row = wide ? X86_TERMINAL_64 + wFromREX(rex) :
++		mode == CS_MODE_16 ? X86_TERMINAL_16 : X86_TERMINAL_32;
++	const uint64_t decision = x86LegacyPublicDecisions[row][escaped][opcode];
++	if (!decision)
++		return X86_SCAN_NOT_HANDLED;
++	const bool needs_modrm = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
++	uint8_t modrm = 0;
++	if (needs_modrm) {
++		if (end >= size)
++			return X86_SCAN_INVALID;
++		modrm = code[end];
++	}
++	uint32_t terminal;
++	if (!selectLegacyTerminal(decision, modrm, true, &terminal))
++		return X86_SCAN_INVALID;
++	const unsigned uid = terminal & X86_TERMINAL_UID_MASK;
++	if (!uid)
++		return X86_SCAN_INVALID;
++	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK;
++	if (needs_modrm || (pattern & 1)) {
++		if (!needs_modrm) {
++			if (end >= size)
++				return X86_SCAN_INVALID;
++			modrm = code[end];
++		}
++		++end;
++		if (modrm < 0xc0) {
++			const unsigned mod = modrm >> 6, rm = modrm & 7;
++			if (mode == CS_MODE_16) {
++				static const uint8_t displacement[] = { 0, 1, 2 };
++				end += displacement[mod] + ((modrm & 0xc7) == 6 ? 2 : 0);
++			} else {
++				static const uint8_t extra[3][8] = {
++					{0,0,0,0,1,4,0,0}, {1,1,1,1,2,1,1,1}, {4,4,4,4,5,4,4,4}
++				};
++				if ((modrm & 0xc7) == 4) {
++					if (end >= size)
++						return X86_SCAN_INVALID;
++					if ((code[end] & 7) == 5)
++						end += 4;
++				}
++				end += extra[mod][rm];
++			}
++		}
++	}
++	const unsigned size_class = wide ? 2 : mode == CS_MODE_16 ? 0 : 1;
++	end += x86LegacyImmediateBytes[size_class][pattern >> 1];
++	if (end > size || end > 15)
++		return X86_SCAN_INVALID;
++	*id = uid;
++	*length = (uint16_t)end;
++	return X86_SCAN_COMPLETE;
++}
++
+ /* Common headers enter the shared readers before the general prefix walk.
+  * The extension selector observes CS_MODE_64, while raw mode selection gives
+  * 16/32-bit flags precedence. Keep their original ordering for mixed flags. */
+@@ -3532,6 +3608,9 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+ 	if (opcode == 0x0f && may_be_0f_feature_extension(
+ 				      code + offset + 1, code_len - offset - 1))
+ 		return X86_SCAN_NOT_HANDLED;
++	if (readerFlags)
++		return scanInitialPublicTerminal(code, code_len, mode, opcode, (unsigned)offset,
++						 instructionID, size);
+ 	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
+ 				   instructionID, size, true, readerFlags);
+ }
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5627f249..751b22f1 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -7069,41 +7069,55 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ },
+ };
+ 
+-X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+-				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
++static const uint8_t x86LegacyImmediateBytes[3][10] = {
++	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
++	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
++	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++};
++
++X86_DECODE_INLINE bool selectLegacyTerminal(uint64_t decision, uint8_t modrm,
++		bool publicID, uint32_t *terminal)
+ {
+-	uint32_t terminal;
+-	const bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+-	if (decisionModRM) {
+-		if (publicID && readerFlags) {
+-			/* Select the public descriptor before consuming its addressing bytes. */
+-			if (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))
+-				return X86_SCAN_INVALID;
+-		} else if (scan ? readModRMScan(insn) : readModRM(insn)) {
+-			return X86_SCAN_INVALID;
+-		}
+-	}
+ 	if (decision & X86_TERMINAL_INDEXED) {
+ 		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
+ 		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
+ 		case MODRM_SPLITREG:
+-			index += regFromModRM(insn->modRM) + (insn->modRM >= 0xc0 ? 8 : 0);
++			index += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);
+ 			break;
+ 		case MODRM_SPLITMISC:
+-			index += insn->modRM >= 0xc0 ? (insn->modRM & 0x3f) + 8 : regFromModRM(insn->modRM);
++			index += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);
+ 			break;
+ 		case MODRM_FULL:
+-			index += insn->modRM;
++			index += modrm;
+ 			break;
+ 		default:
+-			return X86_SCAN_INVALID;
++			return false;
+ 		}
+-		terminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];
++		*terminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];
+ 	} else {
+-		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?
++		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?
+ 			X86_TERMINAL_REGISTER_SHIFT : 0;
+-		terminal = (decision >> shift) & X86_TERMINAL_MASK;
++		*terminal = (decision >> shift) & X86_TERMINAL_MASK;
+ 	}
++	return true;
++}
++
++X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
++				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
++{
++	uint32_t terminal;
++	const bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
++	if (decisionModRM) {
++		if (publicID && readerFlags) {
++			/* Select the public descriptor before consuming its addressing bytes. */
++			if (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))
++				return X86_SCAN_INVALID;
++		} else if (scan ? readModRMScan(insn) : readModRM(insn)) {
++			return X86_SCAN_INVALID;
++		}
++	}
++	if (!selectLegacyTerminal(decision, insn->modRM, publicID != NULL, &terminal))
++		return X86_SCAN_INVALID;
+ 	unsigned instructionID = terminal & X86_TERMINAL_UID_MASK;
+ 	if (publicID) {
+ 		/* Retain the original reader before invalid-ID rejection, including truncation. */
+@@ -14400,41 +14414,55 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ },
+ };
+ 
+-X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+-				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
++static const uint8_t x86LegacyImmediateBytes[3][10] = {
++	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
++	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
++	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++};
++
++X86_DECODE_INLINE bool selectLegacyTerminal(uint64_t decision, uint8_t modrm,
++		bool publicID, uint32_t *terminal)
+ {
+-	uint32_t terminal;
+-	const bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+-	if (decisionModRM) {
+-		if (publicID && readerFlags) {
+-			/* Select the public descriptor before consuming its addressing bytes. */
+-			if (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))
+-				return X86_SCAN_INVALID;
+-		} else if (scan ? readModRMScan(insn) : readModRM(insn)) {
+-			return X86_SCAN_INVALID;
+-		}
+-	}
+ 	if (decision & X86_TERMINAL_INDEXED) {
+ 		unsigned int index = decision & X86_DECISION_OFFSET_MASK;
+ 		switch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {
+ 		case MODRM_SPLITREG:
+-			index += regFromModRM(insn->modRM) + (insn->modRM >= 0xc0 ? 8 : 0);
++			index += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);
+ 			break;
+ 		case MODRM_SPLITMISC:
+-			index += insn->modRM >= 0xc0 ? (insn->modRM & 0x3f) + 8 : regFromModRM(insn->modRM);
++			index += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);
+ 			break;
+ 		case MODRM_FULL:
+-			index += insn->modRM;
++			index += modrm;
+ 			break;
+ 		default:
+-			return X86_SCAN_INVALID;
++			return false;
+ 		}
+-		terminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];
++		*terminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];
+ 	} else {
+-		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?
++		unsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?
+ 			X86_TERMINAL_REGISTER_SHIFT : 0;
+-		terminal = (decision >> shift) & X86_TERMINAL_MASK;
++		*terminal = (decision >> shift) & X86_TERMINAL_MASK;
+ 	}
++	return true;
++}
++
++X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
++				MCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)
++{
++	uint32_t terminal;
++	const bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
++	if (decisionModRM) {
++		if (publicID && readerFlags) {
++			/* Select the public descriptor before consuming its addressing bytes. */
++			if (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))
++				return X86_SCAN_INVALID;
++		} else if (scan ? readModRMScan(insn) : readModRM(insn)) {
++			return X86_SCAN_INVALID;
++		}
++	}
++	if (!selectLegacyTerminal(decision, insn->modRM, publicID != NULL, &terminal))
++		return X86_SCAN_INVALID;
+ 	unsigned instructionID = terminal & X86_TERMINAL_UID_MASK;
+ 	if (publicID) {
+ 		/* Retain the original reader before invalid-ID rejection, including truncation. */
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 83b8d3d8..eaeaa998 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -920,42 +920,74 @@ def emit_terminal(suffix):
+     # Both projections retain the same decision kind, invalid entries and readers.
+     lines += emit_terminal_tables("Legacy", words, rows, kinds)
+     lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
++    immediate_readers = {
++        f"readImmediateImpl(insn, {width}, false)": width
++        for width in IMMEDIATES.values()
++    }
++    lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
++    for size, address_size in ((2, 2), (4, 4), (4, 8)):
++        extents = []
++        for tail in public_tails:
++            total, immediate = 0, size
++            for call in tail:
++                if call == "readMemoryOffset(insn, false)":
++                    total += address_size
++                    immediate = 0
++                else:
++                    width = immediate_readers[call]
++                    immediate = immediate if width == "insn->immediateSize" else int(width)
++                    tables.require(immediate > 0, "Invalid immediate extent")
++                    total += immediate
++            extents.append(str(total))
++        lines.append("\t{ " + ", ".join(extents) + " },")
+     lines += [
+-        "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
+-        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
++        "};",
++        "",
++        "X86_DECODE_INLINE bool selectLegacyTerminal(uint64_t decision, uint8_t modrm,",
++        "\t\tbool publicID, uint32_t *terminal)",
+         "{",
+-        "\tuint32_t terminal;",
+-        "\tconst bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;",
+-        "\tif (decisionModRM) {",
+-        "\t\tif (publicID && readerFlags) {",
+-        "\t\t\t/* Select the public descriptor before consuming its addressing bytes. */",
+-        "\t\t\tif (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))",
+-        "\t\t\t\treturn X86_SCAN_INVALID;",
+-        "\t\t} else if (scan ? readModRMScan(insn) : readModRM(insn)) {",
+-        "\t\t\treturn X86_SCAN_INVALID;",
+-        "\t\t}",
+-        "\t}",
+         "\tif (decision & X86_TERMINAL_INDEXED) {",
+         "\t\tunsigned int index = decision & X86_DECISION_OFFSET_MASK;",
+         "\t\tswitch ((decision >> X86_DECISION_TYPE_SHIFT) & X86_DECISION_TYPE_MASK) {",
+         "\t\tcase MODRM_SPLITREG:",
+-        "\t\t\tindex += regFromModRM(insn->modRM) + (insn->modRM >= 0xc0 ? 8 : 0);",
++        "\t\t\tindex += regFromModRM(modrm) + (modrm >= 0xc0 ? 8 : 0);",
+         "\t\t\tbreak;",
+         "\t\tcase MODRM_SPLITMISC:",
+-        "\t\t\tindex += insn->modRM >= 0xc0 ? (insn->modRM & 0x3f) + 8 : regFromModRM(insn->modRM);",
++        "\t\t\tindex += modrm >= 0xc0 ? (modrm & 0x3f) + 8 : regFromModRM(modrm);",
+         "\t\t\tbreak;",
+         "\t\tcase MODRM_FULL:",
+-        "\t\t\tindex += insn->modRM;",
++        "\t\t\tindex += modrm;",
+         "\t\t\tbreak;",
+         "\t\tdefault:",
+-        "\t\t\treturn X86_SCAN_INVALID;",
++        "\t\t\treturn false;",
+         "\t\t}",
+-        "\t\tterminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];",
++        "\t\t*terminal = publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index];",
+         "\t} else {",
+-        "\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && insn->modRM >= 0xc0 ?",
++        "\t\tunsigned int shift = (decision & X86_TERMINAL_SPLIT) && modrm >= 0xc0 ?",
+         "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
+-        "\t\tterminal = (decision >> shift) & X86_TERMINAL_MASK;",
++        "\t\t*terminal = (decision >> shift) & X86_TERMINAL_MASK;",
++        "\t}",
++        "\treturn true;",
++        "}",
++        "",
++    ]
++    lines += [
++        "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
++        "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
++        "{",
++        "\tuint32_t terminal;",
++        "\tconst bool decisionModRM = (decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;",
++        "\tif (decisionModRM) {",
++        "\t\tif (publicID && readerFlags) {",
++        "\t\t\t/* Select the public descriptor before consuming its addressing bytes. */",
++        "\t\t\tif (!insn->consumedModRM && lookAtByte(insn, &insn->modRM))",
++        "\t\t\t\treturn X86_SCAN_INVALID;",
++        "\t\t} else if (scan ? readModRMScan(insn) : readModRM(insn)) {",
++        "\t\t\treturn X86_SCAN_INVALID;",
++        "\t\t}",
+         "\t}",
++        "\tif (!selectLegacyTerminal(decision, insn->modRM, publicID != NULL, &terminal))",
++        "\t\treturn X86_SCAN_INVALID;",
+         "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
+         "\tif (publicID) {",
+         "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",
