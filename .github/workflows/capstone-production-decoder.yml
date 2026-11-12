@@ -1,7 +1,7 @@
-name: Verify NeverD x86 iterator integration with real PE and multi-architecture controls and latest LLVM source
+name: Compare integer, relative-branch and base-memory records inside production NeverD with current fork LLVM source
 on:
   push:
-    branches: [codex/capstone-neverd-output-iterator]
+    branches: [codex/capstone-neverd-relative-and-memory]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: b15f6bdf05f81020286e1dc65f45a38534c83491
+          ref: df5522219fa734dce94fac2f1c1408727a4d0790
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: owned-iterator-product
+          name: incremental-x86-product
           path: product-evidence/
           retention-days: 14
