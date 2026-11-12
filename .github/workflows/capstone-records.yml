@@ -1,7 +1,7 @@
-name: Compare GCC and Clang on real statically linked AArch64 decoders with identical controls
+name: Compare AArch64 scan placements on real binaries with mixed and dedicated decoders
 on:
   push:
-    branches: [codex/capstone-dedicated-aarch64-static]
+    branches: [codex/capstone-aarch64-scan-forms]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,14 +11,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-24.04-arm, cc: clang }
+          - { host: macos-15, cc: clang, profile: dedicated }
+          - { host: ubuntu-24.04-arm, cc: gcc, profile: dedicated }
+          - { host: ubuntu-24.04, cc: clang, profile: dedicated }
+          - { host: ubuntu-24.04, cc: gcc, profile: dedicated }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: dedicated }
+          - { host: macos-15, cc: clang, profile: mixed }
+          - { host: ubuntu-24.04-arm, cc: gcc, profile: mixed }
+          - { host: ubuntu-24.04, cc: clang, profile: mixed }
+          - { host: ubuntu-24.04, cc: gcc, profile: mixed }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: mixed }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
+      PROFILE: ${{ matrix.profile }}
       MEASURE_CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -28,7 +34,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: f6054796e7ecf52e174edf336c564facb1d762e0
+          ref: 7118f6d507d1648f92214700cdd8dab16214e723
           path: source
           persist-credentials: false
       - name: Measure independent static executables with both initializer placements
@@ -38,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: static-aarch64-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: aarch64-scan-${{ matrix.profile }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
