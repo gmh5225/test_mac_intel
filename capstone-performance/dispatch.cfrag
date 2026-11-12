@@ -1,0 +1,40 @@
+#ifdef CS_FIXED_X86_OUTPUT
+	if (handle->arch == CS_ARCH_X86 && size >= 2) {
+		const bool wide = handle->mode == CS_MODE_64;
+		const unsigned prefix = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+		const unsigned op = code[prefix != 0];
+		const unsigned cls = prefix ? ((prefix & 8) ? 2 : 1) : 0;
+		const unsigned plan = pair_plans[wide][cls][op];
+		if (plan && size >= 2U + !!prefix && code[1 + !!prefix] >= 0xc0 &&
+		    (wide || handle->mode == CS_MODE_32) && !handle->no_text &&
+		    !handle->imm_unsigned && !handle->mnem_list && !handle->doing_mem &&
+		    (handle->syntax == CS_OPT_SYNTAX_DEFAULT || handle->syntax == CS_OPT_SYNTAX_INTEL) &&
+		    handle->disasm == X86_getInstruction && handle->printer == X86_Intel_printInst &&
+		    handle->post_printer == X86_postprinter && cs_vsnprintf == cs_default_vsnprintf) {
+			const unsigned mr = code[1 + !!prefix];
+			const unsigned rm = ((prefix & 1) << 3) | (mr & 7);
+			const unsigned reg = ((prefix & 4) << 1) | ((mr >> 3) & 7);
+			const unsigned a = (plan & 1) ? reg : rm, b = (plan & 1) ? rm : reg;
+			const unsigned cat = (op & 1) ? ((prefix & 8) ? 3 : 2) : (prefix != 0);
+			const unsigned slot = plan >> 1;
+			*insn_size = insn->size = 2 + !!prefix;
+			insn->id = pair_rows[slot].id;
+			insn->bytes[0] = code[0]; insn->bytes[1] = code[1];
+			if(prefix) insn->bytes[2] = code[2];
+			memcpy(insn->mnemonic, pair_rows[slot].mnemonic, sizeof(insn->mnemonic));
+			memset(insn->op_str, 0, sizeof(insn->op_str));
+			memcpy(insn->op_str, pair_regs[cat][a].name, 8);
+			char *p = insn->op_str + pair_regs[cat][a].length;
+			*p++ = ','; *p++ = ' ';
+			memcpy(p, pair_regs[cat][b].name, 8);
+			if (insn->detail) {
+				memcpy(insn->detail, pair_rows[slot].detail, sizeof(pair_rows[slot].detail));
+				cs_x86 *x = &insn->detail->x86;
+				x->rex = prefix; x->modrm = mr;
+				x->operands[0].reg = pair_regs[cat][a].id;
+				x->operands[1].reg = pair_regs[cat][b].id;
+			}
+			return true;
+		}
+	}
+#endif
