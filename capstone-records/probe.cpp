@@ -37,26 +37,42 @@ struct Entry {
     std::array<uint8_t,15> bytes{};
     char mnemonic[CS_MNEMONIC_SIZE], operands[160];
 };
+struct Pending {
+    std::array<uint8_t,15> bytes{};
+    uint8_t size=0;
+};
 struct Cache {
     std::array<Entry,64> entries{};
+    std::array<Pending,64> pending{};
     std::unique_ptr<unsigned char[]> details;
-    bool x64; size_t hits=0;
-    Cache(bool bits,bool full):details(full?new unsigned char[64*used_detail]:nullptr),x64(bits){}
+    bool x64; int policy; size_t hits=0,stores=0;
+    Cache(bool bits,bool full,int kind):details(full && kind!=5?new unsigned char[64*used_detail]:nullptr),x64(bits),policy(kind){}
     bool decode(csh h,const uint8_t **code,size_t *left,uint64_t *pc,cs_insn *insn) {
         size_t slot=(((*code)[0]*131)^(*left>1?(*code)[1]:0)) & (entries.size()-1);
         Entry &e=entries[slot];
         if(e.size && e.size<=*left && !std::memcmp(*code,e.bytes.data(),e.size)) {
+            ++hits;
+            if(policy==5) return cs_disasm_iter(h,code,left,pc,insn);
             insn->address=*pc;insn->id=e.id;insn->size=e.size;
             std::memcpy(insn->bytes,*code,e.size);
             std::memcpy(insn->mnemonic,e.mnemonic,sizeof(e.mnemonic));
             std::memcpy(insn->op_str,e.operands,sizeof(e.operands));
             if(details) std::memcpy(insn->detail,details.get()+used_detail*slot,used_detail);
-            *left-=e.size;*pc+=e.size;*code+=e.size;++hits;return true;
+            *left-=e.size;*pc+=e.size;*code+=e.size;return true;
         }
         if(!cs_disasm_iter(h,code,left,pc,insn)) return false;
-        if(reusable(*insn,x64)) {
-            e.size=static_cast<uint8_t>(insn->size);e.id=insn->id;
-            std::memcpy(e.bytes.data(),insn->bytes,e.size);
+        if(!reusable(*insn,x64)) return true;
+        if(policy==3) {
+            // Replacing a resident record requires a second observation of the prospective entry.
+            auto &p=pending[slot];
+            if(p.size!=insn->size || std::memcmp(p.bytes.data(),insn->bytes,insn->size)) {
+                p.size=static_cast<uint8_t>(insn->size);std::memcpy(p.bytes.data(),insn->bytes,p.size);return true;
+            }
+            p.size=0;
+        }
+        e.size=static_cast<uint8_t>(insn->size);e.id=insn->id;
+        std::memcpy(e.bytes.data(),insn->bytes,e.size);++stores;
+        if(policy!=5) {
             std::memcpy(e.mnemonic,insn->mnemonic,sizeof(e.mnemonic));
             std::memcpy(e.operands,insn->op_str,sizeof(e.operands));
             if(details) std::memcpy(details.get()+used_detail*slot,insn->detail,used_detail);
@@ -87,25 +103,25 @@ int main(int argc,char **argv) {
     std::ifstream f(argv[1],std::ios::binary);std::vector<uint8_t> bytes{std::istreambuf_iterator<char>{f},{}};
     bool x64=std::atoi(argv[2])==64,full=std::atoi(argv[3])!=0;
     int method=std::atoi(argv[4]),reps=std::atoi(argv[5]);
-    if(bytes.empty() || reps<=0 || method<0 || method>2)return 2;
+    if(bytes.empty() || reps<=0 || method<0 || method>5)return 2;
     API test(x64,full),ref(x64,full);
-    uint64_t accepted=0,rejected=0,checksum=0,bounds=0,hits=0;
+    uint64_t accepted=0,rejected=0,checksum=0,bounds=0,hits=0,stores=0;
     const auto start=std::clock();
     for(int n=0;n<reps;++n) {
         // Start cold on each traversal; charge the new cache and destruction.
         std::unique_ptr<Cache> cache;
-        if(method)cache=std::make_unique<Cache>(x64,full);
+        if(method)cache=std::make_unique<Cache>(x64,full,method==2?1:method==4?3:method);
         auto *code=static_cast<const uint8_t*>(bytes.data());size_t left=bytes.size();
         uint64_t pc=0x100000ull+uint64_t(n%17)*0x293500;
         while(left) {
             const uint8_t *next=code;size_t remain=left;uint64_t va=pc;
-            if(method==2) {
+            if(method==2 || method==4) {
                 // Changing poison checks untouched bytes and padding at every call.
                 unsigned char seed=static_cast<unsigned char>((left+pc)*131+17);
                 for(auto *api:{&test,&ref}) {auto *d=api->i->detail;std::memset(api->i,seed,sizeof(cs_insn));api->i->detail=d;if(d)std::memset(d,seed,sizeof(*d));}
             }
             bool ok=method?cache->decode(test.h,&code,&left,&pc,test.i):cs_disasm_iter(test.h,&code,&left,&pc,test.i);
-            if(method==2) {
+            if(method==2 || method==4) {
                 bool valid=cs_disasm_iter(ref.h,&next,&remain,&va,ref.i);
                 auto *a=test.i->detail,*b=ref.i->detail;test.i->detail=ref.i->detail=nullptr;
                 bool bad=ok!=valid||cs_errno(test.h)!=cs_errno(ref.h)||pc!=va||code!=next||left!=remain||std::memcmp(test.i,ref.i,sizeof(cs_insn))||(a&&std::memcmp(a,b,sizeof(*a)));
@@ -115,7 +131,7 @@ int main(int argc,char **argv) {
             if(!ok){++code;--left;++pc;++rejected;continue;}
             ++accepted;checksum+=consume(test,full);bounds=(bounds^(left+test.i->size))*1099511628211ull;
         }
-        if(cache)hits+=cache->hits;
+        if(cache){hits+=cache->hits;stores+=cache->stores;}
     }
-    std::printf("%lld %llu %llu %llu %llu %llu\n",(long long)(std::clock()-start),(unsigned long long)accepted,(unsigned long long)rejected,(unsigned long long)checksum,(unsigned long long)bounds,(unsigned long long)hits);
+    std::printf("%lld %llu %llu %llu %llu %llu %llu\n",(long long)(std::clock()-start),(unsigned long long)accepted,(unsigned long long)rejected,(unsigned long long)checksum,(unsigned long long)bounds,(unsigned long long)hits,(unsigned long long)stores);
 }
