@@ -1,9 +1,9 @@
-name: Verify compact common instruction metadata with complete public records
+name: Verify instruction layout independently of host and backend count
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-compact-common-metadata]
+    branches: [codex/capstone-layout-same-host-factorial]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-compact-common-metadata
+  group: capstone-layout-factorial
   cancel-in-progress: false
 
 jobs:
@@ -21,39 +21,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: neverd-four }
-          - { host: ubuntu-24.04-arm, baseline: neverd-four }
-          - { host: ubuntu-24.04, baseline: all }
-          - { host: ubuntu-24.04-arm, baseline: all }
-          - { host: macos-15-intel, baseline: neverd-four }
-          - { host: macos-15, baseline: neverd-four }
-    env:
-      COMPARE_BASE: ${{ matrix.baseline }}
+          - { host: ubuntu-24.04, replicate: a }
+          - { host: ubuntu-24.04, replicate: b }
+          - { host: ubuntu-24.04, replicate: c }
+          - { host: ubuntu-24.04-arm, replicate: a }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 62
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
           sparse-checkout: capstone-performance
-      - name: Validate protocol and native host
-        run: |
-          uname -sm
-          python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
-      - name: Build immutable sources and verify outputs
-        timeout-minutes: 27
-        run: python3 capstone-performance/run.py prepare
-      - name: Measure fixed CPU A/A and paired workloads
-        timeout-minutes: 37
-        run: python3 capstone-performance/run.py measure
-      - name: Retire disposable products and summarize evidence
-        if: always()
-        run: python3 capstone-performance/run.py finish
+      - name: Measure both linked products and compiler flags on the same processor
+        run: python3 capstone-performance/layout-factorial.py
       - name: Preserve raw evidence including failed attempts
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-metadata-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: layout-factorial-${{ matrix.host }}-${{ matrix.replicate }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

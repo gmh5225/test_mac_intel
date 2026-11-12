@@ -20,9 +20,6 @@ SOURCE = Path(__file__).resolve().parent
 ROOT = SOURCE.parent
 WORK = ROOT / '.capstone-intel-work'
 EVIDENCE = ROOT / 'capstone-evidence'
-PROFILE = os.environ['COMPARE_BASE']
-assert PROFILE in ('neverd-four', 'all')
-ARCHES = ('X86','ARM','AARCH64','MIPS') if PROFILE == 'neverd-four' else ('X86','ARM','AARCH64','MIPS','SPARC','RISCV','LOONGARCH')
 MODES = {'scan': 0, 'format': 1, 'detail': 2}
 
 
@@ -63,10 +60,7 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
-             *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES],
-             *(['-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers']
-               if PROFILE == 'neverd-four' else []),
+             '-DCMAKE_C_COMPILER=clang',
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
@@ -122,7 +116,7 @@ def invoke(case, variant, repeats):
 
 
 def prepare():
-    if (platform.system(), platform.machine()) not in [('Linux','x86_64'),('Linux','aarch64'),('Darwin','x86_64'),('Darwin','arm64')]:
+    if (platform.system(), platform.machine()) not in [('Linux','x86_64'),('Darwin','x86_64'),('Darwin','arm64')]:
         raise RuntimeError('unsupported host for this release experiment')
     if WORK.exists() or EVIDENCE.exists():
         raise RuntimeError('existing work/evidence must be retained under a separate attempt')
@@ -152,14 +146,9 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Place active MCInst metadata before the operand array without increasing the native structure size'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='dense mapping records with one legacy vector opcode resolution'))
     for label in ['base', 'new']:
         build(label)
-    for label in ['base', 'new']:
-        fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
-        selected = {line.split(':')[0] for line in fields if line.startswith('CAPSTONE_')
-                    and line.endswith('_SUPPORT:BOOL=ON')}
-        assert selected == {'CAPSTONE_'+arch+'_SUPPORT' for arch in ARCHES}, selected
     adapter = WORK / 'adapter'
     adapter.mkdir()
     shutil.copyfile(SOURCE / 'iced.rs', adapter / 'iced.rs')
@@ -200,69 +189,17 @@ panic = "abort"
     includes = ['-I', WORK / 'new', '-I', WORK / 'new/include', '-I', WORK / 'new/tests/unit/include']
     library_name = 'libcapstone.6.0.0.dylib' if platform.system() == 'Darwin' else 'libcapstone.so.6.0.0'
     libraries = {label: WORK / (label + '-build') / library_name for label in ['base', 'new']}
-    for unit in ['mapping','api','sstream','detail_option','mcinst','x86_encoding_accuracy','x86_vfpclass_memory_mask_detail','x86_relative_jump']:
-        source = SOURCE / (unit + '.c') if (unit.startswith('check-') or unit == 'flags-state') else WORK / 'new/tests/unit' / (unit + '.c')
+    for unit in ['mapping','api','sstream','detail_option','arm_post_index','check-mips-alias']:
+        source = SOURCE / (unit + '.c') if unit.startswith('check-') else WORK / 'new/tests/unit' / (unit + '.c')
         target = WORK / unit
         command(['clang', '-O3', '-DNDEBUG', *defs, *includes, source,
                  WORK / 'new-build/libcapstone.a',
                  *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
                  '-o', target], 'compile-' + unit)
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
-                 [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
+                 [libraries['base'], libraries['new']] if unit == 'check-callback' else [])
         command([target, *extra], 'verify-' + unit)
-    flag_records = []
-    for label in ('base','new'):
-        tree = WORK / label
-        target = WORK / ('layout-flags-'+label)
-        command(['clang','-O3','-DNDEBUG',*defs,'-I',tree,'-I',tree/'include',
-                 SOURCE/'layout-flags.c', WORK/(label+'-build/libcapstone.a'),
-                 '-o',target], 'build-layout-flags-'+label)
-        # Each executable owns the matching private layout. Compare normalized
-        # logical fields, never pass an MCInst across different private ABIs.
-        raw = subprocess.check_output([target])
-        assert len(raw) == 12 * 1572864
-        flag_records.append(dict(records=len(raw)//12,sha256=hashlib.sha256(raw).hexdigest()))
-    assert flag_records[0] == flag_records[1]
-    write('private-layout-flags.json', flag_records[0])
-    # The new callback regression also passes against the published implementation.
-    command(['clang', '-O3', '-DNDEBUG', *defs, *includes,
-             WORK / 'new/tests/unit/x86_encoding_accuracy.c', WORK / 'base-build/libcapstone.a',
-             *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
-             '-o', WORK / 'x86_encoding_accuracy-base'], 'compile-x86_encoding_accuracy-base')
-    command([WORK / 'x86_encoding_accuracy-base'], 'verify-x86_encoding_accuracy-base')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
-    verifier = WORK / 'layout-public'
-    command(['clang++','-std=c++17','-O2','-I',base/'include',SOURCE/'layout-public.cpp',
-             '-ldl','-o',verifier], 'build-layout-public')
-    states = []
-    for custom in (False, True):
-        label = 'layout-states-custom' if custom else 'layout-states-default'
-        if custom:
-            os.environ['CUSTOM_NAMES'] = '1'
-        command([verifier, libraries['base'], libraries['new'], '65536',
-                 Path(inputs[0]['path']).parent], label)
-        rows=[json.loads(line) for line in (EVIDENCE/(label+'.log')).read_text().splitlines() if line.startswith('{')]
-        assert rows[-1]['compared_total'] > 15000000
-        states.append(dict(custom=custom, cells=len(rows), total=rows[-1]['compared_total']))
-    os.environ.pop('CUSTOM_NAMES',None)
-    write('layout-public-states.json',states)
-    command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
-             SOURCE / 'repair_census.cpp', WORK / 'base-build/libcapstone.a',
-             *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
-             '-o', WORK / 'repair-census'], 'compile-repair-census')
-    repair_counts = []
-    for item in inputs:
-        if item['selector'] < 16:
-            continue
-        command([WORK / 'repair-census', item['selector'], item['path']],
-                'repair-census-' + item['name'])
-        counts = json.loads((EVIDENCE / ('repair-census-' + item['name'] + '.log')).read_text())
-        assert counts['instructions'] == sum(counts[key] for key in
-            ('legacy_memory', 'legacy_without_memory', 'full_repair'))
-        repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
-    write('repair-census.json', repair_counts)
-    selectors = {0,1,4,13} if PROFILE == 'neverd-four' else {0,1,2,4,10,11,13}
-    inputs = [item for item in inputs if item['selector'] >= 16 or item['selector'] in selectors]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
              for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
     windows = []
@@ -299,9 +236,10 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix + 'arch/X86/X86Disassembler.c.o'}
-    allowed = set(objects['base'])
-    if not required <= set(changed) <= allowed:
+    backends = {'AArch64':'AArch64','Mips':'Mips','PowerPC':'PPC','Sparc':'Sparc','ARM':'ARM'}
+    allowed = {prefix+'arch/'+arch+'/'+stem+'Mapping.c.o' for arch,stem in backends.items()}
+    allowed.update(prefix+x for x in ('Mapping.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86Mapping.c.o'))
+    if set(changed) != allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
@@ -368,8 +306,6 @@ def measure():
     measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
     for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
         choices=[c for c in cases if c['consumer']==consumer]
-        if not choices:
-            continue
         variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
         measure_panel(panel,choices,cycles,variants,duration)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
@@ -423,7 +359,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Common MCInst metadata layout', '',
+    lines = ['# Shared x86 lookup tables, guarded ARM detail and validated PPC aliases', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
