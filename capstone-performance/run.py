@@ -146,7 +146,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Skip inapplicable x86 post-printer repairs using decoded legacy opcodes'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Check inapplicable legacy repairs inside the owning x86 post-printer'))
     for label in ['base', 'new']:
         build(label)
     adapter = WORK / 'adapter'
@@ -242,10 +242,28 @@ panic = "abort"
     changed = [name for name in objects['base'] if objects['base'][name] != objects['new'][name]]
     write('changed-objects.json', changed)
     prefix = 'CMakeFiles/capstone.dir/'
-    required = {prefix + 'cs.c.o'}
+    required = {prefix + 'arch/X86/X86Mapping.c.o'}
     allowed = required
     if not required <= set(changed) <= allowed:
         raise RuntimeError('unexpected changed runtime objects; inspect object evidence')
+    # Compile the previous caller-gate prototype only for code-generation analysis.
+    # Its object is never linked into a measured executable.
+    diagnostic = WORK / 'caller-gate-diagnostic'
+    diagnostic.mkdir()
+    shutil.copyfile(base / 'cs.c', diagnostic / 'cs.c')
+    command(['git', 'apply', '--include=cs.c', '--check', SOURCE / 'caller-gate-diagnostic.patch'],
+            'diagnostic-patch-check', diagnostic)
+    command(['git', 'apply', '--include=cs.c', SOURCE / 'caller-gate-diagnostic.patch'],
+            'diagnostic-patch-apply', diagnostic)
+    commands = json.loads((WORK / 'base-build/compile_commands.json').read_text())
+    original = next(row for row in commands if row['file'] == str(base / 'cs.c'))
+    for label, filename in [('base', base / 'cs.c'), ('caller-gate', diagnostic / 'cs.c')]:
+        args = shlex.split(original['command'])
+        args[args.index('-o') + 1] = str(EVIDENCE / (label + '-cs.s'))
+        args[args.index('-c')] = '-S'
+        args[args.index(original['file'])] = str(filename)
+        args += ['-I', str(base)]
+        command(args, label + '-shared-output-assembly', original['directory'])
     binaries = [WORK / (consumer + '-' + label) for consumer in ['decoder', 'single'] for label in ['base', 'new']]
     binaries += [WORK / ('windows-' + label) for label in ['base','new']]
     binaries += list(libraries.values()) + [iced_library]
@@ -364,7 +382,7 @@ def finish():
     write('summary.json', dict(complete=(EVIDENCE / 'measured.json').exists(), panels=panels,
                               qualified=False, published=False,
                               profile="full streams and short windows"))
-    lines = ['# Decoded x86 post-printer eligibility', '',
+    lines = ['# X86-owned post-printer eligibility', '',
              'Ratios > 1 mean candidate faster. This experiment does not qualify or publish a change.', '',
              '| Panel | Case | Mode | Base time / new time | Base speed / iced speed | New speed / iced speed | Positive cycles | A/A outside 2% |',
              '|---|---|---|---:|---:|---:|---:|---:|']
