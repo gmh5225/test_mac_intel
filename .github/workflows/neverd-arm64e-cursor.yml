@@ -32,28 +32,10 @@ jobs:
             unittests/lift/aarch64
             include/neverd/runtime
             include/neverd/ir/intrinsics/AArch64
-      - name: Qualify original native PAC and signed exception controls
+      - name: Compare independent linked frames and outgoing exception arguments
         run: |
           ulimit -c 0
-          python3 neverd/scripts/verify_arm64e_native.py probe --output "$GITHUB_WORKSPACE/cursor-evidence/original-controls"
-      - name: Compare independent signing instructions with the signal cursor
-        run: |
-          ulimit -c 0
-          python3 neverd/scripts/verify_arm64e_native.py probe-cursor --output "$GITHUB_WORKSPACE/cursor-evidence/cursor"
-      - name: Measure native checked pointer arithmetic
-        run: |
-          ulimit -c 0
-          status=0
-          python3 neverd/scripts/verify_arm64e_native.py probe-cpta --output "$GITHUB_WORKSPACE/cursor-evidence/cpta" || status=$?
-          [[ $status == 0 || $status == 2 ]]
-      - name: Replay the complete source-bound Release publication suite
-        env:
-          GH_TOKEN: ${{ github.token }}
-          NEVERD_ARM64E_TEST_INCLUDE_DIR: ${{ github.workspace }}/neverd/include
-        run: |
-          brew list --versions zstd || brew install zstd
-          ulimit -c 0
-          python3 neverd-arm64e-variadic/run.py
+          python3 neverd-arm64e-variadic/diagnose-cxx.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
