@@ -1,7 +1,7 @@
-name: Compare standard MIPS register-immediate and load/store scans in standalone clients on Debian coreutils
+name: Verify dedicated MIPS scanning on Linux ARM hosts with coreutils, four million differential records and object identity
 on:
   push:
-    branches: [codex/capstone-mips-major-coreutils]
+    branches: [codex/capstone-mips-aarch64-host-release]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: f53af83fd00b3403be328033a285915da723d8dc
+          ref: b70c7e94528f1d9f4c7c424f65bbd513bbf32d47
           path: source
           persist-credentials: false
       - name: Measure independent static executables with both initializer placements
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-major-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: linux-arm-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

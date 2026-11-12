@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a608d28f..1b0e59a6 100644
+index a608d28f..88676e41 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -158,6 +158,10 @@ if(capstone_enabled_architectures STREQUAL "X86")
@@ -7,14 +7,14 @@ index a608d28f..1b0e59a6 100644
  endif()
  
 +if(capstone_enabled_architectures STREQUAL "MIPS")
-+    add_compile_definitions(CAPSTONE_MIPS_DEDICATED_SCAN)
++    add_compile_definitions(CAPSTONE_MIPS_ONLY)
 +endif()
 +
  if(capstone_enabled_architectures STREQUAL "RISCV")
      add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
  endif()
 diff --git a/Makefile b/Makefile
-index 636d0411..6ee9ee28 100644
+index 636d0411..c60287ce 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -119,6 +119,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
@@ -22,21 +22,24 @@ index 636d0411..6ee9ee28 100644
  endif
  
 +ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
-+CFLAGS += -DCAPSTONE_MIPS_DEDICATED_SCAN
++CFLAGS += -DCAPSTONE_MIPS_ONLY
 +endif
 +
  ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
  CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
  endif
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 84222bfa..ca0e559f 100644
+index 84222bfa..160678be 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -288,6 +288,55 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -288,6 +288,58 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  {
  	uint64_t size64;
  	Mips_init_cs_detail(instr);
-+#ifdef CAPSTONE_MIPS_DEDICATED_SCAN
++/* The dedicated scan shortens the ordinary table walk on Linux AArch64
++ * hosts without adding work to the time-critical formatted path on x64. */
++#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
++    defined(__GNUC__)
 +	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
 +	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
 +	    instr->csh->disasm == Mips_getInstruction &&
@@ -89,23 +92,24 @@ index 84222bfa..ca0e559f 100644
  	map_set_fill_detail_ops(instr, true);
  
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 908b0266..00b3f131 100644
+index 908b0266..4a17e366 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
-@@ -27,6 +27,7 @@ if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
+@@ -27,7 +27,7 @@ if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
          COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
  endif()
  if(CAPSTONE_MIPS_SUPPORT)
-+    list(APPEND UNIT_TEST_SOURCES mips_scan.c)
-     list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+-    list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
++    list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
  endif()
  if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+    OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_SPARC_SUPPORT
 diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
 new file mode 100644
-index 00000000..b827fd95
+index 00000000..c9d51a88
 --- /dev/null
 +++ b/tests/unit/mips_scan.c
-@@ -0,0 +1,109 @@
+@@ -0,0 +1,110 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -208,10 +212,11 @@ index 00000000..b827fd95
 +
 +int main(void)
 +{
-+	return check_mode(CS_MODE_MIPS32) && check_mode(CS_MODE_MIPS64) &&
-+			       check_mode(CS_MODE_MIPS32 |
-+					  CS_MODE_BIG_ENDIAN) &&
-+			       check_mode(CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN) ?
-+		       0 :
-+		       1;
++	const cs_mode modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64,
++				  CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN,
++				  CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN };
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
++		if (!check_mode(modes[i]))
++			return 1;
++	return 0;
 +}
