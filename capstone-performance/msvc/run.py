@@ -11,6 +11,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 
 source = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(source))
@@ -32,8 +33,11 @@ def write(name, value):
 
 
 def run(cmd, name, cwd=None):
+    started = time.monotonic()
     with (evidence / (name + '.log')).open('w', encoding='utf-8') as log:
         subprocess.run(list(map(str, cmd)), cwd=cwd, stdout=log, stderr=subprocess.STDOUT, check=True)
+    with (evidence / 'command-times.jsonl').open('a') as timing:
+        timing.write(json.dumps(dict(name=name, seconds=time.monotonic() - started)) + '\n')
     return (evidence / (name + '.log')).read_text(encoding='utf-8', errors='replace').strip()
 
 

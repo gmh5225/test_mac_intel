@@ -1,8 +1,8 @@
-name: Verify x86-owned post-printer eligibility
+name: Verify legacy first-memory repairs
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-owned-postprinter-configurations]
+    branches: [codex/capstone-legacy-memory-configurations]
     paths: [capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -25,6 +25,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: owned-postprinter-config-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: legacy-memory-config-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
