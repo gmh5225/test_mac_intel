@@ -1,0 +1,39 @@
+name: Compare compact-only frames from the two Apple linkers
+on:
+  push:
+    branches: [codex/neverd-arm64e-sigtramp-recovery]
+    paths: [neverd-sigtramp-compact/**, .github/workflows/neverd-sigtramp-compact.yml]
+permissions:
+  contents: read
+jobs:
+  compact:
+    strategy:
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 172e1a8309b44793a2d7c37e76dffae381f91ffe
+          sparse-checkout: unittests/lift/aarch64
+          persist-credentials: false
+      - name: Capture exact original compact-only frames
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          source=Path('unittests/lift/aarch64/AArch64AsyncUnwindFixtures.def').read_text()
+          value=lambda k:re.search(r'ASYNC_FRAME_TEXT\('+k+r', "([^"]+)"\)',source)[1]
+          body=re.search(r'ASYNC_FRAME_TEXT\(kCompactBody, R"c\((.*?)\)c"\)',source,re.S)[1]
+          p=Path('compact-evidence');p.mkdir();c=p/'compact.c';c.write_text(body)
+          binary=p/'compact.dylib'
+          subprocess.run([value('kCompiler'),value('kTargetFlag'),value('kTarget'),value('kOptimize'),value('kFramePointer'),value('kDylib'),str(c),value('kOutput'),str(binary)],check=True)
+          for name,args in [('disassembly',['otool','-tvV']),('commands',['otool','-l']),('symbols',['nm','-n']),('unwind',['otool','-s','__TEXT','__unwind_info'])]:
+            (p/(name+'.txt')).write_bytes(subprocess.check_output(args+[str(binary)]))
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compact-${{ matrix.runner }}
+          path: compact-evidence/
+          retention-days: 2
