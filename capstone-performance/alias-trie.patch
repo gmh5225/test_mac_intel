@@ -1,165 +1,349 @@
-diff --git a/arch/AArch64/AArch64GenAsmWriter.inc b/arch/AArch64/AArch64GenAsmWriter.inc
-index 45d70857..570c0b87 100644
---- a/arch/AArch64/AArch64GenAsmWriter.inc
-+++ b/arch/AArch64/AArch64GenAsmWriter.inc
-@@ -21635,7 +21635,7 @@ static void printInstruction(MCInst *MI, uint64_t Address, SStream *O) {
- /// from the register set description.  This returns the assembler name
- /// for the specified register.
- static const char *
--getRegisterName(unsigned RegNo, unsigned AltIdx) {
-+getRegisterNameWithLength(unsigned RegNo, unsigned AltIdx, unsigned *ShortLength) {
- #ifndef CAPSTONE_DIET
-   CS_ASSERT_RET_VAL(RegNo && RegNo < 703 && "Invalid register number!", NULL);
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 11eefc2f..49db5c06 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -148,8 +148,15 @@ foreach(i RANGE ${count})
+     list(GET SUPPORTED_ARCHITECTURES ${i} supported_architecture)
+     list(GET SUPPORTED_ARCHITECTURE_LABELS ${i} supported_architecture_label)
+     option("CAPSTONE_${supported_architecture}_SUPPORT" "${supported_architecture_label} support" ${CAPSTONE_ARCHITECTURE_DEFAULT})
++    if(CAPSTONE_${supported_architecture}_SUPPORT)
++        list(APPEND enabled_architectures "${supported_architecture}")
++    endif()
+ endforeach()
  
-@@ -22139,56 +22139,56 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
-   /* 3547 */ "nzcv\0"
- };
-   static const uint16_t RegAsmOffsetNoRegAltName[] = {
--    3511, 3159, 3506, 270, 3547, 3401, 3385, 3400, 3515, 3519, 3322, 3324, 3328, 3326, 
--    330, 773, 1043, 1401, 1680, 2049, 2290, 2641, 2904, 3245, 53, 456, 877, 1186, 
--    1509, 1826, 2128, 2409, 2720, 3023, 142, 585, 966, 1315, 1606, 1963, 2216, 2537, 
--    2824, 3135, 246, 689, 333, 776, 1046, 1404, 1683, 2052, 2293, 2644, 2907, 3248, 
--    57, 460, 881, 1190, 1513, 1830, 2132, 2413, 2724, 3027, 146, 589, 970, 1319, 
--    1610, 1967, 2220, 2541, 2828, 3139, 250, 693, 336, 779, 1049, 1407, 1686, 2055, 
--    2296, 2647, 2910, 3251, 61, 464, 885, 1194, 1517, 1834, 2136, 2417, 2728, 3031, 
--    150, 593, 974, 1323, 1614, 1971, 2224, 2545, 2832, 3143, 254, 697, 343, 786, 
--    1056, 1414, 1693, 2062, 2303, 2654, 2917, 3258, 70, 473, 894, 1203, 1526, 1843, 
--    339, 782, 1052, 1410, 1689, 2058, 2299, 2650, 2913, 3254, 65, 468, 889, 1198, 
--    1521, 1838, 346, 789, 1059, 1417, 1696, 2065, 2306, 2657, 2920, 3261, 74, 477, 
--    898, 1207, 1530, 1847, 2140, 2421, 2732, 3035, 154, 597, 978, 1327, 1618, 1975, 
--    2228, 2549, 2836, 3147, 258, 701, 349, 792, 1062, 1420, 1699, 2068, 2309, 2660, 
--    2923, 3264, 78, 481, 902, 1211, 1534, 1851, 2144, 2425, 2736, 3039, 158, 601, 
--    982, 1331, 1622, 1979, 2232, 2553, 2840, 3151, 262, 705, 356, 795, 1065, 1423, 
--    1702, 2071, 2312, 2663, 2926, 3267, 82, 485, 906, 1215, 1538, 1855, 2148, 2429, 
--    2740, 3043, 162, 605, 986, 1335, 1626, 1983, 2236, 2557, 2844, 3155, 266, 359, 
--    798, 1068, 1426, 1705, 2074, 2315, 2666, 2929, 3270, 86, 489, 910, 1219, 1542, 
--    1859, 2152, 2433, 2744, 3047, 166, 609, 990, 1339, 1630, 1987, 2240, 2561, 2848, 
--    362, 801, 1071, 1429, 1708, 2077, 2318, 2669, 2932, 3273, 90, 493, 914, 1223, 
--    1546, 1863, 2156, 2437, 2748, 3051, 170, 613, 994, 1343, 1634, 1991, 2244, 2565, 
--    2852, 3163, 274, 709, 3331, 3337, 3343, 3349, 3355, 3361, 3367, 3373, 3379, 3388, 
--    3394, 3411, 3424, 3437, 3450, 3463, 3476, 3482, 3488, 3494, 3500, 3404, 3417, 3430, 
--    3443, 3456, 3469, 3523, 3529, 3535, 3541, 352, 721, 1005, 1353, 1644, 2001, 2254, 
--    2575, 2862, 3173, 6, 371, 811, 1082, 1440, 1719, 2088, 2329, 2680, 2943, 102, 
--    505, 926, 1235, 1558, 1875, 2168, 2449, 2760, 3063, 182, 625, 286, 1347, 1638, 
-+    15799, 15447, 19890, 12558, 19931, 11593, 11577, 15688, 15803, 15807, 7418, 7420, 11520, 7422, 
-+    8522, 8965, 9235, 9593, 9872, 10241, 10482, 10833, 11096, 11437, 12341, 12744, 13165, 13474, 
-+    13797, 14114, 14416, 14697, 15008, 15311, 12430, 12873, 13254, 13603, 13894, 14251, 14504, 14825, 
-+    15112, 15423, 12534, 12977, 8525, 8968, 9238, 9596, 9875, 10244, 10485, 10836, 11099, 11440, 
-+    12345, 12748, 13169, 13478, 13801, 14118, 14420, 14701, 15012, 15315, 12434, 12877, 13258, 13607, 
-+    13898, 14255, 14508, 14829, 15116, 15427, 12538, 12981, 8528, 8971, 9241, 9599, 9878, 10247, 
-+    10488, 10839, 11102, 11443, 12349, 12752, 13173, 13482, 13805, 14122, 14424, 14705, 15016, 15319, 
-+    12438, 12881, 13262, 13611, 13902, 14259, 14512, 14833, 15120, 15431, 12542, 12985, 8535, 8978, 
-+    9248, 9606, 9885, 10254, 10495, 10846, 11109, 11450, 12358, 12761, 13182, 13491, 13814, 14131, 
-+    12627, 13070, 13340, 13698, 13977, 14346, 14587, 14938, 15201, 15542, 16449, 16852, 17273, 17582, 
-+    17905, 18222, 8538, 8981, 9251, 9609, 9888, 10257, 10498, 10849, 11112, 11453, 12362, 12765, 
-+    13186, 13495, 13818, 14135, 14428, 14709, 15020, 15323, 12442, 12885, 13266, 13615, 13906, 14263, 
-+    14516, 14837, 15124, 15435, 12546, 12989, 8541, 8984, 9254, 9612, 9891, 10260, 10501, 10852, 
-+    11115, 11456, 12366, 12769, 13190, 13499, 13822, 14139, 14432, 14713, 15024, 15327, 12446, 12889, 
-+    13270, 13619, 13910, 14267, 14520, 14841, 15128, 15439, 12550, 12993, 8548, 8987, 9257, 9615, 
-+    9894, 10263, 10504, 10855, 11118, 11459, 12370, 12773, 13194, 13503, 13826, 14143, 14436, 14717, 
-+    15028, 15331, 12450, 12893, 13274, 13623, 13914, 14271, 14524, 14845, 15132, 15443, 12554, 8551, 
-+    8990, 9260, 9618, 9897, 10266, 10507, 10858, 11121, 11462, 12374, 12777, 13198, 13507, 13830, 
-+    14147, 14440, 14721, 15032, 15335, 12454, 12897, 13278, 13627, 13918, 14275, 14528, 14849, 15136, 
-+    8554, 8993, 9263, 9621, 9900, 10269, 10510, 10861, 11124, 11465, 12378, 12781, 13202, 13511, 
-+    13834, 14151, 14444, 14725, 15036, 15339, 12458, 12901, 13282, 13631, 13922, 14279, 14532, 14853, 
-+    15140, 15451, 12562, 12997, 23811, 23817, 23823, 23829, 23835, 23841, 23847, 23853, 23859, 23868, 
-+    23874, 23891, 23904, 23917, 23930, 23943, 23956, 23962, 23968, 23974, 23980, 27980, 27993, 28006, 
-+    28019, 28032, 28045, 24003, 24009, 24015, 24021, 12640, 21201, 21485, 21833, 22124, 22481, 22734, 
-+    23055, 23342, 23653, 24582, 29043, 29483, 29754, 30112, 30391, 30760, 31001, 31352, 31615, 28774, 
-+    29177, 29598, 29907, 30230, 30547, 30840, 31121, 31432, 31735, 28854, 29297, 24862, 1347, 1638, 
-     1995, 2248, 2569, 2856, 3167, 0, 365, 804, 1074, 1432, 1711, 2080, 2321, 2672, 
-     2935, 94, 497, 918, 1227, 1550, 1867, 2160, 2441, 2752, 3055, 174, 617, 278, 
-     713, 998, 1002, 1350, 1641, 1998, 2251, 2572, 2859, 3170, 3, 368, 807, 1078, 
-     1436, 1715, 2084, 2325, 2676, 2939, 98, 501, 922, 1231, 1554, 1871, 2164, 2445, 
--    2756, 3059, 178, 621, 282, 717, 727, 1011, 1359, 1650, 2007, 2260, 2581, 2868, 
--    3179, 13, 379, 819, 1090, 1448, 1727, 293, 741, 1024, 1371, 1662, 2019, 2272, 
--    2593, 2880, 3191, 26, 393, 834, 1106, 1464, 1743, 2104, 2345, 2696, 2959, 118, 
--    521, 942, 1251, 1574, 1891, 2184, 2465, 2776, 3079, 198, 641, 308, 1365, 1656, 
-+    2756, 3059, 178, 621, 282, 717, 21207, 21491, 21839, 22130, 22487, 22740, 23061, 23348, 
-+    23659, 24589, 29051, 29491, 29762, 30120, 30399, 24869, 21221, 21504, 21851, 22142, 22499, 22752, 
-+    23073, 23360, 23671, 24602, 29065, 29506, 29778, 30136, 30415, 30776, 31017, 31368, 31631, 28790, 
-+    29193, 29614, 29923, 30246, 30563, 30856, 31137, 31448, 31751, 28870, 29313, 24884, 1365, 1656, 
-     2013, 2266, 2587, 2874, 3185, 20, 387, 827, 1098, 1456, 1735, 2096, 2337, 2688, 
-     2951, 110, 513, 934, 1243, 1566, 1883, 2176, 2457, 2768, 3071, 190, 633, 300, 
-     733, 1017, 1021, 1368, 1659, 2016, 2269, 2590, 2877, 3188, 23, 390, 830, 1102, 
-     1460, 1739, 2100, 2341, 2692, 2955, 114, 517, 938, 1247, 1570, 1887, 2180, 2461, 
-     2772, 3075, 194, 637, 304, 737, 3276, 2605, 3203, 409, 1122, 1759, 2361, 2975, 
--    537, 1267, 1907, 2481, 3307, 747, 1377, 2025, 2599, 3197, 401, 1114, 1751, 2353, 
--    2967, 529, 1259, 1899, 2473, 3087, 3315, 3300, 753, 1383, 2031, 2623, 3221, 427, 
--    1142, 1781, 2385, 2999, 561, 1291, 1931, 2505, 767, 1037, 1395, 1674, 2043, 2284, 
--    2635, 2898, 3239, 46, 441, 849, 1158, 1494, 1811, 2120, 2401, 2712, 3015, 134, 
--    577, 958, 1307, 1590, 1947, 2200, 2521, 2816, 3127, 238, 657, 323, 1389, 1668, 
-+    537, 1267, 1907, 2481, 31979, 21227, 21857, 22505, 23079, 23677, 29073, 29786, 30423, 31025, 
-+    31639, 29201, 29931, 30571, 31145, 31759, 27891, 27876, 21233, 21863, 22511, 23103, 23701, 29099, 
-+    29814, 30453, 31057, 31671, 29233, 29963, 30603, 31177, 21247, 21517, 21875, 22154, 22523, 22764, 
-+    23115, 23378, 23719, 24622, 29113, 29521, 29830, 30166, 30483, 30792, 31073, 31384, 31687, 28806, 
-+    29249, 29630, 29979, 30262, 30619, 30872, 31193, 31488, 31799, 28910, 29329, 24899, 1389, 1668, 
-     2037, 2278, 2629, 2892, 3233, 40, 435, 842, 1150, 1486, 1803, 2112, 2393, 2704, 
-     3007, 126, 569, 950, 1299, 1582, 1939, 2192, 2513, 2808, 3119, 230, 649, 315, 
-     759, 1030, 1034, 1392, 1671, 2040, 2281, 2632, 2895, 3236, 43, 438, 845, 1154, 
-     1490, 1807, 2116, 2397, 2708, 3011, 130, 573, 954, 1303, 1586, 1943, 2196, 2517, 
--    2812, 3123, 234, 653, 319, 763, 1598, 1955, 2208, 2529, 2784, 3095, 206, 665, 
--    2886, 3227, 33, 449, 857, 1166, 1502, 1819, 2792, 3103, 214, 673, 864, 1173, 
-+    2812, 3123, 234, 653, 319, 763, 30270, 30627, 30880, 31201, 31456, 31767, 28878, 29337, 
-+    23366, 23707, 24609, 25025, 25433, 25742, 26078, 26395, 2792, 3103, 214, 673, 864, 1173, 
-     1472, 1789, 
-   };
++if(enabled_architectures STREQUAL "AARCH64")
++    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
++endif()
++
+ # Dedicated builds of these backends use their generated mnemonic tries.
+ set(alias_trie_architectures AARCH64 MIPS PPC SPARC)
+ set(use_alias_trie ON)
+diff --git a/Makefile b/Makefile
+index 4930ecb9..f7de2b6f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -116,6 +116,10 @@ INSTALL_LIB ?= $(INSTALL_BIN) -m0755
+ LIBNAME = capstone
  
-@@ -22339,10 +22339,14 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
  
-   switch(AltIdx) {
-   default: CS_ASSERT_RET_VAL(0 && "Invalid register alt name index!", NULL);
--  case AArch64_NoRegAltName:
--    CS_ASSERT_RET_VAL(*(AsmStrsNoRegAltName+RegAsmOffsetNoRegAltName[RegNo-1]) &&
--           "Invalid alt name index for register!", NULL);
--    return AsmStrsNoRegAltName+RegAsmOffsetNoRegAltName[RegNo-1];
-+  case AArch64_NoRegAltName: {
-+    unsigned entry = RegAsmOffsetNoRegAltName[RegNo-1];
-+    const char *name = AsmStrsNoRegAltName + (entry & 0xfff);
-+    CS_ASSERT_RET_VAL(*name && "Invalid alt name index for register!", NULL);
-+    if (ShortLength)
-+      *ShortLength = entry >> 12;
-+    return name;
-+  }
-   case AArch64_vlist1:
-     CS_ASSERT_RET_VAL(*(AsmStrsvlist1+RegAsmOffsetvlist1[RegNo-1]) &&
-            "Invalid alt name index for register!", NULL);
-@@ -22356,6 +22360,10 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
-   return NULL;
- #endif // CAPSTONE_DIET
- }
-+static const char *getRegisterName(unsigned RegNo, unsigned AltIdx)
-+{
-+  return getRegisterNameWithLength(RegNo, AltIdx, NULL);
-+}
- #ifdef PRINT_ALIAS_INSTR
- #undef PRINT_ALIAS_INSTR
- 
++ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
++CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES
++endif
++
+ ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
+ CFLAGS += -DCAPSTONE_USE_ALIAS_TRIE
+ endif
+diff --git a/arch/AArch64/AArch64GenShortRegisterNames.inc b/arch/AArch64/AArch64GenShortRegisterNames.inc
+new file mode 100644
+index 00000000..66c56538
+--- /dev/null
++++ b/arch/AArch64/AArch64GenShortRegisterNames.inc
+@@ -0,0 +1,181 @@
++/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/aarch64_register_names.py. */
++static const struct {
++	char text[7];
++	uint8_t length;
++} short_names[] = {
++	{ "ffr", 3 }, { "x29", 3 }, { "fpcr", 4 }, { "x30", 3 },
++	{ "nzcv", 4 }, { "sp", 2 }, { "vg", 2 }, { "wsp", 3 },
++	{ "wzr", 3 }, { "xzr", 3 }, { "X", 1 }, { "Y", 1 },
++	{ "za", 2 }, { "Z", 1 }, { "b0", 2 }, { "b1", 2 },
++	{ "b2", 2 }, { "b3", 2 }, { "b4", 2 }, { "b5", 2 },
++	{ "b6", 2 }, { "b7", 2 }, { "b8", 2 }, { "b9", 2 },
++	{ "b10", 3 }, { "b11", 3 }, { "b12", 3 }, { "b13", 3 },
++	{ "b14", 3 }, { "b15", 3 }, { "b16", 3 }, { "b17", 3 },
++	{ "b18", 3 }, { "b19", 3 }, { "b20", 3 }, { "b21", 3 },
++	{ "b22", 3 }, { "b23", 3 }, { "b24", 3 }, { "b25", 3 },
++	{ "b26", 3 }, { "b27", 3 }, { "b28", 3 }, { "b29", 3 },
++	{ "b30", 3 }, { "b31", 3 }, { "d0", 2 }, { "d1", 2 },
++	{ "d2", 2 }, { "d3", 2 }, { "d4", 2 }, { "d5", 2 },
++	{ "d6", 2 }, { "d7", 2 }, { "d8", 2 }, { "d9", 2 },
++	{ "d10", 3 }, { "d11", 3 }, { "d12", 3 }, { "d13", 3 },
++	{ "d14", 3 }, { "d15", 3 }, { "d16", 3 }, { "d17", 3 },
++	{ "d18", 3 }, { "d19", 3 }, { "d20", 3 }, { "d21", 3 },
++	{ "d22", 3 }, { "d23", 3 }, { "d24", 3 }, { "d25", 3 },
++	{ "d26", 3 }, { "d27", 3 }, { "d28", 3 }, { "d29", 3 },
++	{ "d30", 3 }, { "d31", 3 }, { "h0", 2 }, { "h1", 2 },
++	{ "h2", 2 }, { "h3", 2 }, { "h4", 2 }, { "h5", 2 },
++	{ "h6", 2 }, { "h7", 2 }, { "h8", 2 }, { "h9", 2 },
++	{ "h10", 3 }, { "h11", 3 }, { "h12", 3 }, { "h13", 3 },
++	{ "h14", 3 }, { "h15", 3 }, { "h16", 3 }, { "h17", 3 },
++	{ "h18", 3 }, { "h19", 3 }, { "h20", 3 }, { "h21", 3 },
++	{ "h22", 3 }, { "h23", 3 }, { "h24", 3 }, { "h25", 3 },
++	{ "h26", 3 }, { "h27", 3 }, { "h28", 3 }, { "h29", 3 },
++	{ "h30", 3 }, { "h31", 3 }, { "p0", 2 }, { "p1", 2 },
++	{ "p2", 2 }, { "p3", 2 }, { "p4", 2 }, { "p5", 2 },
++	{ "p6", 2 }, { "p7", 2 }, { "p8", 2 }, { "p9", 2 },
++	{ "p10", 3 }, { "p11", 3 }, { "p12", 3 }, { "p13", 3 },
++	{ "p14", 3 }, { "p15", 3 }, { "pn0", 3 }, { "pn1", 3 },
++	{ "pn2", 3 }, { "pn3", 3 }, { "pn4", 3 }, { "pn5", 3 },
++	{ "pn6", 3 }, { "pn7", 3 }, { "pn8", 3 }, { "pn9", 3 },
++	{ "pn10", 4 }, { "pn11", 4 }, { "pn12", 4 }, { "pn13", 4 },
++	{ "pn14", 4 }, { "pn15", 4 }, { "q0", 2 }, { "q1", 2 },
++	{ "q2", 2 }, { "q3", 2 }, { "q4", 2 }, { "q5", 2 },
++	{ "q6", 2 }, { "q7", 2 }, { "q8", 2 }, { "q9", 2 },
++	{ "q10", 3 }, { "q11", 3 }, { "q12", 3 }, { "q13", 3 },
++	{ "q14", 3 }, { "q15", 3 }, { "q16", 3 }, { "q17", 3 },
++	{ "q18", 3 }, { "q19", 3 }, { "q20", 3 }, { "q21", 3 },
++	{ "q22", 3 }, { "q23", 3 }, { "q24", 3 }, { "q25", 3 },
++	{ "q26", 3 }, { "q27", 3 }, { "q28", 3 }, { "q29", 3 },
++	{ "q30", 3 }, { "q31", 3 }, { "s0", 2 }, { "s1", 2 },
++	{ "s2", 2 }, { "s3", 2 }, { "s4", 2 }, { "s5", 2 },
++	{ "s6", 2 }, { "s7", 2 }, { "s8", 2 }, { "s9", 2 },
++	{ "s10", 3 }, { "s11", 3 }, { "s12", 3 }, { "s13", 3 },
++	{ "s14", 3 }, { "s15", 3 }, { "s16", 3 }, { "s17", 3 },
++	{ "s18", 3 }, { "s19", 3 }, { "s20", 3 }, { "s21", 3 },
++	{ "s22", 3 }, { "s23", 3 }, { "s24", 3 }, { "s25", 3 },
++	{ "s26", 3 }, { "s27", 3 }, { "s28", 3 }, { "s29", 3 },
++	{ "s30", 3 }, { "s31", 3 }, { "w0", 2 }, { "w1", 2 },
++	{ "w2", 2 }, { "w3", 2 }, { "w4", 2 }, { "w5", 2 },
++	{ "w6", 2 }, { "w7", 2 }, { "w8", 2 }, { "w9", 2 },
++	{ "w10", 3 }, { "w11", 3 }, { "w12", 3 }, { "w13", 3 },
++	{ "w14", 3 }, { "w15", 3 }, { "w16", 3 }, { "w17", 3 },
++	{ "w18", 3 }, { "w19", 3 }, { "w20", 3 }, { "w21", 3 },
++	{ "w22", 3 }, { "w23", 3 }, { "w24", 3 }, { "w25", 3 },
++	{ "w26", 3 }, { "w27", 3 }, { "w28", 3 }, { "w29", 3 },
++	{ "w30", 3 }, { "x0", 2 }, { "x1", 2 }, { "x2", 2 },
++	{ "x3", 2 }, { "x4", 2 }, { "x5", 2 }, { "x6", 2 },
++	{ "x7", 2 }, { "x8", 2 }, { "x9", 2 }, { "x10", 3 },
++	{ "x11", 3 }, { "x12", 3 }, { "x13", 3 }, { "x14", 3 },
++	{ "x15", 3 }, { "x16", 3 }, { "x17", 3 }, { "x18", 3 },
++	{ "x19", 3 }, { "x20", 3 }, { "x21", 3 }, { "x22", 3 },
++	{ "x23", 3 }, { "x24", 3 }, { "x25", 3 }, { "x26", 3 },
++	{ "x27", 3 }, { "x28", 3 }, { "z0", 2 }, { "z1", 2 },
++	{ "z2", 2 }, { "z3", 2 }, { "z4", 2 }, { "z5", 2 },
++	{ "z6", 2 }, { "z7", 2 }, { "z8", 2 }, { "z9", 2 },
++	{ "z10", 3 }, { "z11", 3 }, { "z12", 3 }, { "z13", 3 },
++	{ "z14", 3 }, { "z15", 3 }, { "z16", 3 }, { "z17", 3 },
++	{ "z18", 3 }, { "z19", 3 }, { "z20", 3 }, { "z21", 3 },
++	{ "z22", 3 }, { "z23", 3 }, { "z24", 3 }, { "z25", 3 },
++	{ "z26", 3 }, { "z27", 3 }, { "z28", 3 }, { "z29", 3 },
++	{ "z30", 3 }, { "z31", 3 }, { "za0.b", 5 }, { "za0.d", 5 },
++	{ "za1.d", 5 }, { "za2.d", 5 }, { "za3.d", 5 }, { "za4.d", 5 },
++	{ "za5.d", 5 }, { "za6.d", 5 }, { "za7.d", 5 }, { "za0.h", 5 },
++	{ "za1.h", 5 }, { "za0.q", 5 }, { "za1.q", 5 }, { "za2.q", 5 },
++	{ "za3.q", 5 }, { "za4.q", 5 }, { "za5.q", 5 }, { "za6.q", 5 },
++	{ "za7.q", 5 }, { "za8.q", 5 }, { "za9.q", 5 }, { "za10.q", 6 },
++	{ "za11.q", 6 }, { "za12.q", 6 }, { "za13.q", 6 }, { "za14.q", 6 },
++	{ "za15.q", 6 }, { "za0.s", 5 }, { "za1.s", 5 }, { "za2.s", 5 },
++	{ "za3.s", 5 }, { "zt0", 3 }, { "D0_D1", 5 }, { "D1_D2", 5 },
++	{ "D2_D3", 5 }, { "D3_D4", 5 }, { "D4_D5", 5 }, { "D5_D6", 5 },
++	{ "D6_D7", 5 }, { "D7_D8", 5 }, { "D8_D9", 5 }, { "D9_D10", 6 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "D31_D0", 6 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "P0_P1", 5 }, { "P1_P2", 5 },
++	{ "P2_P3", 5 }, { "P3_P4", 5 }, { "P4_P5", 5 }, { "P5_P6", 5 },
++	{ "P6_P7", 5 }, { "P7_P8", 5 }, { "P8_P9", 5 }, { "P9_P10", 6 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "P15_P0", 6 }, { "Q0_Q1", 5 }, { "Q1_Q2", 5 },
++	{ "Q2_Q3", 5 }, { "Q3_Q4", 5 }, { "Q4_Q5", 5 }, { "Q5_Q6", 5 },
++	{ "Q6_Q7", 5 }, { "Q7_Q8", 5 }, { "Q8_Q9", 5 }, { "Q9_Q10", 6 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "Q31_Q0", 6 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "W0_W1", 5 },
++	{ "W2_W3", 5 }, { "W4_W5", 5 }, { "W6_W7", 5 }, { "W8_W9", 5 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "LR_XZR", 6 }, { "X28_FP", 6 },
++	{ "X0_X1", 5 }, { "X2_X3", 5 }, { "X4_X5", 5 }, { "X6_X7", 5 },
++	{ "X8_X9", 5 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "Z0_Z1", 5 }, { "Z1_Z2", 5 },
++	{ "Z2_Z3", 5 }, { "Z3_Z4", 5 }, { "Z4_Z5", 5 }, { "Z5_Z6", 5 },
++	{ "Z6_Z7", 5 }, { "Z7_Z8", 5 }, { "Z8_Z9", 5 }, { "Z9_Z10", 6 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "Z31_Z0", 6 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
++	{ "", 0 }, { "", 0 }, { "Z0_Z8", 5 }, { "Z1_Z9", 5 },
++	{ "Z2_Z10", 6 }, { "Z3_Z11", 6 }, { "Z4_Z12", 6 }, { "Z5_Z13", 6 },
++	{ "Z6_Z14", 6 }, { "Z7_Z15", 6 },
++};
 diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
-index bffb617f..32d4d297 100644
+index bffb617f..c8e9f44e 100644
 --- a/arch/AArch64/AArch64InstPrinter.c
 +++ b/arch/AArch64/AArch64InstPrinter.c
-@@ -80,8 +80,21 @@ DECLARE_printComplexRotationOp(90, 0);
+@@ -80,6 +80,18 @@ DECLARE_printComplexRotationOp(90, 0);
  
  void printRegName(SStream *OS, unsigned Reg)
  {
--	SStream_concat2(OS, markup("<reg:"),
--			getRegisterName(Reg, AArch64_NoRegAltName));
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+    !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+    !defined(_WIN32_WCE)
-+	unsigned short_length = 0;
-+	const char *name = getRegisterNameWithLength(Reg, AArch64_NoRegAltName,
-+						    &short_length);
-+	if (short_length && cs_vsnprintf == cs_default_vsnprintf &&
-+	    !getUseMarkup() && OS->index < SSTREAM_BUF_LEN - 1) {
-+		SStream_concat0_small(OS, name, short_length);
++#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#include "AArch64GenShortRegisterNames.inc"
++	if (Reg && Reg <= ARR_SIZE(short_names) && short_names[Reg - 1].length &&
++	    cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
++	    OS->index < SSTREAM_BUF_LEN - 1) {
++		SStream_concat0_small(OS, short_names[Reg - 1].text,
++				      short_names[Reg - 1].length);
 +		return;
 +	}
-+	SStream_concat2(OS, markup("<reg:"), name);
-+#else
-+	SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg, AArch64_NoRegAltName));
 +#endif
+ 	SStream_concat2(OS, markup("<reg:"),
+ 			getRegisterName(Reg, AArch64_NoRegAltName));
  	SStream_concat0(OS, markup(">"));
- }
+diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
+index 8b703760..b75a84fa 100644
+--- a/suite/auto-sync/README.md
++++ b/suite/auto-sync/README.md
+@@ -118,6 +118,10 @@ SystemZ's shared 64-bit input for all three instruction lengths. Xtensa's
+ table calls share the generated 64-bit `_3` helper; the translator preserves
+ that choice instead of inferring a helper suffix from the encoded width.
  
++After regenerating the AArch64 assembly writer or translating its printer,
++run `python3 suite/synctools/aarch64_register_names.py`. Run it again with
++`--check` to verify short register spellings against the default name pool.
++
+ After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
+ `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
+ The generated immediate-size lookup preserves the original metadata and uses
+diff --git a/suite/synctools/aarch64_register_names.py b/suite/synctools/aarch64_register_names.py
+new file mode 100644
+index 00000000..9a25e36a
+--- /dev/null
++++ b/suite/synctools/aarch64_register_names.py
+@@ -0,0 +1,83 @@
++#!/usr/bin/env python3
++# SPDX-License-Identifier: BSD-3-Clause
++"""Project short AArch64 register spellings from the generated default name pool."""
++import argparse
++import ast
++import json
++import re
++from pathlib import Path
++
++ARCH = Path(__file__).resolve().parents[2] / "arch" / "AArch64"
++PRINT_REG = "void printRegName(SStream *OS, unsigned Reg)\n{\n"
++SHORT_REG = """#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \\
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \\
++	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
++#include "AArch64GenShortRegisterNames.inc"
++	if (Reg && Reg <= ARR_SIZE(short_names) && short_names[Reg - 1].length &&
++	    cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
++	    OS->index < SSTREAM_BUF_LEN - 1) {
++		SStream_concat0_small(OS, short_names[Reg - 1].text,
++				      short_names[Reg - 1].length);
++		return;
++	}
++#endif
++"""
++
++
++def generate(writer):
++    strings = re.search(r"static const char AsmStrsNoRegAltName\[\] = \{(.*?)\};", writer, re.S)
++    offsets = re.search(r"static const uint16_t RegAsmOffsetNoRegAltName\[\] = \{([\s\d,]+)\};", writer)
++    if not strings or not offsets:
++        raise ValueError("Missing the default AArch64 register tables")
++    body = re.sub(r"/\*.*?\*/", "", strings[1], flags=re.S)
++    literal = r'"(?:[^"\\]|\\.)*"'
++    if not re.fullmatch(r"\s*(?:" + literal + r"\s*)+", body):
++        raise ValueError("Unexpected register pool literal")
++    pool = b"".join(ast.literal_eval("b" + token) for token in re.findall(literal, body))
++    names = []
++    for token in filter(None, (s.strip() for s in offsets[1].split(","))):
++        start = int(token)
++        name = pool[start:pool.index(0, start)].decode("ascii")
++        names.append(name if 0 < len(name) <= 6 else "")
++    header = [
++        "/* Capstone Disassembly Engine. SPDX-License-Identifier: BSD-3-Clause */",
++        "/* Generated by suite/synctools/aarch64_register_names.py. */",
++        "static const struct {",
++        "\tchar text[7];",
++        "\tuint8_t length;",
++        "} short_names[] = {",
++    ]
++    # Compound register names use the canonical writer. Omit a trailing run of
++    # empty entries, which the caller already handles with its bounds check.
++    while names and not names[-1]:
++        names.pop()
++    if not names:
++        raise ValueError("No short AArch64 registers")
++    entries = [f"{{ {json.dumps(name)}, {len(name)} }}" for name in names]
++    rows = ["\t" + ", ".join(entries[i:i+4]) + "," for i in range(0, len(entries), 4)]
++    return "\n".join([*header, *rows, "};", ""])
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--check", action="store_true")
++    args = parser.parse_args()
++    printer = ARCH / "AArch64InstPrinter.c"
++    source = printer.read_text()
++    if source.count(PRINT_REG) != 1:
++        raise ValueError("Cannot locate the translated register printer")
++    # Restore the hook after auto-sync replaces the translated printer.
++    source = source.replace(PRINT_REG + SHORT_REG, PRINT_REG)
++    outputs = {
++        ARCH / "AArch64GenShortRegisterNames.inc": generate((ARCH / "AArch64GenAsmWriter.inc").read_text()),
++        printer: source.replace(PRINT_REG, PRINT_REG + SHORT_REG),
++    }
++    for path, text in outputs.items():
++        if not path.exists() or path.read_text() != text:
++            if args.check:
++                raise SystemExit(f"Regenerate {path.name}")
++            path.write_text(text)
++
++
++if __name__ == "__main__":
++    main()
