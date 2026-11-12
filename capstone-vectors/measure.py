@@ -40,7 +40,9 @@ def main(w):
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = X86_disasmIter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
-        for patch in reversed(patches):run(['git','apply','-R',patch],'restore-'+label+'-'+patch.stem,tree)
+        run(['git','reset','--hard',reference],'restore-'+label,tree)
+        run(['git','clean','-fdx'],'remove-generated-'+label,tree)
+        assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
     run(['git','apply',r/'combined.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
