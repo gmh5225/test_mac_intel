@@ -1,0 +1,37 @@
+name: Capstone AArch64 outer operand initialization
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/capstone-aarch64-outer-initialization]
+    paths: [capstone-performance/**, .github/workflows/capstone-aarch64-outer.yml]
+permissions:
+  contents: read
+concurrency:
+  group: capstone-aarch64-outer-initialization
+  cancel-in-progress: false
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [ubuntu-24.04, ubuntu-24.04-arm]
+        profile: [full, diet]
+        include:
+          - {host: ubuntu-24.04, profile: pattern}
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-performance
+      - name: Check complete public records and poisoned private operands
+        run: python3 capstone-performance/aarch64_validate.py ${{ matrix.profile }}
+      - name: Preserve validation and cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: aarch64-outer-${{ matrix.host }}-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: capstone-evidence/
+          if-no-files-found: error
+          retention-days: 14
