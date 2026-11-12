@@ -1,9 +1,9 @@
-name: Qualify AArch64 initialization on the released formatter and unchanged x86 workloads
+name: Measure direct one-digit x86 operand formatting in mixed release products
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-aarch64-current-release]
+    branches: [codex/capstone-x86-operand-digit]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-aarch64-current-release
+  group: capstone-x86-operand-digit
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aarch64-current-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: x86-operand-digit-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
@@ -92,7 +92,7 @@ jobs:
           $name = if ($IsWindows) { 'cstest.exe' } else { 'cstest' }
           $bin = Get-ChildItem build -File -Recurse -Filter $name | Select-Object -First 1
           if (!$bin) { throw 'MC test runner missing' }
-          & $bin.FullName source/tests/MC/AArch64 source/tests/MC/X86 > mc.log
+          & $bin.FullName source/tests/MC/X86 > mc.log
           $result = $LASTEXITCODE
           Get-Content mc.log -Tail 18
           exit $result

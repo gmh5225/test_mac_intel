@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Avoid clearing unused AArch64 operands in mixed four- and seven-backend products'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Write the one-digit decimal operands directly inside the bounded x86 printer'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -210,13 +210,15 @@ panic = "abort"
         extra = ([libraries['base']] if unit in ('check-hint','check-ppc','check-defaults','check-shared','check-post','check-final','check-arc-loongarch','check-metadata','check-dense','check-systemz','check-mips-alias') else
                  [libraries['base'], libraries['new']] if unit in ('check-callback','flags-state') else [])
         command([target, *extra], 'verify-' + unit)
+    command(['clang','-O3','-DNDEBUG',*defs,*includes,SOURCE/'digit.c',WORK/'new-build/libcapstone.a','-o',WORK/'digit'],'compile-digit-state')
+    command([WORK/'digit'],'digit-state')
     changed = []
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     difference=sorted(n for n in changed[0] if changed[0][n]!=changed[1][n])
-    assert difference==['cs.c.o'],difference
+    assert 'arch/X86/X86IntelInstPrinterPrechecked.c.o' in difference and all(n in ('arch/X86/X86IntelInstPrinter.c.o','arch/X86/X86IntelInstPrinterPrechecked.c.o') for n in difference),difference
     write('object-difference.json',dict(changed=difference,total=len(changed[0])))
     flag_records = []
     for label in ('base','new'):

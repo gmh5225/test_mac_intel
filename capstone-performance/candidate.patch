@@ -1,17 +1,81 @@
-diff --git a/cs.c b/cs.c
-index 8db01e0d..29db990d 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1049,6 +1049,12 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitX86(&mci);
- 	else
- #endif
-+#ifdef CAPSTONE_HAS_AARCH64
-+	if (handle->arch == CS_ARCH_AARCH64)
-+		/* The AArch64 decoder constructs its operands before printing. */
-+		MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+	else
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -324,6 +324,25 @@
+ 		return false;
+ 	else // this need 0 prefix
+ 		return true;
++}
++
++static inline void printDecimalDigit(SStream *OS, uint64_t digit, bool negative)
++{
++#if defined(CAPSTONE_SSTREAM_PRECHECKED) && HEX_THRESHOLD <= 9
++	/* printImm has selected a single digit and the generated path has room
++	 * for the entire instruction, including the optional sign. */
++	assert(digit < 10 && !OS->is_closed && !OS->markup_stream &&
++	       !OS->prefixed_by_markup);
++	assert(OS->index < SSTREAM_BUF_LEN - (negative ? 2U : 1U));
++	char *out = OS->buffer + OS->index;
++	if (negative)
++		*out++ = '-';
++	*out++ = (char)('0' + digit);
++	*out = '\0';
++	OS->index += negative ? 2U : 1U;
++#else
++	SStream_concat_dec64(OS, digit, negative);
 +#endif
- #ifdef CAPSTONE_HAS_MIPS
- 	if (handle->arch == CS_ARCH_MIPS)
- 		/* MIPS constructs each MCOperand before reading it. The public
+ }
+ 
+ static void printImm(MCInst *MI, SStream *O, int64_t imm, bool positive)
+@@ -364,7 +383,7 @@
+ 						SStream_concat(
+ 							O, "%" PRIx64 "h", imm);
+ 				} else
+-					SStream_concat_dec64(O, imm, false);
++					printDecimalDigit(O, imm, false);
+ 			}
+ 		} else { // Intel syntax
+ 			if (imm < 0) {
+@@ -389,7 +408,7 @@
+ 				if (imm > HEX_THRESHOLD)
+ 					SStream_concat_hex64(O, imm, false);
+ 				else
+-					SStream_concat_dec64(O, imm, false);
++					printDecimalDigit(O, imm, false);
+ 			}
+ 		}
+ 	} else {
+@@ -407,7 +426,7 @@
+ 							       "-%" PRIx64 "h",
+ 							       -imm);
+ 				} else
+-					SStream_concat_dec64(O, (uint64_t)-imm,
++					printDecimalDigit(O, (uint64_t)-imm,
+ 							     true);
+ 			} else {
+ 				if (imm > HEX_THRESHOLD) {
+@@ -419,7 +438,7 @@
+ 						SStream_concat(
+ 							O, "%" PRIx64 "h", imm);
+ 				} else
+-					SStream_concat_dec64(O, imm, false);
++					printDecimalDigit(O, imm, false);
+ 			}
+ 		} else { // Intel syntax
+ 			if (imm < 0) {
+@@ -430,14 +449,14 @@
+ 					SStream_concat_hex64(O, (uint64_t)-imm,
+ 							     true);
+ 				else
+-					SStream_concat_dec64(O, (uint64_t)-imm,
++					printDecimalDigit(O, (uint64_t)-imm,
+ 							     true);
+ 
+ 			} else {
+ 				if (imm > HEX_THRESHOLD)
+ 					SStream_concat_hex64(O, imm, false);
+ 				else
+-					SStream_concat_dec64(O, imm, false);
++					printDecimalDigit(O, imm, false);
+ 			}
+ 		}
+ 	}
