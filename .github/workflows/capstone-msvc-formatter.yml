@@ -1,8 +1,8 @@
-name: Qualify the integrated dynamic CRT decoder and writemask table on current Capstone next
+name: Verify dedicated x86 native MSVC Release LTCG with ordinary and mixed code-section controls
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-dynamic-crt-integration]
+    branches: [codex/capstone-dedicated-release-ipo]
     paths: [.gitattributes, capstone-performance/**, .github/workflows/capstone-msvc-formatter.yml]
 permissions:
   contents: read
@@ -12,9 +12,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { crt: MD, image: windows-2022 }
-          - { crt: MD, image: windows-2025 }
-          - { crt: MT, image: windows-2022 }
+          - { crt: MD, backends: x86, image: windows-2022 }
+          - { crt: MD, backends: x86, image: windows-2025 }
+          - { crt: MT, backends: x86, image: windows-2022 }
+          - { crt: MD, backends: mixed, image: windows-2022 }
+    env:
+      BACKENDS: ${{ matrix.backends }}
     runs-on: ${{ matrix.image }}
     timeout-minutes: 100
     steps:
@@ -28,7 +31,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dynamic-crt-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
+          name: dedicated-release-${{ matrix.backends }}-${{ matrix.image }}-${{ matrix.crt }}-${{ github.run_attempt }}
           path: capstone-evidence/
           retention-days: 14
 
@@ -49,6 +52,6 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: dynamic-public-${{ matrix.mode }}
+          name: dedicated-ipo-public-${{ matrix.mode }}
           path: capstone-evidence/
           retention-days: 14

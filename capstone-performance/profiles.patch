@@ -1,48 +1,60 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 11eefc2f..68b25e9a 100644
+index 524218e6..b5ecede6 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -425,10 +425,9 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -433,11 +433,21 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86Mapping.c
          arch/X86/X86Module.c
      )
 -    # With native MSVC x64 static CRT and LTCG, inlining gives the public
-+    # With native MSVC x64 LTCG, inlining gives the public
-     # iterator a large probed stack frame, even on its compact scan path.
+-    # iterator a large probed stack frame, even on its compact scan path.
 -    if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME AND CMAKE_C_COMPILER_ID STREQUAL "MSVC"
 -       AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
+-        set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
++    # MSVC can inline the decoder into the public iterator under LTCG, giving
++    # even a compact scan a very large probed stack frame.
 +    if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
-         set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
++        if(CAPSTONE_BUILD_STATIC_MSVC_RUNTIME)
++            set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS /GL-)
++        elseif(capstone_enabled_architectures STREQUAL "X86")
++            set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION})
++            if(DEFINED CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
++                set(x86_release_ipo ${CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE})
++            endif()
++            if(x86_release_ipo)
++                set_property(SOURCE arch/X86/X86DisassemblerDecoder.c APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:/GL->")
++                set_property(SOURCE arch/X86/X86Disassembler.c APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Release>:CAPSTONE_X86_LTCG_WRITEMASK>")
++            endif()
++        endif()
      endif()
      set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
+     set(HEADERS_X86
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index 8c3dea2e..c41d245f 100644
+index 8c3dea2e..b88dfbc7 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -96,6 +96,11 @@
+@@ -96,6 +96,9 @@
  #include "../../cs_priv.h"
  
  #include "X86BaseInfo.h"
-+#if defined(_MSC_VER) && !defined(__clang__) && defined(_M_X64) && \
-+	!defined(_M_ARM64EC) && defined(_DLL)
-+#define X86_USE_WRITEMASK_TABLE
++#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
 +#include "X86GenWritemask.inc"
 +#endif
  #include "X86Disassembler.h"
  #include "X86DisassemblerDecoderCommon.h"
  #include "X86DisassemblerDecoder.h"
-@@ -699,6 +704,10 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+@@ -699,6 +702,10 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
  			if (insn.hasLockPrefix)
  				Flags |= X86_IP_HAS_LOCK;
  
-+#ifdef X86_USE_WRITEMASK_TABLE
++#if defined(CAPSTONE_X86_LTCG_WRITEMASK) && defined(_DLL)
 +			if (x86HasWritemaskOperand(insn.instructionID))
 +				Flags |= X86_IP_HAS_EVEX_OPMASK;
 +#else
  			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
  				if (insn.operands[i].encoding ==
  				    ENCODING_WRITEMASK) {
-@@ -706,6 +715,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+@@ -706,6 +713,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
  					break;
  				}
  			}
