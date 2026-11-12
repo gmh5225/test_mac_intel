@@ -1,7 +1,7 @@
-name: NeverD batched x86 CALL discovery from current fork sources
+name: Verify published NeverD with the matching Capstone and current LLVM fork sources
 on:
   push:
-    branches: [codex/capstone-batch-call-discovery]
+    branches: [codex/capstone-neverd-vfpclass-integration]
     paths: [capstone-call-query/**, .github/workflows/capstone-call-query.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 8b46889707124368f56b535ece8d3067c6509cc4
+          ref: 3b335bad27cccc12120bee50a66d68e99a4f6f67
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -34,14 +34,14 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-      - name: Build and test the proposed NeverD dev change and time the production scan
+      - name: Exercise x86 and ARM integration, including masked VFPCLASS loads
         env:
           CC: clang
           CXX: clang++
-        run: python3 capstone-call-query/full-integration.py
+        run: python3 capstone-call-query/published-integration.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-call-discovery
+          name: neverd-published-vfpclass
           path: product-evidence/
           retention-days: 14
