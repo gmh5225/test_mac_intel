@@ -1,9 +1,9 @@
-name: Measure an isolated GCC scan stack frame on four independent x86 and ARM hosts
+name: Isolate GCC repeated string instructions for public formatter and detail output on real PE and ELF
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-gcc-separated-scan]
+    branches: [codex/capstone-gcc-output-stores]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-gcc-separated-scan
+  group: capstone-gcc-output-stores
   cancel-in-progress: false
 
 jobs:
@@ -21,12 +21,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: gcc, trial: 1 }
-          - { host: ubuntu-24.04, baseline: gcc, trial: 2 }
-          - { host: ubuntu-22.04, baseline: gcc, trial: 3 }
-          - { host: ubuntu-24.04-arm, baseline: gcc, trial: 4 }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 1, stores: vector }
+          - { host: ubuntu-22.04, baseline: gcc, trial: 2, stores: vector }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 3, stores: libcall }
+          - { host: ubuntu-22.04, baseline: gcc, trial: 4, stores: libcall }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 5, stores: unrolled }
+          - { host: ubuntu-22.04, baseline: gcc, trial: 6, stores: unrolled }
     env:
-      COMPARE_BASE: ${{ matrix.baseline }}
+      COMPARE_BASE: gcc
+      STORE_STRATEGY: ${{ matrix.stores }}
     runs-on: ${{ matrix.host }}
     timeout-minutes: 62
     steps:
@@ -51,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: separated-scan-trial-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: gcc-stores-${{ matrix.stores }}-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

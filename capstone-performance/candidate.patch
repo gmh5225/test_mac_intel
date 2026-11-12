@@ -117,23 +117,24 @@ index 97b899b5..ae1554b0 100644
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..30fe4931 100644
+index 90ef6e93..903529a8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2942,6 +2942,12 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+@@ -2942,6 +2942,13 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	return 0;
  }
  
-+/* GCC materializes the full legacy reader state for the public iterator.
-+ * Keep the smaller header in this compiler's dedicated Linux builds. */
-+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
++/* AArch64 GCC materializes the general legacy reader state even when
++ * scanning only for the public ID and length. */
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__aarch64__) && \
++    defined(__GNUC__) && !defined(__clang__)
 +#define X86_COMPACT_PUBLIC_HEADER
 +#endif
 +
  #include "X86GenLegacyTerminal.inc"
  #include "X86GenVexScan.inc"
  
-@@ -3506,6 +3512,94 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3506,6 +3513,94 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
  					     prefix);
  }
  
@@ -228,53 +229,19 @@ index 90ef6e93..30fe4931 100644
  /* Common headers enter the shared readers before the general prefix walk.
   * The extension selector observes CS_MODE_64, while raw mode selection gives
   * 16/32-bit flags precedence. Keep their original ordering for mixed flags. */
-@@ -3532,6 +3626,11 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+@@ -3532,6 +3627,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
  	if (opcode == 0x0f && may_be_0f_feature_extension(
  				      code + offset + 1, code_len - offset - 1))
  		return X86_SCAN_NOT_HANDLED;
 +#ifdef X86_COMPACT_PUBLIC_HEADER
 +	if (readerFlags)
-+		return scanInitialPublicTerminal(code, code_len, mode, opcode, (unsigned)offset,
++		return scanInitialPublicTerminal(code, code_len, mode, opcode,
++						 (unsigned)offset,
 +						 instructionID, size);
 +#endif
  	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
  				   instructionID, size, true, readerFlags);
  }
-@@ -3633,7 +3732,15 @@ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
- 					false);
- }
- 
--X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
-+/* The legacy scan uses substantially more local storage than text output.
-+ * Keep that storage in the scan arm of the public iterator on x64 GCC. */
-+#if defined(X86_COMPACT_PUBLIC_HEADER) && defined(__x86_64__)
-+#define X86_ITERATOR_SCAN static __attribute__((noinline))
-+#else
-+#define X86_ITERATOR_SCAN X86_DECODE_INLINE
-+#endif
-+
-+X86_ITERATOR_SCAN bool decodeIteratorScan(cs_struct *handle,
- 					  const uint8_t *code, size_t size,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch);
-@@ -3645,7 +3752,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- /* Keep the admitted terminal's public ID and zero alias adjustment visible
-  * through output completion. Cold helpers can take the fallback result's
-  * address without forcing terminal output through that escaped object. */
--X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
-+X86_ITERATOR_SCAN bool decodeIteratorScan(cs_struct *handle,
- 					  const uint8_t *code, size_t size,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch)
-@@ -3672,6 +3779,8 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 	return true;
- }
- 
-+#undef X86_ITERATOR_SCAN
-+
- CAPSTONE_EXPORT
- X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
 index 5627f249..dcaf2508 100644
 --- a/arch/X86/X86GenLegacyTerminal.inc
@@ -859,10 +826,10 @@ index 00000000..68de7ad4
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..5a51035f
+index 00000000..e6b217fc
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,325 @@
+@@ -0,0 +1,330 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -879,6 +846,11 @@ index 00000000..5a51035f
 +#include "X86InstPrinterCommon.h"
 +#include "../../utils.h"
 +#include "X86Mapping.h"
++/* GCC's generic x64 tuning uses repeated string instructions for zeroing
++ * the fixed public text arrays and for short variable-size copies. */
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__GNUC__) && !defined(__clang__) && defined(__x86_64__)
++#pragma GCC target("stringop-strategy=vector_loop")
++#endif
 +#include "X86SimpleOutput.h"
 +#include "X86GenSimpleOutput.inc"
 +
@@ -1333,7 +1305,7 @@ index 0a4c959f..b883b547 100644
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index 83b8d3d8..f7022128 100644
+index 83b8d3d8..48c6fb41 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
 @@ -871,6 +871,32 @@ def emit_full_legacy_handlers(groups):
@@ -1369,7 +1341,7 @@ index 83b8d3d8..f7022128 100644
  def emit_terminal(suffix):
      groups, terminals, rows, selected_counts, words, kinds = legacy_terminal_model(
          suffix
-@@ -920,6 +946,38 @@ def emit_terminal(suffix):
+@@ -920,6 +946,40 @@ def emit_terminal(suffix):
      # Both projections retain the same decision kind, invalid entries and readers.
      lines += emit_terminal_tables("Legacy", words, rows, kinds)
      lines += emit_terminal_tables("LegacyPublic", public_words, public_rows, kinds)
@@ -1399,7 +1371,9 @@ index 83b8d3d8..f7022128 100644
 +        "",
 +        "X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)",
 +        "{",
-+        *emit_terminal_selection("*terminal", "modrm", "x86LegacyPublicTerminals[index]", "false"),
++        *emit_terminal_selection(
++            "*terminal", "modrm", "x86LegacyPublicTerminals[index]", "false"
++        ),
 +        "\treturn true;",
 +        "}",
 +        "#endif",
@@ -1408,7 +1382,7 @@ index 83b8d3d8..f7022128 100644
      lines += [
          "X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,",
          "\t\t\t\tMCInst *mcInst, uint16_t *size, uint64_t decision, bool scan, unsigned *publicID, bool readerFlags)",
-@@ -935,27 +993,7 @@ def emit_terminal(suffix):
+@@ -935,27 +995,12 @@ def emit_terminal(suffix):
          "\t\t\treturn X86_SCAN_INVALID;",
          "\t\t}",
          "\t}",
@@ -1433,7 +1407,12 @@ index 83b8d3d8..f7022128 100644
 -        "\t\t\tX86_TERMINAL_REGISTER_SHIFT : 0;",
 -        "\t\tterminal = (decision >> shift) & X86_TERMINAL_MASK;",
 -        "\t}",
-+        *emit_terminal_selection("terminal", "insn->modRM", "publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index]", "X86_SCAN_INVALID"),
++        *emit_terminal_selection(
++            "terminal",
++            "insn->modRM",
++            "publicID ? x86LegacyPublicTerminals[index] : x86LegacyTerminals[index]",
++            "X86_SCAN_INVALID",
++        ),
          "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
          "\tif (publicID) {",
          "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",

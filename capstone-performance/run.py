@@ -150,8 +150,8 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
-    command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='compact initial public terminal on dedicated GCC, existing generated reader elsewhere'))
+    command(['git','apply',SOURCE/(os.environ['STORE_STRATEGY']+'-stores.patch')],'apply-release',WORK/'new')
+    write('comparison.json', dict(baseline='published b70c7e94 release', candidate='dedicated GCC x64 output stores '+os.environ['STORE_STRATEGY']))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -214,13 +214,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    expected = ['arch/X86/X86DisassemblerDecoder.c.o'] if os.environ['COMPARE_BASE']=='gcc' else []
-    assert diffs==expected,(diffs,expected)
-    if expected:
-        command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
-        command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
-    else:
-        assert sha(WORK/'decoder-base')==sha(WORK/'decoder-new')
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
@@ -385,7 +379,8 @@ def measure():
         binary=WORK/('decoder-'+label)
         command(['nm','-n','-S','--defined-only',binary],'linked-symbols-'+label)
         command(['objdump','-d','--disassemble=cs_disasm_iter',binary],'linked-cs_disasm_iter-'+label)
-    selected={('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('simd64','format'),('simd64','detail'),('amd64-ls','detail')}
+        command(['objdump','-d','--disassemble=X86_trySimpleOutput',binary],'linked-output-'+label)
+    selected={('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('simd64','format'),('simd64','detail'),('amd64-ls','detail'),('scalar32','format'),('scalar64','detail')}
     checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
     measure_panel('null',[c for c in checks if c['mode']=='detail' and c['name']!='amd64-ls'],9,['base','new','base_aa','new_aa'],350000000)
     measure_panel('x86',checks,17,['base','new','base_aa','new_aa','iced','iced_aa'],280000000)
