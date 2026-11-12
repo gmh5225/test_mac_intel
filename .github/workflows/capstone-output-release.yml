@@ -1,0 +1,43 @@
+name: Compare release and ordinary Capstone objects and native units across compilers and architectures
+on:
+  push:
+    branches: [codex/capstone-output-release-records]
+    paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-24.04, cc: gcc }
+          - { host: ubuntu-24.04-arm, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: gcc }
+          - { host: macos-15, cc: clang }
+          - { host: macos-15-intel, cc: clang }
+          - { host: windows-2022, cc: MD }
+          - { host: windows-2022, cc: MT }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 55
+    env:
+      TOOLCHAIN: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: capstone-output-release
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 64cce0a934f99ae582d30ffe2ba265d12ec823bb
+          path: source
+          persist-credentials: false
+      - run: python capstone-output-release/verify.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: output-release-${{ matrix.host }}-${{ matrix.cc }}
+          path: evidence/
+          retention-days: 14
