@@ -149,12 +149,12 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
-    command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
-    command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
-    incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Avoid clearing unused AArch64 operands in mixed four- and seven-backend products'))
-    for label in ['base', 'new']:
-        build(label)
+    build('base')
+    import install
+    dimensions=install.install(base, WORK/'new', SOURCE, WORK)
+    write('fixed-output.json',dimensions)
+    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Classify direct relative branches alongside fixed and register-pair instructions'))
+    build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
         selected = {line.split(':')[0] for line in fields if line.startswith('CAPSTONE_')
@@ -216,7 +216,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     difference=sorted(n for n in changed[0] if changed[0][n]!=changed[1][n])
-    assert difference==['cs.c.o'],difference
+    assert difference==['arch/X86/X86Disassembler.c.o','cs.c.o'],difference
     write('object-difference.json',dict(changed=difference,total=len(changed[0])))
     flag_records = []
     for label in ('base','new'):

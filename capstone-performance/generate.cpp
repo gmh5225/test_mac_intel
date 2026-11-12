@@ -1,0 +1,266 @@
+/* Capstone Disassembly Engine */
+/* SPDX-License-Identifier: BSD-3-Clause */
+
+// Generate public x86 output records from the full decoder. Build this tool
+// against a normal, non-DIET Capstone library with x86 enabled. A custom name
+// for UD2 selects the ordinary printer even when regenerating with these
+// tables already compiled in. No candidate encoding can produce UD2.
+#include "X86SimpleOutput.h"
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace {
+struct Decoder {
+	csh handle = 0;
+	cs_insn *insn = nullptr;
+	explicit Decoder(cs_mode mode)
+	{
+		cs_opt_mnem ordinary = { X86_INS_UD2, "ud2" };
+		if (cs_open(CS_ARCH_X86, mode, &handle) ||
+		    cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ||
+		    cs_option(handle, CS_OPT_MNEMONIC, reinterpret_cast<size_t>(&ordinary)) ||
+		    !(insn = cs_malloc(handle)))
+			throw std::runtime_error("cannot initialize the full x86 decoder");
+	}
+	~Decoder() { cs_free(insn, 1); cs_close(&handle); }
+	void decode(const uint8_t *input, size_t length, unsigned consumed, uint64_t ip)
+	{
+		const uint8_t *cursor = input;
+		if (!cs_disasm_iter(handle, &cursor, &length, &ip, insn) ||
+		    insn->size != consumed || cursor != input + consumed)
+			throw std::runtime_error("unexpected instruction boundary");
+	}
+};
+
+bool fixed_opcode(unsigned opcode, bool wide)
+{
+	if ((!wide && opcode >= 0x40 && opcode <= 0x4f) ||
+	    (opcode >= 0x50 && opcode <= 0x5f) || (opcode >= 0x90 && opcode <= 0x99) ||
+	    (opcode >= 0x9c && opcode <= 0x9f) || (opcode >= 0xf8 && opcode <= 0xfd))
+		return true;
+	switch (opcode) {
+	case 0xc3: case 0xc9: case 0xcb: case 0xcc: case 0xcf: case 0xd7:
+	case 0xec: case 0xed: case 0xee: case 0xef: case 0xf4: case 0xf5:
+		return true;
+	default: return false;
+	}
+}
+
+bool pair_opcode(unsigned opcode)
+{
+	return (opcode < 0x40 && (opcode & 7) <= 3) ||
+	       (opcode >= 0x84 && opcode <= 0x8b);
+}
+
+template <typename T, size_t N>
+void emit_array(std::ostream &out, const T (&values)[N])
+{
+	out << "{ ";
+	for (size_t i = 0; i < N; ++i) out << (i ? ", " : "") << unsigned(values[i]);
+	out << " }";
+}
+
+std::string initializer(const X86SimpleOutput &row)
+{
+	std::ostringstream out;
+	out << "{ " << row.id << ", \"" << row.mnemonic << "\", \"" << row.operands
+	    << "\", UINT64_C(" << row.flags << "), ";
+	emit_array(out, row.reads); out << ", "; emit_array(out, row.writes);
+	out << ", "; emit_array(out, row.groups);
+	for (unsigned v : {row.read_count, row.write_count, row.group_count,
+	                   row.operand_count, row.address_size, row.modrm_offset, row.imm_offset, row.imm_size}) out << ", " << v;
+	out << ", { ";
+	for (unsigned i = 0; i < 2; ++i) {
+		const auto &op = row.ops[i];
+		out << (i ? ", " : "") << "{ " << op.reg << ", " << unsigned(op.size)
+		    << ", " << unsigned(op.access) << " }";
+	}
+	return out.str() + " } }";
+}
+
+// A pair row owns the operand sizes and access modes. REX and ModR/M supply
+// its two register IDs. Every other public byte must be reproduced by the row.
+std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex, uint8_t modrm,
+                     const X86SimpleRegister *first, const X86SimpleRegister *second, bool branch = false)
+{
+	const auto &d = *insn.detail;
+	const auto &x = d.x86;
+	X86SimpleOutput row{};
+	if (strlen(insn.mnemonic) >= sizeof(row.mnemonic) || strlen(insn.op_str) >= sizeof(row.operands) ||
+	    strpbrk(insn.mnemonic, "\n\r\t\\\"") || strpbrk(insn.op_str, "\n\r\t\\\"") ||
+	    d.regs_read_count > 4 || d.regs_write_count > 4 || d.groups_count > 4 || x.op_count > 2)
+		return {};
+	row.id = insn.id;
+	strcpy(row.mnemonic, insn.mnemonic);
+	if (first) {
+		if (x.op_count != 2 || (std::string(first->name) + ", " + second->name) != insn.op_str)
+			return {};
+	} else if (!branch) strcpy(row.operands, insn.op_str);
+	row.flags = x.eflags;
+	row.read_count = d.regs_read_count;
+	row.write_count = d.regs_write_count;
+	row.group_count = d.groups_count;
+	row.operand_count = x.op_count;
+	row.address_size = x.addr_size;
+	row.modrm_offset = x.encoding.modrm_offset;
+	row.imm_offset = x.encoding.imm_offset;
+	row.imm_size = x.encoding.imm_size;
+	std::copy_n(d.regs_read, row.read_count, row.reads);
+	std::copy_n(d.regs_write, row.write_count, row.writes);
+	std::copy_n(d.groups, row.group_count, row.groups);
+	for (unsigned i = 0; i < x.op_count; ++i) {
+		const auto &op = x.operands[i];
+		if (op.type != (branch ? X86_OP_IMM : X86_OP_REG) || (!branch && unsigned(op.reg) > UINT16_MAX) || unsigned(op.access) > UINT8_MAX)
+			return {};
+		row.ops[i] = {static_cast<uint16_t>((first || branch) ? 0 : op.reg), op.size, static_cast<uint8_t>(op.access)};
+	}
+	cs_detail rebuilt;
+	X86_writeSimpleDetail(&rebuilt, &row, opcode, rex, modrm,
+	                      first ? first->reg : row.ops[0].reg, second ? second->reg : row.ops[1].reg);
+	if (branch) {
+		if (x.op_count != 1) return {};
+		if (row.imm_offset == 2) {
+			rebuilt.x86.opcode[0] = 0x0f;
+			rebuilt.x86.opcode[1] = opcode;
+		}
+		rebuilt.x86.operands[0].type = X86_OP_IMM;
+		rebuilt.x86.operands[0].imm = x.operands[0].imm;
+	}
+	if (memcmp(&rebuilt, &d, offsetof(cs_detail, x86) + sizeof(cs_x86))) return {};
+	return initializer(row);
+}
+
+void decode_pair(Decoder &d, uint8_t rex, uint8_t op, uint8_t mr)
+{
+	uint8_t bytes[] = {rex, op, mr};
+	unsigned length = rex ? 3 : 2;
+	d.decode(bytes + !rex, length, length, UINT64_MAX - 1);
+}
+
+unsigned register_class(unsigned opcode, unsigned rex)
+{
+	return (opcode & 1) ? ((rex & 8) ? 3 : 2) : (rex != 0);
+}
+} // namespace
+
+int main()
+{
+	Decoder x86(CS_MODE_32), x64(CS_MODE_64);
+	X86SimpleRegister regs[4][16]{};
+	for (unsigned width = 0; width < 4; ++width) {
+		for (unsigned i = 0; i < (width ? 16u : 8u); ++i) {
+			unsigned rex = width ? (0x40 | (i >= 8 ? 5 : 0) | (width == 3 ? 8 : 0)) : 0;
+			decode_pair(x64, rex, width < 2 ? 0x88 : 0x89, 0xc0 | (i & 7) * 9);
+			const auto &x = x64.insn->detail->x86;
+			if (x.op_count != 2 || x.operands[0].type != X86_OP_REG ||
+			    x.operands[1].type != X86_OP_REG || x.operands[0].reg != x.operands[1].reg) return 1;
+			auto &reg = regs[width][i];
+			reg.reg = x.operands[0].reg;
+			const char *name = cs_reg_name(x64.handle, reg.reg);
+			if (!name || strlen(name) >= sizeof(reg.name)) return 1;
+			strcpy(reg.name, name);
+			reg.length = static_cast<uint8_t>(strlen(name));
+		}
+	}
+	uint16_t plans[2][4][256]{};
+	std::vector<std::string> rows{initializer(X86SimpleOutput{})};
+	unsigned checked = 0, admitted = 0;
+	for (unsigned wide = 0; wide < 2; ++wide) {
+		Decoder &d = wide ? x64 : x86;
+		for (unsigned cls = 0; cls < 4; ++cls) {
+			for (unsigned op = 0; op < 256; ++op) {
+				if (!wide && (cls == 1 || cls == 2)) continue;
+				std::string row;
+				auto observe = [&](const std::string &actual) {
+					if (actual.empty() || (!row.empty() && row != actual))
+						throw std::runtime_error("unrepresentable x86 opcode " + std::to_string(op));
+					row = actual;
+					++checked;
+				};
+				unsigned form = X86_SIMPLE_FIXED;
+				if (!cls && fixed_opcode(op, wide)) {
+					for (unsigned tail = 0; tail <= 256; ++tail) {
+						uint8_t bytes[15];
+						memset(bytes, tail, sizeof(bytes));
+						bytes[0] = op;
+						d.decode(bytes, tail ? sizeof(bytes) : 1, 1, UINT64_MAX - tail);
+						observe(describe(*d.insn, op, 0, 0, nullptr, nullptr));
+					}
+				} else if ((!cls && ((op >= 0x70 && op <= 0x7f) || op == 0xeb || op == 0xe8 || op == 0xe9)) ||
+				           (cls == 3 && op >= 0x80 && op <= 0x8f)) {
+					form = X86_SIMPLE_RELATIVE;
+					const unsigned offset = cls == 3 ? 2 : 1;
+					const unsigned width = !cls && (op == 0xeb || (op & 0xf0) == 0x70) ? 1 : 4;
+					uint8_t bytes[6]{};
+					bytes[0] = cls == 3 ? 0x0f : op;
+					bytes[offset-1] = op;
+					for (uint32_t bits : {0u, 1u, 9u, 10u, 127u, 128u, 255u, 0x80000000u, 0x7fffffffu, 0xffffffffu}) {
+						for (unsigned j = 0; j < width; ++j) bytes[offset+j] = uint8_t(bits >> (j*8));
+						const int64_t delta = width == 1 ? int8_t(bits) : int32_t(bits);
+						for (uint64_t target : {uint64_t(0), uint64_t(1), uint64_t(9), uint64_t(10), uint64_t(0x12345678), uint64_t(0xffffffffu), UINT64_MAX, UINT64_C(0x8000000000000000)}) {
+							const uint64_t address = target - delta - offset - width;
+							const uint64_t expected = wide ? target : uint32_t(target);
+							d.decode(bytes, width+offset, width+offset, address);
+							auto &x = d.insn->detail->x86;std::ostringstream text;
+							if (expected > 9) text << "0x" << std::hex;
+							text << expected;
+							if (x.op_count != 1 || x.operands[0].type != X86_OP_IMM || uint64_t(x.operands[0].imm) != expected || text.str() != d.insn->op_str || x.encoding.imm_offset != offset || x.encoding.imm_size != width) throw std::runtime_error("relative address or text differs");
+							observe(describe(*d.insn, op, 0, 0, nullptr, nullptr, true));
+						}
+					}
+				} else if (cls != 3 && pair_opcode(op)) {
+					const unsigned start = cls ? (cls == 1 ? 0x40 : 0x48) : 0;
+					const auto &names = regs[register_class(op, start)];
+					decode_pair(d, start, op, 0xc1);
+					form = d.insn->detail->x86.operands[0].reg == names[0].reg ? X86_SIMPLE_REG_RM : X86_SIMPLE_RM_REG;
+					for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
+						for (unsigned mr = 0xc0; mr < 256; ++mr) {
+							decode_pair(d, rex, op, mr);
+							unsigned reg = ((rex & 4) << 1) | ((mr >> 3) & 7);
+							unsigned rm = ((rex & 1) << 3) | (mr & 7);
+							if (form == X86_SIMPLE_RM_REG) std::swap(reg, rm);
+							observe(describe(*d.insn, op, rex, mr, &names[reg], &names[rm]));
+						}
+					}
+				} else continue;
+				auto index = static_cast<size_t>(std::find(rows.begin(), rows.end(), row) - rows.begin());
+				if (index == rows.size()) rows.push_back(row);
+				if (index > UINT16_MAX >> 2) return 1;
+				plans[wide][cls][op] = static_cast<uint16_t>((index << 2) | form);
+				++admitted;
+			}
+		}
+	}
+	std::cout << "/* Generated by suite/synctools/x86_simple_output.cpp. */\n\n"
+	          << "static const uint16_t x86_simple_plans[2][4][256] = {\n";
+	for (auto &mode : plans) {
+		std::cout << "\t{\n";
+		for (auto &prefix : mode) {
+			std::cout << "\t\t{\n";
+			for (unsigned j = 0; j < 256; j += 16) {
+				std::cout << "\t\t\t";
+				for (unsigned k = 0; k < 16; ++k) std::cout << (k ? " " : "") << prefix[j + k] << ',';
+				std::cout << '\n';
+			}
+			std::cout << "\t\t},\n";
+		}
+		std::cout << "\t},\n";
+	}
+	std::cout << "};\n\nstatic const struct X86SimpleOutput x86_simple_outputs[] = {\n";
+	for (const auto &v : rows) std::cout << '\t' << v << ",\n";
+	std::cout << "};\n\nstatic const struct X86SimpleRegister x86_simple_registers[4][16] = {\n";
+	for (auto &names : regs) {
+		std::cout << "\t{\n";
+		for (auto &v : names) std::cout << "\t\t{ " << v.reg << ", " << unsigned(v.length) << ", \"" << v.name << "\" },\n";
+		std::cout << "\t},\n";
+	}
+	std::cout << "};\n";
+	std::cerr << "records=" << rows.size()-1 << " plans=" << admitted << " encodings_checked=" << checked
+	          << " table_bytes=" << sizeof(plans) + sizeof(regs) + rows.size()*sizeof(X86SimpleOutput) << '\n';
+}
