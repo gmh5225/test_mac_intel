@@ -65,17 +65,17 @@ static inline MCOperand *MCInst_getOperand(MCInst *inst, unsigned i)
     body = code[start:end]
     assert body.count('return false;') == 1 and body.count('return true;') == 1
     body = body.replace('\tMCInst mci;', '''\tMCInst mci;
-    const MCInst *previous_instruction = r575_current_instruction;
-    if (handle->arch == CS_ARCH_RISCV)
-        memset(&mci, POISON_VALUE, sizeof(mci));'''.replace('POISON_VALUE', str(poison)))
-    body = body.replace('\tmci.csh = handle;', '''    if (handle->arch == CS_ARCH_RISCV)
-        r575_current_instruction = &mci;
+\tconst MCInst *previous_instruction = r575_current_instruction;
+\tif (handle->arch == CS_ARCH_RISCV)
+\t\tmemset(&mci, POISON_VALUE, sizeof(mci));'''.replace('POISON_VALUE', str(poison)))
+    body = body.replace('\tmci.csh = handle;', '''\tif (handle->arch == CS_ARCH_RISCV)
+\t\tr575_current_instruction = &mci;
 \tmci.csh = handle;''')
-    body = body.replace('\t\treturn false;', '''    {
-        r575_current_instruction = previous_instruction;
-        return false;
-    }''')
-    body = body.replace('\treturn true;', '''    r575_current_instruction = previous_instruction;
+    body = body.replace('\t\treturn false;', '''\t{
+\t\tr575_current_instruction = previous_instruction;
+\t\treturn false;
+\t}''')
+    body = body.replace('\treturn true;', '''\tr575_current_instruction = previous_instruction;
 \treturn true;''')
     globals = '''__thread const MCInst *r575_current_instruction;
 __thread unsigned long long r575_read_checks;
