@@ -36,6 +36,13 @@ jobs:
         run: |
           uname -sm
           python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
+      - name: Install the debugger for private record addresses
+        run: |
+          if ! command -v gdb; then
+            sudo apt-get -qq update
+            sudo apt-get install -y --no-install-recommends gdb
+          fi
+          gdb --version
       - name: Build immutable sources and verify outputs
         timeout-minutes: 27
         run: python3 capstone-performance/run.py prepare
