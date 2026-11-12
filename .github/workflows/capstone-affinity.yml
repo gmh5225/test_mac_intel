@@ -3,7 +3,7 @@ name: Capstone fixed CPU performance control
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-x86-arch-relative-dispatch]
+    branches: [codex/capstone-intel-memory-address-operands]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-x86-arch-relative-dispatch
+  group: capstone-intel-memory-address-operands
   cancel-in-progress: false
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 52
+    timeout-minutes: 62
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -39,7 +39,7 @@ jobs:
           uname -sm
           python3 -m unittest discover -s capstone-performance -p 'test_*.py' -v
       - name: Build immutable sources and verify outputs
-        timeout-minutes: 17
+        timeout-minutes: 27
         run: python3 capstone-performance/run.py prepare
       - name: Measure fixed CPU A/A and paired workloads
         timeout-minutes: 37
