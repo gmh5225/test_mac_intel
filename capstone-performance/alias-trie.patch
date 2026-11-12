@@ -1,176 +1,165 @@
+diff --git a/arch/AArch64/AArch64GenAsmWriter.inc b/arch/AArch64/AArch64GenAsmWriter.inc
+index 45d70857..570c0b87 100644
+--- a/arch/AArch64/AArch64GenAsmWriter.inc
++++ b/arch/AArch64/AArch64GenAsmWriter.inc
+@@ -21635,7 +21635,7 @@ static void printInstruction(MCInst *MI, uint64_t Address, SStream *O) {
+ /// from the register set description.  This returns the assembler name
+ /// for the specified register.
+ static const char *
+-getRegisterName(unsigned RegNo, unsigned AltIdx) {
++getRegisterNameWithLength(unsigned RegNo, unsigned AltIdx, unsigned *ShortLength) {
+ #ifndef CAPSTONE_DIET
+   CS_ASSERT_RET_VAL(RegNo && RegNo < 703 && "Invalid register number!", NULL);
+ 
+@@ -22139,56 +22139,56 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
+   /* 3547 */ "nzcv\0"
+ };
+   static const uint16_t RegAsmOffsetNoRegAltName[] = {
+-    3511, 3159, 3506, 270, 3547, 3401, 3385, 3400, 3515, 3519, 3322, 3324, 3328, 3326, 
+-    330, 773, 1043, 1401, 1680, 2049, 2290, 2641, 2904, 3245, 53, 456, 877, 1186, 
+-    1509, 1826, 2128, 2409, 2720, 3023, 142, 585, 966, 1315, 1606, 1963, 2216, 2537, 
+-    2824, 3135, 246, 689, 333, 776, 1046, 1404, 1683, 2052, 2293, 2644, 2907, 3248, 
+-    57, 460, 881, 1190, 1513, 1830, 2132, 2413, 2724, 3027, 146, 589, 970, 1319, 
+-    1610, 1967, 2220, 2541, 2828, 3139, 250, 693, 336, 779, 1049, 1407, 1686, 2055, 
+-    2296, 2647, 2910, 3251, 61, 464, 885, 1194, 1517, 1834, 2136, 2417, 2728, 3031, 
+-    150, 593, 974, 1323, 1614, 1971, 2224, 2545, 2832, 3143, 254, 697, 343, 786, 
+-    1056, 1414, 1693, 2062, 2303, 2654, 2917, 3258, 70, 473, 894, 1203, 1526, 1843, 
+-    339, 782, 1052, 1410, 1689, 2058, 2299, 2650, 2913, 3254, 65, 468, 889, 1198, 
+-    1521, 1838, 346, 789, 1059, 1417, 1696, 2065, 2306, 2657, 2920, 3261, 74, 477, 
+-    898, 1207, 1530, 1847, 2140, 2421, 2732, 3035, 154, 597, 978, 1327, 1618, 1975, 
+-    2228, 2549, 2836, 3147, 258, 701, 349, 792, 1062, 1420, 1699, 2068, 2309, 2660, 
+-    2923, 3264, 78, 481, 902, 1211, 1534, 1851, 2144, 2425, 2736, 3039, 158, 601, 
+-    982, 1331, 1622, 1979, 2232, 2553, 2840, 3151, 262, 705, 356, 795, 1065, 1423, 
+-    1702, 2071, 2312, 2663, 2926, 3267, 82, 485, 906, 1215, 1538, 1855, 2148, 2429, 
+-    2740, 3043, 162, 605, 986, 1335, 1626, 1983, 2236, 2557, 2844, 3155, 266, 359, 
+-    798, 1068, 1426, 1705, 2074, 2315, 2666, 2929, 3270, 86, 489, 910, 1219, 1542, 
+-    1859, 2152, 2433, 2744, 3047, 166, 609, 990, 1339, 1630, 1987, 2240, 2561, 2848, 
+-    362, 801, 1071, 1429, 1708, 2077, 2318, 2669, 2932, 3273, 90, 493, 914, 1223, 
+-    1546, 1863, 2156, 2437, 2748, 3051, 170, 613, 994, 1343, 1634, 1991, 2244, 2565, 
+-    2852, 3163, 274, 709, 3331, 3337, 3343, 3349, 3355, 3361, 3367, 3373, 3379, 3388, 
+-    3394, 3411, 3424, 3437, 3450, 3463, 3476, 3482, 3488, 3494, 3500, 3404, 3417, 3430, 
+-    3443, 3456, 3469, 3523, 3529, 3535, 3541, 352, 721, 1005, 1353, 1644, 2001, 2254, 
+-    2575, 2862, 3173, 6, 371, 811, 1082, 1440, 1719, 2088, 2329, 2680, 2943, 102, 
+-    505, 926, 1235, 1558, 1875, 2168, 2449, 2760, 3063, 182, 625, 286, 1347, 1638, 
++    15799, 15447, 19890, 12558, 19931, 11593, 11577, 15688, 15803, 15807, 7418, 7420, 11520, 7422, 
++    8522, 8965, 9235, 9593, 9872, 10241, 10482, 10833, 11096, 11437, 12341, 12744, 13165, 13474, 
++    13797, 14114, 14416, 14697, 15008, 15311, 12430, 12873, 13254, 13603, 13894, 14251, 14504, 14825, 
++    15112, 15423, 12534, 12977, 8525, 8968, 9238, 9596, 9875, 10244, 10485, 10836, 11099, 11440, 
++    12345, 12748, 13169, 13478, 13801, 14118, 14420, 14701, 15012, 15315, 12434, 12877, 13258, 13607, 
++    13898, 14255, 14508, 14829, 15116, 15427, 12538, 12981, 8528, 8971, 9241, 9599, 9878, 10247, 
++    10488, 10839, 11102, 11443, 12349, 12752, 13173, 13482, 13805, 14122, 14424, 14705, 15016, 15319, 
++    12438, 12881, 13262, 13611, 13902, 14259, 14512, 14833, 15120, 15431, 12542, 12985, 8535, 8978, 
++    9248, 9606, 9885, 10254, 10495, 10846, 11109, 11450, 12358, 12761, 13182, 13491, 13814, 14131, 
++    12627, 13070, 13340, 13698, 13977, 14346, 14587, 14938, 15201, 15542, 16449, 16852, 17273, 17582, 
++    17905, 18222, 8538, 8981, 9251, 9609, 9888, 10257, 10498, 10849, 11112, 11453, 12362, 12765, 
++    13186, 13495, 13818, 14135, 14428, 14709, 15020, 15323, 12442, 12885, 13266, 13615, 13906, 14263, 
++    14516, 14837, 15124, 15435, 12546, 12989, 8541, 8984, 9254, 9612, 9891, 10260, 10501, 10852, 
++    11115, 11456, 12366, 12769, 13190, 13499, 13822, 14139, 14432, 14713, 15024, 15327, 12446, 12889, 
++    13270, 13619, 13910, 14267, 14520, 14841, 15128, 15439, 12550, 12993, 8548, 8987, 9257, 9615, 
++    9894, 10263, 10504, 10855, 11118, 11459, 12370, 12773, 13194, 13503, 13826, 14143, 14436, 14717, 
++    15028, 15331, 12450, 12893, 13274, 13623, 13914, 14271, 14524, 14845, 15132, 15443, 12554, 8551, 
++    8990, 9260, 9618, 9897, 10266, 10507, 10858, 11121, 11462, 12374, 12777, 13198, 13507, 13830, 
++    14147, 14440, 14721, 15032, 15335, 12454, 12897, 13278, 13627, 13918, 14275, 14528, 14849, 15136, 
++    8554, 8993, 9263, 9621, 9900, 10269, 10510, 10861, 11124, 11465, 12378, 12781, 13202, 13511, 
++    13834, 14151, 14444, 14725, 15036, 15339, 12458, 12901, 13282, 13631, 13922, 14279, 14532, 14853, 
++    15140, 15451, 12562, 12997, 23811, 23817, 23823, 23829, 23835, 23841, 23847, 23853, 23859, 23868, 
++    23874, 23891, 23904, 23917, 23930, 23943, 23956, 23962, 23968, 23974, 23980, 27980, 27993, 28006, 
++    28019, 28032, 28045, 24003, 24009, 24015, 24021, 12640, 21201, 21485, 21833, 22124, 22481, 22734, 
++    23055, 23342, 23653, 24582, 29043, 29483, 29754, 30112, 30391, 30760, 31001, 31352, 31615, 28774, 
++    29177, 29598, 29907, 30230, 30547, 30840, 31121, 31432, 31735, 28854, 29297, 24862, 1347, 1638, 
+     1995, 2248, 2569, 2856, 3167, 0, 365, 804, 1074, 1432, 1711, 2080, 2321, 2672, 
+     2935, 94, 497, 918, 1227, 1550, 1867, 2160, 2441, 2752, 3055, 174, 617, 278, 
+     713, 998, 1002, 1350, 1641, 1998, 2251, 2572, 2859, 3170, 3, 368, 807, 1078, 
+     1436, 1715, 2084, 2325, 2676, 2939, 98, 501, 922, 1231, 1554, 1871, 2164, 2445, 
+-    2756, 3059, 178, 621, 282, 717, 727, 1011, 1359, 1650, 2007, 2260, 2581, 2868, 
+-    3179, 13, 379, 819, 1090, 1448, 1727, 293, 741, 1024, 1371, 1662, 2019, 2272, 
+-    2593, 2880, 3191, 26, 393, 834, 1106, 1464, 1743, 2104, 2345, 2696, 2959, 118, 
+-    521, 942, 1251, 1574, 1891, 2184, 2465, 2776, 3079, 198, 641, 308, 1365, 1656, 
++    2756, 3059, 178, 621, 282, 717, 21207, 21491, 21839, 22130, 22487, 22740, 23061, 23348, 
++    23659, 24589, 29051, 29491, 29762, 30120, 30399, 24869, 21221, 21504, 21851, 22142, 22499, 22752, 
++    23073, 23360, 23671, 24602, 29065, 29506, 29778, 30136, 30415, 30776, 31017, 31368, 31631, 28790, 
++    29193, 29614, 29923, 30246, 30563, 30856, 31137, 31448, 31751, 28870, 29313, 24884, 1365, 1656, 
+     2013, 2266, 2587, 2874, 3185, 20, 387, 827, 1098, 1456, 1735, 2096, 2337, 2688, 
+     2951, 110, 513, 934, 1243, 1566, 1883, 2176, 2457, 2768, 3071, 190, 633, 300, 
+     733, 1017, 1021, 1368, 1659, 2016, 2269, 2590, 2877, 3188, 23, 390, 830, 1102, 
+     1460, 1739, 2100, 2341, 2692, 2955, 114, 517, 938, 1247, 1570, 1887, 2180, 2461, 
+     2772, 3075, 194, 637, 304, 737, 3276, 2605, 3203, 409, 1122, 1759, 2361, 2975, 
+-    537, 1267, 1907, 2481, 3307, 747, 1377, 2025, 2599, 3197, 401, 1114, 1751, 2353, 
+-    2967, 529, 1259, 1899, 2473, 3087, 3315, 3300, 753, 1383, 2031, 2623, 3221, 427, 
+-    1142, 1781, 2385, 2999, 561, 1291, 1931, 2505, 767, 1037, 1395, 1674, 2043, 2284, 
+-    2635, 2898, 3239, 46, 441, 849, 1158, 1494, 1811, 2120, 2401, 2712, 3015, 134, 
+-    577, 958, 1307, 1590, 1947, 2200, 2521, 2816, 3127, 238, 657, 323, 1389, 1668, 
++    537, 1267, 1907, 2481, 31979, 21227, 21857, 22505, 23079, 23677, 29073, 29786, 30423, 31025, 
++    31639, 29201, 29931, 30571, 31145, 31759, 27891, 27876, 21233, 21863, 22511, 23103, 23701, 29099, 
++    29814, 30453, 31057, 31671, 29233, 29963, 30603, 31177, 21247, 21517, 21875, 22154, 22523, 22764, 
++    23115, 23378, 23719, 24622, 29113, 29521, 29830, 30166, 30483, 30792, 31073, 31384, 31687, 28806, 
++    29249, 29630, 29979, 30262, 30619, 30872, 31193, 31488, 31799, 28910, 29329, 24899, 1389, 1668, 
+     2037, 2278, 2629, 2892, 3233, 40, 435, 842, 1150, 1486, 1803, 2112, 2393, 2704, 
+     3007, 126, 569, 950, 1299, 1582, 1939, 2192, 2513, 2808, 3119, 230, 649, 315, 
+     759, 1030, 1034, 1392, 1671, 2040, 2281, 2632, 2895, 3236, 43, 438, 845, 1154, 
+     1490, 1807, 2116, 2397, 2708, 3011, 130, 573, 954, 1303, 1586, 1943, 2196, 2517, 
+-    2812, 3123, 234, 653, 319, 763, 1598, 1955, 2208, 2529, 2784, 3095, 206, 665, 
+-    2886, 3227, 33, 449, 857, 1166, 1502, 1819, 2792, 3103, 214, 673, 864, 1173, 
++    2812, 3123, 234, 653, 319, 763, 30270, 30627, 30880, 31201, 31456, 31767, 28878, 29337, 
++    23366, 23707, 24609, 25025, 25433, 25742, 26078, 26395, 2792, 3103, 214, 673, 864, 1173, 
+     1472, 1789, 
+   };
+ 
+@@ -22339,10 +22339,14 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
+ 
+   switch(AltIdx) {
+   default: CS_ASSERT_RET_VAL(0 && "Invalid register alt name index!", NULL);
+-  case AArch64_NoRegAltName:
+-    CS_ASSERT_RET_VAL(*(AsmStrsNoRegAltName+RegAsmOffsetNoRegAltName[RegNo-1]) &&
+-           "Invalid alt name index for register!", NULL);
+-    return AsmStrsNoRegAltName+RegAsmOffsetNoRegAltName[RegNo-1];
++  case AArch64_NoRegAltName: {
++    unsigned entry = RegAsmOffsetNoRegAltName[RegNo-1];
++    const char *name = AsmStrsNoRegAltName + (entry & 0xfff);
++    CS_ASSERT_RET_VAL(*name && "Invalid alt name index for register!", NULL);
++    if (ShortLength)
++      *ShortLength = entry >> 12;
++    return name;
++  }
+   case AArch64_vlist1:
+     CS_ASSERT_RET_VAL(*(AsmStrsvlist1+RegAsmOffsetvlist1[RegNo-1]) &&
+            "Invalid alt name index for register!", NULL);
+@@ -22356,6 +22360,10 @@ getRegisterName(unsigned RegNo, unsigned AltIdx) {
+   return NULL;
+ #endif // CAPSTONE_DIET
+ }
++static const char *getRegisterName(unsigned RegNo, unsigned AltIdx)
++{
++  return getRegisterNameWithLength(RegNo, AltIdx, NULL);
++}
+ #ifdef PRINT_ALIAS_INSTR
+ #undef PRINT_ALIAS_INSTR
+ 
 diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
-index bffb617f..55b695c4 100644
+index bffb617f..32d4d297 100644
 --- a/arch/AArch64/AArch64InstPrinter.c
 +++ b/arch/AArch64/AArch64InstPrinter.c
-@@ -80,14 +80,43 @@ DECLARE_printComplexRotationOp(90, 0);
+@@ -80,8 +80,21 @@ DECLARE_printComplexRotationOp(90, 0);
  
  void printRegName(SStream *OS, unsigned Reg)
  {
+-	SStream_concat2(OS, markup("<reg:"),
+-			getRegisterName(Reg, AArch64_NoRegAltName));
 +#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	const char *name = getRegisterName(Reg, AArch64_NoRegAltName);
-+	/* With markup disabled the two empty tags contribute no bytes. The
-+	 * generic formatter still owns custom callbacks and full streams. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
-+	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
-+		SStream_concat0(OS, name);
-+		return;
-+	}
-+	SStream_concat2(OS, markup("<reg:"), name);
-+#else
- 	SStream_concat2(OS, markup("<reg:"),
- 			getRegisterName(Reg, AArch64_NoRegAltName));
-+#endif
- 	SStream_concat0(OS, markup(">"));
- }
- 
- void printRegNameAlt(SStream *OS, unsigned Reg, unsigned AltIdx)
- {
--	SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg, AltIdx));
-+#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+	const char *name = getRegisterName(Reg, AltIdx);
-+	/* With markup disabled the two empty tags contribute no bytes. The
-+	 * generic formatter still owns custom callbacks and full streams. */
-+	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
-+	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
-+		SStream_concat0(OS, name);
-+		return;
-+	}
-+	SStream_concat2(OS, markup("<reg:"), name);
-+#else
-+	SStream_concat2(OS, markup("<reg:"),
-+			getRegisterName(Reg, AltIdx));
-+#endif
- 	SStream_concat0(OS, markup(">"));
- }
- 
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-index c74ca4e1..de1366ff 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-@@ -634,6 +634,31 @@ public:
-         syntax = b"{ int y = 1; int x = 1; OS << x; }"
-         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
- 
-+    def test_register_writer(self):
-+        from autosync.cpptranslator.patches.StreamOperation import REGISTER_WRITER
-+
-+        name = b"getRegisterName(Reg, AltIdx)"
-+        expected = (
-+            REGISTER_WRITER.replace(b"$LOCAL", b"name")
-+            .replace(b"$STREAM", b"O")
-+            .replace(b"$NAME", name)
-+        )
-+        for statement in (
-+            b'O << markup("<reg:") << ' + name + b' << markup(">");',
-+            b"markup(O, Markup::Register) << " + name + b";",
-+        ):
-+            self.check_patching_result(
-+                StreamOperations(0), b"void printRegName() {" + statement + b"}", expected
-+            )
-+
-+        self.check_patching_result(
-+            StreamOperations(0),
-+            b"void printRegName(int name) {markup(O, Markup::Register) << getRegisterName(name, AltIdx);}",
-+            REGISTER_WRITER.replace(b"$LOCAL", b"name_")
-+            .replace(b"$STREAM", b"O")
-+            .replace(b"$NAME", b"getRegisterName(name, AltIdx)"),
-+        )
-+
-     def test_streamoperation_string_groups(self):
-         patch = StreamOperations(0)
-         for syntax, expected in [
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-index e507eae0..88b27a6e 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-@@ -7,6 +7,75 @@ from autosync.cpptranslator.patches.Helper import get_text, get_text_from_node
- from autosync.cpptranslator.patches.Patch import Patch
- 
- 
-+def _register_writer(stream: Node, operands: list[Node], statement: Node, src: bytes):
-+    """Lower a complete void register writer, including its callback fallback."""
-+    body = statement.parent
-+    if (
-+        not body
-+        or body.type != "compound_statement"
-+        or body.named_child_count != 1
-+        or not body.parent
-+        or body.parent.type != "function_definition"
-+        or body.parent.child_by_field_name("type") is None
-+        or get_text_from_node(src, body.parent.child_by_field_name("type")) != b"void"
-+    ):
-+        return None
-+    if len(operands) == 3:
-+        if (
-+            stream.type != "identifier"
-+            or get_text_from_node(src, operands[0]) != b'markup("<reg:")'
-+            or get_text_from_node(src, operands[2]) != b'markup(">")'
-+        ):
-+            return None
-+        name = operands[1]
-+    elif len(operands) == 1 and stream.type == "call_expression":
-+        if get_text_from_node(src, stream.child_by_field_name("function")) != b"markup":
-+            return None
-+        args = stream.child_by_field_name("arguments").named_children
-+        if (
-+            len(args) != 2
-+            or args[0].type != "identifier"
-+            or get_text_from_node(src, args[1]) != b"Markup::Register"
-+        ):
-+            return None
-+        stream, name = args[0], operands[0]
-+    else:
-+        return None
-+    if (
-+        name.type != "call_expression"
-+        or get_text_from_node(src, name.child_by_field_name("function"))
-+        != b"getRegisterName"
-+    ):
-+        return None
-+    local = b"name"
-+    function = get_text_from_node(src, body.parent)
-+    while local in function:
-+        local += b"_"
-+    return (
-+        REGISTER_WRITER.replace(b"$LOCAL", local)
-+        .replace(b"$STREAM", get_text_from_node(src, stream))
-+        .replace(b"$NAME", get_text_from_node(src, name))
-+    )
-+
-+
-+REGISTER_WRITER = br"""#if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
 +    !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +    !defined(_WIN32_WCE)
-+    const char *$LOCAL = $NAME;
-+    /* With markup disabled the two empty tags contribute no bytes. The
-+     * generic formatter still owns custom callbacks and full streams. */
-+    if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
-+        $STREAM->index < SSTREAM_BUF_LEN - 1 && $LOCAL && $LOCAL[0]) {
-+        SStream_concat0($STREAM, $LOCAL);
-+        return;
-+    }
-+    SStream_concat2($STREAM, markup("<reg:"), $LOCAL);
++	unsigned short_length = 0;
++	const char *name = getRegisterNameWithLength(Reg, AArch64_NoRegAltName,
++						    &short_length);
++	if (short_length && cs_vsnprintf == cs_default_vsnprintf &&
++	    !getUseMarkup() && OS->index < SSTREAM_BUF_LEN - 1) {
++		SStream_concat0_small(OS, name, short_length);
++		return;
++	}
++	SStream_concat2(OS, markup("<reg:"), name);
 +#else
-+    SStream_concat2($STREAM, markup("<reg:"),
-+            $NAME);
++	SStream_concat2(OS, markup("<reg:"), getRegisterName(Reg, AArch64_NoRegAltName));
 +#endif
-+    SStream_concat0($STREAM, markup(">"));"""
-+
- class StreamOperations(Patch):
-     """
-     Patch   OS << ...
-@@ -57,6 +126,10 @@ class StreamOperations(Patch):
-         # We reversing it so the left most operand comes first.
-         ops.reverse()
+ 	SStream_concat0(OS, markup(">"));
+ }
  
-+        register = _register_writer(bin_expr, ops, captures[0][0], src)
-+        if register is not None:
-+            return register
-+
-         res = b""
-         # Capstone uses the following functions to copy the strings to a buffer:
-         # SStream_concat  - Copies multiple strings.
