@@ -1,7 +1,7 @@
-name: Compare standard MIPS register-immediate and load/store scans in standalone clients on Debian coreutils
+name: Measure changing the dedicated MIPS decode callback when scan options are selected
 on:
   push:
-    branches: [codex/capstone-mips-major-coreutils]
+    branches: [codex/capstone-mips-select-scanner]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-major-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: selected-major-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

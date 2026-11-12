@@ -29,18 +29,23 @@ index 636d0411..6ee9ee28 100644
  CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
  endif
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 84222bfa..ca0e559f 100644
+index 84222bfa..6b0293f0 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -288,6 +288,55 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- {
- 	uint64_t size64;
- 	Mips_init_cs_detail(instr);
+@@ -755,4 +755,76 @@ void Mips_set_mem_access(MCInst *MI, bool status)
+ 	}
+ }
+ 
 +#ifdef CAPSTONE_MIPS_DEDICATED_SCAN
-+	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
-+	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
-+	    instr->csh->disasm == Mips_getInstruction &&
-+	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
++static bool Mips_getInstructionScan(csh handle, const uint8_t *code,
++				    size_t length, MCInst *instr,
++				    uint16_t *size, uint64_t address,
++				    void *info)
++{
++	/* An installed decoder callback may delegate here to obtain MC operands. */
++	if (length >= 4 && !instr->flat_insn->detail &&
++	    instr->csh->disasm == Mips_getInstructionScan) {
++		const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
 +		/* For these standard immediate and load/store encodings all
 +		 * register and immediate bits are operands. */
 +		const unsigned major = readBytes32(instr, code) >> 26;
@@ -78,16 +83,85 @@ index 84222bfa..ca0e559f 100644
 +			break;
 +		}
 +		if (opcode) {
++			Mips_init_cs_detail(instr);
 +			MCInst_setOpcode(instr, opcode);
 +			map_cs_id(instr, mips_insns, ARR_SIZE(mips_insns));
 +			*size = 4;
 +			return true;
 +		}
 +	}
++	return Mips_getInstruction(handle, code, length, instr, size, address,
++				   info);
++}
++
++void Mips_selectDecoder(cs_struct *handle)
++{
++	if (handle->disasm != Mips_getInstruction &&
++	    handle->disasm != Mips_getInstructionScan)
++		return;
++	const cs_mode mode = handle->mode & ~CS_MODE_BIG_ENDIAN;
++	handle->disasm = handle->no_text && !handle->detail_opt &&
++					 (mode == CS_MODE_MIPS32 ||
++					  mode == CS_MODE_MIPS64) ?
++				 Mips_getInstructionScan :
++				 Mips_getInstruction;
++}
 +#endif
- 	instr->MRI = (MCRegisterInfo *)info;
- 	map_set_fill_detail_ops(instr, true);
++
+ #endif
+diff --git a/arch/Mips/MipsModule.c b/arch/Mips/MipsModule.c
+index e774efa0..29cde3cb 100644
+--- a/arch/Mips/MipsModule.c
++++ b/arch/Mips/MipsModule.c
+@@ -40,6 +40,9 @@ cs_err Mips_option(cs_struct *handle, cs_opt_type type, size_t value)
+ 	switch (type) {
+ 	case CS_OPT_MODE:
+ 		handle->mode = (cs_mode)value;
++#ifdef CAPSTONE_MIPS_DEDICATED_SCAN
++		Mips_selectDecoder(handle);
++#endif
+ 		break;
+ 	case CS_OPT_SYNTAX:
+ 		handle->syntax |= (int)value;
+diff --git a/arch/Mips/MipsModule.h b/arch/Mips/MipsModule.h
+index b404171d..1aee4107 100644
+--- a/arch/Mips/MipsModule.h
++++ b/arch/Mips/MipsModule.h
+@@ -7,6 +7,10 @@
+ #include "../../utils.h"
  
+ cs_err Mips_global_init(cs_struct *ud);
++#ifdef CAPSTONE_MIPS_DEDICATED_SCAN
++void Mips_selectDecoder(cs_struct *handle);
++#endif
++
+ cs_err Mips_option(cs_struct *handle, cs_opt_type type, size_t value);
+ 
+ #endif // CS_MIPS_MODULE_H
+diff --git a/cs.c b/cs.c
+index 59a88cf8..2ced066a 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1282,6 +1282,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 
+ 	case CS_OPT_TEXT:
+ 		handle->no_text = value == CS_OPT_OFF;
++#ifdef CAPSTONE_MIPS_DEDICATED_SCAN
++		Mips_selectDecoder(handle);
++#endif
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_DETAIL:
+@@ -1291,6 +1294,9 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
+ 			handle->detail_opt = CS_OPT_OFF;
+ 		else
+ 			handle->detail_opt |= (cs_opt_value)value;
++#ifdef CAPSTONE_MIPS_DEDICATED_SCAN
++		Mips_selectDecoder(handle);
++#endif
+ 		return CS_ERR_OK;
+ 
+ 	case CS_OPT_SKIPDATA:
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index 908b0266..00b3f131 100644
 --- a/tests/unit/CMakeLists.txt
