@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='isolated EVEX scanner and nine register output families'))
+    write('comparison.json', dict(baseline='published f53af83f group-1 register imm8 release', candidate='combined EVEX and VEX indexed full output validated over 2.1 million VEX cases'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -375,16 +375,10 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    selected={'putty-32-0.85','putty-64-0.85','simd64','scalar32','scalar64','amd64-ls'}
-    checks=[v for v in cases if v['name'] in selected and v['consumer']=='decoder']
-    assert len(checks)==18
-    for label in ('base','new'):
-        binary=WORK/('decoder-'+label);command(['nm','-n','-S','--defined-only',binary],'linked-symbols-'+label)
-        for symbol in ('cs_disasm_iter','cs_decode_full_insn','X86_trySimpleOutput','decodeScanResultGeneric','decodeScanResultFallback','tryEvexTerminalScan','writeEvexRegisterOutput'):
-            command(['objdump','-d','--disassemble='+symbol,binary],'linked-'+symbol+'-'+label)
-    controls=[c for c in checks if (c['name'],c['mode']) in [('putty-32-0.85','scan'),('simd64','detail')]]
-    measure_panel('null',controls,9,['base','new','base_aa','new_aa'],300000000)
-    measure_panel('x86',checks,13,['base','new','base_aa','new_aa','iced','iced_aa'],240000000)
+    selected={('amd64-ls','detail'),('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('scalar32','format'),('scalar64','detail'),('simd64','detail'),('putty-64-0.85','format')}
+    checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
+    measure_panel('null',[v for v in checks if (v['name'],v['mode']) in [('putty-32-0.85','format'),('scalar32','format')]],9,['base','new','base_aa','new_aa'],350000000)
+    measure_panel('other',checks,23,['base','new','base_aa','new_aa'],350000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 

@@ -1,9 +1,9 @@
-name: Verify isolated vector decoding against published group-1 release in dedicated profiles
+name: Compare the complete vector output candidate with the current published x86 release across independent long runs
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-isolated-vector-release-controls]
+    branches: [codex/capstone-vector-published-controls]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-isolated-vector-release-controls
+  group: capstone-vector-published-controls
   cancel-in-progress: false
 
 jobs:
@@ -21,10 +21,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: clang }
-          - { host: ubuntu-24.04-arm, baseline: clang }
-          - { host: ubuntu-24.04, baseline: gcc }
-          - { host: ubuntu-24.04-arm, baseline: gcc }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 1 }
+          - { host: ubuntu-24.04, baseline: gcc, trial: 2 }
+          - { host: ubuntu-22.04, baseline: gcc, trial: 3 }
+          - { host: ubuntu-24.04, baseline: clang, trial: 4 }
+          - { host: ubuntu-24.04-arm, baseline: clang, trial: 5 }
+          - { host: ubuntu-24.04-arm, baseline: gcc, trial: 6 }
     env:
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
@@ -51,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-evex-controls-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: vector-release-trial-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
