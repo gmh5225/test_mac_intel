@@ -1,9 +1,9 @@
-name: Capstone fixed CPU performance control
+name: Attribute compiler-specific instruction, memory and branch cost of production scan, formatting and operand detail
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-iced-warm-profile]
+    branches: [codex/capstone-extent-compiler-profiles]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-iced-warm-profile
+  group: capstone-extent-compiler-profiles
   cancel-in-progress: false
 
 jobs:
@@ -21,8 +21,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: combined }
+          - { host: ubuntu-24.04, baseline: gcc }
+          - { host: ubuntu-24.04, baseline: clang }
     env:
+      CC: ${{ matrix.baseline }}
       COMPARE_BASE: ${{ matrix.baseline }}
     runs-on: ${{ matrix.host }}
     timeout-minutes: 52
@@ -39,7 +41,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-arch-relative-dispatch-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: compiler-counters-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

@@ -1,0 +1,324 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 90ef6e93..d730a0d5 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2002,6 +2002,36 @@ X86_DECODE_INLINE int readModRMScan(struct InternalInstruction *insn)
+ 	return readModRMImpl(insn, false);
+ }
+ 
++/* A public scan observes the terminal ID and length. The compact descriptor
++ * already rejects special ModR/M forms. Only a no-base SIB changes the
++ * ordinary 32/64-bit address length after the ModR/M byte has been read. */
++X86_DECODE_INLINE unsigned scanModRMEnd(const uint8_t *code, size_t size,
++					size_t offset, unsigned addressSize)
++{
++	if (offset >= 15 || offset >= size)
++		return 0;
++	const uint8_t modrm = code[offset];
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	unsigned end = (unsigned)offset + 1;
++	if (addressSize == 2) {
++		static const uint8_t disp[4] = { 0, 1, 2, 0 };
++		return end + disp[mod] + ((modrm & 0xc7) == 6 ? 2 : 0);
++	}
++	static const uint8_t extra[4][8] = {
++		{ 0, 0, 0, 0, 1, 4, 0, 0 },
++		{ 1, 1, 1, 1, 2, 1, 1, 1 },
++		{ 4, 4, 4, 4, 5, 4, 4, 4 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
++	};
++	if ((modrm & 0xc7) == 4) {
++		if (end >= size)
++			return 0;
++		if ((code[end] & 7) == 5)
++			end += 4;
++	}
++	return end + extra[mod][rm];
++}
++
+ /* Specializations below pass constant operand classes to the same readers
+  * and validators as the generic operand interpreter. */
+ #define GENERIC_FIXUP_FUNC(name, base, prefix, mask, rm_field) \
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index 5627f249..2e956568 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -2670,59 +2670,33 @@ X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+-X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+-		uint16_t *size, unsigned int pattern)
++X86_DECODE_INLINE int scanPublicLegacyOperands(const struct InternalInstruction *insn,
++		uint16_t *size, unsigned int pattern, bool decisionModRM)
+ {
+-	if ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))
++	size_t end = insn->readerCursor;
++	if (end > 15)
+ 		return X86_SCAN_INVALID;
+-	if (pattern >> 1) {
+-		switch (pattern >> 1) {
+-		case 1:
+-			if (readImmediateImpl(insn, 1, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 2:
+-			if (readImmediateImpl(insn, insn->immediateSize, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 3:
+-			if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-			    readImmediateImpl(insn, 2, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 4:
+-			if (readMemoryOffset(insn, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 5:
+-			if (readImmediateImpl(insn, 2, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 6:
+-			if (readImmediateImpl(insn, 2, false) ||
+-			    readImmediateImpl(insn, 1, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 7:
+-			if (readImmediateImpl(insn, 4, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 8:
+-			if (readImmediateImpl(insn, 8, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 9:
+-			if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-			    readImmediateImpl(insn, insn->immediateSize, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		default:
++	if (((pattern & 1) || decisionModRM) && !insn->consumedModRM) {
++		end = scanModRMEnd(insn->code, insn->codeSize, end, insn->addressSize);
++		if (!end)
+ 			return X86_SCAN_INVALID;
+-		}
+ 	}
+-	if (finishDecodedInstruction(insn, false))
++	switch (pattern >> 1) {
++	case 0: break;
++	case 1: end += 1; break;
++	case 2: end += insn->immediateSize; break;
++	case 3: end += insn->immediateSize + 2; break;
++	case 4: end += insn->addressSize; break;
++	case 5: end += 2; break;
++	case 6: end += 2 + 1; break;
++	case 7: end += 4; break;
++	case 8: end += 8; break;
++	case 9: end += insn->immediateSize + insn->immediateSize; break;
++	default: return X86_SCAN_INVALID;
++	}
++	if (end > 15 || end > insn->codeSize)
+ 		return X86_SCAN_INVALID;
+-	*size = (uint16_t)insn->length;
++	*size = (uint16_t)end;
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+@@ -7106,13 +7080,10 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 	}
+ 	unsigned instructionID = terminal & X86_TERMINAL_UID_MASK;
+ 	if (publicID) {
+-		/* Retain the original reader before invalid-ID rejection, including truncation. */
+-		if (readerFlags && decisionModRM && readModRMScan(insn))
+-			return X86_SCAN_INVALID;
+ 		if (!instructionID)
+ 			return X86_SCAN_INVALID;
+ 		int status = readerFlags ?
+-		    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK) :
++		    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK, decisionModRM) :
+ 		    scanLegacyPublicOperands(insn, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 		if (status == X86_SCAN_COMPLETE)
+ 			*publicID = instructionID;
+@@ -9797,59 +9768,33 @@ X86_DECODE_INLINE int scanLegacyPublicOperands(struct InternalInstruction *insn,
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+-X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,
+-		uint16_t *size, unsigned int pattern)
++X86_DECODE_INLINE int scanPublicLegacyOperands(const struct InternalInstruction *insn,
++		uint16_t *size, unsigned int pattern, bool decisionModRM)
+ {
+-	if ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))
++	size_t end = insn->readerCursor;
++	if (end > 15)
+ 		return X86_SCAN_INVALID;
+-	if (pattern >> 1) {
+-		switch (pattern >> 1) {
+-		case 1:
+-			if (readImmediateImpl(insn, 1, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 2:
+-			if (readImmediateImpl(insn, insn->immediateSize, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 3:
+-			if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-			    readImmediateImpl(insn, 2, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 4:
+-			if (readMemoryOffset(insn, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 5:
+-			if (readImmediateImpl(insn, 2, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 6:
+-			if (readImmediateImpl(insn, 2, false) ||
+-			    readImmediateImpl(insn, 1, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 7:
+-			if (readImmediateImpl(insn, 4, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 8:
+-			if (readImmediateImpl(insn, 8, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		case 9:
+-			if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-			    readImmediateImpl(insn, insn->immediateSize, false))
+-				return X86_SCAN_INVALID;
+-			break;
+-		default:
++	if (((pattern & 1) || decisionModRM) && !insn->consumedModRM) {
++		end = scanModRMEnd(insn->code, insn->codeSize, end, insn->addressSize);
++		if (!end)
+ 			return X86_SCAN_INVALID;
+-		}
+ 	}
+-	if (finishDecodedInstruction(insn, false))
++	switch (pattern >> 1) {
++	case 0: break;
++	case 1: end += 1; break;
++	case 2: end += insn->immediateSize; break;
++	case 3: end += insn->immediateSize + 2; break;
++	case 4: end += insn->addressSize; break;
++	case 5: end += 2; break;
++	case 6: end += 2 + 1; break;
++	case 7: end += 4; break;
++	case 8: end += 8; break;
++	case 9: end += insn->immediateSize + insn->immediateSize; break;
++	default: return X86_SCAN_INVALID;
++	}
++	if (end > 15 || end > insn->codeSize)
+ 		return X86_SCAN_INVALID;
+-	*size = (uint16_t)insn->length;
++	*size = (uint16_t)end;
+ 	return X86_SCAN_COMPLETE;
+ }
+ 
+@@ -14437,13 +14382,10 @@ X86_DECODE_INLINE int decodeLegacyTerminal(struct InternalInstruction *insn,
+ 	}
+ 	unsigned instructionID = terminal & X86_TERMINAL_UID_MASK;
+ 	if (publicID) {
+-		/* Retain the original reader before invalid-ID rejection, including truncation. */
+-		if (readerFlags && decisionModRM && readModRMScan(insn))
+-			return X86_SCAN_INVALID;
+ 		if (!instructionID)
+ 			return X86_SCAN_INVALID;
+ 		int status = readerFlags ?
+-		    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK) :
++		    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK, decisionModRM) :
+ 		    scanLegacyPublicOperands(insn, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);
+ 		if (status == X86_SCAN_COMPLETE)
+ 			*publicID = instructionID;
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 83b8d3d8..7790ae83 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -958,13 +958,10 @@ def emit_terminal(suffix):
+         "\t}",
+         "\tunsigned instructionID = terminal & X86_TERMINAL_UID_MASK;",
+         "\tif (publicID) {",
+-        "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",
+-        "\t\tif (readerFlags && decisionModRM && readModRMScan(insn))",
+-        "\t\t\treturn X86_SCAN_INVALID;",
+         "\t\tif (!instructionID)",
+         "\t\t\treturn X86_SCAN_INVALID;",
+         "\t\tint status = readerFlags ?",
+-        "\t\t    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK) :",
++        "\t\t    scanPublicLegacyOperands(insn, size, (terminal >> X86_TERMINAL_OPERAND_SHIFT) & X86_TERMINAL_OPERAND_MASK, decisionModRM) :",
+         "\t\t    scanLegacyPublicOperands(insn, size, terminal >> X86_TERMINAL_HANDLER_SHIFT);",
+         "\t\tif (status == X86_SCAN_COMPLETE)",
+         "\t\t\t*publicID = instructionID;",
+@@ -1044,31 +1041,49 @@ def emit_terminal(suffix):
+     handlers += [f"\treadLegacyShape{handler}," for handler in groups.values()]
+     handlers += ["};", ""]
+     public_reader = [
+-        "X86_DECODE_INLINE int scanPublicLegacyOperands(struct InternalInstruction *insn,",
+-        "\t\tuint16_t *size, unsigned int pattern)",
++        "X86_DECODE_INLINE int scanPublicLegacyOperands(const struct InternalInstruction *insn,",
++        "\t\tuint16_t *size, unsigned int pattern, bool decisionModRM)",
+         "{",
+-        "\tif ((pattern & 1) && !insn->consumedModRM && readModRMScan(insn))",
++        "\tsize_t end = insn->readerCursor;",
++        "\tif (end > 15)",
+         "\t\treturn X86_SCAN_INVALID;",
+-        "\tif (pattern >> 1) {",
+-        "\t\tswitch (pattern >> 1) {",
++        "\tif (((pattern & 1) || decisionModRM) && !insn->consumedModRM) {",
++        "\t\tend = scanModRMEnd(insn->code, insn->codeSize, end, insn->addressSize);",
++        "\t\tif (!end)",
++        "\t\t\treturn X86_SCAN_INVALID;",
++        "\t}",
++        "\tswitch (pattern >> 1) {",
++        "\tcase 0: break;",
+     ]
++    immediate_widths = {
++        f"readImmediateImpl(insn, {width}, false)": width
++        for width in IMMEDIATES.values()
++    }
+     for calls, kind in public_tails.items():
+         if not kind:
+             continue
+-        public_reader += [
+-            f"\t\tcase {kind}:",
+-            "\t\t\tif (" + " ||\n\t\t\t    ".join(calls) + ")",
+-            "\t\t\t\treturn X86_SCAN_INVALID;",
+-            "\t\t\tbreak;",
+-        ]
++        tables.require(len(calls) <= 2, "Too many public immediate readers")
++        widths = []
++        previous_width = "insn->immediateSize"
++        for reader in calls:
++            if reader == "readMemoryOffset(insn, false)":
++                widths.append("insn->addressSize")
++                previous_width = "0"
++            else:
++                tables.require(reader in immediate_widths, "Unsupported public extent")
++                width = immediate_widths[reader]
++                if width == "insn->immediateSize":
++                    width = previous_width
++                tables.require(width != "0", "Immediate width has already been consumed")
++                widths.append(width)
++                previous_width = width
++        public_reader.append(f"\tcase {kind}: end += {' + '.join(widths)}; break;")
+     public_reader += [
+-        "\t\tdefault:",
+-        "\t\t\treturn X86_SCAN_INVALID;",
+-        "\t\t}",
++        "\tdefault: return X86_SCAN_INVALID;",
+         "\t}",
+-        "\tif (finishDecodedInstruction(insn, false))",
++        "\tif (end > 15 || end > insn->codeSize)",
+         "\t\treturn X86_SCAN_INVALID;",
+-        "\t*size = (uint16_t)insn->length;",
++        "\t*size = (uint16_t)end;",
+         "\treturn X86_SCAN_COMPLETE;",
+         "}",
+         "",

@@ -60,7 +60,7 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang',
+             '-DCMAKE_C_COMPILER='+os.environ['CC'], '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_X86_SUPPORT=ON',
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')

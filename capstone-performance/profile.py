@@ -6,6 +6,10 @@ def main():
  cs=run.fetch('base','https://github.com/NeverSight/capstone.git',m['capstone_revision'])
  iced=run.fetch('iced','https://github.com/NeverSight/iced.git',m['iced_revision'])
  fixtures=corpus.prepare(s,w,e,run.command);b=run.build('base')
+ shutil.copyfile(b/'libcapstone.a',w/'base.a')
+ run.command(['git','apply',s/'extent.patch'],'apply-operand-end',cs)
+ run.command(['cmake','--build',b,'--target','capstone_static','--parallel','3'],'extent-build')
+ assert run.sha(w/'base.a')!=run.sha(b/'libcapstone.a')
  adapter=w/'adapter';adapter.mkdir();shutil.copyfile(s/'Cargo.lock',adapter/'Cargo.lock')
  (adapter/'Cargo.toml').write_text("""[package]
 name = "iced_compare"
@@ -39,23 +43,25 @@ extern "C" void stop_profile(){ if(measuring) { CALLGRIND_STOP_INSTRUMENTATION; 
  assert cpp.count('Result result = run(repeats);')==1
  cpp=cpp.replace('Result result = run(repeats);','measuring = true;\n    Result result = run(repeats);\n    measuring = false;')
  (w/'profile.cpp').write_text(cpp)
- run.command(['clang++','-O3','-gline-tables-only','-DNDEBUG','-std=c++17','-I',cs/'include',w/'profile.cpp',b/'libcapstone.a',adapter/'target/release/libiced_compare.a','-pthread','-ldl','-lm','-o',w/'profile'],'build-consumer')
+ for variant,lib in [('base',w/'base.a'),('new',b/'libcapstone.a')]:
+  run.command(['clang++','-O3','-gline-tables-only','-DNDEBUG','-std=c++17','-I',cs/'include',w/'profile.cpp',lib,adapter/'target/release/libiced_compare.a','-pthread','-ldl','-lm','-o',w/('profile-'+variant)],'build-consumer-'+variant)
  rows=[]
  for case in fixtures:
   if case['name'] not in ('putty-32-0.85','scalar32','simd64'):continue
   for mode in ('scan','format','detail'):
    boundary=None
-   for engine in ('capstone','iced'):
-    tag='-'.join([case['name'],mode,engine]);dest=w/(tag+'.out')
-    run.command(['valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(dest),w/'profile',engine,mode,case['selector'],1,case['path']],tag)
+   for label in (('base','new','iced') if mode=='scan' else ('base','iced')):
+    engine='iced' if label=='iced' else 'capstone'
+    tag='-'.join([case['name'],mode,label]);dest=w/(tag+'.out')
+    run.command(['valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(dest),w/('profile-'+('base' if label=='iced' else label)),engine,mode,case['selector'],1,case['path']],tag)
     res=next(json.loads(x) for x in (e/(tag+'.log')).read_text().splitlines() if x.startswith('{'));pairs=tuple(res[k] for k in ('instructions','rejected','boundary_hash'))
     if boundary is None:boundary=pairs
     assert pairs==boundary,(case['name'],mode,engine,res,boundary)
     raw=dest.read_bytes();events=next(x.split()[1:]for x in raw.splitlines() if x.startswith(b'events:'));totals=next(x.split()[1:]for x in raw.splitlines() if x.startswith(b'totals:'));counts={k.decode():int(v) for k,v in zip(events,totals)}
     assert counts['Ir']>res['instructions']*45
     (e/(tag+'.callgrind.gz')).write_bytes(gzip.compress(raw));dest.unlink()
-    rows.append(dict(case=case['name'],engine=engine,mode=mode,public=res,counters=counts));run.write('counters.json',rows)
- assert len(rows)==18;run.write('complete.json',dict(rows=len(rows),capstone=m['capstone_revision'],iced=m['iced_revision']))
+    rows.append(dict(case=case['name'],engine=label,mode=mode,public=res,counters=counts));run.write('counters.json',rows)
+ assert len(rows)==21;run.write('complete.json',dict(rows=len(rows),capstone=m['capstone_revision'],iced=m['iced_revision']))
 if __name__=='__main__':
  try:main()
  finally:
