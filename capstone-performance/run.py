@@ -148,9 +148,10 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
+    command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline=manifest['capstone_revision'],candidate='Default Linux x86-only build with a separately compiled integer output decoder'))
+    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='Add direct Jcc/CALL/JMP rel8/rel32 records within that archive member'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -211,9 +212,10 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    introduced=set(changed[1])-set(changed[0]);assert introduced=={'arch/X86/X86OutputIterator.c.o'},introduced
-    diff=[k for k,v in changed[0].items() if changed[1][k]!=v];assert diff==['cs.c.o'],diff
-    write('object-difference.json',dict(introduced=sorted(introduced),changed=diff,identical=len(changed[0])-1))
+    assert changed[0].keys()==changed[1].keys()
+    diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',WORK/'new/suite/synctools/x86_simple_output.cpp',WORK/'new-build/libcapstone.a','-o',WORK/'generate-output'],'build-generator')
