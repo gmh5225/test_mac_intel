@@ -1,9 +1,9 @@
-name: Check complete vector records and measure cross-ISA and PE32 production controls in dedicated builds
+name: Inspect linked code and repeat PE32 and AVX2 controls after moving EVEX dispatch off ordinary misses
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-evex-native-controls-dedicated]
+    branches: [codex/capstone-evex-placement-controls]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-evex-native-controls-dedicated
+  group: capstone-evex-placement-controls
   cancel-in-progress: false
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-controls-dedicated-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: evex-placement-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
