@@ -1,256 +1,102 @@
-diff --git a/SStream.c b/SStream.c
-index f1fd1246..687a587b 100644
---- a/SStream.c
-+++ b/SStream.c
-@@ -347,11 +347,7 @@ void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative)
- 		SSTREAM_RETURN_IF_CLOSED(ss);
- 		char buffer[19]; // sign, 0x, and up to 16 hexadecimal digits
- 		char *end = buffer + sizeof(buffer);
--		char *p = end;
--		do {
--			*--p = "0123456789abcdef"[value & 15];
--			value >>= 4;
--		} while (value);
-+		char *p = SStream_hex_digits(end, value);
- 		*--p = 'x';
- 		*--p = '0';
- 		if (negative)
-diff --git a/SStream.h b/SStream.h
-index 2c9bc2c3..9f82244c 100644
---- a/SStream.h
-+++ b/SStream.h
-@@ -60,6 +60,16 @@ void SStream_concat(SStream *ss, const char *fmt, ...);
- // Source strings must not overlap the destination append range.
- void SStream_concat2(SStream *ss, const char *first, const char *second);
+diff --git a/arch/X86/X86IntelInstPrinterNumbers.c b/arch/X86/X86IntelInstPrinterNumbers.c
+index 2d0665a0..2136f2e5 100644
+--- a/arch/X86/X86IntelInstPrinterNumbers.c
++++ b/arch/X86/X86IntelInstPrinterNumbers.c
+@@ -5,11 +5,50 @@
+ #include "../../MathExtras.h"
  
-+/* Write the digits backward so the caller can append or copy them as a span. */
-+static inline char *SStream_hex_digits(char *end, uint64_t value)
+ #if defined(CAPSTONE_HAS_X86) && defined(CAPSTONE_X86_PRECHECKED_PRINTER)
++#if defined(__GNUC__) && __SIZEOF_POINTER__ == 8 && \
++	__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define X86_HEX_WORD
++static inline uint64_t hexAsciiWord(uint32_t value)
 +{
-+	do {
-+		*--end = "0123456789abcdef"[value & 15];
-+		value >>= 4;
-+	} while (value);
-+	return end;
-+}
-+
- // Append a lowercase 0x-prefixed magnitude, optionally preceded by a minus sign.
- void SStream_concat_hex64(SStream *ss, uint64_t value, bool negative);
- 
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..029db920 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3757,4 +3757,85 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
- 
- #undef X86_DECODE_INLINE
- 
-+#ifdef CS_X86_FORMAT_RELATIVE
-+static bool formatRelative(cs_struct *handle, const uint8_t *code,
-+					 size_t length, cs_insn *insn, uint16_t *size)
-+{
-+	InternalInstruction header;
-+	initializeInstructionHeader(&header, code, length, handle->mode);
-+	header.rexPrefix = 0;
-+	setInstructionSizes(&header, false, false);
-+	const bool escaped = code[0] == 0x0f;
-+	const unsigned int offset = escaped ? 2 : 1;
-+	const uint8_t opcode = code[offset - 1];
-+	header.readerCursor = offset;
-+	int64_t displacement;
-+	if (!escaped && ((opcode & 0xf0) == 0x70 || opcode == 0xeb)) {
-+		int8_t rel8;
-+		if (consumeInt8(&header, &rel8))
-+			return false;
-+		displacement = rel8;
-+	} else if (header.mode == MODE_16BIT) {
-+		int16_t rel16;
-+		if (consumeInt16(&header, &rel16))
-+			return false;
-+		displacement = rel16;
-+	} else {
-+		int32_t rel32;
-+		if (consumeInt32(&header, &rel32))
-+			return false;
-+		displacement = rel32;
-+	}
-+	const unsigned row = header.mode == MODE_16BIT ? X86_TERMINAL_16 :
-+			     header.mode == MODE_32BIT ? X86_TERMINAL_32 :
-+							 X86_TERMINAL_64;
-+	const uint64_t decision = insn->detail ? x86LegacyDecisions[row][escaped][opcode] :
-+						 x86LegacyPublicDecisions[row][escaped][opcode];
-+	const unsigned id = decision & X86_TERMINAL_UID_MASK;
-+	if (!id)
-+		return false;
-+	*size = (uint16_t)header.readerCursor;
-+	insn->size = *size;
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		memset(insn->detail, 0, offsetof(cs_detail, x86) + sizeof(*x86));
-+		memcpy(x86->opcode, code, offset);
-+		x86->addr_size = header.addressSize;
-+		x86->encoding.imm_offset = offset;
-+		x86->encoding.imm_size = *size - offset;
-+		X86_get_insn_id(handle, insn, id);
-+	} else {
-+		insn->id = id;
-+	}
-+	uint64_t target = X86_relativeBranchTarget(handle->mode, insn->address,
-+						  *size, displacement, header.immSize);
-+	X86_writeRelativeIntel(handle, insn, target, id, header.immSize);
-+	return true;
-+}
-+
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeFull(cs_struct *handle, const uint8_t *code, size_t size,
-+	       cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+	/* These unprefixed relative branches have one immediate. The
-+	 * default Intel spelling can be written to the two public fields. */
-+	if (!handle->no_text && size >= 2 &&
-+	    (insn->detail != NULL) == (handle->detail_opt != 0) &&
-+	    ((code[0] & 0xf0) == 0x70 || (code[0] & 0xfe) == 0xe8 ||
-+	     code[0] == 0xeb || (code[0] == 0x0f && (code[1] & 0xf0) == 0x80)) &&
-+	    handle->syntax == CS_OPT_SYNTAX_INTEL && !handle->mnem_list &&
-+	    cs_vsnprintf == cs_default_vsnprintf &&
-+	    formatRelative(handle, code, size, insn, insn_size)) {
-+		copy_insn_bytes(insn, code, true);
-+		return true;
-+	}
-+	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
++	uint64_t spread = value;
++	spread = (spread | (spread << 16)) & UINT64_C(0x0000ffff0000ffff);
++	spread = (spread | (spread << 8)) & UINT64_C(0x00ff00ff00ff00ff);
++	spread = (spread | (spread << 4)) & UINT64_C(0x0f0f0f0f0f0f0f0f);
++	/* Adding six distinguishes the alphabetic nibbles in each byte. */
++	uint64_t letters = ((spread + UINT64_C(0x0606060606060606)) &
++			    UINT64_C(0x1010101010101010)) >>
++			   4;
++	uint64_t ascii = spread + UINT64_C(0x3030303030303030) + letters * 39;
++	return __builtin_bswap64(ascii);
 +}
 +#endif
 +
- #endif
-diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
-index 457485ab..c71d063e 100644
---- a/arch/X86/X86IntelInstPrinter.c
-+++ b/arch/X86/X86IntelInstPrinter.c
-@@ -924,6 +924,45 @@ void X86_Intel_printInst(MCInst *MI, SStream *O, void *Info)
- 
- #endif // CAPSTONE_SSTREAM_PRECHECKED
- 
-+static inline void setRelativeOperand(cs_x86 *x86, int64_t target, uint8_t table_size,
-+				      uint8_t immediate_size)
-+{
-+	cs_x86_op *op = &x86->operands[x86->op_count];
-+	op->type = X86_OP_IMM;
-+	op->size = x86->op_count ? x86->operands[0].size :
-+				   (table_size ? table_size : immediate_size);
-+	op->imm = target;
-+}
-+
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_SSTREAM_PRECHECKED)
-+void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target,
-+			    unsigned uid, uint8_t immediate_size)
-+{
-+	if (insn->detail) {
-+		cs_x86 *x86 = &insn->detail->x86;
-+		uint8_t access[CS_X86_MAXIMUM_OPERAND_SIZE];
-+		setRelativeOperand(x86, (int64_t)target, X86_immediate_size(uid, NULL),
-+				   immediate_size);
-+		get_op_access(handle, uid, access, &x86->eflags);
-+		x86->operands[0].access = access[0];
-+		x86->op_count = 1;
+ // The private printer entry proves a plain open stream, default formatter and
+ // capacity for the complete generated output. A signed uint64 hexadecimal
+ // spelling needs at most 19 bytes, already included in that generated bound.
+ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
+ {
++#ifdef X86_HEX_WORD
++	if (value < 256) {
++		char *out = OS->buffer + OS->index;
++		uint32_t text = 0x7830;
++		if (negative)
++			*out++ = '-';
++		if (value >= 16) {
++			text |= (uint32_t)"0123456789abcdef"[value >> 4] << 16;
++			text |= (uint32_t)"0123456789abcdef"[value & 15] << 24;
++			memcpy(out, &text, 4);
++			out += 4;
++			*out = '\0';
++		} else {
++			text |= (uint32_t)"0123456789abcdef"[value] << 16;
++			memcpy(out, &text, 4);
++			out += 3;
++		}
++		OS->index = (size_t)(out - OS->buffer);
++		return;
 +	}
-+	const char *mnemonic = X86_insn_name((csh)(uintptr_t)handle, insn->id);
-+	strncpy(insn->mnemonic, mnemonic, sizeof(insn->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	if (target <= HEX_THRESHOLD) {
-+		insn->op_str[0] = (char)('0' + target);
-+	} else {
-+		char digits[16];
-+		char *end = digits + sizeof(digits);
-+		char *first = SStream_hex_digits(end, target);
-+		insn->op_str[0] = '0';
-+		insn->op_str[1] = 'x';
-+		memcpy(insn->op_str + 2, first, (size_t)(end - first));
-+	}
-+}
 +#endif
-+
- /// printPCRelImm - This is used to print an immediate value that ends up
- /// being encoded as a pc-relative value.
- static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
-@@ -938,31 +977,8 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
- 		printImm(MI, O, imm, true);
+ 	const unsigned digits =
+ 		value ? (64U - CountLeadingZeros_64(value) + 3U) / 4U : 1U;
+ 	char *out = OS->buffer + OS->index;
+@@ -21,9 +60,46 @@ void X86_Intel_printHexPrechecked(SStream *OS, uint64_t value, bool negative)
+ 	*out = 'x';
+ 	*end = '\0';
  
- 		if (MI->csh->detail_opt) {
--			MI->flat_insn->detail->x86
--				.operands[MI->flat_insn->detail->x86.op_count]
--				.type = X86_OP_IMM;
--			// if op_count > 0, then this operand's size is taken from the destination op
--			if (MI->flat_insn->detail->x86.op_count > 0)
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size =
--					MI->flat_insn->detail->x86.operands[0]
--						.size;
--			else if (opsize > 0)
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size = opsize;
--			else
--				MI->flat_insn->detail->x86
--					.operands[MI->flat_insn->detail->x86
--							  .op_count]
--					.size = MI->imm_size;
--			MI->flat_insn->detail->x86
--				.operands[MI->flat_insn->detail->x86.op_count]
--				.imm = imm;
--
-+			setRelativeOperand(&MI->flat_insn->detail->x86, imm, opsize,
-+					   MI->imm_size);
- #ifndef CAPSTONE_DIET
- 			set_early_operand_access(MI);
- #endif
-diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
-index a2677cb8..96606ac9 100644
---- a/arch/X86/X86Mapping.h
-+++ b/arch/X86/X86Mapping.h
-@@ -54,6 +54,8 @@ static inline bool X86_get_insn_id_no_detail(const cs_struct *h, cs_insn *insn,
- 	return true;
++#ifdef X86_HEX_WORD
++	if (digits >= 5) {
++		unsigned head_digits = digits;
++		if (digits > 8) {
++			uint64_t tail = hexAsciiWord((uint32_t)value);
++			memcpy(end - 8, &tail, 8);
++			end -= 8;
++			value >>= 32;
++			head_digits -= 8;
++		}
++		uint64_t head = hexAsciiWord((uint32_t)value);
++		head >>= (8 - head_digits) * 8;
++		out = end - head_digits;
++		if (head_digits >= 4) {
++			memcpy(out, &head, 4);
++			head >>= (head_digits - 4) * 8;
++			memcpy(end - 4, &head, 4);
++		} else if (head_digits >= 2) {
++			memcpy(out, &head, 2);
++			head >>= (head_digits - 2) * 8;
++			memcpy(end - 2, &head, 2);
++		} else {
++			*out = (char)head;
++		}
++		return;
++	}
++#endif
++#ifdef X86_HEX_WORD
++	if (digits >= 4)
++		end[-4] = "0123456789abcdef"[(value >> 12) & 15];
++	if (digits >= 3)
++		end[-3] = "0123456789abcdef"[(value >> 8) & 15];
++	if (digits >= 2)
++		end[-2] = "0123456789abcdef"[(value >> 4) & 15];
++	end[-1] = "0123456789abcdef"[value & 15];
++#else
+ 	do {
+ 		*--end = "0123456789abcdef"[value & 15];
+ 		value >>= 4;
+ 	} while (value);
++#endif
  }
- 
-+void X86_writeRelativeIntel(cs_struct *handle, cs_insn *insn, uint64_t target,
-+			    unsigned uid, uint8_t immediate_size);
- // return insn name, given insn id
- const char *X86_insn_name(csh handle, unsigned int id);
- 
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..569ef281 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -29,6 +29,15 @@ CAPSTONE_INTERNAL void cs_skipdata_opstr(char *opstr, const uint8_t *buffer,
- 					 size_t size);
  #endif
- 
-+#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+#define CS_X86_FORMAT_RELATIVE
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
-+X86_decodeFull(cs_struct *handle, const uint8_t *code, size_t size,
-+	       cs_insn *insn, uint16_t *insn_size, bool batch);
-+#endif
-+
- /* Keep successful compact decoding contiguous with cached mapping and
-  * short copies; cold fallback blocks otherwise split the inline path. */
- #if defined(__GNUC__)
-@@ -158,6 +167,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- 		return true;
- #endif
- 	}
-+#endif
-+#ifdef CS_X86_FORMAT_RELATIVE
-+	if (handle->arch == CS_ARCH_X86)
-+		return X86_decodeFull(handle, code, size, insn, insn_size, batch);
- #endif
- 	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
- }
