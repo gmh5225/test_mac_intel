@@ -1,16 +1,29 @@
 diff --git a/MCInst.h b/MCInst.h
-index 641480ed..aa5397e4 100644
+index 641480ed..015d9b52 100644
 --- a/MCInst.h
 +++ b/MCInst.h
-@@ -149,7 +149,6 @@ struct MCInst {
+@@ -149,16 +149,14 @@ struct MCInst {
  	uint8_t op1_size; // size of 1st operand - for X86 Intel syntax
  	uint8_t tied_op_idx_size; // Upper bound of populated tied_op_idx slots
  	unsigned Opcode; // private opcode
 -	MCOperand Operands[MAX_MC_OPS];
- 	cs_insn *flat_insn; // insn to be exposed to public
- 	uint64_t address; // address of this insn
- 	cs_struct *csh; // save the main csh
-@@ -166,6 +165,7 @@ struct MCInst {
+-	cs_insn *flat_insn; // insn to be exposed to public
+-	uint64_t address; // address of this insn
+-	cs_struct *csh; // save the main csh
+-	uint8_t x86opsize; // opsize for [mem] operand
+-
+ 	// These flags could be used to pass some info from one target subcomponent
+ 	// to another, for example, from disassembler to asm printer. The values of
+ 	// the flags have any sense on target level only (e.g. prefixes on x86).
+ 	unsigned flags;
++	cs_insn *flat_insn; // insn to be exposed to public
++	uint64_t address; // address of this insn
++	cs_struct *csh; // save the main csh
++	uint8_t x86opsize; // opsize for [mem] operand
+ 
+ 	// (Optional) instruction prefix, which can be up to 4 bytes.
+ 	// A prefix byte gets value 0 when irrelevant.
+@@ -166,6 +164,7 @@ struct MCInst {
  	uint8_t x86_prefix[4];
  	uint8_t imm_size; // immediate size for X86_OP_IMM operand
  	bool writeback; // writeback for ARM
@@ -18,7 +31,7 @@ index 641480ed..aa5397e4 100644
  	int8_t tied_op_idx
  		[MAX_MC_OPS]; ///< Tied operand indices. Index = Src op; Value: Dest op
  	// operand access index for list of registers sharing the same access right (for ARM)
-@@ -250,8 +250,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
+@@ -250,8 +249,6 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
  static inline void MCInst_InitX86(MCInst *inst)
  {
  	memset(inst, 0, offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));

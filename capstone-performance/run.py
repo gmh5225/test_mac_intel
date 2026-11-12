@@ -152,7 +152,7 @@ def prepare():
     command(['git', 'apply', '--check', SOURCE / 'candidate.patch'], 'patch-check', WORK / 'new')
     command(['git', 'apply', SOURCE / 'candidate.patch'], 'patch-apply', WORK / 'new')
     incremental = True
-    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Keep common MCInst metadata ahead of the operand array'))
+    write('comparison.json', dict(baseline=manifest['capstone_revision'], candidate='Place active MCInst metadata before the operand array without increasing the native structure size'))
     for label in ['base', 'new']:
         build(label)
     for label in ['base', 'new']:
@@ -231,6 +231,21 @@ panic = "abort"
              '-o', WORK / 'x86_encoding_accuracy-base'], 'compile-x86_encoding_accuracy-base')
     command([WORK / 'x86_encoding_accuracy-base'], 'verify-x86_encoding_accuracy-base')
     inputs = corpus.prepare(SOURCE, WORK, EVIDENCE, command)
+    verifier = WORK / 'layout-public'
+    command(['clang++','-std=c++17','-O2','-I',base/'include',SOURCE/'layout-public.cpp',
+             '-ldl','-o',verifier], 'build-layout-public')
+    states = []
+    for custom in (False, True):
+        label = 'layout-states-custom' if custom else 'layout-states-default'
+        if custom:
+            os.environ['CUSTOM_NAMES'] = '1'
+        command([verifier, libraries['base'], libraries['new'], '65536',
+                 Path(inputs[0]['path']).parent], label)
+        rows=[json.loads(line) for line in (EVIDENCE/(label+'.log')).read_text().splitlines() if line.startswith('{')]
+        assert rows[-1]['compared_total'] > 15000000
+        states.append(dict(custom=custom, cells=len(rows), total=rows[-1]['compared_total']))
+    os.environ.pop('CUSTOM_NAMES',None)
+    write('layout-public-states.json',states)
     command(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', base / 'include',
              SOURCE / 'repair_census.cpp', WORK / 'base-build/libcapstone.a',
              *(['-ldl', '-lm'] if platform.system() == 'Linux' else []),
