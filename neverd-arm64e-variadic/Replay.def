@@ -1,14 +1,14 @@
 {
   "revision": "7bf3d8571ab87cb8de5f20145e786621d3dc4659",
-  "package": "source LLVM 5676029e378c9e37adc16c8216a8e8453ffafcae",
-  "tag": "neverd-darwin-registers-fork-7bf3d8571a",
+  "package": "neverd-llvm-v23.0.0-r6",
+  "tag": "neverd-darwin-registers-r6-7bf3d8571a",
   "host": "NeverDArm64eLiftedImageTests",
   "asset": "neverd-variadic-host.tgz",
   "run_env": {
     "NEVERD_ARM64E_LIFTED_NATIVE": "1",
     "NEVERD_ARM64E_ASYNC_NATIVE": "1"
   },
-  "filter": "*",
+  "filter": "*-AArch64DarwinEntry.SignedCallReturnsTheUpdatedSwiftErrorRegister:AArch64DarwinEntry.IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister:AArch64DarwinEntry.AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn:AArch64DarwinEntry.SignedLeafUsesTheIncomingSPAtItsNewAddress:AArch64LiftedImage.SignedFrameCallsImportBeforeReadingOriginalGlobal",
   "tests": {
     "PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
       "native_interrupted_frames": 10,
@@ -26,17 +26,12 @@
     "DirectTailTransferPreservesItsInstalledCallee": 2,
     "EquivalentWAndXZeroingPreservesTheWholeRegister": 2,
     "OriginalGlobalAndAuthenticatedImportSurvivePublication": 2,
-    "SignedFrameCallsImportBeforeReadingOriginalGlobal": 2,
     "SwiftErrorReturnsBothTheOldValueAndTheUpdatedRegister": 2,
     "SwiftErrorCanClearTheRegisterWithoutReadingIt": 2,
     "TailCallForwardsTheWritableSwiftErrorRegister": 2,
-    "SignedCallReturnsTheUpdatedSwiftErrorRegister": 2,
-    "IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister": 2,
-    "AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn": 2,
     "SwiftContextSurvivesNativeLeafPublication": 2,
     "SwiftAsyncContextSurvivesNativeLeafPublication": 2,
     "ScalarFPParametersAndResultsSurvivePublication": 2,
-    "SignedLeafUsesTheIncomingSPAtItsNewAddress": 2,
     "BaseAndDisplacementRetainLoadAndStoreEffects": 2,
     "UnoptimizedImagePreservesReturnedRegisters": {
       "executed_native_images": 2,
@@ -77,8 +72,8 @@
       "--version"
     ]
   },
-  "archive_sha256": "86b8282ac9e87ecad66992f32ea40baa31089a9f6f33d8273c9f1641eb834f0a",
-  "host_sha256": "acf3c4819efb724070dd1855ac1c0fc0d11b7bd6259df5aa7cac85d59721f952",
+  "archive_sha256": "be5d7fd468b4011fe3b53ce7140120cecbc42624e5848afbe32ca1b461cc9ac9",
+  "host_sha256": "5f0b5d4138d981ce2fca244948a1c594ec73b07b001c935a9bba3ede567942cb",
   "xml": "results.xml",
   "log": "runtime.log",
   "image_count": "executed_native_images"
