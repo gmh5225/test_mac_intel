@@ -2,9 +2,9 @@ name: NeverD instruction-address return recipes
 on:
   push:
     branches: [codex/neverd-arm64e-cursor-recipes]
-    paths: [neverd-arm64e-cursor/**, .github/workflows/neverd-arm64e-cursor.yml]
+    paths: [neverd-arm64e-variadic/**, .github/workflows/neverd-arm64e-cursor.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
   native:
     strategy:
@@ -19,7 +19,7 @@ jobs:
           persist-credentials: false
       - id: source
         name: Read the immutable source revision
-        run: python3 -c 'import json; print("revision=" + json.load(open("neverd-arm64e-cursor/Cursor.def"))["revision"])' >> "$GITHUB_OUTPUT"
+        run: python3 -c 'import json; print("revision=" + json.load(open("neverd-arm64e-variadic/Replay.def"))["revision"])' >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
@@ -46,6 +46,14 @@ jobs:
           status=0
           python3 neverd/scripts/verify_arm64e_native.py probe-cpta --output "$GITHUB_WORKSPACE/cursor-evidence/cpta" || status=$?
           [[ $status == 0 || $status == 2 ]]
+      - name: Replay the complete source-bound Release publication suite
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEVERD_ARM64E_TEST_INCLUDE_DIR: ${{ github.workspace }}/neverd/include
+        run: |
+          brew list --versions zstd || brew install zstd
+          ulimit -c 0
+          python3 neverd-arm64e-variadic/run.py
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

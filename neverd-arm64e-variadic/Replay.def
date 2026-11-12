@@ -1,0 +1,89 @@
+{
+  "revision": "06d091c34b8fa1fa84016c528982aa55452ba874",
+  "package": "source LLVM 5676029e378c9e37adc16c8216a8e8453ffafcae",
+  "tag": "neverd-darwin-unwind-fork-06d091c34b",
+  "host": "NeverDArm64eLiftedImageTests",
+  "asset": "neverd-unwind-host.tgz",
+  "run_env": {
+    "NEVERD_ARM64E_LIFTED_NATIVE": "1",
+    "NEVERD_ARM64E_ASYNC_NATIVE": "1"
+  },
+  "filter": "*",
+  "tests": {
+    "PublishedFrameRecoversCallerAtFiveSignalInterruptions": {
+      "native_interrupted_frames": 10,
+      "native_authenticated_parent_frames": 10,
+      "native_sigtramp_context_handoffs": 10
+    },
+    "OptimizedCalleeWalksTheNativeArgumentArea": 4,
+    "UnoptimizedCalleeHomesItsNativeArgumentCursor": 4,
+    "FramelessStackLoadsSurviveImagePublication": 2,
+    "CompactLeavesElideOnlyTheUnusedStackReservation": 2,
+    "PreIndexedArgumentLoadRestoresTheIncomingSP": 2,
+    "PublishesDarwinTrue": 2,
+    "PublishesDarwinFalse": 2,
+    "VerifiedLeafBodiesUseTheNormalPatchPipeline": 2,
+    "DirectTailTransferPreservesItsInstalledCallee": 2,
+    "EquivalentWAndXZeroingPreservesTheWholeRegister": 2,
+    "OriginalGlobalAndAuthenticatedImportSurvivePublication": 2,
+    "SignedFrameCallsImportBeforeReadingOriginalGlobal": 2,
+    "SwiftErrorReturnsBothTheOldValueAndTheUpdatedRegister": 2,
+    "SwiftErrorCanClearTheRegisterWithoutReadingIt": 2,
+    "TailCallForwardsTheWritableSwiftErrorRegister": 2,
+    "SignedCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "IndexedDwarfCallReturnsTheUpdatedSwiftErrorRegister": 2,
+    "AsyncDwarfRestoresTheLinkRegisterBeforeSwiftReturn": 2,
+    "SwiftContextSurvivesNativeLeafPublication": 2,
+    "SwiftAsyncContextSurvivesNativeLeafPublication": 2,
+    "ScalarFPParametersAndResultsSurvivePublication": 2,
+    "SignedLeafUsesTheIncomingSPAtItsNewAddress": 2,
+    "BaseAndDisplacementRetainLoadAndStoreEffects": 2,
+    "UnoptimizedImagePreservesReturnedRegisters": {
+      "executed_native_images": 2,
+      "native_register_entries_compared": 9,
+      "native_register_input_comparisons": 27,
+      "installed_register_entries": 9
+    },
+    "OptimizedImagePreservesReturnedRegisters": {
+      "executed_native_images": 2,
+      "native_register_entries_compared": 9,
+      "native_register_input_comparisons": 27,
+      "installed_register_entries": 9
+    },
+    "DirectCallerConsumesNonVariadicX8AndX9Results": 2,
+    "DirectCallerConsumesTailForwardedX8AndX9Results": 2,
+    "InstructionAddressRecipesUseTheActualSigningPC": {
+      "native_cursor_pacm_profiles": 4
+    },
+    "MultipleEpiloguesKeepFramePointerAndRememberedRows": 2
+  },
+  "environment": {
+    "hardware": [
+      "/usr/sbin/sysctl",
+      "-n",
+      "machdep.cpu.brand_string"
+    ],
+    "cpa": [
+      "/usr/sbin/sysctl",
+      "-n",
+      "hw.optional.arm.FEAT_CPA"
+    ],
+    "cpa2": [
+      "/usr/sbin/sysctl",
+      "-n",
+      "hw.optional.arm.FEAT_CPA2"
+    ],
+    "os": [
+      "/usr/bin/sw_vers"
+    ],
+    "compiler": [
+      "/usr/bin/clang",
+      "--version"
+    ]
+  },
+  "archive_sha256": "254845a614adb31235666f499ed4fd3e46947d9284c9509dcfdbfece36dcf71a",
+  "host_sha256": "14b1ea62555afee49cbd76257af2afbbe71686a68e9d9760980b9bd4673a7e7b",
+  "xml": "results.xml",
+  "log": "runtime.log",
+  "image_count": "executed_native_images"
+}
