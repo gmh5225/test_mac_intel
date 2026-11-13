@@ -1,7 +1,7 @@
-name: Build NeverD and GCC Capstone with the system linker and fork LLVM sources
+name: Build all four production backends and LLVM sources with a consistent GNU toolchain
 on:
   push:
-    branches: [codex/neverd-gnu-native-system-linker]
+    branches: [codex/neverd-gnu-source-release]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -37,7 +37,7 @@ jobs:
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: gcc
-          CXX: clang++
+          CXX: g++
         run: python3 capstone-product/product.py
       - name: Clean temporary source exports
         if: always()
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-native-system-linker
+          name: gnu-native-production
           path: product-evidence/
           retention-days: 14
