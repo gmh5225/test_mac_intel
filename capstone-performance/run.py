@@ -22,7 +22,7 @@ WORK = ROOT / '.capstone-intel-work'
 EVIDENCE = ROOT / 'capstone-evidence'
 PROFILE = os.environ['COMPARE_BASE']
 assert PROFILE in ('clang','gcc')
-ARCHES = ('X86',)
+ARCHES = ('X86','ARM','AARCH64','MIPS')
 MODES = {'scan': 0, 'format': 1, 'detail': 2}
 
 
@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
+    write('comparison.json',dict(baseline='published e406d02e19f0d0c6a0b29870ab0e1209b7c5f2d3',candidate='Initialize fresh status and reset illegal on iterator reuse'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert sorted(diffs)==['arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'],diffs
+    assert set(diffs)=={'cs.c.o','arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
