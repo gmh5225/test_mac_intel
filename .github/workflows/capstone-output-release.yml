@@ -1,7 +1,7 @@
-name: Qualify dedicated AArch64 defaults and mixed binary identity on profiles
+name: Verify AArch64 public template and identical Apple silicon text layout on profiles
 on:
   push:
-    branches: [codex/capstone-dedicated-aarch64-defaults-profiles]
+    branches: [codex/capstone-aarch64-detail-copy-layout-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-aarch64-config-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: aarch64-copy-config-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
