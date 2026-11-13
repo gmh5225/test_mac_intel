@@ -16,8 +16,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
   cases=corpus.prepare(r,t,out,command)
-  cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386')]
-  assert len(cases)==12
+  cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
+  assert len(cases)==14
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'X86VectorOutput.c.o','X86DisassemblerDecoder.c.o','X86OutputIterator.c.o'},changed
+    assert {Path(k).name for k in changed}=={'X86MemoryOutput.c.o','X86OutputIterator.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
@@ -90,7 +90,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert ticks>0 and signature[0]>0
    return ticks,signature
   results=[]
-  cases_of_interest={'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
+  cases_of_interest={'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2):
     if mode not in cases_of_interest.get(case['name'],()):continue

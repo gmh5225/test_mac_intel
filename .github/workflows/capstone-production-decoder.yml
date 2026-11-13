@@ -1,7 +1,7 @@
-name: Test native x86 EVEX scan and direct output in the fully linked NeverD product
+name: Compare full NeverD i386 addressing on three release libraries and both PuTTY executables
 on:
   push:
-    branches: [codex/neverd-native-evex-output-next]
+    branches: [codex/neverd-real-i386-segment-lea]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 3c07b38906ff22c72617ccd1e25146127d426596
+          ref: f9b75b8f377adff76b7d58fd82359c57fad73df6
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-native-evex-output
+          name: verified-i386-segment-lea
           path: product-evidence/
           retention-days: 14
