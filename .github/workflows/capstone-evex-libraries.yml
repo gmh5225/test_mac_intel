@@ -1,7 +1,7 @@
-name: Isolate i386 prefix scan work, simulated cache events and emitted machine code on identical real function boundaries
+name: Count dynamic x86 decoder work after removing duplicate terminal selection
 on:
   push:
-    branches: [codex/capstone-i386-prefix-work-and-layout]
+    branches: [codex/capstone-single-legacy-header-instructions]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-prefix-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: single-legacy-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
