@@ -151,7 +151,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json',dict(baseline='published 8788c077d7de2724fbf9a82f46f43a2dbd2b5e63',candidate='stack, immediate and SIMD output records with identical scanner object'))
+    write('comparison.json',dict(baseline='published c92f6f103e0123790f574c05a2a57f7203e7a461',candidate='bounded VEX opcode and operand extents'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -203,9 +203,9 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
+    assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    assert diffs==['arch/X86/X86DisassemblerDecoder.c.o'],diffs
     # The Mach-O ad hoc signature includes the linker's output basename. Both
     # files above are linked as 'single' and only renamed after signing.
     if platform.system()=='Darwin':
@@ -213,13 +213,14 @@ panic = "abort"
             proc=subprocess.run(['codesign','-dv','--verbose=4',WORK/('single-'+label)],capture_output=True,text=True)
             if proc.returncode and 'not signed' not in proc.stderr: raise RuntimeError(proc.stderr)
             (EVIDENCE/('signature-'+label+'.txt')).write_text(proc.stderr)
-    assert sha(WORK/'single-base')==sha(WORK/'single-new'), 'mixed public executable changed'
     if os.environ['MIXED_CC']=='gcc':
         command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'compile-full-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
+    command(['clang++','-O2','-std=c++17','-I',base/'include',SOURCE/'verify-vex.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',WORK/'verify-vex'],'build-verify-vex')
+    command([WORK/'verify-vex',libraries['base'],libraries['new'],'quick'],'verify-vex')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
