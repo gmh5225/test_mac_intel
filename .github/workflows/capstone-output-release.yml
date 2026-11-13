@@ -1,7 +1,7 @@
-name: Verify four-backend decoding and iterator legality in GCC 11 and 13 full, reduced, DIET and adapter profiles
+name: Verify generated vector output and iterator status in native four-backend profiles
 on:
   push:
-    branches: [codex/capstone-fixed-iterator-four-profiles]
+    branches: [codex/capstone-four-mode-vector-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: four-public-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: native-vector-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

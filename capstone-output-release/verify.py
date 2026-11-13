@@ -36,6 +36,8 @@ try:
     units=['api','x86_scan_batch','x86_relative_jump']
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','x86_evex_reserved_fields','x86_memory_scale','mips_scan','detail_option']
+    if profile not in ("diet","reduced"):
+        units+=sorted(q.stem for q in (source/"tests/unit").glob("x86_*.c") if q.stem.startswith(("x86_amx","x86_apx","x86_evex")) and q.stem not in units)
     if profile=='adapter':units+=['x86_scan_adapter']
     if profile not in ('diet','reduced'):units+=['arm_post_index']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
