@@ -1,7 +1,7 @@
-name: Retest host-qualified mixed decoders against both iced formatters
+name: Qualify GNU x64 x86 and MIPS against the newly published ARM-only baseline
 on:
   push:
-    branches: [codex/capstone-gnu-x64-mixed-release-libraries]
+    branches: [codex/capstone-x64-published-arm-base]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ea3443bd943f583b65005dc1af9fae94850b6de7
+          ref: a06235189645d7e20660af04d52f71005301e760
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-x64-mixed-release-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: x64-published-arm-base-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
