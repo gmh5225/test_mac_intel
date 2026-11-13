@@ -1,9 +1,9 @@
-name: Measure calling generated output before the full x86 decoder and compare public PE32 and PE64
+name: Keep the scan caller identical and measure the isolated full fallback on real PE and ELF
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-public-writer-placement]
+    branches: [codex/capstone-split-full-decoder]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-public-writer-placement
+  group: capstone-split-full-decoder
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-writer-placement-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: split-full-decoder-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
