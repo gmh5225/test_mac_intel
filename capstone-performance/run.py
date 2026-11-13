@@ -288,9 +288,10 @@ panic = "abort"
             ('legacy_memory', 'legacy_without_memory', 'full_repair'))
         repair_counts.append(dict(case=item['name'], selector=item['selector'], **counts))
     write('repair-census.json', repair_counts)
-    inputs = [item for item in inputs if item['selector'] >= 16]
+    controls = ('arm-ls','arm64-ls','mips64el-ls')
+    inputs = [item for item in inputs if item['selector'] >= 16 or item['name'] in controls]
     cases = [dict(c, mode=mode, consumer='decoder' if c['selector'] >= 16 else 'single')
-             for c in inputs for mode in (['scan', 'format', 'detail'] if c['selector'] >= 16 else ['format', 'detail'])]
+             for c in inputs for mode in ('scan', 'format', 'detail')]
     windows = []
     for item in inputs:
         if item['name'] not in ('putty-32-0.85','amd64-ls','amd64-cp','amd64-sort'):
@@ -385,13 +386,8 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    selected={('amd64-ls','detail'),('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('scalar32','format'),('scalar64','detail'),('simd64','format'),('simd64','detail'),('putty-64-0.85','format')}
-    selected.update((name,'scan') for name in ('simd64','scalar32','scalar64','amd64-ls','amd64-cp','amd64-sort','putty-64-0.85'))
-    checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
-    measure_panel('null',[v for v in checks if (v['name'],v['mode']) in [('putty-32-0.85','format'),('scalar32','format')]],9,['base','new','base_aa','new_aa'],350000000)
-    measure_panel('x86',checks,19,['base','new','base_aa','new_aa','iced','iced_aa'],300000000)
     others=[v for v in cases if v['consumer']=='single' and v['name'] in ('arm-ls','arm64-ls','mips64el-ls') and v['mode'] in ('scan','format','detail')]
-    assert others
+    assert len(others)==9,[(c['name'],c['mode']) for c in others]
     measure_panel('other',others,13,['base','new','base_aa','new_aa'],200000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
