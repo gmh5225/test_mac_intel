@@ -148,10 +148,9 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
-    command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 2fc94937190ef9224bf797851dec71ff10c2c85c',candidate='stack, immediate and SIMD output records with identical scanner object'))
+    write('comparison.json',dict(baseline='published 8788c077d7de2724fbf9a82f46f43a2dbd2b5e63',candidate='stack, immediate and SIMD output records with identical scanner object'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
