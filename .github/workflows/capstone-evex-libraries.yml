@@ -1,7 +1,7 @@
-name: Verify complete operand output and compare gains over the preceding writers on libraries
+name: Attribute write-list membership costs in detail queries on libraries
 on:
   push:
-    branches: [codex/capstone-evex-vector-loads-libraries]
+    branches: [codex/capstone-short-write-list-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-vector-loads-${{ matrix.host }}-${{ matrix.cc }}
+          name: short-write-list-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
