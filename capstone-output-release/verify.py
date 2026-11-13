@@ -37,6 +37,9 @@ try:
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','x86_evex_reserved_fields','x86_memory_scale','mips_scan','detail_option']
     if profile=='adapter':units+=['x86_scan_adapter']
+    if profile not in ('diet','reduced'):
+        known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
+        units+=sorted(q for q in known if q in ('aarch64_memory_access','aarch64_post_index','aarch64_addressing'))
     if profile not in ('diet','reduced'):units+=['arm_post_index']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
