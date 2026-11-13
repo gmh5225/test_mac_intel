@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
+    write('comparison.json',dict(baseline='published e406d02e19f0d0c6a0b29870ab0e1209b7c5f2d3',candidate='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,17 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert sorted(diffs)==['arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'],diffs
+    expected=['arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o']
+    if PROFILE=='clang' and platform.machine()=='x86_64':
+        expected+=['cs.c.o','arch/X86/X86DisassemblerDecoder.c.o']
+        for sym in ('cs_decode_full_insn','cs_disasm_iter'):
+            for label in ('base','new'):
+                command(['objdump','-d','--disassemble='+sym,WORK/('decoder-'+label)],'machine-'+sym+'-'+label)
+        before=(EVIDENCE/'machine-cs_decode_full_insn-base.log').read_text()
+        after=(EVIDENCE/'machine-cs_decode_full_insn-new.log').read_text()
+        into=(EVIDENCE/'machine-cs_disasm_iter-new.log').read_text()
+        assert '<X86_trySimpleOutput>' in before and '<X86_trySimpleOutput>' not in after and '<X86_trySimpleOutput>' in into
+    assert sorted(diffs)==sorted(expected),diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')

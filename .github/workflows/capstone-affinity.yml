@@ -1,9 +1,9 @@
-name: Verify and time combined x86 records on native
+name: Measure calling generated output before the full x86 decoder and compare public PE32 and PE64
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-combined-records-native]
+    branches: [codex/capstone-public-writer-placement]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-combined-records-native
+  group: capstone-public-writer-placement
   cancel-in-progress: false
 
 jobs:
@@ -25,6 +25,7 @@ jobs:
           - { host: ubuntu-24.04, baseline: gcc, trial: 2 }
           - { host: ubuntu-22.04, baseline: gcc, trial: 3 }
           - { host: ubuntu-24.04, baseline: clang, trial: 4 }
+          - { host: ubuntu-24.04, baseline: clang, trial: 7 }
           - { host: ubuntu-24.04-arm, baseline: clang, trial: 5 }
           - { host: ubuntu-24.04-arm, baseline: gcc, trial: 6 }
     env:
@@ -53,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: combined-records-native-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: public-writer-placement-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
