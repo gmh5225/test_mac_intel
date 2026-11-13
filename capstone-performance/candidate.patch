@@ -649,10 +649,20 @@ index 4c9aeba4..d5fc06b3 100644
  }
  #endif
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index f7f0f913..7d201d98 100644
+index f7f0f913..7d9fb8f1 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -310,6 +310,173 @@ void emit_legacy_registers(Decoder &wide)
+@@ -51,6 +51,9 @@ struct Decoder {
+ 	}
+ 	unsigned decode(const uint8_t *bytes, unsigned length)
+ 	{
++		insn->is_alias = false;
++		insn->usesAliasDetails = false;
++		insn->illegal = false;
+ 		const uint8_t *cursor = bytes;
+ 		uint64_t ip = 0x100000012;
+ 		size_t left = length;
+@@ -310,6 +313,173 @@ void emit_legacy_registers(Decoder &wide)
  		     static_cast<unsigned long long>(narrow.probes));
  }
  
@@ -826,7 +836,7 @@ index f7f0f913..7d201d98 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -352,6 +519,7 @@ void emit_output(Decoder &decoder)
+@@ -352,6 +522,7 @@ void emit_output(Decoder &decoder)
  	}
  	std::puts("\tdefault: return NULL;\n\t}\n}");
  	emit_vex_indexed(decoder);

@@ -224,7 +224,26 @@ panic = "abort"
     command([WORK/'output-unit'],'verify-output-unit')
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',WORK/'new/suite/synctools/x86_simple_output.cpp',WORK/'new-build/libcapstone.a','-o',WORK/'generate-output'],'build-generator')
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',WORK/'new/suite/synctools/x86_vector_output.cpp',WORK/'new-build/libcapstone.a','-o',WORK/'generate-vectors'],'compile-vector-generator')
-    gen=subprocess.run([WORK/'generate-vectors'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
+    generator=WORK/'new/suite/synctools/x86_vector_output.cpp'
+    source=generator.read_text()
+    reset='\t\tinsn->is_alias = false;\n\t\tinsn->usesAliasDetails = false;\n\t\tinsn->illegal = false;\n'
+    assert source.count(reset)==1
+    experiments={}
+    for name,body in [('before',source.replace(reset,'')),('seeded',source)]:
+        # Install known true flags once at allocation to expose reliance on allocator contents.
+        k='cannot initialize the full x86 decoder");'
+        assert body.count(k)==1
+        body=body.replace(k,k+'\n\t\tinsn->is_alias = insn->usesAliasDetails = insn->illegal = true;')
+        jf=WORK/(name+'.cpp');jf.write_text(body)
+        exe=WORK/('gen-'+name)
+        command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',jf,WORK/'new-build/libcapstone.a','-o',exe],'compile-'+name)
+        probe=subprocess.run([exe],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+        experiments[name]=dict(returncode=probe.returncode,reason=probe.stderr.decode(errors='replace')[-500:],sha256=hashlib.sha256(probe.stdout).hexdigest())
+        write('generator-allocator-states.json',experiments)
+    gen=subprocess.run([WORK/'generate-vectors'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    (EVIDENCE/'generator-stderr.log').write_bytes(gen.stderr)
+    assert gen.returncode==0,(gen.returncode,gen.stderr.decode(errors='replace')[-1500:])
+    assert experiments['before']['returncode']!=0 and experiments['seeded']['sha256']==hashlib.sha256(gen.stdout).hexdigest(),experiments
     assert gen.stdout==(WORK/'new/arch/X86/X86GenVectorOutput.inc').read_bytes()
     write('vector-regeneration',dict(sha256=hashlib.sha256(gen.stdout).hexdigest(),summary=gen.stderr.decode().strip()))
     result=subprocess.run([WORK/'generate-output'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
