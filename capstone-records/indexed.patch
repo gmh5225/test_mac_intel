@@ -388,7 +388,7 @@ index ebe301e2..afe37a02 100644
  	SStream_concat0(O, markup(">"));
  }
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 11e5e995..ea417a61 100644
+index 11e5e995..37f3b9a4 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -832,6 +832,11 @@ void ARM_check_updates_flags(MCInst *MI)
@@ -447,7 +447,7 @@ index 11e5e995..ea417a61 100644
  {
 +#ifdef ARM_GNU_MIXED_SCAN
 +	if (instr->csh->no_text && !instr->flat_insn->detail &&
-+	    instr->csh->mode == CS_MODE_ARM &&
++	    (instr->csh->mode & ~CS_MODE_V8) == CS_MODE_ARM &&
 +	    instr->csh->disasm == ARM_getInstruction && code_len >= 4) {
 +		const unsigned opcode = armScanImmediateOpcode(code);
 +		if (opcode) {
@@ -513,7 +513,7 @@ index 6266d12b..98805f06 100644
  
  // given internal insn id, return public instruction ID
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..6b921f10 100644
+index c42839d3..09073747 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)

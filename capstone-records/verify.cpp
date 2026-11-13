@@ -43,10 +43,18 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
 }
 int main(int argc,char**argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);
- for (unsigned bits : {0u,(unsigned)CS_MODE_BIG_ENDIAN,(unsigned)CS_MODE_V8,(unsigned)CS_MODE_THUMB,(unsigned)(CS_MODE_THUMB|CS_MODE_MCLASS)}) for(unsigned flags=0; flags<8; ++flags) {
+ for (unsigned bits : {0u,(unsigned)CS_MODE_BIG_ENDIAN,(unsigned)CS_MODE_V8,(unsigned)CS_MODE_THUMB,(unsigned)(CS_MODE_THUMB|CS_MODE_MCLASS),unsigned(CS_MODE_BIG_ENDIAN|CS_MODE_V8),unsigned(CS_MODE_V8|CS_MODE_THUMB),unsigned(CS_MODE_V8|CS_MODE_THUMB|CS_MODE_MCLASS)}) for(unsigned flags=0; flags<8; ++flags) {
   cs_mode mode=(cs_mode)bits;
   bool text=flags&1,detail=flags&2,skip=flags&4;
   Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);
+  if((bits==0 || bits==CS_MODE_V8) && !text && !detail && !skip)
+   for(unsigned cond=0;cond<16;++cond) for(unsigned op=0;op<16;++op)
+    for(unsigned s=0;s<2;++s) for(unsigned rn=0;rn<16;++rn)
+     for(unsigned rd=0;rd<16;++rd) for(unsigned n=0;n<12;++n){
+      uint32_t v=(cond<<28)|0x02000000u|(op<<21)|(s<<20)|(rn<<16)|(rd<<12)|(random_word()&4095);
+      uint8_t bytes[4];for(unsigned i=0;i<4;++i)bytes[i]=uint8_t(v>>(8*i));
+      compare(x,y,bytes,n<4?n:4,detail);
+     }
   for(unsigned i=0;i<65536;++i){
     uint32_t value=random_word();
     if(i&1)value=(value&0xf1ffffff)|0x0a000000;
