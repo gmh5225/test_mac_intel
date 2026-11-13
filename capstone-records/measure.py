@@ -33,6 +33,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','indexed'):
    if key!='base':run(['git','apply',r/(key+'.patch')],'apply-'+key,s)
+   run(['git','apply',r/'ptr64.patch'],'apply-sc64-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
    objdir=b/'CMakeFiles/capstone.dir'
@@ -53,6 +54,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
     run(['ctest','--test-dir',b,'-R','^unit_aarch64_(postprocess|scan|register_names_generator)$','--no-tests=error','--output-on-failure'],'a64-tests')
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
+   run(['git','apply','-R',r/'ptr64.patch'],'undo-sc64-'+key,s)
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
@@ -66,6 +68,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run([t/'verify-x86',libs['base'],libs[key]],'x86-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
+   run(['git','apply',r/'ptr64.patch'],'scope-sc64-only',s)
+   run(['cmake','--build',b,'--target','capstone_shared','mips_scan','--parallel','4'],'sc64-control-build')
+   run(['ctest','--test-dir',b,'-R','^unit_mips_scan$','--no-tests=error','--output-on-failure'],'sc64-control-unit')
+   run(['git','apply','-R',r/'ptr64.patch'],'undo-sc64-control',s)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
    run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
