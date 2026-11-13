@@ -63,9 +63,9 @@ def build(label):
     build_dir = WORK / (label + '-build')
     command(['cmake', '-S', source, '-B', build_dir, '-G', 'Ninja',
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-             '-DCMAKE_C_COMPILER=clang', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
+             '-DCMAKE_C_COMPILER='+os.environ['MIXED_CC'], '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
              *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES],
-             *(['-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers']
+             *(['-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['MIXED_CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers')]
                if PROFILE == 'neverd-four' else []),
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
@@ -152,7 +152,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='Classify EVEX in explicit static iterator and leave ordinary mixed clients byte-identical'))
+    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='admit EVEX in the existing cold extension reader, format from canonical scalar/vector rows'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -203,11 +203,13 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert changed[0].keys()==changed[1].keys()
+    assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
-    assert sha(WORK/'single-base')==sha(WORK/'single-new')
-    write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-1,ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
+    assert set(diffs)=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'},diffs
+    if os.environ['MIXED_CC']=='gcc':
+        command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'compile-full-scan')
+        command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
+    write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'integer-states'],'build-integer-states')
     command([WORK/'integer-states'],'pass-integer-states')
     flag_records = []
@@ -360,7 +362,7 @@ def measure():
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
     controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
-    cycles=10; duration=150_000_000
+    cycles=13; duration=180_000_000
     measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
     for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
         choices=[c for c in cases if c['consumer']==consumer]
