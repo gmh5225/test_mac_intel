@@ -24,11 +24,53 @@ def main(w):
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
     src=src.replace('InstructionInfoFactory, IntelFormatter,','InstructionInfoFactory, IntelFormatter, FastFormatter,').replace('    formatter: IntelFormatter,','    formatter: IntelFormatter,\n    fast: FastFormatter,\n    fast_enabled: bool,').replace('        mode,','        mode: mode & 3,\n        fast_enabled: mode & 8 != 0,\n        fast: FastFormatter::new(),')
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
+    src=src.replace('fast: FastFormatter::new(),','fast: make_fast(mode & 16 != 0),')
+    src+='''
+fn make_fast(matched: bool)->FastFormatter {
+        let mut fmt=FastFormatter::new();
+        if matched {
+            let opts=fmt.options_mut();
+            opts.set_space_after_operand_separator(true);
+            opts.set_rip_relative_addresses(true);
+            opts.set_always_show_memory_size(true);
+            opts.set_uppercase_hex(false);
+            opts.set_use_hex_prefix(true);
+        }
+        fmt
+    }
+    #[no_mangle]
+    pub unsafe extern "C" fn iced_example(state:*mut std::ffi::c_void,input:*const u8,length:usize,output:*mut u8,cap:usize)->usize {
+        let s=&mut *state.cast::<State>();
+        let mut decoder=Decoder::with_ip(64,std::slice::from_raw_parts(input,length),0x401000,DecoderOptions::NONE);
+        let instr=decoder.decode();
+        assert!(!instr.is_invalid() && instr.len()==length);
+        s.text.clear();s.fast.format(&instr,&mut s.text);
+        assert!(s.text.len()<cap);
+        std::ptr::copy_nonoverlapping(s.text.as_ptr(),output,s.text.len());
+        *output.add(s.text.len())=0;
+        s.text.len()
+    }
+'''
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('variants.json',dict(integer='published '+reference,aa='byte-identical published executable',output='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
+    inc=inc.replace('(engine=="fast" ? 8 : 0)','(engine=="matched" ? 24 : engine=="fast" ? 8 : 0)').replace('engine!="fast"','engine!="fast" && engine!="matched"')
+    inc=inc.replace('extern "C" void iced_destroy','extern "C" size_t iced_example(void*,const uint8_t*,size_t,char*,size_t);\nextern "C" void iced_destroy')
+    inc=inc.replace('  if(engine=="audit") {','''  if(engine=="examples") {
+        const uint8_t bytes[][8]={{0x48,0x8b,0x43,0x2a},{0x48,0x8d,0x05,0x78,0x56,0x34,0x12},{0x48,0x83,0xc0,0x2a},{0xc5,0xf1,0xef,0xdc},{0x75,0xf8}};
+        const size_t sizes[]={4,7,4,4,2};
+        auto defaults=iced_create(64,9); auto matched=iced_create(64,25);
+        for (unsigned i=0;i<5;i++) {
+            const uint8_t *ptr=bytes[i];size_t left=sizes[i];uint64_t ip=0x401000;
+            if(!cs_disasm_iter(handle,&ptr,&left,&ip,insn)||left) return 9;
+            char a[256],b[256];
+            iced_example(defaults,bytes[i],sizes[i],a,sizeof(a));iced_example(matched,bytes[i],sizes[i],b,sizeof(b));
+            std::printf("%s %s\\t%s\\t%s\\n",insn->mnemonic,insn->op_str,a,b);
+        }
+        iced_destroy(matched);iced_destroy(defaults);
+      } else if(engine=="audit") {''')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
     inc=inc.replace('if (mode == 2) {','if (mode == 2 || mode == 4) {\n        if (mode == 2) {').replace('        const auto &x = insn->detail->x86;', '        }\n        const auto &x = insn->detail->x86;')
     assert inc.count('iced_trace(bits,ptr,')==1
@@ -56,6 +98,11 @@ def main(w):
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
+        if bits==64 and not (evidence/'format-examples.json').exists():
+            examples=[line.split('\t')for line in sp.check_output([exe['integer'],'examples','1','1',f,intervals,'64'],text=True).splitlines()]
+            assert len(examples)==5 and all(len(row)==3 for row in examples)
+            assert examples[0][1]!=examples[0][2] and examples[3][0]==examples[3][2]
+            save('format-examples.json',dict(columns=['capstone','fast_default','fast_comparable'],rows=examples))
         for panel in ['all-functions','simd-functions']:
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if not sel:continue
@@ -63,15 +110,15 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                labels=['integer','aa','output','iced']+(['fast']if mode else [])
+            for mode in [1,2]:
+                labels=['integer','aa','output','iced','fast','matched']
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
                 for i in range(15):
                     order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe},vs_comparable={k:md('matched',k)for k in exe},formatter_ratio=md('matched','fast'),cycles=cycles);reported.append(row);save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
