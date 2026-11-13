@@ -1,7 +1,7 @@
-name: Compare LoongArch public records and time real loong64 executables in dedicated and mixed builds
+name: Verify LoongArch output and release binary identity across native, multi-backend and DIET builds
 on:
   push:
-    branches: [codex/capstone-loongarch-opcode-rows]
+    branches: [codex/capstone-loongarch-dedicated-mapping]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: loongarch-rows-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: loongarch-dedicated-exact-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
