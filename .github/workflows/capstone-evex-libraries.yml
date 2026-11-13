@@ -1,7 +1,7 @@
-name: Qualify GCC compact scanning and fixed output writes with integrated libraries
+name: Qualify shared cold EVEX lookup and x86-only object changes in libraries
 on:
   push:
-    branches: [codex/capstone-gcc-integrated-libraries]
+    branches: [codex/capstone-cold-evex-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-gcc-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: cold-evex-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
