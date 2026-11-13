@@ -1,299 +1,93 @@
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..32bbf942 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -788,6 +788,16 @@ static const struct VectorOutputRow legacy_register_rows[] = {
- 	{ X86_INS_PADDB, "paddb", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
- 	{ X86_INS_PADDW, "paddw", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
- 	{ X86_INS_PADDD, "paddd", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
-+	{ X86_INS_PSRLW, "psrlw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRAW, "psraw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLW, "psllw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRLD, "psrld", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRAD, "psrad", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLD, "pslld", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRLQ, "psrlq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRLDQ, "psrldq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLQ, "psllq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLDQ, "pslldq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
- };
- /* Low seven bits index legacy_register_rows; bit 7 reverses the operands. */
- static const uint8_t legacy_register_plans[256] = {
-@@ -808,3 +818,8 @@ static const uint8_t legacy_register_plans[256] = {
- 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
- 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
- };
-+static const uint8_t legacy_shift_plans[3][8] = {
-+	{ 0, 0, 82, 0, 83, 0, 84, 0, },
-+	{ 0, 0, 85, 0, 86, 0, 87, 0, },
-+	{ 0, 0, 88, 89, 0, 0, 90, 91, },
-+};
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..b3f212a1 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -32,6 +32,22 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 	return out;
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..8d533210 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -178,6 +178,8 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
++	/* SoftFail belongs to the current instruction, including after reuse. */
++	insn->illegal = false;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+ 	insn->mnemonic[0] = '\0';
+diff --git a/tests/unit/api.c b/tests/unit/api.c
+index 46b3e78d..af447bec 100644
+--- a/tests/unit/api.c
++++ b/tests/unit/api.c
+@@ -77,11 +77,75 @@ static bool test_iterator_allocation(void)
+ 	return cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK && ok;
  }
  
-+static inline void writeVectorImmediate(char *out, unsigned value)
++static bool check_iterator_status(cs_arch arch, cs_mode mode)
 +{
-+	memcpy(out, ", ", 2);
-+	out += 2;
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		memcpy(out, "0x", 2);
-+		out += 2;
-+		if (value >= 16)
-+			*out++ = digits[value >> 4];
-+		*out = digits[value & 15];
++	const uint8_t x86[] = { 0x90 };
++	/* These are the ARM SoftFail and legal UDF from issues #2703 and #1991. */
++	const uint8_t arm[] = { 0x07, 0xb0, 0xbd, 0xe8, 0xf0, 0x00, 0xf0, 0xe7 };
++	if (!cs_support(arch))
++		return true;
++	csh handle;
++	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = true;
++	for (unsigned detail = 0; detail < 2; ++detail) {
++		if (cs_option(handle, CS_OPT_DETAIL,
++			      detail ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK) {
++			ok = false;
++			break;
++		}
++		cs_insn *record = cs_malloc(handle);
++		if (!record) {
++			ok = false;
++			break;
++		}
++		if (record->illegal || record->is_alias ||
++		    record->usesAliasDetails || record->alias_id)
++			ok = false;
++		for (unsigned text = 0; text < 2; ++text) {
++			if (cs_option(handle, CS_OPT_TEXT,
++				      text ? CS_OPT_ON : CS_OPT_OFF) !=
++			    CS_ERR_OK) {
++				ok = false;
++				break;
++			}
++			const uint8_t *cursor = arch == CS_ARCH_ARM ? arm : x86;
++			size_t left = arch == CS_ARCH_ARM ? sizeof(arm) :
++							    sizeof(x86);
++			uint64_t ip = 0x1000;
++			record->illegal = true;
++			if (!cs_disasm_iter(handle, &cursor, &left, &ip,
++					    record)) {
++				ok = false;
++				break;
++			}
++			if (arch == CS_ARCH_ARM) {
++				if (!record->illegal ||
++				    !cs_disasm_iter(handle, &cursor, &left, &ip,
++						    record) ||
++				    record->illegal)
++					ok = false;
++			} else if (record->is_alias ||
++				   record->usesAliasDetails ||
++				   record->illegal || record->alias_id) {
++				ok = false;
++			}
++			if (left)
++				ok = false;
++		}
++		cs_free(record, 1);
 +	}
++	cs_close(&handle);
++	return ok;
 +}
 +
- static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 				 uint16_t *insn_size,
- 				 const struct VectorOutputRow *row,
-@@ -52,19 +68,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 		out = writeVectorRegister(out + 2, ll, regs[n]);
- 	}
- 	if (row->immediate) {
--		const unsigned value = code[prefix + 2];
--		memcpy(out, ", ", 2);
--		out += 2;
--		if (value <= HEX_THRESHOLD) {
--			*out = (char)('0' + value);
--		} else {
--			static const char digits[] = "0123456789abcdef";
--			memcpy(out, "0x", 2);
--			out += 2;
--			if (value >= 16)
--				*out++ = digits[value >> 4];
--			*out = digits[value & 15];
--		}
-+		writeVectorImmediate(out, code[prefix + 2]);
- 	}
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
-@@ -261,20 +265,24 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 	if (size < 4)
- 		return false;
- 	const bool has_rex = wide && (code[1] & 0xf0) == 0x40;
--	const unsigned length = 4 + has_rex;
--	if (size < length || code[1 + has_rex] != 0x0f)
-+	const unsigned header = 4 + has_rex;
-+	if (size < header || code[1 + has_rex] != 0x0f)
- 		return false;
- 	const uint8_t opcode = code[2 + has_rex];
--	const unsigned plan = legacy_register_plans[opcode];
- 	const uint8_t modrm = code[3 + has_rex];
--	if (!plan || modrm < 0xc0)
-+	const bool shift = opcode >= 0x71 && opcode <= 0x73;
-+	const unsigned plan =
-+		shift ? legacy_shift_plans[opcode - 0x71][(modrm >> 3) & 7] :
-+			legacy_register_plans[opcode];
-+	const unsigned length = header + shift;
-+	if (!plan || modrm < 0xc0 || size < length)
- 		return false;
- 
- 	const struct VectorOutputRow *row = &legacy_register_rows[plan & 127];
- 	const uint8_t rex = has_rex ? code[1] : 0;
- 	const unsigned reg = ((modrm >> 3) & 7) | ((rex & 4) << 1);
- 	const unsigned rm = (modrm & 7) | ((rex & 1) << 3);
--	const unsigned first = plan & 128 ? rm : reg;
-+	const unsigned first = shift || (plan & 128) ? rm : reg;
- 	const unsigned second = plan & 128 ? reg : rm;
- 	*insn_size = insn->size = (uint16_t)length;
- 	insn->id = row->id;
-@@ -283,8 +291,12 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, 0, first);
--	memcpy(out, ", ", 2);
--	writeVectorRegister(out + 2, 0, second);
-+	if (shift)
-+		writeVectorImmediate(out, code[header]);
-+	else {
-+		memcpy(out, ", ", 2);
-+		writeVectorRegister(out + 2, 0, second);
-+	}
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
- 		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -297,9 +309,9 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 		x->rex = rex;
- 		x->addr_size = wide ? 8 : 4;
- 		x->modrm = modrm;
--		x->encoding.modrm_offset = (uint8_t)(length - 1);
-+		x->encoding.modrm_offset = (uint8_t)(header - 1);
- 		x->op_count = 2;
--		for (unsigned i = 0; i < 2; ++i) {
-+		for (unsigned i = 0; i < (shift ? 1u : 2u); ++i) {
- 			cs_x86_op *op = &x->operands[i];
- 			op->type = X86_OP_REG;
- 			op->reg =
-@@ -307,6 +319,15 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 			op->size = 16;
- 			op->access = (cs_ac_type)row->access[i];
- 		}
-+		if (shift) {
-+			cs_x86_op *imm = &x->operands[1];
-+			imm->type = X86_OP_IMM;
-+			imm->imm = code[header];
-+			imm->size = 1;
-+			imm->access = (cs_ac_type)row->access[1];
-+			x->encoding.imm_offset = (uint8_t)header;
-+			x->encoding.imm_size = 1;
-+		}
- 	}
- 	return true;
- }
-diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..8bfff3e9 100644
---- a/suite/synctools/x86_vector_output.cpp
-+++ b/suite/synctools/x86_vector_output.cpp
-@@ -285,13 +285,16 @@ void emit_vex_indexed(Decoder &decoder)
- // can be recovered from the prefix, opcode and ModR/M. Generate against
- // the ordinary decoder so special encodings and aliases retain its behavior.
- std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
--				unsigned opcode, unsigned modrm, bool reverse)
-+				unsigned opcode, unsigned modrm, bool reverse,
-+				bool shift = false, unsigned immediate = 0)
+ int main()
  {
--	uint8_t bytes[5] = { 0x66, uint8_t(rex), 0x0f, uint8_t(opcode),
--			     uint8_t(modrm) };
--	const unsigned size = rex ? 5 : 4;
-+	uint8_t bytes[] = { 0x66,	    uint8_t(rex),
-+			    0x0f,	    uint8_t(opcode),
-+			    uint8_t(modrm), uint8_t(immediate) };
-+	const unsigned header = rex ? 5 : 4;
-+	const unsigned size = header + unsigned(shift);
- 	if (!rex)
--		std::memmove(bytes + 1, bytes + 2, 3);
-+		std::memmove(bytes + 1, bytes + 2, 4);
- 	const unsigned id = decoder.decode(bytes, size);
- 	if (!id)
- 		return {};
-@@ -312,25 +315,41 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
- 	expected.rex = uint8_t(rex);
- 	expected.addr_size = wide ? 8 : 4;
- 	expected.modrm = uint8_t(modrm);
--	expected.encoding.modrm_offset = uint8_t(size - 1);
-+	expected.encoding.modrm_offset = uint8_t(header - 1);
- 	expected.op_count = 2;
- 	Bytes4 access{}, groups{};
- 	std::copy_n(d.groups, d.groups_count, groups.begin());
--	for (unsigned i = 0; i < 2; ++i) {
-+	for (unsigned i = 0; i < (shift ? 1u : 2u); ++i) {
- 		auto &op = expected.operands[i];
- 		op.type = X86_OP_REG;
--		op.reg = x86_reg(X86_REG_XMM0 + nums[i]);
-+		op.reg = x86_reg(X86_REG_XMM0 + (shift ? rm : nums[i]));
- 		op.size = 16;
- 		op.access = x.operands[i].access;
- 		access[i] = unsigned(op.access);
- 	}
--	const auto text = "xmm" + std::to_string(nums[0]) + ", xmm" +
--			  std::to_string(nums[1]);
-+	std::string text;
-+	if (shift) {
-+		auto &imm = expected.operands[1];
-+		imm.type = X86_OP_IMM;
-+		imm.imm = immediate;
-+		imm.size = 1;
-+		imm.access = x.operands[1].access;
-+		access[1] = unsigned(imm.access);
-+		expected.encoding.imm_offset = uint8_t(header);
-+		expected.encoding.imm_size = 1;
-+		char number[8];
-+		std::snprintf(number, sizeof(number),
-+			      immediate <= 9 ? "%u" : "0x%x", immediate);
-+		text = "xmm" + std::to_string(rm) + ", " + number;
-+	} else {
-+		text = "xmm" + std::to_string(nums[0]) + ", xmm" +
-+		       std::to_string(nums[1]);
-+	}
- 	if (text != insn.op_str || std::memcmp(&expected, &x, sizeof(x)))
- 		return {};
- 	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
- 	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
--	       fields(access) + ", 0 }";
-+	       fields(access) + ", " + std::to_string(unsigned(shift)) + " }";
- }
+ 	bool result = true;
+ 	result &= test_cs_mem_setup_fail();
+ 	result &= test_iterator_allocation();
++	result &= check_iterator_status(CS_ARCH_ARM, CS_MODE_ARM);
++	result &= check_iterator_status(CS_ARCH_X86, CS_MODE_64);
  
- void emit_legacy_registers(Decoder &wide)
-@@ -374,6 +393,35 @@ void emit_legacy_registers(Decoder &wide)
- 			rows.push_back(row);
- 		plans[opcode] = index | (reverse ? 128 : 0);
- 	}
-+	// Groups 12 through 14 select the SSE2 shift by ModR/M.reg.
-+	std::array<std::array<unsigned, 8>, 3> shift_plans{};
-+	for (unsigned index = 0; index < shift_plans.size(); ++index) {
-+		for (unsigned group = 0; group < 8; ++group) {
-+			const unsigned opcode = 0x71 + index;
-+			const unsigned modrm = 0xc0 | (group << 3);
-+			const auto row = legacy_register_row(narrow, false, 0,
-+							     opcode, modrm,
-+							     false, true, 0);
-+			if (row.empty())
-+				continue;
-+			for (unsigned prefix = 0; prefix < 18; ++prefix) {
-+				const unsigned rex =
-+					prefix >= 2 ? 0x40 + prefix - 2 : 0;
-+				for (unsigned value = 0; value <= 255; ++value)
-+					if (legacy_register_row(
-+						    prefix ? wide : narrow,
-+						    prefix != 0, rex, opcode,
-+						    modrm | (value & 7), false,
-+						    true, value) != row)
-+						throw std::runtime_error(
-+							"nonuniform SSE2 shift encoding");
-+			}
-+			rows.push_back(row);
-+			shift_plans[index][group] = unsigned(rows.size());
-+		}
-+	}
-+	if (!shift_plans[1][2] || !shift_plans[1][6] || rows.size() >= 128)
-+		throw std::runtime_error("missing SSE2 immediate shift rows");
- 	if (!plans[0x6f] || !plans[0x7f] || !plans[0x61] || !plans[0xfe])
- 		throw std::runtime_error("missing SSE2 register forms");
- 	std::puts(
-@@ -389,6 +437,14 @@ void emit_legacy_registers(Decoder &wide)
- 		std::putchar('\n');
- 	}
- 	std::puts("};");
-+	std::puts("static const uint8_t legacy_shift_plans[3][8] = {");
-+	for (const auto &plan : shift_plans) {
-+		std::printf("\t{");
-+		for (unsigned row : plan)
-+			std::printf(" %u,", row);
-+		std::puts(" },");
-+	}
-+	std::puts("};");
- 	std::fprintf(stderr, "%zu legacy register rows, %llu 32-bit probes\n",
- 		     rows.size(),
- 		     static_cast<unsigned long long>(narrow.probes));
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..cf2d9789 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -458,6 +458,18 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
- 					     0xa5))
- 					return false;
- 			}
-+	for (unsigned group = 0; group < 8; ++group)
-+		for (unsigned opcode = 0x71; opcode <= 0x73; ++opcode)
-+			for (unsigned value = 0; value <= 255; ++value) {
-+				uint8_t bytes[] = { 0x66, 0x0f, (uint8_t)opcode,
-+						    (uint8_t)(0xc0 |
-+							      group << 3 |
-+							      (value & 7)),
-+						    (uint8_t)value };
-+				if (!compare(handles, bytes, sizeof(bytes),
-+					     value))
-+					return false;
-+			}
- 	return true;
- }
- 
+ 	if (result) {
+ 		printf("All tests passed.\n");
