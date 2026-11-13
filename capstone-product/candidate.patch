@@ -52,26 +52,52 @@ index 1cb04b92..44471169 100644
  
  $(OBJDIR)/%.o: %.c
  	@mkdir -p $(@D)
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index c8e9f44e..63f99807 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -80,7 +80,8 @@ DECLARE_printComplexRotationOp(90, 0);
+ 
+ void printRegName(SStream *OS, unsigned Reg)
+ {
+-#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
++#if (defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) || \
++     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && !defined(CAPSTONE_DIET) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+ #include "AArch64GenShortRegisterNames.inc"
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index cbaebc8f..bc81cee8 100644
+index cbaebc8f..e82eaaa5 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
-@@ -906,7 +906,13 @@ void AArch64_set_instr_map_data(MCInst *MI)
+@@ -293,8 +293,15 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
+ 	return AArch64_LLVM_getRegisterName(reg, AArch64_NoRegAltName);
+ }
+ 
++/* Dedicated builds select their features separately. The standard GNU
++ * four-backend build also uses the validated scan, detail and printer paths. */
++#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || defined(CAPSTONE_AARCH64_FOUR_OUTPUT)
++#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
++#endif
++
+ /* The template changes text-only dispatch layout on Apple arm64. */
+-#if defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
++#if (defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) || \
++     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && \
+     !(defined(__APPLE__) && defined(__aarch64__))
+ #define AARCH64_COPY_OPERAND_DEFAULTS
+ /* Build all public operand defaults in one copy, including unused slots. */
+@@ -906,7 +913,8 @@ void AArch64_set_instr_map_data(MCInst *MI)
  	map_groups(MI, aarch64_insns);
  }
  
 -#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
-+#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || \
-+	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
-+#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
-+#endif
 +
 +#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
  /* These A64 classes have no reserved operand encodings. For a text-free
   * scan, the table's internal opcode suffices for the normal public mapper. */
  static unsigned scanImmediateOpcode(uint32_t word)
-@@ -938,7 +944,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -938,7 +946,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			    MCInst *MI, uint16_t *size, uint64_t address,
  			    void *info)
  {
@@ -80,6 +106,22 @@ index cbaebc8f..bc81cee8 100644
  	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
  	    MI->csh->disasm == AArch64_getInstruction) {
  		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));
+diff --git a/arch/AArch64/AArch64Mapping.h b/arch/AArch64/AArch64Mapping.h
+index 45d3b2db..041f3418 100644
+--- a/arch/AArch64/AArch64Mapping.h
++++ b/arch/AArch64/AArch64Mapping.h
+@@ -4,6 +4,11 @@
+ #ifndef CS_AARCH64_MAP_H
+ #define CS_AARCH64_MAP_H
+ 
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
++#define CAPSTONE_AARCH64_FOUR_OUTPUT
++#endif
++
+ #include "capstone/capstone.h"
+ #include "../../MCInst.h"
+ #include "../../SStream.h"
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
 index ebe301e2..afe37a02 100644
 --- a/arch/ARM/ARMInstPrinter.c
@@ -654,6 +696,20 @@ index e507eae0..6068ef0f 100644
          args = b", ".join(get_text_from_node(src, op) for op in ops)
          if len(ops) == 2:
              return b"SStream_concat2(" + s_name + b", " + args + b");\n"
+diff --git a/suite/synctools/aarch64_register_names.py b/suite/synctools/aarch64_register_names.py
+index e47c2bbf..bfee13c5 100644
+--- a/suite/synctools/aarch64_register_names.py
++++ b/suite/synctools/aarch64_register_names.py
+@@ -10,7 +10,8 @@ from pathlib import Path
+ 
+ ARCH = Path(__file__).resolve().parents[2] / "arch" / "AArch64"
+ PRINT_REG = "void printRegName(SStream *OS, unsigned Reg)\n{\n"
+-SHORT_REG = """#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \\
++SHORT_REG = """#if (defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) || \\
++     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && !defined(CAPSTONE_DIET) && \\
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \\
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+ #include "AArch64GenShortRegisterNames.inc"
 diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
 index 30482037..29a72009 100644
 --- a/suite/synctools/fixed_len_decoder.py

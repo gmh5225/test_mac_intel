@@ -1,7 +1,7 @@
-name: Build and measure the complete NeverD four-backend decoder using current fork LLVM sources and AArch64 immediate scan
+name: Measure the actual NeverD decoder on fork LLVM sources with four backend register output
 on:
   push:
-    branches: [codex/neverd-four-aarch64-scan-source]
+    branches: [codex/neverd-four-register-output-source]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 37de45cd16cb17f645135c1bdcb712af86269ac0
+          ref: 7301161d28eaca6573f9b86e34090edf57e5c0a1
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: a64-scan-production
+          name: registers-product
           path: product-evidence/
           retention-days: 14
