@@ -1,7 +1,7 @@
-name: Verify fresh x86 metadata and ARM SoftFail reuse on profiles
+name: Verify legality in scan output records and full output records on profiles
 on:
   push:
-    branches: [codex/capstone-iterator-status-profiles]
+    branches: [codex/capstone-scan-result-legality-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: e406d02e19f0d0c6a0b29870ab0e1209b7c5f2d3
+          ref: 6703e144275793a419ad663511e34b5dab3d52d8
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: iterator-status-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: scan-result-legality-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
