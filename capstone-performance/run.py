@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published e406d02e19f0d0c6a0b29870ab0e1209b7c5f2d3',candidate='Initialize fresh status and reset illegal on iterator reuse'))
+    write('comparison.json',dict(baseline='published 6703e144275793a419ad663511e34b5dab3d52d8',candidate='Initialize fresh status and reset illegal on iterator reuse'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -386,6 +386,10 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
+    x86_names={'amd64-ls','amd64-sort','amd64-cp','putty-32-0.85','putty-64-0.85','scalar32','scalar64','simd64'}
+    x86=[v for v in cases if v['consumer']=='decoder' and v['name'] in x86_names and (v['mode']=='scan' or v['name'].startswith('putty'))]
+    assert len(x86)==12
+    measure_panel('x86',x86,15,['base','new','base_aa','new_aa','iced','iced_aa'],200000000)
     others=[v for v in cases if v['consumer']=='single' and v['name'] in ('arm-ls','arm64-ls','mips64el-ls') and v['mode'] in ('scan','format','detail')]
     assert len(others)==9,[(c['name'],c['mode']) for c in others]
     measure_panel('other',others,13,['base','new','base_aa','new_aa'],200000000)
