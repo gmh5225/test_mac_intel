@@ -1,7 +1,7 @@
-name: Measure iterator detail restoration and packed SSE output on actual library functions
+name: Isolate EVEX operand verification against native vector output and both iced formatters across real binaries
 on:
   push:
-    branches: [codex/capstone-four-output-status-libraries]
+    branches: [codex/capstone-single-pass-evex-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checked-detail-storage-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: controlled-single-pass-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

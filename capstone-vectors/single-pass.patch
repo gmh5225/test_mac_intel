@@ -1,0 +1,68 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..6e53751a 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -334,7 +334,7 @@ __attribute__((noinline))
+ #endif
+ static int
+ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+-		      size_t code_len, cs_mode mode,
++		      size_t code_len, cs_mode mode, MCInst *scan, uint16_t *size,
+ 		      bool *scalar_compare_p2_normalized,
+ 		      uint8_t *original_scalar_compare_p2)
+ {
+@@ -582,6 +582,12 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 		}
+ 	}
+ 
++	/* The scan readers validate and translate each operand together. When
++	 * normalization changed any bytes, restore the original EVEX fields
++	 * before translation as required by the raw decoder. */
++	if (scan && decode_code == code)
++		return decodeInstructionScan(insn, code, code_len, mode, scan,
++					     size);
+ 	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
+ 
+ 	/* No further byte reads follow decoding; keep the input pointer valid
+@@ -639,11 +645,15 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	bool result;
+ 
+ 	InternalInstruction insn = { 0 };
+-	if (extension_opcode == 0x62)
++	const bool scan = scanOnly || (handle->no_text && !handle->detail_opt);
++	if (extension_opcode == 0x62) {
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
++					    scan ? instr : NULL, size,
+ 					    &scalar_compare_p2_normalized,
+ 					    &original_scalar_compare_p2);
+-	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
++		if (ret == X86_SCAN_COMPLETE)
++			return true;
++	} else if (scan) {
+ 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
+ 					    instr, size);
+ 		if (ret != X86_SCAN_RAW_READY)
+@@ -664,7 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 		*size = (uint16_t)insn.length;
+ 
+ 		prepareTranslation(&insn);
+-		if (scanOnly || (handle->no_text && !handle->detail_opt))
++		if (scan)
+ 			return !translateInstruction(instr, &insn, false);
+ 		result = operands_ready ||
+ 			 !translateInstruction(instr, &insn, true);
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..14aefc93 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -707,8 +707,8 @@ enum X86DecodeScanResult {
+  * mcInst retains raw decoding with only 0/-1 results. Only RAW_READY promises
+  * a materialized raw instruction; COMPLETE supplies the finished scan output.
+  * The caller selects scan
+- * after extension dispatch; EVEX remains raw so the backend keeps its existing
+- * prefix normalization and restoration order. */
++ * after extension dispatch. EVEX encodings that need prefix normalization
++ * use the raw decoder until their original fields have been restored. */
+ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+ 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+ 			  uint16_t *size);
