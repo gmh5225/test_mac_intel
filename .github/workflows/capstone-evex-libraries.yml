@@ -1,7 +1,7 @@
-name: Profile every common function in the OpenSSL SIMD comparison against both iced formatters
+name: Trace GCC and Clang EVEX opcode lookup in the same 320 OpenSSL functions
 on:
   push:
-    branches: [codex/capstone-all-common-simd-callgrind]
+    branches: [codex/capstone-evex-index-clang-gcc-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,6 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: gcc }
+          - { host: ubuntu-24.04, cc: clang }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -39,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: full-real-simd-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-index-instructions-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

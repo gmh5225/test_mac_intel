@@ -26,7 +26,7 @@ def main(w):
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
-    save('variants.json',dict(integer='May omit native EVEX tables: four-backend corrected control on '+reference,output='Measured native EVEX rows over the same four-backend tree', baseline_sha=sha(r/'baseline.patch'),candidate_sha=sha(r/'dispatch.patch')))
+    save('variants.json',dict(integer='Switch dispatch for generated EVEX packed rows on '+reference,output='Opcode-offset and per-map width table for the same packed rows', baseline_sha=sha(r/'baseline.patch'),candidate_sha=sha(r/'dispatch.patch')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical Text && X86 in NeverD dev f9b75b8f377adff76b7d58fd82359c57fad73df6'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -52,11 +52,13 @@ def main(w):
         if label=='output':
             assert objects['integer'].keys()==objects[label].keys()
             changed={n for n in objects[label] if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86Mapping','X86OutputIterator','X86VectorOutput')}
+            expected={'arch/X86/X86VectorOutput.c.o'}
             assert changed==expected,(changed,expected)
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        vector=next(b.rglob('X86VectorOutput.c.o'))
+        (p/'evidence'/('asm-'+label+'.txt')).write_bytes(sp.check_output(['objdump','-dr','--no-show-raw-insn',vector]))
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
@@ -83,7 +85,7 @@ def main(w):
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
             for mode in ([0,1,2] if bits==64 else [0]):
-                engines=['integer','output','iced']+(['fast'] if mode else [])
+                engines=['integer','output']
                 ref=None;cap_result=None
                 for label in engines:
                     executable=exe.get(label,exe['integer']);port='capstone' if label in exe else label
@@ -109,7 +111,7 @@ def main(w):
                     for temp in (raw,epoch,w/(ident+'.log')):temp.unlink()
                     reported.append(dict(sample=name,panel=panel,mode=mode,engine=label,instructions=result[2],events=dict(zip(events,totals)),per_decoded_instruction={k:v/result[2] for k,v in zip(events,totals)}))
                     save('profile.json',reported)
-    assert len(reported)==11,len(reported)
+    assert len(reported)==6,len(reported)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
