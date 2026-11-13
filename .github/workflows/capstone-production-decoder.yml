@@ -1,7 +1,7 @@
-name: Verify expanded operand records with an isolated fallback in product
+name: Verify EVEX opcode dispatch against the published baseline in product
 on:
   push:
-    branches: [codex/neverd-expanded-operand-output]
+    branches: [codex/capstone-evex-feature-opcodes-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: fc9fadbf57b992d99064a1175fd0cc80cbe13938
+          ref: 2cc799b248ddfeec638f82c42a2e1a685c7500f7
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-expanded-operand-output
+          name: evex-feature-product
           path: product-evidence/
           retention-days: 14
