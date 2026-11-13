@@ -20,23 +20,25 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..e4872c21 100644
+index 76fdbcb7..1e978af3 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3311,6 +3311,13 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 	if (extension == X86_FEATURE_INVALID)
- 		return false;
- 	if (extension != X86_FEATURE_DECODED) {
-+#ifdef CAPSTONE_X86_VECTOR_OUTPUT
-+		/* The adapter and all source-owned extensions retain precedence. */
-+		if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
-+		    handle->insn_id == X86_get_insn_id &&
-+		    X86_scanEvexOutputForm(code, code_len, result))
-+			return true;
+@@ -3365,6 +3365,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return true;
+ 		}
+ 	}
 +#endif
- 		if (tryExtension &&
- 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
- 		    code[0] == 0xc4) {
++#ifdef CAPSTONE_X86_VECTOR_OUTPUT
++	/* Only complete ordinary forms verified by the full decoder have rows.
++     * The adapter above still owns its callback and all misses use the
++     * feature decoder's original order, including malformed prefixes. */
++	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
++	    handle->insn_id == X86_get_insn_id &&
++	    X86_scanEvexOutputForm(code, code_len, result))
++		return true;
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index dc5cecf9..a976814e 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
@@ -2770,6 +2772,31 @@ index 54e9f22d..8ba63a14 100644
  	emit_legacy_registers(decoder);
  }
  }
+diff --git a/tests/unit/x86_scan_adapter.c b/tests/unit/x86_scan_adapter.c
+index a352123c..b3ae8053 100644
+--- a/tests/unit/x86_scan_adapter.c
++++ b/tests/unit/x86_scan_adapter.c
+@@ -108,6 +108,20 @@ int main(void)
+ 		for (size_t i = expected; i < sizeof(insn->bytes); ++i)
+ 			CHECK(insn->bytes[i] == 0xa5);
+ 	}
++	/* Valid ordinary rows may still be overridden by the registered adapter. */
++	static const uint8_t known[] = { 0x62, 0xf1, 0x6d, 0x48, 0xef, 0xd9 };
++	const uint8_t *row_cursor = known;
++	size_t row_left = sizeof(known);
++	uint64_t row_ip = 0x1000;
++	state.calls = 0;
++	state.result = (X86_INS_NOP << 8) | sizeof(known);
++	CHECK(cs_disasm_iter(handle, &row_cursor, &row_left, &row_ip, insn));
++	CHECK(state.calls == 1 && row_left == 0 && insn->id == X86_INS_NOP);
++	state.result = 0;
++	row_cursor = known;
++	row_left = sizeof(known);
++	CHECK(cs_disasm_iter(handle, &row_cursor, &row_left, &row_ip, insn));
++	CHECK(state.calls == 2 && row_left == 0 && insn->id == X86_INS_VPXORD);
+ 	/* Changing bitness disables the old profile until explicitly rebound. */
+ 	CHECK(cs_option(handle, CS_OPT_MODE, CS_MODE_32) == CS_ERR_OK);
+ 	state.calls = 0;
 diff --git a/tests/unit/x86_scan_batch.c b/tests/unit/x86_scan_batch.c
 index 771fefb7..4d51efb4 100644
 --- a/tests/unit/x86_scan_batch.c
