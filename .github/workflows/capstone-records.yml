@@ -1,7 +1,7 @@
-name: Qualify corrected iterator legality together with four-backend decoding on real executable images
+name: Test vector output and native standard-mode decoding on independent PE and ELF executables
 on:
   push:
-    branches: [codex/capstone-four-backend-public-iterator]
+    branches: [codex/capstone-four-mode-vector-release]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: corrected-four-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: native-vector-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
