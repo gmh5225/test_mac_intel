@@ -1,7 +1,7 @@
-name: Test the GCC REX store-to-load dependency inside the scalar public reader
+name: Isolate VEX call placement against scalar PE32 and SIMD throughput
 on:
   push:
-    branches: [codex/capstone-rex-spill-width]
+    branches: [codex/capstone-public-vex-call-placement]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,8 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: x86 }
-          - { host: ubuntu-22.04, cc: gcc, archs: x86 }
+          - { host: ubuntu-24.04, cc: gcc, archs: x86, trial: 1 }
+          - { host: ubuntu-24.04, cc: gcc, archs: x86, trial: 2 }
+          - { host: ubuntu-24.04-arm, cc: gcc, archs: x86, trial: 3 }
+          - { host: ubuntu-22.04, cc: gcc, archs: x86, trial: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -26,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 706eab8fec07688db644fe64c9d82600592134f8
+          ref: 7c43e5beb1da0e76b9e12d13d614d7e26cd17076
           path: source
           persist-credentials: false
       - name: Vary only REX representation and store/load width
@@ -36,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: rex-width-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex-placement-${{ matrix.trial }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
