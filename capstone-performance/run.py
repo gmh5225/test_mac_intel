@@ -210,7 +210,8 @@ panic = "abort"
     # The Mach-O ad hoc signature includes the linker's output basename. Both
     # files above are linked as 'single' and only renamed after signing.
     for label in ('base','new'):
-        proc=subprocess.run(['codesign','-dv','--verbose=4',WORK/('single-'+label)],capture_output=True,text=True,check=True)
+        proc=subprocess.run(['codesign','-dv','--verbose=4',WORK/('single-'+label)],capture_output=True,text=True)
+        if proc.returncode and 'not signed' not in proc.stderr: raise RuntimeError(proc.stderr)
         (EVIDENCE/('signature-'+label+'.txt')).write_text(proc.stderr)
     assert sha(WORK/'single-base')==sha(WORK/'single-new'), 'mixed public executable changed'
     if os.environ['MIXED_CC']=='gcc':

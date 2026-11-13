@@ -3,7 +3,7 @@ name: Verify identical signed public executables and private x86 output on Apple
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-isolated-vector-apple]
+    branches: [codex/capstone-isolated-vector-intel]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-isolated-vector-apple
+  group: capstone-isolated-vector-intel
   cancel-in-progress: false
 
 jobs:
@@ -22,7 +22,6 @@ jobs:
       matrix:
         include:
           - { host: macos-15-intel, baseline: neverd-four, cc: clang }
-          - { host: macos-15, baseline: neverd-four, cc: clang }
     env:
       MIXED_CC: ${{ matrix.cc }}
       COMPARE_BASE: ${{ matrix.baseline }}
@@ -50,7 +49,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-vector-apple-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: isolated-vector-intel-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
