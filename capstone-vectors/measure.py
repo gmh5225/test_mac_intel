@@ -16,7 +16,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference='7c43e5beb1da0e76b9e12d13d614d7e26cd17076'
+    reference='15ce0f6bd4b2497685ad5cca9a66aa721f462d53'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -26,7 +26,7 @@ def main(w):
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
-    save('variants.json',dict(integer='published '+reference,aa='byte-identical published executable',previous='integrated SSE and immediate record writer with eight arguments',output='same records, six-argument call interface'))
+    save('variants.json',dict(integer='published '+reference,aa='byte-identical published executable',previous='SSE and immediate writer',output='SSE, scalar immediate and memory writers'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -35,7 +35,7 @@ def main(w):
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
-    for label in ('integer','aa','previous','output','memory'):
+    for label in ('integer','aa','previous','output'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
         patches=[] if label=='integer' else [r/({'previous':'previous.patch','memory':'memory.patch','output':'dispatch.patch'}[label])]
@@ -76,8 +76,8 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [1,2]:
-                labels=['integer','aa','previous','output','memory']
+            for mode in [0,1,2]:
+                labels=['integer','aa','previous','output']
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
                 for i in range(19):

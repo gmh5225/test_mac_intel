@@ -1,7 +1,7 @@
-name: Measure standalone Capstone clients without co-linking benchmark engines
+name: Qualify the complete x86 operand writers in standalone clients
 on:
   push:
-    branches: [codex/capstone-standalone-operand-output]
+    branches: [codex/capstone-joint-writers-standalone]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 7c43e5beb1da0e76b9e12d13d614d7e26cd17076
+          ref: 15ce0f6bd4b2497685ad5cca9a66aa721f462d53
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -44,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: standalone-writers-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
+          name: integrated-standalone-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
