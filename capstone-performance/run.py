@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 2fc94937190ef9224bf797851dec71ff10c2c85c',candidate='isolated Linux EVEX scan and stack, immediate and SIMD output records'))
+    write('comparison.json',dict(baseline='published 2fc94937190ef9224bf797851dec71ff10c2c85c',candidate='stack, immediate and SIMD output records with identical scanner object'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -214,7 +214,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
@@ -224,6 +224,10 @@ panic = "abort"
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',WORK/'new/suite/synctools/x86_simple_output.cpp',WORK/'new-build/libcapstone.a','-o',WORK/'generate-output'],'build-generator')
+    command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',WORK/'new/suite/synctools/x86_vector_output.cpp',WORK/'new-build/libcapstone.a','-o',WORK/'generate-vectors'],'compile-vector-generator')
+    gen=subprocess.run([WORK/'generate-vectors'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
+    assert gen.stdout==(WORK/'new/arch/X86/X86GenVectorOutput.inc').read_bytes()
+    write('vector-regeneration',dict(sha256=hashlib.sha256(gen.stdout).hexdigest(),summary=gen.stderr.decode().strip()))
     result=subprocess.run([WORK/'generate-output'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
     assert result.stdout==(WORK/'new/arch/X86/X86GenSimpleOutput.inc').read_bytes()
     write('regeneration',dict(sha256=hashlib.sha256(result.stdout).hexdigest(),summary=result.stderr.decode().strip()))
