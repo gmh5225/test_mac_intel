@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published b70c7e94 with previously qualified AArch64 GCC scan', candidate='combined scalar stack, immediate and separate vector output'))
+    write('comparison.json', dict(baseline='published b70c7e94 with previously qualified AArch64 GCC scan', candidate='complete scalar and vector output, compact GCC scan and tuned public writes'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -215,6 +215,11 @@ panic = "abort"
     assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
     assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    if PROFILE == 'gcc' and platform.machine() == 'x86_64':
+        command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
+        command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
+        for lbl in ('base','new'):
+            command(['objdump','-d','--disassemble=X86_trySimpleOutput',libraries[lbl]],'linked-output-'+lbl)
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
@@ -376,6 +381,7 @@ def measure():
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
     selected={('amd64-ls','detail'),('putty-32-0.85','scan'),('putty-32-0.85','format'),('putty-32-0.85','detail'),('scalar32','format'),('scalar64','detail'),('simd64','format'),('simd64','detail'),('putty-64-0.85','format')}
+    selected.update((name,'scan') for name in ('scalar32','scalar64','amd64-ls','amd64-cp','amd64-sort','putty-64-0.85'))
     checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
     measure_panel('null',[v for v in checks if (v['name'],v['mode']) in [('putty-32-0.85','format'),('scalar32','format')]],9,['base','new','base_aa','new_aa'],350000000)
     measure_panel('x86',checks,19,['base','new','base_aa','new_aa','iced','iced_aa'],300000000)
