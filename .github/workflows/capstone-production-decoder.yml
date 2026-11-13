@@ -1,7 +1,7 @@
-name: Compare full NeverD i386 addressing on three release libraries and both PuTTY executables
+name: Measure integrated native EVEX on the current NeverD product and both complete OpenSSL text sections
 on:
   push:
-    branches: [codex/neverd-real-i386-segment-lea]
+    branches: [codex/neverd-current-native-vector]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-i386-segment-lea
+          name: integrated-native-vector
           path: product-evidence/
           retention-days: 14
