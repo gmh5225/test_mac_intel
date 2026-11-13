@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 8788c077d7de2724fbf9a82f46f43a2dbd2b5e63',candidate='stack, immediate and SIMD output records with identical scanner object'))
+    write('comparison.json',dict(baseline='published c92f6f103e0123790f574c05a2a57f7203e7a461',candidate='bounded VEX opcode and operand extents'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -211,14 +211,14 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
+    assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    assert diffs==['arch/X86/X86DisassemblerDecoder.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
         for lbl in ('base','new'):
-            command(['objdump','-d','--disassemble=X86_trySimpleOutput',libraries[lbl]],'linked-output-'+lbl)
+            command(['objdump','-d','--disassemble=X86_getInstructionScan',libraries[lbl]],'linked-scan-'+lbl)
     write('object-difference.json',dict(changed=diffs,identical=len(changed[0])-len(diffs),ordinary_static_client_byte_identical=sha(WORK/'single-base')==sha(WORK/'single-new')))
     command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',WORK/'new/tests/unit/x86_simple_output.c',WORK/'new-build/libcapstone.a','-o',WORK/'output-unit'],'build-output-unit')
     command([WORK/'output-unit'],'verify-output-unit')
@@ -237,6 +237,8 @@ panic = "abort"
     command([WORK/'evex-unit'],'verify-full-vector-records')
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'vector-scan.cpp','-ldl','-o',WORK/'vector-scan'],'build-vector-scan')
     command([WORK/'vector-scan',libraries['base'],libraries['new']],'verify-vector-scan')
+    command(['clang++','-O2','-std=c++17','-I',base/'include',SOURCE/'verify-vex.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',WORK/'verify-vex'],'build-verify-vex')
+    command([WORK/'verify-vex',libraries['base'],libraries['new'],'quick'],'verify-vex')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
