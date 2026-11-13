@@ -41,9 +41,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  for label in ('base','arch','isolated'):
+  for label in ('base','core','iterator'):
    if label!='base':
-    command(['git','apply',r/(label+'.patch')],'select-'+label,nd)
+    command(['git','apply',r/(label+'.patch')],'select-'+label,cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'));trace=t/(label+'.trace')
@@ -57,13 +57,15 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    if label!='base':
-    command(['git','apply','-R',r/(label+'.patch')],'restore-client-'+label,nd)
+    command(['git','apply','-R',r/(label+'.patch')],'restore-source-'+label,cs)
    snapshot=json.loads((build/'.neverd-deps/snapshot.json').read_text())
    write(label+'-snapshot',snapshot)
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
    objects={str(f.relative_to(roots[0])):hashlib.sha256(f.read_bytes()).hexdigest() for f in roots[0].rglob('*.o')};write(label+'-objects',objects)
    if label!='base':
-    base_objects=json.loads((out/'base-objects.json').read_text());assert objects==base_objects
+    base_objects=json.loads((out/'base-objects.json').read_text());assert base_objects.keys()==objects.keys()
+    changed=sorted(k for k in objects if objects[k]!=base_objects[k]);write(label+'-changes',changed)
+    assert set(changed)==({'cs.c.o','arch/X86/X86OutputIterator.c.o'} if label=='core' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}),changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
@@ -81,11 +83,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     cases_of_interest={'arm-cp':(0,1,2),'arm64-ls':(0,2),'arm64-sort':(0,),'mips64el-ls':(0,1),'putty-32-0.85':(0,1,2),'simd64':(2,)}
     if mode not in cases_of_interest.get(case['name'],()):continue
     # A long full text and a tiny compiler fixture have very different costs.
-    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(200000/start)))
+    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(130000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','arch','isolated')):
+    for idx,label in enumerate(('base-copy','core','iterator')):
      plans=[]
-     for cycle in range(11):
+     for cycle in range(9):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
       times={'base':[],label:[]}
       for who in order:
@@ -94,7 +96,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
        assert oracle==sig,(case['name'],mode,who,oracle,sig)
       plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
-    row['signature']=oracle;results.append(row);write('timings',results)
+    row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
   assert len(results)==12;write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
  finally:
