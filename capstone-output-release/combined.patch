@@ -1,329 +1,621 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..46ce34e0 100644
+index 76fdbcb7..8c040e0b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3422,67 +3422,92 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3422,9 +3422,60 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  	return completeTerminalScanResult(result, instructionID, status);
  }
  
-+/* 32- and 64-bit memory operands have the same SIB and displacement
-+ * extents. The caller checks the final end against the architectural limit. */
-+X86_DECODE_INLINE unsigned scanMemoryEnd(const uint8_t *code, size_t size,
-+					 unsigned end, uint8_t modrm)
++/* Shared register/memory entries can provide the public ID, VEX.vvvv
++ * policy and immediate extent without another lookup by internal opcode. */
++X86_DECODE_INLINE int scanVexPublicRow(const uint8_t *code, size_t size,
++				       X86ScanResult *result)
 +{
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	static const uint8_t extra[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
-+					     { 1, 1, 1, 1, 2, 1, 1, 1 },
-+					     { 4, 4, 4, 4, 5, 4, 4, 4 } };
-+	if ((modrm & 0xc7) == 4) {
-+		if (end >= size)
-+			return 16;
-+		if ((code[end] & 7) == 5)
++	const bool vex2 = code[0] == 0xc5;
++	const unsigned off = vex2 ? 2 : 3;
++	if (size <= off + 1)
++		return X86_SCAN_NOT_HANDLED;
++	const unsigned map = vex2 ? 1 : mmmmmFromVEX2of3(code[1]);
++	if (map < 1 || map > 3)
++		return X86_SCAN_NOT_HANDLED;
++	const uint8_t payload = code[off - 1];
++	const unsigned key = (payload & 7) | (vex2 ? 0 : (payload >> 4) & 8);
++	const unsigned table = vex2 ? 1 : map == 1 ? 0 : map;
++	const uint32_t *row = x86VexPublicRows[table][key];
++	const uint32_t word = row ? row[code[off]] : 0;
++	if (!word)
++		return X86_SCAN_NOT_HANDLED;
++	if (!(word & 0x10000) && vvvvFromVEX2of2(payload))
++		return X86_SCAN_INVALID;
++
++	const uint8_t modrm = code[off + 1];
++	unsigned end = off + 2;
++	if (modrm < 0xc0) {
++		const unsigned mod = modFromModRM(modrm),
++			       rm = rmFromModRM(modrm);
++		unsigned base = rm;
++		if (rm == 4) {
++			if (end >= size)
++				return X86_SCAN_INVALID;
++			base = baseFromSIB(code[end++]);
++		}
++		if (mod == 1)
++			++end;
++		else if (mod == 2 || base == 5)
 +			end += 4;
 +	}
-+	return end + extra[mod][rm];
++	end += (word >> 12) & 15;
++	if (end > size)
++		return X86_SCAN_INVALID;
++	result->opcode = 0;
++	result->opcode_pub = word & 0xfff;
++	result->length = (uint16_t)end;
++	result->popcode_adjust = 0;
++	return X86_SCAN_COMPLETE;
 +}
 +
-+/* A bare VEX prefix in 64-bit mode fixes the address size. Only the end
-+ * offset and the opcode IDs escape this scan. Extension and generic fixups
-+ * continue to use their ordinary readers. */
  X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
  					 uint8_t prefix, X86ScanResult *result)
  {
--	InternalInstruction insn = { 0 };
--	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
--	insn.readerCursor = 1;
--	if (readVexPrefix(&insn, prefix))
-+	const bool vex2 = prefix == 0xc5;
-+	const unsigned opcode_offset = vex2 ? 2 : 3;
-+	if (code_len <= opcode_offset)
- 		return X86_SCAN_INVALID;
--	setInstructionSizes(&insn, insn.hasOpSize, insn.hasAdSize);
--	int opcodeResult = readOpcode(&insn, false, true);
--	if (opcodeResult)
--		return opcodeResult == OPCODE_READ_GENERIC ?
--			       X86_SCAN_NOT_HANDLED :
--			       X86_SCAN_INVALID;
--	/* Keep the generic opcode/size repairs outside this admission. */
--	if ((insn.opcodeType == TWOBYTE &&
--	     (insn.opcode == 0xae ||
--	      (insn.opcode >= 0x82 && insn.opcode <= 0x8f))) ||
--	    (insn.opcodeType == THREEBYTE_38 && insn.opcode == 0xf8))
-+	const unsigned map = vex2 ? VEX_LOB_0F : mmmmmFromVEX2of3(code[1]);
-+	if (map < VEX_LOB_0F || map > VEX_LOB_0F3A)
-+		return X86_SCAN_INVALID;
-+	const uint8_t payload = code[opcode_offset - 1];
-+	const uint8_t opcode = code[opcode_offset];
-+	if ((map == VEX_LOB_0F &&
-+	     (opcode == 0xae || (opcode >= 0x82 && opcode <= 0x8f))) ||
-+	    (map == VEX_LOB_0F38 && opcode == 0xf8))
- 		return X86_SCAN_NOT_HANDLED;
--	const uint8_t payload =
--		insn.vectorExtensionPrefix[prefix == 0xc4 ? 2 : 1];
--	const unsigned row = (payload & 7) | (wFromREX(insn.rexPrefix) << 3);
-+	const unsigned row = (payload & 7) |
-+			     (vex2 ? 0 : wFromVEX3of3(payload) << 3);
- 	const struct ModRMDecision *decisions =
--		x86VexScanRows[insn.opcodeType - TWOBYTE][row];
-+		x86VexScanRows[map - VEX_LOB_0F][row];
- 	if (!decisions)
- 		return X86_SCAN_INVALID;
--	const struct ModRMDecision *decision = &decisions[insn.opcode];
--	const uint32_t packed = decision->packed;
--	const bool decisionModRM =
-+	const uint32_t packed = decisions[opcode].packed;
-+	const bool decision_modrm =
- 		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
-+	unsigned end = opcode_offset + 1;
- 	uint8_t modrm = 0;
--	if (decisionModRM && lookAtByte(&insn, &modrm))
--		return X86_SCAN_INVALID;
--	insn.instructionID = decode(packed, modrm);
--	if (!insn.instructionID)
-+	if (decision_modrm) {
-+		if (end >= code_len)
-+			return X86_SCAN_INVALID;
-+		modrm = code[end];
-+	}
-+	const unsigned id = decode(packed, modrm);
-+	if (!id)
- 		return X86_SCAN_INVALID;
--	if (insn.instructionID >= ARR_SIZE(x86VexScanMetadata))
-+	if (id >= ARR_SIZE(x86VexScanMetadata))
- 		return X86_SCAN_NOT_HANDLED;
--	const uint32_t metadata = x86VexScanMetadata[insn.instructionID];
-+	const uint32_t metadata = x86VexScanMetadata[id];
- 	const uint8_t flags = (uint8_t)metadata;
- 	if (!flags)
- 		return X86_SCAN_NOT_HANDLED;
--	if (decisionModRM || (flags & X86_VEX_SCAN_MODRM)) {
--		if (readModRMScan(&insn))
--			return X86_SCAN_INVALID;
--		if (!(flags & (insn.modRM >= 0xc0 ? X86_VEX_SCAN_REGISTER :
--						    X86_VEX_SCAN_MEMORY)))
-+	if (decision_modrm || (flags & X86_VEX_SCAN_MODRM)) {
-+		if (!decision_modrm) {
-+			if (end >= code_len)
-+				return X86_SCAN_INVALID;
-+			modrm = code[end];
-+		}
-+		++end;
-+		if (!(flags & (modrm >= 0xc0 ? X86_VEX_SCAN_REGISTER :
-+					       X86_VEX_SCAN_MEMORY)))
- 			return X86_SCAN_INVALID;
-+		if (modrm < 0xc0)
-+			end = scanMemoryEnd(code, code_len, end, modrm);
- 	}
--	if (!(flags & X86_VEX_SCAN_VVVV) &&
--	    (prefix == 0xc4 ? vvvvFromVEX3of3(payload) :
--			      vvvvFromVEX2of2(payload)))
-+	if (!(flags & X86_VEX_SCAN_VVVV) && vvvvFromVEX2of2(payload))
- 		return X86_SCAN_INVALID;
--	if (readVexScanImmediates(&insn, flags >> X86_VEX_SCAN_PATTERN_SHIFT) !=
--		    X86_SCAN_COMPLETE ||
--	    finishDecodedInstruction(&insn, false))
-+	const bool short_immediate = vex2 &&
-+				     ppFromVEX2of2(payload) == VEX_PREFIX_66;
-+	end += x86VexImmediateBytes[short_immediate]
-+				   [flags >> X86_VEX_SCAN_PATTERN_SHIFT];
-+	if (end > code_len || end > 15)
- 		return X86_SCAN_INVALID;
--	result->opcode = insn.instructionID;
-+	result->opcode = id;
- 	result->opcode_pub = metadata >> X86_VEX_SCAN_PUBLIC_SHIFT;
--	result->length = (uint16_t)insn.length;
-+	result->length = (uint16_t)end;
- 	result->popcode_adjust = 0;
- 	return X86_SCAN_COMPLETE;
- }
-@@ -3569,25 +3594,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
- 		}
- 		++end;
- 		if (modrm < 0xc0) {
--			const unsigned mod = modrm >> 6, rm = modrm & 7;
- 			if (mode == CS_MODE_16) {
- 				static const uint8_t displacement[] = { 0, 1,
- 									2 };
--				end += displacement[mod] +
-+				end += displacement[modrm >> 6] +
- 				       ((modrm & 0xc7) == 6 ? 2 : 0);
- 			} else {
--				static const uint8_t extra[3][8] = {
--					{ 0, 0, 0, 0, 1, 4, 0, 0 },
--					{ 1, 1, 1, 1, 2, 1, 1, 1 },
--					{ 4, 4, 4, 4, 5, 4, 4, 4 }
--				};
--				if ((modrm & 0xc7) == 4) {
--					if (end >= size)
--						return X86_SCAN_INVALID;
--					if ((code[end] & 7) == 5)
--						end += 4;
--				}
--				end += extra[mod][rm];
-+				end = scanMemoryEnd(code, size, end, modrm);
- 			}
- 		}
- 	}
++	const int direct = scanVexPublicRow(code, code_len, result);
++	if (direct != X86_SCAN_NOT_HANDLED)
++		return direct;
+ 	InternalInstruction insn = { 0 };
+ 	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
+ 	insn.readerCursor = 1;
 diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
-index 2c0da2cd..c39eaa65 100644
+index 2c0da2cd..3e872b42 100644
 --- a/arch/X86/X86GenVexScan.inc
 +++ b/arch/X86/X86GenVexScan.inc
-@@ -278,50 +278,10 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x0001ed06u, 0x0001ed05u, 0x0001ed06u,
+@@ -61,6 +61,88 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+ 	},
  };
  
--X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)
--{
--	switch (pattern) {
--	case 0:
--		return X86_SCAN_COMPLETE;
--	case 1:
--		if (readImmediateImpl(insn, 1, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 2:
--		if (readImmediateImpl(insn, insn->immediateSize, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 3:
--		if (readImmediateImpl(insn, 4, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 4:
--		if (readImmediateImpl(insn, 2, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 5:
--		if (readImmediateImpl(insn, 2, false) ||
--		    readImmediateImpl(insn, 1, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 6:
--		if (readImmediateImpl(insn, insn->immediateSize, false) ||
--		    readImmediateImpl(insn, insn->immediateSize, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 7:
--		if (readImmediateImpl(insn, insn->immediateSize, false) ||
--		    readImmediateImpl(insn, 2, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 8:
--		if (readImmediateImpl(insn, 8, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	default:
--		return X86_SCAN_INVALID;
--	}
--}
-+static const uint8_t x86VexImmediateBytes[2][9] = {
-+	{ 0, 1, 4, 4, 2, 3, 8, 6, 8 },
-+	{ 0, 1, 2, 4, 2, 3, 4, 4, 8 },
++/* Ordinary register or memory VEX encodings with identical public metadata. */
++static const uint32_t x86VexPublicWords[][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0x10019u, 0, 0, 0x1003du, 0, 0x1001fu, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0x102adu, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0x10215u, 0, 0x1028au, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0x10214u, 0x101f7u, 0x102b0u, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
 +};
- #else
- /* W, L and pp select existing validated opcode rows directly. */
- static const struct ModRMDecision *const x86VexScanRows[3][16] = {
-@@ -2300,53 +2260,8 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
- 	0x0001ed06u,
++static const uint32_t *const x86VexPublicRows[4][16] = {
++	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
++	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
++	{ x86VexPublicWords[0], x86VexPublicWords[1], x86VexPublicWords[2], x86VexPublicWords[3], NULL, NULL, NULL, NULL, x86VexPublicWords[0], x86VexPublicWords[1], x86VexPublicWords[2], x86VexPublicWords[3], NULL, NULL, NULL, NULL },
++	{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL },
++};
++
+ /* 1570 admitted UIDs, 9 immediate patterns. */
+ enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
+        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
+@@ -381,6 +463,340 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+ 	},
  };
  
--X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)
--{
--	switch (pattern) {
--	case 0:
--		return X86_SCAN_COMPLETE;
--	case 1:
--		if (readImmediateImpl(insn, 1, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 2:
--		if (readImmediateImpl(insn, insn->immediateSize, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 3:
--		if (readImmediateImpl(insn, 4, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 4:
--		if (readImmediateImpl(insn, 2, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 5:
--		if (readImmediateImpl(insn, 2, false) ||
--		    readImmediateImpl(insn, 1, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 6:
--		if (readImmediateImpl(insn, 1, false) ||
--		    readImmediateImpl(insn, 1, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 7:
--		if (readImmediateImpl(insn, insn->immediateSize, false) ||
--		    readImmediateImpl(insn, insn->immediateSize, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 8:
--		if (readImmediateImpl(insn, insn->immediateSize, false) ||
--		    readImmediateImpl(insn, 2, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	case 9:
--		if (readImmediateImpl(insn, 8, false))
--			return X86_SCAN_INVALID;
--		return X86_SCAN_COMPLETE;
--	default:
--		return X86_SCAN_INVALID;
--	}
--}
-+static const uint8_t x86VexImmediateBytes[2][10] = {
-+	{ 0, 1, 4, 4, 2, 3, 2, 8, 6, 8 },
-+	{ 0, 1, 2, 4, 2, 3, 2, 4, 4, 8 },
++/* Ordinary register or memory VEX encodings with identical public metadata. */
++static const uint32_t x86VexPublicWords[][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x41bu, 0x41bu, 0, 0, 0x105c1u, 0x105bfu, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x3ffu, 0x3ffu, 0, 0, 0, 0, 0x5bdu, 0x323u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x5b2u, 0x599u, 0x583u, 0x10308u, 0x10306u, 0x1042bu, 0x105c3u, 0x102f8u, 0x10424u, 0x32fu, 0x327u, 0x105b7u, 0x103f7u, 0x10352u, 0x103f0u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x115b0u, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x41au, 0x41au, 0, 0, 0x105c0u, 0x105beu, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x3feu, 0x3feu, 0, 0, 0, 0, 0x5bcu, 0x322u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x5b1u, 0, 0, 0x10307u, 0x10305u, 0x1042au, 0x105c2u, 0x102f7u, 0x10423u, 0x329u, 0x32eu, 0x105b6u, 0x103f6u, 0x10351u, 0x103efu,
++		0x10570u, 0x10573u, 0x10571u, 0x10433u, 0x1045fu, 0x10462u, 0x10460u, 0x10435u, 0x1056cu, 0x1056fu, 0x1056du, 0x10432u, 0x10572u, 0x1056eu, 0x401u, 0x404u,
++		0x153fu, 0, 0, 0, 0x10459u, 0x1045cu, 0x1045au, 0, 0, 0, 0, 0, 0x103dbu, 0x103ddu, 0x401u, 0x404u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0x114bbu, 0, 0x115afu, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x102fbu, 0x10558u, 0x10553u, 0x10554u, 0x10438u, 0x1050du, 0x3fdu, 0, 0x1055eu, 0x1055fu, 0x104dcu, 0x10444u, 0x1043bu, 0x1043cu, 0x104d4u, 0x10442u,
++		0x10445u, 0x10551u, 0x1054cu, 0x10446u, 0x10509u, 0x1050au, 0x33eu, 0, 0x1055cu, 0x1055du, 0x104dbu, 0x10516u, 0x10439u, 0x1043au, 0x104d3u, 0x10576u,
++		0, 0x1054bu, 0x10546u, 0x10547u, 0x1050fu, 0x104cdu, 0x10524u, 0, 0x10559u, 0x10560u, 0x1055au, 0x1055bu, 0x10436u, 0x1043du, 0x10437u, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0x418u, 0, 0, 0, 0x417u, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1033au, 0, 0x348u, 0x33cu, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x105b4u, 0x1059au, 0x10584u, 0, 0, 0, 0, 0x102fau, 0x10426u, 0x1033bu, 0x342u, 0x105b9u, 0x103f9u, 0x10354u, 0x103f2u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x409u,
++		0x1540u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x3fdu, 0x409u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x326u, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0x400u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10339u, 0, 0x346u, 0x336u, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x105b3u, 0, 0, 0, 0, 0, 0, 0x102f9u, 0x10425u, 0x10337u, 0, 0x105b8u, 0x103f8u, 0x10353u, 0x103f1u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x1541u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x103dcu, 0x103deu, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x102fcu, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x328u, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x41au, 0x41au, 0, 0, 0x105c0u, 0x105beu, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x3feu, 0x3feu, 0, 0, 0, 0, 0x5bcu, 0x322u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x5b1u, 0, 0, 0x10307u, 0x10305u, 0x1042au, 0x105c2u, 0x102f7u, 0x10423u, 0x329u, 0x32eu, 0x105b6u, 0x103f6u, 0x10351u, 0x103efu,
++		0x10570u, 0x10573u, 0x10571u, 0x10433u, 0x1045fu, 0x10462u, 0x10460u, 0x10435u, 0x1056cu, 0x1056fu, 0x1056du, 0x10432u, 0x10572u, 0x1056eu, 0, 0x404u,
++		0x153fu, 0, 0, 0, 0x10459u, 0x1045cu, 0x1045au, 0, 0, 0, 0, 0, 0x103dbu, 0x103ddu, 0, 0x404u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x115afu, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x102fbu, 0x10558u, 0x10553u, 0x10554u, 0x10438u, 0x1050du, 0, 0, 0x1055eu, 0x1055fu, 0x104dcu, 0x10444u, 0x1043bu, 0x1043cu, 0x104d4u, 0x10442u,
++		0x10445u, 0x10551u, 0x1054cu, 0x10446u, 0x10509u, 0x1050au, 0x33eu, 0, 0x1055cu, 0x1055du, 0x104dbu, 0x10516u, 0x10439u, 0x1043au, 0x104d3u, 0x10576u,
++		0, 0x1054bu, 0x10546u, 0x10547u, 0x1050fu, 0x104cdu, 0x10524u, 0, 0x10559u, 0x10560u, 0x1055au, 0x1055bu, 0x10436u, 0x1043du, 0x10437u, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0x418u, 0, 0, 0, 0x417u, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1033au, 0, 0x348u, 0x33cu, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x105b4u, 0x1059au, 0x10584u, 0, 0, 0, 0, 0x102fau, 0x10426u, 0x1033bu, 0x342u, 0x105b9u, 0x103f9u, 0x10354u, 0x103f2u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x409u,
++		0x1540u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x409u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x326u, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x41au, 0x41au, 0, 0, 0x105c0u, 0x105beu, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x3feu, 0x3feu, 0, 0, 0, 0, 0x5bcu, 0x322u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x5b1u, 0, 0, 0x10307u, 0x10305u, 0x1042au, 0x105c2u, 0x102f7u, 0x10423u, 0x329u, 0x32eu, 0x105b6u, 0x103f6u, 0x10351u, 0x103efu,
++		0x10570u, 0x10573u, 0x10571u, 0x10433u, 0x1045fu, 0x10462u, 0x10460u, 0x10435u, 0x1056cu, 0x1056fu, 0x1056du, 0x10432u, 0x10572u, 0x1056eu, 0x3fdu, 0x404u,
++		0x153fu, 0, 0, 0, 0x10459u, 0x1045cu, 0x1045au, 0, 0, 0, 0, 0, 0x103dbu, 0x103ddu, 0x3fdu, 0x404u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x115afu, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x102fbu, 0x10558u, 0x10553u, 0x10554u, 0x10438u, 0x1050du, 0x3fdu, 0, 0x1055eu, 0x1055fu, 0x104dcu, 0x10444u, 0x1043bu, 0x1043cu, 0x104d4u, 0x10442u,
++		0x10445u, 0x10551u, 0x1054cu, 0x10446u, 0x10509u, 0x1050au, 0x33eu, 0, 0x1055cu, 0x1055du, 0x104dbu, 0x10516u, 0x10439u, 0x1043au, 0x104d3u, 0x10576u,
++		0, 0x1054bu, 0x10546u, 0x10547u, 0x1050fu, 0x104cdu, 0x10524u, 0, 0x10559u, 0x10560u, 0x1055au, 0x1055bu, 0x10436u, 0x1043du, 0x10437u, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0x10019u, 0, 0, 0x1003du, 0, 0x1001fu, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0x1053eu, 0x104b0u, 0x104a6u, 0x104a7u, 0x104ccu, 0x104b7u, 0x104b4u, 0x104b5u, 0x10542u, 0x10544u, 0x10543u, 0x10508u, 0x1048bu, 0x10489u, 0x5bbu, 0x5bau,
++		0, 0, 0, 0x32du, 0, 0, 0, 0x56bu, 0x31cu, 0, 0, 0, 0x42eu, 0x431u, 0x42fu, 0,
++		0x4f5u, 0x4f3u, 0x4f4u, 0x4f7u, 0x4f8u, 0x4f6u, 0, 0, 0x10507u, 0x1045bu, 0, 0x10434u, 0, 0, 0, 0,
++		0x503u, 0x501u, 0x502u, 0x505u, 0x506u, 0x504u, 0, 0x10461u, 0x104d8u, 0x104d9u, 0x104dfu, 0x104ddu, 0x104d0u, 0x104d1u, 0x104d7u, 0x104d5u,
++		0x1050bu, 0x4b1u, 0, 0, 0, 0x10555u, 0x1054eu, 0x10548u, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x44fu, 0x452u, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x44eu, 0x453u, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x1037du, 0x10391u, 0x1036du, 0x1036fu, 0x10385u, 0x10387u, 0x1039du, 0x1039fu, 0x103adu, 0x103afu,
++		0, 0, 0, 0, 0, 0, 0x1037fu, 0x10393u, 0x10371u, 0x10373u, 0x10389u, 0x1038bu, 0x103a1u, 0x103a3u, 0x103b1u, 0x103b3u,
++		0, 0, 0, 0, 0, 0, 0x10381u, 0x10395u, 0x10375u, 0x10377u, 0x1038du, 0x1038fu, 0x103a5u, 0x103a7u, 0x103b5u, 0x103b7u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x103dau,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x301u, 0x10300u, 0x102ffu, 0x102feu, 0x102fdu,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0x102adu, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0x10215u, 0, 0x1028au, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0x10214u, 0x101f7u, 0x102b0u, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0x1053eu, 0x104b0u, 0x104a6u, 0x104a7u, 0x104ccu, 0x104b7u, 0x104b4u, 0x104b5u, 0x10542u, 0x10544u, 0x10543u, 0x10508u, 0x1048bu, 0x10489u, 0x5bbu, 0x5bau,
++		0, 0, 0, 0x32du, 0, 0, 0x1048du, 0x56bu, 0x31cu, 0x31bu, 0, 0, 0x42eu, 0x431u, 0x42fu, 0,
++		0x4f5u, 0x4f3u, 0x4f4u, 0x4f7u, 0x4f8u, 0x4f6u, 0, 0, 0x10507u, 0x1045bu, 0, 0x10434u, 0, 0, 0, 0,
++		0x503u, 0x501u, 0x502u, 0x505u, 0x506u, 0x504u, 0x10481u, 0x10461u, 0x104d8u, 0x104d9u, 0x104dfu, 0x104ddu, 0x104d0u, 0x104d1u, 0x104d7u, 0x104d5u,
++		0x1050bu, 0, 0, 0, 0, 0x10555u, 0x1054eu, 0x10548u, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x44fu, 0x452u, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x44eu, 0x453u, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x1037du, 0x10391u, 0x1036du, 0x1036fu, 0x10385u, 0x10387u, 0x1039du, 0x1039fu, 0x103adu, 0x103afu,
++		0, 0, 0, 0, 0, 0, 0x1037fu, 0x10393u, 0x10371u, 0x10373u, 0x10389u, 0x1038bu, 0x103a1u, 0x103a3u, 0x103b1u, 0x103b3u,
++		0, 0, 0, 0, 0, 0, 0x10381u, 0x10395u, 0x10375u, 0x10377u, 0x1038du, 0x1038fu, 0x103a5u, 0x103a7u, 0x103b5u, 0x103b7u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x103dau,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10300u, 0x102ffu, 0x102feu, 0x102fdu,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0x1053eu, 0x104b0u, 0x104a6u, 0x104a7u, 0x104ccu, 0x104b7u, 0, 0x104b5u, 0x10542u, 0x10544u, 0x10543u, 0x10508u, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0x56bu, 0, 0, 0, 0, 0x42eu, 0x431u, 0x42fu, 0,
++		0x4f5u, 0x4f3u, 0x4f4u, 0x4f7u, 0x4f8u, 0x4f6u, 0, 0, 0x10507u, 0x1045bu, 0, 0, 0, 0, 0, 0,
++		0x503u, 0x501u, 0x502u, 0x505u, 0x506u, 0x504u, 0, 0x10461u, 0x104d8u, 0x104d9u, 0x104dfu, 0x104ddu, 0x104d0u, 0x104d1u, 0x104d7u, 0x104d5u,
++		0x1050bu, 0x4b1u, 0, 0, 0, 0x10556u, 0, 0x10549u, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x1037cu, 0x10390u, 0x1036cu, 0x1036eu, 0x10384u, 0x10386u, 0x1039cu, 0x1039eu, 0x103acu, 0x103aeu,
++		0, 0, 0, 0, 0, 0, 0x1037eu, 0x10392u, 0x10370u, 0x10372u, 0x10388u, 0x1038au, 0x103a0u, 0x103a2u, 0x103b0u, 0x103b2u,
++		0, 0, 0, 0, 0, 0, 0x10380u, 0x10394u, 0x10374u, 0x10376u, 0x1038cu, 0x1038eu, 0x103a4u, 0x103a6u, 0x103b4u, 0x103b6u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x301u, 0x10300u, 0x102ffu, 0x102feu, 0x102fdu,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0x102adu, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0x1053eu, 0x104b0u, 0x104a6u, 0x104a7u, 0x104ccu, 0x104b7u, 0, 0x104b5u, 0x10542u, 0x10544u, 0x10543u, 0x10508u, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0x56bu, 0, 0, 0, 0, 0x42eu, 0x431u, 0x42fu, 0,
++		0x4f5u, 0x4f3u, 0x4f4u, 0x4f7u, 0x4f8u, 0x4f6u, 0, 0, 0x10507u, 0x1045bu, 0, 0, 0, 0, 0, 0,
++		0x503u, 0x501u, 0x502u, 0x505u, 0x506u, 0x504u, 0, 0x10461u, 0x104d8u, 0x104d9u, 0x104dfu, 0x104ddu, 0x104d0u, 0x104d1u, 0x104d7u, 0x104d5u,
++		0x1050bu, 0, 0, 0, 0, 0x10556u, 0, 0x10549u, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0x1037cu, 0x10390u, 0x1036cu, 0x1036eu, 0x10384u, 0x10386u, 0x1039cu, 0x1039eu, 0x103acu, 0x103aeu,
++		0, 0, 0, 0, 0, 0, 0x1037eu, 0x10392u, 0x10370u, 0x10372u, 0x10388u, 0x1038au, 0x103a0u, 0x103a2u, 0x103b0u, 0x103b2u,
++		0, 0, 0, 0, 0, 0, 0x10380u, 0x10394u, 0x10374u, 0x10376u, 0x1038cu, 0x1038eu, 0x103a4u, 0x103a6u, 0x103b4u, 0x103b6u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x10300u, 0x102ffu, 0x102feu, 0x102fdu,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0x11447u, 0, 0x148bu, 0x1489u, 0, 0, 0x158eu, 0x158du, 0x11590u, 0x1158fu, 0x1130cu, 0x1130bu, 0x1144du, 0x1143eu,
++		0, 0, 0, 0, 0x149au, 0x149du, 0x149bu, 0x1367u, 0, 0, 0, 0, 0, 0x1330u, 0, 0,
++		0x114b8u, 0x113e9u, 0x114b9u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x11356u, 0x11355u, 0x1141cu, 0, 0x11454u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x145eu, 0x145du, 0x1464u, 0x1463u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1302u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0x11447u, 0, 0x148bu, 0x1489u, 0x1147eu, 0, 0x158eu, 0x158du, 0x11590u, 0x1158fu, 0x1130cu, 0x1130bu, 0x1144du, 0x1143eu,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x113dfu, 0x135du, 0, 0, 0, 0x1330u, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0x113e4u, 0x1362u, 0, 0, 0, 0, 0, 0,
++		0x11356u, 0, 0x1141cu, 0, 0x11454u, 0, 0x1147fu, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0x158eu, 0x158du, 0x11590u, 0x1158fu, 0x1130cu, 0x1130bu, 0x1144du, 0x1143eu,
++		0, 0, 0, 0, 0, 0, 0x149cu, 0x1367u, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0x113e9u, 0x114bau, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x11356u, 0x11355u, 0x1141cu, 0, 0x11454u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x113d9u, 0x113d8u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x1302u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0x148eu, 0x148cu, 0, 0, 0, 0, 0, 0, 0x158eu, 0x158du, 0x11590u, 0x1158fu, 0x1130cu, 0x1130bu, 0x1144du, 0x1143eu,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0x11356u, 0, 0x1141cu, 0, 0x11454u, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x113d9u, 0x113d8u,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
 +};
- #endif
++static const uint32_t *const x86VexPublicRows[4][16] = {
++	{ x86VexPublicWords[0], x86VexPublicWords[1], x86VexPublicWords[2], x86VexPublicWords[3], x86VexPublicWords[0], x86VexPublicWords[4], x86VexPublicWords[5], x86VexPublicWords[3], x86VexPublicWords[0], x86VexPublicWords[6], x86VexPublicWords[2], x86VexPublicWords[3], x86VexPublicWords[0], x86VexPublicWords[4], x86VexPublicWords[5], x86VexPublicWords[3] },
++	{ x86VexPublicWords[0], x86VexPublicWords[1], x86VexPublicWords[2], x86VexPublicWords[3], x86VexPublicWords[0], x86VexPublicWords[4], x86VexPublicWords[5], x86VexPublicWords[3], x86VexPublicWords[0], x86VexPublicWords[6], x86VexPublicWords[2], x86VexPublicWords[3], x86VexPublicWords[0], x86VexPublicWords[4], x86VexPublicWords[5], x86VexPublicWords[3] },
++	{ x86VexPublicWords[7], x86VexPublicWords[8], x86VexPublicWords[9], x86VexPublicWords[10], NULL, x86VexPublicWords[11], NULL, NULL, x86VexPublicWords[7], x86VexPublicWords[12], x86VexPublicWords[9], x86VexPublicWords[10], NULL, x86VexPublicWords[13], NULL, NULL },
++	{ NULL, x86VexPublicWords[14], NULL, NULL, NULL, x86VexPublicWords[15], NULL, NULL, NULL, x86VexPublicWords[16], NULL, NULL, NULL, x86VexPublicWords[17], NULL, NULL },
++};
++
+ /* 4512 admitted UIDs, 10 immediate patterns. */
+ enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
+        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index 48c6fb41..8f23e406 100644
+index 48c6fb41..8288e7fc 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
-@@ -1262,23 +1262,24 @@ def emit_vex_scan(suffix):
-         "\t" + ", ".join(f"0x{f:08x}u" for f in metadata[i : i + 8]) + ","
-         for i in range(0, len(metadata), 8)
+@@ -1158,7 +1158,68 @@ def vex_scan_form(operands, register_form):
+     return True
+ 
+ 
+-def emit_vex_scan_rows(suffix):
++def emit_vex_public_rows(contexts, common_source, source_maps, attributes, metadata, immediate_bytes):
++    # Map direct and memory/register-split decisions to public ID, validity
++    # checks and encoded tail extent. Other decisions keep the ordinary reader.
++    ids = tables.parse_ids(common_source, contexts)
++    rows = []
++    selectors = []
++    for map_number, (_, indices, source_rows) in enumerate(source_maps[1:4], start=1):
++        for prefix_form in range(2 if map_number == 1 else 1):
++            selected = []
++            for context, key in attributes:
++                number = indices[contexts.index(context)]
++                source_row = source_rows[number - 1] if number else ()
++                row = []
++                short = prefix_form and key & 3 == 1
++                for opcode, (kind, offset) in enumerate(source_row):
++                    if kind not in ("MODRM_ONEENTRY", "MODRM_SPLITRM") or (
++                        map_number == 1 and (opcode == 0xAE or 0x82 <= opcode <= 0x8F)
++                    ) or (map_number == 2 and opcode == 0xF8):
++                        row.append(0)
++                        continue
++                    halves = []
++                    for modrm, form in ((0, 1), (0xC0, 2)):
++                        uid = tables.source_id(ids, kind, offset, modrm)
++                        word = metadata[uid]
++                        flags = word & 255
++                        public_id = word >> 8
++                        has_modrm = kind == "MODRM_SPLITRM" or flags & 4
++                        if not public_id or not flags & form or not has_modrm:
++                            halves.append(0)
++                            continue
++                        tail = immediate_bytes[bool(short)][flags >> 4]
++                        tables.require(public_id < (1 << 12) and tail < 16,
++                                       "VEX public ID or immediate size exceeds descriptor")
++                        halves.append(public_id | (tail << 12) | ((flags & 8) << 13))
++                    # A single descriptor suffices for either register or memory.
++                    # Rejecting an unrepresented form would bypass full decoding.
++                    row.append(halves[0] if halves[0] == halves[1] else 0)
++                if not any(row):
++                    selected.append(0)
++                    continue
++                entry = tuple(row)
++                if entry not in rows:
++                    rows.append(entry)
++                selected.append(rows.index(entry) + 1)
++            selectors.append(selected)
++    lines = ["/* Ordinary register or memory VEX encodings with identical public metadata. */",
++             "static const uint32_t x86VexPublicWords[][256] = {"]
++    for row in rows:
++        lines.append("\t{")
++        lines.extend("\t\t" + ", ".join(f"0x{v:x}u" if v else "0" for v in row[i:i+16]) + ","
++                     for i in range(0,256,16))
++        lines.append("\t},")
++    # Avoid empty arrays in the reduced profile, which has no VEX terminals.
++    if not rows:
++        lines.append("\t{ 0 },")
++    lines += ["};", "static const uint32_t *const x86VexPublicRows[4][16] = {"]
++    for row in selectors:
++        lines.append("\t{ " + ", ".join("x86VexPublicWords[%d]" % (v-1) if v else "NULL" for v in row) + " },")
++    return lines + ["};", ""]
++
++
++def emit_vex_scan_rows(suffix, metadata, patterns):
+     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+     contexts, kinds, names = tables.parse_common(common)
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+@@ -1187,6 +1248,7 @@ def emit_vex_scan_rows(suffix):
+         "/* W, L and pp select existing validated opcode rows directly. */",
+         "static const struct ModRMDecision *const x86VexScanRows[3][16] = {",
      ]
--    lines += [
--        "};",
--        "",
--        "X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)",
--        "{",
--        "\tswitch (pattern) {",
--    ]
--    for immediates, pattern in patterns.items():
--        lines.append(f"\tcase {pattern}:")
--        if immediates:
--            calls = [f"readImmediateImpl(insn, {size}, false)" for size in immediates]
--            lines += [
--                "\t\tif (" + " ||\n\t\t    ".join(calls) + ")",
--                "\t\t\treturn X86_SCAN_INVALID;",
--            ]
--        lines.append("\t\treturn X86_SCAN_COMPLETE;")
--    lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
-+    lines += ["};", "", "static const uint8_t x86VexImmediateBytes[2][" + str(len(patterns)) + "] = {"]
-+    # An unprefixed 64-bit VEX scan has an eight-byte address. Only VEX2.pp=66
-+    # changes the ordinary reader's starting immediate width to two bytes.
-+    for default_width in (4, 2):
++    selected_contexts = []
+     for name in names[1:4]:
+         index_body = re.search(
+             r"static const unsigned char index_" + name + r"\[\] = \{(.*?)\};",
+@@ -1203,12 +1265,30 @@ def emit_vex_scan_rows(suffix):
+                 attributes |= attrs["ATTR_VEXL"]
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
++            if name == names[1]:
++                selected_contexts.append((context_values[attributes], key))
+             row = indices[contexts.index(context_values[attributes])]
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+         lines.append("\t},")
+     lines += ["};", ""]
++    maps = tables.parse_maps((X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++                             names[:4] if suffix else names, len(contexts))
++    widths = []
++    for initial in (4, 2):
 +        extents = []
 +        for immediates in patterns:
-+            width = default_width
-+            total = 0
-+            tables.require(len(immediates) <= 2, "VEX immediate count exceeds reader storage")
++            width, total = initial, 0
 +            for size in immediates:
 +                if size == "insn->addressSize":
 +                    width = 8
 +                elif size != "insn->immediateSize":
 +                    width = int(size)
 +                total += width
-+            extents.append(str(total))
-+        lines.append("\t{ " + ", ".join(extents) + " },")
-+    lines.append("};")
-     return "\n".join(emit_vex_scan_rows(suffix) + lines)
++            extents.append(total)
++        widths.append(extents)
++    lines.extend(emit_vex_public_rows(contexts, source, maps, selected_contexts, metadata, widths))
+     return lines
  
  
+@@ -1279,7 +1359,7 @@ def emit_vex_scan(suffix):
+             ]
+         lines.append("\t\treturn X86_SCAN_COMPLETE;")
+     lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
+-    return "\n".join(emit_vex_scan_rows(suffix) + lines)
++    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns) + lines)
+ 
+ 
+ def emit_writemask_opcodes(suffix):

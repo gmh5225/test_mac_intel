@@ -1,7 +1,7 @@
-name: Qualify bounded VEX scans on profiles
+name: Verify generated public VEX entries on profiles
 on:
   push:
-    branches: [codex/capstone-vex-scan-extent-profiles]
+    branches: [codex/capstone-public-vex-entry-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: c92f6f103e0123790f574c05a2a57f7203e7a461
+          ref: 706eab8fec07688db644fe64c9d82600592134f8
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bounded-vex-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex-entry-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
