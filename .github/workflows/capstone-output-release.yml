@@ -1,7 +1,7 @@
-name: Verify integrated x86 scalar and vector output with current published Capstone profiles
+name: Qualify GCC compact scanning and fixed output writes with integrated profiles
 on:
   push:
-    branches: [codex/capstone-integrated-records-profiles]
+    branches: [codex/capstone-gcc-integrated-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-profile-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: integrated-gcc-profile-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
