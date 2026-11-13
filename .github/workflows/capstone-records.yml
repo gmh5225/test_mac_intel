@@ -1,7 +1,7 @@
-name: Validate default ARM markup handling and four-backend decode on PE and ELF sections
+name: Verify regenerated ARM markup calls produce the exact timed code on five hosts
 on:
   push:
-    branches: [codex/capstone-four-arm-plain-markup]
+    branches: [codex/capstone-regenerated-printer-proof]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-arm-markup-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: generated-arm-code-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

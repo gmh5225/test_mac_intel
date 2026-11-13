@@ -51,6 +51,14 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
+  run(['git','apply',r/'previous.patch'],'apply-timed-parent',s)
+  run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-timed-parent')
+  controls={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
+  assert controls==objects['indexed'],sorted(k for k in controls if controls[k]!=objects['indexed'].get(k))
+  earlier=t/'timed-parent';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',earlier],'link-timed-parent')
+  assert sha(earlier)==sha(bins['indexed'])
+  write('regeneration',dict(objects=len(controls),timed_parent=sha(earlier),release=sha(bins['indexed'])))
+  run(['git','apply','-R',r/'previous.patch'],'remove-timed-parent',s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
@@ -66,23 +74,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
-  if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps):
-   return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
-  data=[]
-  for x in cases:
-   for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
-     seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-     for v in seq+seq[::-1]:
-      vout=sample(v,x,mode,n)
-      if reference is None:reference=(vout['first'],vout['result'])
-      assert reference==(vout['first'],vout['result'])
-      ticks[v].append(vout['cpu_ns'])
-     runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
+  write('complete',dict(verified_identical_timed_code=True,objects=len(controls)))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
