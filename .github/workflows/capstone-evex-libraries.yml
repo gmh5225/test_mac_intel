@@ -1,7 +1,7 @@
-name: Measure direct scalar number rendering in libraries
+name: Measure explicit vector register effects on real x86 libraries
 on:
   push:
-    branches: [codex/capstone-direct-number-output-libraries]
+    branches: [codex/capstone-three-register-access-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
+          ref: 01ce67005793c4369e64b509e5ec8f9cb2945d98
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-number-output-${{ matrix.host }}-${{ matrix.cc }}
+          name: three-register-access-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

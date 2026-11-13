@@ -1,130 +1,33 @@
-diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 40eee098..adf4b08d 100644
---- a/arch/X86/X86ImmediateOutput.c
-+++ b/arch/X86/X86ImmediateOutput.c
-@@ -10,20 +10,59 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 461ae5e4..b2a73041 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11929,6 +11929,28 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	read_count = insn->detail->regs_read_count;
+ 	write_count = insn->detail->regs_write_count;
  
-+#include "../../MathExtras.h"
-+
-+char *X86_writeHexDigits(char *out, uint64_t value)
-+{
-+	static const char digits[] = "0123456789abcdef";
-+	static const char pairs[] = "000102030405060708090a0b0c0d0e0f"
-+				    "101112131415161718191a1b1c1d1e1f"
-+				    "202122232425262728292a2b2c2d2e2f"
-+				    "303132333435363738393a3b3c3d3e3f"
-+				    "404142434445464748494a4b4c4d4e4f"
-+				    "505152535455565758595a5b5c5d5e5f"
-+				    "606162636465666768696a6b6c6d6e6f"
-+				    "707172737475767778797a7b7c7d7e7f"
-+				    "808182838485868788898a8b8c8d8e8f"
-+				    "909192939495969798999a9b9c9d9e9f"
-+				    "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
-+				    "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
-+				    "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
-+				    "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
-+				    "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
-+				    "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
-+	if (value < 16) {
-+		*out++ = digits[value];
-+		return out;
-+	}
-+	if (value < 256) {
-+		memcpy(out, pairs + 2 * value, 2);
-+		return out + 2;
++	/* A three-register operation with a write-only destination has at most
++     * two distinct reads. A trailing immediate adds no registers. Preserve the
++     * generic write-before-read order when the output buffers overlap. */
++	const cs_x86_op *ops = x86->operands;
++	if (!read_count && !write_count &&
++	    (x86->op_count == 3 ||
++	     (x86->op_count == 4 && ops[3].type == X86_OP_IMM)) &&
++	    ops[0].type == X86_OP_REG && ops[0].access == CS_AC_WRITE &&
++	    ops[1].type == X86_OP_REG && ops[1].access == CS_AC_READ &&
++	    ops[2].type == X86_OP_REG && ops[2].access == CS_AC_READ) {
++		regs_write[0] = (uint16_t)ops[0].reg;
++		regs_read[0] = (uint16_t)ops[1].reg;
++		read_count = 1;
++		if (regs_read[0] != (unsigned)ops[2].reg) {
++			regs_read[1] = (uint16_t)ops[2].reg;
++			++read_count;
++		}
++		*regs_read_count = read_count;
++		*regs_write_count = 1;
++		return;
 +	}
 +
-+	unsigned shift = (63u - CountLeadingZeros_64(value)) & ~3u;
-+	if (!(shift & 4)) {
-+		*out++ = digits[value >> shift];
-+	} else {
-+		shift -= 4;
-+		memcpy(out, pairs + 2 * (value >> shift), 2);
-+		out += 2;
-+	}
-+	while (shift) {
-+		shift -= 8;
-+		memcpy(out, pairs + 2 * ((value >> shift) & 255), 2);
-+		out += 2;
-+	}
-+	return out;
-+}
-+
- static void writeUnsignedImmediate(char *out, uint64_t value)
- {
- 	if (value <= HEX_THRESHOLD) {
- 		*out = (char)('0' + value);
- 	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
- 		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
-+		X86_writeHexDigits(out + 2, value);
- 	}
- }
- 
-diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index e284469c..848a4ba8 100644
---- a/arch/X86/X86MemoryOutput.c
-+++ b/arch/X86/X86MemoryOutput.c
-@@ -17,14 +17,7 @@ static char *writeDisplacement(char *out, int32_t displacement)
- 	out += 5;
- 	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
- 						(uint32_t)displacement;
--	char digits[8], *start = digits + sizeof(digits);
--	do {
--		*--start = "0123456789abcdef"[magnitude & 15];
--		magnitude >>= 4;
--	} while (magnitude);
--	const size_t length = (size_t)(digits + sizeof(digits) - start);
--	memcpy(out, start, length);
--	return out + length;
-+	return X86_writeHexDigits(out, magnitude);
- }
- 
- /* Decode one ordinary base, optionally ESP/RSP/R12 via SIB, or RIP-relative
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index c0547213..5d9f0583 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -138,17 +138,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		if (target <= HEX_THRESHOLD) {
- 			insn->op_str[0] = (char)('0' + target);
- 		} else {
--			char digits[16];
--			char *end = digits + sizeof(digits);
--			char *p = end;
--			uint64_t value = target;
--			do {
--				*--p = "0123456789abcdef"[value & 15];
--				value >>= 4;
--			} while (value);
--			insn->op_str[0] = '0';
--			insn->op_str[1] = 'x';
--			memcpy(insn->op_str + 2, p, (size_t)(end - p));
-+			memcpy(insn->op_str, "0x", 2);
-+			X86_writeHexDigits(insn->op_str + 2, target);
- 		}
- 		memcpy(insn->bytes, code, length);
- 		*insn_size = insn->size = length;
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index b491ca5f..a982f336 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -59,6 +59,9 @@ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
- 		      const struct X86SimpleRegister regs[4][16]);
- 
-+/* Append minimal lowercase digits to the pre-cleared operand buffer. */
-+CAPSTONE_INTERNAL char *X86_writeHexDigits(char *out, uint64_t value);
-+
- CAPSTONE_INTERNAL void X86_writeImmediateOutput(
- 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
- 	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
+ 	// implicit registers
+ 	if (read_count == 1)
+ 		regs_read[0] = insn->detail->regs_read[0];
