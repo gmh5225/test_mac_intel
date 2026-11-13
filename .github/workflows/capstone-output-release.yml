@@ -1,7 +1,7 @@
-name: Compare integrated legacy vector and immediate output on profiles
+name: Compare direct MOV and LEA address output on profiles
 on:
   push:
-    branches: [codex/capstone-generated-operand-output-profiles]
+    branches: [codex/capstone-effective-address-output-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: generated-operand-output-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: effective-address-output-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
