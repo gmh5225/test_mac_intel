@@ -1,7 +1,7 @@
-name: Verify and measure canonical broadcast operand and register details on profiles
+name: Verify and time combined x86 records on profiles
 on:
   push:
-    branches: [codex/capstone-corrected-broadcast-profiles]
+    branches: [codex/capstone-combined-records-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: corrected-broadcast-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: combined-records-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
