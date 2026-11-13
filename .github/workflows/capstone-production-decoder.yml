@@ -1,7 +1,7 @@
-name: Compare the 32-bit JPEG and 64-bit OpenSSL product decoders on their complete ELF text sections
+name: Test native x86 EVEX scan and direct output in the fully linked NeverD product
 on:
   push:
-    branches: [codex/neverd-openssl-jpeg-evex-mov]
+    branches: [codex/neverd-native-evex-output-next]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 505f69a239a26854100d658c8de521597a86611d
+          ref: 3c07b38906ff22c72617ccd1e25146127d426596
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: openssl-jpeg-evex-mov
+          name: current-native-evex-output
           path: product-evidence/
           retention-days: 14
