@@ -1,7 +1,7 @@
-name: Verify A32 immediate branches and operand defaults with GNU x86 and MIPS
+name: Repeat paired PE and ELF measurements on both GCC versions
 on:
   push:
-    branches: [codex/capstone-gnu-mixed-native-a32]
+    branches: [codex/capstone-gnu-a32-repeat]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,9 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc, archs: four }
           - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -39,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-mixed-native-a32-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gnu-a32-repeat-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
