@@ -104,6 +104,9 @@ int main(int argc, char **argv) {
           for (unsigned side = 0; side < 2; ++side) {
             std::memset(&insn[side], 0xa5, sizeof(cs_insn));
             std::memset(&detail[side], 0xa5, sizeof(cs_detail));
+            insn[side].illegal = false;
+            insn[side].is_alias = false;
+            insn[side].usesAliasDetails = false;
             insn[side].detail = &detail[side];
             ok[side] = api[side].iter(handles[side], &p[side], &sizes[side], &ip[side], &insn[side]);
             err[side] = api[side].error(handles[side]);
