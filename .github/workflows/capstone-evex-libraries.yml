@@ -1,7 +1,7 @@
-name: Measure absolute i386 addressing through the verified memory emitter on real functions
+name: Verify legacy SSE2 packed-shift records on real library functions against iced
 on:
   push:
-    branches: [codex/capstone-i386-absolute-operand-record]
+    branches: [codex/capstone-sse2-shift-next]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: absolute-address-output-${{ matrix.host }}-${{ matrix.cc }}
+          name: sse2-shift-current-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
