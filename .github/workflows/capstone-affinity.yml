@@ -1,9 +1,9 @@
-name: Verify EVEX opcode dispatch against the published baseline in native
+name: Measure direct scalar number rendering in native
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-evex-feature-opcodes-native]
+    branches: [codex/capstone-direct-number-output-native]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-evex-feature-opcodes-native
+  group: capstone-direct-number-output-native
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: feature-opcodes-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: direct-number-output-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
