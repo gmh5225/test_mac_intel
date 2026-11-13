@@ -1,0 +1,310 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 76fdbcb7..702c6d7a 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3422,67 +3422,91 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ 	return completeTerminalScanResult(result, instructionID, status);
+ }
+ 
++X86_DECODE_INLINE unsigned vexMemoryEnd(const uint8_t *code, size_t size,
++					unsigned end, uint8_t modrm)
++{
++	const unsigned mod = modFromModRM(modrm);
++	const unsigned rm = rmFromModRM(modrm);
++	if (rm == 4) {
++		if (end >= size)
++			return 16;
++		const uint8_t sib = code[end++];
++		if (mod == 0 && baseFromSIB(sib) == 5)
++			return end + 4;
++	} else if (mod == 0 && rm == 5) {
++		return end + 4;
++	}
++	return end + (mod == 1 ? 1 : mod == 2 ? 4 : 0);
++}
++
++/* A bare VEX prefix in 64-bit mode fixes the address size. Only the end
++ * offset and the opcode IDs escape this scan. Extension and generic fixups
++ * continue to use their ordinary readers. */
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++			      uint8_t prefix, X86ScanResult *result)
+ {
+-	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
+-	insn.readerCursor = 1;
+-	if (readVexPrefix(&insn, prefix))
++	const bool vex2 = prefix == 0xc5;
++	const unsigned opcode_offset = vex2 ? 2 : 3;
++	if (code_len <= opcode_offset)
+ 		return X86_SCAN_INVALID;
+-	setInstructionSizes(&insn, insn.hasOpSize, insn.hasAdSize);
+-	int opcodeResult = readOpcode(&insn, false, true);
+-	if (opcodeResult)
+-		return opcodeResult == OPCODE_READ_GENERIC ?
+-			       X86_SCAN_NOT_HANDLED :
+-			       X86_SCAN_INVALID;
+-	/* Keep the generic opcode/size repairs outside this admission. */
+-	if ((insn.opcodeType == TWOBYTE &&
+-	     (insn.opcode == 0xae ||
+-	      (insn.opcode >= 0x82 && insn.opcode <= 0x8f))) ||
+-	    (insn.opcodeType == THREEBYTE_38 && insn.opcode == 0xf8))
++	const unsigned map = vex2 ? VEX_LOB_0F : mmmmmFromVEX2of3(code[1]);
++	if (map < VEX_LOB_0F || map > VEX_LOB_0F3A)
++		return X86_SCAN_INVALID;
++	const uint8_t payload = code[opcode_offset - 1];
++	const uint8_t opcode = code[opcode_offset];
++	if ((map == VEX_LOB_0F &&
++	     (opcode == 0xae || (opcode >= 0x82 && opcode <= 0x8f))) ||
++	    (map == VEX_LOB_0F38 && opcode == 0xf8))
+ 		return X86_SCAN_NOT_HANDLED;
+-	const uint8_t payload =
+-		insn.vectorExtensionPrefix[prefix == 0xc4 ? 2 : 1];
+-	const unsigned row = (payload & 7) | (wFromREX(insn.rexPrefix) << 3);
++	const unsigned row = (payload & 7) |
++			     (vex2 ? 0 : wFromVEX3of3(payload) << 3);
+ 	const struct ModRMDecision *decisions =
+-		x86VexScanRows[insn.opcodeType - TWOBYTE][row];
++		x86VexScanRows[map - VEX_LOB_0F][row];
+ 	if (!decisions)
+ 		return X86_SCAN_INVALID;
+-	const struct ModRMDecision *decision = &decisions[insn.opcode];
+-	const uint32_t packed = decision->packed;
+-	const bool decisionModRM =
++	const uint32_t packed = decisions[opcode].packed;
++	const bool decision_modrm =
+ 		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
++	unsigned end = opcode_offset + 1;
+ 	uint8_t modrm = 0;
+-	if (decisionModRM && lookAtByte(&insn, &modrm))
+-		return X86_SCAN_INVALID;
+-	insn.instructionID = decode(packed, modrm);
+-	if (!insn.instructionID)
++	if (decision_modrm) {
++		if (end >= code_len)
++			return X86_SCAN_INVALID;
++		modrm = code[end];
++	}
++	const unsigned id = decode(packed, modrm);
++	if (!id)
+ 		return X86_SCAN_INVALID;
+-	if (insn.instructionID >= ARR_SIZE(x86VexScanMetadata))
++	if (id >= ARR_SIZE(x86VexScanMetadata))
+ 		return X86_SCAN_NOT_HANDLED;
+-	const uint32_t metadata = x86VexScanMetadata[insn.instructionID];
++	const uint32_t metadata = x86VexScanMetadata[id];
+ 	const uint8_t flags = (uint8_t)metadata;
+ 	if (!flags)
+ 		return X86_SCAN_NOT_HANDLED;
+-	if (decisionModRM || (flags & X86_VEX_SCAN_MODRM)) {
+-		if (readModRMScan(&insn))
+-			return X86_SCAN_INVALID;
+-		if (!(flags & (insn.modRM >= 0xc0 ? X86_VEX_SCAN_REGISTER :
+-						    X86_VEX_SCAN_MEMORY)))
++	if (decision_modrm || (flags & X86_VEX_SCAN_MODRM)) {
++		if (!decision_modrm) {
++			if (end >= code_len)
++				return X86_SCAN_INVALID;
++			modrm = code[end];
++		}
++		++end;
++		if (!(flags & (modrm >= 0xc0 ? X86_VEX_SCAN_REGISTER :
++					       X86_VEX_SCAN_MEMORY)))
+ 			return X86_SCAN_INVALID;
++		if (modrm < 0xc0)
++			end = vexMemoryEnd(code, code_len, end, modrm);
+ 	}
+-	if (!(flags & X86_VEX_SCAN_VVVV) &&
+-	    (prefix == 0xc4 ? vvvvFromVEX3of3(payload) :
+-			      vvvvFromVEX2of2(payload)))
++	if (!(flags & X86_VEX_SCAN_VVVV) && vvvvFromVEX2of2(payload))
+ 		return X86_SCAN_INVALID;
+-	if (readVexScanImmediates(&insn, flags >> X86_VEX_SCAN_PATTERN_SHIFT) !=
+-		    X86_SCAN_COMPLETE ||
+-	    finishDecodedInstruction(&insn, false))
++	const bool short_immediate = vex2 &&
++				     ppFromVEX2of2(payload) == VEX_PREFIX_66;
++	end += x86VexImmediateBytes[short_immediate]
++				   [flags >> X86_VEX_SCAN_PATTERN_SHIFT];
++	if (end > code_len || end > 15)
+ 		return X86_SCAN_INVALID;
+-	result->opcode = insn.instructionID;
++	result->opcode = id;
+ 	result->opcode_pub = metadata >> X86_VEX_SCAN_PUBLIC_SHIFT;
+-	result->length = (uint16_t)insn.length;
++	result->length = (uint16_t)end;
+ 	result->popcode_adjust = 0;
+ 	return X86_SCAN_COMPLETE;
+ }
+@@ -3522,7 +3546,7 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 						unsigned *id, uint16_t *length)
+ {
+ 	const bool wide = mode == CS_MODE_64;
+-	const uint8_t rex = offset ? code[0] : 0;
++	volatile unsigned rex = offset ? (unsigned)code[0] : 0;
+ 	const unsigned rejected = FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
+ 				  FEATURE_VEX2_XOP |
+ 				  (wide ? FEATURE_REX_PREFIX : 0);
+diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
+index 2c0da2cd..c39eaa65 100644
+--- a/arch/X86/X86GenVexScan.inc
++++ b/arch/X86/X86GenVexScan.inc
+@@ -278,50 +278,10 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
+ 	0x0001ed06u, 0x0001ed05u, 0x0001ed06u,
+ };
+ 
+-X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)
+-{
+-	switch (pattern) {
+-	case 0:
+-		return X86_SCAN_COMPLETE;
+-	case 1:
+-		if (readImmediateImpl(insn, 1, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 2:
+-		if (readImmediateImpl(insn, insn->immediateSize, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 3:
+-		if (readImmediateImpl(insn, 4, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 4:
+-		if (readImmediateImpl(insn, 2, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 5:
+-		if (readImmediateImpl(insn, 2, false) ||
+-		    readImmediateImpl(insn, 1, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 6:
+-		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-		    readImmediateImpl(insn, insn->immediateSize, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 7:
+-		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-		    readImmediateImpl(insn, 2, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 8:
+-		if (readImmediateImpl(insn, 8, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	default:
+-		return X86_SCAN_INVALID;
+-	}
+-}
++static const uint8_t x86VexImmediateBytes[2][9] = {
++	{ 0, 1, 4, 4, 2, 3, 8, 6, 8 },
++	{ 0, 1, 2, 4, 2, 3, 4, 4, 8 },
++};
+ #else
+ /* W, L and pp select existing validated opcode rows directly. */
+ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+@@ -2300,53 +2260,8 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
+ 	0x0001ed06u,
+ };
+ 
+-X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)
+-{
+-	switch (pattern) {
+-	case 0:
+-		return X86_SCAN_COMPLETE;
+-	case 1:
+-		if (readImmediateImpl(insn, 1, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 2:
+-		if (readImmediateImpl(insn, insn->immediateSize, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 3:
+-		if (readImmediateImpl(insn, 4, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 4:
+-		if (readImmediateImpl(insn, 2, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 5:
+-		if (readImmediateImpl(insn, 2, false) ||
+-		    readImmediateImpl(insn, 1, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 6:
+-		if (readImmediateImpl(insn, 1, false) ||
+-		    readImmediateImpl(insn, 1, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 7:
+-		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-		    readImmediateImpl(insn, insn->immediateSize, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 8:
+-		if (readImmediateImpl(insn, insn->immediateSize, false) ||
+-		    readImmediateImpl(insn, 2, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	case 9:
+-		if (readImmediateImpl(insn, 8, false))
+-			return X86_SCAN_INVALID;
+-		return X86_SCAN_COMPLETE;
+-	default:
+-		return X86_SCAN_INVALID;
+-	}
+-}
++static const uint8_t x86VexImmediateBytes[2][10] = {
++	{ 0, 1, 4, 4, 2, 3, 2, 8, 6, 8 },
++	{ 0, 1, 2, 4, 2, 3, 2, 4, 4, 8 },
++};
+ #endif
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..8f23e406 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1262,23 +1262,24 @@ def emit_vex_scan(suffix):
+         "\t" + ", ".join(f"0x{f:08x}u" for f in metadata[i : i + 8]) + ","
+         for i in range(0, len(metadata), 8)
+     ]
+-    lines += [
+-        "};",
+-        "",
+-        "X86_DECODE_INLINE int readVexScanImmediates(struct InternalInstruction *insn, unsigned pattern)",
+-        "{",
+-        "\tswitch (pattern) {",
+-    ]
+-    for immediates, pattern in patterns.items():
+-        lines.append(f"\tcase {pattern}:")
+-        if immediates:
+-            calls = [f"readImmediateImpl(insn, {size}, false)" for size in immediates]
+-            lines += [
+-                "\t\tif (" + " ||\n\t\t    ".join(calls) + ")",
+-                "\t\t\treturn X86_SCAN_INVALID;",
+-            ]
+-        lines.append("\t\treturn X86_SCAN_COMPLETE;")
+-    lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
++    lines += ["};", "", "static const uint8_t x86VexImmediateBytes[2][" + str(len(patterns)) + "] = {"]
++    # An unprefixed 64-bit VEX scan has an eight-byte address. Only VEX2.pp=66
++    # changes the ordinary reader's starting immediate width to two bytes.
++    for default_width in (4, 2):
++        extents = []
++        for immediates in patterns:
++            width = default_width
++            total = 0
++            tables.require(len(immediates) <= 2, "VEX immediate count exceeds reader storage")
++            for size in immediates:
++                if size == "insn->addressSize":
++                    width = 8
++                elif size != "insn->immediateSize":
++                    width = int(size)
++                total += width
++            extents.append(str(total))
++        lines.append("\t{ " + ", ".join(extents) + " },")
++    lines.append("};")
+     return "\n".join(emit_vex_scan_rows(suffix) + lines)
+ 
+ 

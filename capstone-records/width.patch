@@ -1,0 +1,13 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 76fdbcb7..6c7b086c 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3522,7 +3522,7 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 						unsigned *id, uint16_t *length)
+ {
+ 	const bool wide = mode == CS_MODE_64;
+-	const uint8_t rex = offset ? code[0] : 0;
++	const unsigned rex = offset ? (unsigned)code[0] : 0;
+ 	const unsigned rejected = FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
+ 				  FEATURE_VEX2_XOP |
+ 				  (wide ? FEATURE_REX_PREFIX : 0);

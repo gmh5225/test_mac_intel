@@ -1,7 +1,7 @@
-name: Isolate the scalar regression from the compact VEX reader
+name: Test the GCC REX store-to-load dependency inside the scalar public reader
 on:
   push:
-    branches: [codex/capstone-scalar-vex-factorial]
+    branches: [codex/capstone-rex-spill-width]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,7 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc, archs: x86 }
           - { host: ubuntu-22.04, cc: gcc, archs: x86 }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: x86 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -30,13 +29,13 @@ jobs:
           ref: 706eab8fec07688db644fe64c9d82600592134f8
           path: source
           persist-credentials: false
-      - name: Vary memory extent arithmetic and VEX compact decoding independently
+      - name: Vary only REX representation and store/load width
         run: python3 capstone-records/matrix.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-scalar-factor-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: rex-width-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
