@@ -1,7 +1,7 @@
-name: Qualify dense ARM mapping in dedicated and NeverD four-architecture builds
+name: Verify the shipped ARM-only map against the measured binaries
 on:
   push:
-    branches: [codex/capstone-qualified-arm-map]
+    branches: [codex/capstone-arm-map-dedicated-path]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-qualified-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-map-exact-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

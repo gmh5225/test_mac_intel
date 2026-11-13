@@ -1,0 +1,49 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 308e4a6b..67f06ddf 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -170,6 +170,10 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
+     add_compile_definitions(CAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES)
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "ARM")
++    add_compile_definitions(CAPSTONE_ARM_DEDICATED_MAPPING)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "AARCH64")
+     add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN)
+ endif()
+diff --git a/Makefile b/Makefile
+index f8b3e8a9..0e98074f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -131,6 +131,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),sparc)
+ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
++CFLAGS += -DCAPSTONE_ARM_DEDICATED_MAPPING
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
+ CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN
+ endif
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 30e28897..4a7e97c3 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -834,7 +834,14 @@ void ARM_check_updates_flags(MCInst *MI)
+ 
+ void ARM_set_instr_map_data(MCInst *MI)
+ {
++#ifdef CAPSTONE_ARM_DEDICATED_MAPPING
++	/* The ARM decoder indexes this same generated map for implicit effects. */
++	MI->flat_insn->id = arm_insns[MCInst_getOpcode(MI)].mapid;
++	if (!MI->flat_insn->detail)
++		return;
++#else
+ 	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
++#endif
+ 	map_implicit_reads(MI, arm_insns);
+ 	map_implicit_writes(MI, arm_insns);
+ 	ARM_check_updates_flags(MI);

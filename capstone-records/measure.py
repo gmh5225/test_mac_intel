@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   bins={};objects={};libs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','indexed'):
+  for key in ('base','indexed','shipping'):
    if key!='base':run(['git','apply',r/(key+'.patch')],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
@@ -45,24 +45,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    assert changed==['arch/ARM/ARMMapping.c.o'],changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
-  if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps):
-   return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
-  data=[]
-  for x in cases:
-   for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
-     seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-     for v in seq+seq[::-1]:
-      vout=sample(v,x,mode,n)
-      if reference is None:reference=(vout['first'],vout['result'])
-      assert reference==(vout['first'],vout['result'])
-      ticks[v].append(vout['cpu_ns'])
-     runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
+  reference='base' if mixed else 'indexed'
+  assert objects['shipping']==objects[reference], (reference,[k for k in objects[reference] if objects['shipping'][k]!=objects[reference][k]])
+  assert sha(bins['shipping'])==sha(bins[reference]),reference
+  assert sha(libs['shipping'])==sha(libs[reference]),reference
+  run([t/'verify',libs['base'],libs['shipping']],'shipping-differential')
+  write('complete',dict(compared=reference,objects=len(objects[reference]),binary=sha(bins['shipping']),library=sha(libs['shipping']),host=platform.platform(),cc=cc))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
