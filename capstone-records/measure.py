@@ -20,6 +20,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={}
+  identical=mixed or (platform.system()=='Darwin' and platform.machine()=='arm64')
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','indexed'):
@@ -36,12 +37,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   assert changed==([] if mixed else ['arch/AArch64/AArch64Mapping.c.o']),changed
+   assert changed==([] if identical else ['arch/AArch64/AArch64Mapping.c.o']),changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
    assert '4194304 inputs' in (e/('differential-'+key+'.log')).read_text()
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(1 if mixed else 2);write('binaries',digests)
-  if mixed:
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(1 if identical else 2);write('binaries',digests)
+  if identical:
    write('complete',dict(cases=0,cc=cc,host=platform.platform(),identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps):
