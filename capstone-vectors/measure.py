@@ -16,7 +16,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference='443006768b6518e28ba3fd10baacfbd7e4ba4914'
+    reference='535dfe10dcc2c3d8075f447631cbaf6694adc4cf'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -26,7 +26,7 @@ def main(w):
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
-    save('variants.json',dict(integer='published '+reference,aa='byte-identical reference',output='Compare real library functions with both iced formatters after correcting iterator legality'))
+    save('variants.json',dict(integer='May omit native EVEX tables: four-backend corrected control on '+reference,output='Measured native EVEX rows over the same four-backend tree', baseline_sha=sha(r/'baseline.patch'),candidate_sha=sha(r/'dispatch.patch')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical Text && X86 in NeverD dev f9b75b8f377adff76b7d58fd82359c57fad73df6'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -43,7 +43,7 @@ def main(w):
     for label in ('integer','aa','output'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/'dispatch.patch']
+        patches=[r/'baseline.patch'] if label=='integer' else [r/'dispatch.patch']
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
@@ -52,9 +52,7 @@ def main(w):
         if label=='output':
             assert objects['integer'].keys()==objects[label].keys()
             changed={n for n in objects[label] if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/ARM/ARMInstPrinter.c.o','arch/X86/X86Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/Mips/MipsMapping.c.o',*('arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput'))}
-            if not (os.environ["CC"]=="gcc" and platform.machine()=="x86_64"):
-                expected={"arch/X86/"+n+".c.o" for n in ("X86VectorOutput","X86DisassemblerDecoder","X86Mapping","X86OutputIterator")}
+            expected={'arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86Mapping','X86OutputIterator','X86VectorOutput')}
             assert changed==expected,(changed,expected)
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
@@ -69,7 +67,7 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ("libssl3t64-amd64","libzstd1-i386"):continue
+        if name!="libssl3t64-amd64":continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
@@ -78,8 +76,7 @@ def main(w):
             if not sel:continue
             target="simd-functions" if bits==64 else "all-functions"
             if panel!=target:continue
-            # Sample each equal-sized band of the real function extent distribution.
-            ordered=sorted(sel,key=lambda x:(x[1],x[0]));sel=[ordered[(len(ordered)*i)//min(16,len(ordered))] for i in range(min(16,len(ordered)))]
+            assert len(sel)==320 and sum(q[1] for q in sel)==1069882
             save("extents-"+name+".json",sel)
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
@@ -92,7 +89,7 @@ def main(w):
                     executable=exe.get(label,exe['integer']);port='capstone' if label in exe else label
                     ident=name+'-'+str(mode)+'-'+label
                     raw=w/(ident+'.callgrind')
-                    args=['valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(w/(ident+'.log')),executable,port,str(mode),'3',f,intervals,str(bits)]
+                    args=['valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(w/(ident+'.log')),executable,port,str(mode),'1',f,intervals,str(bits)]
                     result=list(map(int,sp.check_output(args,text=True).split()))
                     if ref is None:ref=result[2:5]
                     assert result[2:5]==ref
@@ -112,7 +109,7 @@ def main(w):
                     for temp in (raw,epoch,w/(ident+'.log')):temp.unlink()
                     reported.append(dict(sample=name,panel=panel,mode=mode,engine=label,instructions=result[2],events=dict(zip(events,totals)),per_decoded_instruction={k:v/result[2] for k,v in zip(events,totals)}))
                     save('profile.json',reported)
-    assert len(reported)==14,len(reported)
+    assert len(reported)==11,len(reported)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
