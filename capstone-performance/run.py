@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249',candidate='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
+    write('comparison.json',dict(baseline='published 01ce67005793c4369e64b509e5ec8f9cb2945d98',candidate='reset SoftFail and elide redundant NULL masking while always restoring the detail pointer'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()

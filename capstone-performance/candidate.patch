@@ -1,17 +1,18 @@
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..e7d8f28b 100644
+index b883b547..eecd3e25 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -208,6 +208,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
- 	if (*size == 0 || !handle)
- 		return false;
- 
-+	/* A reused cache may still contain the previous decoder's SoftFail. */
-+	insn->illegal = false;
-+
- 	// An instruction cs_malloc() allocated while detail was on keeps its
+@@ -212,8 +212,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
  	// detail after detail is turned off.  Much of the decoder tests only
  	// whether that pointer is set, so a decode without detail hides it, as
+ 	// cs_disasm() never allocates it then; the detail is left as it was.
++	insn->illegal = false;
+ 	detail = insn->detail;
+-	if (CS_DECODE_LIKELY(!handle->detail_opt))
++	if (detail && !handle->detail_opt)
+ 		insn->detail = NULL;
+ 	r = cs_disasm_iter_body(handle, code, size, address, insn);
+ 	insn->detail = detail;
 diff --git a/tests/unit/api.c b/tests/unit/api.c
 index 46b3e78d..af447bec 100644
 --- a/tests/unit/api.c
