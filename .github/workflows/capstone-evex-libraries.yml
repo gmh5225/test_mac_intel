@@ -1,7 +1,7 @@
-name: Attribute EVEX memory scan and formatter costs on libraries
+name: Verify EVEX opcode dispatch against the published baseline in libraries
 on:
   push:
-    branches: [codex/capstone-shared-evex-memory-libraries]
+    branches: [codex/capstone-evex-feature-opcodes-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6703e144275793a419ad663511e34b5dab3d52d8
+          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: shared-evex-memory-${{ matrix.host }}-${{ matrix.cc }}
+          name: feature-opcodes-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
