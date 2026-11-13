@@ -1,7 +1,7 @@
-name: Qualify dense ARM mapping in dedicated and NeverD four-architecture builds
+name: Compare complete ARM operand default construction on native mixed and ARM-only targets
 on:
   push:
-    branches: [codex/capstone-qualified-arm-map]
+    branches: [codex/capstone-complete-arm-operand-defaults]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: c92f6f103e0123790f574c05a2a57f7203e7a461
+          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-qualified-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-operand-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

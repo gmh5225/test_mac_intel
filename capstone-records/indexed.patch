@@ -1,16 +1,57 @@
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..ae49e100 100644
+index 4a7e97c3..8dfec3da 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -834,7 +834,10 @@ void ARM_check_updates_flags(MCInst *MI)
+@@ -945,27 +945,37 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ }
+ #endif
  
- void ARM_set_instr_map_data(MCInst *MI)
++/* Unused operands have observable invalid indices and zeroed padding too. */
++#define ARM_EMPTY_OP \
++	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
++#define ARM_FOUR_EMPTY_OPS \
++	ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP
++static const cs_arm_op arm_empty_operands[] = {
++	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
++	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
++	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS
++};
++#undef ARM_FOUR_EMPTY_OPS
++#undef ARM_EMPTY_OP
++_Static_assert(ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS,
++	       "ARM operand defaults must cover all slots");
++
+ void ARM_setup_op(cs_arm_op *op)
  {
--	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
-+	/* The ARM decoder indexes this same generated map for implicit effects. */
-+	MI->flat_insn->id = arm_insns[MCInst_getOpcode(MI)].mapid;
-+	if (!MI->flat_insn->detail)
+-	memset(op, 0, sizeof(cs_arm_op));
+-	op->type = ARM_OP_INVALID;
+-	op->vector_index = -1;
+-	op->neon_lane = -1;
++	memcpy(op, arm_empty_operands, sizeof(*op));
+ }
+ 
+ void ARM_init_cs_detail(MCInst *MI)
+ {
+-	if (detail_is_set(MI)) {
+-		unsigned int i;
+-
+-		memset(get_detail(MI), 0,
+-		       offsetof(cs_detail, arm) + sizeof(cs_arm));
+-
+-		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
+-			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
+-		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
+-		ARM_get_detail(MI)->vcc = ARMVCC_None;
+-	}
++	if (!detail_is_set(MI))
 +		return;
- 	map_implicit_reads(MI, arm_insns);
- 	map_implicit_writes(MI, arm_insns);
- 	ARM_check_updates_flags(MI);
++	cs_detail *detail = get_detail(MI);
++	memset(detail, 0,
++	       offsetof(cs_detail, arm) + offsetof(cs_arm, operands));
++	detail->arm.cc = ARMCC_UNDEF;
++	detail->arm.vcc = ARMVCC_None;
++	memcpy(detail->arm.operands, arm_empty_operands,
++	       sizeof(arm_empty_operands));
+ }
+ 
+ static uint64_t t_add_pc(MCInst *MI, uint64_t v)
