@@ -1,130 +1,353 @@
-diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 40eee098..adf4b08d 100644
---- a/arch/X86/X86ImmediateOutput.c
-+++ b/arch/X86/X86ImmediateOutput.c
-@@ -10,20 +10,59 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
- 
-+#include "../../MathExtras.h"
-+
-+char *X86_writeHexDigits(char *out, uint64_t value)
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..f6c932d2 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -808,3 +808,261 @@ static const uint8_t legacy_register_plans[256] = {
+ 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
+ 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
+ };
++static const char vector_immediate_suffix[256][8] = {
++	", 0",
++	", 1",
++	", 2",
++	", 3",
++	", 4",
++	", 5",
++	", 6",
++	", 7",
++	", 8",
++	", 9",
++	", 0xa",
++	", 0xb",
++	", 0xc",
++	", 0xd",
++	", 0xe",
++	", 0xf",
++	", 0x10",
++	", 0x11",
++	", 0x12",
++	", 0x13",
++	", 0x14",
++	", 0x15",
++	", 0x16",
++	", 0x17",
++	", 0x18",
++	", 0x19",
++	", 0x1a",
++	", 0x1b",
++	", 0x1c",
++	", 0x1d",
++	", 0x1e",
++	", 0x1f",
++	", 0x20",
++	", 0x21",
++	", 0x22",
++	", 0x23",
++	", 0x24",
++	", 0x25",
++	", 0x26",
++	", 0x27",
++	", 0x28",
++	", 0x29",
++	", 0x2a",
++	", 0x2b",
++	", 0x2c",
++	", 0x2d",
++	", 0x2e",
++	", 0x2f",
++	", 0x30",
++	", 0x31",
++	", 0x32",
++	", 0x33",
++	", 0x34",
++	", 0x35",
++	", 0x36",
++	", 0x37",
++	", 0x38",
++	", 0x39",
++	", 0x3a",
++	", 0x3b",
++	", 0x3c",
++	", 0x3d",
++	", 0x3e",
++	", 0x3f",
++	", 0x40",
++	", 0x41",
++	", 0x42",
++	", 0x43",
++	", 0x44",
++	", 0x45",
++	", 0x46",
++	", 0x47",
++	", 0x48",
++	", 0x49",
++	", 0x4a",
++	", 0x4b",
++	", 0x4c",
++	", 0x4d",
++	", 0x4e",
++	", 0x4f",
++	", 0x50",
++	", 0x51",
++	", 0x52",
++	", 0x53",
++	", 0x54",
++	", 0x55",
++	", 0x56",
++	", 0x57",
++	", 0x58",
++	", 0x59",
++	", 0x5a",
++	", 0x5b",
++	", 0x5c",
++	", 0x5d",
++	", 0x5e",
++	", 0x5f",
++	", 0x60",
++	", 0x61",
++	", 0x62",
++	", 0x63",
++	", 0x64",
++	", 0x65",
++	", 0x66",
++	", 0x67",
++	", 0x68",
++	", 0x69",
++	", 0x6a",
++	", 0x6b",
++	", 0x6c",
++	", 0x6d",
++	", 0x6e",
++	", 0x6f",
++	", 0x70",
++	", 0x71",
++	", 0x72",
++	", 0x73",
++	", 0x74",
++	", 0x75",
++	", 0x76",
++	", 0x77",
++	", 0x78",
++	", 0x79",
++	", 0x7a",
++	", 0x7b",
++	", 0x7c",
++	", 0x7d",
++	", 0x7e",
++	", 0x7f",
++	", 0x80",
++	", 0x81",
++	", 0x82",
++	", 0x83",
++	", 0x84",
++	", 0x85",
++	", 0x86",
++	", 0x87",
++	", 0x88",
++	", 0x89",
++	", 0x8a",
++	", 0x8b",
++	", 0x8c",
++	", 0x8d",
++	", 0x8e",
++	", 0x8f",
++	", 0x90",
++	", 0x91",
++	", 0x92",
++	", 0x93",
++	", 0x94",
++	", 0x95",
++	", 0x96",
++	", 0x97",
++	", 0x98",
++	", 0x99",
++	", 0x9a",
++	", 0x9b",
++	", 0x9c",
++	", 0x9d",
++	", 0x9e",
++	", 0x9f",
++	", 0xa0",
++	", 0xa1",
++	", 0xa2",
++	", 0xa3",
++	", 0xa4",
++	", 0xa5",
++	", 0xa6",
++	", 0xa7",
++	", 0xa8",
++	", 0xa9",
++	", 0xaa",
++	", 0xab",
++	", 0xac",
++	", 0xad",
++	", 0xae",
++	", 0xaf",
++	", 0xb0",
++	", 0xb1",
++	", 0xb2",
++	", 0xb3",
++	", 0xb4",
++	", 0xb5",
++	", 0xb6",
++	", 0xb7",
++	", 0xb8",
++	", 0xb9",
++	", 0xba",
++	", 0xbb",
++	", 0xbc",
++	", 0xbd",
++	", 0xbe",
++	", 0xbf",
++	", 0xc0",
++	", 0xc1",
++	", 0xc2",
++	", 0xc3",
++	", 0xc4",
++	", 0xc5",
++	", 0xc6",
++	", 0xc7",
++	", 0xc8",
++	", 0xc9",
++	", 0xca",
++	", 0xcb",
++	", 0xcc",
++	", 0xcd",
++	", 0xce",
++	", 0xcf",
++	", 0xd0",
++	", 0xd1",
++	", 0xd2",
++	", 0xd3",
++	", 0xd4",
++	", 0xd5",
++	", 0xd6",
++	", 0xd7",
++	", 0xd8",
++	", 0xd9",
++	", 0xda",
++	", 0xdb",
++	", 0xdc",
++	", 0xdd",
++	", 0xde",
++	", 0xdf",
++	", 0xe0",
++	", 0xe1",
++	", 0xe2",
++	", 0xe3",
++	", 0xe4",
++	", 0xe5",
++	", 0xe6",
++	", 0xe7",
++	", 0xe8",
++	", 0xe9",
++	", 0xea",
++	", 0xeb",
++	", 0xec",
++	", 0xed",
++	", 0xee",
++	", 0xef",
++	", 0xf0",
++	", 0xf1",
++	", 0xf2",
++	", 0xf3",
++	", 0xf4",
++	", 0xf5",
++	", 0xf6",
++	", 0xf7",
++	", 0xf8",
++	", 0xf9",
++	", 0xfa",
++	", 0xfb",
++	", 0xfc",
++	", 0xfd",
++	", 0xfe",
++	", 0xff",
++};
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..3654dd5e 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -52,19 +52,8 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		out = writeVectorRegister(out + 2, ll, regs[n]);
+ 	}
+ 	if (row->immediate) {
+-		const unsigned value = code[prefix + 2];
+-		memcpy(out, ", ", 2);
+-		out += 2;
+-		if (value <= HEX_THRESHOLD) {
+-			*out = (char)('0' + value);
+-		} else {
+-			static const char digits[] = "0123456789abcdef";
+-			memcpy(out, "0x", 2);
+-			out += 2;
+-			if (value >= 16)
+-				*out++ = digits[value >> 4];
+-			*out = digits[value & 15];
+-		}
++		const char *suffix = vector_immediate_suffix[code[prefix + 2]];
++		memcpy(out, suffix, sizeof(vector_immediate_suffix[0]));
+ 	}
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 834c2488..8bfc7907 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -891,6 +891,30 @@ void emit_vex_registers(Decoder &decoder)
+ 	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
+ 		     rows.size(), widths.size() - 1);
+ }
++void emit_immediate_suffixes(Decoder &decoder)
 +{
-+	static const char digits[] = "0123456789abcdef";
-+	static const char pairs[] = "000102030405060708090a0b0c0d0e0f"
-+				    "101112131415161718191a1b1c1d1e1f"
-+				    "202122232425262728292a2b2c2d2e2f"
-+				    "303132333435363738393a3b3c3d3e3f"
-+				    "404142434445464748494a4b4c4d4e4f"
-+				    "505152535455565758595a5b5c5d5e5f"
-+				    "606162636465666768696a6b6c6d6e6f"
-+				    "707172737475767778797a7b7c7d7e7f"
-+				    "808182838485868788898a8b8c8d8e8f"
-+				    "909192939495969798999a9b9c9d9e9f"
-+				    "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
-+				    "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
-+				    "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
-+				    "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
-+				    "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
-+				    "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
-+	if (value < 16) {
-+		*out++ = digits[value];
-+		return out;
++	std::puts("static const char vector_immediate_suffix[256][8] = {");
++	for (unsigned value = 0; value <= 255; ++value) {
++		const uint8_t bytes[] = { 0x62, 0xf3, 0x7d,	     0x48,
++					  0x25, 0xc1, uint8_t(value) };
++		if (decoder.decode(bytes, sizeof(bytes)) != X86_INS_VPTERNLOGD)
++			throw std::runtime_error(
++				"unexpected ternary logic encoding");
++		const char *suffix = std::strrchr(decoder.insn->op_str, ',');
++		constexpr char prefix[] = "zmm0, zmm0, zmm1";
++		if (!suffix ||
++		    suffix != decoder.insn->op_str + sizeof(prefix) - 1 ||
++		    std::strncmp(decoder.insn->op_str, prefix,
++				 sizeof(prefix) - 1) ||
++		    std::strlen(suffix) >= 8 ||
++		    decoder.insn->detail->x86.operands[3].imm != value)
++			throw std::runtime_error(
++				"unexpected vector immediate suffix");
++		std::printf("\t\"%s\",\n", suffix);
 +	}
-+	if (value < 256) {
-+		memcpy(out, pairs + 2 * value, 2);
-+		return out + 2;
-+	}
-+
-+	unsigned shift = (63u - CountLeadingZeros_64(value)) & ~3u;
-+	if (!(shift & 4)) {
-+		*out++ = digits[value >> shift];
-+	} else {
-+		shift -= 4;
-+		memcpy(out, pairs + 2 * (value >> shift), 2);
-+		out += 2;
-+	}
-+	while (shift) {
-+		shift -= 8;
-+		memcpy(out, pairs + 2 * ((value >> shift) & 255), 2);
-+		out += 2;
-+	}
-+	return out;
++	std::puts("};");
 +}
 +
- static void writeUnsignedImmediate(char *out, uint64_t value)
+ void emit_output(Decoder &decoder)
  {
- 	if (value <= HEX_THRESHOLD) {
- 		*out = (char)('0' + value);
- 	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
- 		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
-+		X86_writeHexDigits(out + 2, value);
- 	}
+ 	std::vector<std::string> records;
+@@ -951,6 +975,7 @@ int main()
+ 	Decoder decoder;
+ 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
+ 	emit_output(decoder);
++	emit_immediate_suffixes(decoder);
+ 	std::fprintf(stderr, "%llu ordinary decoder probes\n",
+ 		     static_cast<unsigned long long>(decoder.probes));
  }
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6990d510..b5f1aeb7 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -354,6 +354,13 @@ static bool check_evex_extract(csh handles[2])
  
-diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index e284469c..848a4ba8 100644
---- a/arch/X86/X86MemoryOutput.c
-+++ b/arch/X86/X86MemoryOutput.c
-@@ -17,14 +17,7 @@ static char *writeDisplacement(char *out, int32_t displacement)
- 	out += 5;
- 	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
- 						(uint32_t)displacement;
--	char digits[8], *start = digits + sizeof(digits);
--	do {
--		*--start = "0123456789abcdef"[magnitude & 15];
--		magnitude >>= 4;
--	} while (magnitude);
--	const size_t length = (size_t)(digits + sizeof(digits) - start);
--	memcpy(out, start, length);
--	return out + length;
-+	return X86_writeHexDigits(out, magnitude);
- }
- 
- /* Decode one ordinary base, optionally ESP/RSP/R12 via SIB, or RIP-relative
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index c0547213..5d9f0583 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -138,17 +138,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		if (target <= HEX_THRESHOLD) {
- 			insn->op_str[0] = (char)('0' + target);
- 		} else {
--			char digits[16];
--			char *end = digits + sizeof(digits);
--			char *p = end;
--			uint64_t value = target;
--			do {
--				*--p = "0123456789abcdef"[value & 15];
--				value >>= 4;
--			} while (value);
--			insn->op_str[0] = '0';
--			insn->op_str[1] = 'x';
--			memcpy(insn->op_str + 2, p, (size_t)(end - p));
-+			memcpy(insn->op_str, "0x", 2);
-+			X86_writeHexDigits(insn->op_str + 2, target);
- 		}
- 		memcpy(insn->bytes, code, length);
- 		*insn_size = insn->size = length;
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index b491ca5f..a982f336 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -59,6 +59,9 @@ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
- 		      const struct X86SimpleRegister regs[4][16]);
- 
-+/* Append minimal lowercase digits to the pre-cleared operand buffer. */
-+CAPSTONE_INTERNAL char *X86_writeHexDigits(char *out, uint64_t value);
+ static bool check_evex(csh handles[2])
+ {
++	uint8_t ternary[] = { 0x62, 0x83, 0x05, 0x40, 0x25, 0xff, 0 };
++	for (unsigned value = 0; value < 256; ++value) {
++		ternary[6] = (uint8_t)value;
++		if (!compare(handles, ternary, sizeof(ternary), value))
++			return false;
++	}
 +
- CAPSTONE_INTERNAL void X86_writeImmediateOutput(
- 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
- 	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
+ 	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
+ 					  0x344, 0x325, 0x1fe, 0x200 };
+ 	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
