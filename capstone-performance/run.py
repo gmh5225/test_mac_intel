@@ -205,7 +205,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86DisassemblerDecoder.c.o'],diffs
+    assert not diffs,diffs
     # The Mach-O ad hoc signature includes the linker's output basename. Both
     # files above are linked as 'single' and only renamed after signing.
     if platform.system()=='Darwin':

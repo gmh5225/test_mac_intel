@@ -1,9 +1,9 @@
-name: Verify generated public VEX entries on mixed
+name: Qualify full-width REX and dedicated GCC VEX extents on mixed
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-public-vex-entry-mixed]
+    branches: [codex/capstone-qualified-vex-gcc-mixed]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-public-vex-entry-mixed
+  group: capstone-qualified-vex-gcc-mixed
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-entry-mixed-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: qualified-gcc-vex-mixed-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
