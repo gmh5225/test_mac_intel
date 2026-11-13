@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 706eab8fec07688db644fe64c9d82600592134f8',candidate='canonical SSE register pair output'))
+    write('comparison.json',dict(baseline='published 706eab8fec07688db644fe64c9d82600592134f8',candidate='canonical SSE and immediate output'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -211,7 +211,7 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert changed[0].keys()==changed[1].keys()
+    assert set(changed[1])-set(changed[0])=={'arch/X86/X86ImmediateOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
     assert sorted(diffs)==['arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
