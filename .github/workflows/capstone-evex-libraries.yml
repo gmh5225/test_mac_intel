@@ -1,7 +1,7 @@
-name: Compare first-byte EVEX scan dispatch with the complete native vector implementation
+name: Measure EVEX align and shuffle rows against the identical native register writer
 on:
   push:
-    branches: [codex/capstone-evex-iterator-first]
+    branches: [codex/capstone-evex-align-and-shuffle]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-iterator-first-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-align-and-shuffle-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

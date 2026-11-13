@@ -20,7 +20,7 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..d725f884 100644
+index 76fdbcb7..1e978af3 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3365,6 +3365,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
@@ -39,55 +39,6 @@ index 76fdbcb7..d725f884 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-@@ -3753,26 +3762,36 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- {
- 	unsigned instructionID = 0;
- 	uint16_t length;
--	int initial = tryInitialScanResult(handle, code, size, &instructionID,
--					   &length, true);
--	if (initial == X86_SCAN_NOT_HANDLED) {
--		X86ScanResult result;
-+	X86ScanResult result;
-+
-+	/* EVEX cannot be a legacy opcode in long mode. The fallback retains its
-+     * adapter-first and feature-extension order for the complete escape. */
-+	if (size && code[0] == 0x62 && handle->mode == CS_MODE_64) {
-+		if (!decodeScanResultFallback((csh)(uintptr_t)handle, code,
-+					      size, insn, &result, 0x62, true))
-+			return false;
-+	} else {
-+		const int initial = tryInitialScanResult(
-+			handle, code, size, &instructionID, &length, true);
-+		if (initial != X86_SCAN_NOT_HANDLED) {
-+			if (initial != X86_SCAN_COMPLETE)
-+				return false;
-+			X86ScanResult terminal = { 0, instructionID, length,
-+						   0 };
-+			*insn_size = length;
-+			finish_x86_scan(handle, insn, &terminal, code, batch,
-+					true);
-+			return true;
-+		}
- 		if (!getInstructionScanResultAfterInitial(
- 			    (csh)(uintptr_t)handle, code, size, insn, &result,
- 			    true))
- 			return false;
--		*insn_size = result.length;
--		finish_x86_scan(handle, insn, &result, code, batch, true);
--		return true;
- 	}
--	if (initial != X86_SCAN_COMPLETE)
--		return false;
--	X86ScanResult result = { 0, instructionID, length, 0 };
--	*insn_size = length;
-+	*insn_size = result.length;
- 	finish_x86_scan(handle, insn, &result, code, batch, true);
- 	return true;
- }
--
- CAPSTONE_EXPORT
- X86_DECODE_ALIGN
- bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..5e6008a8 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
@@ -102,10 +53,43 @@ index a976814e..5e6008a8 100644
  			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
  			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..2dc976ed 100644
+index 1d237cd1..fd671515 100644
 --- a/arch/X86/X86GenVectorOutput.inc
 +++ b/arch/X86/X86GenVectorOutput.inc
-@@ -631,6 +631,32 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+@@ -27,6 +27,10 @@ static const struct VectorOutputRow evex_output_rows[] = {
+ 	{ X86_INS_VPSHUFB, "vpshufb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VPADDD, "vpaddd", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VPADDD, "vpaddd", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSHUFI32X4, "vshufi32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VSHUFI64X2, "vshufi64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VALIGND, "valignd", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1 },
++	{ X86_INS_VALIGNQ, "valignq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ };
+ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
+ {
+@@ -59,6 +63,10 @@ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, uns
+ 		static const uint8_t rows[2][3] = { { 15, 15, 15 }, { 15, 15, 15 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
++	case 0x303: {
++		static const uint8_t rows[2][3] = { { 24, 24, 24 }, { 25, 25, 25 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
+ 	case 0x319: {
+ 		static const uint8_t rows[2][3] = { { 255, 0, 0 }, { 255, 1, 1 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+@@ -79,6 +87,10 @@ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, uns
+ 		static const uint8_t rows[2][3] = { { 255, 255, 6 }, { 255, 255, 7 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
++	case 0x343: {
++		static const uint8_t rows[2][3] = { { 255, 22, 22 }, { 255, 23, 23 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
+ 	case 0x344: {
+ 		static const uint8_t rows[2][3] = { { 16, 16, 16 }, { 16, 16, 16 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+@@ -631,6 +643,32 @@ static const uint8_t vex_shift_plans[3][8][4] = {
  		{ 19, 20, 19, 20 },
  	},
  };
@@ -138,7 +122,7 @@ index 1d237cd1..2dc976ed 100644
  static const struct VectorOutputRow broadcast_rows[2][3] = {
  	{
  		{ 0 },
-@@ -643,6 +669,44 @@ static const struct VectorOutputRow broadcast_rows[2][3] = {
+@@ -643,6 +681,44 @@ static const struct VectorOutputRow broadcast_rows[2][3] = {
  		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
  	},
  };
@@ -572,10 +556,20 @@ index ccc4f0de..d88ac7af 100644
  	plans[1][0][0xc5] = X86_PLAN_VECTOR;
  	for (unsigned wide = 0; wide < 2; ++wide) {
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..65836597 100644
+index 834c2488..150e32de 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -94,6 +94,61 @@ std::string fields(const Bytes4 &array)
+@@ -30,7 +30,8 @@ constexpr Form forms[] = {
+ 	{ 2, 0xdd, false },	 { 2, 0xde, false },
+ 	{ 2, 0xdf, false },	 { 3, 0x44, true },
+ 	{ 3, 0x25, true },	 { 2, 0x00, false },
+-	{ 1, 0xfe, false },
++	{ 1, 0xfe, false },	 { 3, 0x43, true },
++	{ 3, 0x3, true },
+ };
+ 
+ struct Decoder {
+@@ -94,6 +95,61 @@ std::string fields(const Bytes4 &array)
  	       ", " + std::to_string(array[3]) + " }";
  }
  
@@ -637,7 +631,7 @@ index 834c2488..65836597 100644
  // EVEX extracts have a narrower r/m destination, a full-width reg source,
  // and a reserved vvvv field. Reconstruct the entire public record before
  // admitting a width, including the ignored or effective W bit in REX.
-@@ -101,8 +156,6 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+@@ -101,8 +157,6 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
  			   unsigned ll)
  {
  	const unsigned dst_width = (form.opcode & 2) ? 1 : 0;
@@ -646,7 +640,7 @@ index 834c2488..65836597 100644
  	std::string row;
  	for (unsigned i = 0; i < 1024; ++i) {
  		unsigned dst = i & 31, src = i >> 5, value = (i * 37) & 255;
-@@ -115,51 +168,10 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+@@ -115,51 +169,10 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
  				    uint8_t(form.opcode),
  				    uint8_t(0xc0 | (src & 7) << 3 | (dst & 7)),
  				    uint8_t(value) };
@@ -701,7 +695,7 @@ index 834c2488..65836597 100644
  		if (i && record != row)
  			return {};
  		row = record;
-@@ -167,6 +179,54 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+@@ -167,6 +180,54 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
  	return row;
  }
  
@@ -756,7 +750,7 @@ index 834c2488..65836597 100644
  std::string output_record(Decoder &decoder, const Form &form, unsigned w,
  			  unsigned ll)
  {
-@@ -891,6 +951,114 @@ void emit_vex_registers(Decoder &decoder)
+@@ -891,6 +952,114 @@ void emit_vex_registers(Decoder &decoder)
  	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
  		     rows.size(), widths.size() - 1);
  }
@@ -871,7 +865,7 @@ index 834c2488..65836597 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -938,7 +1106,9 @@ void emit_output(Decoder &decoder)
+@@ -938,7 +1107,9 @@ void emit_output(Decoder &decoder)
  	emit_vex_indexed(decoder);
  	emit_vex_registers(decoder);
  	emit_vex_shifts(decoder);
@@ -976,13 +970,17 @@ index 771fefb7..4d51efb4 100644
  			for (size_t size = 0; size <= sizeof(code) - offset;
  			     ++size)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..a5812001 100644
+index 6990d510..15091a49 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -354,10 +354,68 @@ static bool check_evex_extract(csh handles[2])
+@@ -354,10 +354,69 @@ static bool check_evex_extract(csh handles[2])
  
  static bool check_evex(csh handles[2])
  {
+-	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
+-					  0x344, 0x325, 0x1fe, 0x200 };
+-	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
+-					 0xc0, 0xcb, 0xf7, 0xff };
 +	for (unsigned sib = 0; sib < 256; ++sib)
 +		for (unsigned ext = 0; ext < 16; ++ext)
 +			for (unsigned mod = 0; mod < 3; ++mod) {
@@ -1041,17 +1039,15 @@ index 6990d510..a5812001 100644
 +						return false;
 +				}
 +
- 	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
--					  0x344, 0x325, 0x1fe, 0x200 };
--	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
--					 0xc0, 0xcb, 0xf7, 0xff };
-+					  0x344, 0x325, 0x1fe, 0x200, 0x173 };
++	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de,
++					  0x2df, 0x344, 0x325, 0x1fe,
++					  0x200, 0x343, 0x303, 0x173 };
 +	static const uint8_t tails[] = { 0,    4,    0x45, 0x85, 0xc0, 0xcb,
 +					 0xf7, 0xff, 0xd8, 0xdf, 0xf8 };
  	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
  		for (unsigned reg = 0; reg < 32; ++reg)
  			for (unsigned wl = 0; wl < 8; ++wl)
-@@ -738,6 +796,50 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+@@ -738,6 +797,50 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -1102,7 +1098,7 @@ index 6990d510..a5812001 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -765,7 +867,9 @@ static bool check_mode(cs_mode mode)
+@@ -765,7 +868,9 @@ static bool check_mode(cs_mode mode)
  		    !check_push_memory(handles, mode) ||
  		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
  		    !check_rex_stack(handles) ||
