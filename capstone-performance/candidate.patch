@@ -1021,7 +1021,7 @@ index 00000000..f869d85f
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..9dd38104
+index 00000000..cbdf5db3
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
 @@ -0,0 +1,373 @@
@@ -1381,7 +1381,7 @@ index 00000000..9dd38104
 +}
 +
 +#ifndef CAPSTONE_X86_DEDICATED_OUTPUT
-+#define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
++#define CS_DECODE_TRY_OUTPUT
 +#endif
 +#endif
 +#include "../../cs_disasm_internal.h"
@@ -1764,23 +1764,8 @@ index 00000000..3b1b7759
 +}
 +#endif
 +#endif
-diff --git a/cs.c b/cs.c
-index e9785f4a..59a88cf8 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1043,6 +1043,10 @@ CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		    cs_insn *insn, uint16_t *insn_size, bool batch)
- {
-+#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
-+	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
-+		return true;
-+#endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
- 	if (handle->arch == CS_ARCH_X86)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..b883b547 100644
+index 0a4c959f..db532f01 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -116,7 +116,7 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
@@ -1792,13 +1777,15 @@ index 0a4c959f..b883b547 100644
   * implementation. Other users retain the normal private decoder entry. */
  #ifndef CS_DECODE_SCAN
  #define CS_DECODE_SCAN X86_getInstructionScanResult
-@@ -158,6 +158,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+@@ -158,6 +158,12 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
  		return true;
  #endif
  	}
 +#endif
-+#ifdef CS_DECODE_TRY_OUTPUT
-+	if (CS_DECODE_TRY_OUTPUT(handle, code, size, insn, insn_size))
++#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) || defined(CS_DECODE_TRY_OUTPUT)
++	/* Both callers have a nonempty input. Complete output-only records
++     * before allocating the generic instruction and formatting stream. */
++	if (X86_trySimpleOutput(handle, code, size, insn, insn_size))
 +		return true;
  #endif
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);

@@ -1,9 +1,9 @@
-name: Retest complete vector and scalar output with the published scanner on native
+name: Measure early output dispatch before full decoder stack allocation
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-vector-output-only-native]
+    branches: [codex/capstone-x86-output-before-frame]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-vector-output-only-native
+  group: capstone-x86-output-before-frame
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-output-only-native-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: output-before-frame-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
