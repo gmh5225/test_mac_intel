@@ -1,0 +1,175 @@
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index f869d85f..053c9efe 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -72,3 +72,108 @@ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
+ 		{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+ 	},
+ };
++struct VectorRegisterName { char name[6]; uint8_t length; };
++static const struct VectorRegisterName vector_register_names[3][32] = {
++	{
++		{ "xmm0", 4 },
++		{ "xmm1", 4 },
++		{ "xmm2", 4 },
++		{ "xmm3", 4 },
++		{ "xmm4", 4 },
++		{ "xmm5", 4 },
++		{ "xmm6", 4 },
++		{ "xmm7", 4 },
++		{ "xmm8", 4 },
++		{ "xmm9", 4 },
++		{ "xmm10", 5 },
++		{ "xmm11", 5 },
++		{ "xmm12", 5 },
++		{ "xmm13", 5 },
++		{ "xmm14", 5 },
++		{ "xmm15", 5 },
++		{ "xmm16", 5 },
++		{ "xmm17", 5 },
++		{ "xmm18", 5 },
++		{ "xmm19", 5 },
++		{ "xmm20", 5 },
++		{ "xmm21", 5 },
++		{ "xmm22", 5 },
++		{ "xmm23", 5 },
++		{ "xmm24", 5 },
++		{ "xmm25", 5 },
++		{ "xmm26", 5 },
++		{ "xmm27", 5 },
++		{ "xmm28", 5 },
++		{ "xmm29", 5 },
++		{ "xmm30", 5 },
++		{ "xmm31", 5 },
++	},
++	{
++		{ "ymm0", 4 },
++		{ "ymm1", 4 },
++		{ "ymm2", 4 },
++		{ "ymm3", 4 },
++		{ "ymm4", 4 },
++		{ "ymm5", 4 },
++		{ "ymm6", 4 },
++		{ "ymm7", 4 },
++		{ "ymm8", 4 },
++		{ "ymm9", 4 },
++		{ "ymm10", 5 },
++		{ "ymm11", 5 },
++		{ "ymm12", 5 },
++		{ "ymm13", 5 },
++		{ "ymm14", 5 },
++		{ "ymm15", 5 },
++		{ "ymm16", 5 },
++		{ "ymm17", 5 },
++		{ "ymm18", 5 },
++		{ "ymm19", 5 },
++		{ "ymm20", 5 },
++		{ "ymm21", 5 },
++		{ "ymm22", 5 },
++		{ "ymm23", 5 },
++		{ "ymm24", 5 },
++		{ "ymm25", 5 },
++		{ "ymm26", 5 },
++		{ "ymm27", 5 },
++		{ "ymm28", 5 },
++		{ "ymm29", 5 },
++		{ "ymm30", 5 },
++		{ "ymm31", 5 },
++	},
++	{
++		{ "zmm0", 4 },
++		{ "zmm1", 4 },
++		{ "zmm2", 4 },
++		{ "zmm3", 4 },
++		{ "zmm4", 4 },
++		{ "zmm5", 4 },
++		{ "zmm6", 4 },
++		{ "zmm7", 4 },
++		{ "zmm8", 4 },
++		{ "zmm9", 4 },
++		{ "zmm10", 5 },
++		{ "zmm11", 5 },
++		{ "zmm12", 5 },
++		{ "zmm13", 5 },
++		{ "zmm14", 5 },
++		{ "zmm15", 5 },
++		{ "zmm16", 5 },
++		{ "zmm17", 5 },
++		{ "zmm18", 5 },
++		{ "zmm19", 5 },
++		{ "zmm20", 5 },
++		{ "zmm21", 5 },
++		{ "zmm22", 5 },
++		{ "zmm23", 5 },
++		{ "zmm24", 5 },
++		{ "zmm25", 5 },
++		{ "zmm26", 5 },
++		{ "zmm27", 5 },
++		{ "zmm28", 5 },
++		{ "zmm29", 5 },
++		{ "zmm30", 5 },
++		{ "zmm31", 5 },
++	},
++};
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 3b1b7759..597fdda4 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -12,13 +12,10 @@
+ static char *writeVectorRegister(char *out, unsigned length_code,
+ 				 unsigned number)
+ {
+-	*out++ = "xyz"[length_code];
+-	*out++ = 'm';
+-	*out++ = 'm';
+-	if (number >= 10)
+-		*out++ = (char)('0' + number / 10);
+-	*out++ = (char)('0' + number % 10);
+-	return out;
++	const struct VectorRegisterName *reg =
++		&vector_register_names[length_code][number];
++	memcpy(out, reg->name, sizeof(reg->name));
++	return out + reg->length;
+ }
+ 
+ #if defined(_MSC_VER)
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 032db5d1..f25971db 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -197,6 +197,27 @@ void emit_vex_indexed(Decoder &decoder)
+ 	std::puts("};");
+ }
+ 
++void emit_vector_registers(const Decoder &decoder)
++{
++	std::puts(
++		"struct VectorRegisterName { char name[6]; uint8_t length; };\nstatic const struct VectorRegisterName vector_register_names[3][32] = {");
++	for (unsigned base : { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 }) {
++		std::puts("\t{");
++		for (unsigned n = 0; n != 32; ++n) {
++			const char *name =
++				cs_reg_name(decoder.handle, base + n);
++			if (!name || std::strlen(name) < 4 ||
++			    std::strlen(name) > 5)
++				throw std::runtime_error(
++					"invalid vector register name");
++			std::printf("\t\t{ \"%s\", %zu },\n", name,
++				    std::strlen(name));
++		}
++		std::puts("\t},");
++	}
++	std::puts("};");
++}
++
+ void emit_output(Decoder &decoder)
+ {
+ 	std::vector<std::string> records;
+@@ -239,6 +260,7 @@ void emit_output(Decoder &decoder)
+ 	}
+ 	std::puts("\tdefault: return NULL;\n\t}\n}");
+ 	emit_vex_indexed(decoder);
++	emit_vector_registers(decoder);
+ }
+ }
+ 

@@ -1,0 +1,86 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 9dd38104..ca7672ce 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -15,6 +15,7 @@
+ #include "../../utils.h"
+ #include "X86Mapping.h"
+ #include "X86SimpleOutput.h"
++#include "../../MathExtras.h"
+ #include "X86GenSimpleOutput.inc"
+ 
+ /* The admitted MOV forms have a single integer base and at most a disp8. */
+@@ -84,21 +85,40 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
+ 	}
+ }
+ 
++/* The destination is the zeroed public operand buffer. Write digit pairs
++ * directly to their final positions, leaving all bytes after the number zero. */
+ static void writeUnsignedImmediate(char *out, uint64_t value)
+ {
+ 	if (value <= HEX_THRESHOLD) {
+ 		*out = (char)('0' + value);
+-	} else {
+-		static const char digits[] = "0123456789abcdef";
+-		char temp[16], *end = temp + sizeof(temp), *start = end;
+-		uint64_t n = value;
+-		do {
+-			*--start = digits[n & 15];
+-			n >>= 4;
+-		} while (n);
+-		memcpy(out, "0x", 2);
+-		memcpy(out + 2, start, end - start);
++		return;
++	}
++	static const char pairs[] = "000102030405060708090a0b0c0d0e0f"
++				    "101112131415161718191a1b1c1d1e1f"
++				    "202122232425262728292a2b2c2d2e2f"
++				    "303132333435363738393a3b3c3d3e3f"
++				    "404142434445464748494a4b4c4d4e4f"
++				    "505152535455565758595a5b5c5d5e5f"
++				    "606162636465666768696a6b6c6d6e6f"
++				    "707172737475767778797a7b7c7d7e7f"
++				    "808182838485868788898a8b8c8d8e8f"
++				    "909192939495969798999a9b9c9d9e9f"
++				    "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
++				    "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
++				    "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
++				    "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
++				    "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
++				    "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
++	const unsigned digits = (67u - CountLeadingZeros_64(value)) / 4u;
++	memcpy(out, "0x", 2);
++	char *end = out + 2 + digits;
++	while (value >= 16) {
++		end -= 2;
++		memcpy(end, pairs + 2 * (value & 255), 2);
++		value >>= 8;
+ 	}
++	if (value)
++		end[-1] = pairs[2 * value + 1];
+ }
+ 
+ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+@@ -297,21 +317,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		const uint16_t length = row->imm_offset + row->imm_size;
+ 		target = X86_relativeBranchTarget(handle->mode, insn->address,
+ 						  length, delta, row->imm_size);
+-		if (target <= HEX_THRESHOLD) {
+-			insn->op_str[0] = (char)('0' + target);
+-		} else {
+-			char digits[16];
+-			char *end = digits + sizeof(digits);
+-			char *p = end;
+-			uint64_t value = target;
+-			do {
+-				*--p = "0123456789abcdef"[value & 15];
+-				value >>= 4;
+-			} while (value);
+-			insn->op_str[0] = '0';
+-			insn->op_str[1] = 'x';
+-			memcpy(insn->op_str + 2, p, (size_t)(end - p));
+-		}
++		writeUnsignedImmediate(insn->op_str, target);
+ 		memcpy(insn->bytes, code, length);
+ 		*insn_size = insn->size = length;
+ 	} else {

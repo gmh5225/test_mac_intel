@@ -1,7 +1,7 @@
-name: Compare ordered read and write register lists on libraries
+name: Compare direct formatted operands on libraries
 on:
   push:
-    branches: [codex/capstone-ordered-registers-libraries]
+    branches: [codex/capstone-direct-output-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: c92f6f103e0123790f574c05a2a57f7203e7a461
+          ref: 706eab8fec07688db644fe64c9d82600592134f8
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ordered-registers-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: formatted-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
