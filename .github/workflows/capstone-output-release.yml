@@ -1,7 +1,7 @@
-name: Verify isolated x86 vector and scalar output against current Capstone next on profiles
+name: Retest complete vector and scalar output with the published scanner on profiles
 on:
   push:
-    branches: [codex/capstone-isolated-vector-profiles]
+    branches: [codex/capstone-vector-output-only-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-vector-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vector-output-only-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
