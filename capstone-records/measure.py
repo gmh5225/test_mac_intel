@@ -38,16 +38,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':
-    run(['cmake','--build',b,'--target','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
-    run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
+    run(['cmake','--build',b,'--target','api','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
+    run(['ctest','--test-dir',b,'-R','^unit_(api|arm_post_index|mips_scan)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   active=cc=='gcc' and platform.machine()=='x86_64'
-   expected={'arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
+   active=True
+   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
