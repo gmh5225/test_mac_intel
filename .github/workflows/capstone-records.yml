@@ -1,7 +1,7 @@
-name: Compare complete ARM operand default construction on native mixed and ARM-only targets
+name: Compare mixed GCC scan across PuTTY32, PuTTY64, ARM, AArch64 and MIPS executables
 on:
   push:
-    branches: [codex/capstone-complete-arm-operand-defaults]
+    branches: [codex/capstone-gnu-mixed-scan-executables]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,18 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, archs: arm }
-          - { host: macos-15, cc: clang, archs: four }
-          - { host: macos-15-intel, cc: clang, archs: arm }
-          - { host: macos-15-intel, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: arm }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: arm }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: arm }
           - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: arm }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
+          - { host: ubuntu-22.04, cc: gcc, archs: four }
+          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -36,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
+          ref: ea3443bd943f583b65005dc1af9fae94850b6de7
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -46,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-operand-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gnu-mixed-scan-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
