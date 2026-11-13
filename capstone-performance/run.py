@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 706eab8fec07688db644fe64c9d82600592134f8',candidate='public VEX entries with validated memory and register forms'))
+    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='validated dedicated GCC AArch64 VEX memory and register scan'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==(['arch/X86/X86DisassemblerDecoder.c.o'] if PROFILE=='gcc' else []),diffs
+    assert diffs==(['arch/X86/X86DisassemblerDecoder.c.o'] if PROFILE=='gcc' and platform.machine()=='aarch64' else []),diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
@@ -238,7 +238,7 @@ panic = "abort"
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'vector-scan.cpp','-ldl','-o',WORK/'vector-scan'],'build-vector-scan')
     command([WORK/'vector-scan',libraries['base'],libraries['new']],'verify-vector-scan')
     command(['clang++','-O2','-std=c++17','-I',base/'include',SOURCE/'verify-vex.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',WORK/'verify-vex'],'build-verify-vex')
-    command([WORK/'verify-vex',libraries['base'],libraries['new'],'full' if PROFILE=='gcc' else 'quick'],'verify-vex')
+    command([WORK/'verify-vex',libraries['base'],libraries['new'],'full' if PROFILE=='gcc' and platform.machine()=='aarch64' else 'quick'],'verify-vex')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
