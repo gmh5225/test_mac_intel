@@ -22,11 +22,11 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='a06235189645d7e20660af04d52f71005301e760'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='443006768b6518e28ba3fd10baacfbd7e4ba4914'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
-    opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if os.name=='nt':
         opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if compiler=='MT' else 'OFF')]
     else:
@@ -37,9 +37,9 @@ try:
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','x86_evex_reserved_fields','x86_memory_scale','mips_scan','detail_option']
     if profile=='adapter':units+=['x86_scan_adapter']
-    if profile=='four':units+=['arm_post_index']
+    if profile not in ('diet','reduced'):units+=['arm_post_index']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
-    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'tests')
+    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
