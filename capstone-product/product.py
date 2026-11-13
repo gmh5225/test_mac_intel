@@ -51,6 +51,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
+  command(['git','apply',r/'ptr64.patch'],'repair-sc64-for-both',cs)
   for label in ('base','candidate'):
    ref=expected['capstone']
    assert rev(cs)==ref

@@ -1,7 +1,7 @@
-name: Verify the fork-source NeverD product on A32 immediate branches and data processing plus AArch64 register output
+name: Compare corrected SC operands in the four-backend NeverD decoder with the current fork LLVM sources
 on:
   push:
-    branches: [codex/neverd-production-a32-immediate]
+    branches: [codex/neverd-fork-source-mips-sc64]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: immediate-production
+          name: repaired-four-backend
           path: product-evidence/
           retention-days: 14
