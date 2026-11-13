@@ -1,7 +1,7 @@
-name: Verify packed SSE move output on GCC, Clang and Windows release profiles
+name: Validate EVEX operand scans and packed SSE output in twelve supported configurations
 on:
   push:
-    branches: [codex/capstone-sse-memory-output-profiles]
+    branches: [codex/capstone-single-pass-evex-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -44,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-move-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: validated-single-pass-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

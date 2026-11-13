@@ -1,0 +1,780 @@
+diff --git a/tests/unit/x86_amx_compute.c b/tests/unit/x86_amx_compute.c
+index 282ff027..20248a20 100644
+--- a/tests/unit/x86_amx_compute.c
++++ b/tests/unit/x86_amx_compute.c
+@@ -199,11 +199,13 @@ int main(void)
+ 	}
+ 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+ 		success &= test_case(handle64, &cases[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle64, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+ 		success &= test_case(handle64, &cases[i], true);
++#endif
+ 	success &= rejects(handle64, truncated, sizeof(truncated),
+ 			   "truncated compute encoding is rejected");
+ 	success &= is_not_amx_compute(handle64, bad_map, sizeof(bad_map),
+@@ -213,7 +215,11 @@ int main(void)
+ 	{
+ 		compute_case x_case = { { 0 }, X86_INS_TDPBSSD, "tdpbssd" };
+ 		memcpy(x_case.code, x_ignored, sizeof(x_case.code));
++#ifdef CAPSTONE_X86_ATT_DISABLE
++		success &= test_case(handle64, &x_case, false);
++#else
+ 		success &= test_case(handle64, &x_case, true);
++#endif
+ 	}
+ 	success &= rejects(handle64, bad_b, sizeof(bad_b),
+ 			   "extended source is rejected");
+diff --git a/tests/unit/x86_amx_fp8_tf32.c b/tests/unit/x86_amx_fp8_tf32.c
+index 07ad0685..e2569243 100644
+--- a/tests/unit/x86_amx_fp8_tf32.c
++++ b/tests/unit/x86_amx_fp8_tf32.c
+@@ -243,11 +243,13 @@ int main(void)
+ 
+ 	for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
+ 		success &= test_case(handle, &test_cases[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
+ 		success &= test_case(handle, &test_cases[i], true);
++#endif
+ 	for (i = 0; i < sizeof(invalid_cases) / sizeof(invalid_cases[0]); ++i)
+ 		success &= rejects(handle, &invalid_cases[i]);
+ 
+diff --git a/tests/unit/x86_amx_tile_state.c b/tests/unit/x86_amx_tile_state.c
+index f4d270e9..1db7377c 100644
+--- a/tests/unit/x86_amx_tile_state.c
++++ b/tests/unit/x86_amx_tile_state.c
+@@ -205,6 +205,10 @@ static bool test_case(csh handle, const amx_case *test)
+ 
+ static bool test_att_syntax(csh handle)
+ {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
+ 	static const uint8_t load[] = { 0xc4, 0x82, 0x79, 0x4b, 0x14, 0x6c };
+ 	static const uint8_t store[] = { 0xc4, 0x82, 0x7a, 0x4b, 0x3c, 0xbe };
+ 	cs_insn *insn = NULL;
+@@ -259,6 +263,7 @@ static bool test_att_syntax(csh handle)
+ 				 CS_ERR_OK,
+ 			 "restore Intel syntax");
+ 	return success;
++#endif
+ }
+ 
+ static bool expect_invalid(csh handle, const uint8_t *code, size_t code_size,
+diff --git a/tests/unit/x86_apx_cmov.c b/tests/unit/x86_apx_cmov.c
+index 0ae7aa50..23f9b8a3 100644
+--- a/tests/unit/x86_apx_cmov.c
++++ b/tests/unit/x86_apx_cmov.c
+@@ -559,7 +559,12 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (cc = 0; cc < 16; ++cc) {
+ 		for (nd = 0; nd < 2; ++nd) {
+@@ -572,17 +577,25 @@ int main(void)
+ 								intel, false, cc, nd != 0,
+ 								nf != 0, w != 0, pp,
+ 								number);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 							success &= check_register_case(
+ 								att, true, cc, nd != 0,
+ 								nf != 0, w != 0, pp,
+ 								number);
++#endif
+ 						}
+ 						success &= check_memory_case(
+ 							intel, false, false, nd != 0,
+ 							nf != 0, w != 0, pp, cc);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 						success &= check_memory_case(
+ 							att, true, true, nd != 0,
+ 							nf != 0, w != 0, pp, cc);
++#else
++						success &= check_memory_case(
++							intel, false, true, nd != 0,
++							nf != 0, w != 0, pp, cc);
++#endif
+ 					}
+ 				}
+ 			}
+diff --git a/tests/unit/x86_apx_evex_adx.c b/tests/unit/x86_apx_evex_adx.c
+index b8d57c77..f6332bec 100644
+--- a/tests/unit/x86_apx_evex_adx.c
++++ b/tests/unit/x86_apx_evex_adx.c
+@@ -82,6 +82,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	ok &= ck(dec(h, cx, 6, &i), "AT&T");
+ 	if (i) {
+@@ -90,6 +91,7 @@ int main(void)
+ 			 "AT&T text");
+ 		cs_free(i, 1);
+ 	}
++#endif
+ 	cs_close(&h);
+ 	return ok ? 0 : 1;
+ }
+diff --git a/tests/unit/x86_apx_evex_alu.c b/tests/unit/x86_apx_evex_alu.c
+index 3be65efe..c93e302c 100644
+--- a/tests/unit/x86_apx_evex_alu.c
++++ b/tests/unit/x86_apx_evex_alu.c
+@@ -273,9 +273,10 @@ static bool check_case(csh handle, const alu_operation *operation,
+ 			"destination and optional EFLAGS writes are exact");
+ 	}
+ 
+-	cs_free(insn, count);
+-	if (success)
++	if (success) {
++		cs_free(insn, count);
+ 		return true;
++	}
+ failed:
+ 	fprintf(stderr,
+ 		"case: op=%s width=%u reverse=%u nd=%u nf=%u seed=%u syntax=%s\n",
+@@ -641,6 +642,7 @@ int main(void)
+ 	success &= run_matrix(handle, operations,
+ 			      sizeof(operations) / sizeof(operations[0]),
+ 			      false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	if (success) {
+ 		success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 					   CS_OPT_SYNTAX_ATT) == CS_ERR_OK,
+@@ -649,6 +651,10 @@ int main(void)
+ 			handle, operations,
+ 			sizeof(operations) / sizeof(operations[0]), true);
+ 	}
++#else
++	success &= cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#endif
+ 	if (success) {
+ 		success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 					   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,
+diff --git a/tests/unit/x86_apx_evex_arithmetic.c b/tests/unit/x86_apx_evex_arithmetic.c
+index 81db7f66..c1549ba0 100644
+--- a/tests/unit/x86_apx_evex_arithmetic.c
++++ b/tests/unit/x86_apx_evex_arithmetic.c
+@@ -1077,7 +1077,9 @@ static bool test_encoding_anchors(csh handle)
+ 			 "immediate encoding matches current XED");
+ 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
+ 		success &= check_anchor(handle, &anchors[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		success &= check_anchor(handle, &anchors[i], true);
++#endif
+ 		if (!success)
+ 			return false;
+ 	}
+@@ -1255,7 +1257,9 @@ int main(void)
+ 		return 1;
+ 	}
+ 	success &= run_matrix(handle, false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= run_matrix(handle, true);
++#endif
+ 	success &= test_encoding_anchors(handle);
+ 	success &= test_invalid_encodings(handle);
+ 	encode_binary_register(wrong_mode_code, ADC_OPERATION, 4, false, false,
+diff --git a/tests/unit/x86_apx_evex_bmi_ternary.c b/tests/unit/x86_apx_evex_bmi_ternary.c
+index 7cb3c07f..4d1b3afc 100644
+--- a/tests/unit/x86_apx_evex_bmi_ternary.c
++++ b/tests/unit/x86_apx_evex_bmi_ternary.c
+@@ -79,6 +79,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	{
+ 		uint8_t c[] = { 0x62, 0xea, 0xf4, 0, 0xf2, 0xd3 };
+@@ -89,6 +90,7 @@ int main(void)
+ 			cs_free(i, 1);
+ 		}
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX BMI ternary failure\n");
+diff --git a/tests/unit/x86_apx_evex_ccmp.c b/tests/unit/x86_apx_evex_ccmp.c
+index 5270bbe6..80815387 100644
+--- a/tests/unit/x86_apx_evex_ccmp.c
++++ b/tests/unit/x86_apx_evex_ccmp.c
+@@ -32,9 +32,11 @@ int main(void)
+         X86_INS_CCMPO+k,names[k],"{dfv=sf,cf} r17d, r26d"); }
+     b[2]=0xac; b[3]=2;
+     ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpb","{dfv=sf,cf} r17, r26");
++#ifndef CAPSTONE_X86_ATT_DISABLE
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
+     ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpbq","{dfv=sf,cf} %r26, %r17");
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
+     { const uint8_t m[]={0x62,0x6c,0x2c,0x02,0x39,0x11};
+       ok &= check(h,m,sizeof(m),X86_INS_CCMPB,"ccmpb",
+                   "{dfv=sf,cf} dword ptr [r17], r26d"); }
+diff --git a/tests/unit/x86_apx_evex_convert.c b/tests/unit/x86_apx_evex_convert.c
+index 4cd15f5a..f72020c3 100644
+--- a/tests/unit/x86_apx_evex_convert.c
++++ b/tests/unit/x86_apx_evex_convert.c
+@@ -64,10 +64,12 @@ int main(void) {
+     ok &= one(h, mw, sizeof(mw), X86_INS_MOVBE, "movbe", "r18, r19");
+     ok &= one(h, cw66, sizeof(cw66), X86_INS_CRC32, "crc32", "r18, r19");
+   }
++#ifndef CAPSTONE_X86_ATT_DISABLE
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+   ok &= one(h, cq, sizeof(cq), X86_INS_CRC32, "crc32q",
+             "%fs:0x20(%r29,%r14,4), %r26");
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+   for (unsigned k = 0; k < 4; k++) {
+     bad[3] = (uint8_t[]){0x00, 0x0c, 0x18, 0x28}[k];
+     if (cs_disasm(h, bad, sizeof(bad), 0, 1, &i)) {
+diff --git a/tests/unit/x86_apx_evex_count.c b/tests/unit/x86_apx_evex_count.c
+index c64efe61..8dee267f 100644
+--- a/tests/unit/x86_apx_evex_count.c
++++ b/tests/unit/x86_apx_evex_count.c
+@@ -210,7 +210,6 @@ static bool check_16_bit_text_and_size(csh handle)
+ 		uint8_t reg[] = { 0x62, 0xec, 0x7d, 0x08, form->opcode, 0xd3 };
+ 		uint8_t memory[] = { 0x64, 0x62, 0x8c, 0x79, 0x08,
+ 				     form->opcode, 0x54, 0xa5, 0x20 };
+-		char att_mnemonic[16];
+ 		size_t count;
+ 
+ 		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+@@ -242,6 +241,8 @@ static bool check_16_bit_text_and_size(csh handle)
+ 			instruction = NULL;
+ 		}
+ 
++#ifndef CAPSTONE_X86_ATT_DISABLE
++		char att_mnemonic[16];
+ 		snprintf(att_mnemonic, sizeof(att_mnemonic), "%sw",
+ 			 form->mnemonic);
+ 		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+@@ -271,6 +272,7 @@ static bool check_16_bit_text_and_size(csh handle)
+ 			cs_free(instruction, count);
+ 			instruction = NULL;
+ 		}
++#endif
+ 	}
+ 	return ok;
+ }
+diff --git a/tests/unit/x86_apx_evex_ctest.c b/tests/unit/x86_apx_evex_ctest.c
+index 02e9329b..3309dede 100644
+--- a/tests/unit/x86_apx_evex_ctest.c
++++ b/tests/unit/x86_apx_evex_ctest.c
+@@ -48,9 +48,11 @@ int main(void)
+       ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
+       q[5]=0xc9;ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
+       q[5]=0xd1;if(cs_disasm(h,q,7,0,1,&i)){ok=false;cs_free(i,1);}}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
+     ok&=check(h,b,6,X86_INS_CTESTB,"ctestbq","{dfv=sf,cf} %r26, %r17");
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
+     /* W overrides 66, byte forms ignore W, and byte immediates are
+      * zero-extended as for TEST. */
+     b[2]=0xad;ok&=check(h,b,6,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17, r26");
+diff --git a/tests/unit/x86_apx_evex_direct_store.c b/tests/unit/x86_apx_evex_direct_store.c
+index 7bd41371..e4b31fe2 100644
+--- a/tests/unit/x86_apx_evex_direct_store.c
++++ b/tests/unit/x86_apx_evex_direct_store.c
+@@ -3,4 +3,8 @@
+ #include <stdio.h>
+ #include <string.h>
+ static bool ck(csh h,const uint8_t*b,unsigned id,const char*m,const char*o){cs_insn*i=NULL;bool ok=cs_disasm(h,b,9,0,1,&i)==1;if(ok){const cs_x86*x=&i->detail->x86;bool ac=(x->operands[0].type==X86_OP_MEM&&x->operands[0].access==CS_AC_WRITE&&x->operands[1].access==CS_AC_READ)||(x->operands[1].type==X86_OP_MEM&&x->operands[1].access==CS_AC_WRITE&&x->operands[0].access==CS_AC_READ);ok=i->id==id&&!strcmp(i->mnemonic,m)&&!strcmp(i->op_str,o)&&x->op_count==2&&ac&&x->eflags==0;}if(i)cs_free(i,1);return ok;}
+-int main(void){const uint8_t c[][9]={{0x64,0x62,0x0c,0xfc,8,0xf9,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7c,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfc,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7d,8,0x65,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfd,8,0x65,0x54,0xb5,0x20}};const unsigned ids[]={X86_INS_MOVDIRI,X86_INS_WRSSD,X86_INS_WRSSQ,X86_INS_WRUSSD,X86_INS_WRUSSQ};const char*mn[]={"movdiri","wrssd","wrssq","wrussd","wrussq"};const char*op[]={"qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26"};csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);for(unsigned k=0;k<5;k++)ok&=ck(h,c[k],ids[k],mn[k],op[k]);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,c[0],X86_INS_MOVDIRI,"movdiriq","%r26, %fs:0x20(%r29,%r14,4)");cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);uint8_t bad[9];memcpy(bad,c[0],9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}memcpy(bad,c[1],9);bad[5]=0x66;bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX direct store failure\n");return ok?0:1;}
++int main(void){const uint8_t c[][9]={{0x64,0x62,0x0c,0xfc,8,0xf9,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7c,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfc,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7d,8,0x65,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfd,8,0x65,0x54,0xb5,0x20}};const unsigned ids[]={X86_INS_MOVDIRI,X86_INS_WRSSD,X86_INS_WRSSQ,X86_INS_WRUSSD,X86_INS_WRUSSQ};const char*mn[]={"movdiri","wrssd","wrssq","wrussd","wrussq"};const char*op[]={"qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26"};csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);for(unsigned k=0;k<5;k++)ok&=ck(h,c[k],ids[k],mn[k],op[k]);
++#ifndef CAPSTONE_X86_ATT_DISABLE
++	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,c[0],X86_INS_MOVDIRI,"movdiriq","%r26, %fs:0x20(%r29,%r14,4)");cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
++uint8_t bad[9];memcpy(bad,c[0],9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}memcpy(bad,c[1],9);bad[5]=0x66;bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX direct store failure\n");return ok?0:1;}
+diff --git a/tests/unit/x86_apx_evex_double_shift.c b/tests/unit/x86_apx_evex_double_shift.c
+index 7b8e6832..d90a09fa 100644
+--- a/tests/unit/x86_apx_evex_double_shift.c
++++ b/tests/unit/x86_apx_evex_double_shift.c
+@@ -28,7 +28,9 @@ int main(void)
+ 	{const uint8_t w66[]={0x62,0xf4,0xfd,0x10,0xa5,0xc1};const uint8_t hex[]={0x62,0xf4,0xfd,0x08,0x24,0xc1,0xbf};
+ 	ok&=ck(h,w66,sizeof(w66),X86_INS_SHLD,"shld","r16, rcx, rax, cl",4,false);
+ 	ok&=ck(h,hex,sizeof(hex),X86_INS_SHLD,"shld","rcx, rax, 0xbf",3,false);}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,e,sizeof(e),X86_INS_SHRD,"{nf} shrdq","%cl, %r26, %fs:0x20(%r29,%r14,4), %r17",4,true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
+ 	for(unsigned k=0;k<4;k++){bad[3]=(uint8_t[]){0x09,0x28,0x48,0x88}[k];if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}
+ 	bad[2]=0x7e;bad[3]=8;if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX double shift failure\n");return ok?0:1;
+ }
+diff --git a/tests/unit/x86_apx_evex_enqueue.c b/tests/unit/x86_apx_evex_enqueue.c
+index a263c442..b6a7b1cb 100644
+--- a/tests/unit/x86_apx_evex_enqueue.c
++++ b/tests/unit/x86_apx_evex_enqueue.c
+@@ -3,4 +3,8 @@
+ #include <stdio.h>
+ #include <string.h>
+ static bool ck(csh h,const uint8_t*b,unsigned id,const char*m,const char*o,bool flags){cs_insn*i=NULL;bool ok=cs_disasm(h,b,9,0,1,&i)==1;if(ok){const cs_x86*x=&i->detail->x86;const cs_x86_op*mem=x->operands[0].type==X86_OP_MEM?&x->operands[0]:&x->operands[1];const cs_x86_op*reg=x->operands[0].type==X86_OP_REG?&x->operands[0]:&x->operands[1];ok=i->id==id&&!strcmp(i->mnemonic,m)&&!strcmp(i->op_str,o)&&x->op_count==2&&mem->size==64&&mem->access==CS_AC_READ&&reg->size==8&&reg->access==CS_AC_READ&&(flags?x->eflags!=0:x->eflags==0);}if(i)cs_free(i,1);return ok;}
+-int main(void){const uint8_t a[]={0x64,0x62,0x0c,0x7f,8,0xf8,0x54,0xb5,0x20},b[]={0x64,0x62,0x0c,0x7e,8,0xf8,0x54,0xb5,0x20},c[]={0x64,0x62,0x0c,0x7d,8,0xf8,0x54,0xb5,0x20};uint8_t bad[9];csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,b,X86_INS_ENQCMDS,"enqcmds","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,c,X86_INS_MOVDIR64B,"movdir64b","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",false);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","%fs:0x20(%r29,%r14,4), %r26",true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);memcpy(bad,a,9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}/* The register form of the F2 opcode is URDMSR. */memcpy(bad,a,9);bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)!=1)ok=false;else{ok&=i->id==X86_INS_URDMSR&&i->size==7&&!strcmp(i->op_str,"r27, r26");cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX enqueue failure\n");return ok?0:1;}
++int main(void){const uint8_t a[]={0x64,0x62,0x0c,0x7f,8,0xf8,0x54,0xb5,0x20},b[]={0x64,0x62,0x0c,0x7e,8,0xf8,0x54,0xb5,0x20},c[]={0x64,0x62,0x0c,0x7d,8,0xf8,0x54,0xb5,0x20};uint8_t bad[9];csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,b,X86_INS_ENQCMDS,"enqcmds","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,c,X86_INS_MOVDIR64B,"movdir64b","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
++	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","%fs:0x20(%r29,%r14,4), %r26",true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
++memcpy(bad,a,9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}/* The register form of the F2 opcode is URDMSR. */memcpy(bad,a,9);bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)!=1)ok=false;else{ok&=i->id==X86_INS_URDMSR&&i->size==7&&!strcmp(i->op_str,"r27, r26");cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX enqueue failure\n");return ok?0:1;}
+diff --git a/tests/unit/x86_apx_evex_existing_gpr.c b/tests/unit/x86_apx_evex_existing_gpr.c
+index 780fb1a0..3dadd3c2 100644
+--- a/tests/unit/x86_apx_evex_existing_gpr.c
++++ b/tests/unit/x86_apx_evex_existing_gpr.c
+@@ -249,6 +249,7 @@ int main(void)
+ 		"zmm1 {k2}, zmmword ptr [r29 + zmm30*4]", X86_REG_R29,
+ 		X86_REG_ZMM30, 4, 0);
+ 
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "setup", "select AT&T syntax");
+@@ -258,7 +259,7 @@ int main(void)
+ 		"0x40(%r29, %r30, 4), %zmm1 {%k3} {z}", X86_REG_R29,
+ 		X86_REG_R30, 4, 0x40);
+ 	success &= check_gpr_source(handle, true);
+-
++#endif
+ 	success &= rejects_outside_64_bit(gpr_source, sizeof(gpr_source));
+ 	cs_close(&handle);
+ 	return success ? 0 : 1;
+diff --git a/tests/unit/x86_apx_evex_imul.c b/tests/unit/x86_apx_evex_imul.c
+index ec0a96c5..c4e59004 100644
+--- a/tests/unit/x86_apx_evex_imul.c
++++ b/tests/unit/x86_apx_evex_imul.c
+@@ -545,7 +545,9 @@ static bool test_encoding_anchors(csh handle)
+ 			 "64-bit NDD+NF IMUL encoding matches current XED");
+ 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
+ 		success &= check_anchor(handle, &anchors[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		success &= check_anchor(handle, &anchors[i], true);
++#endif
+ 		if (!success)
+ 			return false;
+ 	}
+@@ -787,6 +789,7 @@ static bool test_immediate_and_one_operand_forms(csh handle)
+ 		insn = NULL;
+ 	}
+ 
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax for extended IMUL forms");
+@@ -797,6 +800,7 @@ static bool test_immediate_and_one_operand_forms(csh handle)
+ 	success &= decodes_as(handle, imul_f7_nf, sizeof(imul_f7_nf),
+ 			      X86_INS_IMUL, "{nf} imulq", "%r19",
+ 			      "IMUL F7 AT&T form is exact");
++#endif
+ 	memcpy(invalid, imul6b_zu_nf, sizeof(imul6b_zu_nf));
+ 	invalid[2] ^= 0x08;
+ 	success &= rejects(handle, invalid, sizeof(imul6b_zu_nf),
+@@ -915,7 +919,9 @@ int main(void)
+ 	}
+ 	success &= test_encoding_anchors(handle);
+ 	success &= run_matrix(handle, false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= run_matrix(handle, true);
++#endif
+ 	success &= test_legal_variants(handle);
+ 	success &= test_immediate_and_one_operand_forms(handle);
+ 	success &= test_invalid_encodings(handle);
+diff --git a/tests/unit/x86_apx_evex_invalidate.c b/tests/unit/x86_apx_evex_invalidate.c
+index ffc78ade..e0730161 100644
+--- a/tests/unit/x86_apx_evex_invalidate.c
++++ b/tests/unit/x86_apx_evex_invalidate.c
+@@ -45,9 +45,11 @@ int main(void) {
+     const uint8_t a[] = {0x64, 0x67, 0x62, 0xec, 0x7a, 8, 0xf2, 0x11};
+     ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid",
+              "r18, xmmword ptr fs:[r17d]");
++#ifndef CAPSTONE_X86_ATT_DISABLE
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+     ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid", "%fs:(%r17d), %r18");
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+   }
+   {
+     uint8_t x[] = {0x62, 0xec, 0x7e, 8, 0xf0, 0xd1};
+diff --git a/tests/unit/x86_apx_evex_movrs.c b/tests/unit/x86_apx_evex_movrs.c
+index 27681272..49a45dca 100644
+--- a/tests/unit/x86_apx_evex_movrs.c
++++ b/tests/unit/x86_apx_evex_movrs.c
+@@ -47,9 +47,11 @@ int main(void) {
+            "r26d, dword ptr fs:[r29 + r28*4 + 0x20]", X86_REG_R26D, 4);
+   ok &= ck(h, x4a32, sizeof(x4a32), "movrs",
+            "r26d, dword ptr fs:[r29d + r28d*4 + 0x20]", X86_REG_R26D, 4);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+   ok &= ck(h, b64, sizeof(b64), "movrsq", "%fs:(%r17d), %r18", X86_REG_R18, 8);
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+   /* W selects 64-bit operands over 66, as in XED; the byte form is W0. */
+   {
+     const uint8_t w66[] = {0x62, 0xec, 0xfd, 8, 0x8b, 0x11};
+diff --git a/tests/unit/x86_apx_evex_msr.c b/tests/unit/x86_apx_evex_msr.c
+index d54ef441..946ee8df 100644
+--- a/tests/unit/x86_apx_evex_msr.c
++++ b/tests/unit/x86_apx_evex_msr.c
+@@ -130,6 +130,10 @@ static bool check_implicit_msr(void)
+ 			return false;
+ 		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+ 		for (syntax = 0; syntax < 2; ++syntax) {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++			if (syntax)
++				break;
++#endif
+ 			cs_option(handle, CS_OPT_SYNTAX,
+ 				  syntax ? CS_OPT_SYNTAX_ATT :
+ 					   CS_OPT_SYNTAX_INTEL);
+@@ -377,6 +381,10 @@ int main(void)
+ 		return 1;
+ 	ok = cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
+ 	for (syntax = 0; syntax < 2; ++syntax) {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++		if (syntax)
++			break;
++#endif
+ 		ok &= cs_option(handle, CS_OPT_SYNTAX,
+ 				syntax ? CS_OPT_SYNTAX_ATT :
+ 					 CS_OPT_SYNTAX_INTEL) == CS_ERR_OK;
+diff --git a/tests/unit/x86_apx_evex_mul_div.c b/tests/unit/x86_apx_evex_mul_div.c
+index 51044169..8f7ec059 100644
+--- a/tests/unit/x86_apx_evex_mul_div.c
++++ b/tests/unit/x86_apx_evex_mul_div.c
+@@ -36,6 +36,7 @@ int main(void)
+ 				i = NULL;
+ 			}
+ 		}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	{
+ 		uint8_t c[] = { 0x62, 0xec, 0xfd, 8, 0xf7, 0xf3 };
+@@ -46,6 +47,7 @@ int main(void)
+ 			cs_free(i, 1);
+ 		}
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX MUL/DIV focused failure\n");
+diff --git a/tests/unit/x86_apx_evex_rao.c b/tests/unit/x86_apx_evex_rao.c
+index 442c2278..07f01457 100644
+--- a/tests/unit/x86_apx_evex_rao.c
++++ b/tests/unit/x86_apx_evex_rao.c
+@@ -81,12 +81,13 @@ int main(void)
+ 	}
+ 
+ 	code[3] = 0xff;
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	ok &= check_case(handle, code, sizeof(code), X86_INS_AOR, "aorq",
+ 			 "%r26, %fs:0x20(%r29,%r14,4)", X86_REG_R29,
+ 			 X86_REG_R14, 8);
+ 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+-
++#endif
+ 	code[3] = 0x78;
+ 	code[7] = 0xa5;
+ 	ok &= check_case(handle, code, sizeof(code), X86_INS_AADD, "aadd",
+diff --git a/tests/unit/x86_apx_evex_shift_rotate.c b/tests/unit/x86_apx_evex_shift_rotate.c
+index ac6e44c1..0e49a6ff 100644
+--- a/tests/unit/x86_apx_evex_shift_rotate.c
++++ b/tests/unit/x86_apx_evex_shift_rotate.c
+@@ -772,7 +772,9 @@ static bool test_encoding_anchors(csh handle)
+ 		      "memory SHR encoding matches current XED");
+ 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
+ 		success &= check_anchor(handle, &anchors[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		success &= check_anchor(handle, &anchors[i], true);
++#endif
+ 		if (!success)
+ 			return false;
+ 	}
+@@ -1017,7 +1019,9 @@ int main(void)
+ 	}
+ 	success &= test_encoding_anchors(handle);
+ 	success &= run_matrix(handle, false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= run_matrix(handle, true);
++#endif
+ 	success &= test_legal_variants(handle);
+ 	success &= test_invalid_encodings(handle);
+ 	cs_close(&handle);
+diff --git a/tests/unit/x86_apx_evex_unary.c b/tests/unit/x86_apx_evex_unary.c
+index 6e6f3c2f..b5348896 100644
+--- a/tests/unit/x86_apx_evex_unary.c
++++ b/tests/unit/x86_apx_evex_unary.c
+@@ -64,6 +64,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	b[4] = 0xf7;
+ 	b[5] = 0xdb;
+@@ -74,6 +75,7 @@ int main(void)
+ 		      !strcmp(i->op_str, "%r19, %r17");
+ 		cs_free(i, 1);
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX unary focused failure\n");
+diff --git a/tests/unit/x86_apx_evex_vector_gpr.c b/tests/unit/x86_apx_evex_vector_gpr.c
+index 059315be..0b03e901 100644
+--- a/tests/unit/x86_apx_evex_vector_gpr.c
++++ b/tests/unit/x86_apx_evex_vector_gpr.c
+@@ -216,8 +216,12 @@ int main(void)
+ 		for (index = 0; index < sizeof(cases) / sizeof(cases[0]);
+ 		     ++index)
+ 			success &= check_case(handle, &cases[index], att_syntax);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++		break;
++#else
+ 		if (att_syntax)
+ 			break;
++#endif
+ 	}
+ 
+ 	success &= rejects(handle, zero_without_mask, CS_MODE_64,
+diff --git a/tests/unit/x86_apx_push2_pop2.c b/tests/unit/x86_apx_push2_pop2.c
+index ab252b2d..5463c1f0 100644
+--- a/tests/unit/x86_apx_push2_pop2.c
++++ b/tests/unit/x86_apx_push2_pop2.c
+@@ -179,14 +179,21 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (push_index = 0; push_index < 2; ++push_index) {
+ 		for (ppx_index = 0; ppx_index < 2; ++ppx_index) {
+ 			success &= check_case(intel, false, push_index != 0,
+ 					      ppx_index != 0, 29, 20);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 			success &= check_case(att, true, push_index != 0,
+ 					      ppx_index != 0, 29, 20);
++#endif
+ 		}
+ 	}
+ 
+diff --git a/tests/unit/x86_apx_rex2.c b/tests/unit/x86_apx_rex2.c
+index fc025de0..67f19e92 100644
+--- a/tests/unit/x86_apx_rex2.c
++++ b/tests/unit/x86_apx_rex2.c
+@@ -190,6 +190,10 @@ static bool test_register_names(csh handle)
+ 
+ static bool test_att_detail_order(csh handle)
+ {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
+ 	static const uint8_t addq[] = { 0xd5, 0x5d, 0x01, 0xc7 };
+ 	cs_insn *insn = NULL;
+ 	bool success = true;
+@@ -253,6 +257,7 @@ static bool test_att_detail_order(csh handle)
+ 				 CS_ERR_OK,
+ 			 "restore Intel syntax");
+ 	return success;
++#endif
+ }
+ 
+ /* mov dword ptr [r16], eax: REX2.B4 extends the ModR/M base. */
+diff --git a/tests/unit/x86_apx_rex2_alu.c b/tests/unit/x86_apx_rex2_alu.c
+index e67bcdd1..c5982221 100644
+--- a/tests/unit/x86_apx_rex2_alu.c
++++ b/tests/unit/x86_apx_rex2_alu.c
+@@ -337,6 +337,7 @@ static bool test_fixed_forms(csh handle, uint64_t add_eflags)
+ 	return success;
+ }
+ 
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
+ 			  const char *mnemonic, const char *op_str,
+ 			  x86_reg first_reg, uint8_t first_access,
+@@ -370,9 +371,14 @@ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
+ 	cs_free(insn, count);
+ 	return success;
+ }
++#endif
+ 
+ static bool test_att_syntax(csh handle)
+ {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
+ 	static const uint8_t reverse_subq[] = { 0xd5, 0x5d, 0x2b, 0xc7 };
+ 	static const uint8_t reverse_cmpb[] = { 0xd5, 0x55, 0x3a, 0xc7 };
+ 	static const uint8_t testw[] = { 0x66, 0xd5, 0x55, 0x85, 0xc7 };
+@@ -398,6 +404,7 @@ static bool test_att_syntax(csh handle)
+ 				 CS_ERR_OK,
+ 			 "restore Intel syntax");
+ 	return success;
++#endif
+ }
+ 
+ static bool test_invalid(csh handle, const uint8_t *code, size_t code_size,
+diff --git a/tests/unit/x86_apx_rex2_push_pop.c b/tests/unit/x86_apx_rex2_push_pop.c
+index 05f8e28b..20b99c0c 100644
+--- a/tests/unit/x86_apx_rex2_push_pop.c
++++ b/tests/unit/x86_apx_rex2_push_pop.c
+@@ -176,15 +176,22 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (push = 0; push < 2; ++push) {
+ 		for (hint = 0; hint < 2; ++hint) {
+ 			for (number = 0; number < 32; ++number) {
+ 				success &= check_case(intel, false, push != 0,
+ 						      hint != 0, false, number);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 				success &= check_case(att, true, push != 0,
+ 						      hint != 0, false, number);
++#endif
+ 			}
+ 		}
+ 		for (number = 0; number < 32; ++number) {
+diff --git a/tests/unit/x86_apx_setcc.c b/tests/unit/x86_apx_setcc.c
+index f415cd8d..241fbf74 100644
+--- a/tests/unit/x86_apx_setcc.c
++++ b/tests/unit/x86_apx_setcc.c
+@@ -316,7 +316,12 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (cc = 0; cc < 16; ++cc) {
+ 		for (zu = 0; zu < 2; ++zu) {
+@@ -325,18 +330,24 @@ int main(void)
+ 					success &= check_register_case(
+ 						intel, false, cc, zu != 0, w != 0,
+ 						number);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 					success &= check_register_case(
+ 						att, true, cc, zu != 0, w != 0,
+ 						number);
++#endif
+ 				}
+ 			}
+ 		}
+ 	}
+ 	success &= check_memory_case(intel, false, false, false);
+ 	success &= check_memory_case(intel, false, false, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check_memory_case(att, true, false, true);
++#endif
+ 	success &= check_memory_case(intel, false, true, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check_memory_case(att, true, true, true);
++#endif
+ 	success &= check_addr32_displacement_forms(intel);
+ 
+ 	encode_register(invalid, 5, true, false, 29);
+diff --git a/tests/unit/x86_evex_detail.c b/tests/unit/x86_evex_detail.c
+index 28c23faa..ebe6293c 100644
+--- a/tests/unit/x86_evex_detail.c
++++ b/tests/unit/x86_evex_detail.c
+@@ -206,10 +206,12 @@ int main(void)
+ 	}
+ 
+ 	success &= test_broadcast(handle);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	success &= test_broadcast(handle);
++#endif
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 				   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,
+ 			 "restore Intel syntax");
+diff --git a/tests/unit/x86_evex_mask_conversion_access.c b/tests/unit/x86_evex_mask_conversion_access.c
+index 994ad59c..b65a523c 100644
+--- a/tests/unit/x86_evex_mask_conversion_access.c
++++ b/tests/unit/x86_evex_mask_conversion_access.c
+@@ -271,8 +271,12 @@ int main(void)
+ 		  1,
+ 		  64 },
+ 	};
+-	static const cs_opt_value syntaxes[] = { CS_OPT_SYNTAX_INTEL,
+-						 CS_OPT_SYNTAX_ATT };
++	static const cs_opt_value syntaxes[] = {
++		CS_OPT_SYNTAX_INTEL,
++#ifndef CAPSTONE_X86_ATT_DISABLE
++		CS_OPT_SYNTAX_ATT,
++#endif
++	};
+ 	csh handle = 0;
+ 	bool success = true;
+ 
+diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
+index 48e99bc6..1a30e853 100644
+--- a/tests/unit/x86_evex_vpcmp_id.c
++++ b/tests/unit/x86_evex_vpcmp_id.c
+@@ -65,10 +65,12 @@ int main(void)
+ 		return 1;
+ 	}
+ 	success &= test_vpcmp(handle, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	success &= test_vpcmp(handle, true);
++#endif
+ 	cs_close(&handle);
+ 	return success ? 0 : 1;
+ }
+diff --git a/tests/unit/x86_evex_vpcmp_mask_size.c b/tests/unit/x86_evex_vpcmp_mask_size.c
+index 3b31dc8c..8942d52c 100644
+--- a/tests/unit/x86_evex_vpcmp_mask_size.c
++++ b/tests/unit/x86_evex_vpcmp_mask_size.c
+@@ -204,10 +204,12 @@ int main(void)
+ 	}
+ 
+ 	success &= run_matrix(handle, "Intel");
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	success &= run_matrix(handle, "AT&T");
++#endif
+ 	cs_close(&handle);
+ 	return success ? 0 : 1;
+ }
