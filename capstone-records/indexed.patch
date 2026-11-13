@@ -1,11 +1,38 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d1d78862..2ac58bf2 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -179,7 +179,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "AARCH64")
+-    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN)
++    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS CAPSTONE_AARCH64_DEDICATED_SCAN CAPSTONE_AARCH64_DEDICATED_DETAIL)
+ endif()
+ 
+ # Dedicated builds of these backends use their generated mnemonic tries.
+diff --git a/Makefile b/Makefile
+index 80398b9b..e9a14740 100644
+--- a/Makefile
++++ b/Makefile
+@@ -140,7 +140,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+ endif
+ 
+ ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
+-CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN
++CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN -DCAPSTONE_AARCH64_DEDICATED_DETAIL
+ endif
+ 
+ ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index a269b603..ad1aec57 100644
+index a269b603..04bc0025 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
-@@ -293,23 +293,34 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
+@@ -293,15 +293,44 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
  	return AArch64_LLVM_getRegisterName(reg, AArch64_NoRegAltName);
  }
  
++#ifdef CAPSTONE_AARCH64_DEDICATED_DETAIL
 +/* Build all public operand defaults in one copy, including unused slots. */
 +#if NUM_AARCH64_OPS != 16
 +#error Update the AArch64 operand defaults for the new slot count
@@ -20,31 +47,37 @@ index a269b603..ad1aec57 100644
 +};
 +#undef AARCH64_FOUR_EMPTY_OPS
 +#undef AARCH64_EMPTY_OP
++#endif
 +
  void AArch64_setup_op(cs_aarch64_op *op)
  {
--	memset(op, 0, sizeof(cs_aarch64_op));
--	op->type = AARCH64_OP_INVALID;
--	op->vector_index = -1;
++#ifdef CAPSTONE_AARCH64_DEDICATED_DETAIL
 +	memcpy(op, empty_aarch64_detail.operands, sizeof(*op));
++#else
+ 	memset(op, 0, sizeof(cs_aarch64_op));
+ 	op->type = AARCH64_OP_INVALID;
+ 	op->vector_index = -1;
++#endif
  }
  
  void AArch64_init_cs_detail(MCInst *MI)
  {
--	if (detail_is_set(MI)) {
--		memset(get_detail(MI), 0,
--		       offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
--		for (int i = 0; i < ARR_SIZE(AArch64_get_detail(MI)->operands);
--		     i++)
--			AArch64_setup_op(&AArch64_get_detail(MI)->operands[i]);
--		AArch64_get_detail(MI)->cc = AArch64CC_Invalid;
--	}
++#ifdef CAPSTONE_AARCH64_DEDICATED_DETAIL
 +	if (!detail_is_set(MI))
 +		return;
 +	cs_detail *detail = get_detail(MI);
 +	memset(detail, 0, offsetof(cs_detail, aarch64));
 +	memcpy(&detail->aarch64, &empty_aarch64_detail,
 +	       sizeof(empty_aarch64_detail));
++#else
+ 	if (detail_is_set(MI)) {
+ 		memset(get_detail(MI), 0,
+ 		       offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
+@@ -310,6 +339,7 @@ void AArch64_init_cs_detail(MCInst *MI)
+ 			AArch64_setup_op(&AArch64_get_detail(MI)->operands[i]);
+ 		AArch64_get_detail(MI)->cc = AArch64CC_Invalid;
+ 	}
++#endif
  }
  
  static void AArch64_check_updates_flags(MCInst *MI)

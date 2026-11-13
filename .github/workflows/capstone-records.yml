@@ -1,7 +1,7 @@
-name: Verify all AArch64 detail slots and time Debian ELF and Windows PE consumers on six platforms
+name: Qualify dedicated AArch64 defaults and mixed binary identity on mixed
 on:
   push:
-    branches: [codex/capstone-complete-aarch64-operand-defaults]
+    branches: [codex/capstone-dedicated-aarch64-defaults-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: aarch64-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: dedicated-aarch64-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
