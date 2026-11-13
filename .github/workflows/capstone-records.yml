@@ -1,7 +1,7 @@
-name: Measure generated MIPS primary-opcode admission in the four-backend ELF and PE build
+name: Check short ARM register emission together with MIPS table admission and native x86 on real executables
 on:
   push:
-    branches: [codex/capstone-mips-primary-table-masks]
+    branches: [codex/capstone-arm-generated-register-output]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-primary-admission-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-default-register-writer-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
