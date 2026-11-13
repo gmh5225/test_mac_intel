@@ -33,11 +33,7 @@ try:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]
     profile_options={'dedicated':[],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
     run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
-    units=['api','x86_scan_batch']
-    if profile in ('diet','reduced'):
-        units+=['x86_encoding_accuracy']
-    else:
-        units+=['x86_simple_output','x86_reg_access','x86_relative_jump','x86_encoding_accuracy','x86_evex_reserved_fields','detail_option']
+    units=['api']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'tests')
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))

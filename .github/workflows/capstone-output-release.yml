@@ -1,7 +1,7 @@
-name: Verify per-instruction legality and unchanged complete records on profiles
+name: Verify deterministic fresh iterator records with a nonzero allocator across release profiles
 on:
   push:
-    branches: [codex/capstone-current-legality-profiles]
+    branches: [codex/capstone-allocator-output-metadata]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-legality-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: allocator-metadata-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

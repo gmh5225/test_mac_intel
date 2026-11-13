@@ -1,43 +1,13 @@
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index c0547213..16e53894 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -67,6 +67,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	    cs_vsnprintf != cs_default_vsnprintf)
- 		return false;
- 
-+	insn->illegal = false;
-+
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
- 		if (plan == X86_PLAN_VECTOR)
- 			return X86_writeVectorOutput(code, size, insn,
 diff --git a/cs.c b/cs.c
-index 59a88cf8..9b48e9db 100644
+index 59a88cf8..6791f780 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1043,6 +1043,8 @@ CS_PRESERVE_MOST bool
- cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		    cs_insn *insn, uint16_t *insn_size, bool batch)
- {
-+	/* A backend can set SoftFail for this instruction. */
-+	insn->illegal = false;
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
- 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
- 		return true;
-@@ -1151,6 +1153,7 @@ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
- 
- 	// we have to skip some amount of data, depending on arch & mode
- 	insn->id = 0; // invalid ID for this "data" instruction
-+	insn->illegal = false;
- 	insn->address = *address;
- 	insn->size = (uint16_t)MIN(skipdata_bytes, sizeof(insn->bytes));
- 	memcpy(insn->bytes, *code, MIN(skipdata_bytes, sizeof(insn->bytes)));
-@@ -1682,6 +1685,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
+@@ -1682,6 +1682,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
  		handle->errnum = CS_ERR_MEM;
  		return NULL;
  	} else {
-+		/* Some backends leave alias metadata untouched. A new iterator record
-+		 * has the same initial status as a batch record. */
++		/* Backends can leave alias metadata untouched. Start an iterator
++		 * record with the same status as a freshly allocated batch record. */
 +		insn->alias_id = 0;
 +		insn->is_alias = false;
 +		insn->usesAliasDetails = false;
@@ -45,120 +15,55 @@ index 59a88cf8..9b48e9db 100644
  		if (handle->detail_opt) {
  			// allocate memory for @detail pointer
  			insn->detail = cs_mem_malloc(sizeof(cs_detail));
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..c5bff3db 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -186,6 +186,11 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 
- 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
- 	if (CS_DECODE_LIKELY(r)) {
-+#ifdef CAPSTONE_HAS_X86
-+		/* Compact x86 scan never passes through the full decoder. */
-+		if (scan)
-+			insn->illegal = false;
-+#endif
- 		*code += insn_size;
- 		*size -= insn_size;
- 		*address += insn_size;
 diff --git a/tests/unit/api.c b/tests/unit/api.c
-index e17860cb..928a61ca 100644
+index e17860cb..46b3e78d 100644
 --- a/tests/unit/api.c
 +++ b/tests/unit/api.c
-@@ -41,10 +41,96 @@ static bool test_cs_mem_setup_fail()
+@@ -41,10 +41,47 @@ static bool test_cs_mem_setup_fail()
  	return true;
  }
  
-+static void *allocate_nonzero(size_t size)
++static void *nonzero_malloc(size_t bytes)
 +{
-+	void *p = malloc(size);
++	void *p = malloc(bytes);
 +	if (p)
-+		memset(p, 1, size);
++		memset(p, 1, bytes);
 +	return p;
 +}
 +
-+static bool check_iterator_status(cs_arch arch, cs_mode mode)
++static bool test_iterator_allocation(void)
 +{
-+	const uint8_t x86[] = { 0x90 };
-+	/* These are the ARM SoftFail and legal UDF from issues #2703 and #1991. */
-+	const uint8_t arm[] = { 0x07, 0xb0, 0xbd, 0xe8, 0xf0, 0x00, 0xf0, 0xe7 };
-+	if (!cs_support(arch))
++	const bool x86 = cs_support(CS_ARCH_X86);
++	if (!x86 && !cs_support(CS_ARCH_ARM))
 +		return true;
-+	csh handle;
-+	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
++	cs_opt_mem mem = { nonzero_malloc, calloc, realloc, free, vsnprintf };
++	if (cs_option(0, CS_OPT_MEM, (size_t)&mem) != CS_ERR_OK)
 +		return false;
-+	bool ok = true;
-+	for (unsigned detail = 0; detail < 2; ++detail) {
-+		if (cs_option(handle, CS_OPT_DETAIL,
-+			      detail ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK) {
-+			ok = false;
++	csh handle = 0;
++	bool ok = cs_open(x86 ? CS_ARCH_X86 : CS_ARCH_ARM,
++			  x86 ? CS_MODE_64 : CS_MODE_ARM, &handle) == CS_ERR_OK;
++	for (unsigned i = 0; ok && i < 2; ++i) {
++		ok = cs_option(handle, CS_OPT_DETAIL,
++			       i ? CS_OPT_ON : CS_OPT_OFF) == CS_ERR_OK;
++		if (!ok)
 +			break;
-+		}
-+		cs_insn *record = cs_malloc(handle);
-+		if (!record) {
-+			ok = false;
-+			break;
-+		}
-+		if (record->illegal || record->is_alias ||
-+		    record->usesAliasDetails || record->alias_id)
-+			ok = false;
-+		for (unsigned text = 0; text < 2; ++text) {
-+			if (cs_option(handle, CS_OPT_TEXT,
-+				      text ? CS_OPT_ON : CS_OPT_OFF) !=
-+			    CS_ERR_OK) {
-+				ok = false;
-+				break;
-+			}
-+			const uint8_t *cursor = arch == CS_ARCH_ARM ? arm : x86;
-+			size_t left = arch == CS_ARCH_ARM ? sizeof(arm) :
-+							    sizeof(x86);
-+			uint64_t ip = 0x1000;
-+			record->illegal = true;
-+			if (!cs_disasm_iter(handle, &cursor, &left, &ip,
-+					    record)) {
-+				ok = false;
-+				break;
-+			}
-+			if (arch == CS_ARCH_ARM) {
-+				if (!record->illegal ||
-+				    !cs_disasm_iter(handle, &cursor, &left, &ip,
-+						    record) ||
-+				    record->illegal)
-+					ok = false;
-+			} else if (record->is_alias ||
-+				   record->usesAliasDetails ||
-+				   record->illegal || record->alias_id) {
-+				ok = false;
-+			}
-+			if (left)
-+				ok = false;
-+		}
-+		cs_free(record, 1);
++		cs_insn *insn = cs_malloc(handle);
++		ok = insn && !insn->alias_id && !insn->is_alias &&
++		     !insn->usesAliasDetails && !insn->illegal;
++		if (insn)
++			cs_free(insn, 1);
 +	}
-+	cs_close(&handle);
-+	return ok;
-+}
-+
-+static bool test_iterator_status(void)
-+{
-+	cs_opt_mem mem = { allocate_nonzero, calloc, realloc, free, vsnprintf };
-+	if (cs_option(0, CS_OPT_MEM, (size_t)&mem) != CS_ERR_OK)
-+		return false;
-+	const bool x86 = check_iterator_status(CS_ARCH_X86, CS_MODE_64);
-+	const bool arm = check_iterator_status(CS_ARCH_ARM, CS_MODE_ARM);
++	if (handle)
++		cs_close(&handle);
 +	mem.malloc = malloc;
-+	if (cs_option(0, CS_OPT_MEM, (size_t)&mem) != CS_ERR_OK)
-+		return false;
-+	if (!x86 || !arm)
-+		printf("iterator status mismatch (x86=%d ARM=%d)\n", x86, arm);
-+	return x86 && arm;
++	return cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK && ok;
 +}
 +
  int main()
  {
  	bool result = true;
  	result &= test_cs_mem_setup_fail();
-+	result &= test_iterator_status();
++	result &= test_iterator_allocation();
  
  	if (result) {
  		printf("All tests passed.\n");
