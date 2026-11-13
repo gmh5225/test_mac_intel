@@ -216,18 +216,59 @@ index 11e5e995..65a8dfd1 100644
  #define ARM_EMPTY_OP \
  	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..a36a08f5 100644
+index 25f13d10..ef610ebf 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
-@@ -1684,6 +1684,20 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 			return Result;
+@@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
  	}
+ }
  
 +#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && defined(__x86_64__) && \
 +    defined(__GNUC__) && !defined(__clang__)
 +#define CAPSTONE_MIPS_PRIMARY_DISPATCH
 +#endif
++
+ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 				   const uint8_t *Bytes, size_t BytesLen,
+ 				   uint64_t Address, SStream *CStream);
+@@ -1451,6 +1456,20 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 
+ 	cs_mode mode = Instr->csh->mode;
+ 	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
++	bool IsGP64, IsFP64;
 +#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
++	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
++	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64) {
++		/* The unextended modes use standard byte order and only the
++		 * GP64, FP64, DSP and base tables below, in their usual order. */
++		if (readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
++				      IsBigEndian, false) == MCDisassembler_Fail)
++			return MCDisassembler_Fail;
++		*Size = 4;
++		IsGP64 = IsFP64 = isa == CS_MODE_MIPS64;
++		goto DecodeStandard;
++	}
++#endif
+ 	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
+ 	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
+ 	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
+@@ -1459,8 +1478,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
+ 	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
+ 	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
+-	bool IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
+-	bool IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
++	IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
++	IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
+ 	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
+ 	// Only present in MIPS-I and MIPS-II
+ 	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
+@@ -1684,6 +1703,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
++#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
++DecodeStandard:;
 +	/* A primary-opcode miss in these generated tables reaches Fail before
 +	 * any predicate, operand reader, or instruction state change. */
 +	const uint64_t major = UINT64_C(1) << (Insn >> 26);
@@ -240,7 +281,7 @@ index 25f13d10..a36a08f5 100644
  	if (IsGP64) {
  		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
  					     Address, NULL);
-@@ -1698,10 +1712,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1698,10 +1728,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
@@ -316,6 +357,19 @@ index 01559e08..63dcc538 100644
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
  
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..8d533210 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -178,6 +178,8 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 
+ 	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
++	/* SoftFail belongs to the current instruction, including after reuse. */
++	insn->illegal = false;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+ 	insn->mnemonic[0] = '\0';
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
 index 276f5eca..e8311f3b 100644
 --- a/suite/auto-sync/README.md
@@ -457,3 +511,83 @@ index 4a17e366..943c4330 100644
  if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
      list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
  endif()
+diff --git a/tests/unit/api.c b/tests/unit/api.c
+index 46b3e78d..af447bec 100644
+--- a/tests/unit/api.c
++++ b/tests/unit/api.c
+@@ -77,11 +77,75 @@ static bool test_iterator_allocation(void)
+ 	return cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK && ok;
+ }
+ 
++static bool check_iterator_status(cs_arch arch, cs_mode mode)
++{
++	const uint8_t x86[] = { 0x90 };
++	/* These are the ARM SoftFail and legal UDF from issues #2703 and #1991. */
++	const uint8_t arm[] = { 0x07, 0xb0, 0xbd, 0xe8, 0xf0, 0x00, 0xf0, 0xe7 };
++	if (!cs_support(arch))
++		return true;
++	csh handle;
++	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = true;
++	for (unsigned detail = 0; detail < 2; ++detail) {
++		if (cs_option(handle, CS_OPT_DETAIL,
++			      detail ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK) {
++			ok = false;
++			break;
++		}
++		cs_insn *record = cs_malloc(handle);
++		if (!record) {
++			ok = false;
++			break;
++		}
++		if (record->illegal || record->is_alias ||
++		    record->usesAliasDetails || record->alias_id)
++			ok = false;
++		for (unsigned text = 0; text < 2; ++text) {
++			if (cs_option(handle, CS_OPT_TEXT,
++				      text ? CS_OPT_ON : CS_OPT_OFF) !=
++			    CS_ERR_OK) {
++				ok = false;
++				break;
++			}
++			const uint8_t *cursor = arch == CS_ARCH_ARM ? arm : x86;
++			size_t left = arch == CS_ARCH_ARM ? sizeof(arm) :
++							    sizeof(x86);
++			uint64_t ip = 0x1000;
++			record->illegal = true;
++			if (!cs_disasm_iter(handle, &cursor, &left, &ip,
++					    record)) {
++				ok = false;
++				break;
++			}
++			if (arch == CS_ARCH_ARM) {
++				if (!record->illegal ||
++				    !cs_disasm_iter(handle, &cursor, &left, &ip,
++						    record) ||
++				    record->illegal)
++					ok = false;
++			} else if (record->is_alias ||
++				   record->usesAliasDetails ||
++				   record->illegal || record->alias_id) {
++				ok = false;
++			}
++			if (left)
++				ok = false;
++		}
++		cs_free(record, 1);
++	}
++	cs_close(&handle);
++	return ok;
++}
++
+ int main()
+ {
+ 	bool result = true;
+ 	result &= test_cs_mem_setup_fail();
+ 	result &= test_iterator_allocation();
++	result &= check_iterator_status(CS_ARCH_ARM, CS_MODE_ARM);
++	result &= check_iterator_status(CS_ARCH_X86, CS_MODE_64);
+ 
+ 	if (result) {
+ 		printf("All tests passed.\n");
