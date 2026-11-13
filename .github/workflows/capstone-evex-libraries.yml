@@ -1,7 +1,7 @@
-name: Measure the 0F 38 legacy feature dispatch on real i386 amd64 and SIMD libraries
+name: Verify and time legacy AES and SSSE3 register output on real i386 and amd64 library functions
 on:
   push:
-    branches: [codex/capstone-owned-legacy-map-libraries]
+    branches: [codex/capstone-legacy-0f38-register-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: owned-map-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: legacy-aes-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
