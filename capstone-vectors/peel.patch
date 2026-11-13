@@ -1,0 +1,47 @@
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 461ae5e4..ed489d17 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -11929,20 +11929,30 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	read_count = insn->detail->regs_read_count;
+ 	write_count = insn->detail->regs_write_count;
+ 
+-	// implicit registers
+-	if (read_count == 1)
+-		regs_read[0] = insn->detail->regs_read[0];
+-	else if (read_count != 0)
+-		memcpy(regs_read, insn->detail->regs_read,
+-		       read_count * sizeof(insn->detail->regs_read[0]));
+-	if (write_count == 1)
+-		regs_write[0] = insn->detail->regs_write[0];
+-	else if (write_count != 0)
+-		memcpy(regs_write, insn->detail->regs_write,
+-		       write_count * sizeof(insn->detail->regs_write[0]));
++	i = 0;
++	if (!read_count && !write_count && x86->op_count &&
++	    x86->operands[0].type == X86_OP_REG &&
++	    x86->operands[0].access == CS_AC_WRITE) {
++		regs_write[0] = x86->operands[0].reg;
++		write_count = 1;
++		i = 1;
++	} else {
++		// implicit registers
++		if (read_count == 1)
++			regs_read[0] = insn->detail->regs_read[0];
++		else if (read_count != 0)
++			memcpy(regs_read, insn->detail->regs_read,
++			       read_count * sizeof(insn->detail->regs_read[0]));
++		if (write_count == 1)
++			regs_write[0] = insn->detail->regs_write[0];
++		else if (write_count != 0)
++			memcpy(regs_write, insn->detail->regs_write,
++			       write_count *
++				       sizeof(insn->detail->regs_write[0]));
++	}
+ 
+ 	// explicit registers
+-	for (i = 0; i < x86->op_count; i++) {
++	for (; i < x86->op_count; i++) {
+ 		cs_x86_op *op = &(x86->operands[i]);
+ 		switch ((int)op->type) {
+ 		case X86_OP_REG:
