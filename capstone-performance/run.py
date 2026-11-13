@@ -149,10 +149,9 @@ def prepare():
     iced = fetch('iced', 'https://github.com/NeverSight/iced.git', manifest['iced_revision'])
     shutil.copytree(base, WORK / 'new', ignore=shutil.ignore_patterns('.git'))
     command(['git', 'init', WORK / 'new'], 'new-init')
-    command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json',dict(baseline='published 2fc94937190ef9224bf797851dec71ff10c2c85c',candidate='isolated Linux EVEX scan and stack, immediate and SIMD output records'))
+    write('comparison.json',dict(baseline='published 8788c077d7de2724fbf9a82f46f43a2dbd2b5e63',candidate='stack, immediate and SIMD output records with identical scanner object'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -209,10 +208,11 @@ panic = "abort"
     assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
     # The Mach-O ad hoc signature includes the linker's output basename. Both
     # files above are linked as 'single' and only renamed after signing.
-    for label in ('base','new'):
-        proc=subprocess.run(['codesign','-dv','--verbose=4',WORK/('single-'+label)],capture_output=True,text=True)
-        if proc.returncode and 'not signed' not in proc.stderr: raise RuntimeError(proc.stderr)
-        (EVIDENCE/('signature-'+label+'.txt')).write_text(proc.stderr)
+    if platform.system()=='Darwin':
+        for label in ('base','new'):
+            proc=subprocess.run(['codesign','-dv','--verbose=4',WORK/('single-'+label)],capture_output=True,text=True)
+            if proc.returncode and 'not signed' not in proc.stderr: raise RuntimeError(proc.stderr)
+            (EVIDENCE/('signature-'+label+'.txt')).write_text(proc.stderr)
     assert sha(WORK/'single-base')==sha(WORK/'single-new'), 'mixed public executable changed'
     if os.environ['MIXED_CC']=='gcc':
         command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'compile-full-scan')
