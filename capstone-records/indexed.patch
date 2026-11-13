@@ -513,7 +513,7 @@ index 6266d12b..98805f06 100644
  
  // given internal insn id, return public instruction ID
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..09073747 100644
+index c42839d3..09073747 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -596,22 +596,6 @@ index 25f13d10..09073747 100644
  
  	// Calling the auto-generated decoder function.
  	Result = decodeInstruction_4(DecoderTableMips32, Instr, Insn, Address,
-@@ -1979,6 +2012,7 @@ static DecodeStatus DecodeMem(MCInst *Inst, uint32_t Insn, uint64_t Address,
- 	Base = getReg(Inst, Mips_GPR32RegClassID, Base);
- 
- 	if (MCInst_getOpcode(Inst) == Mips_SC ||
-+	    MCInst_getOpcode(Inst) == Mips_SC64 ||
- 	    MCInst_getOpcode(Inst) == Mips_SCD)
- 		MCOperand_CreateReg0(Inst, (Reg));
- 
-@@ -2607,6 +2641,7 @@ static DecodeStatus DecodeSpecial3LlSc(MCInst *Inst, uint32_t Insn,
- 	Base = getReg(Inst, Mips_GPR32RegClassID, Base);
- 
- 	if (MCInst_getOpcode(Inst) == Mips_SC_R6 ||
-+	    MCInst_getOpcode(Inst) == Mips_SC64_R6 ||
- 	    MCInst_getOpcode(Inst) == Mips_SCD_R6) {
- 		MCOperand_CreateReg0(Inst, (Rt));
- 	}
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 7b2b3a08..4b1738be 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc
@@ -672,7 +656,7 @@ index 01559e08..63dcc538 100644
  #endif
  
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..405c1fbe 100644
+index a976814e..774aa82a 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -5,7 +5,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -680,102 +664,148 @@ index a976814e..405c1fbe 100644
  			5, 9, 6, 10, 0, 0, 0, 0, 13, 17, 14, 18, 0, 0, 0, 0,
  			21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
 -			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
-+			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 3, 0,
++			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 65531, 0,
  			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
  			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
  			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index bd0f6c94..6693cae7 100644
+index bd0f6c94..fdb44188 100644
 --- a/arch/X86/X86MemoryOutput.c
 +++ b/arch/X86/X86MemoryOutput.c
-@@ -9,7 +9,7 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
- 
--/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
-+/* No-base SIB and explicit RIZ spellings retain the general printer. */
- bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 			   uint16_t *insn_size,
- 			   const struct X86SimpleOutput *row,
-@@ -17,7 +17,8 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- {
- 	const bool wide = row->address_size == 8;
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
--	const unsigned lead = rex != 0;
-+	const bool code_segment = !wide && code[0] == 0x2e;
-+	const unsigned lead = rex != 0 || code_segment;
- 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
- 	const bool sib = rm == 4, rip = !mod && rm == 5;
-@@ -36,12 +37,12 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -35,9 +35,14 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		const unsigned index_reg = ((rex & 2) << 2) |
  					   ((encoding >> 3) & 7);
  		base_reg = encoding & 7;
- 		if ((!mod && base_reg == 5) ||
+-		if ((!mod && base_reg == 5) ||
 -		    (index_reg == 4 && encoding != 0x24))
-+		    (wide && index_reg == 4 && encoding != 0x24))
++		if (!mod && base_reg == 5)
  			return false;
++		if (index_reg == 4 && encoding != 0x24) {
++			if (!wide && opcode == 0x8d)
++				return X86_writeLea32(code, size, insn,
++						      insn_size, row, regs);
++			return false;
++		}
  		if (index_reg != 4) {
  			index = &regs[wide ? 3 : 2][index_reg];
--			scale_bits = encoding >> 6;
- 		}
-+		scale_bits = encoding >> 6;
- 	}
+ 			scale_bits = encoding >> 6;
+@@ -129,5 +134,76 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	return true;
+ }
  
- 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
-@@ -71,6 +72,10 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		out += 2;
- 	}
- 	if (lea) {
-+		if (code_segment) {
-+			memcpy(out, "cs:", 3);
-+			out += 3;
++/* Intel syntax suppresses the absent SIB index in 32-bit mode. The
++ * encoded scale and any segment override remain visible in detail. */
++bool X86_writeLea32(const uint8_t *code, size_t size, cs_insn *insn,
++		    uint16_t *insn_size, const struct X86SimpleOutput *row,
++		    const struct X86SimpleRegister regs[4][16])
++{
++	const bool cs = code[0] == 0x2e;
++	const unsigned offset = cs + 3;
++	if (size < offset || code[cs] != 0x8d)
++		return false;
++	const uint8_t modrm = code[cs + 1], sib = code[cs + 2];
++	const unsigned mod = modrm >> 6, base = sib & 7;
++	if (mod == 3 || (modrm & 7) != 4 || ((sib >> 3) & 7) != 4 ||
++	    (!mod && base == 5))
++		return false;
++	const unsigned disp_size = mod == 2 ? 4 : mod;
++	const unsigned length = offset + disp_size;
++	if (size < length)
++		return false;
++	int32_t disp = 0;
++	if (disp_size == 1)
++		disp = (int8_t)code[offset];
++	else if (disp_size == 4)
++		disp = X86_readDisp32(code + offset);
++
++	const struct X86SimpleRegister *dst = &regs[2][(modrm >> 3) & 7];
++	const struct X86SimpleRegister *addr = &regs[2][base];
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)length;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, dst->name, dst->length);
++	char *out = insn->op_str + dst->length;
++	if (cs) {
++		memcpy(out, ", cs:[", 6);
++		out += 6;
++	} else {
++		memcpy(out, ", [", 3);
++		out += 3;
++	}
++	memcpy(out, addr->name, addr->length);
++	out = X86_writeDisplacement(out + addr->length, disp);
++	*out = ']';
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, 0x8d, 0, modrm,
++				      dst->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->encoding.modrm_offset += cs;
++		x->sib = sib;
++		x->sib_base = (x86_reg)addr->reg;
++		x->sib_scale = (int8_t)(1 << (sib >> 6));
++		x->disp = disp;
++		if (disp_size) {
++			x->encoding.disp_offset = (uint8_t)offset;
++			x->encoding.disp_size = (uint8_t)disp_size;
 +		}
- 		*out++ = '[';
- 	} else if (row->ops[0].size == 1) {
- 		memcpy(out, "byte ptr [", 10);
-@@ -109,6 +114,11 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 				      load ? reg->reg : 0, load ? 0 : reg->reg);
- 		cs_x86 *x = &insn->detail->x86;
- 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
-+		if (code_segment) {
++		cs_x86_op *op = &x->operands[1];
++		op->type = X86_OP_MEM;
++		op->mem.base = x->sib_base;
++		op->mem.scale = x->sib_scale;
++		op->mem.disp = disp;
++		if (cs) {
++			op->mem.segment = X86_REG_CS;
 +			x->prefix[1] = 0x2e;
-+			++x->encoding.modrm_offset;
-+			mem->mem.segment = X86_REG_CS;
 +		}
- 		mem->type = X86_OP_MEM;
- 		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
- 		mem->mem.scale = 1 << scale_bits;
++	}
++	return true;
++}
++
+ #endif
+ #endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..371a9e6a 100644
+index 11e8578a..d641d887 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -75,6 +75,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	    cs_vsnprintf != cs_default_vsnprintf)
- 		return false;
- 
-+	if (plan == X86_PLAN_CS_LEA) {
-+		if (size < 3 || code[1] != 0x8d || code[2] >= 0xc0)
-+			return false;
-+		const unsigned lea = x86_simple_plans[0][0][0x8d] >> 2;
-+		return X86_writeMemoryOutput(code, size, insn, insn_size,
-+					     &x86_simple_outputs[lea],
-+					     x86_simple_registers);
-+	}
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
- 		if (plan == X86_PLAN_VECTOR)
- 			return X86_writeVectorOutput(code, size, insn,
+@@ -81,6 +81,12 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 						     insn_size,
+ 						     x86_simple_registers[3],
+ 						     wide);
++		if (plan == X86_PLAN_CS_LEA) {
++			const unsigned lea = x86_simple_plans[0][0][0x8d] >> 2;
++			return X86_writeLea32(code, size, insn, insn_size,
++					      &x86_simple_outputs[lea],
++					      x86_simple_registers);
++		}
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..4f5dd22c 100644
+index 7675273f..48e67e65 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
 @@ -51,6 +51,7 @@ enum X86SimpleForm {
  /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
  #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
  #define X86_PLAN_VECTOR UINT16_MAX
-+#define X86_PLAN_CS_LEA X86_SIMPLE_RELATIVE
++#define X86_PLAN_CS_LEA (X86_PLAN_PUSH_IMMEDIATE | X86_SIMPLE_RELATIVE)
  #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
  #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
  
+@@ -59,6 +60,10 @@ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
+ 		      const struct X86SimpleRegister regs[4][16]);
+ 
++CAPSTONE_INTERNAL bool X86_writeLea32(const uint8_t *code, size_t size, cs_insn *insn,
++		    uint16_t *insn_size, const struct X86SimpleOutput *row,
++		    const struct X86SimpleRegister regs[4][16]);
++
+ CAPSTONE_INTERNAL void X86_writeImmediateOutput(
+ 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
+ 	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py b/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
 index 1dd31e59..37010f31 100755
 --- a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
@@ -904,99 +934,19 @@ index 30482037..29a72009 100644
              counts.append((name, len(nodes)))
          for w, width in sorted(set(inputs.values())):
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..6c0e8140 100644
+index ccc4f0de..3a09e274 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -616,6 +616,8 @@ int main()
+@@ -615,7 +615,8 @@ int main()
+ 			}
  		}
  	}
- 	// Reserve unprefixed EVEX for its own verified vector output records.
-+	// Only nonzero rows describe ordinary relative branches.
+-	// Reserve unprefixed EVEX for its own verified vector output records.
++	// Route prefix bytes to their encoding-specific output writers.
 +	plans[0][0][0x2e] = X86_PLAN_CS_LEA;
  	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
  	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
-diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
-index c9d51a88..d04a63ce 100644
---- a/tests/unit/mips_scan.c
-+++ b/tests/unit/mips_scan.c
-@@ -98,6 +98,65 @@ done:
- 	return success;
- }
- 
-+static bool check_sc_ptr64(bool r6, bool big, bool ptr64)
-+{
-+	const cs_mode mode = (r6 ? CS_MODE_MIPS64R6 : CS_MODE_MIPS64R2) |
-+			     (big ? CS_MODE_BIG_ENDIAN : 0) |
-+			     (ptr64 ? CS_MODE_MIPS_PTR64 : 0);
-+	csh handle;
-+	if (cs_open(CS_ARCH_MIPS, mode, &handle))
-+		return false;
-+	bool ok = false;
-+	cs_insn *insn = NULL;
-+	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ||
-+	    !(insn = cs_malloc(handle)))
-+		goto done;
-+
-+	const int offsets[] = { 0, -4, 19, r6 ? -256 : -32768,
-+				r6 ? 255 : 32767 };
-+	for (unsigned j = 0; j < sizeof(offsets) / sizeof(offsets[0]); ++j) {
-+		const unsigned offset = (unsigned)offsets[j];
-+		/* sc $v0, offset($a0), with distinct value and base registers. */
-+		const uint32_t word =
-+			(4u << 21) | (2u << 16) |
-+			(r6 ? (31u << 26) | ((offset & 0x1ff) << 7) | 0x26 :
-+			      (56u << 26) | (offset & 0xffff));
-+		uint8_t code[4];
-+		for (unsigned k = 0; k < 4; ++k)
-+			code[big ? 3 - k : k] = (uint8_t)(word >> (8 * k));
-+		const uint8_t *at = code;
-+		size_t left = sizeof(code);
-+		uint64_t pc = 0x1000;
-+		if (!cs_disasm_iter(handle, &at, &left, &pc, insn) ||
-+		    insn->id != MIPS_INS_SC || insn->size != 4 || left ||
-+		    at != code + 4 || pc != 0x1004)
-+			goto done;
-+		const cs_mips *m = &insn->detail->mips;
-+		if (m->op_count != 2 || m->operands[0].type != MIPS_OP_REG ||
-+		    m->operands[0].reg != MIPS_REG_V0 ||
-+		    m->operands[1].type != MIPS_OP_MEM ||
-+		    m->operands[1].mem.base != MIPS_REG_A0 ||
-+		    m->operands[1].mem.disp != offsets[j])
-+			goto done;
-+#ifndef CAPSTONE_DIET
-+		if (offsets[j] == -4 && (strcmp(insn->mnemonic, "sc") ||
-+					 strcmp(insn->op_str, "$v0, -4($a0)")))
-+			goto done;
-+#endif
-+	}
-+	ok = true;
-+done:
-+	if (!ok)
-+		fprintf(stderr,
-+			"incorrect SC operands for MIPS mode %u: %s %s\n",
-+			(unsigned)mode, insn ? insn->mnemonic : "",
-+			insn ? insn->op_str : "");
-+	if (insn)
-+		cs_free(insn, 1);
-+	cs_close(&handle);
-+	return ok;
-+}
-+
- int main(void)
- {
- 	const cs_mode modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64,
-@@ -106,5 +165,10 @@ int main(void)
- 	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
- 		if (!check_mode(modes[i]))
- 			return 1;
-+	for (unsigned r6 = 0; r6 < 2; ++r6)
-+		for (unsigned big = 0; big < 2; ++big)
-+			for (unsigned ptr64 = 0; ptr64 < 2; ++ptr64)
-+				if (!check_sc_ptr64(r6, big, ptr64))
-+					return 1;
- 	return 0;
- }
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 6990d510..f4c86138 100644
 --- a/tests/unit/x86_simple_output.c

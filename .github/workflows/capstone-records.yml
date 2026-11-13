@@ -1,7 +1,7 @@
-name: Measure the 32-bit LEA address and SIB formats over PE32 PE64 and independent ARM and MIPS controls
+name: Measure an isolated 32-bit LEA memory formatter with no added ordinary per-instruction comparison on PE32 PE64 and four independent architecture controls
 on:
   push:
-    branches: [codex/capstone-sib-segment-four-images]
+    branches: [codex/capstone-i386-lea-separate-images]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
+          ref: 535dfe10dcc2c3d8075f447631cbaf6694adc4cf
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-lea-mixed-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: separate-i386-lea-mixed-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
