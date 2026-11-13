@@ -1,7 +1,7 @@
-name: Use production public scan and x86 text entry points for libraries paired controls
+name: Retest host-qualified mixed decoders against both iced formatters
 on:
   push:
-    branches: [codex/capstone-gnu-exact-entry-libraries]
+    branches: [codex/capstone-gnu-x64-mixed-release-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,7 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
-          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -39,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-exact-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: gnu-x64-mixed-release-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
