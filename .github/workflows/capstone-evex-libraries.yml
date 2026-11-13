@@ -1,7 +1,7 @@
-name: Measure validated EVEX rows after adapter selection and before the generic frame on libraries
+name: Check the first EVEX escape once before entering the generic scan-stage prefix walk on libraries
 on:
   push:
-    branches: [codex/capstone-validated-evex-before-frame-libraries]
+    branches: [codex/capstone-evex-header-admission-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-before-frame-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-header-admission-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

@@ -20,7 +20,7 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..1e978af3 100644
+index 76fdbcb7..c503e920 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3365,6 +3365,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
@@ -39,6 +39,18 @@ index 76fdbcb7..1e978af3 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+@@ -3665,6 +3674,11 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 				     X86ScanResult *result, bool readerFlags)
+ {
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++	/* 0x62 is always a feature escape. The callback, 32-bit BOUND and
++     * all malformed EVEX encodings keep the ordinary fallback owner. */
++	if (code_len && code[0] == 0x62)
++		return decodeScanResultFallback(ud, code, code_len, insn,
++						result, 0x62, true);
+ 	uint8_t opcode;
+ 	size_t opcodeOffset;
+ 	bool extension = X86_mayDecodeFeatureExtensionImpl(
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index dc5cecf9..a976814e 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
