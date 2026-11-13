@@ -1,30 +1,28 @@
-diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
-index 31844a02..f13e991a 100644
---- a/arch/SystemZ/SystemZMapping.c
-+++ b/arch/SystemZ/SystemZMapping.c
-@@ -42,15 +42,19 @@ const insn_map systemz_insns[] = {
- void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
- 				size_t BytesLen)
+diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
+index a9af759a..75a0f7ab 100644
+--- a/arch/LoongArch/LoongArchMapping.c
++++ b/arch/LoongArch/LoongArchMapping.c
+@@ -376,15 +376,17 @@ void LoongArch_rewrite_address_operand(MCInst *MI)
+ 
+ void LoongArch_set_instr_map_data(MCInst *MI)
  {
--	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
-+	/* TableGen emits one row per internal opcode, including the invalid
-+     * entry at index zero. The implicit-effect helpers use the same index. */
-+	const unsigned opcode = MCInst_getOpcode(MI);
-+	const insn_map *row = &systemz_insns[opcode];
+-	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
++	/* Public ID, implicit effects and format share the generated opcode row. */
++	const insn_map *row = &loongarch_insns[MCInst_getOpcode(MI)];
 +	MI->flat_insn->id = row->mapid;
 +#ifndef CAPSTONE_DIET
 +	if (!MI->flat_insn->detail)
 +		return;
- 	map_implicit_reads(MI, systemz_insns);
- 	map_implicit_writes(MI, systemz_insns);
- 	map_groups(MI, systemz_insns);
--	const systemz_suppl_info *suppl_info =
--		map_get_suppl_info(MI, systemz_insns);
+ 	map_implicit_reads(MI, loongarch_insns);
+ 	map_implicit_writes(MI, loongarch_insns);
+ 	map_groups(MI, loongarch_insns);
+-	const loongarch_suppl_info *suppl_info =
+-		map_get_suppl_info(MI, loongarch_insns);
 -	if (suppl_info) {
--		SystemZ_get_detail(MI)->format = suppl_info->form;
+-		LoongArch_get_detail(MI)->format = suppl_info->form;
 -	}
-+	SystemZ_get_detail(MI)->format = row->suppl_info.systemz.form;
++	LoongArch_get_detail(MI)->format = row->suppl_info.loongarch.form;
 +#endif
  }
  
- void SystemZ_init_mri(MCRegisterInfo *MRI)
+ bool LoongArch_getInstruction(csh handle, const uint8_t *code, size_t code_len,

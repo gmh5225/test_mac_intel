@@ -9,22 +9,22 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-systemz-rows-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-loongarch-rows-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
-  mapping=(s/'arch/SystemZ/SystemZGenCSMappingInsn.inc').read_text()
-  rows=re.findall(r'^\s*(SystemZ_[\w]+) /\* (\d+) \*/, (SYSTEMZ_INS_[\w]+)',mapping,re.M)
-  enums=dict(re.findall(r'^\s*(SystemZ_[\w]+)\s*=\s*(\d+)',(s/'arch/SystemZ/SystemZGenInstrInfo.inc').read_text(),re.M))
-  assert [int(row[1]) for row in rows]==list(range(3105)) and all(enums[name]==idx for name,idx,_ in rows)
+  mapping=(s/'arch/LoongArch/LoongArchGenCSMappingInsn.inc').read_text()
+  rows=re.findall(r'^\s*(LoongArch_[\w]+) /\* (\d+) \*/, (LOONGARCH_INS_[\w]+)',mapping,re.M)
+  enums=dict(re.findall(r'^\s*(LoongArch_[\w]+)\s*=\s*(\d+)',(s/'arch/LoongArch/LoongArchGenInstrInfo.inc').read_text(),re.M))
+  assert [int(row[1]) for row in rows]==list(range(2397)) and all(enums[name]==idx for name,idx,_ in rows)
   write('mapping',dict(rows=len(rows),sha256=hashlib.sha256(mapping.encode()).hexdigest()))
   mixed=os.environ['BUILD_ARCHS']=='four'
   all_inputs=corpus.prepare(r,t,e,run)
-  choices={'s390x-ls','s390x-sort','s390x-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','arm-ls','amd64-ls'} if mixed else set())
+  choices={'loong64-ls','loong64-sort','loong64-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','arm-ls','amd64-ls'} if mixed else set())
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SYSTEMZ_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_LOONGARCH_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
@@ -39,11 +39,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-systemz-rows-') as tmp:
     run(['cmake','--build',b,'--target','mapping','--parallel','4'],'build-test-'+key)
     run(['ctest','--test-dir',b,'-R','^unit_mapping$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
-  (t/'systemz.bin').write_bytes(b''.join(Path(q['path']).read_bytes()for q in cases if q['name'].startswith('s390x-')))
-  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-systemz.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
+  (t/'loongarch.bin').write_bytes(b''.join(Path(q['path']).read_bytes()for q in cases if q['name'].startswith('loong64-')))
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-loongarch.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   assert changed==['arch/SystemZ/SystemZMapping.c.o'],changed
+   assert changed==['arch/LoongArch/LoongArchMapping.c.o'],changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key],16384,t],'differential-'+key)
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)

@@ -1,5 +1,5 @@
 {
-  "capstone_revision": "d843dcdf830e883697b348eff0ee47d99849ff90",
+  "capstone_revision": "6703e144275793a419ad663511e34b5dab3d52d8",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "source_lineage": {
     "single.cpp": {
@@ -87,12 +87,16 @@
       "experiment": "round574-legacy-memory-repair"
     },
     "indexed.patch": {
-      "description": "Read SystemZ public opcode and format from the same generated row",
-      "sha256": "e1d5f6a821bb6814f566fe561f92fa7b0a81553e7a37550b3794d9473d17f3ee"
+      "description": "LoongArch row owns the public ID, implicit effects and format",
+      "sha256": "5a493a8442664be921f1c78447917d1e693b85cbf58e97c0811f2ffc660b2ac1"
     },
     "verify-systemz.cpp": {
       "description": "Complete observable instruction/detail/iteration/regs with 40 mode configurations and four output modes",
       "sha256": "1d9555c4a3a29221f0e72b55a4c0dd52cc65e7730955ff340437dbffeafa66dc"
+    },
+    "verify-loongarch.cpp": {
+      "description": "LoongArch32/64 mode and full public output, dirty records, guard pages and real binaries",
+      "sha256": "a70015eebde9e39756436e952cdb481d8035bd55a56e71eb0b2f968b882d5157"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
@@ -140,31 +144,31 @@
       "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
     },
     {
-      "name": "s390x-ls",
-      "selector": 5,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
-      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
-      "text_sha256": "46819752e9b45e34a3402b173ffa4099c4a2a249647062c92de2c8f99606db08",
+      "name": "loong64-ls",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
       "kind": "deb",
-      "command": "ls"
+      "command": "ls",
+      "text_sha256": "79aee1454bea976cd0a7216849ce9852efabe3dbb7aaea15f2ddc8bb92eb3e7b"
     },
     {
-      "name": "s390x-sort",
-      "selector": 5,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
-      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
-      "text_sha256": "3423b7a3b4c97f02d0b9f41d3cd95917f1415c934f9ae64f946c8de6a8b2f881",
+      "name": "loong64-cp",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
       "kind": "deb",
-      "command": "sort"
+      "command": "cp",
+      "text_sha256": "d630e3eeedfa80897a78b980135a7d156e90f6efc9cc82c4980a0e0c96a8f16d"
     },
     {
-      "name": "s390x-cp",
-      "selector": 5,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
-      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
-      "text_sha256": "8233e8f281a6961b61d5ed52224317097681dc05a86c0b21d73a8376547f915d",
+      "name": "loong64-sort",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
       "kind": "deb",
-      "command": "cp"
+      "command": "sort",
+      "text_sha256": "c591f3113374726c163b6448964bb5f8e7bbcb7a9fd480efac27f5aa339690dc"
     }
   ]
 }
