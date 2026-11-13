@@ -1,7 +1,7 @@
-name: Isolate generated native EVEX scanning and formatting over real JPEG zstd and crypto functions with both iced formatters
+name: Measure one shared EVEX register row selector on common libcrypto JPEG and zstd functions against both iced formatters
 on:
   push:
-    branches: [codex/capstone-keyed-evex-same-isa-control]
+    branches: [codex/capstone-shared-evex-register-lookup-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-evex-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: shared-evex-register-lookup-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
