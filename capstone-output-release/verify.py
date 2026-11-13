@@ -37,6 +37,7 @@ try:
     if profile not in ('diet','reduced'):
         units+=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','x86_evex_reserved_fields','x86_memory_scale','arm_post_index','detail_option']
     if profile=='adapter':units+=['x86_scan_adapter']
+    if profile=='four':units+=['mips_scan']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'tests')
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))

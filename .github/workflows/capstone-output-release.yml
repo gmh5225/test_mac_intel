@@ -1,7 +1,7 @@
-name: Qualify integrated mixed GNU x86 scan and output on configs
+name: Qualify x86 and MIPS under reduced, full and DIET builds
 on:
   push:
-    branches: [codex/capstone-gnu-mixed-integrated-configs]
+    branches: [codex/capstone-gnu-x64-mixed-release-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-gnu-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: gnu-x64-mixed-release-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
