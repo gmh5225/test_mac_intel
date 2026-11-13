@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=cc=='gcc' and platform.machine()=='x86_64'
-   expected={'arch/ARM/ARMInstPrinter.c.o','arch/Mips/MipsDisassembler.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
+   expected={'arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMInstPrinter.c.o','arch/Mips/MipsDisassembler.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
@@ -63,6 +63,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run([t/'verify-x86',libs['base'],libs[key]],'x86-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
+   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
+   run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
