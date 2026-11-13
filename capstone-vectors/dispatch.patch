@@ -1310,7 +1310,7 @@ index b491ca5f..7675273f 100644
  					 const struct X86SimpleOutput *row,
  					 uint8_t opcode, uint8_t rex,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 4c9aeba4..37de5eee 100644
+index 4c9aeba4..b71c7077 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -3,11 +3,20 @@
@@ -1392,7 +1392,7 @@ index 4c9aeba4..37de5eee 100644
  		memcpy(out, ", ", 2);
  		out += 2;
  		if (value <= HEX_THRESHOLD) {
-@@ -77,33 +70,165 @@ static bool writeEvexRegisterOutput(const uint8_t *code, size_t size,
+@@ -77,33 +70,172 @@ static bool writeEvexRegisterOutput(const uint8_t *code, size_t size,
  		memcpy(d->groups, row->groups, sizeof(row->groups));
  		d->groups_count = row->group_count;
  		cs_x86 *x = &d->x86;
@@ -1495,9 +1495,16 @@ index 4c9aeba4..37de5eee 100644
 +	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
 +	const unsigned length = offset + disp_size;
 +	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
-+	if (!row->id || size < length ||
-+	    (sib && ((rxb & 2) || code[6] != 0x24)))
++	if (!row->id || size < length)
 +		return NULL;
++	if (sib) {
++		const uint8_t encoding = code[6];
++		const unsigned index = ((rxb & 2) << 2) | ((encoding >> 3) & 7);
++		/* Keep no-base and explicit RIZ spellings on the general path. */
++		if ((!mod && (encoding & 7) == 5) ||
++		    (index == 4 && encoding != 0x24))
++			return NULL;
++	}
 +	*source_width = memory_ll;
 +	*instruction_length = length;
 +	return row;
@@ -1571,7 +1578,7 @@ index 4c9aeba4..37de5eee 100644
  /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
   * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
  #if defined(_MSC_VER)
-@@ -269,16 +394,306 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -269,16 +401,327 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	return true;
  }
  
@@ -1812,7 +1819,14 @@ index 4c9aeba4..37de5eee 100644
 +	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
 +	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
 +			     (~(unsigned)code[1] & 16);
-+	const struct X86SimpleRegister *base = &regs[rm | ((rxb & 1) << 3)];
++	const unsigned base_number = sib ? (code[6] & 7) : rm;
++	const struct X86SimpleRegister *base =
++		&regs[base_number | ((rxb & 1) << 3)];
++	const unsigned index_number =
++		sib ? (((rxb & 2) << 2) | ((code[6] >> 3) & 7)) : 4;
++	const struct X86SimpleRegister *index =
++		index_number == 4 ? NULL : &regs[index_number];
++	const unsigned scale = sib ? 1u << (code[6] >> 6) : 1;
 +	const unsigned width = 16u << memory_ll;
 +	const int32_t displacement =
 +		disp_size == 4 ? X86_readDisp32(code + offset) :
@@ -1835,6 +1849,16 @@ index 4c9aeba4..37de5eee 100644
 +		memcpy(out, base->name, sizeof(base->name));
 +		out += base->length;
 +	}
++	if (index) {
++		memcpy(out, " + ", 3);
++		out += 3;
++		memcpy(out, index->name, sizeof(index->name));
++		out += index->length;
++		if (scale != 1) {
++			*out++ = '*';
++			*out++ = (char)('0' + scale);
++		}
++	}
 +	out = X86_writeDisplacement(out, displacement);
 +	*out = ']';
 +	if (insn->detail) {
@@ -1854,7 +1878,9 @@ index 4c9aeba4..37de5eee 100644
 +		}
 +		if (sib) {
 +			x->sib = code[6];
-+			x->sib_scale = 1;
++			x->sib_scale = (int8_t)scale;
++			if (index)
++				x->sib_index = (x86_reg)index->reg;
 +			x->sib_base = (x86_reg)base->reg;
 +		}
 +		x->op_count = 2;
@@ -1870,7 +1896,9 @@ index 4c9aeba4..37de5eee 100644
 +		op->type = X86_OP_MEM;
 +		op->size = (uint8_t)width;
 +		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-+		op->mem.scale = 1;
++		op->mem.scale = (int32_t)scale;
++		if (index)
++			op->mem.index = (x86_reg)index->reg;
 +		op->mem.disp = x->disp = displacement;
 +		op->access = (cs_ac_type)row->access[1];
 +	}
@@ -2970,10 +2998,10 @@ index 771fefb7..4d51efb4 100644
  			for (size_t size = 0; size <= sizeof(code) - offset;
  			     ++size)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index c6969cc3..9a69a3de 100644
+index c6969cc3..a5812001 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -318,12 +318,80 @@ static bool check_group1(csh handles[2], cs_mode mode)
+@@ -318,12 +318,104 @@ static bool check_group1(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -3013,6 +3041,30 @@ index c6969cc3..9a69a3de 100644
 +
  static bool check_evex(csh handles[2])
  {
++	for (unsigned sib = 0; sib < 256; ++sib)
++		for (unsigned ext = 0; ext < 16; ++ext)
++			for (unsigned mod = 0; mod < 3; ++mod) {
++				uint8_t b[] = { 0x62,
++						(uint8_t)(ext << 4 | 1),
++						(uint8_t)(0x7d |
++							  ((sib & 1) << 7)),
++						(uint8_t)((sib % 3) << 5 | 8),
++						0x6f,
++						(uint8_t)(mod << 6 | 0x1c),
++						(uint8_t)sib,
++						0x80,
++						0xff,
++						0,
++						0x80 };
++				size_t n = 7 + (mod == 2 || (!mod &&
++							     (sib & 7) == 5) ?
++							4 :
++							mod);
++				if (!compare(handles, b, n, sib) ||
++				    !compare(handles, b, n - 1, ext))
++					return false;
++			}
++
 +	static const uint32_t disps[] = { 0,	      1,	  9,	     10,
 +					  0x7fffffff, 0x80000000, 0xffffffff };
 +	for (unsigned p = 0; p < 16; ++p)
@@ -3057,7 +3109,7 @@ index c6969cc3..9a69a3de 100644
  	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
  		for (unsigned reg = 0; reg < 32; ++reg)
  			for (unsigned wl = 0; wl < 8; ++wl)
-@@ -427,6 +495,327 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
+@@ -427,6 +519,327 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -3385,7 +3437,7 @@ index c6969cc3..9a69a3de 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -450,9 +839,21 @@ static bool check_mode(cs_mode mode)
+@@ -450,9 +863,21 @@ static bool check_mode(cs_mode mode)
  		    !check_shift_immediate(handles, mode) ||
  		    !check_mov_imm32(handles, mode) ||
  		    !check_sib_base_mov(handles, mode) ||

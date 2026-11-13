@@ -1,7 +1,7 @@
-name: RIP-relative EVEX loads with the same bounded scan, text and detail checks on libraries
+name: EVEX indexed memory operands with bounded scalar SIB addressing on libraries
 on:
   push:
-    branches: [codex/capstone-evex-rip-memory-rows-libraries]
+    branches: [codex/capstone-evex-indexed-memory-rows-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-rip-memory-rows-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-indexed-memory-rows-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
