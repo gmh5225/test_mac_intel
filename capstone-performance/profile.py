@@ -36,7 +36,10 @@ static bool measuring;
 extern "C" void start_profile(){ if(measuring) { CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS; } }
 extern "C" void stop_profile(){ if(measuring) { CALLGRIND_STOP_INSTRUMENTATION; } }
 '''
- cpp=prefix+cpp
+ cpp='#include "X86ScanAdapter.h"\n'+prefix+cpp
+ call='cs_disasm_iter(handle, &cursor, &left, &ip, insn)'
+ assert cpp.count(call)==1
+ cpp=cpp.replace(call,'(mode ? X86_disasmIter : cs_disasm_iter)(handle, &cursor, &left, &ip, insn)')
  pos=cpp.index('  for (unsigned repeat = 0; repeat < repeats; ++repeat) {',cpp.index('#endif',cpp.index('#ifdef USE_BATCH',cpp.index('static Result capstone_run'))))
  cpp=cpp[:pos]+'  start_profile();\n'+cpp[pos:]
  pos=cpp.index('  cs_free(insn, 1);',pos);cpp=cpp[:pos]+'  stop_profile();\n'+cpp[pos:]
@@ -44,7 +47,7 @@ extern "C" void stop_profile(){ if(measuring) { CALLGRIND_STOP_INSTRUMENTATION; 
  cpp=cpp.replace('Result result = run(repeats);','measuring = true;\n    Result result = run(repeats);\n    measuring = false;')
  (w/'profile.cpp').write_text(cpp)
  for variant,lib in [('base',w/'base.a'),('new',b/'libcapstone.a')]:
-  run.command(['clang++','-O3','-gline-tables-only','-DNDEBUG','-std=c++17','-I',cs/'include',w/'profile.cpp',lib,adapter/'target/release/libiced_compare.a','-pthread','-ldl','-lm','-o',w/('profile-'+variant)],'build-consumer-'+variant)
+  run.command(['clang++','-O3','-gline-tables-only','-DNDEBUG','-std=c++17','-I',cs/'include','-I',cs/'arch/X86',w/'profile.cpp',lib,adapter/'target/release/libiced_compare.a','-pthread','-ldl','-lm','-o',w/('profile-'+variant)],'build-consumer-'+variant)
  rows=[]
  for case in fixtures:
   if case['name'] not in ('putty-32-0.85','scalar32','scalar64','simd64'):continue

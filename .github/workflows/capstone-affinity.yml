@@ -1,9 +1,9 @@
-name: Attribute the remaining output cost to decoder, formatter and public records against iced FastFormatter
+name: Attribute current x86 scan, format and detail costs against both iced formatters
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-iced-fast-live-counters]
+    branches: [codex/capstone-joint-writer-costs]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -41,7 +41,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fast-counters-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: integrated-costs-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
