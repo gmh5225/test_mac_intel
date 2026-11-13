@@ -11,8 +11,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-xcode-integration-') as tmp:
     try:
         target=os.environ['CAPSTONE_XCODE_TARGET'];project=s/'xcode/Capstone.xcodeproj'
         command=['xcodebuild','-project',project,'-configuration','Release','-target',target,'-jobs','3','ONLY_ACTIVE_ARCH=YES','CODE_SIGNING_ALLOWED=NO','SYMROOT='+str(t/'out'),'OBJROOT='+str(t/'obj'),'SHARED_PRECOMPS_DIR='+str(t/'precomp'),'CLANG_MODULE_CACHE_PATH='+str(t/'modules'),'build']
-        if target=='CapstoneDynamic':
-            rc=run(command,'baseline',False);save('baseline',dict(status=rc))
         run(['git','apply',r/'shipping.patch'],'apply')
         run(command,'xcode')
         name={'CapstoneStatic':'libcapstone.a','CapstoneDynamic':'libcapstone.dylib','CapstoneFramework':'Capstone'}[target]
