@@ -1,8 +1,8 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d1d78862..9dc12263 100644
+index 97022689..96c84e4b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -463,7 +463,7 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -467,7 +467,7 @@ if(CAPSTONE_X86_SUPPORT)
      )
      # Use scalar/vector stores or libc for the fixed public output buffers.
      # Generic x64 GCC otherwise emits REP STOS even for the short clears.
@@ -12,10 +12,10 @@ index d1d78862..9dc12263 100644
         AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
          set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
 diff --git a/Makefile b/Makefile
-index 80398b9b..d5084a3a 100644
+index 7595372a..5b087760 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -657,8 +657,8 @@ else
+@@ -661,8 +661,8 @@ else
  	@echo "Skipping tests on whole corpus"
  endif
  
@@ -26,6 +26,56 @@ index 80398b9b..d5084a3a 100644
  ifneq (,$(filter -O2 -O3,$(CFLAGS)))
  X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
      awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 11e5e995..35581ebf 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -832,6 +832,11 @@ void ARM_check_updates_flags(MCInst *MI)
+ #endif // CAPSTONE_DIET
+ }
+ 
++#if defined(CAPSTONE_HAS_X86) && defined(__linux__) && defined(__x86_64__) && \
++    defined(__GNUC__) && !defined(__clang__)
++#define ARM_GNU_MIXED_SCAN
++#endif
++
+ void ARM_set_instr_map_data(MCInst *MI)
+ {
+ 	/* The ARM decoder indexes this same generated map for implicit effects. */
+@@ -848,6 +853,24 @@ bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info)
+ {
++#ifdef ARM_GNU_MIXED_SCAN
++	/* Every displacement is valid for these A32 immediate branches. */
++	if (!instr->flat_insn->detail && instr->csh->no_text &&
++	    instr->csh->mode == CS_MODE_ARM &&
++	    instr->csh->disasm == ARM_getInstruction && code_len >= 4 &&
++	    (code[3] & 0x0e) == 0x0a) {
++		unsigned cond = code[3] >> 4;
++		unsigned opcode = ARM_Bcc;
++		if (cond == 15)
++			opcode = ARM_BLXi;
++		else if (code[3] & 1)
++			opcode = cond == 14 ? ARM_BL : ARM_BL_pred;
++		MCInst_setOpcode(instr, opcode);
++		ARM_set_instr_map_data(instr);
++		*size = 4;
++		return true;
++	}
++#endif
+ 	ARM_init_cs_detail(instr);
+ 	DecodeStatus Result = ARM_LLVM_getInstruction(
+ 		handle, code, code_len, instr, size, address, info);
+@@ -941,7 +964,7 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ }
+ #endif
+ 
+-#ifdef CAPSTONE_ARM_COPY_OPERAND_DEFAULTS
++#if defined(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS) || defined(ARM_GNU_MIXED_SCAN)
+ /* Unused operands have observable invalid indices and zeroed padding too. */
+ #define ARM_EMPTY_OP \
+ 	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
 index 7104a92a..558f611b 100644
 --- a/arch/Mips/MipsMapping.c

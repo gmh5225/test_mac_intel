@@ -1,7 +1,7 @@
-name: Qualify x86 and MIPS under reduced, full and DIET builds
+name: Verify host-qualified A32, MIPS and x86 in eight GNU profiles
 on:
   push:
-    branches: [codex/capstone-gnu-x64-mixed-release-profiles]
+    branches: [codex/capstone-a32-x86-mips-release-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -33,13 +33,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ea3443bd943f583b65005dc1af9fae94850b6de7
+          ref: a06235189645d7e20660af04d52f71005301e760
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-x64-mixed-release-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: gnu-all-three-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
