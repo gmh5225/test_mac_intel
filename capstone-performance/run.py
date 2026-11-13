@@ -151,7 +151,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json',dict(baseline='published 706eab8fec07688db644fe64c9d82600592134f8',candidate='public VEX entries with validated memory and register forms'))
+    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='validated dedicated GCC AArch64 VEX memory and register scan'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()

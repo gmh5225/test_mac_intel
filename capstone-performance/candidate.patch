@@ -1,12 +1,22 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..6d36374f 100644
+index 76fdbcb7..3ddb3596 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3422,6 +3422,96 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -2947,6 +2947,9 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+ #if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
+     !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
+ #define X86_COMPACT_PUBLIC_HEADER
++#if defined(__aarch64__)
++#define X86_COMPACT_VEX_SCAN
++#endif
+ #endif
+ 
+ #include "X86GenLegacyTerminal.inc"
+@@ -3422,6 +3425,96 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  	return completeTerminalScanResult(result, instructionID, status);
  }
  
-+#ifdef X86_COMPACT_PUBLIC_HEADER
++#ifdef X86_COMPACT_VEX_SCAN
 +X86_DECODE_INLINE unsigned vexMemoryEnd(const uint8_t *code, size_t size,
 +					unsigned end, uint8_t modrm)
 +{
@@ -99,7 +109,7 @@ index 76fdbcb7..6d36374f 100644
  X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
  					 uint8_t prefix, X86ScanResult *result)
  {
-@@ -3486,6 +3576,7 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+@@ -3486,6 +3579,7 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
  	result->popcode_adjust = 0;
  	return X86_SCAN_COMPLETE;
  }
@@ -107,25 +117,42 @@ index 76fdbcb7..6d36374f 100644
  
  /* Constant C5 admission folds the unused three-byte prefix handling. */
  X86_DECODE_INLINE bool
-@@ -3522,7 +3613,8 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+@@ -3522,7 +3616,12 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  						unsigned *id, uint16_t *length)
  {
  	const bool wide = mode == CS_MODE_64;
--	const uint8_t rex = offset ? code[0] : 0;
++#ifdef X86_COMPACT_VEX_SCAN
 +	/* Keep a spilled REX the width of its row-index arithmetic. */
 +	const unsigned rex = offset ? (unsigned)code[0] : 0;
++#else
+ 	const uint8_t rex = offset ? code[0] : 0;
++#endif
  	const unsigned rejected = FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE |
  				  FEATURE_VEX2_XOP |
  				  (wide ? FEATURE_REX_PREFIX : 0);
+@@ -3675,8 +3774,13 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 						result, opcode, extension);
+ 	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
+ 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
++#ifdef X86_COMPACT_VEX_SCAN
++		return decodeVexTerminalResult(ud, code, code_len, insn,
++						     result, 0xc5);
++#else
+ 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+ 						     result, 0xc5);
++#endif
+ 
+ 	unsigned instructionID = 0;
+ 	/* Constant bitness folds the terminal readers' mode and size tests.
 diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
-index 2c0da2cd..ecdc562d 100644
+index 2c0da2cd..77e67bf2 100644
 --- a/arch/X86/X86GenVexScan.inc
 +++ b/arch/X86/X86GenVexScan.inc
 @@ -278,6 +278,12 @@ static const uint32_t x86VexScanMetadata[] X86_DECODE_ALIGN = {
  	0x0001ed06u, 0x0001ed05u, 0x0001ed06u,
  };
  
-+#ifdef X86_COMPACT_PUBLIC_HEADER
++#ifdef X86_COMPACT_VEX_SCAN
 +static const uint8_t x86VexImmediateBytes[2][9] = {
 +	{ 0, 1, 4, 4, 2, 3, 8, 6, 8 },
 +	{ 0, 1, 2, 4, 2, 3, 4, 4, 8 },
@@ -146,7 +173,7 @@ index 2c0da2cd..ecdc562d 100644
  	0x0001ed06u,
  };
  
-+#ifdef X86_COMPACT_PUBLIC_HEADER
++#ifdef X86_COMPACT_VEX_SCAN
 +static const uint8_t x86VexImmediateBytes[2][10] = {
 +	{ 0, 1, 4, 4, 2, 3, 2, 8, 6, 8 },
 +	{ 0, 1, 2, 4, 2, 3, 2, 4, 4, 8 },
@@ -161,14 +188,14 @@ index 2c0da2cd..ecdc562d 100644
  #endif
 +#endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index 48c6fb41..de206f91 100644
+index 48c6fb41..9615c707 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
 @@ -1262,9 +1262,25 @@ def emit_vex_scan(suffix):
          "\t" + ", ".join(f"0x{f:08x}u" for f in metadata[i : i + 8]) + ","
          for i in range(0, len(metadata), 8)
      ]
-+    lines += ["};", "", "#ifdef X86_COMPACT_PUBLIC_HEADER", "static const uint8_t x86VexImmediateBytes[2][" + str(len(patterns)) + "] = {"]
++    lines += ["};", "", "#ifdef X86_COMPACT_VEX_SCAN", "static const uint8_t x86VexImmediateBytes[2][" + str(len(patterns)) + "] = {"]
 +    # An unprefixed 64-bit VEX scan has an eight-byte address. Only VEX2.pp=66
 +    # changes the ordinary reader's starting immediate width to two bytes.
 +    for default_width in (4, 2):
