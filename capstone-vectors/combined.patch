@@ -1119,10 +1119,10 @@ index 00000000..9534fd9d
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..9dd38104
+index 00000000..f05b2124
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,373 @@
+@@ -0,0 +1,396 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1142,16 +1142,46 @@ index 00000000..9dd38104
 +#include "X86SimpleOutput.h"
 +#include "X86GenSimpleOutput.inc"
 +
-+/* The admitted MOV forms have a single integer base and at most a disp8. */
++static uint32_t readLittleEndian32(const uint8_t *p)
++{
++	return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) |
++	       ((uint32_t)p[3] << 24);
++}
++
++static char *writeUnsignedImmediate(char *out, uint64_t value)
++{
++	if (value <= HEX_THRESHOLD) {
++		*out++ = (char)('0' + value);
++	} else {
++		static const char digits[] = "0123456789abcdef";
++		char temp[16], *end = temp + sizeof(temp), *start = end;
++		uint64_t n = value;
++		do {
++			*--start = digits[n & 15];
++			n >>= 4;
++		} while (n);
++		memcpy(out, "0x", 2);
++		memcpy(out + 2, start, end - start);
++		out += 2 + (end - start);
++	}
++	return out;
++}
++
++/* Ordinary MOV references with one base and an optional displacement. */
 +static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
 +			     const uint8_t *code, uint8_t opcode, uint8_t rex,
 +			     uint8_t modrm, bool load, bool wide,
 +			     uint16_t *insn_size)
 +{
-+	const bool has_disp = (modrm >> 6) == 1;
++	const unsigned mod = modrm >> 6;
++	const bool rip = !mod && (modrm & 7) == 5;
++	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
 +	const bool has_sib = (modrm & 7) == 4;
 +	const unsigned offset = 2 + (rex != 0) + has_sib;
-+	const int displacement = has_disp ? (int8_t)code[offset] : 0;
++	const int32_t displacement =
++		disp_size == 4 ? (int32_t)readLittleEndian32(code + offset) :
++		disp_size      ? (int8_t)code[offset] :
++				 0;
 +	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) :
 +						  rex != 0;
 +	const unsigned reg_index = ((rex & 4) << 1) | ((modrm >> 3) & 7);
@@ -1177,15 +1207,28 @@ index 00000000..9dd38104
 +		       11);
 +		out += 11;
 +	}
-+	memcpy(out, base->name, sizeof(base->name));
-+	out += base->length;
-+	out = X86_writeDisp8(out, displacement);
++	if (rip) {
++		memcpy(out, "rip", 3);
++		out += 3;
++	} else {
++		memcpy(out, base->name, sizeof(base->name));
++		out += base->length;
++	}
++	if (disp_size <= 1) {
++		out = X86_writeDisp8(out, displacement);
++	} else if (displacement) {
++		memcpy(out, displacement < 0 ? " - " : " + ", 3);
++		const uint32_t magnitude = displacement < 0 ?
++						   0u - (uint32_t)displacement :
++						   (uint32_t)displacement;
++		out = writeUnsignedImmediate(out + 3, magnitude);
++	}
 +	*out++ = ']';
 +	if (!load) {
 +		memcpy(out, ", ", 2);
 +		memcpy(out + 2, reg->name, sizeof(reg->name));
 +	}
-+	*insn_size = insn->size = (uint16_t)(offset + has_disp);
++	*insn_size = insn->size = (uint16_t)(offset + disp_size);
 +	memcpy(insn->bytes, code, insn->size);
 +	if (insn->detail) {
 +		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
@@ -1197,32 +1240,15 @@ index 00000000..9dd38104
 +			x->sib_scale = 1;
 +		}
 +		x->disp = displacement;
-+		if (has_disp) {
++		if (disp_size) {
 +			x->encoding.disp_offset = (uint8_t)offset;
-+			x->encoding.disp_size = 1;
++			x->encoding.disp_size = (uint8_t)disp_size;
 +		}
 +		cs_x86_op *op = &x->operands[load ? 1 : 0];
 +		op->type = X86_OP_MEM;
-+		op->mem.base = (x86_reg)base->reg;
++		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
 +		op->mem.scale = 1;
 +		op->mem.disp = displacement;
-+	}
-+}
-+
-+static void writeUnsignedImmediate(char *out, uint64_t value)
-+{
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		char temp[16], *end = temp + sizeof(temp), *start = end;
-+		uint64_t n = value;
-+		do {
-+			*--start = digits[n & 15];
-+			n >>= 4;
-+		} while (n);
-+		memcpy(out, "0x", 2);
-+		memcpy(out + 2, start, end - start);
 +	}
 +}
 +
@@ -1232,9 +1258,7 @@ index 00000000..9dd38104
 +{
 +	const unsigned offset = 1 + (rex != 0);
 +	const uint8_t *raw = code + offset;
-+	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
-+			       ((uint32_t)raw[2] << 16) |
-+			       ((uint32_t)raw[3] << 24);
++	const uint32_t value = readLittleEndian32(raw);
 +	const unsigned number = ((rex & 1) << 3) | (opcode & 7);
 +	const struct X86SimpleRegister *reg = &x86_simple_registers[2][number];
 +	insn->id = row->id;
@@ -1340,15 +1364,18 @@ index 00000000..9dd38104
 +		modrm = code[1 + has_rex];
 +		if (modrm < 0xc0) {
 +			unsigned rm = modrm & 7;
-+			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80)
++			if ((opcode & 0xfc) != 0x88)
 +				return false;
 +			/* ESP, RSP and R12 require a SIB. Redundant encodings with other
 +			 * bases can expose EIZ or RIZ in the ordinary public output. */
 +			if (rm == 4 && (size < 3u + has_rex || (rex & 2) ||
 +					code[2 + has_rex] != 0x24))
 +				return false;
-+			if ((modrm < 0x40 && rm == 5) ||
-+			    (modrm >= 0x40 && size < 3u + has_rex + (rm == 4)))
++			const bool no_base = modrm < 0x40 && rm == 5;
++			const unsigned disp_size =
++				modrm >= 0x80 || no_base ? 4 : modrm >> 6;
++			if ((!wide && no_base) ||
++			    size < 2u + has_rex + (rm == 4) + disp_size)
 +				return false;
 +			base_memory = true;
 +		}
@@ -1413,11 +1440,7 @@ index 00000000..9dd38104
 +		if (row->imm_size == 1) {
 +			delta = (int8_t)bytes[0];
 +		} else {
-+			uint32_t raw = (uint32_t)bytes[0] |
-+				       ((uint32_t)bytes[1] << 8) |
-+				       ((uint32_t)bytes[2] << 16) |
-+				       ((uint32_t)bytes[3] << 24);
-+			delta = (int32_t)raw;
++			delta = (int32_t)readLittleEndian32(bytes);
 +		}
 +		const uint16_t length = row->imm_offset + row->imm_size;
 +		target = X86_relativeBranchTarget(handle->mode, insn->address,
@@ -3201,10 +3224,10 @@ index 00000000..c9d51a88
 +}
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
-index 00000000..5bd144d5
+index 00000000..dc529630
 --- /dev/null
 +++ b/tests/unit/x86_simple_output.c
-@@ -0,0 +1,344 @@
+@@ -0,0 +1,387 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -3396,6 +3419,48 @@ index 00000000..5bd144d5
 +	return true;
 +}
 +
++/* Compare public buffers, padding, failure cursors and every truncation. */
++static bool check_mov_disp32(csh handles[2], cs_mode mode)
++{
++	static const uint32_t disps[] = { 0,	      1,	  9,
++					  10,	      0x80,	  0x7fffffff,
++					  0x80000000, 0xfffffff6, 0xffffffff };
++	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p) {
++		for (unsigned op = 0x88; op <= 0x8b; ++op) {
++			for (unsigned mr = 0; mr < 0xc0; ++mr) {
++				if (mr < 0x80 && (mr & 0xc7) != 5 &&
++				    (mr & 0xc7) != 4)
++					continue;
++				for (unsigned j = 0;
++				     j < sizeof(disps) / sizeof(disps[0]);
++				     ++j) {
++					uint8_t bytes[8] = {
++						(uint8_t)(0x3f + p),
++						(uint8_t)op, (uint8_t)mr, 0x24
++					};
++					const bool sib = (mr & 7) == 4;
++					if (sib && (j & 1))
++						bytes[3] =
++							(uint8_t)(37 * j + mr);
++					const unsigned offset = 3 + sib;
++					for (unsigned k = 0; k < 4; ++k)
++						bytes[offset + k] =
++							(uint8_t)(disps[j] >>
++								  (8 * k));
++					for (size_t len = 0;
++					     len <= offset + 4 - !p; ++len) {
++						if (!compare(handles,
++							     bytes + !p, len,
++							     mr + j + p))
++							return false;
++					}
++				}
++			}
++		}
++	}
++	return true;
++}
++
 +static bool check_group1(csh handles[2], cs_mode mode)
 +{
 +	uint8_t bytes[4];
@@ -3509,6 +3574,7 @@ index 00000000..5bd144d5
 +				      detail ? CS_OPT_ON : CS_OPT_OFF))
 +				goto done;
 +		if (!check_branches(handles) || !check_memory(handles, mode) ||
++		    !check_mov_disp32(handles, mode) ||
 +		    !check_group1(handles, mode) ||
 +		    !check_mov_imm32(handles, mode) ||
 +		    !check_sib_base_mov(handles, mode) ||

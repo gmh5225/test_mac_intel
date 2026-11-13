@@ -1,7 +1,7 @@
-name: Verify isolated x86 vector and scalar output against current Capstone next on libraries
+name: Qualify MOV disp32 and RIP-relative output records on Debian i386 and amd64 libraries
 on:
   push:
-    branches: [codex/capstone-isolated-vector-libraries]
+    branches: [codex/capstone-mov-disp32-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-vector-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: mov-disp32-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
