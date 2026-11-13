@@ -1,9 +1,9 @@
-name: Validate corrected broadcasts on real PE32 and PE64 clients
+name: Measure RIP-relative VEX loads and isolated scalar controls on native
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-corrected-broadcast-native]
+    branches: [codex/capstone-vex-rip-loads-native]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-corrected-broadcast-native
+  group: capstone-vex-rip-loads-native
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +53,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: corrected-broadcast-native-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: vex-rip-loads-native-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

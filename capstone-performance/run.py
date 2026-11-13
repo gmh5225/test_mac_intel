@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='unmasked memory broadcasts with canonical read and write effects'))
+    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='VEX scalar and packed loads with RIP-relative memory'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86VectorOutput.c.o'],diffs
+    assert 'arch/X86/X86VectorOutput.c.o' in diffs and set(diffs)<={'arch/X86/X86VectorOutput.c.o','arch/X86/X86MemoryOutput.c.o'},diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
