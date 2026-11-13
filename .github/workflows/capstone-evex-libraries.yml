@@ -1,7 +1,7 @@
-name: Measure direct EVEX terminal return on native product entry points
+name: Keep EVEX admission on the long-mode leg and preserve the vector output object
 on:
   push:
-    branches: [codex/capstone-direct-evex-scan-terminal]
+    branches: [codex/capstone-evex-mode-owned-scan]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-evex-scan-terminal-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-mode-owned-scan-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
