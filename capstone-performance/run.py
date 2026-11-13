@@ -211,9 +211,9 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert set(changed[1])-set(changed[0])=={'arch/X86/X86ImmediateOutput.c.o'} and set(changed[0])<=set(changed[1])
+    assert set(changed[1])-set(changed[0])=={'arch/X86/X86MemoryOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert sorted(diffs)==['arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'],diffs
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
