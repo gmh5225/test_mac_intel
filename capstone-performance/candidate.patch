@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..76d9543a 100644
+index a976814e..25c3cc68 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -5,11 +5,11 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -8,12 +8,12 @@ index a976814e..76d9543a 100644
  			21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
 -			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
 -			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
-+			37, 41, 38, 42, 0, 0, 65535, 0, 45, 49, 46, 50, 0, 0, 65535, 0,
-+			53, 57, 54, 58, 0, 0, 65535, 0, 61, 65, 62, 66, 0, 0, 65535, 0,
++			37, 41, 38, 42, 0, 0, X86_SEGMENT_LEA_PLAN, 0, 45, 49, 46, 50, 0, 0, X86_SEGMENT_LEA_PLAN, 0,
++			53, 57, 54, 58, 0, 0, X86_SEGMENT_LEA_PLAN, 0, 61, 65, 62, 66, 0, 0, X86_SEGMENT_LEA_PLAN, 0,
  			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
  			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 -			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 65535, 65535, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, X86_SEGMENT_LEA_PLAN, X86_SEGMENT_LEA_PLAN, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
  			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
  			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
  			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
@@ -47,7 +47,7 @@ index bd0f6c94..72c218c8 100644
  
  	const bool push = opcode == 0xff, lea = opcode == 0x8d;
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..9a505373 100644
+index 11e8578a..57f27497 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
 @@ -76,7 +76,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
@@ -59,10 +59,11 @@ index 11e8578a..9a505373 100644
  			return X86_writeVectorOutput(code, size, insn,
  						     insn_size,
  						     x86_simple_registers[3],
-@@ -205,6 +205,47 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -205,6 +205,49 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  	return true;
  }
  
++#if X86_SEGMENT_LEA_PLAN
 +/* A single segment overrideon a 32-bit LEA changes the printed segment and
 + * the public offsets. The unprefixed writer owns address decoding. */
 +bool X86_writeSegmentLea(const uint8_t *code, size_t size, cs_insn *insn,
@@ -103,15 +104,16 @@ index 11e8578a..9a505373 100644
 +	}
 +	return true;
 +}
++#endif
 +
  #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
  #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
  #endif
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..92b2e612 100644
+index 7675273f..91f2246e 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -48,12 +48,15 @@ enum X86SimpleForm {
+@@ -48,12 +48,23 @@ enum X86SimpleForm {
   * same register-only operand check as a register pair. */
  #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
  
@@ -123,37 +125,66 @@ index 7675273f..92b2e612 100644
  #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
  #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
  
++/* In dedicated GNU/Linux builds the scalar lookup and vector code retain
++ * their established layout. The ordinary decoder handles segment overrides. */
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
++    !defined(__clang__)
++#define X86_SEGMENT_LEA_PLAN 0
++#else
++#define X86_SEGMENT_LEA_PLAN X86_PLAN_PREFIX
 +CAPSTONE_INTERNAL bool X86_writeSegmentLea(const uint8_t *code, size_t size,
 +					   cs_insn *insn, uint16_t *insn_size);
++#endif
 +
  CAPSTONE_INTERNAL bool
  X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleOutput *row,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..533121f0 100644
+index 6df1472d..408c577f 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -513,6 +513,10 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,6 +513,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
  						 wide);
++#if X86_SEGMENT_LEA_PLAN
 +	/* After padding and legacy SSE, the remaining 32-bit prefix plans are
 +     * segment overrides on LEA. VEX and EVEX plans are 64-bit only. */
 +	if (!wide)
 +		return X86_writeSegmentLea(code, size, insn, insn_size);
++#endif
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..f20bb9cb 100644
+index ccc4f0de..5775c776 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -615,13 +615,15 @@ int main()
+@@ -538,9 +538,18 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					const unsigned op = j + k;
++					std::cout << (k ? " " : "");
++					if (&prefix == &plans[0][0] &&
++					    ((op & 0xe7) == 0x26 ||
++					     op == 0x64 || op == 0x65))
++						std::cout
++							<< "X86_SEGMENT_LEA_PLAN";
++					else
++						std::cout << prefix[op];
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
  			}
+ 			std::cout << "\t\t},\n";
+@@ -616,12 +625,12 @@ int main()
  		}
  	}
-+	for (unsigned segment : { 0x26u, 0x2eu, 0x36u, 0x3eu, 0x64u, 0x65u })
-+		plans[0][0][segment] = X86_PLAN_PREFIX;
  	// Reserve unprefixed EVEX for its own verified vector output records.
 -	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
 -	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;

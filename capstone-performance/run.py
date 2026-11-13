@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published ea3443bd943f583b65005dc1af9fae94850b6de7',candidate='Route i386 segment overrides through legacy prefix output'))
+    write('comparison.json',dict(baseline='published ea3443bd943f583b65005dc1af9fae94850b6de7',candidate='Use qualified i386 prefix output with GNU dedicated objects equal to the SIB-only implementation'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,10 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'},diffs
+    expected={'arch/X86/X86MemoryOutput.c.o'}
+    if PROFILE=='clang':
+        expected.update(['arch/X86/X86VectorOutput.c.o','arch/X86/X86OutputIterator.c.o'])
+    assert set(diffs)==expected,diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
