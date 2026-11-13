@@ -1,9 +1,9 @@
-name: Verify expanded operand records with an isolated fallback in native
+name: Verify and measure compact scalar records in native
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-expanded-public-writer]
+    branches: [codex/capstone-one-cache-line-records-native]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-expanded-public-writer
+  group: capstone-one-cache-line-records-native
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: expanded-public-writer-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: compact-scalar-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
