@@ -1,7 +1,7 @@
-name: Measure the complete four-backend register output candidate against iced on verified real library functions
+name: Measure the complete A32 immediate release candidate against iced on real JPEG zstd and OpenSSL
 on:
   push:
-    branches: [codex/capstone-four-register-output-libraries]
+    branches: [codex/capstone-a32-alu-release-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: registers-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: a32-alu-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
