@@ -43,7 +43,7 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
 }
 int main(int argc,char **argv) {
  API a(argv[1]),b(argv[2]);
- for(unsigned mode:{unsigned(CS_MODE_MIPS32),unsigned(CS_MODE_MIPS64),unsigned(CS_MODE_MIPS32R6),unsigned(CS_MODE_MIPS2)})
+ for(unsigned mode:{unsigned(CS_MODE_MIPS32),unsigned(CS_MODE_MIPS64),unsigned(CS_MODE_MIPS32R6),unsigned(CS_MODE_MIPS2),unsigned(CS_MODE_MIPS32R2),unsigned(CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS32|CS_MODE_MIPS32R2),unsigned(CS_MODE_MIPS64|CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS32|CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS32R2|CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS64R2|CS_MODE_MIPS_PTR64),unsigned(CS_MODE_MIPS64R5),unsigned(CS_MODE_MICRO|CS_MODE_MIPS32R2),unsigned(CS_MODE_MIPS32R2|CS_MODE_MIPS16)})
  for(unsigned endian:{0u,unsigned(CS_MODE_BIG_ENDIAN)}) {
   cs_mode m=cs_mode(mode|endian);
   for(unsigned flags=0;flags<8;++flags) {
