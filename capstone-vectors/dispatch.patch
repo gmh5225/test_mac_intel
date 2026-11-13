@@ -1,41 +1,140 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index d1d78862..9dc12263 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -463,7 +463,7 @@ if(CAPSTONE_X86_SUPPORT)
-     )
-     # Use scalar/vector stores or libc for the fixed public output buffers.
-     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
--    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
-+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
-        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-         set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
-diff --git a/Makefile b/Makefile
-index 80398b9b..d5084a3a 100644
---- a/Makefile
-+++ b/Makefile
-@@ -657,8 +657,8 @@ else
- 	@echo "Skipping tests on whole corpus"
- endif
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index 44c4930b..ccfb2f73 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -10,22 +10,6 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
  
--# Match the Release x86-only formatter tuning for the compiler's target.
--ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
-+# Match the Release x86 formatter tuning for the compiler's target.
-+ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
- ifneq (,$(filter -O2 -O3,$(CFLAGS)))
- X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
-     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..078bbc34 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2944,7 +2944,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+-static void writeUnsignedImmediate(char *out, uint64_t value)
+-{
+-	if (value <= HEX_THRESHOLD) {
+-		*out = (char)('0' + value);
+-	} else {
+-		static const char digits[] = "0123456789abcdef";
+-		char temp[16], *end = temp + sizeof(temp), *start = end;
+-		uint64_t n = value;
+-		do {
+-			*--start = digits[n & 15];
+-			n >>= 4;
+-		} while (n);
+-		memcpy(out, "0x", 2);
+-		memcpy(out + 2, start, end - start);
+-	}
+-}
  
- /* GCC materializes the general legacy reader state on these Linux hosts.
-  * The generated terminal row already provides the public ID and extent. */
--#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
-+#if defined(__linux__) && defined(__GNUC__) && \
-     !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
- #define X86_COMPACT_PUBLIC_HEADER
- #endif
+ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 			       const struct X86SimpleOutput *row, bool wide,
+@@ -51,7 +35,7 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 	char *out = insn->op_str;
+ 	if (value < 0)
+ 		*out++ = '-';
+-	writeUnsignedImmediate(out,
++	X86_writeOutputNumber(out,
+ 			       value < 0 ? (uint64_t)-value : (uint64_t)value);
+ 	if (insn->detail) {
+ 		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
+@@ -80,7 +64,7 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+ 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+ 	char *out = insn->op_str + reg->length;
+ 	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
++	X86_writeOutputNumber(out + 2, value);
+ 	if (insn->detail) {
+ 		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
+ 				      reg->reg, 0);
+@@ -134,7 +118,7 @@ static void writeRegisterImmediate(cs_insn *insn,
+ 	out += 2;
+ 	if (negative)
+ 		*out++ = '-';
+-	writeUnsignedImmediate(out, value);
++	X86_writeOutputNumber(out, value);
+ 	if (insn->detail) {
+ 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
+ 				      reg->reg, 0);
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..cf2a8dc4 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -149,21 +149,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		const uint16_t length = row->imm_offset + row->imm_size;
+ 		target = X86_relativeBranchTarget(handle->mode, insn->address,
+ 						  length, delta, row->imm_size);
+-		if (target <= HEX_THRESHOLD) {
+-			insn->op_str[0] = (char)('0' + target);
+-		} else {
+-			char digits[16];
+-			char *end = digits + sizeof(digits);
+-			char *p = end;
+-			uint64_t value = target;
+-			do {
+-				*--p = "0123456789abcdef"[value & 15];
+-				value >>= 4;
+-			} while (value);
+-			insn->op_str[0] = '0';
+-			insn->op_str[1] = 'x';
+-			memcpy(insn->op_str + 2, p, (size_t)(end - p));
+-		}
++		X86_writeOutputNumber(insn->op_str, target);
+ 		memcpy(insn->bytes, code, length);
+ 		*insn_size = insn->size = length;
+ 	} else {
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..9cb51651 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -4,6 +4,7 @@
+ #ifndef CS_X86_SIMPLE_OUTPUT_H
+ #define CS_X86_SIMPLE_OUTPUT_H
+ 
++#include "../../MathExtras.h"
+ #include <stddef.h>
+ #include <string.h>
+ #include <capstone/capstone.h>
+@@ -68,6 +69,24 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
+ 		      bool wide);
+ 
++/* The formatted writers provide space for at least eighteen characters. */
++static inline char *X86_writeOutputNumber(char *out, uint64_t value)
++{
++	if (value <= HEX_THRESHOLD) {
++		*out++ = (char)('0' + value);
++		return out;
++	}
++	memcpy(out, "0x", 2);
++	const unsigned digit_count = (67u - CountLeadingZeros_64(value)) / 4u;
++	char *end = out + 2 + digit_count;
++	char *cursor = end;
++	do {
++		*--cursor = "0123456789abcdef"[value & 15];
++		value >>= 4;
++	} while (value);
++	return end;
++}
++
+ static inline char *X86_writeDisp8(char *out, int displacement)
+ {
+ 	if (displacement) {
+@@ -99,18 +118,11 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
+ {
+ 	if (displacement >= -128 && displacement <= 127)
+ 		return X86_writeDisp8(out, displacement);
+-	memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
+-	out += 5;
++	memcpy(out, displacement < 0 ? " - " : " + ", 3);
++	out += 3;
+ 	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
+ 						(uint32_t)displacement;
+-	char digits[8], *start = digits + sizeof(digits);
+-	do {
+-		*--start = "0123456789abcdef"[magnitude & 15];
+-		magnitude >>= 4;
+-	} while (magnitude);
+-	const size_t length = (size_t)(digits + sizeof(digits) - start);
+-	memcpy(out, start, length);
+-	return out + length;
++	return X86_writeOutputNumber(out, magnitude);
+ }
+ 
+ static inline void X86_writeSimpleDetail(cs_detail *detail,
