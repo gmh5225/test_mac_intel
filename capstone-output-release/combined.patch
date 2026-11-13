@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index a608d28f..1e9237ad 100644
+index a608d28f..8fcb09ec 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -445,7 +445,16 @@ if(CAPSTONE_X86_SUPPORT)
@@ -10,7 +10,7 @@ index a608d28f..1e9237ad 100644
      )
 +    # Generic x64 GCC lowers the fixed public buffers to REP STOS and REP MOVS.
 +    # Give short copies and clears the usual scalar/vector or libc expansion.
-+    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
++    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
 +       AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
 +       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
 +        set_property(SOURCE arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
@@ -32,32 +32,19 @@ index 636d0411..69b80602 100644
  endif
  
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..aedc72c2 100644
+index ae1554b0..09559fff 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -20,10 +20,13 @@
- #include "../../MCRegisterInfo.h"
- #include "X86DisassemblerDecoderCommon.h"
- 
--#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
--	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
--	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
-+#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
- #include "../../cs_priv.h"
-+#define CAPSTONE_X86_DEDICATED_EVEX_SCAN
-+#endif
-+
-+#if defined(CAPSTONE_X86_DEDICATED_EVEX_SCAN) && defined(__linux__) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
- #define CAPSTONE_X86_DEDICATED_OUTPUT
- CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
- 					 size_t size, cs_insn *insn,
-@@ -47,6 +50,12 @@ typedef struct X86ScanResult {
+@@ -47,6 +47,16 @@ typedef struct X86ScanResult {
  	uint8_t popcode_adjust;
  } X86ScanResult;
  
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++    (defined(CAPSTONE_X86_ONLY) || \
++     (defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
++      !defined(_KERNEL_MODE) && !defined(_WIN32_WCE)))
 +#include "../../cs_priv.h"
++#define CAPSTONE_X86_EVEX_SCAN
 +CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
 +				       X86ScanResult *result);
 +#endif
@@ -66,7 +53,7 @@ index ae1554b0..aedc72c2 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 903529a8..997a24d0 100644
+index 903529a8..8c50b7be 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2942,10 +2942,10 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -78,8 +65,8 @@ index 903529a8..997a24d0 100644
 -#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__aarch64__) && \
 -    defined(__GNUC__) && !defined(__clang__)
 +/* GCC materializes the full reader state for common legacy headers on
-+ * dedicated Linux x86 decoders.  The public scan needs only ID and length. */
-+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
++ * Linux x86 decoder builds.  The public scan needs only ID and length. */
++#if defined(__linux__) && defined(__GNUC__) && \
 +    !defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
@@ -89,7 +76,7 @@ index 903529a8..997a24d0 100644
  		}
  	}
 +#endif
-+#ifdef CAPSTONE_X86_DEDICATED_EVEX_SCAN
++#ifdef CAPSTONE_X86_EVEX_SCAN
 +	/* Give an installed scan adapter the first opportunity to classify EVEX. */
 +	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
 +	    handle->insn_id == X86_get_insn_id &&
@@ -290,7 +277,7 @@ index 68de7ad4..9534fd9d 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 5a51035f..e8ca7b94 100644
+index 5a51035f..9b2176ca 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
 @@ -17,15 +17,15 @@
@@ -468,54 +455,6 @@ index 5a51035f..e8ca7b94 100644
  		if (size < 3u + has_rex)
  			return false;
  		unsigned reg_plan =
-@@ -317,8 +365,29 @@ CAPSTONE_INTERNAL bool X86_disasmIter(csh ud, const uint8_t **code,
- {
- #ifdef CS_DECODE_TRY_OUTPUT
- 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
--	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
--		return cs_disasm_iter_core(ud, code, size, address, insn);
-+	if (handle && handle->arch == CS_ARCH_X86) {
-+		if (!handle->no_text)
-+			return cs_disasm_iter_core(ud, code, size, address,
-+						   insn);
-+#ifndef CAPSTONE_X86_ONLY
-+		X86ScanResult result;
-+		if (handle->mode == CS_MODE_64 && *size >= 6 &&
-+		    **code == 0x62 && !handle->detail_opt &&
-+		    handle->insn_id == X86_get_insn_id &&
-+#ifdef CAPSTONE_X86_SCAN_ADAPTER
-+		    !handle->x86_scan_adapter &&
-+#endif
-+		    X86_tryEvexScan(*code, *size, &result)) {
-+			handle->errnum = CS_ERR_OK;
-+			insn->address = *address;
-+			finish_x86_scan(handle, insn, &result, *code, false,
-+					true);
-+			cs_disasm_iter_advance(code, size, address,
-+					       result.length);
-+			return true;
-+		}
-+#endif
-+	}
- #endif
- 	return cs_disasm_iter(ud, code, size, address, insn);
- }
-diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
-index ff9a2542..11e5b3a6 100644
---- a/arch/X86/X86ScanAdapter.h
-+++ b/arch/X86/X86ScanAdapter.h
-@@ -34,9 +34,9 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
- uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
- 			    uint64_t address, uint64_t *target);
- 
--/* Private static-link iterator for x86 consumers that request text. Uses the
-+/* Private static-link iterator for x86 consumers. Uses the
-  * same options, cursor, errors, callbacks and public records as cs_disasm_iter.
-- * Other architectures and text-free scans use cs_disasm_iter directly. */
-+ * Other architectures use cs_disasm_iter directly. */
- bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
- 		    uint64_t *address, cs_insn *insn);
- 
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
 index 5d8916a4..cc5aa9f7 100644
 --- a/arch/X86/X86SimpleOutput.h
@@ -567,21 +506,17 @@ index 5d8916a4..cc5aa9f7 100644
  					 uint8_t opcode, uint8_t rex,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
 new file mode 100644
-index 00000000..22c8d600
+index 00000000..be293f10
 --- /dev/null
 +++ b/arch/X86/X86VectorOutput.c
-@@ -0,0 +1,279 @@
+@@ -0,0 +1,275 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#ifdef CAPSTONE_HAS_X86
 +#include "../../cs_priv.h"
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	(defined(CAPSTONE_X86_ONLY) || \
-+	 (defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	  !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	  !defined(_WIN32_WCE)))
 +#include "X86Disassembler.h"
++#ifdef CAPSTONE_X86_EVEX_SCAN
 +#include "X86GenEvexScan.inc"
 +/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
 + * public IDs of ordinary vector register or base/index addresses are used. */
@@ -850,36 +785,6 @@ index 00000000..22c8d600
 +}
 +#endif
 +#endif
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..3b555da5 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -167,6 +167,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
- }
- #undef CS_DECODE_SCAN
- 
-+CS_DECODE_INLINE void cs_disasm_iter_advance(const uint8_t **code, size_t *size,
-+					     uint64_t *address, uint16_t length)
-+{
-+	*code += length;
-+	*size -= length;
-+	*address += length;
-+}
-+
- CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 					  const uint8_t **code, size_t *size,
- 					  uint64_t *address, cs_insn *insn)
-@@ -186,9 +194,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 
- 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
- 	if (CS_DECODE_LIKELY(r)) {
--		*code += insn_size;
--		*size -= insn_size;
--		*address += insn_size;
-+		cs_disasm_iter_advance(code, size, address, insn_size);
- 	} else {
- 		return cs_disasm_iter_skipdata(handle, code, size, address,
- 					       insn);
 diff --git a/suite/synctools/x86_evex_tables.cpp b/suite/synctools/x86_evex_tables.cpp
 new file mode 100644
 index 00000000..d138d08a

@@ -1,7 +1,7 @@
-name: Qualify GCC compact scanning and fixed output writes with integrated profiles
+name: Qualify shared cold EVEX lookup and x86-only object changes in profiles
 on:
   push:
-    branches: [codex/capstone-gcc-integrated-profiles]
+    branches: [codex/capstone-cold-evex-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-gcc-profile-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: cold-evex-profile-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
