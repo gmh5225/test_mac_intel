@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=cc=='gcc' and platform.machine()=='x86_64'
-   expected={'arch/X86/X86Mapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else {'arch/X86/'+n+'.c.o' for n in ('X86VectorOutput','X86DisassemblerDecoder','X86Mapping','X86OutputIterator')}
+   expected={'arch/ARM/ARMInstPrinter.c.o','arch/X86/X86Mapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else {'arch/X86/'+n+'.c.o' for n in ('X86VectorOutput','X86DisassemblerDecoder','X86Mapping','X86OutputIterator')}
    active=True
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))

@@ -1,7 +1,7 @@
-name: Check PE32 and other executable sections with packed SSE memory output
+name: Verify four-backend decoded records and avoid redundant null detail writes on real executables
 on:
   push:
-    branches: [codex/capstone-sse-memory-real-images]
+    branches: [codex/capstone-four-status-and-arm-markup]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-move-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: checked-detail-storage-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
