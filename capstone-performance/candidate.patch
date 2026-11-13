@@ -1,16 +1,17 @@
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..8d533210 100644
+index b883b547..e7d8f28b 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -178,6 +178,8 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+@@ -208,6 +208,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	if (*size == 0 || !handle)
+ 		return false;
  
- 	const bool scan = use_x86_scan(handle);
- 	insn->address = *address;
-+	/* SoftFail belongs to the current instruction, including after reuse. */
++	/* A reused cache may still contain the previous decoder's SoftFail. */
 +	insn->illegal = false;
- #ifdef CAPSTONE_DIET
- 	// zero out mnemonic & op_str
- 	insn->mnemonic[0] = '\0';
++
+ 	// An instruction cs_malloc() allocated while detail was on keeps its
+ 	// detail after detail is turned off.  Much of the decoder tests only
+ 	// whether that pointer is set, so a decode without detail hides it, as
 diff --git a/tests/unit/api.c b/tests/unit/api.c
 index 46b3e78d..af447bec 100644
 --- a/tests/unit/api.c

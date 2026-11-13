@@ -1,9 +1,9 @@
-name: Attribute iterator legality changes to concrete instructions and branch layout
+name: Compare legal status at the cache-entry boundary on PE32, PE64 and scalar inputs
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-iterator-status-with-machines]
+    branches: [codex/capstone-reused-record-at-entry]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-iterator-status-with-machines
+  group: capstone-reused-record-at-entry
   cancel-in-progress: false
 
 jobs:
