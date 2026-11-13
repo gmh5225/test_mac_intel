@@ -1,0 +1,91 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 97022689..96c84e4b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -467,7 +467,7 @@ if(CAPSTONE_X86_SUPPORT)
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+-    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
++    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
+diff --git a/Makefile b/Makefile
+index 7595372a..5b087760 100644
+--- a/Makefile
++++ b/Makefile
+@@ -661,8 +661,8 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
+ 
+-# Match the Release x86-only formatter tuning for the compiler's target.
+-ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++# Match the Release x86 formatter tuning for the compiler's target.
++ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ ifneq (,$(filter -O2 -O3,$(CFLAGS)))
+ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
+     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 7104a92a..558f611b 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -22,9 +22,10 @@
+ #include "MipsLinkage.h"
+ #include "MipsDisassembler.h"
+ 
+-#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
+-    defined(__GNUC__)
+-#define MIPS_DEDICATED_MAPPING
++#if defined(__linux__) && defined(__GNUC__) && \
++    ((defined(CAPSTONE_MIPS_ONLY) && defined(__aarch64__)) || \
++     (defined(CAPSTONE_HAS_X86) && defined(__x86_64__) && !defined(__clang__)))
++#define MIPS_DIRECT_MAPPING
+ #endif
+ 
+ #define GET_SUBTARGETINFO_ENUM
+@@ -252,7 +253,7 @@ void Mips_set_instr_map_data(MCInst *MI)
+ #endif
+ 		return;
+ 	}
+-#ifdef MIPS_DEDICATED_MAPPING
++#ifdef MIPS_DIRECT_MAPPING
+ 	/* Implicit effects below use this same dense generated opcode index. */
+ 	MI->flat_insn->id = mips_insns[MCInst_getOpcode(MI)].mapid;
+ 	if (!MI->flat_insn->detail)
+@@ -269,7 +270,7 @@ void Mips_set_instr_map_data(MCInst *MI)
+ 		}
+ 	}
+ 
+-#ifndef MIPS_DEDICATED_MAPPING
++#ifndef MIPS_DIRECT_MAPPING
+ 	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
+ #endif
+ 	map_implicit_reads(MI, mips_insns);
+@@ -301,9 +302,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ {
+ 	uint64_t size64;
+ 	Mips_init_cs_detail(instr);
+-/* The dedicated scan shortens the ordinary table walk on Linux AArch64
+- * hosts without adding work to the time-critical formatted path on x64. */
+-#ifdef MIPS_DEDICATED_MAPPING
++/* These standard encodings have no extra operands to validate in a scan. */
++#ifdef MIPS_DIRECT_MAPPING
+ 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
+ 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
+ 	    instr->csh->disasm == Mips_getInstruction &&
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 76fdbcb7..d23c98f0 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2944,8 +2944,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+ 
+ /* GCC materializes the general legacy reader state on these Linux hosts.
+  * The generated terminal row already provides the public ID and extent. */
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
+-    !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
++#if defined(__linux__) && defined(__GNUC__) && !defined(__clang__) && \
++    (defined(__x86_64__) || (defined(CAPSTONE_X86_ONLY) && defined(__aarch64__)))
+ #define X86_COMPACT_PUBLIC_HEADER
+ #endif
+ 
