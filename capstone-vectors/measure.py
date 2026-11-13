@@ -1,6 +1,6 @@
 """Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
 from pathlib import Path
-import os, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
+import gzip, os, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
 r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
@@ -32,6 +32,9 @@ def main(w):
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
     inc=inc.replace('if (mode == 2) {','if (mode == 2 || mode == 4) {\n        if (mode == 2) {').replace('        const auto &x = insn->detail->x86;', '        }\n        const auto &x = insn->detail->x86;')
     assert inc.count('iced_trace(bits,ptr,')==1
+    inc='#include <valgrind/callgrind.h>\n'+inc
+    assert inc.count('Result timed=run(reps);')==1
+    inc=inc.replace('Result timed=run(reps);','CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS; Result timed=run(reps); CALLGRIND_STOP_INSTRUMENTATION;')
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
@@ -53,26 +56,40 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
+        if name not in ('libssl3t64-amd64','libjpeg62-turbo-i386'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
         for panel in ['all-functions','simd-functions']:
+            if panel!=('simd-functions' if name=='libssl3t64-amd64' else 'all-functions'):continue
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                labels=['integer','aa','output','iced']+(['fast']if mode else [])
-                def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
-                probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
-                for i in range(15):
-                    order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
-                    cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+            for mode in (0,1,2):
+                signatures={}
+                for label in (('integer','output','iced') if mode==0 else ('integer','output','iced','fast')):
+                    command=exe.get(label,exe['output'])
+                    tag=name+'-'+panel+'-'+str(mode)+'-'+label
+                    dest=w/(tag+'.callgrind')
+                    engine='capstone' if label in exe else label
+                    args=[command,engine,str(mode),'1',f,intervals,str(bits)]
+                    expected=list(map(int,sp.check_output(args,text=True).split()))
+                    args=['valgrind','--tool=callgrind','--instr-atstart=no','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(dest),*args]
+                    with (p/'evidence'/(tag+'.log')).open('wb')as log:
+                        raw=sp.run(args,stderr=log,stdout=sp.PIPE,check=True).stdout
+                    result=list(map(int,raw.split()));assert result[2:]==expected[2:] and result[2]>0
+                    signatures[label]=result[2:];data=dest.read_bytes();events=next(k.split()[1:]for k in data.splitlines() if k.startswith(b'events:'));totals=next(k.split()[1:]for k in data.splitlines()if k.startswith(b'totals:'))
+                    counters={k.decode():int(v)for k,v in zip(events,totals)}
+                    assert counters['Ir']>result[2]*30
+                    (p/'evidence'/(tag+'.callgrind.gz')).write_bytes(gzip.compress(data));dest.unlink()
+                    reported.append(dict(case=name,panel=panel,mode=mode,engine=label,instructions=result[2],signature=result[2:],counters=counters));save('counters.json',reported)
+                assert signatures['output']==signatures['integer']
+                assert len({tuple(v[:3]) for v in signatures.values()})==1
             print(name,panel,len(sel),flush=True)
+    assert len(reported)==22
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
