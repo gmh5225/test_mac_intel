@@ -23,6 +23,7 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249'
+    run(['git','-c','core.autocrlf=false','apply',root/'intel-tests.patch'],'fix-optional-syntax-tests')
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')

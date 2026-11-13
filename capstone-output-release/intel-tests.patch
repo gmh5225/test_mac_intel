@@ -1,0 +1,129 @@
+diff --git a/tests/unit/x86_amx_avx512.c b/tests/unit/x86_amx_avx512.c
+index a8fe1391..04670ad6 100644
+--- a/tests/unit/x86_amx_avx512.c
++++ b/tests/unit/x86_amx_avx512.c
+@@ -54,6 +54,12 @@ static bool test_case(csh handle, const row_case *test, bool att_syntax)
+ 	bool success = true;
+ 	size_t count;
+ 
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	if (att_syntax)
++		return check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++				     CS_ERR_X86_ATT,
++			     test->name, "disabled syntax reports CS_ERR_X86_ATT");
++#endif
+ 	success &=
+ 		check(cs_option(handle, CS_OPT_SYNTAX,
+ 				att_syntax ? CS_OPT_SYNTAX_ATT :
+diff --git a/tests/unit/x86_amx_tile_contract.c b/tests/unit/x86_amx_tile_contract.c
+index 40a1f401..18af507d 100644
+--- a/tests/unit/x86_amx_tile_contract.c
++++ b/tests/unit/x86_amx_tile_contract.c
+@@ -208,6 +208,12 @@ static bool test_case(csh handle, const tile_case *test, bool att_syntax)
+ 	size_t count;
+ 	bool success = true;
+ 
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	if (att_syntax)
++		return check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++				     CS_ERR_X86_ATT,
++			     test->name, "disabled syntax reports CS_ERR_X86_ATT");
++#endif
+ 	success &=
+ 		check(cs_option(handle, CS_OPT_SYNTAX,
+ 				att_syntax ? CS_OPT_SYNTAX_ATT :
+diff --git a/tests/unit/x86_apx_evex_bextr.c b/tests/unit/x86_apx_evex_bextr.c
+index 6fd9fbac..67f6d89d 100644
+--- a/tests/unit/x86_apx_evex_bextr.c
++++ b/tests/unit/x86_apx_evex_bextr.c
+@@ -63,6 +63,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	reg[3] = 0;
+ 	if (cs_disasm(h, reg, 6, 0, 1, &i) != 1)
+@@ -71,6 +72,7 @@ int main(void)
+ 		ok &= i->op_str[0] == '%';
+ 		cs_free(i, 1);
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX BEXTR failure\n");
+diff --git a/tests/unit/x86_apx_evex_cmpccxadd.c b/tests/unit/x86_apx_evex_cmpccxadd.c
+index 847bbfdb..eca318e0 100644
+--- a/tests/unit/x86_apx_evex_cmpccxadd.c
++++ b/tests/unit/x86_apx_evex_cmpccxadd.c
+@@ -94,11 +94,13 @@ int main(void)
+ 			 "cmpbexadd",
+ 			 "qword ptr fs:[r29 + r14*4 + 0x20], r26, r17",
+ 			 X86_REG_R29, X86_REG_R14, 8);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	ok &= check_case(handle, code, sizeof(code), X86_INS_CMPBEXADD,
+ 			 "cmpbexaddq", "%r17, %r26, %fs:0x20(%r29,%r14,4)",
+ 			 X86_REG_R29, X86_REG_R14, 8);
+ 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+ 
+ 	code[3] = 0x71;
+ 	code[5] = 0xe0;
+diff --git a/tests/unit/x86_apx_evex_kmov.c b/tests/unit/x86_apx_evex_kmov.c
+index e87322ea..75b961a0 100644
+--- a/tests/unit/x86_apx_evex_kmov.c
++++ b/tests/unit/x86_apx_evex_kmov.c
+@@ -103,12 +103,14 @@ int main(void) {
+     ok &= ck(h, b, sizeof(b), X86_INS_KMOVD, "kmovd",
+              "k2, dword ptr fs:[r29d + r28d*4 + 0x20]", 4, 4);
+   }
++#ifndef CAPSTONE_X86_ATT_DISABLE
+   {
+     const uint8_t b[] = {0x62, 0xf9, 0xff, 8, 0x92, 0xd9};
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+     ok &= ck(h, b, 6, X86_INS_KMOVQ, "kmovq", "%r17, %k3", 8, 8);
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+   }
++#endif
+   {
+     uint8_t x[] = {0x62, 0xf9, 0x7d, 8, 0x92, 0x19};
+     if (cs_disasm(h, x, 6, 0, 1, &i)) {
+diff --git a/tests/unit/x86_apx_evex_mulx.c b/tests/unit/x86_apx_evex_mulx.c
+index 0f5f02c9..c5416af2 100644
+--- a/tests/unit/x86_apx_evex_mulx.c
++++ b/tests/unit/x86_apx_evex_mulx.c
+@@ -45,6 +45,7 @@ int main(void)
+ 			cs_free(i, 1);
+ 			i = NULL;
+ 		}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 		if (cs_disasm(h, mem, sizeof(mem), 0, 1, &i) != 1)
+ 			ok = false;
+@@ -60,6 +61,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 		cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+ 	}
+ 	{
+ 		const uint8_t mem[] = { 0x64, 0x62, 0x8a, 0xf3, 0x00,
+diff --git a/tests/unit/x86_apx_evex_pdep_pext.c b/tests/unit/x86_apx_evex_pdep_pext.c
+index 440e01e5..da45b2a2 100644
+--- a/tests/unit/x86_apx_evex_pdep_pext.c
++++ b/tests/unit/x86_apx_evex_pdep_pext.c
+@@ -15,7 +15,12 @@ int main(void)
+ 	const uint8_t pm[]={0x64,0x62,0x0a,0xf7,0x00,0xf5,0x54,0xb5,0x20};
+ 	uint8_t bad[]={0x62,0xea,0x77,0x00,0xf5,0xd3};csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);
+ 	ok&=check(h,pd,sizeof(pd),X86_INS_PDEP,"pdep","r18d, r17d, r19d");ok&=check(h,px,sizeof(px),X86_INS_PEXT,"pext","r18, r17, r19");ok&=check(h,pm,sizeof(pm),X86_INS_PDEP,"pdep","r26, r17, qword ptr fs:[r29 + r14*4 + 0x20]");
+-	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=check(h,pm,sizeof(pm),X86_INS_PDEP,"pdepq","%fs:0x20(%r29,%r14,4), %r17, %r26");cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#ifndef CAPSTONE_X86_ATT_DISABLE
++	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++	ok &= check(h, pm, sizeof(pm), X86_INS_PDEP, "pdepq",
++		    "%fs:0x20(%r29,%r14,4), %r17, %r26");
++	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+ 	for(unsigned k=0;k<4;k++){bad[3]=(uint8_t[]){4,0x10,0x20,0x80}[k];if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}
+ 	bad[2]=0x75;bad[3]=0;if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX PDEP/PEXT failure\n");return ok?0:1;
+ }

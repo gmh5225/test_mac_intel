@@ -1,7 +1,7 @@
-name: Verify EVEX opcode dispatch against the published baseline in profiles
+name: Verify APX and AMX syntax capabilities with opcode dispatch
 on:
   push:
-    branches: [codex/capstone-evex-feature-opcodes-profiles]
+    branches: [codex/capstone-intel-only-apx-amx]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: feature-opcodes-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: intel-only-apx-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
