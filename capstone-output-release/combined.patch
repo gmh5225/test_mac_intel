@@ -1,8 +1,38 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index c0547213..16e53894 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -67,6 +67,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	    cs_vsnprintf != cs_default_vsnprintf)
+ 		return false;
+ 
++	insn->illegal = false;
++
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+ 			return X86_writeVectorOutput(code, size, insn,
 diff --git a/cs.c b/cs.c
-index 59a88cf8..3dd3ec88 100644
+index 59a88cf8..9b48e9db 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1682,6 +1682,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
+@@ -1043,6 +1043,8 @@ CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch)
+ {
++	/* A backend can set SoftFail for this instruction. */
++	insn->illegal = false;
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+ 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
+ 		return true;
+@@ -1151,6 +1153,7 @@ cs_disasm_iter_skipdata(struct cs_struct *handle, const uint8_t **code,
+ 
+ 	// we have to skip some amount of data, depending on arch & mode
+ 	insn->id = 0; // invalid ID for this "data" instruction
++	insn->illegal = false;
+ 	insn->address = *address;
+ 	insn->size = (uint16_t)MIN(skipdata_bytes, sizeof(insn->bytes));
+ 	memcpy(insn->bytes, *code, MIN(skipdata_bytes, sizeof(insn->bytes)));
+@@ -1682,6 +1685,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
  		handle->errnum = CS_ERR_MEM;
  		return NULL;
  	} else {
@@ -16,23 +46,26 @@ index 59a88cf8..3dd3ec88 100644
  			// allocate memory for @detail pointer
  			insn->detail = cs_mem_malloc(sizeof(cs_detail));
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..8d533210 100644
+index b883b547..c5bff3db 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
-@@ -178,6 +178,8 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+@@ -186,6 +186,11 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
  
- 	const bool scan = use_x86_scan(handle);
- 	insn->address = *address;
-+	/* SoftFail belongs to the current instruction, including after reuse. */
-+	insn->illegal = false;
- #ifdef CAPSTONE_DIET
- 	// zero out mnemonic & op_str
- 	insn->mnemonic[0] = '\0';
+ 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
+ 	if (CS_DECODE_LIKELY(r)) {
++#ifdef CAPSTONE_HAS_X86
++		/* Compact x86 scan never passes through the full decoder. */
++		if (scan)
++			insn->illegal = false;
++#endif
+ 		*code += insn_size;
+ 		*size -= insn_size;
+ 		*address += insn_size;
 diff --git a/tests/unit/api.c b/tests/unit/api.c
-index e17860cb..db217cb1 100644
+index e17860cb..928a61ca 100644
 --- a/tests/unit/api.c
 +++ b/tests/unit/api.c
-@@ -41,10 +41,92 @@ static bool test_cs_mem_setup_fail()
+@@ -41,10 +41,96 @@ static bool test_cs_mem_setup_fail()
  	return true;
  }
  
@@ -66,6 +99,9 @@ index e17860cb..db217cb1 100644
 +			ok = false;
 +			break;
 +		}
++		if (record->illegal || record->is_alias ||
++		    record->usesAliasDetails || record->alias_id)
++			ok = false;
 +		for (unsigned text = 0; text < 2; ++text) {
 +			if (cs_option(handle, CS_OPT_TEXT,
 +				      text ? CS_OPT_ON : CS_OPT_OFF) !=
@@ -77,6 +113,7 @@ index e17860cb..db217cb1 100644
 +			size_t left = arch == CS_ARCH_ARM ? sizeof(arm) :
 +							    sizeof(x86);
 +			uint64_t ip = 0x1000;
++			record->illegal = true;
 +			if (!cs_disasm_iter(handle, &cursor, &left, &ip,
 +					    record)) {
 +				ok = false;
