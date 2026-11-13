@@ -1,7 +1,7 @@
-name: Compare real library functions with both iced formatters after correcting iterator legality
+name: Measure shared native EVEX decode and standard-mode dispatch against both iced formatters
 on:
   push:
-    branches: [codex/capstone-standard-mode-real-libraries]
+    branches: [codex/capstone-four-mode-vector-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,9 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
+          - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -38,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: standard-modes-iced-${{ matrix.host }}-${{ matrix.cc }}
+          name: native-vector-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
