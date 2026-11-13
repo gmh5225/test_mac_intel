@@ -13,6 +13,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
+  fix=r/'packed-move-metadata.patch'
+  assert sha(fix)==json.loads((r/'manifest.json').read_text())['source_lineage'][fix.name]['sha256']
+  run(['git','apply',fix],'packed-move-metadata-on-both',s)
   mapping=(s/'arch/ARM/ARMGenCSMappingInsn.inc').read_text()
   rows=re.findall(r'^\s*(ARM_[\w]+) /\* (\d+) \*/, (ARM_INS_[\w]+)',mapping,re.M)
   enums=dict(re.findall(r'^\s*(ARM_[\w]+)\s*=\s*(\d+)',(s/'arch/ARM/ARMGenInstrInfo.inc').read_text(),re.M))

@@ -1,7 +1,7 @@
-name: Verify A32 V8, EVEX metadata and four native backends in 13 real-image comparisons on five hosts
+name: Verify production MIPS revision 2 and A32 V8 in four native backends across five hosts
 on:
   push:
-    branches: [codex/capstone-arm-v8-product-matrix]
+    branches: [codex/capstone-real-r2-v8-modes]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-v8-four-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: standard-r2-v8-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
