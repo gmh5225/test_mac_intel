@@ -1,7 +1,7 @@
-name: Compare corrected SC operands in the four-backend NeverD decoder with the current fork LLVM sources
+name: Verify A32 V8, EVEX metadata and four native backends in NeverD with current fork LLVM sources
 on:
   push:
-    branches: [codex/neverd-fork-source-mips-sc64]
+    branches: [codex/neverd-a32-v8-real-mode]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 7301161d28eaca6573f9b86e34090edf57e5c0a1
+          ref: cef6b2630f10249ddf27554b51997af126a284cd
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: repaired-four-backend
+          name: product-arm-v8
           path: product-evidence/
           retention-days: 14
