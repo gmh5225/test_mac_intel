@@ -1,23 +1,24 @@
-name: Isolate the MIPS PTR64 public store conditional difference with identical and source-level controls
+name: Verify the MIPS PTR64 store conditional register and address on Release and DIET
 on:
   push:
-    branches: [codex/capstone-mips-ptr64-store-conditional]
+    branches: [codex/capstone-sc64-register-widths]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
 jobs:
-  cost:
+  mips:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
+          - { host: ubuntu-22.04, diet: OFF }
+          - { host: ubuntu-24.04, diet: OFF }
+          - { host: ubuntu-24.04, diet: ON }
+          - { host: ubuntu-24.04-arm, diet: OFF }
+          - { host: windows-2025, diet: OFF }
+          - { host: macos-15-intel, diet: OFF }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 45
-    env:
-      BUILD_ARCHS: ${{ matrix.archs }}
-      MEASURE_CC: ${{ matrix.cc }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -26,16 +27,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
+          ref: 9eaea5dec6e4b3b20a1a9802678405ae4500b52f
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
-        run: python3 capstone-records/measure.py
-      - if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/source"
-      - if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        with:
-          name: ptr64-difference-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
-          path: evidence/
-          retention-days: 14
+      - name: Build and check SC in both byte orders
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -rf -- build source' EXIT
+          git -C source apply ../capstone-records/sc64.patch
+          cmake -S source -B build -DCMAKE_BUILD_TYPE=Release -DCAPSTONE_ARCHITECTURE_DEFAULT=OFF -DCAPSTONE_MIPS_SUPPORT=ON -DCAPSTONE_BUILD_MACOS_THIN=ON -DCAPSTONE_BUILD_CSTEST=ON -DCAPSTONE_BUILD_CSTOOL=OFF -DCAPSTONE_BUILD_LEGACY_TESTS=OFF -DCAPSTONE_BUILD_DIET=${{ matrix.diet }}
+          cmake --build build --config Release --target mips_scan --parallel 4
+          ctest --test-dir build -C Release --no-tests=error --output-on-failure -R '^unit_mips_scan$'
