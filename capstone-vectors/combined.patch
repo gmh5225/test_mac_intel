@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 33536219..6223b7d9 100644
+index 33536219..308e4a6b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -158,6 +158,10 @@ if(capstone_enabled_architectures STREQUAL "X86")
@@ -29,9 +29,9 @@ index 33536219..6223b7d9 100644
 +        arch/X86/X86OutputIterator.c
 +        arch/X86/X86VectorOutput.c
      )
-+    # Generic x64 GCC lowers the fixed public buffers to REP STOS and REP MOVS.
-+    # Give short copies and clears the usual scalar/vector or libc expansion.
-+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
++    # Use scalar/vector stores or libc for the fixed public output buffers.
++    # Generic x64 GCC otherwise emits REP STOS even for the short clears.
++    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
 +       AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
 +       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
 +        set_property(SOURCE arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
@@ -41,7 +41,7 @@ index 33536219..6223b7d9 100644
      # even a compact scan a very large probed stack frame.
      if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
 diff --git a/Makefile b/Makefile
-index d7536526..28c4955b 100644
+index d7536526..f8b3e8a9 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -119,6 +119,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
@@ -73,6 +73,25 @@ index d7536526..28c4955b 100644
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
  
+@@ -641,6 +647,18 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
+ 
++# Match the Release x86-only formatter tuning for the compiler's target.
++ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++ifneq (,$(filter -O2 -O3,$(CFLAGS)))
++X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
++    awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
++         $$2 == "__GNUC__" { gcc=1 } $$2 == "__clang__" { clang_cc=1 } \
++         $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
++         END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
++$(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
++endif
++endif
++
+ $(OBJDIR)/%.o: %.c
+ 	@mkdir -p $(@D)
+ ifeq ($(V),0)
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
 index 0d9018a8..a269b603 100644
 --- a/arch/AArch64/AArch64Mapping.c
@@ -192,7 +211,7 @@ index 84222bfa..160678be 100644
  	map_set_fill_detail_ops(instr, true);
  
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 97b899b5..09559fff 100644
+index 97b899b5..3c446815 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
 @@ -20,6 +20,16 @@
@@ -212,16 +231,11 @@ index 97b899b5..09559fff 100644
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
-@@ -37,6 +47,16 @@ typedef struct X86ScanResult {
+@@ -37,6 +47,11 @@ typedef struct X86ScanResult {
  	uint8_t popcode_adjust;
  } X86ScanResult;
  
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+    (defined(CAPSTONE_X86_ONLY) || \
-+     (defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+      !defined(_KERNEL_MODE) && !defined(_WIN32_WCE)))
-+#include "../../cs_priv.h"
-+#define CAPSTONE_X86_EVEX_SCAN
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
 +				       X86ScanResult *result);
 +#endif
@@ -230,17 +244,17 @@ index 97b899b5..09559fff 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..8c50b7be 100644
+index 90ef6e93..235d4659 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2942,6 +2942,13 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	return 0;
  }
  
-+/* GCC materializes the full reader state for common legacy headers on
-+ * Linux x86 decoder builds.  The public scan needs only ID and length. */
-+#if defined(__linux__) && defined(__GNUC__) && \
-+    !defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
++/* GCC materializes the general legacy reader state on these Linux hosts.
++ * The generated terminal row already provides the public ID and extent. */
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
++    !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
 +#define X86_COMPACT_PUBLIC_HEADER
 +#endif
 +
@@ -252,8 +266,8 @@ index 90ef6e93..8c50b7be 100644
  		}
  	}
 +#endif
-+#ifdef CAPSTONE_X86_EVEX_SCAN
-+	/* Give an installed scan adapter the first opportunity to classify EVEX. */
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
++	/* An installed scan adapter has precedence over the EVEX terminal rows. */
 +	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
 +	    handle->insn_id == X86_get_insn_id &&
 +	    X86_tryEvexScan(code, code_len, result))
@@ -609,10 +623,10 @@ index 5627f249..dcaf2508 100644
  {
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 new file mode 100644
-index 00000000..30f6c5c1
+index 00000000..9534fd9d
 --- /dev/null
 +++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -0,0 +1,510 @@
+@@ -0,0 +1,490 @@
 +/* Generated by suite/synctools/x86_simple_output.cpp. */
 +
 +static const uint16_t x86_simple_plans[2][4][256] = {
@@ -626,14 +640,14 @@ index 00000000..30f6c5c1
 +			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
-+			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
-+			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
++			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
++			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
-+			0, 0, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
-+			0, 0, 0, 0, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 0,
++			0, 0, 0, 340, 0, 0, 0, 0, 0, 344, 0, 348, 352, 0, 0, 356,
++			0, 0, 0, 0, 0, 0, 0, 360, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 367, 371, 0, 375, 376, 380, 384, 388,
++			0, 0, 0, 0, 392, 396, 0, 0, 400, 404, 408, 412, 416, 420, 0, 0,
 +		},
 +		{
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -680,7 +694,7 @@ index 00000000..30f6c5c1
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			431, 435, 439, 443, 447, 451, 455, 459, 463, 467, 471, 475, 479, 483, 487, 491,
++			427, 431, 435, 439, 443, 447, 451, 455, 459, 463, 467, 471, 475, 479, 483, 487,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -692,33 +706,33 @@ index 00000000..30f6c5c1
 +	},
 +	{
 +		{
-+			493, 497, 494, 498, 0, 0, 0, 0, 501, 505, 502, 506, 0, 0, 0, 0,
-+			509, 513, 510, 514, 0, 0, 0, 0, 517, 521, 518, 522, 0, 0, 0, 0,
-+			525, 529, 526, 530, 0, 0, 0, 0, 533, 537, 534, 538, 0, 0, 0, 0,
-+			541, 545, 542, 546, 0, 0, 0, 0, 549, 553, 550, 554, 0, 0, 0, 0,
++			489, 493, 490, 494, 0, 0, 0, 0, 497, 501, 498, 502, 0, 0, 0, 0,
++			505, 509, 506, 510, 0, 0, 0, 0, 513, 517, 514, 518, 0, 0, 0, 0,
++			521, 525, 522, 526, 0, 0, 0, 0, 529, 533, 530, 534, 0, 0, 0, 0,
++			537, 541, 538, 542, 0, 0, 0, 0, 545, 549, 546, 550, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616,
++			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
 +			0, 0, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683,
-+			0, 0, 0, 65534, 685, 689, 693, 697, 701, 705, 702, 706, 0, 710, 0, 0,
-+			712, 716, 720, 724, 728, 732, 736, 740, 744, 748, 0, 0, 752, 756, 760, 764,
++			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
++			0, 0, 0, 65534, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
++			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
-+			0, 0, 0, 768, 65535, 65535, 0, 0, 0, 772, 0, 776, 780, 0, 0, 784,
-+			0, 0, 0, 0, 0, 0, 0, 788, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 795, 799, 0, 803, 804, 808, 812, 816,
-+			0, 0, 0, 0, 820, 824, 0, 0, 828, 832, 836, 840, 844, 848, 0, 0,
++			0, 0, 0, 760, 65535, 65535, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
++			0, 0, 0, 0, 0, 0, 0, 780, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 787, 791, 0, 795, 796, 800, 804, 808,
++			0, 0, 0, 0, 812, 816, 0, 0, 820, 824, 828, 832, 836, 840, 0, 0,
 +		},
 +		{
-+			853, 857, 854, 858, 0, 0, 0, 0, 861, 865, 862, 866, 0, 0, 0, 0,
-+			869, 873, 870, 874, 0, 0, 0, 0, 877, 881, 878, 882, 0, 0, 0, 0,
-+			885, 889, 886, 890, 0, 0, 0, 0, 893, 897, 894, 898, 0, 0, 0, 0,
-+			901, 905, 902, 906, 0, 0, 0, 0, 909, 913, 910, 914, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616,
++			845, 849, 846, 850, 0, 0, 0, 0, 853, 857, 854, 858, 0, 0, 0, 0,
++			861, 865, 862, 866, 0, 0, 0, 0, 869, 873, 870, 874, 0, 0, 0, 0,
++			877, 881, 878, 882, 0, 0, 0, 0, 885, 889, 886, 890, 0, 0, 0, 0,
++			893, 897, 894, 898, 0, 0, 0, 0, 901, 905, 902, 906, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 65534, 917, 921, 925, 929, 933, 937, 934, 938, 0, 942, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 65534, 909, 913, 917, 921, 925, 929, 926, 930, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
@@ -728,15 +742,15 @@ index 00000000..30f6c5c1
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +		},
 +		{
-+			853, 945, 854, 946, 0, 0, 0, 0, 861, 949, 862, 950, 0, 0, 0, 0,
-+			869, 953, 870, 954, 0, 0, 0, 0, 877, 957, 878, 958, 0, 0, 0, 0,
-+			885, 961, 886, 962, 0, 0, 0, 0, 893, 965, 894, 966, 0, 0, 0, 0,
-+			901, 969, 902, 970, 0, 0, 0, 0, 909, 973, 910, 974, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			976, 980, 984, 988, 992, 996, 1000, 1004, 1008, 1012, 1016, 1020, 1024, 1028, 1032, 1036,
++			845, 933, 846, 934, 0, 0, 0, 0, 853, 937, 854, 938, 0, 0, 0, 0,
++			861, 941, 862, 942, 0, 0, 0, 0, 869, 945, 870, 946, 0, 0, 0, 0,
++			877, 949, 878, 950, 0, 0, 0, 0, 885, 953, 886, 954, 0, 0, 0, 0,
++			893, 957, 894, 958, 0, 0, 0, 0, 901, 961, 902, 962, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 65534, 917, 1041, 925, 1045, 933, 1049, 934, 1050, 0, 1054, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 65534, 909, 965, 917, 969, 925, 973, 926, 974, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -754,7 +768,7 @@ index 00000000..30f6c5c1
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			1059, 1063, 1067, 1071, 1075, 1079, 1083, 1087, 1091, 1095, 1099, 1103, 1107, 1111, 1115, 1119,
++			979, 983, 987, 991, 995, 999, 1003, 1007, 1011, 1015, 1019, 1023, 1027, 1031, 1035, 1039,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -838,7 +852,6 @@ index 00000000..30f6c5c1
 +	{ 1493, "xchg", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 4, 3 }, { 0, 4, 3 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 1, 2 }, { 0, 1, 1 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 4, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
-+	{ 332, "lea", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 0, 1, 2, 4, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
 +	{ 510, "nop", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 0, 4, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
 +	{ 1493, "xchg", "ecx, eax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 0, 1, 2, 4, 0, 0, 0, { { 22, 4, 3 }, { 19, 4, 3 } } },
 +	{ 1493, "xchg", "edx, eax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 0, 1, 2, 4, 0, 0, 0, { { 24, 4, 3 }, { 19, 4, 3 } } },
@@ -944,7 +957,6 @@ index 00000000..30f6c5c1
 +	{ 1493, "xchg", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 1, 0, 0, { { 0, 4, 3 }, { 0, 4, 3 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 1, 0, 0, { { 0, 1, 2 }, { 0, 1, 1 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
-+	{ 332, "lea", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 145, 0, 0, 0 }, 0, 0, 1, 2, 8, 1, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
 +	{ 510, "nop", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 0, 8, 0, 0, 0, { { 0, 0, 0 }, { 0, 0, 0 } } },
 +	{ 1493, "xchg", "ecx, eax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 0, 1, 2, 8, 0, 0, 0, { { 22, 4, 3 }, { 19, 4, 3 } } },
 +	{ 1493, "xchg", "edx, eax", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 161, 0, 0, 0 }, 0, 0, 1, 2, 8, 0, 0, 0, { { 24, 4, 3 }, { 19, 4, 3 } } },
@@ -1002,7 +1014,6 @@ index 00000000..30f6c5c1
 +	{ 1493, "xchg", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 4, 3 }, { 0, 4, 3 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 1, 1 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
-+	{ 332, "lea", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 145, 0, 0, 0 }, 0, 0, 1, 2, 8, 2, 0, 0, { { 0, 4, 2 }, { 0, 4, 1 } } },
 +	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
 +	{ 512, "or", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
 +	{ 6, "adc", "", UINT64_C(137438953535), { 25, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
@@ -1011,26 +1022,9 @@ index 00000000..30f6c5c1
 +	{ 715, "sub", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
 +	{ 1503, "xor", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 1 } } },
 +	{ 105, "cmp", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 1 }, { 0, 8, 1 } } },
-+	{ 609, "push", "r8", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 106, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r9", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 107, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r10", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 108, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r11", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 109, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r12", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 110, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r13", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 111, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r14", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 112, 8, 1 }, { 0, 0, 0 } } },
-+	{ 609, "push", "r15", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 113, 8, 1 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r8", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 106, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r9", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 107, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r10", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 108, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r11", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 109, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r12", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 110, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r13", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 111, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r14", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 112, 8, 2 }, { 0, 0, 0 } } },
-+	{ 585, "pop", "r15", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 0, 0, { { 113, 8, 2 }, { 0, 0, 0 } } },
 +	{ 734, "test", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 0, 0, { { 0, 8, 1 }, { 0, 8, 1 } } },
 +	{ 1493, "xchg", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 3 }, { 0, 8, 3 } } },
 +	{ 460, "mov", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 8, 1 } } },
-+	{ 332, "lea", "", UINT64_C(0), { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 0, 0, 2, 8, 2, 0, 0, { { 0, 8, 2 }, { 0, 8, 1 } } },
 +	{ 269, "jo", "", UINT64_C(8589934592), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
 +	{ 266, "jno", "", UINT64_C(8589934592), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
 +	{ 257, "jb", "", UINT64_C(137438953472), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
@@ -1125,10 +1119,10 @@ index 00000000..30f6c5c1
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..3db7416e
+index 00000000..9dd38104
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,472 @@
+@@ -0,0 +1,373 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1215,10 +1209,10 @@ index 00000000..3db7416e
 +	}
 +}
 +
-+static char *writeUnsignedImmediate(char *out, uint64_t value)
++static void writeUnsignedImmediate(char *out, uint64_t value)
 +{
 +	if (value <= HEX_THRESHOLD) {
-+		*out++ = (char)('0' + value);
++		*out = (char)('0' + value);
 +	} else {
 +		static const char digits[] = "0123456789abcdef";
 +		char temp[16], *end = temp + sizeof(temp), *start = end;
@@ -1229,92 +1223,7 @@ index 00000000..3db7416e
 +		} while (n);
 +		memcpy(out, "0x", 2);
 +		memcpy(out + 2, start, end - start);
-+		out += 2 + (end - start);
 +	}
-+	return out;
-+}
-+
-+/* Admit ordinary one-base forms and RIP-relative addresses. Other SIB
-+ * encodings, absolute disp32 and address-size overrides use the full reader. */
-+static bool writeLea(const uint8_t *code, size_t size, cs_insn *insn,
-+		     const struct X86SimpleOutput *row, uint8_t rex,
-+		     uint8_t modrm, bool wide, uint16_t *insn_size)
-+{
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	if (mod == 3 || (!wide && !mod && rm == 5))
-+		return false;
-+	const bool sib = rm == 4;
-+	const unsigned off = 2 + (rex != 0);
-+	if (sib && (off >= size || (rex & 2) || code[off] != 0x24))
-+		return false;
-+	const unsigned start = off + sib;
-+	const bool rip = !mod && rm == 5;
-+	const unsigned width = mod == 2 || rip ? 4 : mod == 1 ? 1 : 0;
-+	const unsigned end = start + width;
-+	if (end > size)
-+		return false;
-+	int32_t disp = 0;
-+	if (width == 1)
-+		disp = (int8_t)code[start];
-+	else if (width == 4) {
-+		uint32_t raw = (uint32_t)code[start] |
-+			       ((uint32_t)code[start + 1] << 8) |
-+			       ((uint32_t)code[start + 2] << 16) |
-+			       ((uint32_t)code[start + 3] << 24);
-+		disp = (int32_t)raw;
-+	}
-+	const unsigned dest = ((rex & 4) << 1) | ((modrm >> 3) & 7);
-+	const struct X86SimpleRegister *reg =
-+		&x86_simple_registers[(rex & 8) ? 3 : 2][dest];
-+	const struct X86SimpleRegister *base =
-+		&x86_simple_registers[wide ? 3 : 2][((rex & 1) << 3) | rm];
-+	insn->id = row->id;
-+	*insn_size = insn->size = (uint16_t)end;
-+	memcpy(insn->bytes, code, end);
-+	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
-+	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	char *out = insn->op_str;
-+	memcpy(out, reg->name, sizeof(reg->name));
-+	out += reg->length;
-+	memcpy(out, ", [", 3);
-+	out += 3;
-+	if (rip) {
-+		memcpy(out, "rip", 3);
-+		out += 3;
-+	} else {
-+		memcpy(out, base->name, sizeof(base->name));
-+		out += base->length;
-+	}
-+	if (disp) {
-+		memcpy(out, disp < 0 ? " - " : " + ", 3);
-+		/* Unsigned subtraction includes the most negative disp32. */
-+		out = writeUnsignedImmediate(out + 3,
-+					     disp < 0 ? 0u - (uint32_t)disp :
-+							(uint32_t)disp);
-+	}
-+	*out = ']';
-+	if (insn->detail) {
-+		X86_writeSimpleDetail(insn->detail, row, 0x8d, rex, modrm,
-+				      reg->reg, 0);
-+		cs_x86 *x = &insn->detail->x86;
-+		cs_x86_op *mem = &x->operands[1];
-+		mem->type = X86_OP_MEM;
-+		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-+		mem->mem.scale = 1;
-+		mem->mem.disp = disp;
-+		x->disp = disp;
-+		if (width) {
-+			x->encoding.disp_offset = (uint8_t)start;
-+			x->encoding.disp_size = (uint8_t)width;
-+		}
-+		if (sib) {
-+			x->sib = code[off];
-+			x->sib_scale = 1;
-+			x->sib_base = mem->mem.base;
-+		}
-+	}
-+	return true;
 +}
 +
 +static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
@@ -1429,12 +1338,12 @@ index 00000000..3db7416e
 +		if (size < 2u + has_rex)
 +			return false;
 +		modrm = code[1 + has_rex];
-+		if (modrm < 0xc0 && opcode != 0x8d) {
++		if (modrm < 0xc0) {
 +			unsigned rm = modrm & 7;
 +			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80)
 +				return false;
 +			/* ESP, RSP and R12 require a SIB. Redundant encodings with other
-+             * bases can expose EIZ or RIZ in the ordinary public output. */
++			 * bases can expose EIZ or RIZ in the ordinary public output. */
 +			if (rm == 4 && (size < 3u + has_rex || (rex & 2) ||
 +					code[2 + has_rex] != 0x24))
 +				return false;
@@ -1455,11 +1364,6 @@ index 00000000..3db7416e
 +	    cs_vsnprintf != cs_default_vsnprintf)
 +		return false;
 +
-+	if (opcode == 0x8d && !escaped) {
-+		return writeLea(code, size, insn,
-+				&x86_simple_outputs[plan >> 2], rex, modrm,
-+				wide, insn_size);
-+	}
 +	if (plan >= X86_PLAN_MOV_REG_IMM32) {
 +		if (plan == X86_PLAN_MOV_REG_IMM32) {
 +			if (size < 5u + has_rex)
@@ -1501,17 +1405,8 @@ index 00000000..3db7416e
 +	}
 +	insn->bytes[0] = code[0];
 +	if (form == X86_SIMPLE_FIXED) {
-+		/* Both prefixed rows describe low registers for class 1 and extended
-+         * registers for class 2. Only B, independent of W, selects the bank. */
-+		if (has_rex) {
-+			unsigned stack_plan =
-+				x86_simple_plans[1][1 + (rex & 1)][opcode];
-+			row = &x86_simple_outputs[stack_plan >> 2];
-+			first = row->ops[0].reg;
-+			insn->bytes[1] = opcode;
-+		}
 +		memcpy(insn->op_str, row->operands, sizeof(row->operands));
-+		*insn_size = insn->size = 1 + has_rex;
++		*insn_size = insn->size = 1;
 +	} else if (relative) {
 +		const uint8_t *bytes = code + row->imm_offset;
 +		int64_t delta;
@@ -1739,7 +1634,7 @@ index 00000000..cc5aa9f7
 +#endif
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
 new file mode 100644
-index 00000000..be293f10
+index 00000000..217e6fd6
 --- /dev/null
 +++ b/arch/X86/X86VectorOutput.c
 @@ -0,0 +1,275 @@
@@ -1749,7 +1644,7 @@ index 00000000..be293f10
 +#ifdef CAPSTONE_HAS_X86
 +#include "../../cs_priv.h"
 +#include "X86Disassembler.h"
-+#ifdef CAPSTONE_X86_EVEX_SCAN
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +#include "X86GenEvexScan.inc"
 +/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
 + * public IDs of ordinary vector register or base/index addresses are used. */
@@ -2576,10 +2471,10 @@ index 83b8d3d8..48c6fb41 100644
          "\t\t/* Retain the original reader before invalid-ID rejection, including truncation. */",
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 new file mode 100644
-index 00000000..1e4ebaa2
+index 00000000..257b1f9f
 --- /dev/null
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -0,0 +1,520 @@
+@@ -0,0 +1,444 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -2701,8 +2596,7 @@ index 00000000..1e4ebaa2
 +// its two register IDs. Every other public byte must be reproduced by the row.
 +std::string describe(const cs_insn &insn, uint8_t opcode, uint8_t rex,
 +		     uint8_t modrm, const X86SimpleRegister *first,
-+		     const X86SimpleRegister *second, bool branch = false,
-+		     bool lea = false)
++		     const X86SimpleRegister *second, bool branch = false)
 +{
 +	const auto &d = *insn.detail;
 +	const auto &x = d.x86;
@@ -2719,7 +2613,7 @@ index 00000000..1e4ebaa2
 +		if (x.op_count != 2 || (std::string(first->name) + ", " +
 +					second->name) != insn.op_str)
 +			return {};
-+	} else if (!branch && !lea)
++	} else if (!branch)
 +		strcpy(row.operands, insn.op_str);
 +	row.flags = x.eflags;
 +	row.read_count = d.regs_read_count;
@@ -2735,19 +2629,12 @@ index 00000000..1e4ebaa2
 +	std::copy_n(d.groups, row.group_count, row.groups);
 +	for (unsigned i = 0; i < x.op_count; ++i) {
 +		const auto &op = x.operands[i];
-+		if (lea && i == 1) {
-+			if (op.type != X86_OP_MEM)
-+				return {};
-+			row.ops[1] = { 0, op.size,
-+				       static_cast<uint8_t>(op.access) };
-+			continue;
-+		}
 +		if (op.type != (branch ? X86_OP_IMM : X86_OP_REG) ||
 +		    (!branch && unsigned(op.reg) > UINT16_MAX) ||
 +		    unsigned(op.access) > UINT8_MAX)
 +			return {};
 +		row.ops[i] = { static_cast<uint16_t>(
-+				       (first || branch || lea) ? 0 : op.reg),
++				       (first || branch) ? 0 : op.reg),
 +			       op.size, static_cast<uint8_t>(op.access) };
 +	}
 +	cs_detail rebuilt;
@@ -2755,13 +2642,6 @@ index 00000000..1e4ebaa2
 +			      first ? first->reg : row.ops[0].reg,
 +			      second ? second->reg : row.ops[1].reg);
 +
-+	if (lea) {
-+		if (x.op_count != 2 || x.operands[0].type != X86_OP_REG)
-+			return {};
-+		rebuilt.x86.operands[0].reg = x.operands[0].reg;
-+		rebuilt.x86.operands[1].type = X86_OP_MEM;
-+		rebuilt.x86.operands[1].mem = x.operands[1].mem;
-+	}
 +	if (branch) {
 +		if (x.op_count != 1)
 +			return {};
@@ -2869,59 +2749,6 @@ index 00000000..1e4ebaa2
 +				std::swap(reg, rm);
 +			row.observe(describe(*decoder.insn, opcode, rex, mr,
 +					     &names[reg], &names[rm]));
-+		}
-+	}
-+	return row;
-+}
-+
-+// The B bit selects the upper register bank for 50+rd and 58+rd.
-+CheckedRow check_stack_register(Decoder &decoder, unsigned opcode, bool upper,
-+				const RegisterTable &regs)
-+{
-+	CheckedRow row;
-+	const unsigned number = (opcode & 7) + (upper ? 8 : 0);
-+	for (unsigned rex = 0x40 + upper; rex < 0x50; rex += 2) {
-+		uint8_t bytes[] = { static_cast<uint8_t>(rex),
-+				    static_cast<uint8_t>(opcode) };
-+		decoder.decode(bytes, 2, 2, 0);
-+		const auto &op = decoder.insn->detail->x86.operands[0];
-+		if (decoder.insn->detail->x86.op_count != 1 ||
-+		    op.type != X86_OP_REG ||
-+		    unsigned(op.reg) != regs[3][number].reg ||
-+		    strcmp(decoder.insn->op_str, regs[3][number].name))
-+			throw std::runtime_error(
-+				"unexpected REX stack register");
-+		row.observe(describe(*decoder.insn, opcode, rex, 0, nullptr,
-+				     nullptr));
-+	}
-+	return row;
-+}
-+
-+CheckedRow check_lea(Decoder &d, unsigned cls, const RegisterTable &regs,
-+		     bool wide)
-+{
-+	CheckedRow row;
-+	const unsigned start = !cls ? 0 : cls == 1 ? 0x40 : 0x48;
-+	for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
-+		for (unsigned mr = 0; mr < 0x40; ++mr) {
-+			if ((mr & 7) == 4 || (mr & 7) == 5)
-+				continue;
-+			decode_pair(d, rex, 0x8d, mr);
-+			const auto &reg =
-+				regs[(rex & 8) ? 3 : 2]
-+				    [((rex & 4) << 1) | ((mr >> 3) & 7)];
-+			const auto &base =
-+				regs[wide ? 3 : 2][((rex & 1) << 3) | (mr & 7)];
-+			if (d.insn->detail->x86.operands[0].reg !=
-+				    (x86_reg)reg.reg ||
-+			    d.insn->detail->x86.operands[1].mem.base !=
-+				    (x86_reg)base.reg ||
-+			    std::string(reg.name) + ", [" + base.name + "]" !=
-+				    d.insn->op_str)
-+				throw std::runtime_error(
-+					"unexpected effective address");
-+			row.observe(describe(*d.insn, 0x8d, rex, mr, nullptr,
-+					     nullptr, false, true));
 +		}
 +	}
 +	return row;
@@ -3040,14 +2867,6 @@ index 00000000..1e4ebaa2
 +					form = X86_SIMPLE_RELATIVE;
 +					row = check_relative(decoder, wide, cls,
 +							     op);
-+				} else if (wide && (cls == 1 || cls == 2) &&
-+					   op >= 0x50 && op <= 0x5f)
-+					row = check_stack_register(
-+						decoder, op, cls == 2, regs);
-+				else if (cls != 3 && op == 0x8d) {
-+					form = X86_SIMPLE_REG_RM;
-+					row = check_lea(decoder, cls, regs,
-+							wide);
 +				} else if (cls != 3 && pair_opcode(op))
 +					row = check_pair(decoder, op, cls, regs,
 +							 form);
@@ -3382,10 +3201,10 @@ index 00000000..c9d51a88
 +}
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
-index 00000000..353ca881
+index 00000000..5bd144d5
 --- /dev/null
 +++ b/tests/unit/x86_simple_output.c
-@@ -0,0 +1,388 @@
+@@ -0,0 +1,344 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -3577,48 +3396,6 @@ index 00000000..353ca881
 +	return true;
 +}
 +
-+static bool check_stack_registers(csh handles[2], cs_mode mode)
-+{
-+	for (unsigned rex = 0x40; rex < 0x50; ++rex) {
-+		for (unsigned opcode = 0x50; opcode < 0x60; ++opcode) {
-+			uint8_t bytes[] = { (uint8_t)rex, (uint8_t)opcode,
-+					    0x90 };
-+			for (size_t n = 0; n <= sizeof(bytes); ++n)
-+				if (!compare(handles, bytes, n,
-+					     (unsigned)mode + rex + opcode))
-+					return false;
-+		}
-+	}
-+	return true;
-+}
-+
-+static bool check_lea(csh handles[2], cs_mode mode)
-+{
-+	static const uint32_t edges[] = { 0,	      1,	  9,
-+					  10,	      0x7f,	  0x80,
-+					  0x7fffffff, 0x80000000, 0xfffffff6,
-+					  0xffffffff };
-+	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p)
-+		for (unsigned mr = 0; mr < 256; ++mr)
-+			for (unsigned j = 0;
-+			     j < sizeof(edges) / sizeof(edges[0]); ++j) {
-+				const uint32_t v = edges[j];
-+				const bool sib = (mr & 7) == 4 && mr < 0xc0;
-+				uint8_t bytes[10] = { (uint8_t)(p + 0x3f), 0x8d,
-+						      (uint8_t)mr, 0x24 };
-+				unsigned at = 3 + sib;
-+				if (sib && (j & 1))
-+					bytes[3] = (uint8_t)(mr + 31 * j);
-+				for (unsigned i = 0; i < 4; ++i)
-+					bytes[at + i] = (uint8_t)(v >> (8 * i));
-+				for (unsigned n = 0; n <= at + 4 - !p; ++n)
-+					if (!compare(handles, bytes + !p, n,
-+						     mr + p + j))
-+						return false;
-+			}
-+	return true;
-+}
-+
 +static bool check_group1(csh handles[2], cs_mode mode)
 +{
 +	uint8_t bytes[4];
@@ -3732,9 +3509,7 @@ index 00000000..353ca881
 +				      detail ? CS_OPT_ON : CS_OPT_OFF))
 +				goto done;
 +		if (!check_branches(handles) || !check_memory(handles, mode) ||
-+		    (!check_lea(handles, mode) ||
-+		     !check_group1(handles, mode) ||
-+		     !check_stack_registers(handles, mode)) ||
++		    !check_group1(handles, mode) ||
 +		    !check_mov_imm32(handles, mode) ||
 +		    !check_sib_base_mov(handles, mode) ||
 +		    (mode == CS_MODE_64 &&
