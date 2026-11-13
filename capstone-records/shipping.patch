@@ -1,0 +1,62 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d9ab8a03..2ec36c34 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -162,6 +162,10 @@ if(capstone_enabled_architectures STREQUAL "MIPS")
+     add_compile_definitions(CAPSTONE_MIPS_ONLY)
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "SYSTEMZ")
++    add_compile_definitions(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+diff --git a/Makefile b/Makefile
+index 779062b5..0c7fc47a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -123,6 +123,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
+ CFLAGS += -DCAPSTONE_MIPS_ONLY
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),systemz)
++CFLAGS += -DCAPSTONE_SYSTEMZ_DEDICATED_MAPPING
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+ endif
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 31844a02..711691be 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -42,15 +42,27 @@ const insn_map systemz_insns[] = {
+ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 				size_t BytesLen)
+ {
++#ifdef CAPSTONE_SYSTEMZ_DEDICATED_MAPPING
++	/* The generated opcode row also owns the implicit effects and format. */
++	const insn_map *row = &systemz_insns[MCInst_getOpcode(MI)];
++	MI->flat_insn->id = row->mapid;
++	if (!MI->flat_insn->detail)
++		return;
++#else
+ 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
++#endif
+ 	map_implicit_reads(MI, systemz_insns);
+ 	map_implicit_writes(MI, systemz_insns);
+ 	map_groups(MI, systemz_insns);
++#if defined(CAPSTONE_SYSTEMZ_DEDICATED_MAPPING) && !defined(CAPSTONE_DIET)
++	SystemZ_get_detail(MI)->format = row->suppl_info.systemz.form;
++#else
+ 	const systemz_suppl_info *suppl_info =
+ 		map_get_suppl_info(MI, systemz_insns);
+ 	if (suppl_info) {
+ 		SystemZ_get_detail(MI)->format = suppl_info->form;
+ 	}
++#endif
+ }
+ 
+ void SystemZ_init_mri(MCRegisterInfo *MRI)
