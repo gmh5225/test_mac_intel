@@ -1,32 +1,30 @@
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 160678be..7764d7c0 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -247,6 +247,10 @@ void Mips_set_instr_map_data(MCInst *MI)
- #endif
- 		return;
- 	}
-+	/* Implicit effects below use this same dense generated opcode index. */
-+	MI->flat_insn->id = mips_insns[MCInst_getOpcode(MI)].mapid;
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 31844a02..f13e991a 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -42,15 +42,19 @@ const insn_map systemz_insns[] = {
+ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 				size_t BytesLen)
+ {
+-	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
++	/* TableGen emits one row per internal opcode, including the invalid
++     * entry at index zero. The implicit-effect helpers use the same index. */
++	const unsigned opcode = MCInst_getOpcode(MI);
++	const insn_map *row = &systemz_insns[opcode];
++	MI->flat_insn->id = row->mapid;
++#ifndef CAPSTONE_DIET
 +	if (!MI->flat_insn->detail)
 +		return;
- 	// Fixes for missing groups.
- 	if (MCInst_getOpcode(MI) == Mips_JR) {
- 		unsigned Reg = MCInst_getOpVal(MI, 0);
-@@ -258,7 +262,6 @@ void Mips_set_instr_map_data(MCInst *MI)
- 		}
- 	}
+ 	map_implicit_reads(MI, systemz_insns);
+ 	map_implicit_writes(MI, systemz_insns);
+ 	map_groups(MI, systemz_insns);
+-	const systemz_suppl_info *suppl_info =
+-		map_get_suppl_info(MI, systemz_insns);
+-	if (suppl_info) {
+-		SystemZ_get_detail(MI)->format = suppl_info->form;
+-	}
++	SystemZ_get_detail(MI)->format = row->suppl_info.systemz.form;
++#endif
+ }
  
--	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
- 	map_implicit_reads(MI, mips_insns);
- 	map_implicit_writes(MI, mips_insns);
- 	map_groups(MI, mips_insns);
-@@ -334,7 +337,7 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 		}
- 		if (opcode) {
- 			MCInst_setOpcode(instr, opcode);
--			map_cs_id(instr, mips_insns, ARR_SIZE(mips_insns));
-+			instr->flat_insn->id = mips_insns[opcode].mapid;
- 			*size = 4;
- 			return true;
- 		}
+ void SystemZ_init_mri(MCRegisterInfo *MRI)

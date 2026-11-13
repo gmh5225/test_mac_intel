@@ -9,22 +9,22 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-mips-mapping-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-systemz-rows-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
-  mapping=(s/'arch/Mips/MipsGenCSMappingInsn.inc').read_text()
-  rows=re.findall(r'^\s*(Mips_[\w]+) /\* (\d+) \*/, (MIPS_INS_[\w]+)',mapping,re.M)
-  enums=dict(re.findall(r'^\s*(Mips_[\w]+)\s*=\s*(\d+)',(s/'arch/Mips/MipsGenInstrInfo.inc').read_text(),re.M))
-  assert [int(row[1]) for row in rows]==list(range(3134)) and all(enums[name]==idx for name,idx,_ in rows)
+  mapping=(s/'arch/SystemZ/SystemZGenCSMappingInsn.inc').read_text()
+  rows=re.findall(r'^\s*(SystemZ_[\w]+) /\* (\d+) \*/, (SYSTEMZ_INS_[\w]+)',mapping,re.M)
+  enums=dict(re.findall(r'^\s*(SystemZ_[\w]+)\s*=\s*(\d+)',(s/'arch/SystemZ/SystemZGenInstrInfo.inc').read_text(),re.M))
+  assert [int(row[1]) for row in rows]==list(range(3105)) and all(enums[name]==idx for name,idx,_ in rows)
   write('mapping',dict(rows=len(rows),sha256=hashlib.sha256(mapping.encode()).hexdigest()))
   mixed=os.environ['BUILD_ARCHS']=='four'
   all_inputs=corpus.prepare(r,t,e,run)
-  choices={'mips64el-ls','mips64el-sort','mips64el-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','arm-ls','amd64-ls'} if mixed else set())
+  choices={'s390x-ls','s390x-sort','s390x-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','arm-ls','amd64-ls'} if mixed else set())
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_MIPS_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_SYSTEMZ_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
@@ -36,15 +36,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-mips-mapping-') as tmp:
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':
-    run(['cmake','--build',b,'--target','mips_scan','--parallel','4'],'build-test-'+key)
-    run(['ctest','--test-dir',b,'-R','^unit_mips_scan$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
+    run(['cmake','--build',b,'--target','mapping','--parallel','4'],'build-test-'+key)
+    run(['ctest','--test-dir',b,'-R','^unit_mapping$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
-  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
+  (t/'systemz.bin').write_bytes(b''.join(Path(q['path']).read_bytes()for q in cases if q['name'].startswith('s390x-')))
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-systemz.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   assert changed==['arch/Mips/MipsMapping.c.o'],changed
+   assert changed==['arch/SystemZ/SystemZMapping.c.o'],changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
-   run([t/'verify',libs['base'],libs[key]],'differential-'+key)
+   run([t/'verify',libs['base'],libs[key],16384,t],'differential-'+key)
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps):

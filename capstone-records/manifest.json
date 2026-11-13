@@ -1,5 +1,5 @@
 {
-  "capstone_revision": "706eab8fec07688db644fe64c9d82600592134f8",
+  "capstone_revision": "d843dcdf830e883697b348eff0ee47d99849ff90",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "source_lineage": {
     "single.cpp": {
@@ -87,8 +87,12 @@
       "experiment": "round574-legacy-memory-repair"
     },
     "indexed.patch": {
-      "description": "direct MIPS map and one no-detail return",
-      "sha256": "799de8f67f72b7c64daeec2e8c4fd569e0766bbf25ff31ea21eac3c88fef4e7e"
+      "description": "Read SystemZ public opcode and format from the same generated row",
+      "sha256": "e1d5f6a821bb6814f566fe561f92fa7b0a81553e7a37550b3794d9473d17f3ee"
+    },
+    "verify-systemz.cpp": {
+      "description": "Complete observable instruction/detail/iteration/regs with 40 mode configurations and four output modes",
+      "sha256": "1d9555c4a3a29221f0e72b55a4c0dd52cc65e7730955ff340437dbffeafa66dc"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
@@ -101,33 +105,6 @@
       "kind": "deb",
       "command": "ls",
       "text_sha256": "c3ab7564ed458e2e97012a6436b80685573452630c13a2f5366bba908253c29e"
-    },
-    {
-      "name": "arm-sort",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "sort",
-      "text_sha256": "76987581cc48d7187eb2ad76293be2b89414d7277c22ad6093ce9b770169a824"
-    },
-    {
-      "name": "arm-cp",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "cp",
-      "text_sha256": "82569bcb320c864a08cf37798b610396d1e1066f68758826e3294e561987d393"
-    },
-    {
-      "name": "mips64el-ls",
-      "selector": 4,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
-      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
-      "kind": "deb",
-      "command": "ls",
-      "text_sha256": "3b48cf397f99bbee260ba1c12f976a9b790cc44b120f8ae0dfad89384ca6a2fa"
     },
     {
       "name": "putty-32-0.85",
@@ -163,20 +140,31 @@
       "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
     },
     {
-      "name": "mips64el-cp",
-      "selector": 4,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
-      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
+      "name": "s390x-ls",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "text_sha256": "46819752e9b45e34a3402b173ffa4099c4a2a249647062c92de2c8f99606db08",
       "kind": "deb",
-      "command": "cp"
+      "command": "ls"
     },
     {
-      "name": "mips64el-sort",
-      "selector": 4,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
-      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
+      "name": "s390x-sort",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "text_sha256": "3423b7a3b4c97f02d0b9f41d3cd95917f1415c934f9ae64f946c8de6a8b2f881",
       "kind": "deb",
       "command": "sort"
+    },
+    {
+      "name": "s390x-cp",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "text_sha256": "8233e8f281a6961b61d5ed52224317097681dc05a86c0b21d73a8376547f915d",
+      "kind": "deb",
+      "command": "cp"
     }
   ]
 }
