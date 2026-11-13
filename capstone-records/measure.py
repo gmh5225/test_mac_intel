@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    write('cpu',{'model':next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith(('model name','CPU part')))})
   mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
   all_inputs=corpus.prepare(r,t,e,run)
-  choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls'} if mixed else set())
+  choices={'arm64-ls','arm64-sort','arm64-cp','putty-32-0.85','mips64el-ls'}
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
@@ -74,11 +74,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*210e6/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
+    for k in range(25):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-     for v in seq+seq[::-1]:
+     for v in ((seq+seq[::-1]) if (k//3)%2==0 else (seq[::-1]+seq)):
       vout=sample(v,x,mode,n)
       if reference is None:reference=(vout['first'],vout['result'])
       assert reference==(vout['first'],vout['result'])
