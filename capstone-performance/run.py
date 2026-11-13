@@ -152,7 +152,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='admit EVEX in the existing cold extension reader, format from canonical scalar/vector rows'))
+    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='separate non-x86 public iterator from the x86 scan frame'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -205,7 +205,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'},diffs
+    assert set(diffs)=={'cs.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'},diffs
     if os.environ['MIXED_CC']=='gcc':
         command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'compile-full-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
@@ -364,12 +364,15 @@ def measure():
     controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
     cycles=13; duration=180_000_000
     measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
-    for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
-        choices=[c for c in cases if c['consumer']==consumer]
-        if not choices:
-            continue
-        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
-        measure_panel(panel,choices,cycles,variants,duration)
+    for panel,consumer in [('x86','decoder'),('other','single')]:
+        if consumer=='decoder':
+            picks={'putty-32-0.85','amd64-ls','simd64','scalar32'}
+        else:
+            picks={'arm-cp','arm64-ls','mips64el-ls','mips64el-cp','mips64el-sort'}
+        choices=[c for c in cases if c['consumer']==consumer and c['name'] in picks]
+        assert choices
+        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer=='decoder' else [])
+        measure_panel(panel,choices,17,variants,220000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 

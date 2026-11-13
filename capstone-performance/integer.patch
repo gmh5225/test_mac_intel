@@ -1,8 +1,19 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 33536219..a608d28f 100644
+index 33536219..88676e41 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -167,7 +167,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
+@@ -158,6 +158,10 @@ if(capstone_enabled_architectures STREQUAL "X86")
+     add_compile_definitions(CAPSTONE_X86_ONLY)
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "MIPS")
++    add_compile_definitions(CAPSTONE_MIPS_ONLY)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+@@ -167,7 +171,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
  endif()
  
  if(capstone_enabled_architectures STREQUAL "AARCH64")
@@ -11,7 +22,7 @@ index 33536219..a608d28f 100644
  endif()
  
  # Dedicated builds of these backends use their generated mnemonic tries.
-@@ -444,6 +444,7 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -444,6 +448,7 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86InstPrinterCommon.c
          arch/X86/X86Mapping.c
          arch/X86/X86Module.c
@@ -20,10 +31,21 @@ index 33536219..a608d28f 100644
      # MSVC can inline the decoder into the public iterator under LTCG, giving
      # even a compact scan a very large probed stack frame.
 diff --git a/Makefile b/Makefile
-index d7536526..636d0411 100644
+index d7536526..c60287ce 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -128,7 +128,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+@@ -119,6 +119,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ CFLAGS += -DCAPSTONE_X86_ONLY
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
++CFLAGS += -DCAPSTONE_MIPS_ONLY
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+ endif
+@@ -128,7 +132,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
  endif
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
@@ -32,7 +54,7 @@ index d7536526..636d0411 100644
  endif
  
  ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
-@@ -248,6 +248,7 @@ endif
+@@ -248,6 +252,7 @@ endif
  endif
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
@@ -95,6 +117,69 @@ index 0d9018a8..a269b603 100644
  	AArch64_init_cs_detail(MI);
  	DecodeStatus Result = AArch64_LLVM_getInstruction(
  		handle, code, code_len, MI, size, address, info);
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 84222bfa..160678be 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -288,6 +288,58 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ {
+ 	uint64_t size64;
+ 	Mips_init_cs_detail(instr);
++/* The dedicated scan shortens the ordinary table walk on Linux AArch64
++ * hosts without adding work to the time-critical formatted path on x64. */
++#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
++    defined(__GNUC__)
++	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
++	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
++	    instr->csh->disasm == Mips_getInstruction &&
++	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
++		/* For these standard immediate and load/store encodings all
++		 * register and immediate bits are operands. */
++		const unsigned major = readBytes32(instr, code) >> 26;
++		unsigned opcode = 0;
++		switch (major) {
++		case 9:
++			opcode = Mips_ADDiu;
++			break;
++		case 12:
++			opcode = Mips_ANDi;
++			break;
++		case 13:
++			opcode = Mips_ORi;
++			break;
++		case 14:
++			opcode = Mips_XORi;
++			break;
++		case 25:
++			if (mode == CS_MODE_MIPS64)
++				opcode = Mips_DADDiu;
++			break;
++		case 35:
++			opcode = Mips_LW;
++			break;
++		case 43:
++			opcode = Mips_SW;
++			break;
++		case 55:
++			if (mode == CS_MODE_MIPS64)
++				opcode = Mips_LD;
++			break;
++		case 63:
++			if (mode == CS_MODE_MIPS64)
++				opcode = Mips_SD;
++			break;
++		}
++		if (opcode) {
++			MCInst_setOpcode(instr, opcode);
++			map_cs_id(instr, mips_insns, ARR_SIZE(mips_insns));
++			*size = 4;
++			return true;
++		}
++	}
++#endif
+ 	instr->MRI = (MCRegisterInfo *)info;
+ 	map_set_fill_detail_ops(instr, true);
+ 
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index 97b899b5..ae1554b0 100644
 --- a/arch/X86/X86Disassembler.h
@@ -1840,9 +1925,18 @@ index 00000000..1d3b62a0
 +		  << '\n';
 +}
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index e42caf08..908b0266 100644
+index e42caf08..4a17e366 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
+@@ -27,7 +27,7 @@ if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
+         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
+ endif()
+ if(CAPSTONE_MIPS_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
++    list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+    OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_SPARC_SUPPORT
 @@ -63,7 +63,7 @@ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
      list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
  endif()
@@ -1993,6 +2087,122 @@ index 00000000..0f827721
 +			       check_mode(CS_MODE_BIG_ENDIAN) ?
 +		       0 :
 +		       1;
++}
+diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
+new file mode 100644
+index 00000000..c9d51a88
+--- /dev/null
++++ b/tests/unit/mips_scan.c
+@@ -0,0 +1,110 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <stdio.h>
++#include <string.h>
++#include "../../cs_priv.h"
++
++/* An installed decoder callback can inspect the decoded MC operands. It
++ * also gives these tests the ordinary table decoder as an independent path. */
++static Disasm_t ordinary;
++static unsigned operand_count;
++
++static bool inspect_operands(csh handle, const uint8_t *code, size_t length,
++			     MCInst *inst, uint16_t *size, uint64_t address,
++			     void *info)
++{
++	bool ok = ordinary(handle, code, length, inst, size, address, info);
++	operand_count = MCInst_getNumOperands(inst);
++	return ok;
++}
++
++static bool compare(csh handles[2], uint32_t word, bool big_endian,
++		    size_t length, bool has_operands)
++{
++	uint8_t code[4];
++	for (unsigned i = 0; i < 4; ++i)
++		code[big_endian ? 3 - i : i] = (uint8_t)(word >> (8 * i));
++	const uint8_t *cursor[2] = { code, code };
++	size_t left[2] = { length, length };
++	uint64_t pc[2] = { UINT64_MAX - 2, UINT64_MAX - 2 };
++	cs_insn insn[2];
++	cs_detail detail[2];
++	bool ok[2];
++	for (unsigned i = 0; i < 2; ++i) {
++		memset(&insn[i], 0xa5, sizeof(insn[i]));
++		memset(&detail[i], 0x5a, sizeof(detail[i]));
++		insn[i].is_alias = insn[i].usesAliasDetails = insn[i].illegal =
++			false;
++		insn[i].detail = &detail[i];
++		ok[i] = cs_disasm_iter(handles[i], &cursor[i], &left[i], &pc[i],
++				       &insn[i]);
++		if (insn[i].detail != &detail[i])
++			return false;
++		insn[i].detail = NULL;
++	}
++	if (ok[0] == ok[1] && left[0] == left[1] && pc[0] == pc[1] &&
++	    cursor[0] == cursor[1] &&
++	    cs_errno(handles[0]) == cs_errno(handles[1]) &&
++	    !memcmp(&insn[0], &insn[1], sizeof(cs_insn)) &&
++	    !memcmp(&detail[0], &detail[1], sizeof(cs_detail)) &&
++	    (!has_operands || (ok[1] && operand_count > 0)))
++		return true;
++	fprintf(stderr, "MIPS scan mismatch for %08x, length %zu, %s-endian\n",
++		(unsigned)word, length, big_endian ? "big" : "little");
++	return false;
++}
++
++static bool check_mode(cs_mode mode)
++{
++	static const uint32_t words[] = {
++		0x24080001, 0x3128ffff, 0x35080000,
++		0x3928ffff, 0x8fa80000, 0xafa8fffc,
++	};
++	static const uint32_t others[] = {
++		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
++		0,	    0x03e00008, 0xffffffff,
++	};
++	csh handles[2] = { 0 };
++	bool success = false, big_endian = (mode & CS_MODE_BIG_ENDIAN) != 0;
++	for (unsigned i = 0; i < 2; ++i)
++		if (cs_open(CS_ARCH_MIPS, mode, &handles[i]))
++			goto done;
++	cs_struct *reference = (cs_struct *)(uintptr_t)handles[1];
++	ordinary = reference->disasm;
++	reference->disasm = inspect_operands;
++	for (unsigned options = 0; options < 4; ++options) {
++		for (unsigned i = 0; i < 2; ++i)
++			if (cs_option(handles[i], CS_OPT_TEXT,
++				      options & 1 ? CS_OPT_ON : CS_OPT_OFF) ||
++			    cs_option(handles[i], CS_OPT_DETAIL,
++				      options & 2 ? CS_OPT_ON : CS_OPT_OFF))
++				goto done;
++		for (unsigned i = 0; i < sizeof(words) / sizeof(words[0]); ++i)
++			for (size_t length = 0; length <= 4; ++length)
++				if (!compare(handles, words[i], big_endian,
++					     length, length == 4))
++					goto done;
++		for (unsigned i = 0; i < sizeof(others) / sizeof(others[0]);
++		     ++i)
++			if (!compare(handles, others[i], big_endian, 4, false))
++				goto done;
++	}
++	success = true;
++done:
++	for (unsigned i = 0; i < 2; ++i)
++		if (handles[i])
++			cs_close(&handles[i]);
++	return success;
++}
++
++int main(void)
++{
++	const cs_mode modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64,
++				  CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN,
++				  CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN };
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
++		if (!check_mode(modes[i]))
++			return 1;
++	return 0;
 +}
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
