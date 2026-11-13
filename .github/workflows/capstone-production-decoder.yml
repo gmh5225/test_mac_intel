@@ -1,7 +1,7 @@
-name: Verify unchanged production NeverD with two public Capstone output dispatch placements
+name: Verify native NeverD with Capstone-owned XBEGIN targets and displacement widths
 on:
   push:
-    branches: [codex/capstone-public-dispatch-neverd]
+    branches: [codex/capstone-canonical-x86-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 04ba89ec9f69d063c7bad3e5f8b8f27752217355
+          ref: 78210f23e22f2292250acc84135de5067684e32d
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: public-capstone-neverd
+          name: canonical-x86-product
           path: product-evidence/
           retention-days: 14

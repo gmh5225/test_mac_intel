@@ -41,12 +41,15 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  for label in ('base','core','iterator'):
+  for label in ('base','fixed','direct'):
    if label!='base':
-    command(['git','apply',r/(label+'.patch')],'select-'+label,cs)
+    command(['git','apply',r/'xbegin.patch'],'select-capstone-'+label,cs)
+    if label=='direct':command(['git','apply',r/'neverd.patch'],'select-neverd-'+label,nd)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
-   tool=next(build.rglob('capstone-route'));trace=t/(label+'.trace')
+   tool=next(build.rglob('capstone-route'))
+   command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
+   trace=t/(label+'.trace')
    signature=sp.check_output([tool,trace],text=True).strip();write(label+'-public-state',signature)
    if label=='base':
     rep=t/'repeat.trace';again=sp.check_output([tool,rep],text=True).strip();write('base-repeat-state',again);compare(trace,rep,'base-repeat');rep.unlink()
@@ -57,7 +60,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    if label!='base':
-    command(['git','apply','-R',r/(label+'.patch')],'restore-source-'+label,cs)
+    command(['git','apply','-R',r/'xbegin.patch'],'restore-source-'+label,cs)
+    if label=='direct':command(['git','apply','-R',r/'neverd.patch'],'restore-neverd-'+label,nd)
    snapshot=json.loads((build/'.neverd-deps/snapshot.json').read_text())
    write(label+'-snapshot',snapshot)
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
@@ -65,7 +69,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     base_objects=json.loads((out/'base-objects.json').read_text());assert base_objects.keys()==objects.keys()
     changed=sorted(k for k in objects if objects[k]!=base_objects[k]);write(label+'-changes',changed)
-    assert set(changed)==({'cs.c.o','arch/X86/X86OutputIterator.c.o'} if label=='core' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}),changed
+    assert changed and all(k.startswith('arch/X86/') for k in changed),changed
+    if label=='direct':
+     assert objects==json.loads((out/'fixed-objects.json').read_text()),'N adapter change changed Capstone binary'
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
@@ -85,7 +91,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(130000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','core','iterator')):
+    for idx,label in enumerate(('base-copy','fixed','direct')):
      plans=[]
      for cycle in range(9):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)

@@ -1,3 +1,6 @@
+#include <array>
+#include <cstdio>
+#include <cstring>
 #include "neverd/decode/Decoder.h"
 #include <array>
 #include <cstdio>
@@ -6,7 +9,31 @@
 using namespace neverd;
 static uint64_t hash=14695981039346656037ull;
 static void observe(const void* data,size_t n){ const auto*b=static_cast<const uint8_t*>(data);while(n--)hash=(hash^*b++)*1099511628211ull; }
+static int all_xbegin_targets() {
+    unsigned count=0;
+    for (auto arch : {neverd::Arch::X86,neverd::Arch::X64})
+        for (bool ad : {false,true}) {
+            neverd::Decoder decoder;
+            if (!decoder.init(arch)) return 7;
+            std::array<uint8_t,6> bytes{0x67,0x66,0xc7,0xf8,0,0};
+            for (unsigned bits=0; bits<65536; ++bits) {
+                bytes[4]=(uint8_t)bits; bytes[5]=(uint8_t)(bits>>8);
+                const uint64_t expected=uint64_t(0x12345000+5+ad)+(int16_t)bits;
+                for (unsigned route=0;route<3;++route) {
+                    neverd::DecodedInsn i{};
+                    auto *src=bytes.data()+!ad;size_t n=5+ad;
+                    int size=route==0?decoder.decodeOne(src,n,0x12345000,i):route==1?decoder.decodeOneLight(src,n,0x12345000,i):decoder.decodeOneForLift(src,n,0x12345000,i);
+                    if ((size_t)size!=n || !i.Raw || !i.Raw->detail || i.Id!=X86_INS_XBEGIN || i.Raw->detail->x86.operands[0].imm!=(int64_t)expected) return 6;
+                    ++count;
+                }
+            }
+        }
+    std::printf("%u signed XBEGIN targets across three production decode routes\n",count);
+    return 0;
+}
+
 int main(int argc,char**argv) {
+  if(argc==2 && std::strcmp(argv[1],"--xbegin")==0)return all_xbegin_targets();
   FILE* trace=argc>1?std::fopen(argv[1],"wb"):nullptr;
   if(argc>1&&!trace)return 5;
   if(trace) {
