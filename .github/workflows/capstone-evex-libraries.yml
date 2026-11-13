@@ -1,7 +1,7 @@
-name: Measure prefixed public operand extents on real PE32 PE64 ELF and SIMD under GCC 11 and 13
+name: Isolate padded mnemonic byte stores across five hosts on real i386 amd64 and SIMD library functions
 on:
   push:
-    branches: [codex/capstone-compact-prefix-real-libraries]
+    branches: [codex/capstone-generated-mnemonic-stores]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,9 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
+          - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -38,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-prefix-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: fixed-mnemonic-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
