@@ -50,28 +50,42 @@ def main(w):
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
     run(['clang++','-O2','-std=c++17','-I',tree/'include',r/'census.cpp',b/'libcapstone.a','-o',w/'census'],'census-link')
+    run(['clang++','-O2','-std=c++17','-I',base/'include',r/'cells.cpp',b/'libcapstone.a','-o',w/'cells'],'cells-build')
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
+        if name not in ('libssl3t64-amd64','libssl3t64-i386','libjpeg62-turbo-amd64'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in ['all-functions','simd-functions']:
-            sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
-            if not sel:continue
-            intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
-            rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
-            counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
-            save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                labels=['integer','aa','output','iced']+(['fast']if mode else [])
+        intervals.write_text(''.join('%d %d %d\n'%tuple(q)for q,_ in common))
+        per=[tuple(map(int,ln.split()))for ln in sp.check_output([w/'cells',f,intervals,str(bits)],text=True).splitlines()]
+        assert len(per)==len(common)
+        def bucket(c):
+            total,hits,invalid=c
+            if invalid or not total:return 'has-rejections'
+            if hits==total:return 'all-direct'
+            if 10*hits>=9*total:return '90-to-100'
+            if 2*hits>=total:return '50-to-90'
+            return 'below-50'
+        for scope in ('all','simd'):
+          if scope=='simd' and name!='libssl3t64-amd64':continue
+          for group in ('all-direct','90-to-100','50-to-90','below-50','has-rejections'):
+            selected=[(span,cell)for (span,vw),cell in zip(common,per)if bucket(cell)==group and (scope=='all' or (vw[1]>=8 and vw[1]>=0.15*vw[0]))]
+            if not selected:continue
+            sel=[q for q,v in selected];panel=scope+'-'+group
+            manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel),instructions=sum(c[0]for q,c in selected),hits=sum(c[1]for q,c in selected),invalid=sum(c[2]for q,c in selected))
+            save('provenance.json',manifest)
+            intervals.write_text(''.join('%d %d %d\n'%tuple(q)for q in sel))
+            for mode in [1,2]:
+                labels=['integer','aa','output','fast']
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
-                probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
-                for i in range(15):
+                probe=measure('integer',1);rep=max(1,math.ceil(45e6/max(1,probe[0])));cycles=[]
+                for i in range(13):
                     order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
