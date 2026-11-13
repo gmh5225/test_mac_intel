@@ -19,7 +19,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-xcode-integration-') as tmp:
         paths=[x for x in (t/'out').rglob(name) if x.is_file() and not x.is_symlink()]
         assert len(paths)==1,paths
         lib=paths[0]
-        run(['xcrun','clang','-O2','-I',s/'include',r/'smoke.c',lib,'-o',t/'smoke'],'consumer-link')
+        flags=['-F',t/'out/Release','-framework','Capstone'] if target=='CapstoneFramework' else ['-I',s/'include',lib]
+        run(['xcrun','clang','-O2',r/'smoke.c',*flags,'-o',t/'smoke'],'consumer-link')
         env=os.environ.copy();env.update(DYLD_LIBRARY_PATH=str(lib.parent),DYLD_FRAMEWORK_PATH=str(t/'out/Release'))
         with (e/'consumer.log').open('wb')as f:sp.run([t/'smoke'],env=env,stdout=f,stderr=sp.STDOUT,check=True)
         save('complete',dict(target=target,library=name,architectures=9))
