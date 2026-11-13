@@ -1,7 +1,7 @@
-name: Render wide displacements, immediates and targets at the final operand cursor
+name: Measure copy and tail clearing of ten fixed-width mnemonic writers
 on:
   push:
-    branches: [codex/capstone-direct-operand-digit-writes]
+    branches: [codex/capstone-mnemonic-fixed-tail]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ea3443bd943f583b65005dc1af9fae94850b6de7
+          ref: a06235189645d7e20660af04d52f71005301e760
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-operand-digit-writes-${{ matrix.host }}-${{ matrix.cc }}
+          name: mnemonic-fixed-tail-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

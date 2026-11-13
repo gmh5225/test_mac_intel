@@ -1,140 +1,136 @@
 diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 44c4930b..ccfb2f73 100644
+index 44c4930b..b9545112 100644
 --- a/arch/X86/X86ImmediateOutput.c
 +++ b/arch/X86/X86ImmediateOutput.c
-@@ -10,22 +10,6 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
- 
--static void writeUnsignedImmediate(char *out, uint64_t value)
--{
--	if (value <= HEX_THRESHOLD) {
--		*out = (char)('0' + value);
--	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
--		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
--	}
--}
- 
- static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 			       const struct X86SimpleOutput *row, bool wide,
-@@ -51,7 +35,7 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+@@ -45,8 +45,7 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 	*insn_size = insn->size = length;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
  	char *out = insn->op_str;
  	if (value < 0)
- 		*out++ = '-';
--	writeUnsignedImmediate(out,
-+	X86_writeOutputNumber(out,
- 			       value < 0 ? (uint64_t)-value : (uint64_t)value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
-@@ -80,7 +64,7 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+@@ -74,8 +73,7 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)(offset + 4);
+ 	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
  	memcpy(insn->op_str, reg->name, sizeof(reg->name));
  	char *out = insn->op_str + reg->length;
- 	memcpy(out, ", ", 2);
--	writeUnsignedImmediate(out + 2, value);
-+	X86_writeOutputNumber(out + 2, value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
- 				      reg->reg, 0);
-@@ -134,7 +118,7 @@ static void writeRegisterImmediate(cs_insn *insn,
- 	out += 2;
- 	if (negative)
- 		*out++ = '-';
--	writeUnsignedImmediate(out, value);
-+	X86_writeOutputNumber(out, value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      reg->reg, 0);
+@@ -125,8 +123,7 @@ static void writeRegisterImmediate(cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)(offset + imm_size);
+ 	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+ 	char *out = insn->op_str + reg->length;
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index bd0f6c94..41b4a94a 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -60,8 +60,7 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)length;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = insn->op_str;
+ 	if (load) {
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..cf2a8dc4 100644
+index 11e8578a..8e6a0214 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -149,21 +149,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		const uint16_t length = row->imm_offset + row->imm_size;
- 		target = X86_relativeBranchTarget(handle->mode, insn->address,
- 						  length, delta, row->imm_size);
--		if (target <= HEX_THRESHOLD) {
--			insn->op_str[0] = (char)('0' + target);
--		} else {
--			char digits[16];
--			char *end = digits + sizeof(digits);
--			char *p = end;
--			uint64_t value = target;
--			do {
--				*--p = "0123456789abcdef"[value & 15];
--				value >>= 4;
--			} while (value);
--			insn->op_str[0] = '0';
--			insn->op_str[1] = 'x';
--			memcpy(insn->op_str + 2, p, (size_t)(end - p));
--		}
-+		X86_writeOutputNumber(insn->op_str, target);
- 		memcpy(insn->bytes, code, length);
- 		*insn_size = insn->size = length;
- 	} else {
+@@ -121,8 +121,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	uint64_t target = 0;
+ 	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
+ 	insn->id = row->id;
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	insn->bytes[0] = code[0];
+ 	if (form == X86_SIMPLE_FIXED) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..9cb51651 100644
+index 7675273f..84b4a2de 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -4,6 +4,7 @@
- #ifndef CS_X86_SIMPLE_OUTPUT_H
- #define CS_X86_SIMPLE_OUTPUT_H
- 
-+#include "../../MathExtras.h"
- #include <stddef.h>
- #include <string.h>
- #include <capstone/capstone.h>
-@@ -68,6 +69,24 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -68,6 +68,15 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
  		      bool wide);
  
-+/* The formatted writers provide space for at least eighteen characters. */
-+static inline char *X86_writeOutputNumber(char *out, uint64_t value)
++/* Generated mnemonics contain their own zero padding. Only the remaining
++ * bytes of the public field need clearing when an iterator record is reused. */
++static inline void X86_writeOutputMnemonic(cs_insn *insn, const char *name,
++					   size_t extent)
 +{
-+	if (value <= HEX_THRESHOLD) {
-+		*out++ = (char)('0' + value);
-+		return out;
-+	}
-+	memcpy(out, "0x", 2);
-+	const unsigned digit_count = (67u - CountLeadingZeros_64(value)) / 4u;
-+	char *end = out + 2 + digit_count;
-+	char *cursor = end;
-+	do {
-+		*--cursor = "0123456789abcdef"[value & 15];
-+		value >>= 4;
-+	} while (value);
-+	return end;
++	memcpy(insn->mnemonic, name, extent);
++	memset(insn->mnemonic + extent, 0, sizeof(insn->mnemonic) - extent);
 +}
 +
  static inline char *X86_writeDisp8(char *out, int displacement)
  {
  	if (displacement) {
-@@ -99,18 +118,11 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
- {
- 	if (displacement >= -128 && displacement <= 127)
- 		return X86_writeDisp8(out, displacement);
--	memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
--	out += 5;
-+	memcpy(out, displacement < 0 ? " - " : " + ", 3);
-+	out += 3;
- 	uint32_t magnitude = displacement < 0 ? 0u - (uint32_t)displacement :
- 						(uint32_t)displacement;
--	char digits[8], *start = digits + sizeof(digits);
--	do {
--		*--start = "0123456789abcdef"[magnitude & 15];
--		magnitude >>= 4;
--	} while (magnitude);
--	const size_t length = (size_t)(digits + sizeof(digits) - start);
--	memcpy(out, start, length);
--	return out + length;
-+	return X86_writeOutputNumber(out, magnitude);
- }
- 
- static inline void X86_writeSimpleDetail(cs_detail *detail,
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..7414af59 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -43,8 +43,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	*insn_size = insn->size = (uint16_t)len;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, len);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
+ 	for (unsigned n = 1; n != reg_count; ++n) {
+@@ -189,8 +188,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+ 	*insn_size = insn->size = (uint16_t)len;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, len);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, ll, dst);
+ 	if (fma) {
+@@ -279,8 +277,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ 	*insn_size = insn->size = (uint16_t)length;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, 0, first);
+ 	memcpy(out, ", ", 2);
+@@ -329,8 +326,7 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = 8;
+ 	memcpy(insn->bytes, code, 8);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, row->length_code, dst);
+ 	memcpy(out, row->address, sizeof(row->address));
+@@ -556,8 +552,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)length;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	X86_writeOutputMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, ll, dst);
+ 	memcpy(out, ", xmmword ptr [", 15);
