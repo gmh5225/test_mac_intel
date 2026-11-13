@@ -1,7 +1,7 @@
-name: Measure iterator detail restoration and packed SSE output on actual library functions
+name: Profile retired host instructions and simulated branches for real OpenSSL SIMD and i386 function extents
 on:
   push:
-    branches: [codex/capstone-four-output-status-libraries]
+    branches: [codex/capstone-real-simd-instruction-profiles]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,10 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-22.04, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -31,7 +27,9 @@ jobs:
           ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
           path: source
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - name: Install the Callgrind instrumentation headers and binary
+        run: sudo apt-get update -qq && sudo apt-get install -qy valgrind
+      - name: Compare instrumented work at identical real function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -41,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checked-detail-storage-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: real-library-callgrind-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
