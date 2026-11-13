@@ -1,7 +1,7 @@
-name: Attribute scan, format and detail costs on the same OpenSSL SIMD and 32-bit libjpeg functions
+name: Attribute remaining native and iced instruction costs after mixed GNU scan and output changes
 on:
   push:
-    branches: [codex/capstone-real-library-instruction-costs]
+    branches: [codex/capstone-current-simd-costs-with-gnu-stores]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6703e144275793a419ad663511e34b5dab3d52d8
+          ref: ea3443bd943f583b65005dc1af9fae94850b6de7
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-library-costs-${{ matrix.host }}-${{ matrix.cc }}
+          name: current-integrated-costs-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
