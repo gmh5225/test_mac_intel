@@ -63,6 +63,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     compare(t/'base.trace',trace,label);trace.unlink()
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
+   command(['nm','-S','-C',prod],'timed-symbols-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
