@@ -1,12 +1,16 @@
-name: Verify expanded operand records with an isolated fallback in product
+name: Isolate static code placement from ARM and PE decoder changes on two independent workers
 on:
   push:
-    branches: [codex/neverd-expanded-operand-output]
+    branches: [codex/neverd-arm-code-layout-controls]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
 jobs:
   product:
+    strategy:
+      fail-fast: false
+      matrix:
+        trial: [1, 2]
     runs-on: ubuntu-24.04
     timeout-minutes: 235
     steps:
@@ -18,7 +22,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: fc9fadbf57b992d99064a1175fd0cc80cbe13938
+          ref: 2cc799b248ddfeec638f82c42a2e1a685c7500f7
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-expanded-operand-output
+          name: arm-layout-control-${{ matrix.trial }}
           path: product-evidence/
           retention-days: 14
