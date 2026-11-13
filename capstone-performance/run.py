@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published b70c7e94 with previously qualified AArch64 GCC scan', candidate='complete scalar and vector output, compact GCC scan and tuned public writes'))
+    write('comparison.json', dict(baseline='integrated GCC and cold vector output', candidate='same code plus canonical LEA and REX push/pop output'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -212,9 +212,9 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
+    assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
