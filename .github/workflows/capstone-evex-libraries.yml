@@ -1,7 +1,7 @@
-name: Measure packed SSE move output against a byte-identical control and both iced formatters
+name: Measure iterator detail restoration and packed SSE output on actual library functions
 on:
   push:
-    branches: [codex/capstone-sse-memory-real-libraries]
+    branches: [codex/capstone-four-output-status-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: packed-move-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: checked-detail-storage-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

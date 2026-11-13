@@ -49,7 +49,7 @@ def main(w):
         if label=='output':
             assert objects['integer'].keys()==objects[label].keys()
             changed={n for n in objects[label] if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/X86/X86Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/Mips/MipsMapping.c.o',*('arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput'))}
+            expected={'arch/ARM/ARMInstPrinter.c.o','arch/X86/X86Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/Mips/MipsMapping.c.o',*('arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput'))}
             if not (os.environ["CC"]=="gcc" and platform.machine()=="x86_64"):
                 expected={"arch/X86/"+n+".c.o" for n in ("X86VectorOutput","X86DisassemblerDecoder","X86Mapping","X86OutputIterator")}
             assert changed==expected,(changed,expected)
