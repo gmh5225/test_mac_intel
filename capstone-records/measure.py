@@ -22,7 +22,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    write('cpu',{'model':next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith(('model name','CPU part')))})
   mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
   all_inputs=corpus.prepare(r,t,e,run)
-  choices={'arm64-ls','arm64-sort','arm64-cp','putty-32-0.85','mips64el-ls'}
+  choices={'arm64-ls','arm64-sort','arm64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','mips64el-ls','arm-ls','arm-sort','arm-cp'}
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
@@ -48,6 +48,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
      assert ('-DCAPSTONE_ARM_AARCH64_MIPS_X86' in compile)==(len(archs.split())==4)
     write('make-profiles',dict(architecture_sets=6,cc=cc,target=target))
     run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan|aarch64_register_names_generator|arm_register_names_generator|fixed_len_decoder|fixed_len_decoder_newlines)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
+    run(['cmake','--build',b,'--target','aarch64_postprocess','aarch64_scan','--parallel','4'],'build-a64-tests')
+    run(['ctest','--test-dir',b,'-R','^unit_aarch64_(postprocess|scan|register_names_generator)$','--no-tests=error','--output-on-failure'],'a64-tests')
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
@@ -55,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=cc=='gcc' and platform.machine()=='x86_64'
-   expected={'arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMInstPrinter.c.o','arch/Mips/MipsDisassembler.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
+   expected={'arch/AArch64/AArch64InstPrinter.c.o','arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMInstPrinter.c.o','arch/Mips/MipsDisassembler.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
@@ -74,9 +76,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*210e6/warm['cpu_ns'])))
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(25):
+    for k in range(19):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in ((seq+seq[::-1]) if (k//3)%2==0 else (seq[::-1]+seq)):
       vout=sample(v,x,mode,n)
