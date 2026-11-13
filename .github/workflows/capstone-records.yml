@@ -1,7 +1,7 @@
-name: Verify softfail to legal transitions plus PE32, PE64, ARM and MIPS performance
+name: Measure real PE32 and PE64 with absolute address output and check other architecture executables
 on:
   push:
-    branches: [codex/capstone-next-softfail-public-state]
+    branches: [codex/capstone-absolute-memory-pe32]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: softfail-next-four-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: absolute-memory-pe-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
