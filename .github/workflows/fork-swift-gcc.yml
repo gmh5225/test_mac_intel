@@ -1,0 +1,31 @@
+name: Compile and run the fork's Swift demangling tests with GCC
+on:
+  push:
+    branches: [codex/swiftdemangle-gcc-source-tests]
+    paths: [.github/workflows/fork-swift-gcc.yml]
+permissions:
+  contents: read
+jobs:
+  swift:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/llvm-project
+          ref: 16e02253d172dfb0e086815a02b15db3ff76766a
+          persist-credentials: false
+          sparse-checkout: |
+            cmake
+            llvm
+            libc/cmake
+            third-party
+      - name: Configure from the fork sources with GCC
+        run: cmake -S llvm -B "$RUNNER_TEMP/swift-build" -G Ninja -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_INCLUDE_TESTS=ON -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_ENABLE_PROJECTS=
+      - name: Build SwiftDemangleTests and run every case
+        run: |
+          cmake --build "$RUNNER_TEMP/swift-build" --target SwiftDemangleTests --parallel 4
+          "$RUNNER_TEMP/swift-build/unittests/SwiftDemangle/SwiftDemangleTests"
+      - if: always()
+        name: Remove the temporary build tree
+        run: rm -rf -- "$RUNNER_TEMP/swift-build"
