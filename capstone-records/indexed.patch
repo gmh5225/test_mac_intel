@@ -76,6 +76,79 @@ index 11e5e995..35581ebf 100644
  /* Unused operands have observable invalid indices and zeroed padding too. */
  #define ARM_EMPTY_OP \
  	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
+diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
+index 25f13d10..37e0a26f 100644
+--- a/arch/Mips/MipsDisassembler.c
++++ b/arch/Mips/MipsDisassembler.c
+@@ -1684,6 +1684,20 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
++#if defined(CAPSTONE_HAS_X86) && defined(__linux__) && defined(__x86_64__) && \
++    defined(__GNUC__) && !defined(__clang__)
++#define CAPSTONE_MIPS_PRIMARY_DISPATCH
++#endif
++#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
++	/* A primary-opcode miss in these generated tables reaches Fail before
++	 * any predicate, operand reader, or instruction state change. */
++	const uint64_t major = UINT64_C(1) << (Insn >> 26);
++	IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
++	IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
++	const bool try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
++#else
++	const bool try_dsp = true;
++#endif
+ 	if (IsGP64) {
+ 		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
+ 					     Address, NULL);
+@@ -1698,10 +1712,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 			return Result;
+ 	}
+ 
+-	Result = decodeInstruction_4(DecoderTableMipsDSP32, Instr, Insn,
+-				     Address, NULL);
+-	if (Result != MCDisassembler_Fail)
+-		return Result;
++	if (try_dsp) {
++		Result = decodeInstruction_4(DecoderTableMipsDSP32, Instr, Insn,
++					     Address, NULL);
++		if (Result != MCDisassembler_Fail)
++			return Result;
++	}
+ 
+ 	// Calling the auto-generated decoder function.
+ 	Result = decodeInstruction_4(DecoderTableMips32, Instr, Insn, Address,
+diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
+index 7b2b3a08..4b1738be 100644
+--- a/arch/Mips/MipsGenDirectDecoder.inc
++++ b/arch/Mips/MipsGenDirectDecoder.inc
+@@ -15309,6 +15309,8 @@ Decode:
+ 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
++#define DecoderTableMips6432_MAJOR_MASK UINT64_C(0x9090f0809f250001)
++
+ static DecodeStatus direct_DecoderTableMips6432(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
+ {
+ 	uint64_t CurFieldValue = 0;
+@@ -15905,6 +15907,8 @@ Decode:
+ 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
++#define DecoderTableMipsDSP32_MAJOR_MASK UINT64_C(0x0000080800000000)
++
+ static DecodeStatus direct_DecoderTableMipsDSP32(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
+ {
+ 	uint64_t CurFieldValue = 0;
+@@ -15940,6 +15944,8 @@ Decode:
+ 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ }
+ 
++#define DecoderTableMipsFP6432_MAJOR_MASK UINT64_C(0x20200000000a0000)
++
+ static DecodeStatus direct_DecoderTableMipsFP6432(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
+ {
+ 	uint64_t CurFieldValue = 0;
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
 index 7104a92a..558f611b 100644
 --- a/arch/Mips/MipsMapping.c
@@ -139,3 +212,42 @@ index 76fdbcb7..d23c98f0 100644
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
  
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index 30482037..29a72009 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -144,6 +144,22 @@ def successors(n):
+     return [n.end] + ([] if n.target is None else [n.target])
+ 
+ 
++def primary_opcode_mask(nodes):
++    """A top-level miss must reach Fail without modifying the instruction."""
++    root = nodes[0]
++    require(root.op == "ExtractField" and root.args == (26, 6),
++            "Review MIPS primary opcode field")
++    node = nodes[root.end]
++    mask = 0
++    while node.op == "FilterValue":
++        value = node.args[0]
++        require(value < 64, "Invalid MIPS primary opcode")
++        mask |= 1 << value
++        node = nodes[node.target]
++    require(node.op == "Fail", "Review MIPS primary opcode fallback")
++    return mask
++
++
+ def emit(name, nodes, width, w):
+     incoming = {p: set() for p in nodes}
+     for p, n in nodes.items():
+@@ -274,6 +290,11 @@ def main():
+                 "Review changed decoder input width before regenerating",
+             )
+             nodes = parse(body)
++            if arch == "Mips" and name in (
++                "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
++            ):
++                mask = primary_opcode_mask(nodes)
++                output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
+             output.append(emit(name, nodes, width, w))
+             counts.append((name, len(nodes)))
+         for w, width in sorted(set(inputs.values())):
