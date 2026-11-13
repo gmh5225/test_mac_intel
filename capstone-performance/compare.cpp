@@ -189,11 +189,11 @@ int main(int argc, char **argv) {
                                std::istreambuf_iterator<char>()};
     if (bytes.empty())
       throw std::runtime_error("empty or unreadable input");
-    void *iced = iced_create(bits, mode);
+    void *iced = iced_create(bits, mode | (library == "fast" ? 8 : 0));
     auto run = [&](unsigned n) {
       if (library == "capstone")
         return capstone_run(bytes.data(), bytes.size(), bits, mode, n);
-      if (library == "iced") {
+      if (library == "iced" || library == "fast") {
         Result r;
         iced_run(iced, bytes.data(), bytes.size(), n, &r);
         return r;
