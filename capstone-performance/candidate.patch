@@ -1,175 +1,737 @@
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index f869d85f..053c9efe 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -72,3 +72,108 @@ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
- 		{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 67f06ddf..d80a3fc5 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -452,6 +452,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86InstPrinterCommon.c
+         arch/X86/X86Mapping.c
+         arch/X86/X86Module.c
++        arch/X86/X86ImmediateOutput.c
+         arch/X86/X86OutputIterator.c
+         arch/X86/X86VectorOutput.c
+     )
+@@ -460,7 +461,7 @@ if(CAPSTONE_X86_SUPPORT)
+     if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+-        set_property(SOURCE arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
++        set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
+             APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-mstringop-strategy=libcall>")
+     endif()
+     # MSVC can inline the decoder into the public iterator under LTCG, giving
+diff --git a/Makefile b/Makefile
+index 0e98074f..9bf5b882 100644
+--- a/Makefile
++++ b/Makefile
+@@ -256,6 +256,7 @@ endif
+ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86ImmediateOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+@@ -659,7 +660,7 @@ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/de
+          $$2 == "__GNUC__" { gcc=1 } $$2 == "__clang__" { clang_cc=1 } \
+          $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+          END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
+-$(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
++$(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
+ endif
+ endif
+ 
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index 9534fd9d..a8e890ee 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -9,13 +9,13 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
+ 			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
+ 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
+ 			0, 0, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 0, 0, 0,
+ 			284, 288, 292, 296, 300, 304, 308, 312, 316, 320, 0, 0, 324, 328, 332, 336,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 0, 0, 340, 0, 0, 0, 0, 0, 344, 0, 348, 352, 0, 0, 356,
++			0, 65533, 0, 340, 0, 0, 0, 0, 0, 344, 0, 348, 352, 0, 0, 356,
+ 			0, 0, 0, 0, 0, 0, 0, 360, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 367, 371, 0, 375, 376, 380, 384, 388,
+ 			0, 0, 0, 0, 392, 396, 0, 0, 400, 404, 408, 412, 416, 420, 0, 0,
+@@ -83,13 +83,13 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			537, 541, 538, 542, 0, 0, 0, 0, 545, 549, 546, 550, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			552, 556, 560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612,
+-			0, 0, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 65535, 0, 0, 0, 0, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
+ 			619, 623, 627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679,
+ 			0, 0, 0, 65534, 681, 685, 689, 693, 697, 701, 698, 702, 0, 0, 0, 0,
+ 			704, 708, 712, 716, 720, 724, 728, 732, 736, 740, 0, 0, 744, 748, 752, 756,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 0, 0, 760, 65535, 65535, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
++			0, 65533, 0, 760, 65535, 65535, 0, 0, 0, 764, 0, 768, 772, 0, 0, 776,
+ 			0, 0, 0, 0, 0, 0, 0, 780, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 787, 791, 0, 795, 796, 800, 804, 808,
+ 			0, 0, 0, 0, 812, 816, 0, 0, 820, 824, 828, 832, 836, 840, 0, 0,
+@@ -107,7 +107,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -125,7 +125,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -412,6 +412,42 @@ static const struct X86SimpleOutput x86_simple_outputs[] = {
+ 	{ 261, "jge", "", UINT64_C(25769803776), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
+ 	{ 263, "jle", "", UINT64_C(60129542144), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
+ 	{ 262, "jg", "", UINT64_C(60129542144), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
++	{ 635, "rol", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 636, "ror", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 615, "rcl", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 618, "rcr", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 683, "shl", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 686, "shr", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 647, "sal", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 649, "sar", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 635, "rol", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 636, "ror", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 615, "rcl", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 618, "rcr", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 683, "shl", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 686, "shr", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 647, "sal", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 649, "sar", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 635, "rol", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 636, "ror", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 615, "rcl", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 618, "rcr", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 683, "shl", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 686, "shr", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 647, "sal", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 649, "sar", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
++	{ 635, "rol", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 636, "ror", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 615, "rcl", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 618, "rcr", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 683, "shl", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 686, "shr", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 647, "sal", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 649, "sar", "", UINT64_C(17592186044478), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 2, 3, 1, { { 0, 8, 3 }, { 0, 1, 0 } } },
++	{ 609, "push", "", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 161, 0, 0, 0 }, 1, 1, 1, 1, 4, 0, 1, 4, { { 0, 4, 0 }, { 0, 0, 0 } } },
++	{ 609, "push", "", UINT64_C(0), { 30, 0, 0, 0 }, { 30, 0, 0, 0 }, { 161, 0, 0, 0 }, 1, 1, 1, 1, 4, 0, 1, 1, { { 0, 4, 0 }, { 0, 0, 0 } } },
++	{ 609, "push", "", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 1, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
++	{ 609, "push", "", UINT64_C(0), { 44, 0, 0, 0 }, { 44, 0, 0, 0 }, { 145, 0, 0, 0 }, 1, 1, 1, 1, 8, 0, 1, 1, { { 0, 8, 0 }, { 0, 0, 0 } } },
+ };
+ 
+ static const struct X86SimpleRegister x86_simple_registers[4][16] = {
+@@ -488,3 +524,21 @@ static const struct X86SimpleRegister x86_simple_registers[4][16] = {
+ 		{ 113, 3, "r15" },
  	},
  };
-+struct VectorRegisterName { char name[6]; uint8_t length; };
-+static const struct VectorRegisterName vector_register_names[3][32] = {
++
++static const uint16_t x86_shift_rows[2][3][8] = {
 +	{
-+		{ "xmm0", 4 },
-+		{ "xmm1", 4 },
-+		{ "xmm2", 4 },
-+		{ "xmm3", 4 },
-+		{ "xmm4", 4 },
-+		{ "xmm5", 4 },
-+		{ "xmm6", 4 },
-+		{ "xmm7", 4 },
-+		{ "xmm8", 4 },
-+		{ "xmm9", 4 },
-+		{ "xmm10", 5 },
-+		{ "xmm11", 5 },
-+		{ "xmm12", 5 },
-+		{ "xmm13", 5 },
-+		{ "xmm14", 5 },
-+		{ "xmm15", 5 },
-+		{ "xmm16", 5 },
-+		{ "xmm17", 5 },
-+		{ "xmm18", 5 },
-+		{ "xmm19", 5 },
-+		{ "xmm20", 5 },
-+		{ "xmm21", 5 },
-+		{ "xmm22", 5 },
-+		{ "xmm23", 5 },
-+		{ "xmm24", 5 },
-+		{ "xmm25", 5 },
-+		{ "xmm26", 5 },
-+		{ "xmm27", 5 },
-+		{ "xmm28", 5 },
-+		{ "xmm29", 5 },
-+		{ "xmm30", 5 },
-+		{ "xmm31", 5 },
++		{ 260, 261, 262, 263, 264, 265, 266, 267 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
++		{ 0, 0, 0, 0, 0, 0, 0, 0 },
 +	},
 +	{
-+		{ "ymm0", 4 },
-+		{ "ymm1", 4 },
-+		{ "ymm2", 4 },
-+		{ "ymm3", 4 },
-+		{ "ymm4", 4 },
-+		{ "ymm5", 4 },
-+		{ "ymm6", 4 },
-+		{ "ymm7", 4 },
-+		{ "ymm8", 4 },
-+		{ "ymm9", 4 },
-+		{ "ymm10", 5 },
-+		{ "ymm11", 5 },
-+		{ "ymm12", 5 },
-+		{ "ymm13", 5 },
-+		{ "ymm14", 5 },
-+		{ "ymm15", 5 },
-+		{ "ymm16", 5 },
-+		{ "ymm17", 5 },
-+		{ "ymm18", 5 },
-+		{ "ymm19", 5 },
-+		{ "ymm20", 5 },
-+		{ "ymm21", 5 },
-+		{ "ymm22", 5 },
-+		{ "ymm23", 5 },
-+		{ "ymm24", 5 },
-+		{ "ymm25", 5 },
-+		{ "ymm26", 5 },
-+		{ "ymm27", 5 },
-+		{ "ymm28", 5 },
-+		{ "ymm29", 5 },
-+		{ "ymm30", 5 },
-+		{ "ymm31", 5 },
-+	},
-+	{
-+		{ "zmm0", 4 },
-+		{ "zmm1", 4 },
-+		{ "zmm2", 4 },
-+		{ "zmm3", 4 },
-+		{ "zmm4", 4 },
-+		{ "zmm5", 4 },
-+		{ "zmm6", 4 },
-+		{ "zmm7", 4 },
-+		{ "zmm8", 4 },
-+		{ "zmm9", 4 },
-+		{ "zmm10", 5 },
-+		{ "zmm11", 5 },
-+		{ "zmm12", 5 },
-+		{ "zmm13", 5 },
-+		{ "zmm14", 5 },
-+		{ "zmm15", 5 },
-+		{ "zmm16", 5 },
-+		{ "zmm17", 5 },
-+		{ "zmm18", 5 },
-+		{ "zmm19", 5 },
-+		{ "zmm20", 5 },
-+		{ "zmm21", 5 },
-+		{ "zmm22", 5 },
-+		{ "zmm23", 5 },
-+		{ "zmm24", 5 },
-+		{ "zmm25", 5 },
-+		{ "zmm26", 5 },
-+		{ "zmm27", 5 },
-+		{ "zmm28", 5 },
-+		{ "zmm29", 5 },
-+		{ "zmm30", 5 },
-+		{ "zmm31", 5 },
++		{ 268, 269, 270, 271, 272, 273, 274, 275 },
++		{ 276, 277, 278, 279, 280, 281, 282, 283 },
++		{ 284, 285, 286, 287, 288, 289, 290, 291 },
 +	},
 +};
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 3b1b7759..597fdda4 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -12,13 +12,10 @@
- static char *writeVectorRegister(char *out, unsigned length_code,
- 				 unsigned number)
- {
--	*out++ = "xyz"[length_code];
--	*out++ = 'm';
--	*out++ = 'm';
--	if (number >= 10)
--		*out++ = (char)('0' + number / 10);
--	*out++ = (char)('0' + number % 10);
--	return out;
-+	const struct VectorRegisterName *reg =
-+		&vector_register_names[length_code][number];
-+	memcpy(out, reg->name, sizeof(reg->name));
-+	return out + reg->length;
- }
- 
- #if defined(_MSC_VER)
-diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 032db5d1..f25971db 100644
---- a/suite/synctools/x86_vector_output.cpp
-+++ b/suite/synctools/x86_vector_output.cpp
-@@ -197,6 +197,27 @@ void emit_vex_indexed(Decoder &decoder)
- 	std::puts("};");
- }
- 
-+void emit_vector_registers(const Decoder &decoder)
++
++static const uint16_t x86_push_rows[2][2] = {
++	{ 292, 293 },
++	{ 294, 295 },
++};
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+new file mode 100644
+index 00000000..4958ca20
+--- /dev/null
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -0,0 +1,185 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#include "X86ScanAdapter.h"
++
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86SimpleOutput.h"
++
++static void writeUnsignedImmediate(char *out, uint64_t value)
 +{
-+	std::puts(
-+		"struct VectorRegisterName { char name[6]; uint8_t length; };\nstatic const struct VectorRegisterName vector_register_names[3][32] = {");
-+	for (unsigned base : { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 }) {
-+		std::puts("\t{");
-+		for (unsigned n = 0; n != 32; ++n) {
-+			const char *name =
-+				cs_reg_name(decoder.handle, base + n);
-+			if (!name || std::strlen(name) < 4 ||
-+			    std::strlen(name) > 5)
-+				throw std::runtime_error(
-+					"invalid vector register name");
-+			std::printf("\t\t{ \"%s\", %zu },\n", name,
-+				    std::strlen(name));
-+		}
-+		std::puts("\t},");
++	if (value <= HEX_THRESHOLD) {
++		*out = (char)('0' + value);
++	} else {
++		static const char digits[] = "0123456789abcdef";
++		char temp[16], *end = temp + sizeof(temp), *start = end;
++		uint64_t n = value;
++		do {
++			*--start = digits[n & 15];
++			n >>= 4;
++		} while (n);
++		memcpy(out, "0x", 2);
++		memcpy(out + 2, start, end - start);
 +	}
-+	std::puts("};");
 +}
 +
- void emit_output(Decoder &decoder)
- {
- 	std::vector<std::string> records;
-@@ -239,6 +260,7 @@ void emit_output(Decoder &decoder)
++static bool writePushImmediate(cs_insn *insn, const uint8_t *code, size_t size,
++			       const struct X86SimpleOutput *row, bool wide,
++			       uint16_t *insn_size)
++{
++	const bool imm8 = code[0] == 0x6a;
++	const unsigned length = imm8 ? 2 : 5;
++	if (size < length)
++		return false;
++	int64_t value;
++	if (imm8)
++		value = (int8_t)code[1];
++	else {
++		uint32_t raw = (uint32_t)code[1] | (uint32_t)code[2] << 8 |
++			       (uint32_t)code[3] << 16 |
++			       (uint32_t)code[4] << 24;
++		value = wide ? (int64_t)(int32_t)raw : (int64_t)raw;
++	}
++	*insn_size = insn->size = length;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = insn->op_str;
++	if (value < 0)
++		*out++ = '-';
++	writeUnsignedImmediate(out,
++			       value < 0 ? (uint64_t)-value : (uint64_t)value);
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
++		cs_x86_op *op = &insn->detail->x86.operands[0];
++		op->type = X86_OP_IMM;
++		op->imm = value;
++	}
++	return true;
++}
++
++static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
++			     const struct X86SimpleRegister (*regs)[16],
++			     const uint8_t *code, uint8_t opcode, uint8_t rex,
++			     uint16_t *insn_size)
++{
++	const unsigned offset = 1 + (rex != 0);
++	const uint8_t *raw = code + offset;
++	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
++			       ((uint32_t)raw[2] << 16) |
++			       ((uint32_t)raw[3] << 24);
++	const unsigned number = ((rex & 1) << 3) | (opcode & 7);
++	const struct X86SimpleRegister *reg = &regs[2][number];
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(offset + 4);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	char *out = insn->op_str + reg->length;
++	memcpy(out, ", ", 2);
++	writeUnsignedImmediate(out + 2, value);
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, opcode, rex, 0,
++				      reg->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->encoding.modrm_offset = 0;
++		x->encoding.imm_offset = (uint8_t)offset;
++		x->encoding.imm_size = 4;
++		x->operands[1].type = X86_OP_IMM;
++		x->operands[1].imm = value;
++		x->operands[1].access = 0;
++	}
++}
++
++/* The /digit selects the same flags and register access as the corresponding
++ * ALU register pair. The immediate's public width follows the destination. */
++static void writeRegisterImmediate(cs_insn *insn,
++				   const struct X86SimpleOutput *row,
++				   const struct X86SimpleRegister (*regs)[16],
++				   const uint8_t *code, uint8_t rex,
++				   uint8_t modrm, bool shift,
++				   uint16_t *insn_size)
++{
++	const unsigned offset = 2 + (rex != 0);
++	const int immediate = shift ? code[offset] : (int8_t)code[offset];
++	const unsigned group = (modrm >> 3) & 7;
++	const bool logical = !shift && (group == 1 || group == 4 || group == 6);
++	const bool wide = (rex & 8) != 0;
++	const bool negative = !logical && immediate < 0;
++	const uint64_t value =
++		logical ? (wide ? (uint64_t)(int64_t)immediate :
++				  (uint32_t)immediate) :
++			  (uint64_t)(negative ? -immediate : immediate);
++	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
++	const struct X86SimpleRegister *reg = &regs[wide ? 3 : 2][id];
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)(offset + 1);
++	memcpy(insn->bytes, code, insn->size);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	memcpy(insn->op_str, reg->name, sizeof(reg->name));
++	char *out = insn->op_str + reg->length;
++	memcpy(out, ", ", 2);
++	out += 2;
++	if (negative)
++		*out++ = '-';
++	writeUnsignedImmediate(out, value);
++	if (insn->detail) {
++		X86_writeSimpleDetail(insn->detail, row, shift ? 0xc1 : 0x83,
++				      rex, modrm, reg->reg, 0);
++		cs_x86 *x = &insn->detail->x86;
++		x->operands[1].type = X86_OP_IMM;
++		x->operands[1].imm = logical && !wide ?
++					     (int64_t)(uint32_t)immediate :
++					     immediate;
++		if (!shift)
++			x->operands[1].access = 0;
++		x->encoding.imm_offset = (uint8_t)offset;
++		x->encoding.imm_size = 1;
++	}
++}
++
++bool X86_writeImmediateOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			      uint16_t *insn_size, unsigned plan, uint8_t rex,
++			      bool wide, const uint16_t *plans,
++			      const struct X86SimpleOutput *rows,
++			      const struct X86SimpleRegister (*regs)[16],
++			      const uint16_t *push_rows,
++			      const uint16_t *shift_rows)
++{
++	const unsigned lead = rex != 0;
++	const uint8_t opcode = code[lead];
++	if (plan == X86_PLAN_PUSH_IMMEDIATE)
++		return writePushImmediate(insn, code, size,
++					  &rows[push_rows[opcode == 0x6a]],
++					  wide, insn_size);
++	if (plan == X86_PLAN_MOV_REG_IMM32) {
++		if (size < 5 + lead)
++			return false;
++		writeMovRegImm32(insn, &rows[plans[0x8b] >> 2], regs, code,
++				 opcode, rex, insn_size);
++		return true;
++	}
++	if (size < 3 + lead)
++		return false;
++	const uint8_t modrm = code[lead + 1];
++	const unsigned group = (modrm >> 3) & 7;
++	const bool shift = plan == X86_PLAN_SHIFT_IMM8;
++	const unsigned row = shift ? shift_rows[group] :
++				     plans[(group << 3) | 1] >> 2;
++	writeRegisterImmediate(insn, &rows[row], regs, code, rex, modrm, shift,
++			       insn_size);
++	return true;
++}
++#endif
++#endif
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 9dd38104..bab64dfb 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -84,104 +84,6 @@ static void X86_writeBaseMov(cs_insn *insn, const struct X86SimpleOutput *row,
  	}
- 	std::puts("\tdefault: return NULL;\n\t}\n}");
- 	emit_vex_indexed(decoder);
-+	emit_vector_registers(decoder);
- }
  }
  
+-static void writeUnsignedImmediate(char *out, uint64_t value)
+-{
+-	if (value <= HEX_THRESHOLD) {
+-		*out = (char)('0' + value);
+-	} else {
+-		static const char digits[] = "0123456789abcdef";
+-		char temp[16], *end = temp + sizeof(temp), *start = end;
+-		uint64_t n = value;
+-		do {
+-			*--start = digits[n & 15];
+-			n >>= 4;
+-		} while (n);
+-		memcpy(out, "0x", 2);
+-		memcpy(out + 2, start, end - start);
+-	}
+-}
+-
+-static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+-			     const uint8_t *code, uint8_t opcode, uint8_t rex,
+-			     uint16_t *insn_size)
+-{
+-	const unsigned offset = 1 + (rex != 0);
+-	const uint8_t *raw = code + offset;
+-	const uint32_t value = (uint32_t)raw[0] | ((uint32_t)raw[1] << 8) |
+-			       ((uint32_t)raw[2] << 16) |
+-			       ((uint32_t)raw[3] << 24);
+-	const unsigned number = ((rex & 1) << 3) | (opcode & 7);
+-	const struct X86SimpleRegister *reg = &x86_simple_registers[2][number];
+-	insn->id = row->id;
+-	*insn_size = insn->size = (uint16_t)(offset + 4);
+-	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+-	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+-	char *out = insn->op_str + reg->length;
+-	memcpy(out, ", ", 2);
+-	writeUnsignedImmediate(out + 2, value);
+-	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, opcode, rex, 0,
+-				      reg->reg, 0);
+-		cs_x86 *x = &insn->detail->x86;
+-		x->encoding.modrm_offset = 0;
+-		x->encoding.imm_offset = (uint8_t)offset;
+-		x->encoding.imm_size = 4;
+-		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = value;
+-		x->operands[1].access = 0;
+-	}
+-}
+-
+-/* The /digit selects the same flags and register access as the corresponding
+- * ALU register pair. The immediate's public width follows the destination. */
+-static void writeGroup1Immediate(cs_insn *insn,
+-				 const struct X86SimpleOutput *row,
+-				 const uint8_t *code, uint8_t rex,
+-				 uint8_t modrm, uint16_t *insn_size)
+-{
+-	const unsigned offset = 2 + (rex != 0);
+-	const int immediate = (int8_t)code[offset];
+-	const unsigned group = (modrm >> 3) & 7;
+-	const bool logical = group == 1 || group == 4 || group == 6;
+-	const bool wide = (rex & 8) != 0;
+-	const bool negative = !logical && immediate < 0;
+-	const uint64_t value =
+-		logical ? (wide ? (uint64_t)(int64_t)immediate :
+-				  (uint32_t)immediate) :
+-			  (uint64_t)(negative ? -immediate : immediate);
+-	const unsigned id = ((rex & 1) << 3) | (modrm & 7);
+-	const struct X86SimpleRegister *reg =
+-		&x86_simple_registers[wide ? 3 : 2][id];
+-	insn->id = row->id;
+-	*insn_size = insn->size = (uint16_t)(offset + 1);
+-	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+-	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+-	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+-	char *out = insn->op_str + reg->length;
+-	memcpy(out, ", ", 2);
+-	out += 2;
+-	if (negative)
+-		*out++ = '-';
+-	writeUnsignedImmediate(out, value);
+-	if (insn->detail) {
+-		X86_writeSimpleDetail(insn->detail, row, 0x83, rex, modrm,
+-				      reg->reg, 0);
+-		cs_x86 *x = &insn->detail->x86;
+-		x->operands[1].type = X86_OP_IMM;
+-		x->operands[1].imm = logical && !wide ?
+-					     (int64_t)(uint32_t)immediate :
+-					     immediate;
+-		x->operands[1].access = 0;
+-		x->encoding.imm_offset = (uint8_t)offset;
+-		x->encoding.imm_size = 1;
+-	}
+-}
+-
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+  * present. Memory admission below is limited to MOV with a base or base+disp8. */
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+@@ -239,29 +141,17 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	    cs_vsnprintf != cs_default_vsnprintf)
+ 		return false;
+ 
+-	if (plan >= X86_PLAN_MOV_REG_IMM32) {
+-		if (plan == X86_PLAN_MOV_REG_IMM32) {
+-			if (size < 5u + has_rex)
+-				return false;
+-			const unsigned pair =
+-				x86_simple_plans[wide][prefix_class][0x8b];
+-			writeMovRegImm32(insn, &x86_simple_outputs[pair >> 2],
+-					 code, opcode, rex, insn_size);
+-			return true;
+-		}
++	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+ 			return X86_writeVectorOutput(code, size, insn,
+ 						     insn_size,
+ 						     x86_simple_registers[3]);
+-		if (size < 3u + has_rex)
+-			return false;
+-		unsigned reg_plan =
+-			x86_simple_plans[wide][prefix_class][(modrm & 0x38) | 1];
+-		if (!reg_plan)
+-			return false;
+-		writeGroup1Immediate(insn, &x86_simple_outputs[reg_plan >> 2],
+-				     code, rex, modrm, insn_size);
+-		return true;
++		return X86_writeImmediateOutput(
++			code, size, insn, insn_size, plan, rex, wide,
++			x86_simple_plans[wide][prefix_class],
++			x86_simple_outputs, x86_simple_registers,
++			x86_push_rows[wide],
++			x86_shift_rows[wide][prefix_class]);
+ 	}
+ 	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
+ 	const bool relative = form == X86_SIMPLE_RELATIVE;
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index cc5aa9f7..e1edaf73 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -49,9 +49,19 @@ enum X86SimpleForm {
+ #define X86_PLAN_GROUP1_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
+ 
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
++#define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++#define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
++CAPSTONE_INTERNAL bool
++X86_writeImmediateOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			 uint16_t *insn_size, unsigned plan, uint8_t rex,
++			 bool wide, const uint16_t *plans,
++			 const struct X86SimpleOutput *rows,
++			 const struct X86SimpleRegister (*regs)[16],
++			 const uint16_t *push_rows, const uint16_t *shift_rows);
++
+ CAPSTONE_INTERNAL bool
+ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size,
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index 57906903..8c8af9a8 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -277,6 +277,75 @@ CheckedRow check_pair(Decoder &decoder, unsigned opcode, unsigned prefix_class,
+ 	return row;
+ }
+ 
++// The register/imm8 form reuses the register row builder. Reconstruct the
++// one varying immediate separately after checking its public value and text.
++CheckedRow check_shift(Decoder &decoder, unsigned cls, unsigned group,
++		       const RegisterTable &regs)
++{
++	CheckedRow row;
++	const unsigned start = cls == 0 ? 0 : cls == 1 ? 0x40 : 0x48;
++	for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
++		for (unsigned rm = 0; rm < 8; ++rm) {
++			const auto &reg =
++				regs[cls == 2 ? 3 : 2][rm | ((rex & 1) << 3)];
++			for (unsigned imm : { 0u, 1u, 9u, 10u, 31u, 32u, 63u,
++					      64u, 127u, 128u, 255u }) {
++				const uint8_t modrm =
++					uint8_t(0xc0 | (group << 3) | rm);
++				uint8_t bytes[] = { uint8_t(rex), 0xc1, modrm,
++						    uint8_t(imm) };
++				unsigned length = 3 + !!rex;
++				decoder.decode(bytes + !rex, length, length, 0);
++				cs_insn projected = *decoder.insn;
++				cs_detail detail = *projected.detail;
++				auto &x = detail.x86;
++				std::ostringstream printed;
++				printed << reg.name << ", ";
++				if (imm > HEX_THRESHOLD)
++					printed << "0x" << std::hex;
++				printed << imm;
++				if (projected.op_str != printed.str() ||
++				    x.op_count != 2 ||
++				    x.operands[0].type != X86_OP_REG ||
++				    x.operands[0].reg != reg.reg ||
++				    x.operands[1].type != X86_OP_IMM ||
++				    x.operands[1].imm != imm ||
++				    x.encoding.imm_offset != length - 1 ||
++				    x.encoding.imm_size != 1)
++					throw std::runtime_error(
++						"unexpected register shift count or spelling");
++				// The runtime assigns this operand's type and value after
++				// writing the row. Keep its generated size and access.
++				projected.detail = &detail;
++				projected.op_str[0] = 0;
++				x.operands[0].reg = X86_REG_INVALID;
++				x.operands[1].type = X86_OP_REG;
++				x.operands[1].imm = 0;
++				row.observe(describe(projected, 0xc1,
++						     uint8_t(rex), modrm,
++						     nullptr, nullptr));
++			}
++		}
++	}
++	return row;
++}
++
++CheckedRow check_push_immediate(Decoder &d, unsigned op)
++{
++	CheckedRow row;
++	const unsigned width = op == 0x6a ? 1 : 4;
++	for (uint32_t value : { 0u, 1u, 9u, 10u, 0x7fu, 0x80u, 0xffu,
++				0x7fffffffu, 0x80000000u, 0xffffffffu }) {
++		uint8_t data[] = { uint8_t(op), uint8_t(value),
++				   uint8_t(value >> 8), uint8_t(value >> 16),
++				   uint8_t(value >> 24) };
++		d.decode(data, width + 1, width + 1, 0);
++		row.observe(
++			describe(*d.insn, op, 0, 0, nullptr, nullptr, true));
++	}
++	return row;
++}
++
+ bool relative_opcode(unsigned cls, unsigned op)
+ {
+ 	if (cls == 3)
+@@ -401,7 +470,7 @@ int main()
+ 					rows.begin());
+ 				if (index == rows.size())
+ 					rows.push_back(row.fields);
+-				if (index >= UINT16_MAX >> 2)
++				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
+ 					return 1;
+ 				plans[wide][cls][op] = static_cast<uint16_t>(
+ 					(index << 2) | form);
+@@ -435,7 +504,63 @@ int main()
+ 					X86_PLAN_MOV_REG_IMM32;
+ 		}
+ 	}
++	uint16_t shifts[2][3][8]{};
++	for (unsigned wide = 0; wide < 2; ++wide) {
++		Decoder &decoder = wide ? x64 : x86;
++		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
++			plans[wide][cls][0xc1] = X86_PLAN_SHIFT_IMM8;
++			for (unsigned group = 0; group < 8; ++group) {
++				auto row =
++					check_shift(decoder, cls, group, regs);
++				size_t index = std::find(rows.begin(),
++							 rows.end(),
++							 row.fields) -
++					       rows.begin();
++				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++					return 1;
++				if (index == rows.size())
++					rows.push_back(row.fields);
++				shifts[wide][cls][group] = uint16_t(index);
++				checked += row.encodings;
++			}
++		}
++	}
++	uint16_t pushes[2][2];
++	for (unsigned wide = 0; wide < 2; ++wide) {
++		Decoder &decoder = wide ? x64 : x86;
++		for (unsigned index = 0; index < 2; ++index) {
++			const unsigned op = index ? 0x6a : 0x68;
++			CheckedRow row = check_push_immediate(decoder, op);
++			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++				return 1;
++			pushes[wide][index] =
++				static_cast<uint16_t>(rows.size());
++			rows.push_back(row.fields);
++			checked += row.encodings;
++			plans[wide][0][op] = X86_PLAN_PUSH_IMMEDIATE;
++		}
++	}
+ 	emit_tables(plans, regs, rows);
++	std::cout << "\nstatic const uint16_t x86_shift_rows[2][3][8] = {\n";
++	for (const auto &mode : shifts) {
++		std::cout << "\t{\n";
++		for (const auto &cls : mode) {
++			std::cout << "\t\t";
++			emit_array(std::cout, cls);
++			std::cout << ",\n";
++		}
++		std::cout << "\t},\n";
++	}
++	std::cout << "};\n";
++
++	std::cout << "\nstatic const uint16_t x86_push_rows[2][2] = {\n";
++	for (const auto &mode : pushes) {
++		std::cout << "\t";
++		emit_array(std::cout, mode);
++		std::cout << ",\n";
++	}
++	std::cout << "};\n";
++
+ 	std::cerr << "records=" << rows.size() - 1 << " plans=" << admitted
+ 		  << " encodings_checked=" << checked << " table_bytes="
+ 		  << sizeof(plans) + sizeof(regs) +
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 5bd144d5..c56277ba 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -189,6 +189,48 @@ static bool check_sib_base_mov(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_shift_immediate(csh handles[2], cs_mode mode)
++{
++	for (unsigned p = 0; p < (mode == CS_MODE_64 ? 17u : 1u); ++p) {
++		uint8_t rex = p ? (uint8_t)(0x3f + p) : 0;
++		for (unsigned modrm = 0xc0; modrm <= 0xff; ++modrm) {
++			for (unsigned count = 0; count < 256; ++count) {
++				uint8_t bytes[] = { rex, 0xc1, (uint8_t)modrm,
++						    (uint8_t)count };
++				size_t length = 3 + !!rex;
++				if (!compare(handles, bytes + !rex, length,
++					     count))
++					return false;
++				if (!count)
++					for (size_t n = 0; n < length; ++n)
++						if (!compare(handles,
++							     bytes + !rex, n,
++							     modrm))
++							return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool check_push_immediates(csh handles[2])
++{
++	for (unsigned op = 0x68; op <= 0x6a; op += 2) {
++		for (unsigned n = 0; n < 4096; ++n) {
++			uint32_t imm = n < 256 ? n : n * UINT32_C(2654435761);
++			uint8_t code[] = { (uint8_t)op, (uint8_t)imm,
++					   (uint8_t)(imm >> 8),
++					   (uint8_t)(imm >> 16),
++					   (uint8_t)(imm >> 24) };
++			for (unsigned length = 0; length <= sizeof(code);
++			     ++length)
++				if (!compare(handles, code, length, n))
++					return false;
++		}
++	}
++	return true;
++}
++
+ static bool check_group1(csh handles[2], cs_mode mode)
+ {
+ 	uint8_t bytes[4];
+@@ -303,6 +345,8 @@ static bool check_mode(cs_mode mode)
+ 				goto done;
+ 		if (!check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_group1(handles, mode) ||
++		    !check_push_immediates(handles) ||
++		    !check_shift_immediate(handles, mode) ||
+ 		    !check_mov_imm32(handles, mode) ||
+ 		    !check_sib_base_mov(handles, mode) ||
+ 		    (mode == CS_MODE_64 &&
