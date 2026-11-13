@@ -1310,7 +1310,7 @@ index b491ca5f..7675273f 100644
  					 const struct X86SimpleOutput *row,
  					 uint8_t opcode, uint8_t rex,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 4c9aeba4..ee5eb3e9 100644
+index 4c9aeba4..37de5eee 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -3,11 +3,20 @@
@@ -1477,7 +1477,7 @@ index 4c9aeba4..ee5eb3e9 100644
 +	const unsigned ll = code[3] >> 5, w = code[2] >> 7, pp = code[2] & 3;
 +	const uint8_t modrm = code[5];
 +	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	if (ll >= 3 || mod >= 3 || (!mod && rm == 5))
++	if (ll >= 3 || mod >= 3)
 +		return NULL;
 +	const unsigned key = ((code[1] & 15) << 8) | code[4];
 +	const struct VectorOutputRow *row;
@@ -1491,8 +1491,8 @@ index 4c9aeba4..ee5eb3e9 100644
 +	} else {
 +		return NULL;
 +	}
-+	const bool sib = rm == 4;
-+	const unsigned offset = 6 + sib, disp_size = mod == 2 ? 4 : mod;
++	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
 +	const unsigned length = offset + disp_size;
 +	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
 +	if (!row->id || size < length ||
@@ -1571,7 +1571,7 @@ index 4c9aeba4..ee5eb3e9 100644
  /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
   * Prefix, ModR/M and SIB also supply all register IDs used in detail. */
  #if defined(_MSC_VER)
-@@ -269,16 +394,301 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -269,16 +394,306 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	return true;
  }
  
@@ -1807,17 +1807,17 @@ index 4c9aeba4..ee5eb3e9 100644
 +	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
 +	const uint8_t modrm = code[5];
 +	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	const bool sib = rm == 4;
-+	const unsigned offset = 6 + sib, disp_size = mod == 2 ? 4 : mod;
++	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
 +	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
 +	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
 +			     (~(unsigned)code[1] & 16);
 +	const struct X86SimpleRegister *base = &regs[rm | ((rxb & 1) << 3)];
 +	const unsigned width = 16u << memory_ll;
 +	const int32_t displacement =
-+		mod == 2 ? X86_readDisp32(code + offset) :
-+		mod	 ? (int8_t)code[offset] * (int32_t)width :
-+			   0;
++		disp_size == 4 ? X86_readDisp32(code + offset) :
++		mod	       ? (int8_t)code[offset] * (int32_t)width :
++				 0;
 +	insn->id = row->id;
 +	*insn_size = insn->size = (uint16_t)length;
 +	memcpy(insn->bytes, code, length);
@@ -1828,8 +1828,13 @@ index 4c9aeba4..ee5eb3e9 100644
 +	memcpy(out, ", xmmword ptr [", 15);
 +	out[2] = "xyz"[memory_ll];
 +	out += 15;
-+	memcpy(out, base->name, sizeof(base->name));
-+	out += base->length;
++	if (rip) {
++		memcpy(out, "rip", 3);
++		out += 3;
++	} else {
++		memcpy(out, base->name, sizeof(base->name));
++		out += base->length;
++	}
 +	out = X86_writeDisplacement(out, displacement);
 +	*out = ']';
 +	if (insn->detail) {
@@ -1843,7 +1848,7 @@ index 4c9aeba4..ee5eb3e9 100644
 +		x->addr_size = 8;
 +		x->modrm = modrm;
 +		x->encoding.modrm_offset = 5;
-+		if (mod) {
++		if (disp_size) {
 +			x->encoding.disp_offset = (uint8_t)offset;
 +			x->encoding.disp_size = (uint8_t)disp_size;
 +		}
@@ -1864,7 +1869,7 @@ index 4c9aeba4..ee5eb3e9 100644
 +		op = &x->operands[1];
 +		op->type = X86_OP_MEM;
 +		op->size = (uint8_t)width;
-+		op->mem.base = (x86_reg)base->reg;
++		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
 +		op->mem.scale = 1;
 +		op->mem.disp = x->disp = displacement;
 +		op->access = (cs_ac_type)row->access[1];
@@ -2965,10 +2970,10 @@ index 771fefb7..4d51efb4 100644
  			for (size_t size = 0; size <= sizeof(code) - offset;
  			     ++size)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index c6969cc3..9f2a454a 100644
+index c6969cc3..9a69a3de 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -318,12 +318,46 @@ static bool check_group1(csh handles[2], cs_mode mode)
+@@ -318,12 +318,80 @@ static bool check_group1(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -3008,6 +3013,40 @@ index c6969cc3..9f2a454a 100644
 +
  static bool check_evex(csh handles[2])
  {
++	static const uint32_t disps[] = { 0,	      1,	  9,	     10,
++					  0x7fffffff, 0x80000000, 0xffffffff };
++	for (unsigned p = 0; p < 16; ++p)
++		for (unsigned wl = 0; wl < 8; ++wl)
++			for (unsigned form = 0; form < 4; ++form)
++				for (unsigned i = 0;
++				     i < sizeof(disps) / sizeof(disps[0]);
++				     ++i) {
++					const uint32_t d = disps[i];
++					uint8_t b[] = {
++						0x62,
++						(uint8_t)(p << 4 |
++							  (form == 3 ? 2 : 1)),
++						(uint8_t)((wl >> 2) << 7 |
++							  0x7c |
++							  (form == 3 ?
++								   1 :
++								   form + 1)),
++						(uint8_t)((wl & 3) << 5 | 8),
++						(uint8_t)(form == 3 ? 0x1a :
++								      0x6f),
++						0x3d,
++						(uint8_t)d,
++						(uint8_t)(d >> 8),
++						(uint8_t)(d >> 16),
++						(uint8_t)(d >> 24)
++					};
++					if (!compare(handles, b, sizeof(b),
++						     i) ||
++					    !compare(handles, b, sizeof(b) - 1,
++						     p))
++						return false;
++				}
++
  	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
 -					  0x344, 0x325, 0x1fe, 0x200 };
 -	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
@@ -3018,7 +3057,7 @@ index c6969cc3..9f2a454a 100644
  	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
  		for (unsigned reg = 0; reg < 32; ++reg)
  			for (unsigned wl = 0; wl < 8; ++wl)
-@@ -427,6 +461,327 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
+@@ -427,6 +495,327 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -3346,7 +3385,7 @@ index c6969cc3..9f2a454a 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -450,9 +805,21 @@ static bool check_mode(cs_mode mode)
+@@ -450,9 +839,21 @@ static bool check_mode(cs_mode mode)
  		    !check_shift_immediate(handles, mode) ||
  		    !check_mov_imm32(handles, mode) ||
  		    !check_sib_base_mov(handles, mode) ||
