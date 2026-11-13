@@ -1,7 +1,7 @@
-name: Isolate the leading EVEX iterator dispatch on real PE32 PE64 and SIMD with five native toolchains
+name: Measure single legacy header selection on real i386 amd64 and vector library functions
 on:
   push:
-    branches: [codex/capstone-evex-public-iterator-libraries]
+    branches: [codex/capstone-single-legacy-header-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: single-legacy-libraries-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
