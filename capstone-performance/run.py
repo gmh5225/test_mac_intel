@@ -65,7 +65,7 @@ def build(label):
              '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
              '-DCMAKE_C_COMPILER='+PROFILE, '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
              *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ARCHES],
-             '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer',
+             '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if PROFILE=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),
              f'-DCMAKE_OSX_ARCHITECTURES={platform.machine()}', '-DCAPSTONE_BUILD_MACOS_THIN=ON',
              '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
              '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], label + '-configure')
@@ -390,6 +390,9 @@ def measure():
     checks=[c for c in cases if c['consumer']=='decoder' and (c['name'],c['mode']) in selected];assert len(checks)==len(selected)
     measure_panel('null',[v for v in checks if (v['name'],v['mode']) in [('putty-32-0.85','format'),('scalar32','format')]],9,['base','new','base_aa','new_aa'],350000000)
     measure_panel('x86',checks,19,['base','new','base_aa','new_aa','iced','iced_aa'],300000000)
+    others=[v for v in cases if v['consumer']=='single' and v['name'] in ('arm-ls','arm64-ls','mips64el-ls') and v['mode'] in ('scan','format','detail')]
+    assert others
+    measure_panel('other',others,13,['base','new','base_aa','new_aa'],200000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 
