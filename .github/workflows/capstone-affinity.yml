@@ -1,9 +1,9 @@
-name: Measure validated EVEX rows after adapter selection and before the generic frame on native
+name: Canonical EVEX register-byte shifts shared by scan, text and operand detail on native
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-validated-evex-before-frame-native]
+    branches: [codex/capstone-evex-byte-shift-rows-native]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-validated-evex-before-frame-native
+  group: capstone-evex-byte-shift-rows-native
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-before-frame-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: evex-byte-shift-rows-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
