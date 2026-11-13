@@ -1,7 +1,7 @@
-name: Compare full NeverD i386 addressing on three release libraries and both PuTTY executables
+name: Measure verified i386 addressing in the complete NeverD decoder
 on:
   push:
-    branches: [codex/neverd-real-i386-segment-lea]
+    branches: [codex/neverd-qualified-i386-address-output]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-i386-segment-lea
+          name: qualified-i386-address-output
           path: product-evidence/
           retention-days: 14
