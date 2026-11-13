@@ -513,7 +513,7 @@ index 6266d12b..98805f06 100644
  
  // given internal insn id, return public instruction ID
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..6b921f10 100644
+index 25f13d10..09073747 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -596,6 +596,22 @@ index 25f13d10..6b921f10 100644
  
  	// Calling the auto-generated decoder function.
  	Result = decodeInstruction_4(DecoderTableMips32, Instr, Insn, Address,
+@@ -1979,6 +2012,7 @@ static DecodeStatus DecodeMem(MCInst *Inst, uint32_t Insn, uint64_t Address,
+ 	Base = getReg(Inst, Mips_GPR32RegClassID, Base);
+ 
+ 	if (MCInst_getOpcode(Inst) == Mips_SC ||
++	    MCInst_getOpcode(Inst) == Mips_SC64 ||
+ 	    MCInst_getOpcode(Inst) == Mips_SCD)
+ 		MCOperand_CreateReg0(Inst, (Reg));
+ 
+@@ -2607,6 +2641,7 @@ static DecodeStatus DecodeSpecial3LlSc(MCInst *Inst, uint32_t Insn,
+ 	Base = getReg(Inst, Mips_GPR32RegClassID, Base);
+ 
+ 	if (MCInst_getOpcode(Inst) == Mips_SC_R6 ||
++	    MCInst_getOpcode(Inst) == Mips_SC64_R6 ||
+ 	    MCInst_getOpcode(Inst) == Mips_SCD_R6) {
+ 		MCOperand_CreateReg0(Inst, (Rt));
+ 	}
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 7b2b3a08..4b1738be 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc
@@ -642,7 +658,7 @@ index d3566525..d6775ef0 100644
  #endif
  
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 01559e08..539cb62f 100644
+index 01559e08..63dcc538 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -655,49 +671,111 @@ index 01559e08..539cb62f 100644
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
  
-@@ -3679,28 +3680,20 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
- 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
- 						     result, 0xc5);
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..405c1fbe 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -5,7 +5,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 		{
+ 			5, 9, 6, 10, 0, 0, 0, 0, 13, 17, 14, 18, 0, 0, 0, 0,
+ 			21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
+-			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
++			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 3, 0,
+ 			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
+ 			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
+ 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index bd0f6c94..6693cae7 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -9,7 +9,7 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
  
--	unsigned instructionID = 0;
--	/* Constant bitness folds the terminal readers' mode and size tests.
--	 * Feature routing above still observes the original mode bits. */
--	int status;
--	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
--		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
--					     opcodeOffset, &instructionID,
--					     &result->length, true,
--					     readerFlags);
--	else if (handle->mode & CS_MODE_16)
--		status = trySimpleLegacyScan(code, code_len, CS_MODE_16, opcode,
--					     opcodeOffset, &instructionID,
--					     &result->length, true,
--					     readerFlags);
--	else
--		status = trySimpleLegacyScan(code, code_len, CS_MODE_32, opcode,
--					     opcodeOffset, &instructionID,
--					     &result->length, true,
--					     readerFlags);
--	if (status != X86_SCAN_NOT_HANDLED)
--		return completeTerminalScanResult(result, instructionID,
--						  status);
-+	/* The initial reader already tried the same simple legacy terminal.
-+     * Only mixed bitness can select a different prefix policy there. */
-+	if ((handle->mode & CS_MODE_64) &&
-+	    (handle->mode & (CS_MODE_16 | CS_MODE_32))) {
-+		const cs_mode mode = handle->mode & CS_MODE_16 ? CS_MODE_16 :
-+								 CS_MODE_32;
-+		unsigned instructionID = 0;
-+		const int status = trySimpleLegacyScan(
-+			code, code_len, mode, opcode, opcodeOffset,
-+			&instructionID, &result->length, true, readerFlags);
-+		if (status != X86_SCAN_NOT_HANDLED)
-+			return completeTerminalScanResult(result, instructionID,
-+							  status);
+-/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
++/* No-base SIB and explicit RIZ spellings retain the general printer. */
+ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			   uint16_t *insn_size,
+ 			   const struct X86SimpleOutput *row,
+@@ -17,7 +17,8 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ {
+ 	const bool wide = row->address_size == 8;
+ 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
+-	const unsigned lead = rex != 0;
++	const bool code_segment = !wide && code[0] == 0x2e;
++	const unsigned lead = rex != 0 || code_segment;
+ 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
+ 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 	const bool sib = rm == 4, rip = !mod && rm == 5;
+@@ -36,12 +37,12 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 					   ((encoding >> 3) & 7);
+ 		base_reg = encoding & 7;
+ 		if ((!mod && base_reg == 5) ||
+-		    (index_reg == 4 && encoding != 0x24))
++		    (wide && index_reg == 4 && encoding != 0x24))
+ 			return false;
+ 		if (index_reg != 4) {
+ 			index = &regs[wide ? 3 : 2][index_reg];
+-			scale_bits = encoding >> 6;
+ 		}
++		scale_bits = encoding >> 6;
+ 	}
+ 
+ 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
+@@ -71,6 +72,10 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		out += 2;
+ 	}
+ 	if (lea) {
++		if (code_segment) {
++			memcpy(out, "cs:", 3);
++			out += 3;
++		}
+ 		*out++ = '[';
+ 	} else if (row->ops[0].size == 1) {
+ 		memcpy(out, "byte ptr [", 10);
+@@ -109,6 +114,11 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 				      load ? reg->reg : 0, load ? 0 : reg->reg);
+ 		cs_x86 *x = &insn->detail->x86;
+ 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
++		if (code_segment) {
++			x->prefix[1] = 0x2e;
++			++x->encoding.modrm_offset;
++			mem->mem.segment = X86_REG_CS;
++		}
+ 		mem->type = X86_OP_MEM;
+ 		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
+ 		mem->mem.scale = 1 << scale_bits;
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..371a9e6a 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -75,6 +75,14 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	    cs_vsnprintf != cs_default_vsnprintf)
+ 		return false;
+ 
++	if (plan == X86_PLAN_CS_LEA) {
++		if (size < 3 || code[1] != 0x8d || code[2] >= 0xc0)
++			return false;
++		const unsigned lea = x86_simple_plans[0][0][0x8d] >> 2;
++		return X86_writeMemoryOutput(code, size, insn, insn_size,
++					     &x86_simple_outputs[lea],
++					     x86_simple_registers);
 +	}
- 	if (opcodeOffset && opcodeOffset != SIZE_MAX)
- 		return decodeLegacyPrefixedResult(ud, code, code_len, insn,
- 						  result);
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+ 			return X86_writeVectorOutput(code, size, insn,
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..4f5dd22c 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -51,6 +51,7 @@ enum X86SimpleForm {
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++#define X86_PLAN_CS_LEA X86_SIMPLE_RELATIVE
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py b/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
 index 1dd31e59..37010f31 100755
 --- a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
@@ -825,3 +903,145 @@ index 30482037..29a72009 100644
              output.append(emit(name, nodes, width, w))
              counts.append((name, len(nodes)))
          for w, width in sorted(set(inputs.values())):
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index ccc4f0de..6c0e8140 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -616,6 +616,8 @@ int main()
+ 		}
+ 	}
+ 	// Reserve unprefixed EVEX for its own verified vector output records.
++	// Only nonzero rows describe ordinary relative branches.
++	plans[0][0][0x2e] = X86_PLAN_CS_LEA;
+ 	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
+ 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
+ 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
+diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
+index c9d51a88..d04a63ce 100644
+--- a/tests/unit/mips_scan.c
++++ b/tests/unit/mips_scan.c
+@@ -98,6 +98,65 @@ done:
+ 	return success;
+ }
+ 
++static bool check_sc_ptr64(bool r6, bool big, bool ptr64)
++{
++	const cs_mode mode = (r6 ? CS_MODE_MIPS64R6 : CS_MODE_MIPS64R2) |
++			     (big ? CS_MODE_BIG_ENDIAN : 0) |
++			     (ptr64 ? CS_MODE_MIPS_PTR64 : 0);
++	csh handle;
++	if (cs_open(CS_ARCH_MIPS, mode, &handle))
++		return false;
++	bool ok = false;
++	cs_insn *insn = NULL;
++	if (cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) ||
++	    !(insn = cs_malloc(handle)))
++		goto done;
++
++	const int offsets[] = { 0, -4, 19, r6 ? -256 : -32768,
++				r6 ? 255 : 32767 };
++	for (unsigned j = 0; j < sizeof(offsets) / sizeof(offsets[0]); ++j) {
++		const unsigned offset = (unsigned)offsets[j];
++		/* sc $v0, offset($a0), with distinct value and base registers. */
++		const uint32_t word =
++			(4u << 21) | (2u << 16) |
++			(r6 ? (31u << 26) | ((offset & 0x1ff) << 7) | 0x26 :
++			      (56u << 26) | (offset & 0xffff));
++		uint8_t code[4];
++		for (unsigned k = 0; k < 4; ++k)
++			code[big ? 3 - k : k] = (uint8_t)(word >> (8 * k));
++		const uint8_t *at = code;
++		size_t left = sizeof(code);
++		uint64_t pc = 0x1000;
++		if (!cs_disasm_iter(handle, &at, &left, &pc, insn) ||
++		    insn->id != MIPS_INS_SC || insn->size != 4 || left ||
++		    at != code + 4 || pc != 0x1004)
++			goto done;
++		const cs_mips *m = &insn->detail->mips;
++		if (m->op_count != 2 || m->operands[0].type != MIPS_OP_REG ||
++		    m->operands[0].reg != MIPS_REG_V0 ||
++		    m->operands[1].type != MIPS_OP_MEM ||
++		    m->operands[1].mem.base != MIPS_REG_A0 ||
++		    m->operands[1].mem.disp != offsets[j])
++			goto done;
++#ifndef CAPSTONE_DIET
++		if (offsets[j] == -4 && (strcmp(insn->mnemonic, "sc") ||
++					 strcmp(insn->op_str, "$v0, -4($a0)")))
++			goto done;
++#endif
++	}
++	ok = true;
++done:
++	if (!ok)
++		fprintf(stderr,
++			"incorrect SC operands for MIPS mode %u: %s %s\n",
++			(unsigned)mode, insn ? insn->mnemonic : "",
++			insn ? insn->op_str : "");
++	if (insn)
++		cs_free(insn, 1);
++	cs_close(&handle);
++	return ok;
++}
++
+ int main(void)
+ {
+ 	const cs_mode modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64,
+@@ -106,5 +165,10 @@ int main(void)
+ 	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
+ 		if (!check_mode(modes[i]))
+ 			return 1;
++	for (unsigned r6 = 0; r6 < 2; ++r6)
++		for (unsigned big = 0; big < 2; ++big)
++			for (unsigned ptr64 = 0; ptr64 < 2; ++ptr64)
++				if (!check_sc_ptr64(r6, big, ptr64))
++					return 1;
+ 	return 0;
+ }
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6990d510..f4c86138 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -42,6 +42,34 @@ static bool compare(csh handles[2], const uint8_t *input, size_t length,
+ 	return false;
+ }
+ 
++/* The Intel printer suppresses EIZ, retaining the encoded SIB scale in
++ * public detail. In long mode RIZ remains visible. */
++static bool check_segment_lea(csh handles[2])
++{
++	for (unsigned mod = 0; mod < 3; ++mod)
++		for (unsigned rm = 0; rm < 8; ++rm)
++			for (unsigned sib = 0; sib < 256; ++sib) {
++				uint8_t code[] = {
++					0x2e,
++					0x8d,
++					(uint8_t)((mod << 6) | 0x30 | rm),
++					(uint8_t)sib,
++					0x80,
++					0xff,
++					0x12,
++					0x9f
++				};
++				for (unsigned seg = 0; seg <= 1; ++seg)
++					for (size_t len = 1;
++					     len <= sizeof(code) - seg; ++len)
++						if (!compare(handles,
++							     code + seg, len,
++							     sib + mod))
++							return false;
++			}
++	return true;
++}
++
+ static bool check_branches(csh handles[2])
+ {
+ 	const uint32_t bits[] = { 0,	1,    9,	  10,	     0x7f,
+@@ -753,7 +781,7 @@ static bool check_mode(cs_mode mode)
+ 			if (cs_option(handles[side], CS_OPT_DETAIL,
+ 				      detail ? CS_OPT_ON : CS_OPT_OFF))
+ 				goto done;
+-		if (!check_branches(handles) || !check_memory(handles, mode) ||
++		if (!check_segment_lea(handles) || !check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
+ 		    !check_group1(handles, mode) ||

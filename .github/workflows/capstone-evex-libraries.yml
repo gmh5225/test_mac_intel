@@ -1,7 +1,7 @@
-name: Measure single legacy header selection on real i386 amd64 and vector library functions
+name: Measure the 32-bit LEA address and SIB formats over real i386 zstd crypto JPEG functions and both iced formatters
 on:
   push:
-    branches: [codex/capstone-single-legacy-header-libraries]
+    branches: [codex/capstone-sib-segment-four-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-legacy-libraries-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: i386-lea-libraries-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
