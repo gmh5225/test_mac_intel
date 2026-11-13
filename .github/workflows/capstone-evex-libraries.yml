@@ -1,7 +1,7 @@
-name: Measure a shared compact GNU legacy scan on mixed builds
+name: Measure native vector dispatch beyond mixed GNU scanner and fixed formatter improvements
 on:
   push:
-    branches: [codex/capstone-gcc-mixed-legacy-reader-libraries]
+    branches: [codex/capstone-gnu-vector-delta]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gcc-mixed-legacy-reader-${{ matrix.host }}-${{ matrix.cc }}
+          name: gnu-vector-delta-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
