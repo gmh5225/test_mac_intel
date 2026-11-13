@@ -34,7 +34,7 @@ def main(w):
     inc=inc.replace('if (mode == 2) {','if (mode == 2 || mode == 4) {\n        if (mode == 2) {').replace('        const auto &x = insn->detail->x86;', '        }\n        const auto &x = insn->detail->x86;')
     assert inc.count('iced_trace(bits,ptr,')==1
     inc='#include <valgrind/callgrind.h>\n'+inc
-    inc=inc.replace('Result timed=run(reps);','CALLGRIND_ZERO_STATS; CALLGRIND_START_INSTRUMENTATION; Result timed=run(reps); CALLGRIND_STOP_INSTRUMENTATION;')
+    inc=inc.replace('Result timed=run(reps);','CALLGRIND_START_INSTRUMENTATION; CALLGRIND_ZERO_STATS; Result timed=run(reps); CALLGRIND_DUMP_STATS_AT("measure"); CALLGRIND_STOP_INSTRUMENTATION;')
     assert inc.count('CALLGRIND_START_INSTRUMENTATION')==1
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
@@ -99,13 +99,17 @@ def main(w):
                     if label in exe:
                         if cap_result is None:cap_result=result[2:]
                         assert result[2:]==cap_result
-                    payload=raw.read_text(errors='replace')
+                    # STOP resets the live counters; use the named, explicit dump generated inside the measured epoch.
+                    dumps=[q for q in raw.parent.glob(raw.name+'.*') if 'Client Request: measure' in q.read_text(errors='replace')]
+                    assert len(dumps)==1,[(q.name,q.stat().st_size) for q in raw.parent.glob(raw.name+'*')]
+                    epoch=dumps[0]
+                    payload=epoch.read_text(errors='replace')
                     events=next(row.split()[1:] for row in payload.splitlines() if row.startswith('events:'))
                     totals=next(list(map(int,row.split()[1:]))for row in payload.splitlines() if row.startswith('summary:'))
                     assert events[0]=='Ir' and totals[0]>10000,(events,totals)
-                    annotated=sp.check_output(['callgrind_annotate','--show=Ir,Bc,Bcm,Bi,Bim','--threshold=99','--auto=no',raw],text=True,errors='replace')
+                    annotated=sp.check_output(['callgrind_annotate','--show=Ir,Bc,Bcm,Bi,Bim','--threshold=99','--auto=no',epoch],text=True,errors='replace')
                     (p/'evidence'/(ident+'.txt')).write_text(annotated)
-                    for temp in (raw,w/(ident+'.log')):temp.unlink()
+                    for temp in (raw,epoch,w/(ident+'.log')):temp.unlink()
                     reported.append(dict(sample=name,panel=panel,mode=mode,engine=label,instructions=result[2],events=dict(zip(events,totals)),per_decoded_instruction={k:v/result[2] for k,v in zip(events,totals)}))
                     save('profile.json',reported)
     assert len(reported)==14,len(reported)

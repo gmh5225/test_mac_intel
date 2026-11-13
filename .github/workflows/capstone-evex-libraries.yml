@@ -1,7 +1,7 @@
-name: Profile retired host instructions and simulated branches for real OpenSSL SIMD and i386 function extents
+name: Compare a named Callgrind measurement for each native decode, text and detail loop
 on:
   push:
-    branches: [codex/capstone-real-simd-instruction-profiles]
+    branches: [codex/capstone-measured-callgrind-epochs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: real-library-callgrind-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: measured-epoch-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
