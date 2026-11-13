@@ -1,7 +1,7 @@
-name: Isolate EVEX scan and ARM detail gains against published NeverD dev
+name: Compare the 32-bit JPEG and 64-bit OpenSSL product decoders on their complete ELF text sections
 on:
   push:
-    branches: [codex/neverd-current-evex-arm-delta]
+    branches: [codex/neverd-openssl-jpeg-evex-mov]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-evex-arm-delta
+          name: openssl-jpeg-evex-mov
           path: product-evidence/
           retention-days: 14
