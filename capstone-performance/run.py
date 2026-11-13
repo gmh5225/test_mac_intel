@@ -213,7 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    expected=['arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o']
+    expected=['arch/X86/X86ImmediateOutput.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o']
     if PROFILE=='clang' and platform.machine()=='x86_64':
         expected+=['cs.c.o']
         for sym in ('cs_decode_full_insn','cs_disasm_iter'):
