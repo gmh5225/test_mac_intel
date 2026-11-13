@@ -1,7 +1,7 @@
-name: Verify i386 addressing with both MSVC runtimes, sanitizers, DIET and reduced tables
+name: Verify the qualified 32-bit address writer across configurations
 on:
   push:
-    branches: [codex/capstone-i386-address-configurations]
+    branches: [codex/capstone-qualified-i386-portable-builds]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-address-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: gnu-qualified-address-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
