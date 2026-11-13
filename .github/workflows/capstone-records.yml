@@ -1,7 +1,7 @@
-name: Measure real PE32 and PE64 with absolute address output and check other architecture executables
+name: Verify legacy SSE2 packed-shift records on real PE and ELF executables with four backends
 on:
   push:
-    branches: [codex/capstone-absolute-memory-pe32]
+    branches: [codex/capstone-sse2-shift-live-executables]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: absolute-memory-pe-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: sse2-shift-pe-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
