@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
   all_inputs=corpus.prepare(r,t,e,run)
   choices={'arm64-ls','arm64-sort','arm64-cp','putty-32-0.85','putty-64-0.85','amd64-ls','mips64el-ls','arm-ls','arm-sort','arm-cp'}
+  choices.update(('mips64el-r2-ls','mips64el-r2-cp','mips64el-r2-sort'))
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
