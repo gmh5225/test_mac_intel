@@ -16,7 +16,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference='706eab8fec07688db644fe64c9d82600592134f8'
+    reference='7c43e5beb1da0e76b9e12d13d614d7e26cd17076'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -35,14 +35,27 @@ def main(w):
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
-    for label in ('integer','aa','previous','output'):
+    for label in ('integer','aa','previous','output','memory'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/('previous.patch' if label=='previous' else 'dispatch.patch')]
+        patches=[] if label=='integer' else [r/({'previous':'previous.patch','memory':'memory.patch','output':'dispatch.patch'}[label])]
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = X86_disasmIter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        if label=='integer':
+            audit=w/'audit';run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',audit],'link-audit')
+        # Remove the comparison engine's 2 MiB of decoder and formatter text from
+        # each Capstone executable. Its only job is public decoding and checksum.
+        standalone=code
+        a=standalone.index('  void *iced=iced_create(');z=standalone.index('  if(engine=="audit")',a)
+        standalone=standalone[:a]+'  if (!insn || engine!="capstone") return 5;\n'+standalone[z:]
+        a=standalone.index('  if(engine=="audit")');z=standalone.index('  if(engine!="capstone"',a)
+        standalone=standalone[:a]+standalone[z:]
+        a=standalone.index('        if(engine=="capstone") row=cs_span');z=standalone.index('\n',standalone.index('else iced_run',a))
+        standalone=standalone[:a]+'        row=cs_span(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);'+standalone[z:]
+        standalone=standalone.replace('iced_destroy(iced);','')
+        srcfile=w/'standalone.cpp';srcfile.write_text(standalone);run(['clang++','-std=c++17','-O3','-DNDEBUG','-I',base/'include','-I',tree/'arch/X86','-c',srcfile,'-o',obj],'standalone-driver-'+label)
+        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a','-lm','-o',target],'link-'+label);exe[label]=target
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
@@ -53,7 +66,7 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
-        intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
+        intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([audit,'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
         for panel in ['all-functions','simd-functions']:
@@ -63,15 +76,15 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                labels=['integer','aa','previous','output','iced']+(['fast']if mode else [])
+            for mode in [1,2]:
+                labels=['integer','aa','previous','output','memory']
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
-                for i in range(15):
+                for i in range(19):
                     order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},cycles=cycles);reported.append(row);save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))

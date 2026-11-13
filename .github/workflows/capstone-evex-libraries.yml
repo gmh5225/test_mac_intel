@@ -1,7 +1,7 @@
-name: Compare immediate writer calling conventions on libraries
+name: Measure standalone Capstone clients without co-linking benchmark engines
 on:
   push:
-    branches: [codex/capstone-immediate-call-shape-libraries]
+    branches: [codex/capstone-standalone-operand-output]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,12 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-24.04-arm, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
-          - { host: macos-15, cc: clang }
-          - { host: macos-15-intel, cc: clang }
+          - { host: ubuntu-24.04, cc: clang, trial: 1 }
+          - { host: ubuntu-24.04, cc: gcc, trial: 2 }
+          - { host: ubuntu-24.04, cc: clang, trial: 3 }
+          - { host: ubuntu-24.04, cc: gcc, trial: 4 }
+          - { host: ubuntu-24.04-arm, cc: clang, trial: 5 }
+          - { host: ubuntu-24.04-arm, cc: gcc, trial: 6 }
+          - { host: macos-15, cc: clang, trial: 7 }
+          - { host: macos-15-intel, cc: clang, trial: 8 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -29,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 706eab8fec07688db644fe64c9d82600592134f8
+          ref: 7c43e5beb1da0e76b9e12d13d614d7e26cd17076
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -42,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: register-call-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: standalone-writers-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
