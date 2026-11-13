@@ -1,0 +1,25 @@
+name: Darwin sigreturn control
+on:
+  push:
+    branches: [codex/neverd-arm64e-resume-control]
+    paths: [resume-control/**, .github/workflows/neverd-resume-control.yml]
+permissions:
+  contents: read
+jobs:
+  control:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Resume the caller through the original signal frame
+        working-directory: resume-control
+        run: |
+          ulimit -c 0
+          for cpu in arm64 arm64e; do
+            clang -target "$cpu-apple-macos15" -O2 system-control.c system-control.S -o "$RUNNER_TEMP/control-$cpu"
+            "$RUNNER_TEMP/control-$cpu"
+            rm "$RUNNER_TEMP/control-$cpu"
+          done
