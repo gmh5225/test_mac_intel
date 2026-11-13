@@ -46,8 +46,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   active=cc=='gcc' and platform.machine()=='x86_64'
-   expected={'arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
+   active=False
+   expected={'arch/Mips/MipsMapping.c.o','arch/X86/X86DisassemblerDecoder.c.o',*('arch/X86/'+x+'.c.o' for x in ('X86ImmediateOutput','X86MemoryOutput','X86OutputIterator','X86VectorOutput'))} if active else set()
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)

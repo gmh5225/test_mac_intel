@@ -1,7 +1,7 @@
-name: Verify A32 immediate branches and operand defaults with GNU x86 and MIPS
+name: Verify byte-identical ARM-enabled binaries across GNU and Clang hosts
 on:
   push:
-    branches: [codex/capstone-gnu-mixed-native-a32]
+    branches: [codex/capstone-unchanged-arm-enabled-images]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-mixed-native-a32-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: unchanged-arm-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
