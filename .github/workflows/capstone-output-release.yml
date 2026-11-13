@@ -1,7 +1,7 @@
-name: Validate EVEX operand scans and packed SSE output in twelve supported configurations
+name: Test native EVEX public rows, generators and corrected MIPS operands in twelve Release configurations and sanitizers
 on:
   push:
-    branches: [codex/capstone-single-pass-evex-profiles]
+    branches: [codex/capstone-native-evex-sc64-multiconfig]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -37,13 +37,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
+          ref: 535dfe10dcc2c3d8075f447631cbaf6694adc4cf
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: validated-single-pass-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: native-evex-config-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

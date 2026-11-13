@@ -52,26 +52,52 @@ index 1cb04b92..44471169 100644
  
  $(OBJDIR)/%.o: %.c
  	@mkdir -p $(@D)
+diff --git a/arch/AArch64/AArch64InstPrinter.c b/arch/AArch64/AArch64InstPrinter.c
+index c8e9f44e..63f99807 100644
+--- a/arch/AArch64/AArch64InstPrinter.c
++++ b/arch/AArch64/AArch64InstPrinter.c
+@@ -80,7 +80,8 @@ DECLARE_printComplexRotationOp(90, 0);
+ 
+ void printRegName(SStream *OS, unsigned Reg)
+ {
+-#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \
++#if (defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) || \
++     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && !defined(CAPSTONE_DIET) && \
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+ #include "AArch64GenShortRegisterNames.inc"
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index cbaebc8f..bc81cee8 100644
+index cbaebc8f..e82eaaa5 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
-@@ -906,7 +906,13 @@ void AArch64_set_instr_map_data(MCInst *MI)
+@@ -293,8 +293,15 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
+ 	return AArch64_LLVM_getRegisterName(reg, AArch64_NoRegAltName);
+ }
+ 
++/* Dedicated builds select their features separately. The standard GNU
++ * four-backend build also uses the validated scan, detail and printer paths. */
++#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || defined(CAPSTONE_AARCH64_FOUR_OUTPUT)
++#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
++#endif
++
+ /* The template changes text-only dispatch layout on Apple arm64. */
+-#if defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
++#if (defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) || \
++     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && \
+     !(defined(__APPLE__) && defined(__aarch64__))
+ #define AARCH64_COPY_OPERAND_DEFAULTS
+ /* Build all public operand defaults in one copy, including unused slots. */
+@@ -906,7 +913,8 @@ void AArch64_set_instr_map_data(MCInst *MI)
  	map_groups(MI, aarch64_insns);
  }
  
 -#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
-+#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || \
-+	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
-+#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
-+#endif
 +
 +#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
  /* These A64 classes have no reserved operand encodings. For a text-free
   * scan, the table's internal opcode suffices for the normal public mapper. */
  static unsigned scanImmediateOpcode(uint32_t word)
-@@ -938,7 +944,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -938,7 +946,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			    MCInst *MI, uint16_t *size, uint64_t address,
  			    void *info)
  {
@@ -80,6 +106,22 @@ index cbaebc8f..bc81cee8 100644
  	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
  	    MI->csh->disasm == AArch64_getInstruction) {
  		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));
+diff --git a/arch/AArch64/AArch64Mapping.h b/arch/AArch64/AArch64Mapping.h
+index 45d3b2db..041f3418 100644
+--- a/arch/AArch64/AArch64Mapping.h
++++ b/arch/AArch64/AArch64Mapping.h
+@@ -4,6 +4,11 @@
+ #ifndef CS_AARCH64_MAP_H
+ #define CS_AARCH64_MAP_H
+ 
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
++#define CAPSTONE_AARCH64_FOUR_OUTPUT
++#endif
++
+ #include "capstone/capstone.h"
+ #include "../../MCInst.h"
+ #include "../../SStream.h"
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
 index ebe301e2..afe37a02 100644
 --- a/arch/ARM/ARMInstPrinter.c
@@ -346,7 +388,7 @@ index ebe301e2..afe37a02 100644
  	SStream_concat0(O, markup(">"));
  }
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 11e5e995..844ba11a 100644
+index 11e5e995..ea417a61 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -832,6 +832,11 @@ void ARM_check_updates_flags(MCInst *MI)
@@ -361,32 +403,65 @@ index 11e5e995..844ba11a 100644
  void ARM_set_instr_map_data(MCInst *MI)
  {
  	/* The ARM decoder indexes this same generated map for implicit effects. */
-@@ -848,6 +853,24 @@ bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -844,10 +849,57 @@ void ARM_set_instr_map_data(MCInst *MI)
+ 	map_groups(MI, arm_insns);
+ }
+ 
++#ifdef ARM_GNU_MIXED_SCAN
++static unsigned armScanImmediateOpcode(const uint8_t *code)
++{
++	const unsigned cond = code[3] >> 4;
++	if ((code[3] & 0x0e) == 0x0a) {
++		if (cond == 15)
++			return ARM_BLXi;
++		if (code[3] & 1)
++			return cond == 14 ? ARM_BL : ARM_BL_pred;
++		return ARM_Bcc;
++	}
++	/* A32 data-processing immediates have no register-shift encoding.
++	 * Keep reserved condition codes, PC operands and malformed aliases
++	 * on the full decoder, which also records soft failures. */
++	if (cond == 15 || (code[3] & 0x0e) != 2)
++		return 0;
++	const unsigned op = ((code[3] & 1) << 3) | (code[2] >> 5);
++	const unsigned rd = code[1] >> 4, rn = code[2] & 15;
++	if (rd == 15 || rn == 15)
++		return 0;
++	static const uint16_t opcodes[] = {
++		ARM_ANDri, ARM_EORri, ARM_SUBri, ARM_RSBri,
++		ARM_ADDri, ARM_ADCri, ARM_SBCri, ARM_RSCri,
++		ARM_TSTri, ARM_TEQri, ARM_CMPri, ARM_CMNri,
++		ARM_ORRri, ARM_MOVi, ARM_BICri, ARM_MVNi,
++	};
++	if (op >= 8 && op <= 11 && (rd != 0 || !(code[2] & 0x10)))
++		return 0;
++	if ((op == 13 || op == 15) && rn != 0)
++		return 0;
++	return opcodes[op];
++}
++#endif
++
+ bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info)
  {
 +#ifdef ARM_GNU_MIXED_SCAN
-+	/* Every displacement is valid for these A32 immediate branches. */
 +	if (instr->csh->no_text && !instr->flat_insn->detail &&
 +	    instr->csh->mode == CS_MODE_ARM &&
-+	    instr->csh->disasm == ARM_getInstruction && code_len >= 4 &&
-+	    (code[3] & 0x0e) == 0x0a) {
-+		unsigned cond = code[3] >> 4;
-+		unsigned opcode = ARM_Bcc;
-+		if (cond == 15)
-+			opcode = ARM_BLXi;
-+		else if (code[3] & 1)
-+			opcode = cond == 14 ? ARM_BL : ARM_BL_pred;
-+		MCInst_setOpcode(instr, opcode);
-+		ARM_set_instr_map_data(instr);
-+		*size = 4;
-+		return true;
++	    instr->csh->disasm == ARM_getInstruction && code_len >= 4) {
++		const unsigned opcode = armScanImmediateOpcode(code);
++		if (opcode) {
++			MCInst_setOpcode(instr, opcode);
++			ARM_set_instr_map_data(instr);
++			*size = 4;
++			return true;
++		}
 +	}
 +#endif
  	ARM_init_cs_detail(instr);
  	DecodeStatus Result = ARM_LLVM_getInstruction(
  		handle, code, code_len, instr, size, address, info);
-@@ -941,7 +964,7 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -941,7 +993,7 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -438,7 +513,7 @@ index 6266d12b..98805f06 100644
  
  // given internal insn id, return public instruction ID
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..6b921f10 100644
+index c42839d3..09073747 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -566,59 +641,6 @@ index d3566525..d6775ef0 100644
  #define MIPS_DIRECT_MAPPING
  #endif
  
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..6e53751a 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -334,7 +334,7 @@ __attribute__((noinline))
- #endif
- static int
- decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
--		      size_t code_len, cs_mode mode,
-+		      size_t code_len, cs_mode mode, MCInst *scan, uint16_t *size,
- 		      bool *scalar_compare_p2_normalized,
- 		      uint8_t *original_scalar_compare_p2)
- {
-@@ -582,6 +582,12 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
- 		}
- 	}
- 
-+	/* The scan readers validate and translate each operand together. When
-+	 * normalization changed any bytes, restore the original EVEX fields
-+	 * before translation as required by the raw decoder. */
-+	if (scan && decode_code == code)
-+		return decodeInstructionScan(insn, code, code_len, mode, scan,
-+					     size);
- 	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
- 
- 	/* No further byte reads follow decoding; keep the input pointer valid
-@@ -639,11 +645,15 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 	bool result;
- 
- 	InternalInstruction insn = { 0 };
--	if (extension_opcode == 0x62)
-+	const bool scan = scanOnly || (handle->no_text && !handle->detail_opt);
-+	if (extension_opcode == 0x62) {
- 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
-+					    scan ? instr : NULL, size,
- 					    &scalar_compare_p2_normalized,
- 					    &original_scalar_compare_p2);
--	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
-+		if (ret == X86_SCAN_COMPLETE)
-+			return true;
-+	} else if (scan) {
- 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
- 					    instr, size);
- 		if (ret != X86_SCAN_RAW_READY)
-@@ -664,7 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 		*size = (uint16_t)insn.length;
- 
- 		prepareTranslation(&insn);
--		if (scanOnly || (handle->no_text && !handle->detail_opt))
-+		if (scan)
- 			return !translateInstruction(instr, &insn, false);
- 		result = operands_ready ||
- 			 !translateInstruction(instr, &insn, true);
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index ae1554b0..da53269e 100644
 --- a/arch/X86/X86Disassembler.h
@@ -670,21 +692,6 @@ index 01559e08..8e6577c8 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
-index ae3428b5..14aefc93 100644
---- a/arch/X86/X86DisassemblerDecoder.h
-+++ b/arch/X86/X86DisassemblerDecoder.h
-@@ -707,8 +707,8 @@ enum X86DecodeScanResult {
-  * mcInst retains raw decoding with only 0/-1 results. Only RAW_READY promises
-  * a materialized raw instruction; COMPLETE supplies the finished scan output.
-  * The caller selects scan
-- * after extension dispatch; EVEX remains raw so the backend keeps its existing
-- * prefix normalization and restoration order. */
-+ * after extension dispatch. EVEX encodings that need prefix normalization
-+ * use the raw decoder until their original fields have been restored. */
- int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
- 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
- 			  uint16_t *size);
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..92c55fd2 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
@@ -1589,6 +1596,20 @@ index e507eae0..6068ef0f 100644
          args = b", ".join(get_text_from_node(src, op) for op in ops)
          if len(ops) == 2:
              return b"SStream_concat2(" + s_name + b", " + args + b");\n"
+diff --git a/suite/synctools/aarch64_register_names.py b/suite/synctools/aarch64_register_names.py
+index e47c2bbf..bfee13c5 100644
+--- a/suite/synctools/aarch64_register_names.py
++++ b/suite/synctools/aarch64_register_names.py
+@@ -10,7 +10,8 @@ from pathlib import Path
+ 
+ ARCH = Path(__file__).resolve().parents[2] / "arch" / "AArch64"
+ PRINT_REG = "void printRegName(SStream *OS, unsigned Reg)\n{\n"
+-SHORT_REG = """#if defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) && !defined(CAPSTONE_DIET) && \\
++SHORT_REG = """#if (defined(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES) || \\
++     defined(CAPSTONE_AARCH64_FOUR_OUTPUT)) && !defined(CAPSTONE_DIET) && \\
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \\
+ 	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
+ #include "AArch64GenShortRegisterNames.inc"
 diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
 index 30482037..29a72009 100644
 --- a/suite/synctools/fixed_len_decoder.py
