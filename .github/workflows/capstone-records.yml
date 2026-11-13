@@ -1,7 +1,7 @@
-name: Measure one terminal selection against duplicate checking on real PE32 PE64 ARM64 and MIPS files
+name: Measure the 32-bit LEA address and SIB formats over PE32 PE64 and independent ARM and MIPS controls
 on:
   push:
-    branches: [codex/capstone-single-legacy-header-images]
+    branches: [codex/capstone-sib-segment-four-images]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: single-legacy-mixed-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: i386-lea-mixed-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
