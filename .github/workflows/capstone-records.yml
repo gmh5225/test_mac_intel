@@ -1,7 +1,7 @@
-name: Measure direct ARM opcode mapping with real coreutils and A32/Thumb differential records
+name: Qualify dense ARM mapping in dedicated and NeverD four-architecture builds
 on:
   push:
-    branches: [codex/capstone-arm-opcode-mapping]
+    branches: [codex/capstone-qualified-arm-map]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,15 +11,22 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang }
-          - { host: macos-15-intel, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-24.04-arm, cc: clang }
+          - { host: macos-15, cc: clang, archs: arm }
+          - { host: macos-15, cc: clang, archs: four }
+          - { host: macos-15-intel, cc: clang, archs: arm }
+          - { host: macos-15-intel, cc: clang, archs: four }
+          - { host: ubuntu-24.04-arm, cc: gcc, archs: arm }
+          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
+          - { host: ubuntu-24.04, cc: clang, archs: arm }
+          - { host: ubuntu-24.04, cc: clang, archs: four }
+          - { host: ubuntu-24.04, cc: gcc, archs: arm }
+          - { host: ubuntu-24.04, cc: gcc, archs: four }
+          - { host: ubuntu-24.04-arm, cc: clang, archs: arm }
+          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
+      BUILD_ARCHS: ${{ matrix.archs }}
       MEASURE_CC: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -29,16 +36,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8788c077d7de2724fbf9a82f46f43a2dbd2b5e63
+          ref: c92f6f103e0123790f574c05a2a57f7203e7a461
           path: source
           persist-credentials: false
-      - name: Measure independent static executables with both initializer placements
+      - name: Compare complete ARM records and independent executables with A/A controls
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-opcode-mapping-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-qualified-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
