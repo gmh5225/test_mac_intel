@@ -15,6 +15,14 @@ write('sources',dict(neverd=rev(nd),capstone=rev(cs),llvm_fork=rev(ll),llvm_sour
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
+  # Qualify the GCC portability fix against the live fork that both
+  # Capstone variants share. Once the fork contains it, skip the patch.
+  fix=r/'swift-friend.patch'
+  probe=sp.run(['git','apply','--reverse','--check',fix],cwd=ll,capture_output=True)
+  if probe.returncode:
+   command(['git','apply','--check',fix],'swift-check',ll)
+   command(['git','apply',fix],'swift-gnu-friend',ll)
+  write('llvm_source_build',dict(revision=rev(ll),compiler='g++',swift_friend_applied=bool(probe.returncode),patch_sha256=hashlib.sha256(fix.read_bytes()).hexdigest()))
   cases=corpus.prepare(r,t,out,command)
   cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
   assert len(cases)==14
@@ -25,6 +33,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers','-DCMAKE_CXX_COMPILER=g++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   write('compiler',dict(c=sp.check_output(['gcc','--version'],text=True).splitlines()[0],cxx=sp.check_output(['g++','--version'],text=True).splitlines()[0],cpu=next(x for x in Path('/proc/cpuinfo').read_text().splitlines()if x.startswith('model name'))))
+  command(['cmake','--build',build,'--target','LLVMSwiftDemangle','--parallel','4'],'swift-demangle-from-source')
   products={}
   import struct,collections
   def compare(left,right,label):
@@ -78,7 +87,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'ARMMapping.c.o','MipsMapping.c.o','X86DisassemblerDecoder.c.o','X86ImmediateOutput.c.o','X86MemoryOutput.c.o','X86OutputIterator.c.o','X86VectorOutput.c.o'},changed
+    assert {Path(k).name for k in changed}=={'ARMMapping.c.o','ARMInstPrinter.c.o','MipsDisassembler.c.o','MipsMapping.c.o','X86DisassemblerDecoder.c.o','X86ImmediateOutput.c.o','X86MemoryOutput.c.o','X86OutputIterator.c.o','X86VectorOutput.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}

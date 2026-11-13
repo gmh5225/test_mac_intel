@@ -1,7 +1,7 @@
-name: Build all four production backends and LLVM sources with a consistent GNU toolchain
+name: Build and exercise the four-backend NeverD decoder using GCC, current fork LLVM sources and a verified Swift friend specialization
 on:
   push:
-    branches: [codex/neverd-gnu-source-release]
+    branches: [codex/neverd-four-decoder-source-qualification]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 2ebdc73942b6f12d8485c7ce04c43b0f88744b5b
+          ref: 37de45cd16cb17f645135c1bdcb712af86269ac0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-native-production
+          name: four-backend-gnu-production
           path: product-evidence/
           retention-days: 14

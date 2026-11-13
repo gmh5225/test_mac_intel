@@ -1,0 +1,13 @@
+diff --git a/llvm/lib/SwiftDemangle/vendor/swift/lib/Demangling/Remangler.cpp b/llvm/lib/SwiftDemangle/vendor/swift/lib/Demangling/Remangler.cpp
+--- a/llvm/lib/SwiftDemangle/vendor/swift/lib/Demangling/Remangler.cpp
++++ b/llvm/lib/SwiftDemangle/vendor/swift/lib/Demangling/Remangler.cpp
+@@ -208,8 +208,7 @@
+ namespace {
+ 
+ class Remangler : public RemanglerBase {
+-  template <typename Mangler>
+-  friend void Mangle::mangleIdentifier(Mangler &M, StringRef ident);
++  friend void Mangle::mangleIdentifier<Remangler>(Remangler &M, StringRef ident);
+   friend class Mangle::SubstitutionMerging;
+ 
+   const ManglingFlavor Flavor = ManglingFlavor::Default;
