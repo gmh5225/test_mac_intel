@@ -151,7 +151,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json',dict(baseline='published c92f6f103e0123790f574c05a2a57f7203e7a461',candidate='bounded VEX opcode and operand extents'))
+    write('comparison.json',dict(baseline='published c92f6f103e0123790f574c05a2a57f7203e7a461',candidate='out of line extent VEX scan'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -221,6 +221,14 @@ panic = "abort"
     command([WORK/'integer-states'],'pass-integer-states')
     command(['clang++','-O2','-std=c++17','-I',base/'include',SOURCE/'verify-vex.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',WORK/'verify-vex'],'build-verify-vex')
     command([WORK/'verify-vex',libraries['base'],libraries['new'],'quick'],'verify-vex')
+    if platform.system()=='Linux':
+        for lbl in ('base','new'):
+            target=WORK/('single-'+lbl)
+            command(['nm','-n','-S',target],'sym-'+lbl)
+            command(['objdump','-d','--disassemble=cs_disasm_iter',target],'scalar-asm-'+lbl)
+            syms=(EVIDENCE/('sym-'+lbl+'.log')).read_text().splitlines()
+            for sym in [s.split()[-1] for s in syms if 'tryVexTerminalScan' in s]:
+                command(['objdump','-d','--disassemble='+sym,target],'vex-asm-'+lbl+'-'+sym)
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label

@@ -1,39 +1,54 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..46ce34e0 100644
+index 76fdbcb7..49941b2c 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3422,67 +3422,92 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3280,7 +3280,12 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+ }
+ #endif
+ 
+-X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 					 uint8_t prefix, X86ScanResult *result);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+@@ -3422,67 +3427,91 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  	return completeTerminalScanResult(result, instructionID, status);
  }
  
-+/* 32- and 64-bit memory operands have the same SIB and displacement
-+ * extents. The caller checks the final end against the architectural limit. */
-+X86_DECODE_INLINE unsigned scanMemoryEnd(const uint8_t *code, size_t size,
-+					 unsigned end, uint8_t modrm)
-+{
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	static const uint8_t extra[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
-+					     { 1, 1, 1, 1, 2, 1, 1, 1 },
-+					     { 4, 4, 4, 4, 5, 4, 4, 4 } };
-+	if ((modrm & 0xc7) == 4) {
-+		if (end >= size)
-+			return 16;
-+		if ((code[end] & 7) == 5)
-+			end += 4;
-+	}
-+	return end + extra[mod][rm];
-+}
-+
-+/* A bare VEX prefix in 64-bit mode fixes the address size. Only the end
-+ * offset and the opcode IDs escape this scan. Extension and generic fixups
-+ * continue to use their ordinary readers. */
- X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 					 uint8_t prefix, X86ScanResult *result)
+-X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++X86_DECODE_INLINE unsigned vexMemoryEnd(const uint8_t *code, size_t size,
++					unsigned end, uint8_t modrm)
  {
 -	InternalInstruction insn = { 0 };
 -	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
 -	insn.readerCursor = 1;
 -	if (readVexPrefix(&insn, prefix))
++	const unsigned mod = modFromModRM(modrm);
++	const unsigned rm = rmFromModRM(modrm);
++	if (rm == 4) {
++		if (end >= size)
++			return 16;
++		const uint8_t sib = code[end++];
++		if (mod == 0 && baseFromSIB(sib) == 5)
++			return end + 4;
++	} else if (mod == 0 && rm == 5) {
++		return end + 4;
++	}
++	return end + (mod == 1 ? 1 : mod == 2 ? 4 : 0);
++}
++
++/* A bare VEX prefix in 64-bit mode fixes the address size. Only the end
++ * offset and the opcode IDs escape this scan. Extension and generic fixups
++ * continue to use their ordinary readers. */
++static int tryVexTerminalScan(const uint8_t *code, size_t code_len,
++			      uint8_t prefix, X86ScanResult *result)
++{
 +	const bool vex2 = prefix == 0xc5;
 +	const unsigned opcode_offset = vex2 ? 2 : 3;
 +	if (code_len <= opcode_offset)
@@ -112,7 +127,7 @@ index 76fdbcb7..46ce34e0 100644
 +					       X86_VEX_SCAN_MEMORY)))
  			return X86_SCAN_INVALID;
 +		if (modrm < 0xc0)
-+			end = scanMemoryEnd(code, code_len, end, modrm);
++			end = vexMemoryEnd(code, code_len, end, modrm);
  	}
 -	if (!(flags & X86_VEX_SCAN_VVVV) &&
 -	    (prefix == 0xc4 ? vvvvFromVEX3of3(payload) :
@@ -136,34 +151,6 @@ index 76fdbcb7..46ce34e0 100644
  	result->popcode_adjust = 0;
  	return X86_SCAN_COMPLETE;
  }
-@@ -3569,25 +3594,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
- 		}
- 		++end;
- 		if (modrm < 0xc0) {
--			const unsigned mod = modrm >> 6, rm = modrm & 7;
- 			if (mode == CS_MODE_16) {
- 				static const uint8_t displacement[] = { 0, 1,
- 									2 };
--				end += displacement[mod] +
-+				end += displacement[modrm >> 6] +
- 				       ((modrm & 0xc7) == 6 ? 2 : 0);
- 			} else {
--				static const uint8_t extra[3][8] = {
--					{ 0, 0, 0, 0, 1, 4, 0, 0 },
--					{ 1, 1, 1, 1, 2, 1, 1, 1 },
--					{ 4, 4, 4, 4, 5, 4, 4, 4 }
--				};
--				if ((modrm & 0xc7) == 4) {
--					if (end >= size)
--						return X86_SCAN_INVALID;
--					if ((code[end] & 7) == 5)
--						end += 4;
--				}
--				end += extra[mod][rm];
-+				end = scanMemoryEnd(code, size, end, modrm);
- 			}
- 		}
- 	}
 diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
 index 2c0da2cd..c39eaa65 100644
 --- a/arch/X86/X86GenVexScan.inc
