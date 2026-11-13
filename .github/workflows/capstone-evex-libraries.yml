@@ -1,7 +1,7 @@
-name: Isolate padded mnemonic byte stores across five hosts on real i386 amd64 and SIMD library functions
+name: Compare one public text clear with separate mnemonic and operand clears on real scalar and SIMD functions
 on:
   push:
-    branches: [codex/capstone-generated-mnemonic-stores]
+    branches: [codex/capstone-initialize-public-text-once]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-mnemonic-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: contiguous-text-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
