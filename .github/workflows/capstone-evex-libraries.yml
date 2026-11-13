@@ -1,7 +1,7 @@
-name: Verify complete operand output and compare gains over the preceding writers on standalone
+name: Retime expanded x86 operand output on populated JPEG, zstd and libcrypto functions on two Mac models
 on:
   push:
-    branches: [codex/capstone-expanded-operands-standalone]
+    branches: [codex/capstone-macos-expanded-real-functions]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,14 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: clang, trial: 1 }
-          - { host: ubuntu-24.04, cc: gcc, trial: 2 }
-          - { host: ubuntu-24.04, cc: clang, trial: 3 }
-          - { host: ubuntu-24.04, cc: gcc, trial: 4 }
-          - { host: ubuntu-24.04-arm, cc: clang, trial: 5 }
-          - { host: ubuntu-24.04-arm, cc: gcc, trial: 6 }
-          - { host: macos-15, cc: clang, trial: 7 }
-          - { host: macos-15-intel, cc: clang, trial: 8 }
+          - { host: macos-15, cc: clang, trial: 1 }
+          - { host: macos-15-intel, cc: clang, trial: 2 }
+          - { host: macos-15, cc: clang, trial: 3 }
+          - { host: macos-15-intel, cc: clang, trial: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -44,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: expanded-operands-standalone-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
+          name: macos-expanded-repeat-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
