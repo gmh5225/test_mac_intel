@@ -1,7 +1,7 @@
-name: Validate EVEX.W vector-element selection and predicated broadcast access across build profiles
+name: Verify and measure canonical broadcast operand and register details on profiles
 on:
   push:
-    branches: [codex/capstone-evex-width-access-profiles]
+    branches: [codex/capstone-corrected-broadcast-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 15ce0f6bd4b2497685ad5cca9a66aa721f462d53
+          ref: d843dcdf830e883697b348eff0ee47d99849ff90
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-element-width-access-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: corrected-broadcast-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
