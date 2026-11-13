@@ -1,0 +1,28 @@
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 30e28897..7c7fff29 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -845,6 +845,23 @@ bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info)
+ {
++	/* A32 B, BL and BLX immediate have no reserved displacement values.
++     * Text-free decoding needs only the normal mapping's opcode. */
++	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
++	    instr->csh->mode == CS_MODE_ARM &&
++	    instr->csh->disasm == ARM_getInstruction &&
++	    (code[3] & 0x0e) == 0x0a) {
++		const unsigned cond = code[3] >> 4;
++		unsigned opcode = ARM_Bcc;
++		if (cond == 15)
++			opcode = ARM_BLXi;
++		else if (code[3] & 1)
++			opcode = cond == 14 ? ARM_BL : ARM_BL_pred;
++		MCInst_setOpcode(instr, opcode);
++		map_cs_id(instr, arm_insns, ARR_SIZE(arm_insns));
++		*size = 4;
++		return true;
++	}
+ 	ARM_init_cs_detail(instr);
+ 	DecodeStatus Result = ARM_LLVM_getInstruction(
+ 		handle, code, code_len, instr, size, address, info);

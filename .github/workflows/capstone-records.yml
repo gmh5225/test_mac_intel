@@ -1,7 +1,7 @@
-name: Verify dedicated MIPS scanning on Linux ARM hosts with coreutils, four million differential records and object identity
+name: Compare A32 branch scanning and a single public detail check on ARM coreutils
 on:
   push:
-    branches: [codex/capstone-mips-aarch64-host-release]
+    branches: [codex/capstone-arm-scan-and-mapping]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -12,6 +12,7 @@ jobs:
       matrix:
         include:
           - { host: macos-15, cc: clang }
+          - { host: macos-15-intel, cc: clang }
           - { host: ubuntu-24.04-arm, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
           - { host: ubuntu-24.04, cc: gcc }
@@ -28,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b70c7e94528f1d9f4c7c424f65bbd513bbf32d47
+          ref: 8788c077d7de2724fbf9a82f46f43a2dbd2b5e63
           path: source
           persist-credentials: false
       - name: Measure independent static executables with both initializer placements
@@ -38,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: linux-arm-mips-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-branches-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

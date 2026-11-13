@@ -1,0 +1,13 @@
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 30e28897..60bff354 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -835,6 +835,8 @@ void ARM_check_updates_flags(MCInst *MI)
+ void ARM_set_instr_map_data(MCInst *MI)
+ {
+ 	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, arm_insns);
+ 	map_implicit_writes(MI, arm_insns);
+ 	ARM_check_updates_flags(MI);
