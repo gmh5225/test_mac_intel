@@ -1,7 +1,7 @@
-name: Qualify shared cold EVEX lookup and x86-only object changes in libraries
+name: Verify canonical effective address and extended stack records on libraries
 on:
   push:
-    branches: [codex/capstone-cold-evex-libraries]
+    branches: [codex/capstone-effective-address-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cold-evex-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: ea-and-stack-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
