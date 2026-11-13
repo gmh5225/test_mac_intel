@@ -1,7 +1,7 @@
-name: Measure explicit MIPS64R2 on coreutils ls cp sort and generic MIPS64 separately on two GCC versions
+name: Measure standard MIPS64 and explicit R2 primary decoding on ls cp sort with repaired store conditional and two GCC versions
 on:
   push:
-    branches: [codex/capstone-exact-mips-revisions]
+    branches: [codex/capstone-correct-r2-mapping-and-primary]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
+          ref: 535dfe10dcc2c3d8075f447631cbaf6694adc4cf
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -36,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-r2-increment-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mips-r2-primary-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
