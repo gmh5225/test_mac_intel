@@ -1,9 +1,9 @@
-name: Verify isolated x86 vector and scalar output against current Capstone next on mixed
+name: Verify identical signed public executables and private x86 output on Apple Silicon and Intel
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-isolated-vector-mixed]
+    branches: [codex/capstone-isolated-vector-apple]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-isolated-vector-mixed
+  group: capstone-isolated-vector-apple
   cancel-in-progress: false
 
 jobs:
@@ -21,10 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, baseline: neverd-four, cc: gcc }
-          - { host: ubuntu-24.04-arm, baseline: neverd-four, cc: gcc }
-          - { host: ubuntu-24.04, baseline: neverd-four, cc: clang }
-          - { host: ubuntu-24.04-arm, baseline: neverd-four, cc: clang }
           - { host: macos-15-intel, baseline: neverd-four, cc: clang }
           - { host: macos-15, baseline: neverd-four, cc: clang }
     env:
@@ -54,7 +50,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: isolated-vector-mixed-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: isolated-vector-apple-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14

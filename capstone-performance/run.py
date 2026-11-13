@@ -182,7 +182,8 @@ panic = "abort"
     for label in ('base','new'):
         for consumer,src in [('decoder','compare.cpp'),('single','single.cpp'),('windows','windows.cpp')]:
             flags=['-DUSE_X86_OUTPUT_ITERATOR','-I',WORK/'new/arch/X86'] if consumer!='single' else []
-            command(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',*flags,SOURCE/src,WORK/(label+'-build/libcapstone.a'),*([iced_library] if consumer!='single' else []),'-lpthread','-ldl','-lm','-o',WORK/(consumer+'-'+label)],consumer+'-'+label+'-link')
+            command(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include',*flags,SOURCE/src,WORK/(label+'-build/libcapstone.a'),*([iced_library] if consumer!='single' else []),'-lpthread','-ldl','-lm','-o',WORK/consumer],consumer+'-'+label+'-link')
+            (WORK/consumer).rename(WORK/(consumer+'-'+label))
     commands = json.loads((WORK / 'new-build/compile_commands.json').read_text())
     args = shlex.split(next(c['command'] for c in commands if c['file'].endswith('/Mapping.c')))
     defs = [arg for arg in args if arg.startswith('-D')]
@@ -206,6 +207,11 @@ panic = "abort"
     assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
     assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    # The Mach-O ad hoc signature includes the linker's output basename. Both
+    # files above are linked as 'single' and only renamed after signing.
+    for label in ('base','new'):
+        proc=subprocess.run(['codesign','-dv','--verbose=4',WORK/('single-'+label)],capture_output=True,text=True,check=True)
+        (EVIDENCE/('signature-'+label+'.txt')).write_text(proc.stderr)
     assert sha(WORK/'single-base')==sha(WORK/'single-new'), 'mixed public executable changed'
     if os.environ['MIXED_CC']=='gcc':
         command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'compile-full-scan')
