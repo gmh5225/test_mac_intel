@@ -27,7 +27,7 @@ index 80398b9b..d5084a3a 100644
  X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
      awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..da53269e 100644
+index ae1554b0..9050c42a 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
 @@ -47,6 +47,16 @@ typedef struct X86ScanResult {
@@ -40,15 +40,15 @@ index ae1554b0..da53269e 100644
 +	!defined(_WIN32_WCE)
 +#include "../../cs_priv.h"
 +#define CAPSTONE_X86_VECTOR_OUTPUT
-+CAPSTONE_INTERNAL bool X86_scanEvexOutputForm(const uint8_t *code, size_t size,
-+					     X86ScanResult *result);
++/* Return (public ID << 8) | length, or zero for a general-decoder form. */
++CAPSTONE_INTERNAL uint32_t X86_scanEvexOutputForm(const uint8_t *code, size_t size);
 +#endif
 +
  bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..90f2825c 100644
+index 76fdbcb7..b5a7f680 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2944,7 +2944,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -60,7 +60,7 @@ index 76fdbcb7..90f2825c 100644
      !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
-@@ -3365,6 +3365,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+@@ -3365,6 +3365,23 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
  			return true;
  		}
  	}
@@ -70,12 +70,83 @@ index 76fdbcb7..90f2825c 100644
 +     * The adapter above still owns its callback and all misses use the
 +     * feature decoder's original order, including malformed prefixes. */
 +	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
-+	    handle->insn_id == X86_get_insn_id &&
-+	    X86_scanEvexOutputForm(code, code_len, result))
-+		return true;
++	    handle->insn_id == X86_get_insn_id) {
++		const uint32_t terminal =
++			X86_scanEvexOutputForm(code, code_len);
++		if (terminal) {
++			result->opcode = 0;
++			result->opcode_pub = terminal >> 8;
++			result->length = (uint8_t)terminal;
++			result->popcode_adjust = 0;
++			return true;
++		}
++	}
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+@@ -3753,26 +3770,49 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ {
+ 	unsigned instructionID = 0;
+ 	uint16_t length;
+-	int initial = tryInitialScanResult(handle, code, size, &instructionID,
+-					   &length, true);
+-	if (initial == X86_SCAN_NOT_HANDLED) {
+-		X86ScanResult result;
+-		if (!getInstructionScanResultAfterInitial(
++	X86ScanResult result;
++#ifdef CAPSTONE_X86_VECTOR_OUTPUT
++	/* A raw long-mode EVEX has no legacy interpretation. An installed scan
++     * adapter still gets first refusal through the regular escape decoder. */
++	if (size && code[0] == 0x62 && handle->mode == CS_MODE_64 &&
++	    handle->insn_id == X86_get_insn_id
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++	    && !handle->x86_scan_adapter
++#endif
++	) {
++		const uint32_t terminal = X86_scanEvexOutputForm(code, size);
++		if (terminal) {
++			instructionID = terminal >> 8;
++			length = (uint8_t)terminal;
++			goto complete_terminal;
++		}
++		if (!decodeScanResultGeneric((csh)(uintptr_t)handle, code, size,
++					     insn, &result, 0x62, true))
++			return false;
++	} else
++#endif
++	{
++		const int initial = tryInitialScanResult(
++			handle, code, size, &instructionID, &length, true);
++		if (initial == X86_SCAN_COMPLETE)
++			goto complete_terminal;
++		if (initial != X86_SCAN_NOT_HANDLED ||
++		    !getInstructionScanResultAfterInitial(
+ 			    (csh)(uintptr_t)handle, code, size, insn, &result,
+ 			    true))
+ 			return false;
+-		*insn_size = result.length;
+-		finish_x86_scan(handle, insn, &result, code, batch, true);
+-		return true;
+ 	}
+-	if (initial != X86_SCAN_COMPLETE)
+-		return false;
+-	X86ScanResult result = { 0, instructionID, length, 0 };
+-	*insn_size = length;
++	*insn_size = result.length;
+ 	finish_x86_scan(handle, insn, &result, code, batch, true);
+ 	return true;
+-}
+ 
++complete_terminal: {
++	const X86ScanResult terminal = { 0, instructionID, length, 0 };
++	*insn_size = length;
++	finish_x86_scan(handle, insn, &terminal, code, batch, true);
++	return true;
++}
++}
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..5e6008a8 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
@@ -241,7 +312,7 @@ index 7675273f..6241a850 100644
  X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..65b4cbf5 100644
+index 6df1472d..cca53729 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -3,10 +3,8 @@
@@ -257,7 +328,7 @@ index 6df1472d..65b4cbf5 100644
  #include "X86SimpleOutput.h"
  struct PaddingOutput {
  	unsigned id;
-@@ -101,42 +99,134 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -101,42 +99,129 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  	return true;
  }
  
@@ -336,29 +407,24 @@ index 6df1472d..65b4cbf5 100644
 +	return row;
 +}
 +
-+bool X86_scanEvexOutputForm(const uint8_t *code, size_t size,
-+			    X86ScanResult *result)
++uint32_t X86_scanEvexOutputForm(const uint8_t *code, size_t size)
 +{
 +	if (size < 6 || code[0] != 0x62)
-+		return false;
++		return 0;
 +	const struct VectorOutputRow *row;
 +	unsigned length;
 +	if (code[5] < 0xc0) {
 +		unsigned source_width;
 +		row = evexMemoryRow(code, size, &source_width, &length);
 +		if (!row)
-+			return false;
++			return 0;
 +	} else {
 +		row = evexRegisterRow(code, size);
 +		if (!row)
-+			return false;
++			return 0;
 +		length = 6 + row->immediate;
 +	}
-+	result->opcode = 0;
-+	result->opcode_pub = row->id;
-+	result->length = (uint16_t)length;
-+	result->popcode_adjust = 0;
-+	return true;
++	return ((uint32_t)row->id << 8) | length;
 +}
  
  #if defined(_MSC_VER)
@@ -407,7 +473,7 @@ index 6df1472d..65b4cbf5 100644
  		const unsigned pair[] = { regs[2], regs[0] };
  		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
  					    0x40 | (w << 3) | rxb,
-@@ -513,8 +603,6 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,8 +598,6 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
  						 wide);
@@ -416,7 +482,7 @@ index 6df1472d..65b4cbf5 100644
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
  		return writeVexRipLoad(code, size, insn, insn_size);
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
-@@ -530,29 +618,36 @@ __declspec(noinline)
+@@ -530,29 +613,36 @@ __declspec(noinline)
  #elif defined(__GNUC__)
  __attribute__((noinline))
  #endif
@@ -468,7 +534,7 @@ index 6df1472d..65b4cbf5 100644
  	insn->id = row->id;
  	*insn_size = insn->size = (uint16_t)length;
  	memcpy(insn->bytes, code, length);
-@@ -561,21 +656,26 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -561,21 +651,26 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	memset(insn->op_str, 0, sizeof(insn->op_str));
  	char *out = writeVectorRegister(insn->op_str, ll, dst);
  	memcpy(out, ", xmmword ptr [", 15);
@@ -508,7 +574,7 @@ index 6df1472d..65b4cbf5 100644
  	*out = ']';
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
-@@ -588,13 +688,15 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -588,13 +683,15 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  		x->addr_size = 8;
  		x->modrm = modrm;
  		x->encoding.modrm_offset = 5;
@@ -527,7 +593,7 @@ index 6df1472d..65b4cbf5 100644
  			x->sib_base = (x86_reg)base->reg;
  		}
  		x->op_count = 2;
-@@ -608,9 +710,11 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -608,9 +705,11 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  		op->access = (cs_ac_type)row->access[0];
  		op = &x->operands[1];
  		op->type = X86_OP_MEM;

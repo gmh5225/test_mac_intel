@@ -1,7 +1,7 @@
-name: Use production public scan and x86 text entry points for simd paired controls
+name: Measure direct EVEX terminal return on native product entry points
 on:
   push:
-    branches: [codex/capstone-evex-exact-entry-libraries]
+    branches: [codex/capstone-direct-evex-scan-terminal]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
+          - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-24.04-arm, cc: clang }
           - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
@@ -39,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-exact-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: direct-evex-scan-terminal-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
