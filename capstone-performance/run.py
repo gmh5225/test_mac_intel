@@ -151,7 +151,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json', dict(baseline='published b70c7e94 with previously qualified AArch64 GCC scan', candidate='complete scalar and vector output, compact GCC scan and tuned public writes'))
+    write('comparison.json', dict(baseline='published 6289e782', candidate='exact standalone GCC scalar output stores and compact initial public headers'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -212,9 +212,12 @@ panic = "abort"
     for label in ('base','new'):
         root = WORK / (label+'-build/CMakeFiles/capstone.dir')
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
-    assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
+    assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    if PROFILE == 'gcc' and platform.machine()=='x86_64':
+        assert set(diffs)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/X86/X86OutputIterator.c.o'},diffs
+    else:
+        assert not diffs and sha(WORK/'decoder-base')==sha(WORK/'decoder-new')
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
@@ -227,11 +230,6 @@ panic = "abort"
     result=subprocess.run([WORK/'generate-output'],stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True)
     assert result.stdout==(WORK/'new/arch/X86/X86GenSimpleOutput.inc').read_bytes()
     write('regeneration',dict(sha256=hashlib.sha256(result.stdout).hexdigest(),summary=result.stderr.decode().strip()))
-    unit=(WORK/'new/tests/unit/x86_simple_output.c').read_text()
-    vector_unit=WORK/'new/tests/unit/checked_evex_records.c'
-    vector_unit.write_text(unit[:unit.index('int main(void)')]+(SOURCE/'checked-evex.cfrag').read_text())
-    command(['clang','-O2',*defs,'-I',WORK/'new','-I',WORK/'new/include',vector_unit,WORK/'new-build/libcapstone.a','-o',WORK/'evex-unit'],'build-full-vector-records')
-    command([WORK/'evex-unit'],'verify-full-vector-records')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
