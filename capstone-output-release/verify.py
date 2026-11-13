@@ -36,6 +36,15 @@ try:
         units+=['x86_simple_output','x86_reg_access','x86_relative_jump','x86_encoding_accuracy','x86_evex_reserved_fields','detail_option']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'tests')
+    if profile not in ('diet','reduced'):
+        import shlex
+        if os.name=='nt':
+            # CTest above exercises the compiled regression on both MSVC runtimes.
+            pass
+        else:
+            flags=['-fsanitize=address,undefined'] if profile=='sanitize' else []
+            run([compiler,'-O2',*flags,'-I'+str(source/'include'),root/'xbegin-targets.c',b/'libcapstone.a','-o',root_build/'verify-xbegin'],'compile-targets')
+            run([root_build/'verify-xbegin'],'xbegin-targets')
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
