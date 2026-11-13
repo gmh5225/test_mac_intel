@@ -16,6 +16,8 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
+    assert platform.system()=='Darwin' and platform.machine() in ('x86_64','arm64')
+    save('cpu.json',dict(arch=platform.machine(),model=sp.check_output(['sysctl','-n','machdep.cpu.brand_string'],text=True).strip(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
     reference='443006768b6518e28ba3fd10baacfbd7e4ba4914'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
