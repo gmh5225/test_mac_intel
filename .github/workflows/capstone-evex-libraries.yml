@@ -1,7 +1,7 @@
-name: Verify and time combined x86 records on libraries
+name: Verify complete operand output and compare gains over the preceding writers on libraries
 on:
   push:
-    branches: [codex/capstone-combined-records-libraries]
+    branches: [codex/capstone-expanded-operands-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d843dcdf830e883697b348eff0ee47d99849ff90
+          ref: 6703e144275793a419ad663511e34b5dab3d52d8
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: combined-records-${{ matrix.host }}-${{ matrix.cc }}
+          name: expanded-operands-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
