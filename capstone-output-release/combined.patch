@@ -1,180 +1,41 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..b4e85672 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -5,11 +5,11 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 		{
- 			5, 9, 6, 10, 0, 0, 0, 0, 13, 17, 14, 18, 0, 0, 0, 0,
- 			21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
--			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
--			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
-+			37, 41, 38, 42, 0, 0, 65531, 0, 45, 49, 46, 50, 0, 0, 65531, 0,
-+			53, 57, 54, 58, 0, 0, 65531, 0, 61, 65, 62, 66, 0, 0, 65531, 0,
- 			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
- 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
--			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 65531, 65531, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
- 			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
- 			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
- 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
-diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index bd0f6c94..e475655e 100644
---- a/arch/X86/X86MemoryOutput.c
-+++ b/arch/X86/X86MemoryOutput.c
-@@ -9,7 +9,7 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d1d78862..9dc12263 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -463,7 +463,7 @@ if(CAPSTONE_X86_SUPPORT)
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+-    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
++    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
+diff --git a/Makefile b/Makefile
+index 80398b9b..d5084a3a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -657,8 +657,8 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
  
--/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
-+/* The 32-bit Intel printer omits EIZ but preserves the encoded scale. */
- bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 			   uint16_t *insn_size,
- 			   const struct X86SimpleOutput *row,
-@@ -36,12 +36,11 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 					   ((encoding >> 3) & 7);
- 		base_reg = encoding & 7;
- 		if ((!mod && base_reg == 5) ||
--		    (index_reg == 4 && encoding != 0x24))
-+		    (wide && index_reg == 4 && encoding != 0x24))
- 			return false;
--		if (index_reg != 4) {
-+		scale_bits = encoding >> 6;
-+		if (index_reg != 4)
- 			index = &regs[wide ? 3 : 2][index_reg];
--			scale_bits = encoding >> 6;
--		}
- 	}
+-# Match the Release x86-only formatter tuning for the compiler's target.
+-ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++# Match the Release x86 formatter tuning for the compiler's target.
++ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ ifneq (,$(filter -O2 -O3,$(CFLAGS)))
+ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
+     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 76fdbcb7..078bbc34 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -2944,7 +2944,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  
- 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
-@@ -129,5 +128,44 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	return true;
- }
- 
-+/* A single segment override on a 32-bit LEA changes the printed segment and
-+ * the public offsets. The unprefixed writer owns address decoding. */
-+bool X86_writeSegmentLea(const uint8_t *code, size_t size, cs_insn *insn,
-+			 uint16_t *insn_size, const struct X86SimpleOutput *row,
-+			 const struct X86SimpleRegister regs[4][16])
-+{
-+	if (size < 3 || code[1] != 0x8d || code[2] >= 0xc0)
-+		return false;
-+	if (!X86_writeMemoryOutput(code + 1, size - 1, insn, insn_size, row,
-+				   regs))
-+		return false;
-+
-+	static const struct {
-+		x86_reg reg;
-+		char name[3];
-+	} segments[] = {
-+		{ X86_REG_ES, "es" }, { X86_REG_CS, "cs" },
-+		{ X86_REG_SS, "ss" }, { X86_REG_DS, "ds" },
-+		{ X86_REG_FS, "fs" }, { X86_REG_GS, "gs" },
-+	};
-+	unsigned segment = code[0] >= 0x64 ? 4u + (code[0] & 1) :
-+					     (code[0] >> 3) & 3;
-+	char *memory = insn->op_str + regs[2][(code[2] >> 3) & 7].length + 2;
-+	memmove(memory + 3, memory, strlen(memory) + 1);
-+	memcpy(memory, segments[segment].name, 2);
-+	memory[2] = ':';
-+	*insn_size = ++insn->size;
-+	memcpy(insn->bytes, code, *insn_size);
-+	if (insn->detail) {
-+		cs_x86 *x = &insn->detail->x86;
-+		x->prefix[1] = code[0];
-+		++x->encoding.modrm_offset;
-+		if (x->encoding.disp_size)
-+			++x->encoding.disp_offset;
-+		x->operands[1].mem.segment = segments[segment].reg;
-+	}
-+	return true;
-+}
-+
+ /* GCC materializes the general legacy reader state on these Linux hosts.
+  * The generated terminal row already provides the public ID and extent. */
+-#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
++#if defined(__linux__) && defined(__GNUC__) && \
+     !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
+ #define X86_COMPACT_PUBLIC_HEADER
  #endif
- #endif
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..de38a209 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -81,6 +81,12 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 						     insn_size,
- 						     x86_simple_registers[3],
- 						     wide);
-+		if (plan == X86_PLAN_SEGMENT_LEA)
-+			return X86_writeSegmentLea(
-+				code, size, insn, insn_size,
-+				&x86_simple_outputs
-+					[x86_simple_plans[0][0][0x8d] >> 2],
-+				x86_simple_registers);
- 		unsigned row;
- 		const struct X86SimpleRegister *reg = NULL;
- 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..e253f497 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -49,11 +49,17 @@ enum X86SimpleForm {
- #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
- 
- /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
-+#define X86_PLAN_SEGMENT_LEA ((UINT16_MAX & ~7u) | X86_SIMPLE_RELATIVE)
- #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
- #define X86_PLAN_VECTOR UINT16_MAX
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
- 
-+CAPSTONE_INTERNAL bool
-+X86_writeSegmentLea(const uint8_t *code, size_t size, cs_insn *insn,
-+		    uint16_t *insn_size, const struct X86SimpleOutput *row,
-+		    const struct X86SimpleRegister regs[4][16]);
-+
- CAPSTONE_INTERNAL bool
- X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..e2102a28 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -615,6 +615,8 @@ int main()
- 			}
- 		}
- 	}
-+	for (unsigned segment : { 0x26u, 0x2eu, 0x36u, 0x3eu, 0x64u, 0x65u })
-+		plans[0][0][segment] = X86_PLAN_SEGMENT_LEA;
- 	// Reserve unprefixed EVEX for its own verified vector output records.
- 	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
- 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..579a9edd 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -231,6 +231,21 @@ static bool check_push_immediates(csh handles[2])
- 	return true;
- }
- 
-+static bool check_segment_lea(csh handles[2])
-+{
-+	static const uint8_t prefixes[] = { 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65 };
-+	for (unsigned p = 0; p < sizeof(prefixes); ++p)
-+		for (unsigned mr = 0; mr < 256; ++mr) {
-+			uint8_t bytes[] = { prefixes[p], 0x8d, (uint8_t)mr,
-+					    0x26,	 0xfc, 0xff,
-+					    0xff,	 0xff };
-+			for (size_t n = 0; n <= sizeof(bytes); ++n)
-+				if (!compare(handles, bytes, n, p + mr))
-+					return false;
-+		}
-+	return true;
-+}
-+
- static bool check_lea(csh handles[2], cs_mode mode)
- {
- 	static const uint32_t edges[] = { 0,	      1,	  9,
-@@ -754,7 +769,7 @@ static bool check_mode(cs_mode mode)
- 				      detail ? CS_OPT_ON : CS_OPT_OFF))
- 				goto done;
- 		if (!check_branches(handles) || !check_memory(handles, mode) ||
--		    !check_lea(handles, mode) ||
-+		    !check_lea(handles, mode) || !check_segment_lea(handles) ||
- 		    !check_mov_disp32(handles, mode) ||
- 		    !check_group1(handles, mode) ||
- 		    !check_push_immediates(handles) ||
