@@ -1,7 +1,7 @@
-name: Validate four-backend AArch64 register printing and operand construction under ten toolchain configurations
+name: Verify native immediate scan and register output across ten supported configurations
 on:
   push:
-    branches: [codex/capstone-four-register-output-profiles]
+    branches: [codex/capstone-a32-alu-release-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: registers-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: a32-alu-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
