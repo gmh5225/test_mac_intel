@@ -1,31 +1,57 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 97022689..96c84e4b 100644
+index 88d21fa2..1482e8d9 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -467,7 +467,7 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -158,6 +158,8 @@ if(capstone_enabled_architectures STREQUAL "X86")
+     add_compile_definitions(CAPSTONE_X86_ONLY)
+ elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
+     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
++elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
++    add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+@@ -469,7 +471,8 @@ if(CAPSTONE_X86_SUPPORT)
      )
      # Use scalar/vector stores or libc for the fixed public output buffers.
      # Generic x64 GCC otherwise emits REP STOS even for the short clears.
--    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
-+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
+-    if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86")
++    if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86"
++        OR capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+        AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
         AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
         AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-         set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
 diff --git a/Makefile b/Makefile
-index 7595372a..5b087760 100644
+index 1cb04b92..44471169 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -661,8 +661,8 @@ else
- 	@echo "Skipping tests on whole corpus"
+@@ -119,6 +119,8 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ CFLAGS += -DCAPSTONE_X86_ONLY
+ else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
+ CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
++else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
++CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
  endif
  
--# Match the Release x86-only formatter tuning for the compiler's target.
--ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
-+# Match the Release x86 formatter tuning for the compiler's target.
-+ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
+@@ -664,8 +666,7 @@ else
+ endif
+ 
+ # Match the Release x86 formatter tuning for the compiler's target.
+-ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+-ifeq (,$(filter-out mips x86,$(CAPSTONE_ARCHS)))
++ifneq (,$(filter -DCAPSTONE_X86_ONLY -DCAPSTONE_X86_MIPS_ONLY -DCAPSTONE_ARM_AARCH64_MIPS_X86,$(CFLAGS)))
  ifneq (,$(filter -O2 -O3,$(CFLAGS)))
  X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
      awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
+@@ -675,7 +676,6 @@ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/de
+ $(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
+ endif
+ endif
+-endif
+ 
+ $(OBJDIR)/%.o: %.c
+ 	@mkdir -p $(@D)
 diff --git a/arch/ARM/ARMGenShortRegisterNames.inc b/arch/ARM/ARMGenShortRegisterNames.inc
 new file mode 100644
 index 00000000..38dd7907
@@ -108,14 +134,14 @@ index 00000000..38dd7907
 +	{ "D5_D6", 5 }, { "D7_D8", 5 }, { "D9_D10", 6 },
 +};
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index ebe301e2..0b0513eb 100644
+index ebe301e2..348d5201 100644
 --- a/arch/ARM/ARMInstPrinter.c
 +++ b/arch/ARM/ARMInstPrinter.c
 @@ -106,11 +106,27 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
  		SStream_concat0(O, ARMCondCodeToString(CC));
  }
  
-+#if defined(CAPSTONE_HAS_X86) && defined(__linux__) && defined(__x86_64__) && \
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && defined(__x86_64__) && \
 +    defined(__GNUC__) && !defined(__clang__)
 +#define CAPSTONE_ARM_SHORT_REGISTER_NAMES
 +#endif
@@ -140,14 +166,14 @@ index ebe301e2..0b0513eb 100644
  	/* With markup disabled the two empty tags contribute no bytes. The
  	 * generic formatter still owns custom callbacks and full streams. */
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 11e5e995..35581ebf 100644
+index 11e5e995..65a8dfd1 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -832,6 +832,11 @@ void ARM_check_updates_flags(MCInst *MI)
  #endif // CAPSTONE_DIET
  }
  
-+#if defined(CAPSTONE_HAS_X86) && defined(__linux__) && defined(__x86_64__) && \
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && defined(__x86_64__) && \
 +    defined(__GNUC__) && !defined(__clang__)
 +#define ARM_GNU_MIXED_SCAN
 +#endif
@@ -190,14 +216,14 @@ index 11e5e995..35581ebf 100644
  #define ARM_EMPTY_OP \
  	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..37e0a26f 100644
+index 25f13d10..a36a08f5 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -1684,6 +1684,20 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
-+#if defined(CAPSTONE_HAS_X86) && defined(__linux__) && defined(__x86_64__) && \
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && defined(__x86_64__) && \
 +    defined(__GNUC__) && !defined(__clang__)
 +#define CAPSTONE_MIPS_PRIMARY_DISPATCH
 +#endif
@@ -263,65 +289,30 @@ index 7b2b3a08..4b1738be 100644
  {
  	uint64_t CurFieldValue = 0;
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index 7104a92a..558f611b 100644
+index d3566525..d6775ef0 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -22,9 +22,10 @@
- #include "MipsLinkage.h"
- #include "MipsDisassembler.h"
+@@ -24,7 +24,8 @@
  
--#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
--    defined(__GNUC__)
--#define MIPS_DEDICATED_MAPPING
-+#if defined(__linux__) && defined(__GNUC__) && \
-+    ((defined(CAPSTONE_MIPS_ONLY) && defined(__aarch64__)) || \
-+     (defined(CAPSTONE_HAS_X86) && defined(__x86_64__) && !defined(__clang__)))
-+#define MIPS_DIRECT_MAPPING
+ #if defined(__linux__) && defined(__GNUC__) && \
+     ((defined(CAPSTONE_MIPS_ONLY) && defined(__aarch64__)) || \
+-     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__) && !defined(__clang__)))
++     ((defined(CAPSTONE_X86_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++      defined(__x86_64__) && !defined(__clang__)))
+ #define MIPS_DIRECT_MAPPING
  #endif
  
- #define GET_SUBTARGETINFO_ENUM
-@@ -252,7 +253,7 @@ void Mips_set_instr_map_data(MCInst *MI)
- #endif
- 		return;
- 	}
--#ifdef MIPS_DEDICATED_MAPPING
-+#ifdef MIPS_DIRECT_MAPPING
- 	/* Implicit effects below use this same dense generated opcode index. */
- 	MI->flat_insn->id = mips_insns[MCInst_getOpcode(MI)].mapid;
- 	if (!MI->flat_insn->detail)
-@@ -269,7 +270,7 @@ void Mips_set_instr_map_data(MCInst *MI)
- 		}
- 	}
- 
--#ifndef MIPS_DEDICATED_MAPPING
-+#ifndef MIPS_DIRECT_MAPPING
- 	map_cs_id(MI, mips_insns, ARR_SIZE(mips_insns));
- #endif
- 	map_implicit_reads(MI, mips_insns);
-@@ -301,9 +302,8 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- {
- 	uint64_t size64;
- 	Mips_init_cs_detail(instr);
--/* The dedicated scan shortens the ordinary table walk on Linux AArch64
-- * hosts without adding work to the time-critical formatted path on x64. */
--#ifdef MIPS_DEDICATED_MAPPING
-+/* These standard encodings have no extra operands to validate in a scan. */
-+#ifdef MIPS_DIRECT_MAPPING
- 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
- 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
- 	    instr->csh->disasm == Mips_getInstruction &&
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..d23c98f0 100644
+index 01559e08..63dcc538 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2944,8 +2944,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
- 
- /* GCC materializes the general legacy reader state on these Linux hosts.
+@@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
   * The generated terminal row already provides the public ID and extent. */
--#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
--    !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
-+#if defined(__linux__) && defined(__GNUC__) && !defined(__clang__) && \
-+    (defined(__x86_64__) || (defined(CAPSTONE_X86_ONLY) && defined(__aarch64__)))
+ #if defined(__linux__) && defined(__GNUC__) && !defined(__clang__) && \
+     ((defined(CAPSTONE_X86_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
+-     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__)))
++     ((defined(CAPSTONE_X86_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
++      defined(__x86_64__)))
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
  
@@ -452,15 +443,17 @@ index 30482037..29a72009 100644
              counts.append((name, len(nodes)))
          for w, width in sorted(set(inputs.values())):
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index 4a17e366..ffb0bf67 100644
+index 4a17e366..943c4330 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
-@@ -65,6 +65,8 @@ endif()
- if(CAPSTONE_AARCH64_SUPPORT)
-     list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c aarch64_scan.c)
-     if(Python3_Interpreter_FOUND)
-+        add_test(NAME unit_arm_register_names_generator
-+            COMMAND "${Python3_EXECUTABLE}" -B "${PROJECT_SOURCE_DIR}/suite/synctools/arm_register_names.py" --check)
-         add_test(NAME unit_aarch64_register_names_generator
-             COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/aarch64_register_names.py" --check)
-         add_test(NAME unit_aarch64_postprocess_generator
+@@ -59,6 +59,10 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+             COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/test_operand_writeback.py")
+     endif()
+ endif()
++if(CAPSTONE_ARM_SUPPORT AND Python3_Interpreter_FOUND)
++    add_test(NAME unit_arm_register_names_generator
++        COMMAND "${Python3_EXECUTABLE}" -B "${PROJECT_SOURCE_DIR}/suite/synctools/arm_register_names.py" --check)
++endif()
+ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
+     list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
+ endif()

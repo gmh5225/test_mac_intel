@@ -1,7 +1,7 @@
-name: Check short ARM register emission together with MIPS table admission and native x86 on real executables
+name: Verify the exact four-backend release on independent real PE and ELF images
 on:
   push:
-    branches: [codex/capstone-arm-generated-register-output]
+    branches: [codex/capstone-four-backend-registers-next]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a06235189645d7e20660af04d52f71005301e760
+          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-default-register-writer-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: four-backend-next-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
