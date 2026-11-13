@@ -641,7 +641,7 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 01559e08..8e6577c8 100644
+index 01559e08..d150a151 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -654,7 +654,97 @@ index 01559e08..8e6577c8 100644
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
  
-@@ -3366,6 +3367,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+@@ -3147,6 +3148,70 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
+ 	return X86_completeScan(instr, &insn, size);
+ }
+ 
++#ifdef X86_COMPACT_PUBLIC_HEADER
++/* The selected row describes both the public ID and all encoded operands.
++ * Address width controls ModR/M and SIB extents. The independent immediate
++ * class includes the size of an absolute memory offset. */
++X86_DECODE_INLINE int scanPublicTerminalExtent(const uint8_t *code, size_t size,
++					       unsigned end, uint64_t decision,
++					       bool address16, unsigned size_class,
++					       unsigned *id, uint16_t *length)
++{
++	const bool needs_modrm =
++		(decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
++	uint8_t modrm = 0;
++	if (needs_modrm) {
++		if (end >= size)
++			return X86_SCAN_INVALID;
++		modrm = code[end];
++	}
++	uint32_t terminal;
++	if (!selectPublicTerminal(decision, modrm, &terminal))
++		return X86_SCAN_INVALID;
++	const unsigned uid = terminal & X86_TERMINAL_UID_MASK;
++	if (!uid)
++		return X86_SCAN_INVALID;
++	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) &
++				 X86_TERMINAL_OPERAND_MASK;
++	if (needs_modrm || (pattern & 1)) {
++		if (!needs_modrm) {
++			if (end >= size)
++				return X86_SCAN_INVALID;
++			modrm = code[end];
++		}
++		++end;
++		if (modrm < 0xc0) {
++			const unsigned mod = modrm >> 6, rm = modrm & 7;
++			if (address16) {
++				static const uint8_t displacement[] = { 0, 1,
++									2 };
++				end += displacement[mod] +
++				       ((modrm & 0xc7) == 6 ? 2 : 0);
++			} else {
++				static const uint8_t extra[3][8] = {
++					{ 0, 0, 0, 0, 1, 4, 0, 0 },
++					{ 1, 1, 1, 1, 2, 1, 1, 1 },
++					{ 4, 4, 4, 4, 5, 4, 4, 4 }
++				};
++				if ((modrm & 0xc7) == 4) {
++					if (end >= size)
++						return X86_SCAN_INVALID;
++					if ((code[end] & 7) == 5)
++						end += 4;
++				}
++				end += extra[mod][rm];
++			}
++		}
++	}
++	end += x86LegacyImmediateBytes[size_class][pattern >> 1];
++	if (end > size || end > 15)
++		return X86_SCAN_INVALID;
++	*id = uid;
++	*length = (uint16_t)end;
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
+ X86_DECODE_INLINE int
+ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 		      unsigned *instructionID, uint16_t *size, bool publicID,
+@@ -3196,6 +3261,18 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 	const uint64_t decision = legacyTerminalDecision(&insn, true, publicID);
+ 	if (!decision)
+ 		return X86_SCAN_NOT_HANDLED;
++#ifdef X86_COMPACT_PUBLIC_HEADER
++	if (publicID) {
++		/* Rows zero through two are the ordinary 16/32/64-bit sizes.
++		 * A size prefix can change immediate and address widths independently. */
++		const unsigned size_class = insn.immediateSize == 2 ?
++			(insn.addressSize == 2 ? 0 : insn.addressSize == 4 ? 3 : 4) :
++			(insn.addressSize == 2 ? 5 : insn.addressSize == 4 ? 1 : 2);
++		return scanPublicTerminalExtent(code, code_len, insn.readerCursor,
++						decision, insn.addressSize == 2,
++						size_class, instructionID, size);
++	}
++#endif
+ 	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true,
+ 					  publicID ? instructionID : NULL,
+ 					  readerFlags);
+@@ -3366,6 +3443,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
  			return true;
  		}
  	}
@@ -670,6 +760,68 @@ index 01559e08..8e6577c8 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+@@ -3546,59 +3632,9 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 		x86LegacyPublicDecisions[row][escaped][opcode];
+ 	if (!decision)
+ 		return X86_SCAN_NOT_HANDLED;
+-	const bool needs_modrm =
+-		(decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+-	uint8_t modrm = 0;
+-	if (needs_modrm) {
+-		if (end >= size)
+-			return X86_SCAN_INVALID;
+-		modrm = code[end];
+-	}
+-	uint32_t terminal;
+-	if (!selectPublicTerminal(decision, modrm, &terminal))
+-		return X86_SCAN_INVALID;
+-	const unsigned uid = terminal & X86_TERMINAL_UID_MASK;
+-	if (!uid)
+-		return X86_SCAN_INVALID;
+-	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) &
+-				 X86_TERMINAL_OPERAND_MASK;
+-	if (needs_modrm || (pattern & 1)) {
+-		if (!needs_modrm) {
+-			if (end >= size)
+-				return X86_SCAN_INVALID;
+-			modrm = code[end];
+-		}
+-		++end;
+-		if (modrm < 0xc0) {
+-			const unsigned mod = modrm >> 6, rm = modrm & 7;
+-			if (mode == CS_MODE_16) {
+-				static const uint8_t displacement[] = { 0, 1,
+-									2 };
+-				end += displacement[mod] +
+-				       ((modrm & 0xc7) == 6 ? 2 : 0);
+-			} else {
+-				static const uint8_t extra[3][8] = {
+-					{ 0, 0, 0, 0, 1, 4, 0, 0 },
+-					{ 1, 1, 1, 1, 2, 1, 1, 1 },
+-					{ 4, 4, 4, 4, 5, 4, 4, 4 }
+-				};
+-				if ((modrm & 0xc7) == 4) {
+-					if (end >= size)
+-						return X86_SCAN_INVALID;
+-					if ((code[end] & 7) == 5)
+-						end += 4;
+-				}
+-				end += extra[mod][rm];
+-			}
+-		}
+-	}
+ 	const unsigned size_class = wide ? 2 : mode == CS_MODE_16 ? 0 : 1;
+-	end += x86LegacyImmediateBytes[size_class][pattern >> 1];
+-	if (end > size || end > 15)
+-		return X86_SCAN_INVALID;
+-	*id = uid;
+-	*length = (uint16_t)end;
+-	return X86_SCAN_COMPLETE;
++	return scanPublicTerminalExtent(code, size, end, decision,
++					mode == CS_MODE_16, size_class, id, length);
+ }
+ #endif
+ 
 diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
 index ae3428b5..14aefc93 100644
 --- a/arch/X86/X86DisassemblerDecoder.h
@@ -685,6 +837,40 @@ index ae3428b5..14aefc93 100644
  int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
  			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
  			  uint16_t *size);
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index dcaf2508..035a3e7c 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -7070,10 +7070,13 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ };
+ 
+ #ifdef X86_COMPACT_PUBLIC_HEADER
+-static const uint8_t x86LegacyImmediateBytes[3][10] = {
++static const uint8_t x86LegacyImmediateBytes[][10] = {
+ 	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
+ 	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
+ 	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++	{ 0, 1, 2, 4, 4, 2, 3, 4, 8, 4 },
++	{ 0, 1, 2, 4, 8, 2, 3, 4, 8, 4 },
++	{ 0, 1, 4, 6, 2, 2, 3, 4, 8, 8 },
+ };
+ 
+ X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)
+@@ -14435,10 +14438,13 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ };
+ 
+ #ifdef X86_COMPACT_PUBLIC_HEADER
+-static const uint8_t x86LegacyImmediateBytes[3][10] = {
++static const uint8_t x86LegacyImmediateBytes[][10] = {
+ 	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
+ 	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
+ 	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++	{ 0, 1, 2, 4, 4, 2, 3, 4, 8, 4 },
++	{ 0, 1, 2, 4, 8, 2, 3, 4, 8, 4 },
++	{ 0, 1, 4, 6, 2, 2, 3, 4, 8, 8 },
+ };
+ 
+ X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..92c55fd2 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
@@ -1628,6 +1814,21 @@ index 30482037..29a72009 100644
              output.append(emit(name, nodes, width, w))
              counts.append((name, len(nodes)))
          for w, width in sorted(set(inputs.values())):
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..b8b0a864 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -951,8 +951,8 @@ def emit_terminal(suffix):
+         f"readImmediateImpl(insn, {width}, false)": width
+         for width in IMMEDIATES.values()
+     }
+-    lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
+-    for size, address_size in ((2, 2), (4, 4), (4, 8)):
++    lines.append("static const uint8_t x86LegacyImmediateBytes[][" + str(len(public_tails)) + "] = {")
++    for size, address_size in ((2, 2), (4, 4), (4, 8), (2, 4), (2, 8), (4, 2)):
+         extents = []
+         for tail in public_tails:
+             total, immediate = 0, size
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 index ccc4f0de..e0fc9ad0 100644
 --- a/suite/synctools/x86_simple_output.cpp
