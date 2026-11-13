@@ -1,7 +1,7 @@
-name: Verify A32 V8, EVEX metadata and four native backends in NeverD with current fork LLVM sources
+name: Verify production MIPS revision 2 and A32 V8 in the NeverD decoder built with current fork LLVM
 on:
   push:
-    branches: [codex/neverd-a32-v8-real-mode]
+    branches: [codex/neverd-r2-v8-verified-metadata]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-arm-v8
+          name: product-standard-r2-v8
           path: product-evidence/
           retention-days: 14
