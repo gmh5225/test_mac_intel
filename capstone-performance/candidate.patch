@@ -1,3 +1,36 @@
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..1aacce20 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -25,7 +25,14 @@
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
+ #include "../../cs_priv.h"
+ #define CAPSTONE_X86_DEDICATED_OUTPUT
+-CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
++/* The small x86-64 Clang decode wrapper retains the same arguments for
++ * the full decoder when a generated output row does not match. */
++#if defined(__x86_64__)
++#define X86_OUTPUT_CALL CS_PRESERVE_MOST
++#else
++#define X86_OUTPUT_CALL
++#endif
++CAPSTONE_INTERNAL X86_OUTPUT_CALL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
+ 					 size_t size, cs_insn *insn,
+ 					 uint16_t *insn_size);
+ #endif
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index c0547213..01e6eac6 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -20,7 +20,7 @@
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+  * present. Memory admission and bounds checks belong to the address writer. */
+ #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+-CAPSTONE_INTERNAL
++CAPSTONE_INTERNAL X86_OUTPUT_CALL
+ #else
+ static
+ #endif
 diff --git a/cs.c b/cs.c
 index 6791f780..b2db69da 100644
 --- a/cs.c

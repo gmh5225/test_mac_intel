@@ -215,8 +215,8 @@ panic = "abort"
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
     expected=[]
     if PROFILE=='clang' and platform.machine()=='x86_64':
-        expected+=['cs.c.o']
-        for sym in ('cs_decode_full_insn','cs_disasm_iter'):
+        expected+=['cs.c.o','arch/X86/X86OutputIterator.c.o']
+        for sym in ('cs_decode_full_insn','cs_disasm_iter','X86_trySimpleOutput'):
             for label in ('base','new'):
                 command(['objdump','-d','--disassemble='+sym,WORK/('decoder-'+label)],'machine-'+sym+'-'+label)
         before=(EVIDENCE/'machine-cs_decode_full_insn-base.log').read_text()
