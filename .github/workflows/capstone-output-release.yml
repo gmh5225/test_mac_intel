@@ -1,7 +1,7 @@
-name: Compare complete Release libraries and object code with every Capstone backend enabled on Linux and macOS
+name: Check the MIPS R2, ARM and x86 changes for binary identity with all backends enabled
 on:
   push:
-    branches: [codex/capstone-all-backends-binary-equivalence]
+    branches: [codex/capstone-standard-r2-all-backends]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -32,6 +32,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: all-backends-${{ matrix.host }}-${{ matrix.cc }}
+          name: mips-r2-all-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
