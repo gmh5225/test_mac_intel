@@ -22,15 +22,52 @@ index 1d0c9cca..3a1a9309 100644
  	{ 0 },
  	{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 4c9aeba4..f6f3e617 100644
+index 4c9aeba4..9c97a0b2 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -269,6 +269,95 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 	return true;
+@@ -21,16 +21,24 @@ static char *writeVectorRegister(char *out, unsigned length_code,
+ 	return out;
  }
  
++static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
++			       uint16_t *insn_size,
++			       const struct X86SimpleRegister *regs);
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static bool writeEvexRegisterOutput(const uint8_t *code, size_t size,
+-				    cs_insn *insn, uint16_t *insn_size)
++static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			    uint16_t *insn_size,
++			    const struct X86SimpleRegister *address_regs)
+ {
++	if (size >= 6 && code[5] < 0xc0)
++		return writeEvexBroadcast(code, size, insn, insn_size,
++					  address_regs);
+ 	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
+-	    (code[3] & 0x60) == 0x60 || code[5] < 0xc0)
++	    (code[3] & 0x60) == 0x60)
+ 		return false;
+ 	const unsigned ll = code[3] >> 5;
+ 	const unsigned w = code[2] >> 7;
+@@ -277,8 +285,102 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+ 						 wide);
+ 	if (code[0] == 0x62)
+-		return writeEvexRegisterOutput(code, size, insn, insn_size);
++		return writeEvexOutput(code, size, insn, insn_size, regs);
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
+ }
 +/* A regular base, an unmasked destination and a full 128-bit memory tuple.
 + * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
 +static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
 +			       uint16_t *insn_size,
 +			       const struct X86SimpleRegister *regs)
@@ -118,22 +155,7 @@ index 4c9aeba4..f6f3e617 100644
 +	return true;
 +}
 +
- bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 			   uint16_t *insn_size,
- 			   const struct X86SimpleRegister *regs, bool wide)
-@@ -276,8 +365,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	if (code[0] == 0x66)
- 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
- 						 wide);
--	if (code[0] == 0x62)
-+	if (code[0] == 0x62) {
-+		if (size >= 6 && code[5] < 0xc0)
-+			return writeEvexBroadcast(code, size, insn, insn_size,
-+						  regs);
- 		return writeEvexRegisterOutput(code, size, insn, insn_size);
-+	}
- 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
- }
+ #endif
  #endif
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index f7f0f913..b6e4510a 100644
