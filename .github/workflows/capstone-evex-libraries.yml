@@ -1,7 +1,7 @@
-name: Compare generated legacy SSE register records on libraries
+name: Compare integrated legacy vector and immediate output on libraries
 on:
   push:
-    branches: [codex/capstone-sse-register-output-libraries]
+    branches: [codex/capstone-generated-operand-output-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: sse-reg-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: generated-operand-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
