@@ -1,7 +1,7 @@
-name: Qualify dense ARM mapping in dedicated and NeverD four-architecture builds
+name: Measure dense MIPS opcode mapping with ISA, endian and PE controls
 on:
   push:
-    branches: [codex/capstone-qualified-arm-map]
+    branches: [codex/capstone-dense-mips-map]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,17 +11,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, archs: arm }
+          - { host: macos-15, cc: clang, archs: mips }
           - { host: macos-15, cc: clang, archs: four }
-          - { host: macos-15-intel, cc: clang, archs: arm }
+          - { host: macos-15-intel, cc: clang, archs: mips }
           - { host: macos-15-intel, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: arm }
+          - { host: ubuntu-24.04-arm, cc: gcc, archs: mips }
           - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: arm }
+          - { host: ubuntu-24.04, cc: clang, archs: mips }
           - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: arm }
+          - { host: ubuntu-24.04, cc: gcc, archs: mips }
           - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: arm }
+          - { host: ubuntu-24.04-arm, cc: clang, archs: mips }
           - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
@@ -36,16 +36,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: c92f6f103e0123790f574c05a2a57f7203e7a461
+          ref: 706eab8fec07688db644fe64c9d82600592134f8
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Compare complete MIPS records and real MIPS executables with cross-ISA controls
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-qualified-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mips-dense-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
