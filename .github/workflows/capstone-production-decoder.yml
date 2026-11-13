@@ -1,7 +1,7 @@
-name: Measure verified i386 addressing in the complete NeverD decoder
+name: Compare all four production architectures in NeverD with GCC Capstone and source-built LLVM
 on:
   push:
-    branches: [codex/neverd-qualified-i386-address-output]
+    branches: [codex/neverd-gnu-native-all-archs]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: f9b75b8f377adff76b7d58fd82359c57fad73df6
+          ref: 2ebdc73942b6f12d8485c7ce04c43b0f88744b5b
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -36,7 +36,7 @@ jobs:
         run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
-          CC: clang
+          CC: gcc
           CXX: clang++
         run: python3 capstone-product/product.py
       - name: Clean temporary source exports
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: qualified-i386-address-output
+          name: gnu-native-all-archs
           path: product-evidence/
           retention-days: 14
