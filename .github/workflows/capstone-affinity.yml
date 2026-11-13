@@ -1,9 +1,9 @@
-name: Attribute current x86 scan, format and detail costs against both iced formatters
+name: Attribute decode, formatter, consumer and detail costs after the x86 output changes
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-joint-writer-costs]
+    branches: [codex/capstone-vector-and-memory-costs]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-iced-fast-live-counters
+  group: capstone-current-writer-costs
   cancel-in-progress: false
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-costs-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: current-writer-costs-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
