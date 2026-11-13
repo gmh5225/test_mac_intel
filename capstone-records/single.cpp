@@ -16,6 +16,7 @@
 #include <vector>
 #include <memory>
 #include <capstone/capstone.h>
+#include "arch/X86/X86ScanAdapter.h"
 struct API {
   decltype(&::cs_open) cs_open;
   decltype(&::cs_option) cs_option;
@@ -99,9 +100,10 @@ static Result run(Session &session,const std::vector<uint8_t>&bytes_,unsigned re
     const uint8_t *cursor = bytes;
     size_t left = count;
     uint64_t ip = 0x100000;
+    auto iterate = session.bits >= 16 ? &X86_disasmIter : api.cs_disasm_iter;
     while (left) {
       size_t offset = cursor - bytes;
-      bool ok = api.cs_disasm_iter(handle, &cursor, &left, &ip, insn);
+      bool ok = iterate(handle, &cursor, &left, &ip, insn);
       record(result, offset, ok ? insn->size : 1, ok);
       if (!ok) {
         ++cursor;

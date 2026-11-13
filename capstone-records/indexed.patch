@@ -1,57 +1,28 @@
-diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 4a7e97c3..8dfec3da 100644
---- a/arch/ARM/ARMMapping.c
-+++ b/arch/ARM/ARMMapping.c
-@@ -945,27 +945,37 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
- }
- #endif
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d1d78862..9dc12263 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -463,7 +463,7 @@ if(CAPSTONE_X86_SUPPORT)
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+-    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
++    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
+diff --git a/Makefile b/Makefile
+index 80398b9b..d5084a3a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -657,8 +657,8 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
  
-+/* Unused operands have observable invalid indices and zeroed padding too. */
-+#define ARM_EMPTY_OP \
-+	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
-+#define ARM_FOUR_EMPTY_OPS \
-+	ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP
-+static const cs_arm_op arm_empty_operands[] = {
-+	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
-+	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
-+	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS
-+};
-+#undef ARM_FOUR_EMPTY_OPS
-+#undef ARM_EMPTY_OP
-+_Static_assert(ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS,
-+	       "ARM operand defaults must cover all slots");
-+
- void ARM_setup_op(cs_arm_op *op)
- {
--	memset(op, 0, sizeof(cs_arm_op));
--	op->type = ARM_OP_INVALID;
--	op->vector_index = -1;
--	op->neon_lane = -1;
-+	memcpy(op, arm_empty_operands, sizeof(*op));
- }
- 
- void ARM_init_cs_detail(MCInst *MI)
- {
--	if (detail_is_set(MI)) {
--		unsigned int i;
--
--		memset(get_detail(MI), 0,
--		       offsetof(cs_detail, arm) + sizeof(cs_arm));
--
--		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
--			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
--		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
--		ARM_get_detail(MI)->vcc = ARMVCC_None;
--	}
-+	if (!detail_is_set(MI))
-+		return;
-+	cs_detail *detail = get_detail(MI);
-+	memset(detail, 0,
-+	       offsetof(cs_detail, arm) + offsetof(cs_arm, operands));
-+	detail->arm.cc = ARMCC_UNDEF;
-+	detail->arm.vcc = ARMVCC_None;
-+	memcpy(detail->arm.operands, arm_empty_operands,
-+	       sizeof(arm_empty_operands));
- }
- 
- static uint64_t t_add_pc(MCInst *MI, uint64_t v)
+-# Match the Release x86-only formatter tuning for the compiler's target.
+-ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++# Match the Release x86 formatter tuning for the compiler's target.
++ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ ifneq (,$(filter -O2 -O3,$(CFLAGS)))
+ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
+     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
