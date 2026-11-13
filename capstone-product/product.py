@@ -63,6 +63,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     compare(t/'base.trace',trace,label);trace.unlink()
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
+   command(['nm','-S','-C',prod],'timed-symbols-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
    assert rev(cs)==ref
@@ -76,7 +77,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'X86OutputIterator.c.o','X86VectorOutput.c.o','X86MemoryOutput.c.o','X86ImmediateOutput.c.o'},changed
+    assert {Path(k).name for k in changed}=={'X86OutputIterator.c.o','X86VectorOutput.c.o','X86MemoryOutput.c.o','X86ImmediateOutput.c.o','ARMMapping.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
@@ -94,11 +95,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     cases_of_interest={'arm-cp':(0,1,2),'arm64-ls':(0,2),'arm64-sort':(0,),'mips64el-ls':(0,1),'putty-32-0.85':(0,1,2),'simd64':(1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
     if mode not in cases_of_interest.get(case['name'],()):continue
     # A long full text and a tiny compiler fixture have very different costs.
-    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(65000/start)))
+    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(130000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
     for idx,label in enumerate(('base-copy','candidate')):
      plans=[]
-     for cycle in range(11):
+     for cycle in range(21):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
       times={'base':[],label:[]}
       for who in order:
