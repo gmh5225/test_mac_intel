@@ -546,10 +546,10 @@ index 00000000..40eee098
 +#endif
 diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
 new file mode 100644
-index 00000000..e284469c
+index 00000000..31d90d11
 --- /dev/null
 +++ b/arch/X86/X86MemoryOutput.c
-@@ -0,0 +1,125 @@
+@@ -0,0 +1,153 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -579,8 +579,7 @@ index 00000000..e284469c
 +	return out + length;
 +}
 +
-+/* Decode one ordinary base, optionally ESP/RSP/R12 via SIB, or RIP-relative
-+ * disp32. The full reader handles absolute addresses and indexed SIB forms. */
++/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
 +bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
 +			   uint16_t *insn_size,
 +			   const struct X86SimpleOutput *row,
@@ -595,16 +594,32 @@ index 00000000..e284469c
 +	const unsigned offset = lead + 2 + sib;
 +	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
 +	const unsigned length = offset + disp_size;
-+	if (size < length || (rip && !wide) ||
-+	    (sib && ((rex & 2) || code[offset - 1] != 0x24)))
++	if (size < length || (rip && !wide))
 +		return false;
++
++	unsigned base_reg = rm;
++	const struct X86SimpleRegister *index = NULL;
++	unsigned scale_bits = 0;
++	if (sib) {
++		const uint8_t encoding = code[offset - 1];
++		const unsigned index_reg = ((rex & 2) << 2) |
++					   ((encoding >> 3) & 7);
++		base_reg = encoding & 7;
++		if ((!mod && base_reg == 5) ||
++		    (index_reg == 4 && encoding != 0x24))
++			return false;
++		if (index_reg != 4) {
++			index = &regs[wide ? 3 : 2][index_reg];
++			scale_bits = encoding >> 6;
++		}
++	}
 +
 +	const bool lea = opcode == 0x8d, load = lea || (opcode & 2);
 +	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) : lead;
 +	const struct X86SimpleRegister *reg =
 +		&regs[reg_width][((rex & 4) << 1) | ((modrm >> 3) & 7)];
 +	const struct X86SimpleRegister *base =
-+		&regs[wide ? 3 : 2][((rex & 1) << 3) | rm];
++		&regs[wide ? 3 : 2][((rex & 1) << 3) | base_reg];
 +	int32_t displacement = 0;
 +	if (disp_size == 1) {
 +		displacement = (int8_t)code[offset];
@@ -645,6 +660,16 @@ index 00000000..e284469c
 +		memcpy(out, base->name, sizeof(base->name));
 +		out += base->length;
 +	}
++	if (index) {
++		memcpy(out, " + ", 3);
++		out += 3;
++		memcpy(out, index->name, sizeof(index->name));
++		out += index->length;
++		if (scale_bits) {
++			*out++ = '*';
++			*out++ = (char)('0' + (1u << scale_bits));
++		}
++	}
 +	out = writeDisplacement(out, displacement);
 +	*out++ = ']';
 +	if (!load) {
@@ -658,7 +683,9 @@ index 00000000..e284469c
 +		cs_x86_op *mem = &x->operands[load ? 1 : 0];
 +		mem->type = X86_OP_MEM;
 +		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-+		mem->mem.scale = 1;
++		mem->mem.scale = 1 << scale_bits;
++		if (index)
++			mem->mem.index = (x86_reg)index->reg;
 +		mem->mem.disp = x->disp = displacement;
 +		if (disp_size) {
 +			x->encoding.disp_offset = (uint8_t)offset;
@@ -667,7 +694,8 @@ index 00000000..e284469c
 +		if (sib) {
 +			x->sib = code[offset - 1];
 +			x->sib_base = mem->mem.base;
-+			x->sib_scale = 1;
++			x->sib_scale = (int8_t)mem->mem.scale;
++			x->sib_index = mem->mem.index;
 +		}
 +	}
 +	return true;
@@ -1465,10 +1493,10 @@ index 032db5d1..f7f0f913 100644
  }
  
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 5bd144d5..c6969cc3 100644
+index 5bd144d5..380b2907 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -189,6 +189,117 @@ static bool check_sib_base_mov(csh handles[2], cs_mode mode)
+@@ -189,6 +189,147 @@ static bool check_sib_base_mov(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -1541,6 +1569,36 @@ index 5bd144d5..c6969cc3 100644
 +	return true;
 +}
 +
++static bool check_indexed_memory(csh handles[2], cs_mode mode)
++{
++	const uint8_t opcodes[] = { 0x88, 0x89, 0x8a, 0x8b, 0x8d };
++	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p)
++		for (unsigned o = 0; o < sizeof(opcodes); ++o)
++			for (unsigned mod = 0; mod < 3; ++mod)
++				for (unsigned sib = 0; sib < 256; ++sib) {
++					uint8_t bytes[] = {
++						(uint8_t)(0x3f + p),
++						opcodes[o],
++						(uint8_t)((mod << 6) |
++							  (sib & 0x38) | 4),
++						(uint8_t)sib,
++						0x80,
++						0xff,
++						0x7f,
++						0x80
++					};
++					const unsigned disp =
++						mod == 2 || (!mod &&
++							     (sib & 7) == 5) ?
++							4 :
++							mod;
++					if (!compare(handles, bytes + !p,
++						     4 + disp - !p, sib ^ p))
++						return false;
++				}
++	return true;
++}
++
 +/* Compare public buffers, padding, failure cursors and every truncation. */
 +static bool check_mov_disp32(csh handles[2], cs_mode mode)
 +{
@@ -1586,7 +1644,7 @@ index 5bd144d5..c6969cc3 100644
  static bool check_group1(csh handles[2], cs_mode mode)
  {
  	uint8_t bytes[4];
-@@ -286,6 +397,36 @@ static bool check_vex_indexed(csh handles[2])
+@@ -286,6 +427,36 @@ static bool check_vex_indexed(csh handles[2])
  	return true;
  }
  
@@ -1623,10 +1681,11 @@ index 5bd144d5..c6969cc3 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -302,9 +443,14 @@ static bool check_mode(cs_mode mode)
+@@ -302,9 +473,15 @@ static bool check_mode(cs_mode mode)
  				      detail ? CS_OPT_ON : CS_OPT_OFF))
  				goto done;
  		if (!check_branches(handles) || !check_memory(handles, mode) ||
++		    !check_indexed_memory(handles, mode) ||
 +		    !check_lea(handles, mode) ||
 +		    !check_mov_disp32(handles, mode) ||
  		    !check_group1(handles, mode) ||

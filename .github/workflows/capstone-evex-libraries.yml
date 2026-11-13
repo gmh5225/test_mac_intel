@@ -1,7 +1,7 @@
-name: Qualify the complete x86 operand writers in standalone clients
+name: Compare scaled-index MOV and LEA with base-only memory writers
 on:
   push:
-    branches: [codex/capstone-joint-writers-standalone]
+    branches: [codex/capstone-indexed-address-standalone]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -44,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-standalone-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
+          name: indexed-vs-base-memory-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
