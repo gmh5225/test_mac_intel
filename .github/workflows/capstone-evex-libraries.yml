@@ -1,7 +1,7 @@
-name: Isolate EVEX operand verification against native vector output and both iced formatters across real binaries
+name: Measure prefixed public operand extents on real PE32 PE64 ELF and SIMD under GCC 11 and 13
 on:
   push:
-    branches: [codex/capstone-single-pass-evex-libraries]
+    branches: [codex/capstone-compact-prefix-real-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,9 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -41,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: controlled-single-pass-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: compact-prefix-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
