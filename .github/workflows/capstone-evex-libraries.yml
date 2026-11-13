@@ -1,7 +1,7 @@
-name: Measure shared native EVEX decode and standard-mode dispatch against both iced formatters
+name: Measure packed SSE move output against a byte-identical control and both iced formatters
 on:
   push:
-    branches: [codex/capstone-four-mode-vector-libraries]
+    branches: [codex/capstone-sse-memory-real-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-vector-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: packed-move-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
