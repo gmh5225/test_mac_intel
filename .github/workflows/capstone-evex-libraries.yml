@@ -1,7 +1,7 @@
-name: Measure the complete four-backend GNU release against both iced formatters on real i386 and amd64 functions
+name: Qualify exact four-backend AArch64 scan build on real libraries against both iced formatters
 on:
   push:
-    branches: [codex/capstone-four-markup-real-libraries]
+    branches: [codex/capstone-four-aarch64-scan-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: verified-arm-markup-${{ matrix.host }}-${{ matrix.cc }}
+          name: a64-standard-scan-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

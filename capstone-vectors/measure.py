@@ -49,7 +49,7 @@ def main(w):
         if label=='output':
             assert objects['integer'].keys()==objects[label].keys()
             changed={n for n in objects[label] if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/ARM/ARMInstPrinter.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/Mips/MipsMapping.c.o',*('arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput'))}
+            expected={'arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMInstPrinter.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/Mips/MipsMapping.c.o',*('arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput'))}
             assert changed==expected,(changed,expected)
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
