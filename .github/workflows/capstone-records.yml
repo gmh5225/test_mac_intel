@@ -1,7 +1,7 @@
-name: Measure prefixed public operand extents on real PE32 PE64 ELF and SIMD under GCC 11 and 13
+name: Isolate ARM immediate scan on three real armel files and check mixed PE32 AArch64 MIPS controls
 on:
   push:
-    branches: [codex/capstone-compact-prefix-real-images]
+    branches: [codex/capstone-isolate-a32-immediate]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -36,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: prefix-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: a32-alu-increment-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
