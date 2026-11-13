@@ -27,7 +27,7 @@ index 80398b9b..d5084a3a 100644
  X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
      awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 76fdbcb7..078bbc34 100644
+index 76fdbcb7..67cf202a 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2944,7 +2944,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -38,4 +38,85 @@ index 76fdbcb7..078bbc34 100644
 +#if defined(__linux__) && defined(__GNUC__) && \
      !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
  #define X86_COMPACT_PUBLIC_HEADER
+ #endif
+@@ -3773,11 +3773,27 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
+ 
++#if defined(X86_COMPACT_PUBLIC_HEADER) && !defined(CAPSTONE_X86_ONLY)
++/* Other architectures never enter the x86 scanner. Keep their per-instruction
++ * stack frame independent of the compiled legacy and vector scan tables. */
++static __attribute__((noinline)) bool
++decodeFullIterator(csh handle, const uint8_t **code, size_t *size,
++		   uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_core_mode(handle, code, size, address, insn,
++					false);
++}
++#endif
++
+ CAPSTONE_EXPORT
+ X86_DECODE_ALIGN
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#if defined(X86_COMPACT_PUBLIC_HEADER) && !defined(CAPSTONE_X86_ONLY)
++	if (ud && ((cs_struct *)(uintptr_t)ud)->arch != CS_ARCH_X86)
++		return decodeFullIterator(ud, code, size, address, insn);
++#endif
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+ }
+ 
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..830aa0ef 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -169,14 +169,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+-					  uint64_t *address, cs_insn *insn)
++					  uint64_t *address, cs_insn *insn,
++					  bool scan)
+ {
+ 	uint16_t insn_size;
+ 	bool r;
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
+-	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+@@ -197,9 +197,9 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 	return true;
+ }
+ 
+-CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+-					  size_t *size, uint64_t *address,
+-					  cs_insn *insn)
++CS_DECODE_INLINE bool cs_disasm_iter_core_mode(csh ud, const uint8_t **code,
++					       size_t *size, uint64_t *address,
++					       cs_insn *insn, bool allow_scan)
+ {
+ 	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+ 	cs_detail *detail;
+@@ -215,9 +215,17 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+ 	detail = insn->detail;
+ 	if (CS_DECODE_LIKELY(!handle->detail_opt))
+ 		insn->detail = NULL;
+-	r = cs_disasm_iter_body(handle, code, size, address, insn);
++	r = cs_disasm_iter_body(handle, code, size, address, insn,
++				allow_scan && use_x86_scan(handle));
+ 	insn->detail = detail;
+ 	return r;
+ }
+ 
++CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
++{
++	return cs_disasm_iter_core_mode(ud, code, size, address, insn, true);
++}
++
  #endif

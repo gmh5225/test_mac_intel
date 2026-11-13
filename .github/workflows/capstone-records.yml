@@ -1,7 +1,7 @@
-name: Use production public scan and x86 text entry points for mixed paired controls
+name: Isolate the non-x86 iterator frame and retest real cross-ISA inputs
 on:
   push:
-    branches: [codex/capstone-gnu-exact-entry-executables]
+    branches: [codex/capstone-gnu-independent-full-iterator]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-exact-entry-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gnu-full-iterator-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
