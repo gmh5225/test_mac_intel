@@ -1,7 +1,7 @@
-name: Verify 25 real product panels with portable ARM extents and native EVEX rows
+name: Isolate EVEX scan and ARM detail gains against published NeverD dev
 on:
   push:
-    branches: [codex/neverd-portable-evex-arm-details]
+    branches: [codex/neverd-current-evex-arm-delta]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 8d7f6f8046bd94d028f091eabbc0524921054db5
+          ref: 505f69a239a26854100d658c8de521597a86611d
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: portable-evex-arm-details
+          name: current-evex-arm-delta
           path: product-evidence/
           retention-days: 14
