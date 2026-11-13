@@ -1,7 +1,7 @@
-name: Compare A32 branch scanning and a single public detail check on ARM coreutils
+name: Measure direct ARM opcode mapping with real coreutils and A32/Thumb differential records
 on:
   push:
-    branches: [codex/capstone-arm-scan-and-mapping]
+    branches: [codex/capstone-arm-opcode-mapping]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-branches-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-opcode-mapping-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

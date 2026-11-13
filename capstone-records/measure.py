@@ -12,13 +12,19 @@ assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==jso
 with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
+  import re
+  mapping=(s/'arch/ARM/ARMGenCSMappingInsn.inc').read_text()
+  rows=re.findall(r'^\s*(ARM_[\w]+) /\* (\d+) \*/, (ARM_INS_[\w]+)',mapping,re.M)
+  enums=dict(re.findall(r'^\s*(ARM_[\w]+)\s*=\s*(\d+)',(s/'arch/ARM/ARMGenInstrInfo.inc').read_text(),re.M))
+  assert [int(row[1]) for row in rows]==list(range(4465)) and all(enums[name]==idx for name,idx,_ in rows)
+  write('mapping',dict(rows=len(rows),sha256=hashlib.sha256(mapping.encode()).hexdigest()))
   cases=[x for x in corpus.prepare(r,t,e,run) if x['name'].startswith('arm-')];assert len(cases)==3
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','metadata','branch'):
+  for key in ('base','indexed','lookup'):
    if key!='base':run(['git','apply',r/(key+'.patch')],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    f=t/key;run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',f],'link-'+key);bins[key]=f
@@ -30,7 +36,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
     run(['ctest','--test-dir',b,'-R','^unit_arm_post_index$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
-  for key in ('metadata','branch'):
+  for key in ('indexed','lookup'):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    assert changed==['arch/ARM/ARMMapping.c.o'],changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
@@ -43,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for x in cases:
    for mode in (0,1,2):
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','metadata','branch','aa']
+    runs=[];reference=None;keys=['base','indexed','lookup','aa']
     for k in range(15):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
