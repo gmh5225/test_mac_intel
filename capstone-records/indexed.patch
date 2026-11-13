@@ -658,7 +658,7 @@ index 7b2b3a08..4b1738be 100644
  {
  	uint64_t CurFieldValue = 0;
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d3566525..85c9f0f1 100644
+index d3566525..83ac6f99 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
 @@ -24,7 +24,8 @@
@@ -671,7 +671,7 @@ index d3566525..85c9f0f1 100644
  #define MIPS_DIRECT_MAPPING
  #endif
  
-@@ -304,10 +305,17 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+@@ -304,46 +305,38 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  	Mips_init_cs_detail(instr);
  /* These standard encodings have no extra operands to validate in a scan. */
  #ifdef MIPS_DIRECT_MAPPING
@@ -691,29 +691,60 @@ index d3566525..85c9f0f1 100644
  		/* For these standard immediate and load/store encodings all
  		 * register and immediate bits are operands. */
  		const unsigned major = readBytes32(instr, code) >> 26;
-@@ -326,7 +334,7 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			opcode = Mips_XORi;
- 			break;
- 		case 25:
+-		unsigned opcode = 0;
+-		switch (major) {
+-		case 9:
+-			opcode = Mips_ADDiu;
+-			break;
+-		case 12:
+-			opcode = Mips_ANDi;
+-			break;
+-		case 13:
+-			opcode = Mips_ORi;
+-			break;
+-		case 14:
+-			opcode = Mips_XORi;
+-			break;
+-		case 25:
 -			if (mode == CS_MODE_MIPS64)
-+			if (gp64)
- 				opcode = Mips_DADDiu;
- 			break;
- 		case 35:
-@@ -336,11 +344,11 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			opcode = Mips_SW;
- 			break;
- 		case 55:
+-				opcode = Mips_DADDiu;
+-			break;
+-		case 35:
+-			opcode = Mips_LW;
+-			break;
+-		case 43:
+-			opcode = Mips_SW;
+-			break;
+-		case 55:
 -			if (mode == CS_MODE_MIPS64)
-+			if (gp64)
- 				opcode = Mips_LD;
- 			break;
- 		case 63:
+-				opcode = Mips_LD;
+-			break;
+-		case 63:
 -			if (mode == CS_MODE_MIPS64)
-+			if (gp64)
- 				opcode = Mips_SD;
- 			break;
- 		}
+-				opcode = Mips_SD;
+-			break;
+-		}
++		/* A zero entry keeps the normal predicate and operand decoder.
++         * The second row adds the three GP64 immediate and memory forms. */
++		static const uint16_t opcodes[2][64] = { { [9] = Mips_ADDiu,
++							   [12] = Mips_ANDi,
++							   [13] = Mips_ORi,
++							   [14] = Mips_XORi,
++							   [35] = Mips_LW,
++							   [43] = Mips_SW },
++							 { [9] = Mips_ADDiu,
++							   [12] = Mips_ANDi,
++							   [13] = Mips_ORi,
++							   [14] = Mips_XORi,
++							   [25] = Mips_DADDiu,
++							   [35] = Mips_LW,
++							   [43] = Mips_SW,
++							   [55] = Mips_LD,
++							   [63] = Mips_SD } };
++		const unsigned opcode = opcodes[gp64][major];
+ 		if (opcode) {
+ 			MCInst_setOpcode(instr, opcode);
+ 			instr->flat_insn->id = mips_insns[opcode].mapid;
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
 index 01559e08..63dcc538 100644
 --- a/arch/X86/X86DisassemblerDecoder.c

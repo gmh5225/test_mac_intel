@@ -1,7 +1,7 @@
-name: Measure standard MIPS64 and explicit R2 primary decoding on ls cp sort with repaired store conditional and two GCC versions
+name: Compare lookup and switch for common MIPS32 and GP64 primary opcodes with explicit R2 and generic ls cp sort
 on:
   push:
-    branches: [codex/capstone-correct-r2-mapping-and-primary]
+    branches: [codex/capstone-gp64-primary-opcodes]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -36,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-r2-primary-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gp64-primary-opcode-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

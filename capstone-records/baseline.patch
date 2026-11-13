@@ -513,44 +513,40 @@ index 6266d12b..98805f06 100644
  
  // given internal insn id, return public instruction ID
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..6b921f10 100644
+index c42839d3..8a7f7caf 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
-@@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
- 	}
- }
+@@ -37,6 +37,7 @@
+ #include "../../MCFixedLenDisassembler.h"
+ #include "../../cs_priv.h"
+ #include "../../utils.h"
++#include "MipsDisassembler.h"
+ #define GET_SUBTARGETINFO_ENUM
+ #include "MipsGenSubtargetInfo.inc"
  
-+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
-+#define CAPSTONE_MIPS_PRIMARY_DISPATCH
-+#endif
-+
- static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 				   const uint8_t *Bytes, size_t BytesLen,
- 				   uint64_t Address, SStream *CStream);
-@@ -1451,6 +1456,21 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1451,6 +1452,21 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  
  	cs_mode mode = Instr->csh->mode;
  	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
 +	bool IsGP64, IsFP64;
 +#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
 +	uint64_t major;
-+	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
-+	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64) {
-+		/* The unextended modes use standard byte order and only the
-+		 * GP64, FP64, DSP and base tables below, in their usual order. */
++	const cs_mode isa = Mips_standardMode(mode);
++	if (isa) {
++		/* The generated tables still test the complete mode. */
 +		if (readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
 +				      IsBigEndian, false) == MCDisassembler_Fail)
 +			return MCDisassembler_Fail;
 +		*Size = 4;
-+		IsGP64 = IsFP64 = isa == CS_MODE_MIPS64;
++		IsGP64 = Mips_standardModeIs64(isa);
++		IsFP64 = isa != CS_MODE_MIPS32;
 +		goto DecodeStandard;
 +	}
 +#endif
  	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
  	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
  	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
-@@ -1459,8 +1479,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1459,8 +1475,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
  	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
  	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
@@ -561,7 +557,7 @@ index 25f13d10..6b921f10 100644
  	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
  	// Only present in MIPS-I and MIPS-II
  	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
-@@ -1684,6 +1704,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1684,6 +1700,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
@@ -579,7 +575,7 @@ index 25f13d10..6b921f10 100644
  	if (IsGP64) {
  		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
  					     Address, NULL);
-@@ -1698,10 +1729,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1698,10 +1725,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
@@ -596,6 +592,40 @@ index 25f13d10..6b921f10 100644
  
  	// Calling the auto-generated decoder function.
  	Result = decodeInstruction_4(DecoderTableMips32, Instr, Insn, Address,
+diff --git a/arch/Mips/MipsDisassembler.h b/arch/Mips/MipsDisassembler.h
+index 3c9c2c89..96333696 100644
+--- a/arch/Mips/MipsDisassembler.h
++++ b/arch/Mips/MipsDisassembler.h
+@@ -8,6 +8,29 @@
+ #include "../../MCInst.h"
+ #include "../../MCRegisterInfo.h"
+ 
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
++#define CAPSTONE_MIPS_PRIMARY_DISPATCH
++#endif
++
++#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
++/* These modes share the standard instruction width, table order and
++ * immediate/load/store encodings. Extensions such as microMIPS and PTR64
++ * enter the general decoder. Preserve all revision bits for its predicates. */
++static inline cs_mode Mips_standardMode(cs_mode mode)
++{
++	const cs_mode supported = CS_MODE_MIPS32 | CS_MODE_MIPS64 |
++				  CS_MODE_MIPS32R2 | CS_MODE_MIPS64R2;
++	mode &= ~CS_MODE_BIG_ENDIAN;
++	return mode & ~supported ? 0 : mode;
++}
++
++static inline bool Mips_standardModeIs64(cs_mode mode)
++{
++	return (mode & (CS_MODE_MIPS64 | CS_MODE_MIPS64R2)) != 0;
++}
++#endif
++
+ void Mips_init(MCRegisterInfo *MRI);
+ 
+ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature);
 diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
 index 7b2b3a08..4b1738be 100644
 --- a/arch/Mips/MipsGenDirectDecoder.inc
@@ -628,7 +658,7 @@ index 7b2b3a08..4b1738be 100644
  {
  	uint64_t CurFieldValue = 0;
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d3566525..d6775ef0 100644
+index d3566525..85c9f0f1 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
 @@ -24,7 +24,8 @@
@@ -641,6 +671,49 @@ index d3566525..d6775ef0 100644
  #define MIPS_DIRECT_MAPPING
  #endif
  
+@@ -304,10 +305,17 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 	Mips_init_cs_detail(instr);
+ /* These standard encodings have no extra operands to validate in a scan. */
+ #ifdef MIPS_DIRECT_MAPPING
++#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
++	const cs_mode mode = Mips_standardMode(instr->csh->mode);
++	const bool standard = mode != 0;
++	const bool gp64 = Mips_standardModeIs64(mode);
++#else
+ 	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
++	const bool standard = mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64;
++	const bool gp64 = mode == CS_MODE_MIPS64;
++#endif
+ 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
+-	    instr->csh->disasm == Mips_getInstruction &&
+-	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
++	    instr->csh->disasm == Mips_getInstruction && standard) {
+ 		/* For these standard immediate and load/store encodings all
+ 		 * register and immediate bits are operands. */
+ 		const unsigned major = readBytes32(instr, code) >> 26;
+@@ -326,7 +334,7 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			opcode = Mips_XORi;
+ 			break;
+ 		case 25:
+-			if (mode == CS_MODE_MIPS64)
++			if (gp64)
+ 				opcode = Mips_DADDiu;
+ 			break;
+ 		case 35:
+@@ -336,11 +344,11 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			opcode = Mips_SW;
+ 			break;
+ 		case 55:
+-			if (mode == CS_MODE_MIPS64)
++			if (gp64)
+ 				opcode = Mips_LD;
+ 			break;
+ 		case 63:
+-			if (mode == CS_MODE_MIPS64)
++			if (gp64)
+ 				opcode = Mips_SD;
+ 			break;
+ 		}
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
 index 01559e08..63dcc538 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
