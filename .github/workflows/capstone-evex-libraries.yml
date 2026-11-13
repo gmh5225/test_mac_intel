@@ -1,7 +1,7 @@
-name: Measure native EVEX with the mixed scalar dispatcher held byte-identical
+name: Test a bounded four-byte EVEX read against the same native row and dispatcher
 on:
   push:
-    branches: [codex/capstone-evex-with-common-scalar-entry]
+    branches: [codex/capstone-evex-bounded-header-word]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-common-dispatch-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-header-word-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
