@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/X86/X86DisassemblerDecoder.c.o'}
+   expected={'arch/X86/X86Mapping.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)

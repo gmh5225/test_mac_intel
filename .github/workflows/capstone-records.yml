@@ -1,7 +1,7 @@
-name: Measure prefixed public operand extents on real PE32 PE64 ELF and SIMD under GCC 11 and 13
+name: Measure the 0F 38 legacy feature dispatch on PE32 PE64 ARM64 and MIPS images
 on:
   push:
-    branches: [codex/capstone-compact-prefix-real-images]
+    branches: [codex/capstone-owned-legacy-map-images]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -36,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: prefix-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: owned-map-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
