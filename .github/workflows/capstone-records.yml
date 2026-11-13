@@ -1,7 +1,7 @@
-name: Compare ARM64 register text and operand default copies with real x86 ARM and MIPS binaries across five hosts
+name: Verify and measure A32 immediate, AArch64 register, x86 and MIPS decoding across five hosts
 on:
   push:
-    branches: [codex/capstone-four-register-and-detail-defaults]
+    branches: [codex/capstone-four-a32-immediate-decode]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mixed-register-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: a32-alu-mixed-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
