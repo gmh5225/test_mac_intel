@@ -52,10 +52,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-loongarch-rows-') as tmp:
    return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]
   for x in cases:
-   for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
+   for mode in (1,2):
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*250e6/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
+    for k in range(31):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
       vout=sample(v,x,mode,n)

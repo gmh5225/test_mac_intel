@@ -1,7 +1,7 @@
-name: Compare LoongArch public records and time real loong64 executables in dedicated and mixed builds
+name: Retime dedicated LoongArch output and details on independent Apple hosts
 on:
   push:
-    branches: [codex/capstone-loongarch-opcode-rows]
+    branches: [codex/capstone-loongarch-native-detail-repeats]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,18 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, archs: loongarch }
-          - { host: macos-15, cc: clang, archs: four }
-          - { host: macos-15-intel, cc: clang, archs: loongarch }
-          - { host: macos-15-intel, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: loongarch }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: loongarch }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: loongarch }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: loongarch }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
+          - { host: macos-15, cc: clang, archs: loongarch, trial: 1 }
+          - { host: macos-15, cc: clang, archs: loongarch, trial: 2 }
+          - { host: macos-15-intel, cc: clang, archs: loongarch, trial: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -39,13 +30,13 @@ jobs:
           ref: 6703e144275793a419ad663511e34b5dab3d52d8
           path: source
           persist-credentials: false
-      - name: Compare complete SystemZ records and real s390x executables with cross-ISA controls
+      - name: Compare LoongArch records and retime complete native loong64 coreutils text sections
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: loongarch-rows-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: loongarch-repeat-${{ matrix.trial }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
