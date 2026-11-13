@@ -1,7 +1,7 @@
-name: Isolate the leading EVEX iterator dispatch on real PE32 PE64 and SIMD with five native toolchains
+name: Compare vector register text and detail in one pass on PE32 PE64 and other architectures
 on:
   push:
-    branches: [codex/capstone-evex-public-iterator-images]
+    branches: [codex/capstone-vector-operand-names-pe32]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-entry-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vector-operands-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

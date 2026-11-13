@@ -641,7 +641,7 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 01559e08..f715832b 100644
+index 01559e08..8e6577c8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -670,28 +670,6 @@ index 01559e08..f715832b 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-@@ -3752,6 +3762,21 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					  cs_insn *insn, uint16_t *insn_size,
- 					  bool batch)
- {
-+#if defined(CAPSTONE_X86_VECTOR_OUTPUT) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+	/* A leading EVEX in ordinary long mode never denotes a legacy opcode.
-+	 * Reuse the same validated public row as the fallback scan. */
-+	if (size && code[0] == 0x62 && handle->mode == CS_MODE_64 &&
-+	    handle->insn_id == X86_get_insn_id) {
-+		X86ScanResult result;
-+		if (!X86_scanEvexOutputForm(code, size, &result) &&
-+		    !decodeScanResultGeneric((csh)(uintptr_t)handle, code, size,
-+					     insn, &result, 0x62, true))
-+			return false;
-+		*insn_size = result.length;
-+		finish_x86_scan(handle, insn, &result, code, batch, true);
-+		return true;
-+	}
-+#endif
- 	unsigned instructionID = 0;
- 	uint16_t length;
- 	int initial = tryInitialScanResult(handle, code, size, &instructionID,
 diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
 index ae3428b5..14aefc93 100644
 --- a/arch/X86/X86DisassemblerDecoder.h
@@ -734,7 +712,7 @@ index a976814e..92c55fd2 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..4bb68e90 100644
+index 1d237cd1..ae5f73e1 100644
 --- a/arch/X86/X86GenVectorOutput.inc
 +++ b/arch/X86/X86GenVectorOutput.inc
 @@ -631,6 +631,32 @@ static const uint8_t vex_shift_plans[3][8][4] = {
@@ -832,7 +810,7 @@ index 1d237cd1..4bb68e90 100644
  };
  /* Low seven bits index legacy_register_rows; bit 7 reverses the operands. */
  static const uint8_t legacy_register_plans[256] = {
-@@ -808,3 +882,34 @@ static const uint8_t legacy_register_plans[256] = {
+@@ -808,3 +882,138 @@ static const uint8_t legacy_register_plans[256] = {
  	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
  	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
  };
@@ -840,6 +818,110 @@ index 1d237cd1..4bb68e90 100644
 +	{ 0, 0, 82, 0, 83, 0, 84, 0, },
 +	{ 0, 0, 85, 0, 86, 0, 87, 0, },
 +	{ 0, 0, 88, 89, 0, 0, 90, 91, },
++};
++static const char vector_operand_names[3][32][8] = {
++	{
++		", xmm0",
++		", xmm1",
++		", xmm2",
++		", xmm3",
++		", xmm4",
++		", xmm5",
++		", xmm6",
++		", xmm7",
++		", xmm8",
++		", xmm9",
++		", xmm10",
++		", xmm11",
++		", xmm12",
++		", xmm13",
++		", xmm14",
++		", xmm15",
++		", xmm16",
++		", xmm17",
++		", xmm18",
++		", xmm19",
++		", xmm20",
++		", xmm21",
++		", xmm22",
++		", xmm23",
++		", xmm24",
++		", xmm25",
++		", xmm26",
++		", xmm27",
++		", xmm28",
++		", xmm29",
++		", xmm30",
++		", xmm31",
++	},
++	{
++		", ymm0",
++		", ymm1",
++		", ymm2",
++		", ymm3",
++		", ymm4",
++		", ymm5",
++		", ymm6",
++		", ymm7",
++		", ymm8",
++		", ymm9",
++		", ymm10",
++		", ymm11",
++		", ymm12",
++		", ymm13",
++		", ymm14",
++		", ymm15",
++		", ymm16",
++		", ymm17",
++		", ymm18",
++		", ymm19",
++		", ymm20",
++		", ymm21",
++		", ymm22",
++		", ymm23",
++		", ymm24",
++		", ymm25",
++		", ymm26",
++		", ymm27",
++		", ymm28",
++		", ymm29",
++		", ymm30",
++		", ymm31",
++	},
++	{
++		", zmm0",
++		", zmm1",
++		", zmm2",
++		", zmm3",
++		", zmm4",
++		", zmm5",
++		", zmm6",
++		", zmm7",
++		", zmm8",
++		", zmm9",
++		", zmm10",
++		", zmm11",
++		", zmm12",
++		", zmm13",
++		", zmm14",
++		", zmm15",
++		", zmm16",
++		", zmm17",
++		", zmm18",
++		", zmm19",
++		", zmm20",
++		", zmm21",
++		", zmm22",
++		", zmm23",
++		", zmm24",
++		", zmm25",
++		", zmm26",
++		", zmm27",
++		", zmm28",
++		", zmm29",
++		", zmm30",
++		", zmm31",
++	},
 +};
 +static const struct VectorOutputRow legacy_memory_moves[3][6] = {
 +	{
@@ -988,7 +1070,7 @@ index 11e8578a..20263b76 100644
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..6865a739 100644
+index 6df1472d..fa66dfe6 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -3,10 +3,8 @@
@@ -1027,10 +1109,15 @@ index 6df1472d..6865a739 100644
  static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  				 uint16_t *insn_size,
  				 const struct VectorOutputRow *row,
-@@ -51,21 +65,8 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 		memcpy(out, ", ", 2);
- 		out = writeVectorRegister(out + 2, ll, regs[n]);
- 	}
+@@ -46,28 +60,9 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+-	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
+-	for (unsigned n = 1; n != reg_count; ++n) {
+-		memcpy(out, ", ", 2);
+-		out = writeVectorRegister(out + 2, ll, regs[n]);
+-	}
 -	if (row->immediate) {
 -		const unsigned value = code[prefix + 2];
 -		memcpy(out, ", ", 2);
@@ -1046,12 +1133,55 @@ index 6df1472d..6865a739 100644
 -			*out = digits[value & 15];
 -		}
 -	}
-+	if (row->immediate)
-+		writeVectorImmediate(out, code[prefix + 2]);
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
+-	if (insn->detail) {
+-		cs_detail *d = insn->detail;
++	char *out = insn->op_str;
++	cs_detail *d = insn->detail;
++	if (d) {
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -101,9 +102,102 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+@@ -78,17 +73,32 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		x->modrm = code[prefix + 1];
+ 		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
+ 		x->op_count = (uint8_t)(reg_count + row->immediate);
+-		static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
+-						 X86_REG_ZMM0 };
+-		for (unsigned n = 0; n != reg_count; ++n) {
+-			cs_x86_op *op = &x->operands[n];
++	}
++	static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
++					 X86_REG_ZMM0 };
++	for (unsigned n = 0; n < reg_count; ++n) {
++		const unsigned width = n ? ll : first_ll;
++		const unsigned number = regs[n];
++		const char *name = vector_operand_names[width][number];
++		if (n) {
++			memcpy(out, name, 8);
++			out += 6 + (number >= 10);
++		} else {
++			memcpy(out, name + 2, 6);
++			out += 4 + (number >= 10);
++		}
++		if (d) {
++			cs_x86_op *op = &d->x86.operands[n];
+ 			op->type = X86_OP_REG;
+-			const unsigned width = n == 0 ? first_ll : ll;
+-			op->reg = (x86_reg)(bases[width] + regs[n]);
++			op->reg = (x86_reg)(bases[width] + number);
+ 			op->access = (cs_ac_type)row->access[n];
+ 			op->size = (uint8_t)(16 << width);
+ 		}
+-		if (row->immediate) {
++	}
++	if (row->immediate) {
++		writeVectorImmediate(out, code[prefix + 2]);
++		if (d) {
++			cs_x86 *x = &d->x86;
+ 			x->operands[reg_count].type = X86_OP_IMM;
+ 			x->operands[reg_count].imm = code[prefix + 2];
+ 			x->operands[reg_count].access =
+@@ -101,9 +111,102 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  	return true;
  }
  
@@ -1157,7 +1287,7 @@ index 6df1472d..6865a739 100644
  
  #if defined(_MSC_VER)
  __declspec(noinline)
-@@ -111,32 +205,31 @@ __declspec(noinline)
+@@ -111,32 +214,31 @@ __declspec(noinline)
  __attribute__((noinline))
  #endif
  static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
@@ -1200,7 +1330,7 @@ index 6df1472d..6865a739 100644
  		const unsigned pair[] = { regs[2], regs[0] };
  		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
  					    0x40 | (w << 3) | rxb,
-@@ -261,20 +354,24 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -261,20 +363,24 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	if (size < 4)
  		return false;
  	const bool has_rex = wide && (code[1] & 0xf0) == 0x40;
@@ -1230,7 +1360,7 @@ index 6df1472d..6865a739 100644
  	const unsigned second = plan & 128 ? reg : rm;
  	*insn_size = insn->size = (uint16_t)length;
  	insn->id = row->id;
-@@ -283,8 +380,12 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -283,8 +389,12 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
  	memset(insn->op_str, 0, sizeof(insn->op_str));
  	char *out = writeVectorRegister(insn->op_str, 0, first);
@@ -1245,7 +1375,7 @@ index 6df1472d..6865a739 100644
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
  		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -297,9 +398,9 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -297,9 +407,9 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  		x->rex = rex;
  		x->addr_size = wide ? 8 : 4;
  		x->modrm = modrm;
@@ -1257,7 +1387,7 @@ index 6df1472d..6865a739 100644
  			cs_x86_op *op = &x->operands[i];
  			op->type = X86_OP_REG;
  			op->reg =
-@@ -307,6 +408,15 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -307,6 +417,15 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  			op->size = 16;
  			op->access = (cs_ac_type)row->access[i];
  		}
@@ -1273,7 +1403,7 @@ index 6df1472d..6865a739 100644
  	}
  	return true;
  }
-@@ -501,18 +611,133 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -501,18 +620,133 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				    0x40 | (w << 3) | rxb, ll, regs, 3);
  }
  
@@ -1411,7 +1541,7 @@ index 6df1472d..6865a739 100644
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -530,29 +755,36 @@ __declspec(noinline)
+@@ -530,29 +764,36 @@ __declspec(noinline)
  #elif defined(__GNUC__)
  __attribute__((noinline))
  #endif
@@ -1463,7 +1593,7 @@ index 6df1472d..6865a739 100644
  	insn->id = row->id;
  	*insn_size = insn->size = (uint16_t)length;
  	memcpy(insn->bytes, code, length);
-@@ -561,21 +793,26 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -561,21 +802,26 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  	memset(insn->op_str, 0, sizeof(insn->op_str));
  	char *out = writeVectorRegister(insn->op_str, ll, dst);
  	memcpy(out, ", xmmword ptr [", 15);
@@ -1503,7 +1633,7 @@ index 6df1472d..6865a739 100644
  	*out = ']';
  	if (insn->detail) {
  		cs_detail *d = insn->detail;
-@@ -588,13 +825,15 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -588,13 +834,15 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  		x->addr_size = 8;
  		x->modrm = modrm;
  		x->encoding.modrm_offset = 5;
@@ -1522,7 +1652,7 @@ index 6df1472d..6865a739 100644
  			x->sib_base = (x86_reg)base->reg;
  		}
  		x->op_count = 2;
-@@ -608,9 +847,11 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -608,9 +856,11 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  		op->access = (cs_ac_type)row->access[0];
  		op = &x->operands[1];
  		op->type = X86_OP_MEM;
@@ -1664,7 +1794,7 @@ index ccc4f0de..e0fc9ad0 100644
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..0163d27f 100644
+index 834c2488..3123a236 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -94,6 +94,61 @@ std::string fields(const Bytes4 &array)
@@ -1744,16 +1874,16 @@ index 834c2488..0163d27f 100644
  				    uint8_t(value) };
 -		unsigned id = decoder.decode(bytes, sizeof(bytes));
 -		if (!id)
-+		const std::string record = two_register_immediate_row(
-+			decoder, bytes, dst_width, dst, ll, src);
-+		if (record.empty())
- 			return {};
+-			return {};
 -		const auto &insn = *decoder.insn;
 -		const auto &d = *insn.detail;
 -		if (insn.is_alias || insn.usesAliasDetails || insn.illegal ||
 -		    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
 -		    d.regs_write_count || d.groups_count > 4)
--			return {};
++		const std::string record = two_register_immediate_row(
++			decoder, bytes, dst_width, dst, ll, src);
++		if (record.empty())
+ 			return {};
 -		cs_x86 x{};
 -		std::memcpy(x.opcode, bytes, 4);
 -		x.rex = uint8_t(0x40 | (w << 3) | (ext >> 5));
@@ -2088,7 +2218,7 @@ index 834c2488..0163d27f 100644
  	std::fprintf(stderr, "%zu legacy register rows, %llu 32-bit probes\n",
  		     rows.size(),
  		     static_cast<unsigned long long>(narrow.probes));
-@@ -891,6 +1125,114 @@ void emit_vex_registers(Decoder &decoder)
+@@ -891,6 +1125,134 @@ void emit_vex_registers(Decoder &decoder)
  	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
  		     rows.size(), widths.size() - 1);
  }
@@ -2200,10 +2330,30 @@ index 834c2488..0163d27f 100644
 +	std::fprintf(stderr, "%u EVEX vector load rows\n", valid_rows);
 +}
 +
++// Copy the punctuation of noninitial operands together with their name.
++void emit_vector_operand_names(Decoder &decoder)
++{
++	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
++	std::puts("static const char vector_operand_names[3][32][8] = {");
++	for (const auto base : bases) {
++		std::puts("\t{");
++		for (unsigned i = 0; i < 32; ++i) {
++			const char *name =
++				cs_reg_name(decoder.handle, base + i);
++			if (!name || std::strlen(name) != (i < 10 ? 4u : 5u))
++				throw std::runtime_error(
++					"unexpected vector register spelling");
++			std::printf("\t\t\", %s\",\n", name);
++		}
++		std::puts("\t},");
++	}
++	std::puts("};");
++}
++
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -938,11 +1280,14 @@ void emit_output(Decoder &decoder)
+@@ -938,11 +1300,15 @@ void emit_output(Decoder &decoder)
  	emit_vex_indexed(decoder);
  	emit_vex_registers(decoder);
  	emit_vex_shifts(decoder);
@@ -2214,6 +2364,7 @@ index 834c2488..0163d27f 100644
  	Decoder padding32(CS_MODE_32);
  	emit_padding_rows(padding32, decoder);
  	emit_legacy_registers(decoder);
++	emit_vector_operand_names(decoder);
 +	emit_legacy_memory_moves(padding32, decoder);
  }
  }
