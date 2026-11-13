@@ -1,69 +1,57 @@
-diff --git a/cs.c b/cs.c
-index 59a88cf8..6791f780 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1682,6 +1682,12 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
- 		handle->errnum = CS_ERR_MEM;
- 		return NULL;
- 	} else {
-+		/* Backends can leave alias metadata untouched. Start an iterator
-+		 * record with the same status as a freshly allocated batch record. */
-+		insn->alias_id = 0;
-+		insn->is_alias = false;
-+		insn->usesAliasDetails = false;
-+		insn->illegal = false;
- 		if (handle->detail_opt) {
- 			// allocate memory for @detail pointer
- 			insn->detail = cs_mem_malloc(sizeof(cs_detail));
-diff --git a/tests/unit/api.c b/tests/unit/api.c
-index e17860cb..46b3e78d 100644
---- a/tests/unit/api.c
-+++ b/tests/unit/api.c
-@@ -41,10 +41,47 @@ static bool test_cs_mem_setup_fail()
- 	return true;
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 4a7e97c3..8dfec3da 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -945,27 +945,37 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ }
+ #endif
+ 
++/* Unused operands have observable invalid indices and zeroed padding too. */
++#define ARM_EMPTY_OP \
++	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
++#define ARM_FOUR_EMPTY_OPS \
++	ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP, ARM_EMPTY_OP
++static const cs_arm_op arm_empty_operands[] = {
++	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
++	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS,
++	ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS, ARM_FOUR_EMPTY_OPS
++};
++#undef ARM_FOUR_EMPTY_OPS
++#undef ARM_EMPTY_OP
++_Static_assert(ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS,
++	       "ARM operand defaults must cover all slots");
++
+ void ARM_setup_op(cs_arm_op *op)
+ {
+-	memset(op, 0, sizeof(cs_arm_op));
+-	op->type = ARM_OP_INVALID;
+-	op->vector_index = -1;
+-	op->neon_lane = -1;
++	memcpy(op, arm_empty_operands, sizeof(*op));
  }
  
-+static void *nonzero_malloc(size_t bytes)
-+{
-+	void *p = malloc(bytes);
-+	if (p)
-+		memset(p, 1, bytes);
-+	return p;
-+}
-+
-+static bool test_iterator_allocation(void)
-+{
-+	const bool x86 = cs_support(CS_ARCH_X86);
-+	if (!x86 && !cs_support(CS_ARCH_ARM))
-+		return true;
-+	cs_opt_mem mem = { nonzero_malloc, calloc, realloc, free, vsnprintf };
-+	if (cs_option(0, CS_OPT_MEM, (size_t)&mem) != CS_ERR_OK)
-+		return false;
-+	csh handle = 0;
-+	bool ok = cs_open(x86 ? CS_ARCH_X86 : CS_ARCH_ARM,
-+			  x86 ? CS_MODE_64 : CS_MODE_ARM, &handle) == CS_ERR_OK;
-+	for (unsigned i = 0; ok && i < 2; ++i) {
-+		ok = cs_option(handle, CS_OPT_DETAIL,
-+			       i ? CS_OPT_ON : CS_OPT_OFF) == CS_ERR_OK;
-+		if (!ok)
-+			break;
-+		cs_insn *insn = cs_malloc(handle);
-+		ok = insn && !insn->alias_id && !insn->is_alias &&
-+		     !insn->usesAliasDetails && !insn->illegal;
-+		if (insn)
-+			cs_free(insn, 1);
-+	}
-+	if (handle)
-+		cs_close(&handle);
-+	mem.malloc = malloc;
-+	return cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK && ok;
-+}
-+
- int main()
+ void ARM_init_cs_detail(MCInst *MI)
  {
- 	bool result = true;
- 	result &= test_cs_mem_setup_fail();
-+	result &= test_iterator_allocation();
+-	if (detail_is_set(MI)) {
+-		unsigned int i;
+-
+-		memset(get_detail(MI), 0,
+-		       offsetof(cs_detail, arm) + sizeof(cs_arm));
+-
+-		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
+-			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
+-		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
+-		ARM_get_detail(MI)->vcc = ARMVCC_None;
+-	}
++	if (!detail_is_set(MI))
++		return;
++	cs_detail *detail = get_detail(MI);
++	memset(detail, 0,
++	       offsetof(cs_detail, arm) + offsetof(cs_arm, operands));
++	detail->arm.cc = ARMCC_UNDEF;
++	detail->arm.vcc = ARMVCC_None;
++	memcpy(detail->arm.operands, arm_empty_operands,
++	       sizeof(arm_empty_operands));
+ }
  
- 	if (result) {
- 		printf("All tests passed.\n");
+ static uint64_t t_add_pc(MCInst *MI, uint64_t v)

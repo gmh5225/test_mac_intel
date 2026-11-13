@@ -1,7 +1,7 @@
-name: Verify deterministic fresh iterator records with a nonzero allocator across release profiles
+name: Verify complete ARM operand storage in MSVC, DIET, reduced and sanitizer configurations
 on:
   push:
-    branches: [codex/capstone-allocator-output-metadata]
+    branches: [codex/capstone-arm-operand-storage-configs]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6703e144275793a419ad663511e34b5dab3d52d8
+          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: allocator-metadata-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: arm-operand-storage-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
