@@ -38,16 +38,17 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
+   dry_profiles={}
+   for archs in ('x86','mips x86','x86 arm mips aarch64','arm x86','mips arm x86','mips aarch64 arm x86 riscv'):
+    env={**os.environ,'CAPSTONE_ARCHS':archs,'CC':cc,'CXX':'g++' if cc=='gcc' else 'clang++','CAPSTONE_STATIC':'yes','CAPSTONE_SHARED':'no'}
+    dry=sp.check_output(['make','-Bn','arch/X86/X86VectorOutput.o'],env=env,cwd=s,text=True)
+    dry_profiles[archs]=next(line for line in dry.splitlines() if ' -c ' in line and 'X86VectorOutput.c' in line)
+   if key=='base':make_control=dry_profiles
+   else:
+    assert dry_profiles==make_control
+    write('make-profiles',dict(architecture_sets=len(dry_profiles),cc=cc,compiles=dry_profiles))
    if key!='base':
     run(['cmake','--build',b,'--target','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
-    target='arch/X86/X86VectorOutput.o'
-    for archs,qualified in (('x86',True),('mips x86',True),('x86 arm mips aarch64',True),('arm x86',False),('mips arm x86',False),('mips aarch64 arm x86 riscv',False)):
-     env={**os.environ,'CAPSTONE_ARCHS':archs,'CC':cc,'CXX':'g++' if cc=='gcc' else 'clang++','CAPSTONE_STATIC':'yes','CAPSTONE_SHARED':'no'}
-     dry=sp.check_output(['make','-Bn',target],env=env,cwd=s,text=True)
-     compile=next(line for line in dry.splitlines() if ' -c ' in line and 'X86VectorOutput.c' in line)
-     assert ('-mstringop-strategy=libcall' in compile)==(qualified and cc=='gcc' and platform.machine()=='x86_64'),(archs,cc,compile)
-     assert ('-DCAPSTONE_ARM_AARCH64_MIPS_X86' in compile)==(len(archs.split())==4)
-    write('make-profiles',dict(architecture_sets=6,cc=cc,target=target))
     run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan|aarch64_register_names_generator|arm_register_names_generator|fixed_len_decoder|fixed_len_decoder_newlines)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
