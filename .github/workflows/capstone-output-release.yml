@@ -1,7 +1,7 @@
-name: Verify generated public VEX entries on profiles
+name: Measure immediate output without expanding the shared formatter on profiles
 on:
   push:
-    branches: [codex/capstone-public-vex-entry-profiles]
+    branches: [codex/capstone-record-immediates-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-entry-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: immediate-output-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
