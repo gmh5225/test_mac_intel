@@ -300,7 +300,7 @@ index 1d0c9cca..a6474b4a 100644
  	{ 0 },
  	{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
 diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index e284469c..bd0f6c94 100644
+index e284469c..024efb6a 100644
 --- a/arch/X86/X86MemoryOutput.c
 +++ b/arch/X86/X86MemoryOutput.c
 @@ -9,26 +9,7 @@
@@ -327,11 +327,11 @@ index e284469c..bd0f6c94 100644
 -
 -/* Decode one ordinary base, optionally ESP/RSP/R12 via SIB, or RIP-relative
 - * disp32. The full reader handles absolute addresses and indexed SIB forms. */
-+/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
++/* No-base SIB and 64-bit operands exposing RIZ retain the general printer. */
  bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
  			   const struct X86SimpleOutput *row,
-@@ -43,24 +24,38 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -43,24 +24,39 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	const unsigned offset = lead + 2 + sib;
  	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
  	const unsigned length = offset + disp_size;
@@ -350,12 +350,13 @@ index e284469c..bd0f6c94 100644
 +					   ((encoding >> 3) & 7);
 +		base_reg = encoding & 7;
 +		if ((!mod && base_reg == 5) ||
-+		    (index_reg == 4 && encoding != 0x24))
++		    (wide && index_reg == 4 && encoding != 0x24))
 +			return false;
-+		if (index_reg != 4) {
++		/* Intel syntax suppresses EIZ, but both public scale fields
++         * still describe the SIB even when the index is absent. */
++		scale_bits = encoding >> 6;
++		if (index_reg != 4)
 +			index = &regs[wide ? 3 : 2][index_reg];
-+			scale_bits = encoding >> 6;
-+		}
 +	}
 +
 +	const bool push = opcode == 0xff, lea = opcode == 0x8d;
@@ -378,7 +379,7 @@ index e284469c..bd0f6c94 100644
  	}
  	insn->id = row->id;
  	*insn_size = insn->size = (uint16_t)length;
-@@ -93,9 +88,19 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -93,9 +89,19 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		memcpy(out, base->name, sizeof(base->name));
  		out += base->length;
  	}
@@ -400,7 +401,7 @@ index e284469c..bd0f6c94 100644
  		memcpy(out, ", ", 2);
  		memcpy(out + 2, reg->name, sizeof(reg->name));
  	}
-@@ -106,7 +111,9 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -106,7 +112,9 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		cs_x86_op *mem = &x->operands[load ? 1 : 0];
  		mem->type = X86_OP_MEM;
  		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
@@ -411,7 +412,7 @@ index e284469c..bd0f6c94 100644
  		mem->mem.disp = x->disp = displacement;
  		if (disp_size) {
  			x->encoding.disp_offset = (uint8_t)offset;
-@@ -115,7 +122,8 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -115,7 +123,8 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		if (sib) {
  			x->sib = code[offset - 1];
  			x->sib_base = mem->mem.base;
@@ -939,7 +940,7 @@ index a0ac6a5d..972d10e0 100644
  	std::cout << "\nstatic const uint16_t x86_shift_rows[2][3][8] = {\n";
  	for (const auto &mode : shifts) {
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index f7f0f913..d204080e 100644
+index 54e9f22d..f5f47bdd 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -8,6 +8,7 @@
@@ -950,7 +951,7 @@ index f7f0f913..d204080e 100644
  #include <stdexcept>
  #include <string>
  #include <vector>
-@@ -310,6 +311,276 @@ void emit_legacy_registers(Decoder &wide)
+@@ -313,6 +314,276 @@ void emit_legacy_registers(Decoder &wide)
  		     static_cast<unsigned long long>(narrow.probes));
  }
  
@@ -1227,7 +1228,7 @@ index f7f0f913..d204080e 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -352,6 +623,10 @@ void emit_output(Decoder &decoder)
+@@ -355,6 +626,10 @@ void emit_output(Decoder &decoder)
  	}
  	std::puts("\tdefault: return NULL;\n\t}\n}");
  	emit_vex_indexed(decoder);
@@ -1239,7 +1240,7 @@ index f7f0f913..d204080e 100644
  }
  }
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index c6969cc3..a93e8e49 100644
+index c6969cc3..8feedbf7 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -427,6 +427,189 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
@@ -1248,7 +1249,7 @@ index c6969cc3..a93e8e49 100644
  
 +static bool check_indexed_memory(csh handles[2], cs_mode mode)
 +{
-+	const uint8_t opcodes[] = { 0x88, 0x89, 0x8a, 0x8b, 0x8d };
++	const uint8_t opcodes[] = { 0x88, 0x89, 0x8a, 0x8b, 0x8d, 0xff };
 +	for (unsigned p = 0; p <= (mode == CS_MODE_64 ? 16u : 0u); ++p)
 +		for (unsigned o = 0; o < sizeof(opcodes); ++o)
 +			for (unsigned mod = 0; mod < 3; ++mod)
