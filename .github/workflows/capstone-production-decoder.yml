@@ -1,7 +1,7 @@
-name: Verify native NeverD with Capstone-owned XBEGIN targets and displacement widths
+name: Measure production NeverD iterator selection at initialization and text changes
 on:
   push:
-    branches: [codex/capstone-canonical-x86-product]
+    branches: [codex/neverd-iterator-selected-at-init]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 78210f23e22f2292250acc84135de5067684e32d
+          ref: 2abf73caa1f0f180ea498d58396424f42bfc9746
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:

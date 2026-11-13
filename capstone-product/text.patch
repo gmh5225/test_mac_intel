@@ -1,0 +1,49 @@
+diff --git a/include/neverd/decode/Decoder.h b/include/neverd/decode/Decoder.h
+index 93b59045bd..5efe3a8f38 100644
+--- a/include/neverd/decode/Decoder.h
++++ b/include/neverd/decode/Decoder.h
+@@ -431,6 +431,7 @@ private:
+   std::unique_ptr<ARMLifter> ARM;
+   std::unique_ptr<AArch64Lifter> AArch64;
+   std::unique_ptr<MIPSLifter> MIPS;
++  decltype(&cs_disasm_iter) DisasmIter = cs_disasm_iter;
+ };
+ 
+ } // namespace neverd
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index e21615a13d..3ebaba5fe1 100644
+--- a/lib/decode/Decoder.cpp
++++ b/lib/decode/Decoder.cpp
+@@ -12,6 +12,7 @@
+ #include "neverd/decode/Decoder.h"
+ 
+ #include "DecoderDetail.h"
++#include "X86ScanAdapter.h"
+ 
+ #include "neverd/ArchSupport.h"
+ #include "neverd/ir/intrinsics/Intrinsics.h"
+@@ -193,6 +194,7 @@ bool Decoder::initWithMIPSRevision(Arch TheArch, InstructionMode Mode,
+     closeHandle(Handle, TargetArch);
+ 
+   Handle = NewHandle;
++  DisasmIter = CsArch == CS_ARCH_X86 ? X86_disasmIter : cs_disasm_iter;
+   InsnBuf = NewInsnBuf;
+   TargetArch = TheArch;
+   CurrentMode = Mode;
+@@ -328,7 +330,7 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
+   const uint8_t *Code = Bytes;
+   size_t Remaining = Len;
+   uint64_t PC = Addr;
+-  if (cs_disasm_iter(Handle, &Code, &Remaining, &PC, InsnBuf))
++  if (DisasmIter(Handle, &Code, &Remaining, &PC, InsnBuf))
+     return true;
+   return !VectorPool && decodeArchitectureFallback(Bytes, Len, Addr);
+ }
+@@ -411,6 +413,7 @@ void Decoder::setText(bool On) {
+   if (MicroASEHandle)
+     cs_option(MicroASEHandle, CS_OPT_TEXT, On ? CS_OPT_ON : CS_OPT_OFF);
+   Text = On;
++  DisasmIter = X86 && On ? X86_disasmIter : cs_disasm_iter;
+ }
+ 
+ void Decoder::liftToLow(const DecodedInsn &Insn, std::vector<LowOp> &Ops,

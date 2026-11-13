@@ -1,3 +1,17 @@
+diff --git a/include/neverd/decode/Decoder.h b/include/neverd/decode/Decoder.h
+index 93b59045bd..5efe3a8f38 100644
+--- a/include/neverd/decode/Decoder.h
++++ b/include/neverd/decode/Decoder.h
+@@ -431,6 +431,7 @@ private:
+   std::unique_ptr<ARMLifter> ARM;
+   std::unique_ptr<AArch64Lifter> AArch64;
+   std::unique_ptr<MIPSLifter> MIPS;
++  decltype(&cs_disasm_iter) DisasmIter = cs_disasm_iter;
+ };
+ 
+ } // namespace neverd
+diff --git a/lib/decode/Decoder.cpp b/lib/decode/Decoder.cpp
+index e21615a13d..1dc588ecae 100644
 --- a/lib/decode/Decoder.cpp
 +++ b/lib/decode/Decoder.cpp
 @@ -12,6 +12,7 @@
@@ -8,15 +22,15 @@
  
  #include "neverd/ArchSupport.h"
  #include "neverd/ir/intrinsics/Intrinsics.h"
-@@ -201,6 +202,7 @@
-   Detail = true;
-   Text = true;
-   X86 = std::move(NewX86);
-+  DisasmIter = X86 ? X86_disasmIter : cs_disasm_iter;
-   ARM = std::move(NewARM);
-   AArch64 = std::move(NewAArch64);
-   MIPS = std::move(NewMIPS);
-@@ -328,7 +330,7 @@
+@@ -193,6 +194,7 @@ bool Decoder::initWithMIPSRevision(Arch TheArch, InstructionMode Mode,
+     closeHandle(Handle, TargetArch);
+ 
+   Handle = NewHandle;
++  DisasmIter = CsArch == CS_ARCH_X86 ? X86_disasmIter : cs_disasm_iter;
+   InsnBuf = NewInsnBuf;
+   TargetArch = TheArch;
+   CurrentMode = Mode;
+@@ -328,7 +330,7 @@ Decoder::decodePhysical(const uint8_t *Bytes, size_t Len, va_t Addr) {
    const uint8_t *Code = Bytes;
    size_t Remaining = Len;
    uint64_t PC = Addr;
@@ -25,90 +39,3 @@
      return true;
    return !VectorPool && decodeArchitectureFallback(Bytes, Len, Addr);
  }
-@@ -411,6 +413,7 @@
-   if (MicroASEHandle)
-     cs_option(MicroASEHandle, CS_OPT_TEXT, On ? CS_OPT_ON : CS_OPT_OFF);
-   Text = On;
-+  DisasmIter = Text && X86 ? X86_disasmIter : cs_disasm_iter;
- }
- 
- void Decoder::liftToLow(const DecodedInsn &Insn, std::vector<LowOp> &Ops,
---- a/include/neverd/decode/Decoder.h
-+++ b/include/neverd/decode/Decoder.h
-@@ -426,6 +426,7 @@
-   bool Strict = true;
-   bool Detail = true;
-   bool Text = true;
-+  decltype(&cs_disasm_iter) DisasmIter = cs_disasm_iter;
- 
-   std::unique_ptr<X86Lifter> X86;
-   std::unique_ptr<ARMLifter> ARM;
---- a/lib/decode/X86/X86Decoder.cpp
-+++ b/lib/decode/X86/X86Decoder.cpp
-@@ -212,13 +212,29 @@
- }
- 
- void Decoder::fixupX86DecodeMetadata(cs_insn *I) const {
--  fixupX86MpxDetail(I);
--  fixupX86DisplacementDetail(I);
-+  switch (I->id) {
-+  case X86_INS_BNDCL:
-+  case X86_INS_BNDCU:
-+  case X86_INS_BNDCN:
-+  case X86_INS_BNDMK:
-+  case X86_INS_BNDMOV:
-+  case X86_INS_BNDLDX:
-+  case X86_INS_BNDSTX:
-+    fixupX86MpxDetail(I);
-+    break;
-+  default:
-+    break;
-+  }
-+  if (!Detail || !Text || !I->detail)
-+    return;
-+  if (TargetArch == Arch::X64) {
-+    fixupX86DisplacementDetail(I);
-+    return;
-+  }
-   // The pinned Capstone sign-extends XBEGIN using the address size in i386,
-   // not the encoded immediate size. Normalize only that known decoder
-   // representation before CFG consumers or lifting see the fallback.
--  if (TargetArch != Arch::X86 || !Detail || !Text || !I || !I->detail ||
--      I->id != X86_INS_XBEGIN)
-+  if (I->id != X86_INS_XBEGIN)
-     return;
-   const auto E =
-       x86TransactionBeginEncoding({I->bytes, I->size}, I->address, false);
-@@ -247,8 +263,7 @@
-   // Correct that metadata once, before relocation ownership and form audits
-   // consume it. Do not reinterpret genuine i386 disp16, moffs, compressed
-   // disp8 or an instruction decoded without populated operand detail.
--  if (TargetArch != Arch::X64 || !Detail || !Text || !I || !I->detail ||
--      !I->size || I->size > 15)
-+  if (!I->size || I->size > 15)
-     return;
-   auto &X = I->detail->x86;
-   auto &E = X.encoding;
---- a/lib/decode/X86/X86MpxDecoder.cpp
-+++ b/lib/decode/X86/X86MpxDecoder.cpp
-@@ -101,20 +101,6 @@
- }
- 
- void Decoder::fixupX86MpxDetail(cs_insn *Insn) const {
--  if (!X86 || !Insn)
--    return;
--  switch (Insn->id) {
--  case X86_INS_BNDCL:
--  case X86_INS_BNDCU:
--  case X86_INS_BNDCN:
--  case X86_INS_BNDMK:
--  case X86_INS_BNDMOV:
--  case X86_INS_BNDLDX:
--  case X86_INS_BNDSTX:
--    break;
--  default:
--    return;
--  }
-   if (Insn->size > sizeof(Insn->bytes))
-     return;
-   const auto E = decodeX86MpxEncoding({Insn->bytes, Insn->size}, TargetArch);
