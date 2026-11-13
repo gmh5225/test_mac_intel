@@ -1,7 +1,7 @@
-name: Verify and measure canonical broadcast operand and register details on standalone
+name: Measure REX stack outputs in real AMD64 libraries and PE32 controls on standalone
 on:
   push:
-    branches: [codex/capstone-corrected-broadcast-standalone]
+    branches: [codex/capstone-rex-stack-records-standalone]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -44,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: corrected-broadcast-standalone-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
+          name: rex-stack-standalone-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
