@@ -43,7 +43,7 @@ def main(w):
     for label in ('integer','aa','output'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/'dispatch.patch']
+        patches=[r/('baseline.patch' if label=='integer' else 'dispatch.patch')]
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
@@ -52,13 +52,19 @@ def main(w):
         if label=='output':
             assert objects['integer'].keys()==objects[label].keys()
             changed={n for n in objects[label] if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/ARM/ARMInstPrinter.c.o','arch/X86/X86Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsDisassembler.c.o','arch/Mips/MipsMapping.c.o',*('arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput'))}
-            if not (os.environ["CC"]=="gcc" and platform.machine()=="x86_64"):
-                expected={"arch/X86/"+n+".c.o" for n in ("X86VectorOutput","X86DisassemblerDecoder","X86Mapping","X86OutputIterator")}
+            expected={'arch/X86/X86DisassemblerDecoder.c.o'}
             assert changed==expected,(changed,expected)
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        symbols=sp.check_output(['nm','-S','--defined-only',target],text=True)
+        hot={v.split()[3]:v.split()[:2] for v in symbols.splitlines() if len(v.split())==4 and v.split()[3] in ('cs_disasm_iter','decodeLegacyPrefixedResult','decodeGenericScan','X86_disasmIter','X86_trySimpleOutput')}
+        save('hot-symbols-'+label+'.json',hot)
+        import gzip
+        for symbol in sorted(hot):
+            insns=sp.check_output(['objdump','-d','--disassemble='+symbol,target])
+            (p/'evidence'/(symbol+'-'+label+'.asm.gz')).write_bytes(gzip.compress(insns))
+
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
@@ -92,7 +98,7 @@ def main(w):
                     executable=exe.get(label,exe['integer']);port='capstone' if label in exe else label
                     ident=name+'-'+str(mode)+'-'+label
                     raw=w/(ident+'.callgrind')
-                    args=['valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(w/(ident+'.log')),executable,port,str(mode),'3',f,intervals,str(bits)]
+                    args=['valgrind','--tool=callgrind','--instr-atstart=no','--branch-sim=yes','--cache-sim=yes','--callgrind-out-file='+str(raw),'--log-file='+str(w/(ident+'.log')),executable,port,str(mode),'3',f,intervals,str(bits)]
                     result=list(map(int,sp.check_output(args,text=True).split()))
                     if ref is None:ref=result[2:5]
                     assert result[2:5]==ref

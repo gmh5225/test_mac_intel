@@ -52,6 +52,34 @@ index 1cb04b92..44471169 100644
  
  $(OBJDIR)/%.o: %.c
  	@mkdir -p $(@D)
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index cbaebc8f..bc81cee8 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -906,7 +906,13 @@ void AArch64_set_instr_map_data(MCInst *MI)
+ 	map_groups(MI, aarch64_insns);
+ }
+ 
+-#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
++#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || \
++	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
++#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
++#endif
++
++#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
+ /* These A64 classes have no reserved operand encodings. For a text-free
+  * scan, the table's internal opcode suffices for the normal public mapper. */
+ static unsigned scanImmediateOpcode(uint32_t word)
+@@ -938,7 +944,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			    MCInst *MI, uint16_t *size, uint64_t address,
+ 			    void *info)
+ {
+-#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
++#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
+ 	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
+ 	    MI->csh->disasm == AArch64_getInstruction) {
+ 		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
 index ebe301e2..afe37a02 100644
 --- a/arch/ARM/ARMInstPrinter.c
@@ -538,6 +566,59 @@ index d3566525..d6775ef0 100644
  #define MIPS_DIRECT_MAPPING
  #endif
  
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..6e53751a 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -334,7 +334,7 @@ __attribute__((noinline))
+ #endif
+ static int
+ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+-		      size_t code_len, cs_mode mode,
++		      size_t code_len, cs_mode mode, MCInst *scan, uint16_t *size,
+ 		      bool *scalar_compare_p2_normalized,
+ 		      uint8_t *original_scalar_compare_p2)
+ {
+@@ -582,6 +582,12 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 		}
+ 	}
+ 
++	/* The scan readers validate and translate each operand together. When
++	 * normalization changed any bytes, restore the original EVEX fields
++	 * before translation as required by the raw decoder. */
++	if (scan && decode_code == code)
++		return decodeInstructionScan(insn, code, code_len, mode, scan,
++					     size);
+ 	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
+ 
+ 	/* No further byte reads follow decoding; keep the input pointer valid
+@@ -639,11 +645,15 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	bool result;
+ 
+ 	InternalInstruction insn = { 0 };
+-	if (extension_opcode == 0x62)
++	const bool scan = scanOnly || (handle->no_text && !handle->detail_opt);
++	if (extension_opcode == 0x62) {
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
++					    scan ? instr : NULL, size,
+ 					    &scalar_compare_p2_normalized,
+ 					    &original_scalar_compare_p2);
+-	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
++		if (ret == X86_SCAN_COMPLETE)
++			return true;
++	} else if (scan) {
+ 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
+ 					    instr, size);
+ 		if (ret != X86_SCAN_RAW_READY)
+@@ -664,7 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 		*size = (uint16_t)insn.length;
+ 
+ 		prepareTranslation(&insn);
+-		if (scanOnly || (handle->no_text && !handle->detail_opt))
++		if (scan)
+ 			return !translateInstruction(instr, &insn, false);
+ 		result = operands_ready ||
+ 			 !translateInstruction(instr, &insn, true);
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
 index ae1554b0..da53269e 100644
 --- a/arch/X86/X86Disassembler.h
@@ -560,7 +641,7 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 01559e08..95aeb972 100644
+index 01559e08..d150a151 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -573,15 +654,105 @@ index 01559e08..95aeb972 100644
  #define X86_COMPACT_PUBLIC_HEADER
  #endif
  
-@@ -3366,6 +3367,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+@@ -3147,6 +3148,70 @@ static bool decodeGenericScan(const uint8_t *code, size_t code_len,
+ 	return X86_completeScan(instr, &insn, size);
+ }
+ 
++#ifdef X86_COMPACT_PUBLIC_HEADER
++/* The selected row describes both the public ID and all encoded operands.
++ * Address width controls ModR/M and SIB extents. The independent immediate
++ * class includes the size of an absolute memory offset. */
++X86_DECODE_INLINE int scanPublicTerminalExtent(const uint8_t *code, size_t size,
++					       unsigned end, uint64_t decision,
++					       bool address16, unsigned size_class,
++					       unsigned *id, uint16_t *length)
++{
++	const bool needs_modrm =
++		(decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
++	uint8_t modrm = 0;
++	if (needs_modrm) {
++		if (end >= size)
++			return X86_SCAN_INVALID;
++		modrm = code[end];
++	}
++	uint32_t terminal;
++	if (!selectPublicTerminal(decision, modrm, &terminal))
++		return X86_SCAN_INVALID;
++	const unsigned uid = terminal & X86_TERMINAL_UID_MASK;
++	if (!uid)
++		return X86_SCAN_INVALID;
++	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) &
++				 X86_TERMINAL_OPERAND_MASK;
++	if (needs_modrm || (pattern & 1)) {
++		if (!needs_modrm) {
++			if (end >= size)
++				return X86_SCAN_INVALID;
++			modrm = code[end];
++		}
++		++end;
++		if (modrm < 0xc0) {
++			const unsigned mod = modrm >> 6, rm = modrm & 7;
++			if (address16) {
++				static const uint8_t displacement[] = { 0, 1,
++									2 };
++				end += displacement[mod] +
++				       ((modrm & 0xc7) == 6 ? 2 : 0);
++			} else {
++				static const uint8_t extra[3][8] = {
++					{ 0, 0, 0, 0, 1, 4, 0, 0 },
++					{ 1, 1, 1, 1, 2, 1, 1, 1 },
++					{ 4, 4, 4, 4, 5, 4, 4, 4 }
++				};
++				if ((modrm & 0xc7) == 4) {
++					if (end >= size)
++						return X86_SCAN_INVALID;
++					if ((code[end] & 7) == 5)
++						end += 4;
++				}
++				end += extra[mod][rm];
++			}
++		}
++	}
++	end += x86LegacyImmediateBytes[size_class][pattern >> 1];
++	if (end > size || end > 15)
++		return X86_SCAN_INVALID;
++	*id = uid;
++	*length = (uint16_t)end;
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
+ X86_DECODE_INLINE int
+ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 		      unsigned *instructionID, uint16_t *size, bool publicID,
+@@ -3196,6 +3261,18 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 	const uint64_t decision = legacyTerminalDecision(&insn, true, publicID);
+ 	if (!decision)
+ 		return X86_SCAN_NOT_HANDLED;
++#ifdef X86_COMPACT_PUBLIC_HEADER
++	if (publicID) {
++		/* Rows zero through two are the ordinary 16/32/64-bit sizes.
++		 * A size prefix can change immediate and address widths independently. */
++		const unsigned size_class = insn.immediateSize == 2 ?
++			(insn.addressSize == 2 ? 0 : insn.addressSize == 4 ? 3 : 4) :
++			(insn.addressSize == 2 ? 5 : insn.addressSize == 4 ? 1 : 2);
++		return scanPublicTerminalExtent(code, code_len, insn.readerCursor,
++						decision, insn.addressSize == 2,
++						size_class, instructionID, size);
++	}
++#endif
+ 	int result = decodeLegacyTerminal(&insn, NULL, size, decision, true,
+ 					  publicID ? instructionID : NULL,
+ 					  readerFlags);
+@@ -3366,6 +3443,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
  			return true;
  		}
  	}
 +#endif
 +#ifdef CAPSTONE_X86_VECTOR_OUTPUT
 +	/* Only complete ordinary forms verified by the full decoder have rows.
-+	 * The adapter above still owns its callback and all misses use the
-+	 * feature decoder's original order, including malformed prefixes. */
++     * The adapter above still owns its callback and all misses use the
++     * feature decoder's original order, including malformed prefixes. */
 +	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
 +	    handle->insn_id == X86_get_insn_id &&
 +	    X86_scanEvexOutputForm(code, code_len, result))
@@ -589,6 +760,117 @@ index 01559e08..95aeb972 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+@@ -3546,59 +3632,9 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 		x86LegacyPublicDecisions[row][escaped][opcode];
+ 	if (!decision)
+ 		return X86_SCAN_NOT_HANDLED;
+-	const bool needs_modrm =
+-		(decision & (X86_TERMINAL_INDEXED | X86_TERMINAL_SPLIT)) != 0;
+-	uint8_t modrm = 0;
+-	if (needs_modrm) {
+-		if (end >= size)
+-			return X86_SCAN_INVALID;
+-		modrm = code[end];
+-	}
+-	uint32_t terminal;
+-	if (!selectPublicTerminal(decision, modrm, &terminal))
+-		return X86_SCAN_INVALID;
+-	const unsigned uid = terminal & X86_TERMINAL_UID_MASK;
+-	if (!uid)
+-		return X86_SCAN_INVALID;
+-	const unsigned pattern = (terminal >> X86_TERMINAL_OPERAND_SHIFT) &
+-				 X86_TERMINAL_OPERAND_MASK;
+-	if (needs_modrm || (pattern & 1)) {
+-		if (!needs_modrm) {
+-			if (end >= size)
+-				return X86_SCAN_INVALID;
+-			modrm = code[end];
+-		}
+-		++end;
+-		if (modrm < 0xc0) {
+-			const unsigned mod = modrm >> 6, rm = modrm & 7;
+-			if (mode == CS_MODE_16) {
+-				static const uint8_t displacement[] = { 0, 1,
+-									2 };
+-				end += displacement[mod] +
+-				       ((modrm & 0xc7) == 6 ? 2 : 0);
+-			} else {
+-				static const uint8_t extra[3][8] = {
+-					{ 0, 0, 0, 0, 1, 4, 0, 0 },
+-					{ 1, 1, 1, 1, 2, 1, 1, 1 },
+-					{ 4, 4, 4, 4, 5, 4, 4, 4 }
+-				};
+-				if ((modrm & 0xc7) == 4) {
+-					if (end >= size)
+-						return X86_SCAN_INVALID;
+-					if ((code[end] & 7) == 5)
+-						end += 4;
+-				}
+-				end += extra[mod][rm];
+-			}
+-		}
+-	}
+ 	const unsigned size_class = wide ? 2 : mode == CS_MODE_16 ? 0 : 1;
+-	end += x86LegacyImmediateBytes[size_class][pattern >> 1];
+-	if (end > size || end > 15)
+-		return X86_SCAN_INVALID;
+-	*id = uid;
+-	*length = (uint16_t)end;
+-	return X86_SCAN_COMPLETE;
++	return scanPublicTerminalExtent(code, size, end, decision,
++					mode == CS_MODE_16, size_class, id, length);
+ }
+ #endif
+ 
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..14aefc93 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -707,8 +707,8 @@ enum X86DecodeScanResult {
+  * mcInst retains raw decoding with only 0/-1 results. Only RAW_READY promises
+  * a materialized raw instruction; COMPLETE supplies the finished scan output.
+  * The caller selects scan
+- * after extension dispatch; EVEX remains raw so the backend keeps its existing
+- * prefix normalization and restoration order. */
++ * after extension dispatch. EVEX encodings that need prefix normalization
++ * use the raw decoder until their original fields have been restored. */
+ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+ 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+ 			  uint16_t *size);
+diff --git a/arch/X86/X86GenLegacyTerminal.inc b/arch/X86/X86GenLegacyTerminal.inc
+index dcaf2508..035a3e7c 100644
+--- a/arch/X86/X86GenLegacyTerminal.inc
++++ b/arch/X86/X86GenLegacyTerminal.inc
+@@ -7070,10 +7070,13 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ };
+ 
+ #ifdef X86_COMPACT_PUBLIC_HEADER
+-static const uint8_t x86LegacyImmediateBytes[3][10] = {
++static const uint8_t x86LegacyImmediateBytes[][10] = {
+ 	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
+ 	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
+ 	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++	{ 0, 1, 2, 4, 4, 2, 3, 4, 8, 4 },
++	{ 0, 1, 2, 4, 8, 2, 3, 4, 8, 4 },
++	{ 0, 1, 4, 6, 2, 2, 3, 4, 8, 8 },
+ };
+ 
+ X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)
+@@ -14435,10 +14438,13 @@ static const uint64_t x86LegacyPublicDecisions[X86_TERMINAL_ROW_COUNT][2][256] X
+ };
+ 
+ #ifdef X86_COMPACT_PUBLIC_HEADER
+-static const uint8_t x86LegacyImmediateBytes[3][10] = {
++static const uint8_t x86LegacyImmediateBytes[][10] = {
+ 	{ 0, 1, 2, 4, 2, 2, 3, 4, 8, 4 },
+ 	{ 0, 1, 4, 6, 4, 2, 3, 4, 8, 8 },
+ 	{ 0, 1, 4, 6, 8, 2, 3, 4, 8, 8 },
++	{ 0, 1, 2, 4, 4, 2, 3, 4, 8, 4 },
++	{ 0, 1, 2, 4, 8, 2, 3, 4, 8, 4 },
++	{ 0, 1, 4, 6, 2, 2, 3, 4, 8, 8 },
+ };
+ 
+ X86_DECODE_INLINE bool selectPublicTerminal(uint64_t decision, uint8_t modrm, uint32_t *terminal)
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..92c55fd2 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
@@ -750,7 +1032,7 @@ index 1d237cd1..4bb68e90 100644
 +	},
 +};
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 461ae5e4..98c4ee93 100644
+index 461ae5e4..193740cc 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
 @@ -4907,39 +4907,68 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
@@ -768,7 +1050,7 @@ index 461ae5e4..98c4ee93 100644
 +		return X86_FEATURE_NOT_HANDLED;
 +	case 2: {
 +		/* Several promoted families reject a truncated EVEX opcode. After
-+		 * the opcode is present only handlers for that opcode can match. */
++         * the opcode is present only handlers for that opcode can match. */
 +		if (code_len - offset < 5)
 +			return X86_FEATURE_INVALID;
 +		const uint8_t op = code[offset + 4];
@@ -1419,34 +1701,6 @@ index 6df1472d..6865a739 100644
  		op->mem.disp = x->disp = displacement;
  		op->access = (cs_ac_type)row->access[1];
  	}
-diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index b883b547..7e83a308 100644
---- a/cs_disasm_internal.h
-+++ b/cs_disasm_internal.h
-@@ -178,6 +178,8 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 
- 	const bool scan = use_x86_scan(handle);
- 	insn->address = *address;
-+	/* SoftFail belongs to the current instruction, including after reuse. */
-+	insn->illegal = false;
- #ifdef CAPSTONE_DIET
- 	// zero out mnemonic & op_str
- 	insn->mnemonic[0] = '\0';
-@@ -213,7 +215,13 @@ CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
- 	// whether that pointer is set, so a decode without detail hides it, as
- 	// cs_disasm() never allocates it then; the detail is left as it was.
- 	detail = insn->detail;
--	if (CS_DECODE_LIKELY(!handle->detail_opt))
-+	if (!detail && !handle->detail_opt) {
-+		r = cs_disasm_iter_body(handle, code, size, address, insn);
-+		if (CS_DECODE_UNLIKELY(insn->detail != NULL))
-+			insn->detail = NULL;
-+		return r;
-+	}
-+	if (!handle->detail_opt)
- 		insn->detail = NULL;
- 	r = cs_disasm_iter_body(handle, code, size, address, insn);
- 	insn->detail = detail;
 diff --git a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py b/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
 index 1dd31e59..37010f31 100755
 --- a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
@@ -1560,6 +1814,21 @@ index 30482037..29a72009 100644
              output.append(emit(name, nodes, width, w))
              counts.append((name, len(nodes)))
          for w, width in sorted(set(inputs.values())):
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..b8b0a864 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -951,8 +951,8 @@ def emit_terminal(suffix):
+         f"readImmediateImpl(insn, {width}, false)": width
+         for width in IMMEDIATES.values()
+     }
+-    lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
+-    for size, address_size in ((2, 2), (4, 4), (4, 8)):
++    lines.append("static const uint8_t x86LegacyImmediateBytes[][" + str(len(public_tails)) + "] = {")
++    for size, address_size in ((2, 2), (4, 4), (4, 8), (2, 4), (2, 8), (4, 2)):
+         extents = []
+         for tail in public_tails:
+             total, immediate = 0, size
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 index ccc4f0de..e0fc9ad0 100644
 --- a/suite/synctools/x86_simple_output.cpp
@@ -2128,86 +2397,6 @@ index 834c2488..0163d27f 100644
  }
  }
  
-diff --git a/tests/unit/api.c b/tests/unit/api.c
-index 46b3e78d..af447bec 100644
---- a/tests/unit/api.c
-+++ b/tests/unit/api.c
-@@ -77,11 +77,75 @@ static bool test_iterator_allocation(void)
- 	return cs_option(0, CS_OPT_MEM, (size_t)&mem) == CS_ERR_OK && ok;
- }
- 
-+static bool check_iterator_status(cs_arch arch, cs_mode mode)
-+{
-+	const uint8_t x86[] = { 0x90 };
-+	/* These are the ARM SoftFail and legal UDF from issues #2703 and #1991. */
-+	const uint8_t arm[] = { 0x07, 0xb0, 0xbd, 0xe8, 0xf0, 0x00, 0xf0, 0xe7 };
-+	if (!cs_support(arch))
-+		return true;
-+	csh handle;
-+	if (cs_open(arch, mode, &handle) != CS_ERR_OK)
-+		return false;
-+	bool ok = true;
-+	for (unsigned detail = 0; detail < 2; ++detail) {
-+		if (cs_option(handle, CS_OPT_DETAIL,
-+			      detail ? CS_OPT_ON : CS_OPT_OFF) != CS_ERR_OK) {
-+			ok = false;
-+			break;
-+		}
-+		cs_insn *record = cs_malloc(handle);
-+		if (!record) {
-+			ok = false;
-+			break;
-+		}
-+		if (record->illegal || record->is_alias ||
-+		    record->usesAliasDetails || record->alias_id)
-+			ok = false;
-+		for (unsigned text = 0; text < 2; ++text) {
-+			if (cs_option(handle, CS_OPT_TEXT,
-+				      text ? CS_OPT_ON : CS_OPT_OFF) !=
-+			    CS_ERR_OK) {
-+				ok = false;
-+				break;
-+			}
-+			const uint8_t *cursor = arch == CS_ARCH_ARM ? arm : x86;
-+			size_t left = arch == CS_ARCH_ARM ? sizeof(arm) :
-+							    sizeof(x86);
-+			uint64_t ip = 0x1000;
-+			record->illegal = true;
-+			if (!cs_disasm_iter(handle, &cursor, &left, &ip,
-+					    record)) {
-+				ok = false;
-+				break;
-+			}
-+			if (arch == CS_ARCH_ARM) {
-+				if (!record->illegal ||
-+				    !cs_disasm_iter(handle, &cursor, &left, &ip,
-+						    record) ||
-+				    record->illegal)
-+					ok = false;
-+			} else if (record->is_alias ||
-+				   record->usesAliasDetails ||
-+				   record->illegal || record->alias_id) {
-+				ok = false;
-+			}
-+			if (left)
-+				ok = false;
-+		}
-+		cs_free(record, 1);
-+	}
-+	cs_close(&handle);
-+	return ok;
-+}
-+
- int main()
- {
- 	bool result = true;
- 	result &= test_cs_mem_setup_fail();
- 	result &= test_iterator_allocation();
-+	result &= check_iterator_status(CS_ARCH_ARM, CS_MODE_ARM);
-+	result &= check_iterator_status(CS_ARCH_X86, CS_MODE_64);
- 
- 	if (result) {
- 		printf("All tests passed.\n");
 diff --git a/tests/unit/x86_scan_adapter.c b/tests/unit/x86_scan_adapter.c
 index a352123c..b3ae8053 100644
 --- a/tests/unit/x86_scan_adapter.c

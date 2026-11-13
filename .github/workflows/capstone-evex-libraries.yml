@@ -1,7 +1,7 @@
-name: Compare a named Callgrind measurement for each native decode, text and detail loop
+name: Isolate i386 prefix scan work, simulated cache events and emitted machine code on identical real function boundaries
 on:
   push:
-    branches: [codex/capstone-measured-callgrind-epochs]
+    branches: [codex/capstone-i386-prefix-work-and-layout]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,6 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: gcc }
+          - { host: ubuntu-22.04, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -39,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: measured-epoch-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: compact-prefix-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
