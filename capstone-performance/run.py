@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published c92f6f103e0123790f574c05a2a57f7203e7a461',candidate='bounded VEX opcode and operand extents'))
+    write('comparison.json',dict(baseline='published c92f6f103e0123790f574c05a2a57f7203e7a461',candidate='ordered register lists for binary write/read records'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert diffs==['arch/X86/X86DisassemblerDecoder.c.o'],diffs
+    assert diffs==['arch/X86/X86Mapping.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
@@ -237,8 +237,8 @@ panic = "abort"
     command([WORK/'evex-unit'],'verify-full-vector-records')
     command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'vector-scan.cpp','-ldl','-o',WORK/'vector-scan'],'build-vector-scan')
     command([WORK/'vector-scan',libraries['base'],libraries['new']],'verify-vector-scan')
-    command(['clang++','-O2','-std=c++17','-I',base/'include',SOURCE/'verify-vex.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',WORK/'verify-vex'],'build-verify-vex')
-    command([WORK/'verify-vex',libraries['base'],libraries['new'],'quick'],'verify-vex')
+    command(['clang','-std=gnu11','-O2','-I',base/'include',SOURCE/'verify-reg-access.c','-ldl','-o',WORK/'verify-access'],'build-access')
+    command([WORK/'verify-access',libraries['base'],libraries['new']],'verify-access')
     flag_records = []
     for label in ('base','new'):
         tree = WORK / label
