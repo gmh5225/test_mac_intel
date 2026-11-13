@@ -1,7 +1,7 @@
-name: Qualify dedicated AArch64 defaults and mixed binary identity on mixed
+name: Repeat real AArch64 ls formatting with independent macOS machines and A/A controls
 on:
   push:
-    branches: [codex/capstone-dedicated-aarch64-defaults-mixed]
+    branches: [codex/capstone-aarch64-macos-repeat]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,18 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, archs: aarch64 }
-          - { host: macos-15, cc: clang, archs: four }
-          - { host: macos-15-intel, cc: clang, archs: aarch64 }
-          - { host: macos-15-intel, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: aarch64 }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: aarch64 }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: aarch64 }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: aarch64 }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
+          - { host: macos-15, cc: clang, archs: aarch64, repeat: 1 }
+          - { host: macos-15, cc: clang, archs: aarch64, repeat: 2 }
+          - { host: macos-15-intel, cc: clang, archs: aarch64, repeat: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -46,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: dedicated-aarch64-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: macos-repeat-${{ matrix.repeat }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
