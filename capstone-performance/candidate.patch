@@ -1,8 +1,19 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 33536219..1e9237ad 100644
+index 33536219..308e4a6b 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -167,7 +167,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
+@@ -158,6 +158,10 @@ if(capstone_enabled_architectures STREQUAL "X86")
+     add_compile_definitions(CAPSTONE_X86_ONLY)
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "MIPS")
++    add_compile_definitions(CAPSTONE_MIPS_ONLY)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "RISCV")
+     add_compile_definitions(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
+ endif()
+@@ -167,7 +171,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
  endif()
  
  if(capstone_enabled_architectures STREQUAL "AARCH64")
@@ -11,15 +22,15 @@ index 33536219..1e9237ad 100644
  endif()
  
  # Dedicated builds of these backends use their generated mnemonic tries.
-@@ -444,7 +444,17 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -444,7 +448,17 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86InstPrinterCommon.c
          arch/X86/X86Mapping.c
          arch/X86/X86Module.c
 +        arch/X86/X86OutputIterator.c
 +        arch/X86/X86VectorOutput.c
      )
-+    # Generic x64 GCC lowers the fixed public buffers to REP STOS and REP MOVS.
-+    # Give short copies and clears the usual scalar/vector or libc expansion.
++    # Use scalar/vector stores or libc for the fixed public output buffers.
++    # Generic x64 GCC otherwise emits REP STOS even for the short clears.
 +    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
 +       AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
 +       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
@@ -30,10 +41,21 @@ index 33536219..1e9237ad 100644
      # even a compact scan a very large probed stack frame.
      if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
 diff --git a/Makefile b/Makefile
-index d7536526..69b80602 100644
+index d7536526..f8b3e8a9 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -128,7 +128,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
+@@ -119,6 +119,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ CFLAGS += -DCAPSTONE_X86_ONLY
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
++CFLAGS += -DCAPSTONE_MIPS_ONLY
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),riscv)
+ CFLAGS += -DCAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
+ endif
+@@ -128,7 +132,7 @@ CFLAGS += -DCAPSTONE_SPARC_SHORT_STATE_REGISTER_NAMES
  endif
  
  ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
@@ -42,7 +64,7 @@ index d7536526..69b80602 100644
  endif
  
  ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
-@@ -248,6 +248,8 @@ endif
+@@ -248,6 +252,8 @@ endif
  endif
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Mapping.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Module.o
@@ -51,6 +73,25 @@ index d7536526..69b80602 100644
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
  endif
  
+@@ -641,6 +647,18 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
+ 
++# Match the Release x86-only formatter tuning for the compiler's target.
++ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++ifneq (,$(filter -O2 -O3,$(CFLAGS)))
++X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
++    awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
++         $$2 == "__GNUC__" { gcc=1 } $$2 == "__clang__" { clang_cc=1 } \
++         $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
++         END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
++$(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
++endif
++endif
++
+ $(OBJDIR)/%.o: %.c
+ 	@mkdir -p $(@D)
+ ifeq ($(V),0)
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
 index 0d9018a8..a269b603 100644
 --- a/arch/AArch64/AArch64Mapping.c
@@ -106,21 +147,81 @@ index 0d9018a8..a269b603 100644
  	AArch64_init_cs_detail(MI);
  	DecodeStatus Result = AArch64_LLVM_getInstruction(
  		handle, code, code_len, MI, size, address, info);
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index 84222bfa..160678be 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -288,6 +288,58 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ {
+ 	uint64_t size64;
+ 	Mips_init_cs_detail(instr);
++/* The dedicated scan shortens the ordinary table walk on Linux AArch64
++ * hosts without adding work to the time-critical formatted path on x64. */
++#if defined(CAPSTONE_MIPS_ONLY) && defined(__linux__) && defined(__aarch64__) && \
++    defined(__GNUC__)
++	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
++	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
++	    instr->csh->disasm == Mips_getInstruction &&
++	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
++		/* For these standard immediate and load/store encodings all
++		 * register and immediate bits are operands. */
++		const unsigned major = readBytes32(instr, code) >> 26;
++		unsigned opcode = 0;
++		switch (major) {
++		case 9:
++			opcode = Mips_ADDiu;
++			break;
++		case 12:
++			opcode = Mips_ANDi;
++			break;
++		case 13:
++			opcode = Mips_ORi;
++			break;
++		case 14:
++			opcode = Mips_XORi;
++			break;
++		case 25:
++			if (mode == CS_MODE_MIPS64)
++				opcode = Mips_DADDiu;
++			break;
++		case 35:
++			opcode = Mips_LW;
++			break;
++		case 43:
++			opcode = Mips_SW;
++			break;
++		case 55:
++			if (mode == CS_MODE_MIPS64)
++				opcode = Mips_LD;
++			break;
++		case 63:
++			if (mode == CS_MODE_MIPS64)
++				opcode = Mips_SD;
++			break;
++		}
++		if (opcode) {
++			MCInst_setOpcode(instr, opcode);
++			map_cs_id(instr, mips_insns, ARR_SIZE(mips_insns));
++			*size = 4;
++			return true;
++		}
++	}
++#endif
+ 	instr->MRI = (MCRegisterInfo *)info;
+ 	map_set_fill_detail_ops(instr, true);
+ 
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index 97b899b5..aedc72c2 100644
+index 97b899b5..3c446815 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -20,6 +20,19 @@
+@@ -20,6 +20,16 @@
  #include "../../MCRegisterInfo.h"
  #include "X86DisassemblerDecoderCommon.h"
  
-+#if defined(CAPSTONE_X86_ONLY) && !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+#include "../../cs_priv.h"
-+#define CAPSTONE_X86_DEDICATED_EVEX_SCAN
-+#endif
-+
-+#if defined(CAPSTONE_X86_DEDICATED_EVEX_SCAN) && defined(__linux__) && \
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
 +	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(_KERNEL_MODE)
++#include "../../cs_priv.h"
 +#define CAPSTONE_X86_DEDICATED_OUTPUT
 +CAPSTONE_INTERNAL bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code,
 +					 size_t size, cs_insn *insn,
@@ -130,12 +231,11 @@ index 97b899b5..aedc72c2 100644
  bool X86_getInstruction(csh handle, const uint8_t *code, size_t code_len,
  			MCInst *instr, uint16_t *size, uint64_t address,
  			void *info);
-@@ -37,6 +50,12 @@ typedef struct X86ScanResult {
+@@ -37,6 +47,11 @@ typedef struct X86ScanResult {
  	uint8_t popcode_adjust;
  } X86ScanResult;
  
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE)
-+#include "../../cs_priv.h"
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +CAPSTONE_INTERNAL bool X86_tryEvexScan(const uint8_t *code, size_t size,
 +				       X86ScanResult *result);
 +#endif
@@ -144,17 +244,17 @@ index 97b899b5..aedc72c2 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..997a24d0 100644
+index 90ef6e93..235d4659 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2942,6 +2942,13 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	return 0;
  }
  
-+/* GCC materializes the full reader state for common legacy headers on
-+ * dedicated Linux x86 decoders.  The public scan needs only ID and length. */
++/* GCC materializes the general legacy reader state on these Linux hosts.
++ * The generated terminal row already provides the public ID and extent. */
 +#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
-+    !defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
++    !defined(__clang__) && (defined(__x86_64__) || defined(__aarch64__))
 +#define X86_COMPACT_PUBLIC_HEADER
 +#endif
 +
@@ -166,8 +266,8 @@ index 90ef6e93..997a24d0 100644
  		}
  	}
 +#endif
-+#ifdef CAPSTONE_X86_DEDICATED_EVEX_SCAN
-+	/* Give an installed scan adapter the first opportunity to classify EVEX. */
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
++	/* An installed scan adapter has precedence over the EVEX terminal rows. */
 +	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
 +	    handle->insn_id == X86_get_insn_id &&
 +	    X86_tryEvexScan(code, code_len, result))
@@ -1019,10 +1119,10 @@ index 00000000..9534fd9d
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
 new file mode 100644
-index 00000000..e8ca7b94
+index 00000000..9dd38104
 --- /dev/null
 +++ b/arch/X86/X86OutputIterator.c
-@@ -0,0 +1,394 @@
+@@ -0,0 +1,373 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1243,7 +1343,7 @@ index 00000000..e8ca7b94
 +			if ((opcode & 0xfc) != 0x88 || modrm >= 0x80)
 +				return false;
 +			/* ESP, RSP and R12 require a SIB. Redundant encodings with other
-+             * bases can expose EIZ or RIZ in the ordinary public output. */
++			 * bases can expose EIZ or RIZ in the ordinary public output. */
 +			if (rm == 4 && (size < 3u + has_rex || (rex & 2) ||
 +					code[2 + has_rex] != 0x24))
 +				return false;
@@ -1390,44 +1490,23 @@ index 00000000..e8ca7b94
 +{
 +#ifdef CS_DECODE_TRY_OUTPUT
 +	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+	if (handle && handle->arch == CS_ARCH_X86) {
-+		if (!handle->no_text)
-+			return cs_disasm_iter_core(ud, code, size, address,
-+						   insn);
-+#ifndef CAPSTONE_X86_ONLY
-+		X86ScanResult result;
-+		if (handle->mode == CS_MODE_64 && *size >= 6 &&
-+		    **code == 0x62 && !handle->detail_opt &&
-+		    handle->insn_id == X86_get_insn_id &&
-+#ifdef CAPSTONE_X86_SCAN_ADAPTER
-+		    !handle->x86_scan_adapter &&
-+#endif
-+		    X86_tryEvexScan(*code, *size, &result)) {
-+			handle->errnum = CS_ERR_OK;
-+			insn->address = *address;
-+			finish_x86_scan(handle, insn, &result, *code, false,
-+					true);
-+			cs_disasm_iter_advance(code, size, address,
-+					       result.length);
-+			return true;
-+		}
-+#endif
-+	}
++	if (handle && handle->arch == CS_ARCH_X86 && !handle->no_text)
++		return cs_disasm_iter_core(ud, code, size, address, insn);
 +#endif
 +	return cs_disasm_iter(ud, code, size, address, insn);
 +}
 +#endif
 diff --git a/arch/X86/X86ScanAdapter.h b/arch/X86/X86ScanAdapter.h
-index 99a0800e..11e5b3a6 100644
+index 99a0800e..ff9a2542 100644
 --- a/arch/X86/X86ScanAdapter.h
 +++ b/arch/X86/X86ScanAdapter.h
 @@ -34,6 +34,12 @@ X86ScanBatchResult X86_scanBatch(csh handle, const uint8_t *code, size_t size,
  uint16_t X86_scanCallTarget(csh handle, const uint8_t *code, size_t size,
  			    uint64_t address, uint64_t *target);
  
-+/* Private static-link iterator for x86 consumers. Uses the
++/* Private static-link iterator for x86 consumers that request text. Uses the
 + * same options, cursor, errors, callbacks and public records as cs_disasm_iter.
-+ * Other architectures use cs_disasm_iter directly. */
++ * Other architectures and text-free scans use cs_disasm_iter directly. */
 +bool X86_disasmIter(csh handle, const uint8_t **code, size_t *size,
 +		    uint64_t *address, cs_insn *insn);
 +
@@ -1555,21 +1634,17 @@ index 00000000..cc5aa9f7
 +#endif
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
 new file mode 100644
-index 00000000..22c8d600
+index 00000000..217e6fd6
 --- /dev/null
 +++ b/arch/X86/X86VectorOutput.c
-@@ -0,0 +1,279 @@
+@@ -0,0 +1,275 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#ifdef CAPSTONE_HAS_X86
 +#include "../../cs_priv.h"
-+#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	(defined(CAPSTONE_X86_ONLY) || \
-+	 (defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	  !defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	  !defined(_WIN32_WCE)))
 +#include "X86Disassembler.h"
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +#include "X86GenEvexScan.inc"
 +/* An unprefixed EVEX packet has its ModR/M at byte five. Only immutable
 + * public IDs of ordinary vector register or base/index addresses are used. */
@@ -1854,7 +1929,7 @@ index e9785f4a..59a88cf8 100644
  #ifdef CAPSTONE_HAS_X86
  	if (handle->arch == CS_ARCH_X86)
 diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
-index 0a4c959f..3b555da5 100644
+index 0a4c959f..b883b547 100644
 --- a/cs_disasm_internal.h
 +++ b/cs_disasm_internal.h
 @@ -116,7 +116,7 @@ CS_DECODE_INLINE void fill_insn_without_text(cs_insn *insn, unsigned opcode_pub,
@@ -1866,7 +1941,7 @@ index 0a4c959f..3b555da5 100644
   * implementation. Other users retain the normal private decoder entry. */
  #ifndef CS_DECODE_SCAN
  #define CS_DECODE_SCAN X86_getInstructionScanResult
-@@ -158,11 +158,23 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+@@ -158,6 +158,10 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
  		return true;
  #endif
  	}
@@ -1877,30 +1952,6 @@ index 0a4c959f..3b555da5 100644
  #endif
  	return cs_decode_full_insn(handle, code, size, insn, insn_size, batch);
  }
- #undef CS_DECODE_SCAN
- 
-+CS_DECODE_INLINE void cs_disasm_iter_advance(const uint8_t **code, size_t *size,
-+					     uint64_t *address, uint16_t length)
-+{
-+	*code += length;
-+	*size -= length;
-+	*address += length;
-+}
-+
- CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 					  const uint8_t **code, size_t *size,
- 					  uint64_t *address, cs_insn *insn)
-@@ -182,9 +194,7 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
- 
- 	r = decode_insn(handle, *code, *size, insn, &insn_size, scan, false);
- 	if (CS_DECODE_LIKELY(r)) {
--		*code += insn_size;
--		*size -= insn_size;
--		*address += insn_size;
-+		cs_disasm_iter_advance(code, size, address, insn_size);
- 	} else {
- 		return cs_disasm_iter_skipdata(handle, code, size, address,
- 					       insn);
 diff --git a/suite/synctools/x86_evex_tables.cpp b/suite/synctools/x86_evex_tables.cpp
 new file mode 100644
 index 00000000..d138d08a
@@ -2869,9 +2920,18 @@ index 00000000..257b1f9f
 +		  << '\n';
 +}
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index e42caf08..908b0266 100644
+index e42caf08..4a17e366 100644
 --- a/tests/unit/CMakeLists.txt
 +++ b/tests/unit/CMakeLists.txt
+@@ -27,7 +27,7 @@ if(CAPSTONE_SPARC_SUPPORT AND Python3_Interpreter_FOUND)
+         COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/sparc_state_register_names.py" --check)
+ endif()
+ if(CAPSTONE_MIPS_SUPPORT)
+-    list(APPEND UNIT_TEST_SOURCES mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
++    list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+    OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_SPARC_SUPPORT
 @@ -63,7 +63,7 @@ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
      list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
  endif()
@@ -3022,6 +3082,122 @@ index 00000000..0f827721
 +			       check_mode(CS_MODE_BIG_ENDIAN) ?
 +		       0 :
 +		       1;
++}
+diff --git a/tests/unit/mips_scan.c b/tests/unit/mips_scan.c
+new file mode 100644
+index 00000000..c9d51a88
+--- /dev/null
++++ b/tests/unit/mips_scan.c
+@@ -0,0 +1,110 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <stdio.h>
++#include <string.h>
++#include "../../cs_priv.h"
++
++/* An installed decoder callback can inspect the decoded MC operands. It
++ * also gives these tests the ordinary table decoder as an independent path. */
++static Disasm_t ordinary;
++static unsigned operand_count;
++
++static bool inspect_operands(csh handle, const uint8_t *code, size_t length,
++			     MCInst *inst, uint16_t *size, uint64_t address,
++			     void *info)
++{
++	bool ok = ordinary(handle, code, length, inst, size, address, info);
++	operand_count = MCInst_getNumOperands(inst);
++	return ok;
++}
++
++static bool compare(csh handles[2], uint32_t word, bool big_endian,
++		    size_t length, bool has_operands)
++{
++	uint8_t code[4];
++	for (unsigned i = 0; i < 4; ++i)
++		code[big_endian ? 3 - i : i] = (uint8_t)(word >> (8 * i));
++	const uint8_t *cursor[2] = { code, code };
++	size_t left[2] = { length, length };
++	uint64_t pc[2] = { UINT64_MAX - 2, UINT64_MAX - 2 };
++	cs_insn insn[2];
++	cs_detail detail[2];
++	bool ok[2];
++	for (unsigned i = 0; i < 2; ++i) {
++		memset(&insn[i], 0xa5, sizeof(insn[i]));
++		memset(&detail[i], 0x5a, sizeof(detail[i]));
++		insn[i].is_alias = insn[i].usesAliasDetails = insn[i].illegal =
++			false;
++		insn[i].detail = &detail[i];
++		ok[i] = cs_disasm_iter(handles[i], &cursor[i], &left[i], &pc[i],
++				       &insn[i]);
++		if (insn[i].detail != &detail[i])
++			return false;
++		insn[i].detail = NULL;
++	}
++	if (ok[0] == ok[1] && left[0] == left[1] && pc[0] == pc[1] &&
++	    cursor[0] == cursor[1] &&
++	    cs_errno(handles[0]) == cs_errno(handles[1]) &&
++	    !memcmp(&insn[0], &insn[1], sizeof(cs_insn)) &&
++	    !memcmp(&detail[0], &detail[1], sizeof(cs_detail)) &&
++	    (!has_operands || (ok[1] && operand_count > 0)))
++		return true;
++	fprintf(stderr, "MIPS scan mismatch for %08x, length %zu, %s-endian\n",
++		(unsigned)word, length, big_endian ? "big" : "little");
++	return false;
++}
++
++static bool check_mode(cs_mode mode)
++{
++	static const uint32_t words[] = {
++		0x24080001, 0x3128ffff, 0x35080000,
++		0x3928ffff, 0x8fa80000, 0xafa8fffc,
++	};
++	static const uint32_t others[] = {
++		0x6508ffff, 0xdfa80000, 0xffa8fffc, 0x10000002,
++		0,	    0x03e00008, 0xffffffff,
++	};
++	csh handles[2] = { 0 };
++	bool success = false, big_endian = (mode & CS_MODE_BIG_ENDIAN) != 0;
++	for (unsigned i = 0; i < 2; ++i)
++		if (cs_open(CS_ARCH_MIPS, mode, &handles[i]))
++			goto done;
++	cs_struct *reference = (cs_struct *)(uintptr_t)handles[1];
++	ordinary = reference->disasm;
++	reference->disasm = inspect_operands;
++	for (unsigned options = 0; options < 4; ++options) {
++		for (unsigned i = 0; i < 2; ++i)
++			if (cs_option(handles[i], CS_OPT_TEXT,
++				      options & 1 ? CS_OPT_ON : CS_OPT_OFF) ||
++			    cs_option(handles[i], CS_OPT_DETAIL,
++				      options & 2 ? CS_OPT_ON : CS_OPT_OFF))
++				goto done;
++		for (unsigned i = 0; i < sizeof(words) / sizeof(words[0]); ++i)
++			for (size_t length = 0; length <= 4; ++length)
++				if (!compare(handles, words[i], big_endian,
++					     length, length == 4))
++					goto done;
++		for (unsigned i = 0; i < sizeof(others) / sizeof(others[0]);
++		     ++i)
++			if (!compare(handles, others[i], big_endian, 4, false))
++				goto done;
++	}
++	success = true;
++done:
++	for (unsigned i = 0; i < 2; ++i)
++		if (handles[i])
++			cs_close(&handles[i]);
++	return success;
++}
++
++int main(void)
++{
++	const cs_mode modes[] = { CS_MODE_MIPS32, CS_MODE_MIPS64,
++				  CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN,
++				  CS_MODE_MIPS64 | CS_MODE_BIG_ENDIAN };
++	for (unsigned i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
++		if (!check_mode(modes[i]))
++			return 1;
++	return 0;
 +}
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 new file mode 100644
