@@ -1,7 +1,7 @@
-name: Verify host-qualified A32, MIPS and x86 in eight GNU profiles
+name: Verify full, reduced, DIET and adapter configurations with GCC 11 and 13
 on:
   push:
-    branches: [codex/capstone-a32-x86-mips-release-profiles]
+    branches: [codex/capstone-two-backend-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-all-three-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: two-backend-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
