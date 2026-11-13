@@ -1,7 +1,7 @@
-name: Verify complete operand output and compare gains over the preceding writers on profiles
+name: Verify expanded operand records with an isolated fallback in profiles
 on:
   push:
-    branches: [codex/capstone-expanded-operands-profiles]
+    branches: [codex/capstone-expanded-placement-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: expanded-operands-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: expanded-placement-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
