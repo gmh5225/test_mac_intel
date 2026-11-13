@@ -1,8 +1,8 @@
 diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
-index f19dc990..0dcc999e 100644
+index f19dc990..fce3091c 100644
 --- a/xcode/Capstone.xcodeproj/project.pbxproj
 +++ b/xcode/Capstone.xcodeproj/project.pbxproj
-@@ -39,6 +39,21 @@
+@@ -39,30 +39,51 @@
  		DC474F8319DE6F6B00BCA449 /* capstone.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24BE19DDCE2F00EF8EA9 /* capstone.h */; settings = {ATTRIBUTES = (Public, ); }; };
  		DC474F8419DE6F6B00BCA449 /* mips.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24BF19DDCE2F00EF8EA9 /* mips.h */; settings = {ATTRIBUTES = (Public, ); }; };
  		DC474F8519DE6F6B00BCA449 /* platform.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24C019DDCE2F00EF8EA9 /* platform.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -24,7 +24,9 @@ index f19dc990..0dcc999e 100644
  		DC474F8619DE6F6B00BCA449 /* ppc.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24C119DDCE2F00EF8EA9 /* ppc.h */; settings = {ATTRIBUTES = (Public, ); }; };
  		DC474F8719DE6F6B00BCA449 /* sparc.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24C219DDCE2F00EF8EA9 /* sparc.h */; settings = {ATTRIBUTES = (Public, ); }; };
  		DC474F8819DE6F6B00BCA449 /* systemz.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24C319DDCE2F00EF8EA9 /* systemz.h */; settings = {ATTRIBUTES = (Public, ); }; };
-@@ -48,21 +63,28 @@
+ 		DC474F8919DE6F6B00BCA449 /* x86.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24C419DDCE2F00EF8EA9 /* x86.h */; settings = {ATTRIBUTES = (Public, ); }; };
+ 		DC474F8A19DE6F6B00BCA449 /* xcore.h in Headers */ = {isa = PBXBuildFile; fileRef = DCFE24C519DDCE2F00EF8EA9 /* xcore.h */; settings = {ATTRIBUTES = (Public, ); }; };
+-		DC474F8C19DE6F8000BCA449 /* libcapstone.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DCFE23BD19DDCC2D00EF8EA9 /* libcapstone.a */; };
  		DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249D19DDCDEE00EF8EA9 /* cs.c */; };
  		DC474F8E19DE6FCD00BCA449 /* MCInst.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249E19DDCDEE00EF8EA9 /* MCInst.c */; };
  		DC474F8F19DE6FCD00BCA449 /* MCInstrDesc.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */; };
@@ -53,7 +55,7 @@ index f19dc990..0dcc999e 100644
  		DC474F9F19DE6FDA00BCA449 /* ARMInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23F619DDCD8700EF8EA9 /* ARMInstPrinter.c */; };
  		DC474FA019DE6FDA00BCA449 /* ARMMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23F819DDCD8700EF8EA9 /* ARMMapping.c */; };
  		DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23FA19DDCD8700EF8EA9 /* ARMModule.c */; };
-@@ -75,10 +97,12 @@
+@@ -75,10 +96,12 @@
  		DC474FA819DE6FDA00BCA449 /* PPCMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241219DDCD8700EF8EA9 /* PPCMapping.c */; };
  		DC474FA919DE6FDA00BCA449 /* PPCModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241419DDCD8700EF8EA9 /* PPCModule.c */; };
  		DC474FAA19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241819DDCD8700EF8EA9 /* SparcDisassembler.c */; };
@@ -66,7 +68,7 @@ index f19dc990..0dcc999e 100644
  		DC474FAF19DE6FDA00BCA449 /* SystemZInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE242C19DDCD8800EF8EA9 /* SystemZInstPrinter.c */; };
  		DC474FB019DE6FDA00BCA449 /* SystemZMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE242E19DDCD8800EF8EA9 /* SystemZMapping.c */; };
  		DC474FB119DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243019DDCD8800EF8EA9 /* SystemZMCTargetDesc.c */; };
-@@ -86,6 +110,8 @@
+@@ -86,6 +109,8 @@
  		DC474FB319DE6FDA00BCA449 /* X86ATTInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243419DDCD8800EF8EA9 /* X86ATTInstPrinter.c */; };
  		DC474FB419DE6FDA00BCA449 /* X86Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */; };
  		E20687B68603755AFC5F87F6 /* X86OutputIterator.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B56000BA9634450923573AB /* X86OutputIterator.c */; };
@@ -75,7 +77,7 @@ index f19dc990..0dcc999e 100644
  		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
  		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
  		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
-@@ -98,10 +124,13 @@
+@@ -98,10 +123,13 @@
  		DC474FBC19DE6FDA00BCA449 /* XCoreModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE245419DDCD8800EF8EA9 /* XCoreModule.c */; };
  		DC474FBD19DE6FDA00BCA449 /* AArch64BaseInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23DE19DDCD8700EF8EA9 /* AArch64BaseInfo.c */; };
  		DC474FBE19DE6FDA00BCA449 /* AArch64Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23E019DDCD8700EF8EA9 /* AArch64Disassembler.c */; };
@@ -89,7 +91,7 @@ index f19dc990..0dcc999e 100644
  		DC474FC319DE6FDA00BCA449 /* ARMInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23F619DDCD8700EF8EA9 /* ARMInstPrinter.c */; };
  		DC474FC419DE6FDA00BCA449 /* ARMMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23F819DDCD8700EF8EA9 /* ARMMapping.c */; };
  		DC474FC519DE6FDA00BCA449 /* ARMModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23FA19DDCD8700EF8EA9 /* ARMModule.c */; };
-@@ -114,10 +143,12 @@
+@@ -114,10 +142,12 @@
  		DC474FCC19DE6FDA00BCA449 /* PPCMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241219DDCD8700EF8EA9 /* PPCMapping.c */; };
  		DC474FCD19DE6FDA00BCA449 /* PPCModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241419DDCD8700EF8EA9 /* PPCModule.c */; };
  		DC474FCE19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241819DDCD8700EF8EA9 /* SparcDisassembler.c */; };
@@ -102,7 +104,7 @@ index f19dc990..0dcc999e 100644
  		DC474FD319DE6FDA00BCA449 /* SystemZInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE242C19DDCD8800EF8EA9 /* SystemZInstPrinter.c */; };
  		DC474FD419DE6FDA00BCA449 /* SystemZMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE242E19DDCD8800EF8EA9 /* SystemZMapping.c */; };
  		DC474FD519DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243019DDCD8800EF8EA9 /* SystemZMCTargetDesc.c */; };
-@@ -125,6 +156,8 @@
+@@ -125,6 +155,8 @@
  		DC474FD719DE6FDA00BCA449 /* X86ATTInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243419DDCD8800EF8EA9 /* X86ATTInstPrinter.c */; };
  		DC474FD819DE6FDA00BCA449 /* X86Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */; };
  		2F86CB2757A1327E40D06205 /* X86OutputIterator.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B56000BA9634450923573AB /* X86OutputIterator.c */; };
@@ -111,7 +113,7 @@ index f19dc990..0dcc999e 100644
  		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
  		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
  		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
-@@ -156,10 +189,13 @@
+@@ -156,10 +188,13 @@
  		DCA3579E1BC2C0EB0094BB3F /* test_m68k.c in Sources */ = {isa = PBXBuildFile; fileRef = DCA3579D1BC2C0EB0094BB3F /* test_m68k.c */; };
  		DCFE245519DDCD9200EF8EA9 /* AArch64BaseInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23DE19DDCD8700EF8EA9 /* AArch64BaseInfo.c */; };
  		DCFE245619DDCD9200EF8EA9 /* AArch64Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23E019DDCD8700EF8EA9 /* AArch64Disassembler.c */; };
@@ -125,7 +127,7 @@ index f19dc990..0dcc999e 100644
  		DCFE246019DDCD9900EF8EA9 /* ARMInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23F619DDCD8700EF8EA9 /* ARMInstPrinter.c */; };
  		DCFE246119DDCD9900EF8EA9 /* ARMMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23F819DDCD8700EF8EA9 /* ARMMapping.c */; };
  		DCFE246219DDCD9900EF8EA9 /* ARMModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE23FA19DDCD8700EF8EA9 /* ARMModule.c */; };
-@@ -172,10 +208,12 @@
+@@ -172,10 +207,12 @@
  		DCFE247119DDCDA700EF8EA9 /* PPCMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241219DDCD8700EF8EA9 /* PPCMapping.c */; };
  		DCFE247219DDCDA700EF8EA9 /* PPCModule.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241419DDCD8700EF8EA9 /* PPCModule.c */; };
  		DCFE247719DDCDAD00EF8EA9 /* SparcDisassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE241819DDCD8700EF8EA9 /* SparcDisassembler.c */; };
@@ -138,7 +140,7 @@ index f19dc990..0dcc999e 100644
  		DCFE248019DDCDB700EF8EA9 /* SystemZInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE242C19DDCD8800EF8EA9 /* SystemZInstPrinter.c */; };
  		DCFE248119DDCDB700EF8EA9 /* SystemZMapping.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE242E19DDCD8800EF8EA9 /* SystemZMapping.c */; };
  		DCFE248219DDCDB700EF8EA9 /* SystemZMCTargetDesc.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243019DDCD8800EF8EA9 /* SystemZMCTargetDesc.c */; };
-@@ -183,6 +221,8 @@
+@@ -183,6 +220,8 @@
  		DCFE248919DDCDC000EF8EA9 /* X86ATTInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243419DDCD8800EF8EA9 /* X86ATTInstPrinter.c */; };
  		DCFE248A19DDCDC000EF8EA9 /* X86Disassembler.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */; };
  		2577BA5E41DF2459B4D95926 /* X86OutputIterator.c in Sources */ = {isa = PBXBuildFile; fileRef = 3B56000BA9634450923573AB /* X86OutputIterator.c */; };
@@ -147,7 +149,7 @@ index f19dc990..0dcc999e 100644
  		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
  		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
  		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
-@@ -196,6 +236,8 @@
+@@ -196,6 +235,8 @@
  		DCFE24A319DDCDEE00EF8EA9 /* cs.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249D19DDCDEE00EF8EA9 /* cs.c */; };
  		DCFE24A519DDCDEE00EF8EA9 /* MCInst.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249E19DDCDEE00EF8EA9 /* MCInst.c */; };
  		DCFE24A719DDCDEE00EF8EA9 /* MCInstrDesc.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */; };
@@ -156,7 +158,7 @@ index f19dc990..0dcc999e 100644
  		DCFE24A919DDCDEE00EF8EA9 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
  		DCFE24AB19DDCDEE00EF8EA9 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
  		DCFE24AD19DDCDEE00EF8EA9 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
-@@ -376,6 +418,7 @@
+@@ -376,6 +417,7 @@
  		DCFE23DE19DDCD8700EF8EA9 /* AArch64BaseInfo.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = AArch64BaseInfo.c; sourceTree = "<group>"; };
  		DCFE23DF19DDCD8700EF8EA9 /* AArch64BaseInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AArch64BaseInfo.h; sourceTree = "<group>"; };
  		DCFE23E019DDCD8700EF8EA9 /* AArch64Disassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = AArch64Disassembler.c; sourceTree = "<group>"; };
@@ -164,7 +166,7 @@ index f19dc990..0dcc999e 100644
  		DCFE23E119DDCD8700EF8EA9 /* AArch64Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AArch64Disassembler.h; sourceTree = "<group>"; };
  		DCFE23E219DDCD8700EF8EA9 /* AArch64GenAsmWriter.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = AArch64GenAsmWriter.inc; sourceTree = "<group>"; };
  		DCFE23E319DDCD8700EF8EA9 /* AArch64GenDisassemblerTables.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = AArch64GenDisassemblerTables.inc; sourceTree = "<group>"; };
-@@ -390,6 +433,8 @@
+@@ -390,6 +432,8 @@
  		DCFE23ED19DDCD8700EF8EA9 /* ARMAddressingModes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARMAddressingModes.h; sourceTree = "<group>"; };
  		DCFE23EE19DDCD8700EF8EA9 /* ARMBaseInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARMBaseInfo.h; sourceTree = "<group>"; };
  		DCFE23EF19DDCD8700EF8EA9 /* ARMDisassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = ARMDisassembler.c; sourceTree = "<group>"; };
@@ -173,7 +175,7 @@ index f19dc990..0dcc999e 100644
  		DCFE23F019DDCD8700EF8EA9 /* ARMDisassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ARMDisassembler.h; sourceTree = "<group>"; };
  		DCFE23F119DDCD8700EF8EA9 /* ARMGenAsmWriter.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = ARMGenAsmWriter.inc; sourceTree = "<group>"; };
  		DCFE23F219DDCD8700EF8EA9 /* ARMGenDisassemblerTables.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = ARMGenDisassemblerTables.inc; sourceTree = "<group>"; };
-@@ -428,6 +473,7 @@
+@@ -428,6 +472,7 @@
  		DCFE241519DDCD8700EF8EA9 /* PPCPredicates.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PPCPredicates.h; sourceTree = "<group>"; };
  		DCFE241719DDCD8700EF8EA9 /* Sparc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Sparc.h; sourceTree = "<group>"; };
  		DCFE241819DDCD8700EF8EA9 /* SparcDisassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SparcDisassembler.c; sourceTree = "<group>"; };
@@ -181,7 +183,7 @@ index f19dc990..0dcc999e 100644
  		DCFE241919DDCD8700EF8EA9 /* SparcDisassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SparcDisassembler.h; sourceTree = "<group>"; };
  		DCFE241A19DDCD8700EF8EA9 /* SparcGenAsmWriter.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = SparcGenAsmWriter.inc; sourceTree = "<group>"; };
  		DCFE241B19DDCD8700EF8EA9 /* SparcGenDisassemblerTables.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = SparcGenDisassemblerTables.inc; sourceTree = "<group>"; };
-@@ -440,6 +486,7 @@
+@@ -440,6 +485,7 @@
  		DCFE242219DDCD8800EF8EA9 /* SparcMapping.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SparcMapping.h; sourceTree = "<group>"; };
  		DCFE242319DDCD8800EF8EA9 /* SparcModule.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SparcModule.c; sourceTree = "<group>"; };
  		DCFE242519DDCD8800EF8EA9 /* SystemZDisassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = SystemZDisassembler.c; sourceTree = "<group>"; };
@@ -189,7 +191,7 @@ index f19dc990..0dcc999e 100644
  		DCFE242619DDCD8800EF8EA9 /* SystemZDisassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SystemZDisassembler.h; sourceTree = "<group>"; };
  		DCFE242719DDCD8800EF8EA9 /* SystemZGenAsmWriter.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = SystemZGenAsmWriter.inc; sourceTree = "<group>"; };
  		DCFE242819DDCD8800EF8EA9 /* SystemZGenDisassemblerTables.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = SystemZGenDisassemblerTables.inc; sourceTree = "<group>"; };
-@@ -457,6 +504,8 @@
+@@ -457,6 +503,8 @@
  		DCFE243519DDCD8800EF8EA9 /* X86BaseInfo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86BaseInfo.h; sourceTree = "<group>"; };
  		DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Disassembler.c; sourceTree = "<group>"; };
  		3B56000BA9634450923573AB /* X86OutputIterator.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86OutputIterator.c; sourceTree = "<group>"; };
@@ -198,7 +200,7 @@ index f19dc990..0dcc999e 100644
  		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
  		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
  		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
-@@ -491,6 +540,8 @@
+@@ -491,6 +539,8 @@
  		DCFE249D19DDCDEE00EF8EA9 /* cs.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cs.c; path = ../cs.c; sourceTree = "<group>"; };
  		DCFE249E19DDCDEE00EF8EA9 /* MCInst.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCInst.c; path = ../MCInst.c; sourceTree = "<group>"; };
  		DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCInstrDesc.c; path = ../MCInstrDesc.c; sourceTree = "<group>"; };
@@ -207,7 +209,7 @@ index f19dc990..0dcc999e 100644
  		DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCRegisterInfo.c; path = ../MCRegisterInfo.c; sourceTree = "<group>"; };
  		DCFE24A119DDCDEE00EF8EA9 /* SStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = SStream.c; path = ../SStream.c; sourceTree = "<group>"; };
  		DCFE24A219DDCDEE00EF8EA9 /* utils.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = utils.c; path = ../utils.c; sourceTree = "<group>"; };
-@@ -509,6 +560,21 @@
+@@ -509,6 +559,21 @@
  		DCFE24BE19DDCE2F00EF8EA9 /* capstone.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = capstone.h; sourceTree = "<group>"; };
  		DCFE24BF19DDCE2F00EF8EA9 /* mips.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = mips.h; sourceTree = "<group>"; };
  		DCFE24C019DDCE2F00EF8EA9 /* platform.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = platform.h; sourceTree = "<group>"; };
@@ -229,7 +231,15 @@ index f19dc990..0dcc999e 100644
  		DCFE24C119DDCE2F00EF8EA9 /* ppc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ppc.h; sourceTree = "<group>"; };
  		DCFE24C219DDCE2F00EF8EA9 /* sparc.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = sparc.h; sourceTree = "<group>"; };
  		DCFE24C319DDCE2F00EF8EA9 /* systemz.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = systemz.h; sourceTree = "<group>"; };
-@@ -719,6 +785,8 @@
+@@ -647,7 +712,6 @@
+ 			isa = PBXFrameworksBuildPhase;
+ 			buildActionMask = 2147483647;
+ 			files = (
+-				DC474F8C19DE6F8000BCA449 /* libcapstone.a in Frameworks */,
+ 			);
+ 			runOnlyForDeploymentPostprocessing = 0;
+ 		};
+@@ -719,6 +783,8 @@
  				DCFE249E19DDCDEE00EF8EA9 /* MCInst.c */,
  				DCFE24B619DDCE1E00EF8EA9 /* MCInst.h */,
  				DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */,
@@ -238,7 +248,7 @@ index f19dc990..0dcc999e 100644
  				DCFE24B719DDCE1E00EF8EA9 /* MCInstrDesc.h */,
  				DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */,
  				DCFE24B819DDCE1E00EF8EA9 /* MCRegisterInfo.h */,
-@@ -782,6 +850,7 @@
+@@ -782,6 +848,7 @@
  				DCFE23DE19DDCD8700EF8EA9 /* AArch64BaseInfo.c */,
  				DCFE23DF19DDCD8700EF8EA9 /* AArch64BaseInfo.h */,
  				DCFE23E019DDCD8700EF8EA9 /* AArch64Disassembler.c */,
@@ -246,7 +256,7 @@ index f19dc990..0dcc999e 100644
  				DCFE23E119DDCD8700EF8EA9 /* AArch64Disassembler.h */,
  				DCFE23E219DDCD8700EF8EA9 /* AArch64GenAsmWriter.inc */,
  				DCFE23E319DDCD8700EF8EA9 /* AArch64GenDisassemblerTables.inc */,
-@@ -803,6 +872,8 @@
+@@ -803,6 +870,8 @@
  				DCFE23ED19DDCD8700EF8EA9 /* ARMAddressingModes.h */,
  				DCFE23EE19DDCD8700EF8EA9 /* ARMBaseInfo.h */,
  				DCFE23EF19DDCD8700EF8EA9 /* ARMDisassembler.c */,
@@ -255,7 +265,7 @@ index f19dc990..0dcc999e 100644
  				DCFE23F019DDCD8700EF8EA9 /* ARMDisassembler.h */,
  				DCFE23F119DDCD8700EF8EA9 /* ARMGenAsmWriter.inc */,
  				DCFE23F219DDCD8700EF8EA9 /* ARMGenDisassemblerTables.inc */,
-@@ -862,6 +933,7 @@
+@@ -862,6 +931,7 @@
  			children = (
  				DCFE241719DDCD8700EF8EA9 /* Sparc.h */,
  				DCFE241819DDCD8700EF8EA9 /* SparcDisassembler.c */,
@@ -263,7 +273,7 @@ index f19dc990..0dcc999e 100644
  				DCFE241919DDCD8700EF8EA9 /* SparcDisassembler.h */,
  				DCFE241A19DDCD8700EF8EA9 /* SparcGenAsmWriter.inc */,
  				DCFE241B19DDCD8700EF8EA9 /* SparcGenDisassemblerTables.inc */,
-@@ -881,6 +953,7 @@
+@@ -881,6 +951,7 @@
  			isa = PBXGroup;
  			children = (
  				DCFE242519DDCD8800EF8EA9 /* SystemZDisassembler.c */,
@@ -271,7 +281,7 @@ index f19dc990..0dcc999e 100644
  				DCFE242619DDCD8800EF8EA9 /* SystemZDisassembler.h */,
  				DCFE242719DDCD8800EF8EA9 /* SystemZGenAsmWriter.inc */,
  				DCFE242819DDCD8800EF8EA9 /* SystemZGenDisassemblerTables.inc */,
-@@ -905,6 +978,8 @@
+@@ -905,6 +976,8 @@
  				DCFE243519DDCD8800EF8EA9 /* X86BaseInfo.h */,
  				DCFE243619DDCD8800EF8EA9 /* X86Disassembler.c */,
  				3B56000BA9634450923573AB /* X86OutputIterator.c */,
@@ -280,7 +290,7 @@ index f19dc990..0dcc999e 100644
  				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
  				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
  				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
-@@ -957,6 +1032,21 @@
+@@ -957,6 +1030,21 @@
  				0537EAAB1FC6286300F06BF9 /* m680x.h */,
  				DCFE24BF19DDCE2F00EF8EA9 /* mips.h */,
  				DCFE24C019DDCE2F00EF8EA9 /* platform.h */,
@@ -302,7 +312,7 @@ index f19dc990..0dcc999e 100644
  				DCFE24C119DDCE2F00EF8EA9 /* ppc.h */,
  				DCFE24C219DDCE2F00EF8EA9 /* sparc.h */,
  				DCFE24C319DDCE2F00EF8EA9 /* systemz.h */,
-@@ -981,6 +1071,21 @@
+@@ -981,6 +1069,21 @@
  				DC474F8319DE6F6B00BCA449 /* capstone.h in Headers */,
  				DC474F8419DE6F6B00BCA449 /* mips.h in Headers */,
  				DC474F8519DE6F6B00BCA449 /* platform.h in Headers */,
@@ -324,7 +334,7 @@ index f19dc990..0dcc999e 100644
  				DC474F8619DE6F6B00BCA449 /* ppc.h in Headers */,
  				DC474F8719DE6F6B00BCA449 /* sparc.h in Headers */,
  				DC474F8819DE6F6B00BCA449 /* systemz.h in Headers */,
-@@ -1527,15 +1632,21 @@
+@@ -1527,15 +1630,21 @@
  				DC474FDD19DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */,
  				DC474FD819DE6FDA00BCA449 /* X86Disassembler.c in Sources */,
  				2F86CB2757A1327E40D06205 /* X86OutputIterator.c in Sources */,
@@ -346,7 +356,7 @@ index f19dc990..0dcc999e 100644
  				DC474FC919DE6FDA00BCA449 /* MipsModule.c in Sources */,
  				DC474FC019DE6FDA00BCA449 /* AArch64Mapping.c in Sources */,
  				DC474FBF19DE6FDA00BCA449 /* AArch64InstPrinter.c in Sources */,
-@@ -1552,8 +1663,11 @@
+@@ -1552,8 +1661,11 @@
  				DCA357911BC2C0290094BB3F /* M68KModule.c in Sources */,
  				DC474FC419DE6FDA00BCA449 /* ARMMapping.c in Sources */,
  				DC474FC219DE6FDA00BCA449 /* ARMDisassembler.c in Sources */,
@@ -358,7 +368,7 @@ index f19dc990..0dcc999e 100644
  				DC474F9619DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */,
  				DC474F9419DE6FCD00BCA449 /* MCInst.c in Sources */,
  			);
-@@ -1601,20 +1715,28 @@
+@@ -1601,20 +1713,28 @@
  				DCFE247A19DDCDAD00EF8EA9 /* SparcModule.c in Sources */,
  				DCFE247819DDCDAD00EF8EA9 /* SparcInstPrinter.c in Sources */,
  				DCFE245F19DDCD9900EF8EA9 /* ARMDisassembler.c in Sources */,
@@ -387,7 +397,7 @@ index f19dc990..0dcc999e 100644
  				DCFE246019DDCD9900EF8EA9 /* ARMInstPrinter.c in Sources */,
  				DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */,
  				DCFE248219DDCDB700EF8EA9 /* SystemZMCTargetDesc.c in Sources */,
-@@ -1626,6 +1748,7 @@
+@@ -1626,6 +1746,7 @@
  				DCFE247219DDCDA700EF8EA9 /* PPCModule.c in Sources */,
  				DCFE249819DDCDD000EF8EA9 /* XCoreModule.c in Sources */,
  				DCFE245619DDCD9200EF8EA9 /* AArch64Disassembler.c in Sources */,
@@ -395,7 +405,7 @@ index f19dc990..0dcc999e 100644
  				DCFE245919DDCD9200EF8EA9 /* AArch64Module.c in Sources */,
  			);
  			runOnlyForDeploymentPostprocessing = 0;
-@@ -1653,15 +1776,21 @@
+@@ -1653,15 +1774,21 @@
  				DC474FB919DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */,
  				DC474FB419DE6FDA00BCA449 /* X86Disassembler.c in Sources */,
  				E20687B68603755AFC5F87F6 /* X86OutputIterator.c in Sources */,
@@ -417,7 +427,7 @@ index f19dc990..0dcc999e 100644
  				DC474FA519DE6FDA00BCA449 /* MipsModule.c in Sources */,
  				DC474F9C19DE6FDA00BCA449 /* AArch64Mapping.c in Sources */,
  				DC474F9B19DE6FDA00BCA449 /* AArch64InstPrinter.c in Sources */,
-@@ -1678,8 +1807,11 @@
+@@ -1678,8 +1805,11 @@
  				DCA357901BC2C0290094BB3F /* M68KModule.c in Sources */,
  				DC474FA019DE6FDA00BCA449 /* ARMMapping.c in Sources */,
  				DC474F9E19DE6FDA00BCA449 /* ARMDisassembler.c in Sources */,
@@ -429,7 +439,7 @@ index f19dc990..0dcc999e 100644
  				DC474F9019DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */,
  				DC474F8E19DE6FCD00BCA449 /* MCInst.c in Sources */,
  			);
-@@ -2754,12 +2886,12 @@
+@@ -2754,12 +2884,12 @@
  				GCC_OPTIMIZATION_LEVEL = 0;
  				GCC_PREPROCESSOR_DEFINITIONS = (
  					"CAPSTONE_HAS_ARM=1",
@@ -444,7 +454,7 @@ index f19dc990..0dcc999e 100644
  					"CAPSTONE_HAS_X86=1",
  					"CAPSTONE_HAS_XCORE=1",
  					"CAPSTONE_USE_SYS_DYN_MEM=1",
-@@ -2821,12 +2953,12 @@
+@@ -2821,12 +2951,12 @@
  				GCC_C_LANGUAGE_STANDARD = gnu99;
  				GCC_PREPROCESSOR_DEFINITIONS = (
  					"CAPSTONE_HAS_ARM=1",
@@ -459,7 +469,7 @@ index f19dc990..0dcc999e 100644
  					"CAPSTONE_HAS_X86=1",
  					"CAPSTONE_HAS_XCORE=1",
  					"CAPSTONE_USE_SYS_DYN_MEM=1",
-@@ -3107,12 +3239,12 @@
+@@ -3107,12 +3237,12 @@
  				GCC_OPTIMIZATION_LEVEL = 0;
  				GCC_PREPROCESSOR_DEFINITIONS = (
  					"CAPSTONE_HAS_ARM=1",
@@ -474,7 +484,7 @@ index f19dc990..0dcc999e 100644
  					"CAPSTONE_HAS_X86=1",
  					"CAPSTONE_HAS_XCORE=1",
  					"CAPSTONE_USE_SYS_DYN_MEM=1",
-@@ -3165,12 +3297,12 @@
+@@ -3165,12 +3295,12 @@
  				GCC_C_LANGUAGE_STANDARD = gnu99;
  				GCC_PREPROCESSOR_DEFINITIONS = (
  					"CAPSTONE_HAS_ARM=1",
@@ -489,7 +499,7 @@ index f19dc990..0dcc999e 100644
  					"CAPSTONE_HAS_X86=1",
  					"CAPSTONE_HAS_XCORE=1",
  					"CAPSTONE_USE_SYS_DYN_MEM=1",
-@@ -3222,12 +3354,12 @@
+@@ -3222,12 +3352,12 @@
  				GCC_OPTIMIZATION_LEVEL = 0;
  				GCC_PREPROCESSOR_DEFINITIONS = (
  					"CAPSTONE_HAS_ARM=1",
@@ -504,7 +514,7 @@ index f19dc990..0dcc999e 100644
  					"CAPSTONE_HAS_X86=1",
  					"CAPSTONE_HAS_XCORE=1",
  					"CAPSTONE_USE_SYS_DYN_MEM=1",
-@@ -3283,12 +3415,12 @@
+@@ -3283,12 +3413,12 @@
  				GCC_C_LANGUAGE_STANDARD = gnu99;
  				GCC_PREPROCESSOR_DEFINITIONS = (
  					"CAPSTONE_HAS_ARM=1",

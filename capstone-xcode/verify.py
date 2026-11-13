@@ -16,9 +16,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-xcode-integration-') as tmp:
         run(['git','apply',r/'shipping.patch'],'apply')
         run(command,'xcode')
         name={'CapstoneStatic':'libcapstone.a','CapstoneDynamic':'libcapstone.dylib','CapstoneFramework':'Capstone'}[target]
-        paths=[x for x in (t/'out').rglob(name) if x.is_file() and not x.is_symlink()]
-        assert len(paths)==1,paths
-        lib=paths[0]
+        lib=t/'out/Release'/('Capstone.framework/Versions/A/Capstone' if target=='CapstoneFramework' else name)
+        assert lib.is_file(),lib
         flags=['-F',t/'out/Release','-framework','Capstone'] if target=='CapstoneFramework' else ['-I',s/'include',lib]
         run(['xcrun','clang','-O2',r/'smoke.c',*flags,'-o',t/'smoke'],'consumer-link')
         env=os.environ.copy();env.update(DYLD_LIBRARY_PATH=str(lib.parent),DYLD_FRAMEWORK_PATH=str(t/'out/Release'))
