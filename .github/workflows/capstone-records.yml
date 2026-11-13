@@ -1,7 +1,7 @@
-name: Use production public scan and x86 text entry points for mixed paired controls
+name: Attribute the other-ISA timing shifts to image, slot and executed instructions
 on:
   push:
-    branches: [codex/capstone-gnu-exact-entry-executables]
+    branches: [codex/capstone-gnu-nonx86-image-counters]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -30,6 +30,8 @@ jobs:
           ref: ea3443bd943f583b65005dc1af9fae94850b6de7
           path: source
           persist-credentials: false
+      - name: Install execution counters
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
       - name: Compare complete ARM records and independent executables with A/A controls
         run: python3 capstone-records/measure.py
       - if: always()
@@ -37,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-exact-entry-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gnu-image-counters-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

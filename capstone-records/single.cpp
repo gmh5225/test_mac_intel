@@ -1,3 +1,4 @@
+#include <valgrind/callgrind.h>
 #include <algorithm>
 #include <chrono>
 #include <sys/resource.h>
@@ -185,7 +186,9 @@ int main(int argc, char **argv) {
     const Result expected = run(session, bytes, repeats);
     auto wall = std::chrono::steady_clock::now();
     double cpu = process_cpu_ns();
+    CALLGRIND_START_INSTRUMENTATION;
     const Result measured = run(session, bytes, repeats);
+    CALLGRIND_STOP_INSTRUMENTATION;
     cpu = process_cpu_ns() - cpu;
     double elapsed = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - wall).count();
     if (!equal(expected, measured)) throw std::runtime_error("sample mismatch");

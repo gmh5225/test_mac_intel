@@ -49,24 +49,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-x86.cpp','-ldl','-o',t/'verify-x86'],'build-x86-differential')
    run([t/'verify-x86',libs['base'],libs[key]],'x86-differential')
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
-  if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps):
-   return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
-  data=[]
-  for x in cases:
-   for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
-     seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-     for v in seq+seq[::-1]:
-      vout=sample(v,x,mode,n)
-      if reference is None:reference=(vout['first'],vout['result'])
-      assert reference==(vout['first'],vout['result'])
-      ticks[v].append(vout['cpu_ns'])
-     runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
+  from attribute import inspect
+  inspect(t,bins,cases,e)
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
