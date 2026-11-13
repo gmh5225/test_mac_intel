@@ -1,16 +1,16 @@
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index f869d85f..3f637c4a 100644
+index 1d0c9cca..3a1a9309 100644
 --- a/arch/X86/X86GenVectorOutput.inc
 +++ b/arch/X86/X86GenVectorOutput.inc
-@@ -72,3 +72,15 @@ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
+@@ -72,6 +72,18 @@ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
  		{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
  	},
  };
 +static const struct VectorOutputRow broadcast_rows[2][3] = {
 +	{
 +		{ 0 },
-+		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
-+		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 0 },
++		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++		{ X86_INS_VBROADCASTF32X4, "vbroadcastf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
 +	},
 +	{
 +		{ 0 },
@@ -18,11 +18,14 @@ index f869d85f..3f637c4a 100644
 +		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
 +	},
 +};
+ static const struct VectorOutputRow legacy_register_rows[] = {
+ 	{ 0 },
+ 	{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 3b1b7759..c8bd7ce9 100644
+index 4c9aeba4..f6f3e617 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -212,12 +212,105 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+@@ -269,6 +269,95 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	return true;
  }
  
@@ -117,8 +120,11 @@ index 3b1b7759..c8bd7ce9 100644
 +
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
- 			   const struct X86SimpleRegister *regs)
- {
+ 			   const struct X86SimpleRegister *regs, bool wide)
+@@ -276,8 +365,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (code[0] == 0x66)
+ 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+ 						 wide);
 -	if (code[0] == 0x62)
 +	if (code[0] == 0x62) {
 +		if (size >= 6 && code[5] < 0xc0)
@@ -130,11 +136,11 @@ index 3b1b7759..c8bd7ce9 100644
  }
  #endif
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 032db5d1..aa94d844 100644
+index f7f0f913..b6e4510a 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -197,6 +197,87 @@ void emit_vex_indexed(Decoder &decoder)
- 	std::puts("};");
+@@ -310,6 +310,87 @@ void emit_legacy_registers(Decoder &wide)
+ 		     static_cast<unsigned long long>(narrow.probes));
  }
  
 +/* Derive the unmasked EVEX.66.0F38 1A memory forms from the canonical
@@ -183,14 +189,14 @@ index 032db5d1..aa94d844 100644
 +			reg.type = X86_OP_REG;
 +			reg.reg = x86_reg(vec[ll] + 3);
 +			reg.size = uint8_t(16 << ll);
-+			reg.access = x.operands[0].access;
++			reg.access = CS_AC_WRITE;
 +			auto &mem = expect.operands[1];
 +			mem.type = X86_OP_MEM;
 +			mem.size = 16;
 +			mem.mem.base = X86_REG_RAX;
 +			mem.mem.scale = 1;
 +			mem.mem.disp = 16;
-+			mem.access = x.operands[1].access;
++			mem.access = CS_AC_READ;
 +			if (insn.illegal || insn.is_alias ||
 +			    insn.usesAliasDetails ||
 +			    std::strcmp(insn.mnemonic, mnemonic) ||
@@ -221,19 +227,19 @@ index 032db5d1..aa94d844 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -239,6 +320,7 @@ void emit_output(Decoder &decoder)
+@@ -352,6 +433,7 @@ void emit_output(Decoder &decoder)
  	}
  	std::puts("\tdefault: return NULL;\n\t}\n}");
  	emit_vex_indexed(decoder);
 +	emit_broadcast_rows(decoder);
+ 	emit_legacy_registers(decoder);
  }
  }
- 
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 5bd144d5..cc5ff3a7 100644
+index c6969cc3..3d51f523 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -286,6 +286,58 @@ static bool check_vex_indexed(csh handles[2])
+@@ -427,6 +427,58 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -292,9 +298,9 @@ index 5bd144d5..cc5ff3a7 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -306,7 +358,8 @@ static bool check_mode(cs_mode mode)
- 		    !check_mov_imm32(handles, mode) ||
+@@ -452,7 +504,8 @@ static bool check_mode(cs_mode mode)
  		    !check_sib_base_mov(handles, mode) ||
+ 		    !check_legacy_vectors(handles, mode) ||
  		    (mode == CS_MODE_64 &&
 -		     (!check_evex(handles) || !check_vex_indexed(handles))))
 +		     (!check_evex(handles) || (!check_broadcast(handles) ||

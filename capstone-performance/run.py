@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 706eab8fec07688db644fe64c9d82600592134f8',candidate='canonical SSE and immediate output'))
+    write('comparison.json',dict(baseline='published d843dcdf830e883697b348eff0ee47d99849ff90',candidate='unmasked memory broadcasts with canonical read and write effects'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
