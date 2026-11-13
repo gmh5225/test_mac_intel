@@ -1,7 +1,7 @@
-name: Verify the exact four-backend release on independent real PE and ELF images
+name: Validate default ARM markup handling and four-backend decode on PE and ELF sections
 on:
   push:
-    branches: [codex/capstone-four-backend-registers-next]
+    branches: [codex/capstone-four-arm-plain-markup]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: four-backend-next-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: verified-arm-markup-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
