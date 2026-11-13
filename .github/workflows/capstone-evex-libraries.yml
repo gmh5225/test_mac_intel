@@ -1,7 +1,7 @@
-name: Measure native vector dispatch beyond mixed GNU scanner and fixed formatter improvements
+name: Use production public scan and x86 text entry points for simd paired controls
 on:
   push:
-    branches: [codex/capstone-gnu-vector-delta]
+    branches: [codex/capstone-evex-exact-entry-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-vector-delta-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-exact-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
