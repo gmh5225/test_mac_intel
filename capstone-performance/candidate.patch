@@ -1,40 +1,102 @@
-diff --git a/cs.c b/cs.c
-index 6791f780..b2db69da 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1034,6 +1034,27 @@ static inline void fill_insn(struct cs_struct *handle, cs_insn *insn,
- #endif
- }
- 
-+/* Keep the full decoder's stack frame off generated-output hits, while
-+ * retaining the public iterator's scan code and private calling convention. */
-+#if defined(CAPSTONE_X86_DEDICATED_OUTPUT) && defined(__clang__) && defined(__x86_64__)
-+static __attribute__((noinline)) CS_PRESERVE_MOST bool
-+decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
-+		    cs_insn *insn, uint16_t *insn_size, bool batch);
-+
-+CS_PRESERVE_MOST bool
-+cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
-+		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
-+		return true;
-+	return decode_full_insn_body(handle, code, size, insn, insn_size, batch);
-+}
-+
-+static __attribute__((noinline)) CS_PRESERVE_MOST bool
-+decode_full_insn_body(cs_struct *handle, const uint8_t *code, size_t size,
-+		    cs_insn *insn, uint16_t *insn_size, bool batch)
-+{
-+#else
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
-@@ -1046,6 +1067,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- #ifdef CAPSTONE_X86_DEDICATED_OUTPUT
- 	if (size && X86_trySimpleOutput(handle, code, size, insn, insn_size))
- 		return true;
-+#endif
- #endif
- 	MCInst mci;
- #ifdef CAPSTONE_HAS_X86
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 461ae5e4..193740cc 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -4907,39 +4907,68 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+ 	default:
+ 		return X86_FEATURE_NOT_HANDLED;
+ 	case 1:
+-		return decode_apx_kmov(handle, code, code_len, instr, size);
+-	case 2:
+-		result = decode_apx_evex_vector_gpr(handle, code, code_len,
++		if (code_len - offset < 6)
++			return X86_FEATURE_INVALID;
++		if (code[offset + 4] >= 0x90 && code[offset + 4] <= 0x93)
++			return decode_apx_kmov(handle, code, code_len, instr,
++					       size);
++		return X86_FEATURE_NOT_HANDLED;
++	case 2: {
++		/* Several promoted families reject a truncated EVEX opcode. After
++         * the opcode is present only handlers for that opcode can match. */
++		if (code_len - offset < 5)
++			return X86_FEATURE_INVALID;
++		const uint8_t op = code[offset + 4];
++		if (op >= 0xe0 && op <= 0xef)
++			return decode_apx_cmpccxadd(handle, code, code_len,
+ 						    instr, size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		result = decode_apx_cmpccxadd(handle, code, code_len, instr,
+-					      size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		result = decode_amx(handle, code, code_len, instr, size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		result = decode_apx_pdep_pext(handle, code, code_len, instr,
++		switch (op) {
++		case 0x49:
++		case 0x4a:
++		case 0x4b:
++		case 0x6d:
++			return decode_amx(handle, code, code_len, instr, size);
++		case 0x7a:
++		case 0x7b:
++		case 0x7c:
++			return decode_apx_evex_vector_gpr(
++				handle, code, code_len, instr, size);
++		case 0xf2:
++			return decode_apx_bmi_ternary(handle, code, code_len,
++						      instr, size);
++		case 0xf3:
++			return decode_apx_bls(handle, code, code_len, instr,
+ 					      size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		result = decode_apx_bmi_ternary(handle, code, code_len, instr,
++		case 0xf5:
++			result = decode_apx_pdep_pext(handle, code, code_len,
++						      instr, size);
++			if (result != X86_FEATURE_NOT_HANDLED)
++				return result;
++			return decode_apx_bmi_ternary(handle, code, code_len,
++						      instr, size);
++		case 0xf6:
++			return decode_apx_mulx(handle, code, code_len, instr,
++					       size);
++		case 0xf7:
++			return decode_apx_bextr(handle, code, code_len, instr,
+ 						size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		result = decode_apx_bls(handle, code, code_len, instr, size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		result = decode_apx_bextr(handle, code, code_len, instr, size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		return decode_apx_mulx(handle, code, code_len, instr, size);
++		default:
++			return X86_FEATURE_NOT_HANDLED;
++		}
++	}
+ 	case 3:
+-		result = decode_amx(handle, code, code_len, instr, size);
+-		if (result != X86_FEATURE_NOT_HANDLED)
+-			return result;
+-		return decode_apx_rorx(handle, code, code_len, instr, size);
++		if (code_len - offset < 5)
++			return X86_FEATURE_INVALID;
++		switch (code[offset + 4]) {
++		case 0x07:
++		case 0x77:
++			return decode_amx(handle, code, code_len, instr, size);
++		case 0xf0:
++			return decode_apx_rorx(handle, code, code_len, instr,
++					       size);
++		default:
++			return X86_FEATURE_NOT_HANDLED;
++		}
+ 	case 4:
+ 		result = decode_apx_direct_store(handle, code, code_len, instr,
+ 						 size);

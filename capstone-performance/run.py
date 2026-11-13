@@ -213,19 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    expected=[]
-    if PROFILE=='clang' and platform.machine()=='x86_64':
-        expected+=['cs.c.o']
-        for sym in ('cs_decode_full_insn','cs_disasm_iter'):
-            for label in ('base','new'):
-                command(['objdump','-d','--disassemble='+sym,WORK/('decoder-'+label)],'machine-'+sym+'-'+label)
-        before=(EVIDENCE/'machine-cs_decode_full_insn-base.log').read_text()
-        after=(EVIDENCE/'machine-cs_decode_full_insn-new.log').read_text()
-        into=(EVIDENCE/'machine-cs_disasm_iter-new.log').read_text()
-        assert '<X86_trySimpleOutput>' in before and '<X86_trySimpleOutput>' in after and '<decode_full_insn_body>' in after and '<X86_trySimpleOutput>' not in into
-    assert sorted(diffs)==sorted(expected),diffs
-    if not expected:
-        assert sha(WORK/'single-base')==sha(WORK/'single-new')
+    assert diffs==['arch/X86/X86Mapping.c.o'],diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
