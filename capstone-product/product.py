@@ -41,8 +41,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  for label in ('base','owner','cached','branch'):
-   if label!='base':command(['git','apply',r/(label+'.patch')],'select-'+label,nd)
+  command(['git','fetch','--no-tags','origin',expected['previous']],'fetch-prior-capstone',cs)
+  for label in ('base','published'):
+   ref=expected['previous' if label=='base' else 'capstone']
+   command(['git','checkout','--detach',ref],'select-'+label,cs)
+   assert rev(cs)==ref
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
@@ -60,19 +63,22 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
-   if label!='base':command(['git','apply','-R',r/(label+'.patch')],'restore-'+label,nd)
+   assert rev(cs)==ref
    snapshot=json.loads((build/'.neverd-deps/snapshot.json').read_text())
    write(label+'-snapshot',snapshot)
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
    objects={str(f.relative_to(roots[0])):hashlib.sha256(f.read_bytes()).hexdigest() for f in roots[0].rglob('*.o')};write(label+'-objects',objects)
    if label!='base':
-    base_objects=json.loads((out/'base-objects.json').read_text());assert base_objects.keys()==objects.keys()
-    changed=sorted(k for k in objects if objects[k]!=base_objects[k]);write(label+'-changes',changed)
-    assert not changed,changed
+    base_objects=json.loads((out/'base-objects.json').read_text())
+    new_files=sorted(set(objects)-set(base_objects))
+    changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
+    write('capstone-objects',dict(added=new_files,changed=changed))
+    assert {Path(k).name for k in new_files}=={'X86ImmediateOutput.c.o','X86MemoryOutput.c.o'},new_files
+    assert {Path(k).name for k in changed}=={'X86OutputIterator.c.o','X86VectorOutput.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==4
+  write('products',identities);assert len(set(identities.values()))==2
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def measure(name,case,mode,reps):
@@ -88,7 +94,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(65000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','owner','cached','branch')):
+    for idx,label in enumerate(('base-copy','published')):
      plans=[]
      for cycle in range(11):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)

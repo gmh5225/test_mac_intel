@@ -1,7 +1,7 @@
-name: Measure complete NeverD x86 formatted records, scanning and architecture controls
+name: Compare the published Capstone releases inside the same NeverD dev binary
 on:
   push:
-    branches: [codex/neverd-rendered-records-owner]
+    branches: [codex/neverd-integrated-operand-release]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 284e95cda2275684f7da865caf0a8aea423ca156
+          ref: 589aed797f2f5c8ae9cecd4b19aa7bd9649c078a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-rendered-records
+          name: neverd-integrated-writers
           path: product-evidence/
           retention-days: 14
