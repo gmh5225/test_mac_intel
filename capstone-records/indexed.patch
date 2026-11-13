@@ -719,10 +719,78 @@ index a976814e..92c55fd2 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..4bb68e90 100644
+index 1d237cd1..b6c74a50 100644
 --- a/arch/X86/X86GenVectorOutput.inc
 +++ b/arch/X86/X86GenVectorOutput.inc
-@@ -631,6 +631,32 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+@@ -27,10 +27,30 @@ static const struct VectorOutputRow evex_output_rows[] = {
+ 	{ X86_INS_VPSHUFB, "vpshufb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VPADDD, "vpaddd", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VPADDD, "vpaddd", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDQ, "vpaddq", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDQ, "vpaddq", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPANDD, "vpandd", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPANDQ, "vpandq", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPANDD, "vpandd", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPANDQ, "vpandq", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADD52LUQ, "vpmadd52luq", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADD52HUQ, "vpmadd52huq", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VALIGND, "valignd", 0, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1 },
++	{ X86_INS_VALIGNQ, "valignq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VSHUFI32X4, "vshufi32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VSHUFI64X2, "vshufi64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ };
+ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
+ {
+ 	switch (key) {
++	case 0x1d4: {
++		static const uint8_t rows[2][3] = { { 255, 255, 255 }, { 22, 22, 23 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
++	case 0x1db: {
++		static const uint8_t rows[2][3] = { { 24, 24, 26 }, { 25, 25, 27 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
+ 	case 0x1ef: {
+ 		static const uint8_t rows[2][3] = { { 8, 8, 10 }, { 9, 9, 11 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+@@ -43,6 +63,14 @@ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, uns
+ 		static const uint8_t rows[2][3] = { { 19, 19, 19 }, { 19, 19, 19 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
++	case 0x2b4: {
++		static const uint8_t rows[2][3] = { { 255, 255, 255 }, { 28, 28, 28 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
++	case 0x2b5: {
++		static const uint8_t rows[2][3] = { { 255, 255, 255 }, { 29, 29, 29 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
+ 	case 0x2dc: {
+ 		static const uint8_t rows[2][3] = { { 12, 12, 12 }, { 12, 12, 12 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+@@ -59,6 +87,10 @@ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, uns
+ 		static const uint8_t rows[2][3] = { { 15, 15, 15 }, { 15, 15, 15 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
++	case 0x303: {
++		static const uint8_t rows[2][3] = { { 30, 30, 30 }, { 31, 31, 31 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
+ 	case 0x319: {
+ 		static const uint8_t rows[2][3] = { { 255, 0, 0 }, { 255, 1, 1 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+@@ -79,6 +111,10 @@ static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, uns
+ 		static const uint8_t rows[2][3] = { { 255, 255, 6 }, { 255, 255, 7 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
++	case 0x343: {
++		static const uint8_t rows[2][3] = { { 255, 32, 32 }, { 255, 33, 33 } };
++		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
++	}
+ 	case 0x344: {
+ 		static const uint8_t rows[2][3] = { { 16, 16, 16 }, { 16, 16, 16 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+@@ -631,6 +667,32 @@ static const uint8_t vex_shift_plans[3][8][4] = {
  		{ 19, 20, 19, 20 },
  	},
  };
@@ -755,7 +823,7 @@ index 1d237cd1..4bb68e90 100644
  static const struct VectorOutputRow broadcast_rows[2][3] = {
  	{
  		{ 0 },
-@@ -643,6 +669,44 @@ static const struct VectorOutputRow broadcast_rows[2][3] = {
+@@ -643,6 +705,44 @@ static const struct VectorOutputRow broadcast_rows[2][3] = {
  		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
  	},
  };
@@ -800,7 +868,7 @@ index 1d237cd1..4bb68e90 100644
  struct VexRipLoad {
  	unsigned id; char mnemonic[12], address[20];
  	uint8_t address_length, length_code, reg_size, mem_size, reg_access, mem_access, group_count, groups[4];
-@@ -788,6 +852,16 @@ static const struct VectorOutputRow legacy_register_rows[] = {
+@@ -788,6 +888,16 @@ static const struct VectorOutputRow legacy_register_rows[] = {
  	{ X86_INS_PADDB, "paddb", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
  	{ X86_INS_PADDW, "paddw", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
  	{ X86_INS_PADDD, "paddd", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
@@ -817,7 +885,7 @@ index 1d237cd1..4bb68e90 100644
  };
  /* Low seven bits index legacy_register_rows; bit 7 reverses the operands. */
  static const uint8_t legacy_register_plans[256] = {
-@@ -808,3 +882,34 @@ static const uint8_t legacy_register_plans[256] = {
+@@ -808,3 +918,34 @@ static const uint8_t legacy_register_plans[256] = {
  	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
  	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
  };
@@ -1663,10 +1731,20 @@ index ccc4f0de..e0fc9ad0 100644
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..0163d27f 100644
+index 834c2488..fee16653 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -94,6 +94,61 @@ std::string fields(const Bytes4 &array)
+@@ -31,6 +31,9 @@ constexpr Form forms[] = {
+ 	{ 2, 0xdf, false },	 { 3, 0x44, true },
+ 	{ 3, 0x25, true },	 { 2, 0x00, false },
+ 	{ 1, 0xfe, false },
++	{ 1, 0xd4, false }, { 1, 0xdb, false },
++	{ 2, 0xb4, false }, { 2, 0xb5, false },
++	{ 3, 0x03, true },  { 3, 0x43, true },
+ };
+ 
+ struct Decoder {
+@@ -94,6 +97,61 @@ std::string fields(const Bytes4 &array)
  	       ", " + std::to_string(array[3]) + " }";
  }
  
@@ -1728,7 +1806,7 @@ index 834c2488..0163d27f 100644
  // EVEX extracts have a narrower r/m destination, a full-width reg source,
  // and a reserved vvvv field. Reconstruct the entire public record before
  // admitting a width, including the ignored or effective W bit in REX.
-@@ -101,8 +156,6 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+@@ -101,8 +159,6 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
  			   unsigned ll)
  {
  	const unsigned dst_width = (form.opcode & 2) ? 1 : 0;
@@ -1737,7 +1815,7 @@ index 834c2488..0163d27f 100644
  	std::string row;
  	for (unsigned i = 0; i < 1024; ++i) {
  		unsigned dst = i & 31, src = i >> 5, value = (i * 37) & 255;
-@@ -115,51 +168,10 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+@@ -115,51 +171,10 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
  				    uint8_t(form.opcode),
  				    uint8_t(0xc0 | (src & 7) << 3 | (dst & 7)),
  				    uint8_t(value) };
@@ -1792,7 +1870,7 @@ index 834c2488..0163d27f 100644
  		if (i && record != row)
  			return {};
  		row = record;
-@@ -167,6 +179,54 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
+@@ -167,6 +182,54 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
  	return row;
  }
  
@@ -1847,7 +1925,7 @@ index 834c2488..0163d27f 100644
  std::string output_record(Decoder &decoder, const Form &form, unsigned w,
  			  unsigned ll)
  {
-@@ -285,13 +345,16 @@ void emit_vex_indexed(Decoder &decoder)
+@@ -285,13 +348,16 @@ void emit_vex_indexed(Decoder &decoder)
  // can be recovered from the prefix, opcode and ModR/M. Generate against
  // the ordinary decoder so special encodings and aliases retain its behavior.
  std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
@@ -1869,7 +1947,7 @@ index 834c2488..0163d27f 100644
  	const unsigned id = decoder.decode(bytes, size);
  	if (!id)
  		return {};
-@@ -312,27 +375,161 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
+@@ -312,27 +378,161 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
  	expected.rex = uint8_t(rex);
  	expected.addr_size = wide ? 8 : 4;
  	expected.modrm = uint8_t(modrm);
@@ -2036,7 +2114,7 @@ index 834c2488..0163d27f 100644
  void emit_legacy_registers(Decoder &wide)
  {
  	Decoder narrow(CS_MODE_32);
-@@ -374,6 +571,35 @@ void emit_legacy_registers(Decoder &wide)
+@@ -374,6 +574,35 @@ void emit_legacy_registers(Decoder &wide)
  			rows.push_back(row);
  		plans[opcode] = index | (reverse ? 128 : 0);
  	}
@@ -2072,7 +2150,7 @@ index 834c2488..0163d27f 100644
  	if (!plans[0x6f] || !plans[0x7f] || !plans[0x61] || !plans[0xfe])
  		throw std::runtime_error("missing SSE2 register forms");
  	std::puts(
-@@ -389,6 +615,14 @@ void emit_legacy_registers(Decoder &wide)
+@@ -389,6 +618,14 @@ void emit_legacy_registers(Decoder &wide)
  		std::putchar('\n');
  	}
  	std::puts("};");
@@ -2087,7 +2165,7 @@ index 834c2488..0163d27f 100644
  	std::fprintf(stderr, "%zu legacy register rows, %llu 32-bit probes\n",
  		     rows.size(),
  		     static_cast<unsigned long long>(narrow.probes));
-@@ -891,6 +1125,114 @@ void emit_vex_registers(Decoder &decoder)
+@@ -891,6 +1128,114 @@ void emit_vex_registers(Decoder &decoder)
  	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
  		     rows.size(), widths.size() - 1);
  }
@@ -2202,7 +2280,7 @@ index 834c2488..0163d27f 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -938,11 +1280,14 @@ void emit_output(Decoder &decoder)
+@@ -938,11 +1283,14 @@ void emit_output(Decoder &decoder)
  	emit_vex_indexed(decoder);
  	emit_vex_registers(decoder);
  	emit_vex_shifts(decoder);
@@ -2312,7 +2390,7 @@ index 771fefb7..4d51efb4 100644
  			for (size_t size = 0; size <= sizeof(code) - offset;
  			     ++size)
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..9532cd5d 100644
+index 6990d510..bff92418 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
 @@ -42,6 +42,38 @@ static bool compare(csh handles[2], const uint8_t *input, size_t length,
@@ -2445,10 +2523,48 @@ index 6990d510..9532cd5d 100644
  	return true;
  }
  
-@@ -738,6 +840,50 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+@@ -738,6 +840,88 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
  	return true;
  }
  
++/* Cross the two extension bits of each vector register and the reserved
++ * mask, length and broadcast fields before accepting a generated row. */
++static bool check_evex_packed_arithmetic(csh handles[2])
++{
++	const uint8_t forms[][2] = { { 1, 0xd4 }, { 1, 0xdb }, { 2, 0xb4 },
++				     { 2, 0xb5 }, { 3, 0x03 }, { 3, 0x43 } };
++	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
++		for (unsigned ext = 0; ext < 16; ++ext)
++			for (unsigned wl = 0; wl < 8; ++wl)
++				for (unsigned v = 0; v < 32; ++v) {
++					uint8_t bytes[] = {
++						0x62,
++						(uint8_t)((ext << 4) |
++							  forms[i][0]),
++						(uint8_t)(((wl >> 2) << 7) |
++							  ((v & 15) << 3) | 5),
++						(uint8_t)(((wl & 3) << 5) |
++							  ((v >> 4) << 3)),
++						forms[i][1],
++						(uint8_t)(0xc0 |
++							  ((v + i) & 7) << 3 |
++							  ((ext + v) & 7)),
++						(uint8_t)(v * 17 + wl)
++					};
++					if (!compare(handles, bytes,
++						     sizeof(bytes), v) ||
++					    !compare(handles, bytes,
++						     (ext + v) % sizeof(bytes),
++						     wl))
++						return false;
++					bytes[3] |= (uint8_t)(1u << (v & 7));
++					if (!compare(handles, bytes,
++						     sizeof(bytes), ext))
++						return false;
++				}
++	return true;
++}
++
 +static bool check_evex_vector_loads(csh handles[2])
 +{
 +	for (unsigned pp = 0; pp < 4; ++pp)
@@ -2496,14 +2612,14 @@ index 6990d510..9532cd5d 100644
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -765,11 +911,14 @@ static bool check_mode(cs_mode mode)
+@@ -765,11 +949,14 @@ static bool check_mode(cs_mode mode)
  		    !check_push_memory(handles, mode) ||
  		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
  		    !check_rex_stack(handles) ||
 -		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
 +		    (mode == CS_MODE_64 &&
 +		     (!check_broadcast(handles) ||
-+		      !check_evex_vector_loads(handles))) ||
++		      (!check_evex_packed_arithmetic(handles) || !check_evex_vector_loads(handles)))) ||
  		    !check_padding(handles) ||
  		    !check_alu_memory(handles, mode) ||
  		    !check_alu_immediates(handles, mode) ||
