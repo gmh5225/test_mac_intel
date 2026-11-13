@@ -1,7 +1,7 @@
-name: Use production public scan and x86 text entry points for mixed paired controls
+name: Measure mixed GNU x86 and MIPS paths at the real product entry points
 on:
   push:
-    branches: [codex/capstone-gnu-exact-entry-executables]
+    branches: [codex/capstone-shared-gnu-mips-x86-rows]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gnu-exact-entry-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: shared-gnu-mips-x86-rows-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

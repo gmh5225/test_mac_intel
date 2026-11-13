@@ -36,19 +36,21 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':
-    run(['cmake','--build',b,'--target','arm_post_index','--parallel','4'],'build-test-'+key)
-    run(['ctest','--test-dir',b,'-R','^unit_arm_post_index$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
+    run(['cmake','--build',b,'--target','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
+    run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   assert set(changed)=={'arch/X86/X86DisassemblerDecoder.c.o'}.union(['arch/X86/X86ImmediateOutput.c.o', 'arch/X86/X86MemoryOutput.c.o', 'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'] if platform.machine()=='x86_64' else []),changed
+   assert set(changed)=={'arch/X86/X86DisassemblerDecoder.c.o','arch/Mips/MipsMapping.c.o'}.union(['arch/X86/X86ImmediateOutput.c.o', 'arch/X86/X86MemoryOutput.c.o', 'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'] if platform.machine()=='x86_64' else []),changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-x86.cpp','-ldl','-o',t/'verify-x86'],'build-x86-differential')
    run([t/'verify-x86',libs['base'],libs[key]],'x86-differential')
+   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
+   run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps):
