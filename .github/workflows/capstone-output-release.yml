@@ -1,7 +1,7 @@
-name: Verify and time combined x86 records on profiles
+name: Verify fresh x86 metadata and ARM SoftFail reuse on profiles
 on:
   push:
-    branches: [codex/capstone-combined-records-profiles]
+    branches: [codex/capstone-iterator-status-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d843dcdf830e883697b348eff0ee47d99849ff90
+          ref: e406d02e19f0d0c6a0b29870ab0e1209b7c5f2d3
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: combined-records-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: iterator-status-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
