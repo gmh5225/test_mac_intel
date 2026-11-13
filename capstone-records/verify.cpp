@@ -22,8 +22,8 @@ struct API {
 };
 struct Machine {
  API &api;csh handle=0;
- Machine(API&a,cs_mode mode,bool text,bool detail,bool skip):api(a){
-  if(a.open(CS_ARCH_ARM,mode,&handle)||a.option(handle,CS_OPT_TEXT,text?CS_OPT_ON:CS_OPT_OFF)||a.option(handle,CS_OPT_DETAIL,detail?CS_OPT_ON:CS_OPT_OFF)||a.option(handle,CS_OPT_SKIPDATA,skip?CS_OPT_ON:CS_OPT_OFF))throw std::runtime_error("open or option");
+ Machine(API&a,cs_mode mode,bool text,unsigned detail,bool skip):api(a){
+  if(a.open(CS_ARCH_AARCH64,mode,&handle)||a.option(handle,CS_OPT_TEXT,text?CS_OPT_ON:CS_OPT_OFF)||a.option(handle,CS_OPT_DETAIL,detail)||a.option(handle,CS_OPT_SKIPDATA,skip?CS_OPT_ON:CS_OPT_OFF))throw std::runtime_error("open or option");
  }
  ~Machine(){api.close(&handle);}
 };
@@ -42,17 +42,18 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
  ++verified;
 }
 int main(int argc,char**argv) {
- if(argc!=3)return 1;API a(argv[1]),b(argv[2]);
- for (unsigned bits : {0u,(unsigned)CS_MODE_BIG_ENDIAN,(unsigned)CS_MODE_V8,(unsigned)CS_MODE_THUMB,(unsigned)(CS_MODE_THUMB|CS_MODE_MCLASS)}) for(unsigned flags=0; flags<8; ++flags) {
+ if(argc!=3)return 1;API a(argv[1]),b(argv[2]); if(a.iter==b.iter) throw std::runtime_error("coalesced disassemblers");
+ for (unsigned bits : {0u,(unsigned)CS_MODE_BIG_ENDIAN,(unsigned)CS_MODE_APPLE_PROPRIETARY,(unsigned)(CS_MODE_APPLE_PROPRIETARY|CS_MODE_BIG_ENDIAN)}) for(unsigned flags=0; flags<16; ++flags) {
   cs_mode mode=(cs_mode)bits;
   bool text=flags&1,detail=flags&2,skip=flags&4;
-  Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);
+  unsigned options=detail ? CS_OPT_ON | ((flags&8)?CS_OPT_DETAIL_ALIAS:CS_OPT_DETAIL_REAL) : CS_OPT_OFF;
+  Machine x(a,mode,text,options,skip),y(b,mode,text,options,skip);
   for(unsigned i=0;i<65536;++i){
     uint32_t value=random_word();
-    if(i&1)value=(value&0xf1ffffff)|0x0a000000;
+    if(i&1)value=((i & 65535u) << 16) | (value & 65535u);
     uint8_t bytes[8]={};for(unsigned q=0;q<4;++q)bytes[bits&CS_MODE_BIG_ENDIAN?3-q:q]=uint8_t(value>>(8*q));
     compare(x,y,bytes,(i&31)<5?(i&31):8,detail);
   }
  }
- std::printf("equal ARM public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
+ std::printf("equal AArch64 public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
 }

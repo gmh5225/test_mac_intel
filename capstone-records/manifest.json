@@ -1,5 +1,5 @@
 {
-  "capstone_revision": "c92f6f103e0123790f574c05a2a57f7203e7a461",
+  "capstone_revision": "01ce67005793c4369e64b509e5ec8f9cb2945d98",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
   "source_lineage": {
     "single.cpp": {
@@ -87,8 +87,8 @@
       "experiment": "round574-legacy-memory-repair"
     },
     "indexed.patch": {
-      "description": "direct ARM opcode mapping with a single detail check",
-      "sha256": "992839249e2cbdf32d0ffcf5aa0ecd1ca516322ede8797702c54ea72c7a25425"
+      "description": "Copy the full AArch64 architectural default including sentinel fields, padding and unused operands",
+      "sha256": "97fd0d704ce93003c159fa9a026829270140e3becd9a3fa4cee01fa4ce6b5098"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
@@ -101,24 +101,6 @@
       "kind": "deb",
       "command": "ls",
       "text_sha256": "c3ab7564ed458e2e97012a6436b80685573452630c13a2f5366bba908253c29e"
-    },
-    {
-      "name": "arm-sort",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "sort",
-      "text_sha256": "76987581cc48d7187eb2ad76293be2b89414d7277c22ad6093ce9b770169a824"
-    },
-    {
-      "name": "arm-cp",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "cp",
-      "text_sha256": "82569bcb320c864a08cf37798b610396d1e1066f68758826e3294e561987d393"
     },
     {
       "name": "mips64el-ls",
@@ -161,6 +143,22 @@
       "kind": "deb",
       "command": "ls",
       "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
+    },
+    {
+      "name": "arm64-cp",
+      "selector": 0,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
+      "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
+      "kind": "deb",
+      "command": "cp"
+    },
+    {
+      "name": "arm64-sort",
+      "selector": 0,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
+      "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
+      "kind": "deb",
+      "command": "sort"
     }
   ]
 }

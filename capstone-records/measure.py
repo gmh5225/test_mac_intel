@@ -12,19 +12,13 @@ assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==jso
 with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
-  import re
-  mapping=(s/'arch/ARM/ARMGenCSMappingInsn.inc').read_text()
-  rows=re.findall(r'^\s*(ARM_[\w]+) /\* (\d+) \*/, (ARM_INS_[\w]+)',mapping,re.M)
-  enums=dict(re.findall(r'^\s*(ARM_[\w]+)\s*=\s*(\d+)',(s/'arch/ARM/ARMGenInstrInfo.inc').read_text(),re.M))
-  assert [int(row[1]) for row in rows]==list(range(4465)) and all(enums[name]==idx for name,idx,_ in rows)
-  write('mapping',dict(rows=len(rows),sha256=hashlib.sha256(mapping.encode()).hexdigest()))
   mixed=os.environ['BUILD_ARCHS']=='four'
   all_inputs=corpus.prepare(r,t,e,run)
-  choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls'} if mixed else set())
+  choices={'arm64-ls','arm64-sort','arm64-cp'} | ({'putty-32-0.85','putty-64-0.85','arm-ls','mips64el-ls','amd64-ls'} if mixed else set())
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_AARCH64_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
@@ -36,15 +30,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':
-    run(['cmake','--build',b,'--target','arm_post_index','--parallel','4'],'build-test-'+key)
-    run(['ctest','--test-dir',b,'-R','^unit_arm_post_index$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
+    run(['cmake','--build',b,'--target','aarch64_postprocess','aarch64_scan','--parallel','4'],'build-test-'+key)
+    run(['ctest','--test-dir',b,'-R','^unit_aarch64_(postprocess|scan)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   assert changed==['arch/ARM/ARMMapping.c.o'],changed
+   assert changed==['arch/AArch64/AArch64Mapping.c.o'],changed
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
+   assert '4194304 inputs' in (e/('differential-'+key+'.log')).read_text()
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps):
@@ -52,9 +47,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*90000000/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
+    for k in range(15):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
       vout=sample(v,x,mode,n)

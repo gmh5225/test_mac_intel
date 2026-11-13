@@ -1,16 +1,50 @@
-diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 30e28897..ae49e100 100644
---- a/arch/ARM/ARMMapping.c
-+++ b/arch/ARM/ARMMapping.c
-@@ -834,7 +834,10 @@ void ARM_check_updates_flags(MCInst *MI)
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index a269b603..ad1aec57 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -293,23 +293,34 @@ const char *AArch64_reg_name(csh handle, unsigned int reg)
+ 	return AArch64_LLVM_getRegisterName(reg, AArch64_NoRegAltName);
+ }
  
- void ARM_set_instr_map_data(MCInst *MI)
++/* Build all public operand defaults in one copy, including unused slots. */
++#if NUM_AARCH64_OPS != 16
++#error Update the AArch64 operand defaults for the new slot count
++#endif
++#define AARCH64_EMPTY_OP { .vector_index = -1, .type = AARCH64_OP_INVALID }
++#define AARCH64_FOUR_EMPTY_OPS \
++	AARCH64_EMPTY_OP, AARCH64_EMPTY_OP, AARCH64_EMPTY_OP, AARCH64_EMPTY_OP
++static const cs_aarch64 empty_aarch64_detail = {
++	.cc = AArch64CC_Invalid,
++	.operands = { AARCH64_FOUR_EMPTY_OPS, AARCH64_FOUR_EMPTY_OPS,
++		      AARCH64_FOUR_EMPTY_OPS, AARCH64_FOUR_EMPTY_OPS },
++};
++#undef AARCH64_FOUR_EMPTY_OPS
++#undef AARCH64_EMPTY_OP
++
+ void AArch64_setup_op(cs_aarch64_op *op)
  {
--	map_cs_id(MI, arm_insns, ARR_SIZE(arm_insns));
-+	/* The ARM decoder indexes this same generated map for implicit effects. */
-+	MI->flat_insn->id = arm_insns[MCInst_getOpcode(MI)].mapid;
-+	if (!MI->flat_insn->detail)
+-	memset(op, 0, sizeof(cs_aarch64_op));
+-	op->type = AARCH64_OP_INVALID;
+-	op->vector_index = -1;
++	memcpy(op, empty_aarch64_detail.operands, sizeof(*op));
+ }
+ 
+ void AArch64_init_cs_detail(MCInst *MI)
+ {
+-	if (detail_is_set(MI)) {
+-		memset(get_detail(MI), 0,
+-		       offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
+-		for (int i = 0; i < ARR_SIZE(AArch64_get_detail(MI)->operands);
+-		     i++)
+-			AArch64_setup_op(&AArch64_get_detail(MI)->operands[i]);
+-		AArch64_get_detail(MI)->cc = AArch64CC_Invalid;
+-	}
++	if (!detail_is_set(MI))
 +		return;
- 	map_implicit_reads(MI, arm_insns);
- 	map_implicit_writes(MI, arm_insns);
- 	ARM_check_updates_flags(MI);
++	cs_detail *detail = get_detail(MI);
++	memset(detail, 0, offsetof(cs_detail, aarch64));
++	memcpy(&detail->aarch64, &empty_aarch64_detail,
++	       sizeof(empty_aarch64_detail));
+ }
+ 
+ static void AArch64_check_updates_flags(MCInst *MI)
