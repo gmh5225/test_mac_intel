@@ -1,7 +1,7 @@
-name: Isolate the leading EVEX iterator dispatch on real PE32 PE64 and SIMD with five native toolchains
+name: Isolate generated native EVEX scanning and formatting over real JPEG zstd and crypto functions with both iced formatters
 on:
   push:
-    branches: [codex/capstone-evex-public-iterator-libraries]
+    branches: [codex/capstone-keyed-evex-same-isa-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
+          ref: 535dfe10dcc2c3d8075f447631cbaf6694adc4cf
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: native-evex-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
