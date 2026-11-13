@@ -1,0 +1,57 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 76fdbcb7..098c4daf 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3422,6 +3422,24 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ 	return completeTerminalScanResult(result, instructionID, status);
+ }
+ 
++/* 32- and 64-bit memory operands have the same SIB and displacement
++ * extents. The caller checks the final end against the architectural limit. */
++X86_DECODE_INLINE unsigned scanMemoryEnd(const uint8_t *code, size_t size,
++					 unsigned end, uint8_t modrm)
++{
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	static const uint8_t extra[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					     { 1, 1, 1, 1, 2, 1, 1, 1 },
++					     { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	if ((modrm & 0xc7) == 4) {
++		if (end >= size)
++			return 16;
++		if ((code[end] & 7) == 5)
++			end += 4;
++	}
++	return end + extra[mod][rm];
++}
++
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+ 					 uint8_t prefix, X86ScanResult *result)
+ {
+@@ -3569,25 +3587,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 		}
+ 		++end;
+ 		if (modrm < 0xc0) {
+-			const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 			if (mode == CS_MODE_16) {
+ 				static const uint8_t displacement[] = { 0, 1,
+ 									2 };
+-				end += displacement[mod] +
++				end += displacement[modrm >> 6] +
+ 				       ((modrm & 0xc7) == 6 ? 2 : 0);
+ 			} else {
+-				static const uint8_t extra[3][8] = {
+-					{ 0, 0, 0, 0, 1, 4, 0, 0 },
+-					{ 1, 1, 1, 1, 2, 1, 1, 1 },
+-					{ 4, 4, 4, 4, 5, 4, 4, 4 }
+-				};
+-				if ((modrm & 0xc7) == 4) {
+-					if (end >= size)
+-						return X86_SCAN_INVALID;
+-					if ((code[end] & 7) == 5)
+-						end += 4;
+-				}
+-				end += extra[mod][rm];
++				end = scanMemoryEnd(code, size, end, modrm);
+ 			}
+ 		}
+ 	}
