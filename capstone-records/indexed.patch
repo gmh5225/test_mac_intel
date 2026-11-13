@@ -134,10 +134,10 @@ index 00000000..38dd7907
 +	{ "D5_D6", 5 }, { "D7_D8", 5 }, { "D9_D10", 6 },
 +};
 diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index ebe301e2..348d5201 100644
+index ebe301e2..ac13c8ce 100644
 --- a/arch/ARM/ARMInstPrinter.c
 +++ b/arch/ARM/ARMInstPrinter.c
-@@ -106,11 +106,27 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
+@@ -106,18 +106,42 @@ static void printPredicateOperand(MCInst *MI, unsigned OpNum, SStream *O)
  		SStream_concat0(O, ARMCondCodeToString(CC));
  }
  
@@ -151,20 +151,41 @@ index ebe301e2..348d5201 100644
  #if !defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
  	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
  	!defined(_WIN32_WCE)
+-	const char *name = getRegisterName(RegNo, ARM_NoRegAltName);
+-	/* With markup disabled the two empty tags contribute no bytes. The
+-	 * generic formatter still owns custom callbacks and full streams. */
 +#ifdef CAPSTONE_ARM_SHORT_REGISTER_NAMES
 +#include "ARMGenShortRegisterNames.inc"
-+	if (RegNo && RegNo <= ARR_SIZE(short_names) &&
-+	    short_names[RegNo - 1].length &&
-+	    cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
-+	    OS->index < SSTREAM_BUF_LEN - 1) {
-+		SStream_concat0_small(OS, short_names[RegNo - 1].text,
-+				      short_names[RegNo - 1].length);
-+		return;
-+	}
 +#endif
- 	const char *name = getRegisterName(RegNo, ARM_NoRegAltName);
- 	/* With markup disabled the two empty tags contribute no bytes. The
- 	 * generic formatter still owns custom callbacks and full streams. */
++	const char *name;
+ 	if (cs_vsnprintf == cs_default_vsnprintf && !getUseMarkup() &&
+-	    OS->index < SSTREAM_BUF_LEN - 1 && name && name[0]) {
+-		SStream_concat0(OS, name);
+-		return;
++	    OS->index < SSTREAM_BUF_LEN - 1) {
++#ifdef CAPSTONE_ARM_SHORT_REGISTER_NAMES
++		/* Every short name has seven readable bytes including the NUL.
++		 * The length advances the stream past the spelling only. */
++		if (RegNo && RegNo <= ARR_SIZE(short_names) &&
++		    short_names[RegNo - 1].length && !OS->is_closed &&
++		    !OS->markup_stream &&
++		    OS->index <= SSTREAM_BUF_LEN - sizeof(short_names[0].text)) {
++			memcpy(OS->buffer + OS->index, short_names[RegNo - 1].text,
++			       sizeof(short_names[0].text));
++			OS->index += short_names[RegNo - 1].length;
++			return;
++		}
++#endif
++		name = getRegisterName(RegNo, ARM_NoRegAltName);
++		if (name && name[0]) {
++			SStream_concat0(OS, name);
++			return;
++		}
++	} else {
++		name = getRegisterName(RegNo, ARM_NoRegAltName);
+ 	}
+ 	SStream_concat2(OS, markup("<reg:"), name);
+ #else
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
 index 11e5e995..65a8dfd1 100644
 --- a/arch/ARM/ARMMapping.c
