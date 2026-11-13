@@ -1,9 +1,9 @@
-name: Measure direct EVEX output dispatch on real x86 native
+name: Measure complete verified EVEX register and memory paths across the native x86 corpus
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-direct-evex-writer-native]
+    branches: [codex/capstone-native-complete-evex]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-direct-evex-writer-native
+  group: capstone-native-complete-evex
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: direct-evex-writer-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: complete-evex-native-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
