@@ -1,3 +1,31 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d1d78862..9dc12263 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -463,7 +463,7 @@ if(CAPSTONE_X86_SUPPORT)
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+-    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
++    if(CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+         set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
+diff --git a/Makefile b/Makefile
+index 80398b9b..d5084a3a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -657,8 +657,8 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
+ 
+-# Match the Release x86-only formatter tuning for the compiler's target.
+-ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
++# Match the Release x86 formatter tuning for the compiler's target.
++ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ ifneq (,$(filter -O2 -O3,$(CFLAGS)))
+ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
+     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
 index 76fdbcb7..078bbc34 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
