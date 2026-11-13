@@ -1,7 +1,7 @@
-name: Measure native EVEX scanning, scalar and vector output, and ARM detail in NeverD
+name: Verify 25 real product panels with portable ARM extents and native EVEX rows
 on:
   push:
-    branches: [codex/neverd-integrated-evex-arm-details]
+    branches: [codex/neverd-portable-evex-arm-details]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-evex-arm-details
+          name: portable-evex-arm-details
           path: product-evidence/
           retention-days: 14

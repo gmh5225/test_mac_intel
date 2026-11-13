@@ -29,7 +29,7 @@ index 695d5f2d..80398b9b 100644
  CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS -DCAPSTONE_AARCH64_DEDICATED_SCAN
  endif
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 4a7e97c3..875949f1 100644
+index 4a7e97c3..e1ff3a05 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
 @@ -834,14 +834,10 @@ void ARM_check_updates_flags(MCInst *MI)
@@ -47,7 +47,7 @@ index 4a7e97c3..875949f1 100644
  	map_implicit_reads(MI, arm_insns);
  	map_implicit_writes(MI, arm_insns);
  	ARM_check_updates_flags(MI);
-@@ -945,27 +941,40 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -945,27 +941,41 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -63,11 +63,12 @@ index 4a7e97c3..875949f1 100644
 +};
 +#undef ARM_FOUR_EMPTY_OPS
 +#undef ARM_EMPTY_OP
-+_Static_assert(offsetof(cs_arm, operands) + sizeof(arm_empty_operands) ==
-+		       sizeof(cs_arm),
-+	       "initialize the complete ARM detail extent");
-+_Static_assert(ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS,
-+	       "ARM operand defaults must cover all slots");
++/* Capstone builds as C99, including with MSVC. */
++typedef char ARMOperandDefaultsCoverSlots[
++    ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS ? 1 : -1];
++typedef char ARMOperandDefaultsCoverTail[
++    offsetof(cs_arm, operands) + sizeof(arm_empty_operands) == sizeof(cs_arm) ?
++        1 : -1];
 +
  void ARM_setup_op(cs_arm_op *op)
  {
