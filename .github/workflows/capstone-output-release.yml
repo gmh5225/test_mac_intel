@@ -1,7 +1,7 @@
-name: Qualify shared cold EVEX lookup and x86-only object changes in profiles
+name: Verify canonical effective address and extended stack records on profiles
 on:
   push:
-    branches: [codex/capstone-cold-evex-profiles]
+    branches: [codex/capstone-effective-address-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: b70c7e94528f1d9f4c7c424f65bbd513bbf32d47
+          ref: 6289e7824d02cb7d45a67ec2d4df4b54036a04ce
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cold-evex-profile-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: ea-and-stack-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
