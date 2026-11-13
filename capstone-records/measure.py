@@ -50,9 +50,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*90000000/warm['cpu_ns'])))
+    if mode!=2:continue
+    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*200000000/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(15):
+    for k in range(45):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
       vout=sample(v,x,mode,n)
