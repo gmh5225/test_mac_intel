@@ -1,7 +1,7 @@
-name: Measure dense MIPS opcode mapping with ISA, endian and PE controls
+name: Verify the dedicated MIPS map and original binaries across release profiles
 on:
   push:
-    branches: [codex/capstone-dense-mips-map]
+    branches: [codex/capstone-mips-dedicated-index]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-dense-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mips-dedicated-exact-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
