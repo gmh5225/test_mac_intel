@@ -1,7 +1,7 @@
-name: Verify the ARM defaults and both layout extents with supported C99 compilers
+name: Validate the complete current baseline delta with Windows runtimes, sanitizers, Intel-only, reduced and DIET builds
 on:
   push:
-    branches: [codex/capstone-portable-arm-operand-storage]
+    branches: [codex/capstone-current-vector-memory-configs]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -34,13 +34,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
+          ref: 01ce67005793c4369e64b509e5ec8f9cb2945d98
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: portable-arm-storage-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: current-vector-memory-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
