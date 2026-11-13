@@ -47,20 +47,21 @@ index 07ad0685..e2569243 100644
  		success &= rejects(handle, &invalid_cases[i]);
  
 diff --git a/tests/unit/x86_amx_tile_state.c b/tests/unit/x86_amx_tile_state.c
-index f4d270e9..4e0cdf6d 100644
+index f4d270e9..1db7377c 100644
 --- a/tests/unit/x86_amx_tile_state.c
 +++ b/tests/unit/x86_amx_tile_state.c
-@@ -205,6 +205,9 @@ static bool test_case(csh handle, const amx_case *test)
+@@ -205,6 +205,10 @@ static bool test_case(csh handle, const amx_case *test)
  
  static bool test_att_syntax(csh handle)
  {
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
  	static const uint8_t load[] = { 0xc4, 0x82, 0x79, 0x4b, 0x14, 0x6c };
  	static const uint8_t store[] = { 0xc4, 0x82, 0x7a, 0x4b, 0x3c, 0xbe };
  	cs_insn *insn = NULL;
-@@ -259,6 +262,7 @@ static bool test_att_syntax(csh handle)
+@@ -259,6 +263,7 @@ static bool test_att_syntax(csh handle)
  				 CS_ERR_OK,
  			 "restore Intel syntax");
  	return success;
@@ -69,23 +70,24 @@ index f4d270e9..4e0cdf6d 100644
  
  static bool expect_invalid(csh handle, const uint8_t *code, size_t code_size,
 diff --git a/tests/unit/x86_apx_cmov.c b/tests/unit/x86_apx_cmov.c
-index 0ae7aa50..2b78e2ed 100644
+index 0ae7aa50..23f9b8a3 100644
 --- a/tests/unit/x86_apx_cmov.c
 +++ b/tests/unit/x86_apx_cmov.c
-@@ -559,7 +559,11 @@ int main(void)
+@@ -559,7 +559,12 @@ int main(void)
  	}
  	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
  	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
 -	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
 +	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
 +#endif
  
  	for (cc = 0; cc < 16; ++cc) {
  		for (nd = 0; nd < 2; ++nd) {
-@@ -572,17 +576,21 @@ int main(void)
+@@ -572,17 +577,25 @@ int main(void)
  								intel, false, cc, nd != 0,
  								nf != 0, w != 0, pp,
  								number);
@@ -103,6 +105,10 @@ index 0ae7aa50..2b78e2ed 100644
  						success &= check_memory_case(
  							att, true, true, nd != 0,
  							nf != 0, w != 0, pp, cc);
++#else
++						success &= check_memory_case(
++							intel, false, true, nd != 0,
++							nf != 0, w != 0, pp, cc);
 +#endif
  					}
  				}
@@ -128,7 +134,7 @@ index b8d57c77..f6332bec 100644
  	return ok ? 0 : 1;
  }
 diff --git a/tests/unit/x86_apx_evex_alu.c b/tests/unit/x86_apx_evex_alu.c
-index 3be65efe..168a14e5 100644
+index 3be65efe..c93e302c 100644
 --- a/tests/unit/x86_apx_evex_alu.c
 +++ b/tests/unit/x86_apx_evex_alu.c
 @@ -273,9 +273,10 @@ static bool check_case(csh handle, const alu_operation *operation,
@@ -152,12 +158,13 @@ index 3be65efe..168a14e5 100644
  	if (success) {
  		success &= check(cs_option(handle, CS_OPT_SYNTAX,
  					   CS_OPT_SYNTAX_ATT) == CS_ERR_OK,
-@@ -649,6 +651,9 @@ int main(void)
+@@ -649,6 +651,10 @@ int main(void)
  			handle, operations,
  			sizeof(operations) / sizeof(operations[0]), true);
  	}
 +#else
-+	success &= cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	success &= cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#endif
  	if (success) {
  		success &= check(cs_option(handle, CS_OPT_SYNTAX,
@@ -207,16 +214,15 @@ index 7cb3c07f..4d1b3afc 100644
  	if (!ok)
  		fprintf(stderr, "APX BMI ternary failure\n");
 diff --git a/tests/unit/x86_apx_evex_ccmp.c b/tests/unit/x86_apx_evex_ccmp.c
-index 5270bbe6..ed3bd0f9 100644
+index 5270bbe6..80815387 100644
 --- a/tests/unit/x86_apx_evex_ccmp.c
 +++ b/tests/unit/x86_apx_evex_ccmp.c
 @@ -32,9 +32,11 @@ int main(void)
          X86_INS_CCMPO+k,names[k],"{dfv=sf,cf} r17d, r26d"); }
      b[2]=0xac; b[3]=2;
      ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpb","{dfv=sf,cf} r17, r26");
--    cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
 +#ifndef CAPSTONE_X86_ATT_DISABLE
-+	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
      ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpbq","{dfv=sf,cf} %r26, %r17");
      cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
 +#endif
@@ -224,16 +230,15 @@ index 5270bbe6..ed3bd0f9 100644
        ok &= check(h,m,sizeof(m),X86_INS_CCMPB,"ccmpb",
                    "{dfv=sf,cf} dword ptr [r17], r26d"); }
 diff --git a/tests/unit/x86_apx_evex_convert.c b/tests/unit/x86_apx_evex_convert.c
-index 4cd15f5a..bfe29e26 100644
+index 4cd15f5a..f72020c3 100644
 --- a/tests/unit/x86_apx_evex_convert.c
 +++ b/tests/unit/x86_apx_evex_convert.c
 @@ -64,10 +64,12 @@ int main(void) {
      ok &= one(h, mw, sizeof(mw), X86_INS_MOVBE, "movbe", "r18, r19");
      ok &= one(h, cw66, sizeof(cw66), X86_INS_CRC32, "crc32", "r18, r19");
    }
--  cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifndef CAPSTONE_X86_ATT_DISABLE
-+	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
    ok &= one(h, cq, sizeof(cq), X86_INS_CRC32, "crc32q",
              "%fs:0x20(%r29,%r14,4), %r26");
    cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
@@ -271,16 +276,15 @@ index c64efe61..8dee267f 100644
  	return ok;
  }
 diff --git a/tests/unit/x86_apx_evex_ctest.c b/tests/unit/x86_apx_evex_ctest.c
-index 02e9329b..5466706d 100644
+index 02e9329b..3309dede 100644
 --- a/tests/unit/x86_apx_evex_ctest.c
 +++ b/tests/unit/x86_apx_evex_ctest.c
 @@ -48,9 +48,11 @@ int main(void)
        ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
        q[5]=0xc9;ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
        q[5]=0xd1;if(cs_disasm(h,q,7,0,1,&i)){ok=false;cs_free(i,1);}}
--    cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
 +#ifndef CAPSTONE_X86_ATT_DISABLE
-+	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
      ok&=check(h,b,6,X86_INS_CTESTB,"ctestbq","{dfv=sf,cf} %r26, %r17");
      cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
 +#endif
@@ -391,16 +395,15 @@ index ec0a96c5..c4e59004 100644
  	success &= test_immediate_and_one_operand_forms(handle);
  	success &= test_invalid_encodings(handle);
 diff --git a/tests/unit/x86_apx_evex_invalidate.c b/tests/unit/x86_apx_evex_invalidate.c
-index ffc78ade..c1be9140 100644
+index ffc78ade..e0730161 100644
 --- a/tests/unit/x86_apx_evex_invalidate.c
 +++ b/tests/unit/x86_apx_evex_invalidate.c
 @@ -45,9 +45,11 @@ int main(void) {
      const uint8_t a[] = {0x64, 0x67, 0x62, 0xec, 0x7a, 8, 0xf2, 0x11};
      ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid",
               "r18, xmmword ptr fs:[r17d]");
--    cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifndef CAPSTONE_X86_ATT_DISABLE
-+	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
      ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid", "%fs:(%r17d), %r18");
      cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
 +#endif
@@ -408,16 +411,15 @@ index ffc78ade..c1be9140 100644
    {
      uint8_t x[] = {0x62, 0xec, 0x7e, 8, 0xf0, 0xd1};
 diff --git a/tests/unit/x86_apx_evex_movrs.c b/tests/unit/x86_apx_evex_movrs.c
-index 27681272..ce89a18d 100644
+index 27681272..49a45dca 100644
 --- a/tests/unit/x86_apx_evex_movrs.c
 +++ b/tests/unit/x86_apx_evex_movrs.c
 @@ -47,9 +47,11 @@ int main(void) {
             "r26d, dword ptr fs:[r29 + r28*4 + 0x20]", X86_REG_R26D, 4);
    ok &= ck(h, x4a32, sizeof(x4a32), "movrs",
             "r26d, dword ptr fs:[r29d + r28d*4 + 0x20]", X86_REG_R26D, 4);
--  cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifndef CAPSTONE_X86_ATT_DISABLE
-+	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
    ok &= ck(h, b64, sizeof(b64), "movrsq", "%fs:(%r17d), %r18", X86_REG_R18, 8);
    cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
 +#endif
@@ -425,7 +427,7 @@ index 27681272..ce89a18d 100644
    {
      const uint8_t w66[] = {0x62, 0xec, 0xfd, 8, 0x8b, 0x11};
 diff --git a/tests/unit/x86_apx_evex_msr.c b/tests/unit/x86_apx_evex_msr.c
-index d54ef441..583cc654 100644
+index d54ef441..946ee8df 100644
 --- a/tests/unit/x86_apx_evex_msr.c
 +++ b/tests/unit/x86_apx_evex_msr.c
 @@ -130,6 +130,10 @@ static bool check_implicit_msr(void)
@@ -433,8 +435,8 @@ index d54ef441..583cc654 100644
  		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
  		for (syntax = 0; syntax < 2; ++syntax) {
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+		if (syntax)
-+			break;
++			if (syntax)
++				break;
 +#endif
  			cs_option(handle, CS_OPT_SYNTAX,
  				  syntax ? CS_OPT_SYNTAX_ATT :
@@ -551,16 +553,17 @@ index 059315be..0b03e901 100644
  
  	success &= rejects(handle, zero_without_mask, CS_MODE_64,
 diff --git a/tests/unit/x86_apx_push2_pop2.c b/tests/unit/x86_apx_push2_pop2.c
-index ab252b2d..f83ad84c 100644
+index ab252b2d..5463c1f0 100644
 --- a/tests/unit/x86_apx_push2_pop2.c
 +++ b/tests/unit/x86_apx_push2_pop2.c
-@@ -179,14 +179,20 @@ int main(void)
+@@ -179,14 +179,21 @@ int main(void)
  	}
  	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
  	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
 -	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
 +	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
 +#endif
@@ -577,20 +580,21 @@ index ab252b2d..f83ad84c 100644
  	}
  
 diff --git a/tests/unit/x86_apx_rex2.c b/tests/unit/x86_apx_rex2.c
-index fc025de0..69a341bf 100644
+index fc025de0..67f19e92 100644
 --- a/tests/unit/x86_apx_rex2.c
 +++ b/tests/unit/x86_apx_rex2.c
-@@ -190,6 +190,9 @@ static bool test_register_names(csh handle)
+@@ -190,6 +190,10 @@ static bool test_register_names(csh handle)
  
  static bool test_att_detail_order(csh handle)
  {
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
  	static const uint8_t addq[] = { 0xd5, 0x5d, 0x01, 0xc7 };
  	cs_insn *insn = NULL;
  	bool success = true;
-@@ -253,6 +256,7 @@ static bool test_att_detail_order(csh handle)
+@@ -253,6 +257,7 @@ static bool test_att_detail_order(csh handle)
  				 CS_ERR_OK,
  			 "restore Intel syntax");
  	return success;
@@ -599,7 +603,7 @@ index fc025de0..69a341bf 100644
  
  /* mov dword ptr [r16], eax: REX2.B4 extends the ModR/M base. */
 diff --git a/tests/unit/x86_apx_rex2_alu.c b/tests/unit/x86_apx_rex2_alu.c
-index e67bcdd1..577b7dfd 100644
+index e67bcdd1..c5982221 100644
 --- a/tests/unit/x86_apx_rex2_alu.c
 +++ b/tests/unit/x86_apx_rex2_alu.c
 @@ -337,6 +337,7 @@ static bool test_fixed_forms(csh handle, uint64_t add_eflags)
@@ -610,7 +614,7 @@ index e67bcdd1..577b7dfd 100644
  static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
  			  const char *mnemonic, const char *op_str,
  			  x86_reg first_reg, uint8_t first_access,
-@@ -370,9 +371,13 @@ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
+@@ -370,9 +371,14 @@ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
  	cs_free(insn, count);
  	return success;
  }
@@ -619,12 +623,13 @@ index e67bcdd1..577b7dfd 100644
  static bool test_att_syntax(csh handle)
  {
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
  	static const uint8_t reverse_subq[] = { 0xd5, 0x5d, 0x2b, 0xc7 };
  	static const uint8_t reverse_cmpb[] = { 0xd5, 0x55, 0x3a, 0xc7 };
  	static const uint8_t testw[] = { 0x66, 0xd5, 0x55, 0x85, 0xc7 };
-@@ -398,6 +403,7 @@ static bool test_att_syntax(csh handle)
+@@ -398,6 +404,7 @@ static bool test_att_syntax(csh handle)
  				 CS_ERR_OK,
  			 "restore Intel syntax");
  	return success;
@@ -633,16 +638,17 @@ index e67bcdd1..577b7dfd 100644
  
  static bool test_invalid(csh handle, const uint8_t *code, size_t code_size,
 diff --git a/tests/unit/x86_apx_rex2_push_pop.c b/tests/unit/x86_apx_rex2_push_pop.c
-index 05f8e28b..c2e7db7d 100644
+index 05f8e28b..20b99c0c 100644
 --- a/tests/unit/x86_apx_rex2_push_pop.c
 +++ b/tests/unit/x86_apx_rex2_push_pop.c
-@@ -176,15 +176,21 @@ int main(void)
+@@ -176,15 +176,22 @@ int main(void)
  	}
  	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
  	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
 -	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
 +	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
 +#endif
@@ -660,23 +666,24 @@ index 05f8e28b..c2e7db7d 100644
  		}
  		for (number = 0; number < 32; ++number) {
 diff --git a/tests/unit/x86_apx_setcc.c b/tests/unit/x86_apx_setcc.c
-index f415cd8d..e35eb80d 100644
+index f415cd8d..241fbf74 100644
 --- a/tests/unit/x86_apx_setcc.c
 +++ b/tests/unit/x86_apx_setcc.c
-@@ -316,7 +316,11 @@ int main(void)
+@@ -316,7 +316,12 @@ int main(void)
  	}
  	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
  	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
 -	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
 +#ifdef CAPSTONE_X86_ATT_DISABLE
-+	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_X86_ATT;
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
 +	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
 +#endif
  
  	for (cc = 0; cc < 16; ++cc) {
  		for (zu = 0; zu < 2; ++zu) {
-@@ -325,18 +329,24 @@ int main(void)
+@@ -325,18 +330,24 @@ int main(void)
  					success &= check_register_case(
  						intel, false, cc, zu != 0, w != 0,
  						number);

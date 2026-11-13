@@ -1,7 +1,7 @@
-name: Check every EVEX and AMX contract with both supported printers and single-owner failure cleanup
+name: Verify both address sizes and every available printer in APX AMX and EVEX suites
 on:
   push:
-    branches: [codex/capstone-all-enabled-printer-contracts]
+    branches: [codex/capstone-isa-printer-address-sizes]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: checked-isa-contracts-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: checked-address-size-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
