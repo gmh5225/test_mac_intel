@@ -1,7 +1,7 @@
-name: Compare FF /6 memory pushes against the published output implementation
+name: Verify and measure canonical broadcast operand and register details on standalone
 on:
   push:
-    branches: [codex/capstone-ff6-memory-costs]
+    branches: [codex/capstone-corrected-broadcast-standalone]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8a04d2ca0497837257c36406f88d91809cffbda9
+          ref: d843dcdf830e883697b348eff0ee47d99849ff90
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -44,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ff6-memory-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
+          name: corrected-broadcast-standalone-${{ matrix.trial }}-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
