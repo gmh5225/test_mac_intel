@@ -1,7 +1,7 @@
-name: Verify the exact four-backend release on i386 and amd64 functions using iced IntelFormatter and FastFormatter
+name: Measure the complete four-backend GNU release against both iced formatters on real i386 and amd64 functions
 on:
   push:
-    branches: [codex/capstone-four-backend-library-throughput]
+    branches: [codex/capstone-four-markup-real-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: four-backend-iced-${{ matrix.host }}-${{ matrix.cc }}
+          name: verified-arm-markup-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
