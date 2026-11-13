@@ -41,11 +41,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  command(['git','fetch','--no-tags','origin',expected['previous']],'fetch-prior-capstone',cs)
-  for label in ('base','published'):
-   ref=expected['previous' if label=='base' else 'capstone']
-   command(['git','checkout','--detach',ref],'select-'+label,cs)
+  for label in ('base','candidate'):
+   ref=expected['capstone']
    assert rev(cs)==ref
+   if label=='candidate':
+    change=r/'candidate.patch'
+    assert hashlib.sha256(change.read_bytes()).hexdigest()==expected['patch_sha256']
+    command(['git','apply',change],'apply-combined-writers',cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
@@ -73,8 +75,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     new_files=sorted(set(objects)-set(base_objects))
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
-    assert {Path(k).name for k in new_files}=={'X86ImmediateOutput.c.o','X86MemoryOutput.c.o'},new_files
-    assert {Path(k).name for k in changed}=={'X86OutputIterator.c.o','X86VectorOutput.c.o'},changed
+    assert not new_files,new_files
+    assert {Path(k).name for k in changed}=={'X86OutputIterator.c.o','X86VectorOutput.c.o','X86MemoryOutput.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
@@ -94,7 +96,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(65000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','published')):
+    for idx,label in enumerate(('base-copy','candidate')):
      plans=[]
      for cycle in range(11):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
