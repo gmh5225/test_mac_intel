@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 33536219..2ae8399c 100644
+index 33536219..1e9237ad 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -167,7 +167,7 @@ if(capstone_enabled_architectures STREQUAL "SPARC")
@@ -11,15 +11,24 @@ index 33536219..2ae8399c 100644
  endif()
  
  # Dedicated builds of these backends use their generated mnemonic tries.
-@@ -444,6 +444,8 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -444,7 +444,17 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86InstPrinterCommon.c
          arch/X86/X86Mapping.c
          arch/X86/X86Module.c
 +        arch/X86/X86OutputIterator.c
 +        arch/X86/X86VectorOutput.c
      )
++    # Generic x64 GCC lowers the fixed public buffers to REP STOS and REP MOVS.
++    # Give short copies and clears the usual scalar/vector or libc expansion.
++    if(capstone_enabled_architectures STREQUAL "X86" AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
++       AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
++       AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
++        set_property(SOURCE arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
++            APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-mstringop-strategy=libcall>")
++    endif()
      # MSVC can inline the decoder into the public iterator under LTCG, giving
      # even a compact scan a very large probed stack frame.
+     if(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND MSVC_C_ARCHITECTURE_ID STREQUAL "x64")
 diff --git a/Makefile b/Makefile
 index d7536526..69b80602 100644
 --- a/Makefile
@@ -135,17 +144,17 @@ index 97b899b5..aedc72c2 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 90ef6e93..c989d415 100644
+index 90ef6e93..997a24d0 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2942,6 +2942,13 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	return 0;
  }
  
-+/* AArch64 GCC materializes the general legacy reader state even when
-+ * scanning only for the public ID and length. */
-+#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__aarch64__) && \
-+    defined(__GNUC__) && !defined(__clang__)
++/* GCC materializes the full reader state for common legacy headers on
++ * dedicated Linux x86 decoders.  The public scan needs only ID and length. */
++#if defined(CAPSTONE_X86_ONLY) && defined(__linux__) && defined(__GNUC__) && \
++    !defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
 +#define X86_COMPACT_PUBLIC_HEADER
 +#endif
 +
