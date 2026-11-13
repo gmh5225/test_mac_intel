@@ -1,0 +1,38 @@
+name: Link the public Xcode libraries and framework on both Mac hosts
+on:
+  push:
+    branches: [codex/capstone-xcode-source-membership]
+    paths: [capstone-xcode/**, .github/workflows/capstone-xcode-membership.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        host: [macos-15, macos-15-intel]
+        target: [CapstoneStatic, CapstoneDynamic, CapstoneFramework]
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 25
+    env:
+      CAPSTONE_XCODE_TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-xcode
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 7c43e5beb1da0e76b9e12d13d614d7e26cd17076
+          path: source
+          persist-credentials: false
+      - run: python3 capstone-xcode/verify.py
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: xcode-library-${{ matrix.host }}-${{ matrix.target }}
+          path: evidence/
+          retention-days: 14
