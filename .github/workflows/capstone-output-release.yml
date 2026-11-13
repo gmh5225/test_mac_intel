@@ -1,7 +1,7 @@
-name: Verify complete ARM operand storage in MSVC, DIET, reduced and sanitizer configurations
+name: Verify the ARM defaults and both layout extents with supported C99 compilers
 on:
   push:
-    branches: [codex/capstone-arm-operand-storage-configs]
+    branches: [codex/capstone-portable-arm-operand-storage]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-operand-storage-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: portable-arm-storage-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

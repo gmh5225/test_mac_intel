@@ -1,8 +1,8 @@
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 4a7e97c3..8dfec3da 100644
+index 4a7e97c3..2a6b4643 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -945,27 +945,37 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -945,27 +945,41 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
@@ -18,8 +18,12 @@ index 4a7e97c3..8dfec3da 100644
 +};
 +#undef ARM_FOUR_EMPTY_OPS
 +#undef ARM_EMPTY_OP
-+_Static_assert(ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS,
-+	       "ARM operand defaults must cover all slots");
++/* Capstone builds as C99, including with MSVC. */
++typedef char ARMOperandDefaultsCoverSlots[
++    ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS ? 1 : -1];
++typedef char ARMOperandDefaultsCoverTail[
++    offsetof(cs_arm, operands) + sizeof(arm_empty_operands) == sizeof(cs_arm) ?
++        1 : -1];
 +
  void ARM_setup_op(cs_arm_op *op)
  {
