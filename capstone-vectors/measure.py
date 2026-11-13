@@ -16,7 +16,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference='a06235189645d7e20660af04d52f71005301e760'
+    reference='443006768b6518e28ba3fd10baacfbd7e4ba4914'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -49,7 +49,7 @@ def main(w):
         if label=='output':
             assert objects['integer'].keys()==objects[label].keys()
             changed={n for n in objects[label] if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/X86/X86OutputIterator.c.o'}
+            expected={'arch/X86/X86MemoryOutput.c.o'}
             assert changed==expected,(changed,expected)
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)

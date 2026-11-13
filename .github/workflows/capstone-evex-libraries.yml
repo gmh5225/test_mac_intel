@@ -1,7 +1,7 @@
-name: Measure verified byte-register condition writes in real i386 and amd64 functions
+name: Measure absolute i386 addressing through the verified memory emitter on real functions
 on:
   push:
-    branches: [codex/capstone-short-setcc-registers]
+    branches: [codex/capstone-i386-absolute-operand-record]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a06235189645d7e20660af04d52f71005301e760
+          ref: 443006768b6518e28ba3fd10baacfbd7e4ba4914
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: setcc-byte-register-${{ matrix.host }}-${{ matrix.cc }}
+          name: absolute-address-output-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

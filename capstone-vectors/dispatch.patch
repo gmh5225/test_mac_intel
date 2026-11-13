@@ -1,299 +1,139 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..b5232a57 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -66,7 +66,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			435, 439, 443, 447, 451, 455, 459, 463, 467, 471, 475, 479, 483, 487, 491, 495,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			496, 500, 504, 508, 512, 516, 520, 524, 528, 532, 536, 540, 544, 548, 552, 556,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -77,58 +77,58 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 	},
- 	{
- 		{
--			497, 501, 498, 502, 0, 0, 0, 0, 505, 509, 506, 510, 0, 0, 0, 0,
--			513, 517, 514, 518, 0, 0, 0, 0, 521, 525, 522, 526, 0, 0, 0, 0,
--			529, 533, 530, 534, 0, 0, 0, 0, 537, 541, 538, 542, 0, 0, 0, 0,
--			545, 549, 546, 550, 0, 0, 0, 0, 553, 557, 554, 558, 0, 0, 0, 0,
-+			561, 565, 562, 566, 0, 0, 0, 0, 569, 573, 570, 574, 0, 0, 0, 0,
-+			577, 581, 578, 582, 0, 0, 0, 0, 585, 589, 586, 590, 0, 0, 0, 0,
-+			593, 597, 594, 598, 0, 0, 0, 0, 601, 605, 602, 606, 0, 0, 0, 0,
-+			609, 613, 610, 614, 0, 0, 0, 0, 617, 621, 618, 622, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
-+			624, 628, 632, 636, 640, 644, 648, 652, 656, 660, 664, 668, 672, 676, 680, 684,
- 			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
--			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
--			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
--			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
-+			691, 695, 699, 703, 707, 711, 715, 719, 723, 727, 731, 735, 739, 743, 747, 751,
-+			0, 65534, 0, 65534, 753, 757, 761, 765, 769, 773, 770, 774, 0, 778, 0, 0,
-+			780, 784, 788, 792, 796, 800, 804, 808, 812, 816, 0, 0, 820, 824, 828, 832,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 772, 65535, 65535, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
--			0, 0, 0, 0, 0, 0, 0, 792, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 799, 803, 0, 807, 808, 812, 816, 820,
--			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
-+			0, 65533, 0, 836, 65535, 65535, 0, 0, 0, 840, 0, 844, 848, 0, 0, 852,
-+			0, 0, 0, 0, 0, 0, 0, 856, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 863, 867, 0, 871, 872, 876, 880, 884,
-+			0, 0, 0, 65535, 888, 892, 0, 0, 896, 900, 904, 908, 912, 916, 0, 921,
- 		},
- 		{
--			861, 865, 862, 866, 0, 0, 0, 0, 869, 873, 870, 874, 0, 0, 0, 0,
--			877, 881, 878, 882, 0, 0, 0, 0, 885, 889, 886, 890, 0, 0, 0, 0,
--			893, 897, 894, 898, 0, 0, 0, 0, 901, 905, 902, 906, 0, 0, 0, 0,
--			909, 913, 910, 914, 0, 0, 0, 0, 917, 921, 918, 922, 0, 0, 0, 0,
-+			925, 929, 926, 930, 0, 0, 0, 0, 933, 937, 934, 938, 0, 0, 0, 0,
-+			941, 945, 942, 946, 0, 0, 0, 0, 949, 953, 950, 954, 0, 0, 0, 0,
-+			957, 961, 958, 962, 0, 0, 0, 0, 965, 969, 966, 970, 0, 0, 0, 0,
-+			973, 977, 974, 978, 0, 0, 0, 0, 981, 985, 982, 986, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
-+			1340, 1348, 1356, 1364, 1372, 1380, 1388, 1396, 1404, 1412, 1420, 1428, 1436, 1444, 1452, 1460,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
-+			0, 65534, 0, 65534, 989, 993, 997, 1001, 1005, 1009, 1006, 1010, 0, 1014, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
- 			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1017,
- 		},
- 		{
--			861, 957, 862, 958, 0, 0, 0, 0, 869, 961, 870, 962, 0, 0, 0, 0,
--			877, 965, 878, 966, 0, 0, 0, 0, 885, 969, 886, 970, 0, 0, 0, 0,
--			893, 973, 894, 974, 0, 0, 0, 0, 901, 977, 902, 978, 0, 0, 0, 0,
--			909, 981, 910, 982, 0, 0, 0, 0, 917, 985, 918, 986, 0, 0, 0, 0,
-+			925, 1021, 926, 1022, 0, 0, 0, 0, 933, 1025, 934, 1026, 0, 0, 0, 0,
-+			941, 1029, 942, 1030, 0, 0, 0, 0, 949, 1033, 950, 1034, 0, 0, 0, 0,
-+			957, 1037, 958, 1038, 0, 0, 0, 0, 965, 1041, 966, 1042, 0, 0, 0, 0,
-+			973, 1045, 974, 1046, 0, 0, 0, 0, 981, 1049, 982, 1050, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
-+			1340, 1348, 1356, 1364, 1372, 1380, 1388, 1396, 1404, 1412, 1420, 1428, 1436, 1444, 1452, 1460,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
-+			0, 65534, 0, 65534, 989, 1053, 997, 1057, 1005, 1061, 1006, 1062, 0, 1066, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1017,
- 		},
- 		{
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -139,8 +139,8 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			1007, 1011, 1015, 1019, 1023, 1027, 1031, 1035, 1039, 1043, 1047, 1051, 1055, 1059, 1063, 1067,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			1071, 1075, 1079, 1083, 1087, 1091, 1095, 1099, 1103, 1107, 1111, 1115, 1119, 1123, 1127, 1131,
-+			1132, 1136, 1140, 1144, 1148, 1152, 1156, 1160, 1164, 1168, 1172, 1176, 1180, 1184, 1188, 1192,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -276,6 +276,22 @@ static const struct X86SimpleOutput x86_simple_outputs[] = {
- 	{ 261, "jge", "", UINT64_C(25769803776), { 25, 26, 0, 0 }, { 26, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 4, 0, 2, 4, { { 0, 4, 0 }, { 0, 0, 0 } } },
- 	{ 263, "jle", "", UINT64_C(60129542144), { 25, 26, 0, 0 }, { 26, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 4, 0, 2, 4, { { 0, 4, 0 }, { 0, 0, 0 } } },
- 	{ 262, "jg", "", UINT64_C(60129542144), { 25, 26, 0, 0 }, { 26, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 4, 0, 2, 4, { { 0, 4, 0 }, { 0, 0, 0 } } },
-+	{ 670, "seto", "", UINT64_C(8589934592), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 667, "setno", "", UINT64_C(8589934592), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 660, "setb", "", UINT64_C(137438953472), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 657, "setae", "", UINT64_C(137438953472), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 661, "sete", "", UINT64_C(34359738368), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 666, "setne", "", UINT64_C(34359738368), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 659, "setbe", "", UINT64_C(171798691840), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 658, "seta", "", UINT64_C(171798691840), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 673, "sets", "", UINT64_C(17179869184), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 669, "setns", "", UINT64_C(17179869184), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 671, "setp", "", UINT64_C(68719476736), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 668, "setnp", "", UINT64_C(68719476736), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 665, "setl", "", UINT64_C(25769803776), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 662, "setge", "", UINT64_C(25769803776), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 664, "setle", "", UINT64_C(60129542144), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 663, "setg", "", UINT64_C(60129542144), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 4, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
- 	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
- 	{ 8, "add", "", UINT64_C(63), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 0, 0, { { 0, 4, 3 }, { 0, 4, 1 } } },
- 	{ 512, "or", "", UINT64_C(17592192335900), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 8, 1, 0, 0, { { 0, 1, 3 }, { 0, 1, 1 } } },
-@@ -419,6 +435,22 @@ static const struct X86SimpleOutput x86_simple_outputs[] = {
- 	{ 261, "jge", "", UINT64_C(25769803776), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
- 	{ 263, "jle", "", UINT64_C(60129542144), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
- 	{ 262, "jg", "", UINT64_C(60129542144), { 25, 41, 0, 0 }, { 41, 0, 0, 0 }, { 7, 1, 0, 0 }, 2, 1, 2, 1, 8, 0, 2, 4, { { 0, 8, 0 }, { 0, 0, 0 } } },
-+	{ 670, "seto", "", UINT64_C(8589934592), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 667, "setno", "", UINT64_C(8589934592), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 660, "setb", "", UINT64_C(137438953472), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 657, "setae", "", UINT64_C(137438953472), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 661, "sete", "", UINT64_C(34359738368), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 666, "setne", "", UINT64_C(34359738368), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 659, "setbe", "", UINT64_C(171798691840), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 658, "seta", "", UINT64_C(171798691840), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 673, "sets", "", UINT64_C(17179869184), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 669, "setns", "", UINT64_C(17179869184), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 671, "setp", "", UINT64_C(68719476736), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 668, "setnp", "", UINT64_C(68719476736), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 665, "setl", "", UINT64_C(25769803776), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 662, "setge", "", UINT64_C(25769803776), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 664, "setle", "", UINT64_C(60129542144), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
-+	{ 663, "setg", "", UINT64_C(60129542144), { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, { 0, 0, 0, 0 }, 1, 0, 0, 1, 8, 2, 0, 0, { { 0, 1, 2 }, { 0, 0, 0 } } },
- 	{ 635, "rol", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
- 	{ 636, "ror", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
- 	{ 615, "rcl", "", UINT64_C(1099511627778), { 0, 0, 0, 0 }, { 25, 0, 0, 0 }, { 0, 0, 0, 0 }, 0, 1, 0, 2, 4, 1, 2, 1, { { 0, 4, 3 }, { 0, 1, 0 } } },
-@@ -566,18 +598,18 @@ static const struct X86SimpleRegister x86_simple_registers[4][16] = {
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index bd0f6c94..ea411ffe 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -9,6 +9,25 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
  
- static const uint16_t x86_shift_rows[2][3][8] = {
- 	{
--		{ 267, 268, 269, 270, 271, 272, 273, 274 },
-+		{ 299, 300, 301, 302, 303, 304, 305, 306 },
- 		{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 		{ 0, 0, 0, 0, 0, 0, 0, 0 },
- 	},
- 	{
--		{ 275, 276, 277, 278, 279, 280, 281, 282 },
--		{ 283, 284, 285, 286, 287, 288, 289, 290 },
--		{ 291, 292, 293, 294, 295, 296, 297, 298 },
-+		{ 307, 308, 309, 310, 311, 312, 313, 314 },
-+		{ 315, 316, 317, 318, 319, 320, 321, 322 },
-+		{ 323, 324, 325, 326, 327, 328, 329, 330 },
- 	},
- };
- 
- static const uint16_t x86_push_rows[2][2] = {
--	{ 299, 300 },
--	{ 301, 302 },
-+	{ 331, 332 },
-+	{ 333, 334 },
- };
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..ba3692f6 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -118,6 +118,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	const bool relative = form == X86_SIMPLE_RELATIVE;
- 	if (relative && size < (size_t)row->imm_offset + row->imm_size)
- 		return false;
-+	/* The only escaped fixed rows are SETcc r/m8 without REX. */
-+	if (form == X86_SIMPLE_FIXED && escaped && (size < 3 || code[2] < 0xc0))
-+		return false;
- 	uint64_t target = 0;
- 	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
- 	insn->id = row->id;
-@@ -125,7 +128,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	insn->bytes[0] = code[0];
--	if (form == X86_SIMPLE_FIXED) {
-+	if (form == X86_SIMPLE_FIXED && escaped) {
-+		modrm = code[2];
-+		const struct X86SimpleRegister *reg =
-+			&x86_simple_registers[0][modrm & 7];
-+		first = reg->reg;
-+		memcpy(insn->op_str, reg->name, sizeof(reg->name));
-+		memcpy(insn->bytes, code, 3);
-+		*insn_size = insn->size = 3;
-+	} else if (form == X86_SIMPLE_FIXED) {
- 		if (has_rex) {
- 			// REX-prefixed fixed rows describe low and extended stack registers.
- 			row += rex & 1;
-@@ -192,12 +203,12 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      first, second);
-+		cs_x86 *x = &insn->detail->x86;
-+		if (escaped) {
-+			x->opcode[0] = 0x0f;
-+			x->opcode[1] = opcode;
-+		}
- 		if (relative) {
--			cs_x86 *x = &insn->detail->x86;
--			if (escaped) {
--				x->opcode[0] = 0x0f;
--				x->opcode[1] = opcode;
--			}
- 			x->operands[0].type = X86_OP_IMM;
- 			x->operands[0].imm = (int64_t)target;
- 		}
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..14a4130d 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -250,6 +250,37 @@ struct CheckedRow {
- 	}
- };
- 
-+CheckedRow check_setcc(Decoder &decoder, unsigned opcode,
-+		       const RegisterTable &regs)
++/* In 32-bit addressing, an unprefixed mod=0, r/m=5 displacement is the
++ * entire address. The Intel printer renders its unsigned 32-bit value. */
++static char *writeAbsoluteAddress(char *out, uint32_t address)
 +{
-+	CheckedRow row;
-+	for (unsigned mr = 0xc0; mr <= 0xff; ++mr) {
-+		const uint8_t bytes[] = { 0x0f, uint8_t(opcode), uint8_t(mr) };
-+		decoder.decode(bytes, sizeof(bytes), sizeof(bytes),
-+			       UINT64_MAX - mr);
-+		const auto &insn = *decoder.insn;
-+		cs_detail detail = *insn.detail;
-+		auto &x = detail.x86;
-+		const auto &reg = regs[0][mr & 7];
-+		if (x.op_count != 1 || x.operands[0].type != X86_OP_REG ||
-+		    unsigned(x.operands[0].reg) != reg.reg ||
-+		    strcmp(insn.op_str, reg.name) || x.opcode[0] != 0x0f ||
-+		    x.opcode[1] != opcode)
-+			throw std::runtime_error(
-+				"unexpected byte condition register");
-+		// Project the varying register and the shared escape before the
-+		// full-byte detail comparison in describe().
-+		cs_insn projected = insn;
-+		projected.detail = &detail;
-+		projected.op_str[0] = '\0';
-+		x.operands[0].reg = X86_REG_INVALID;
-+		x.opcode[1] = 0;
-+		row.observe(describe(projected, 0x0f, 0, uint8_t(mr), nullptr,
-+				     nullptr));
++	if (address <= HEX_THRESHOLD) {
++		*out++ = (char)('0' + address);
++		return out;
 +	}
-+	return row;
++	char digits[8], *p = digits + sizeof(digits);
++	do {
++		*--p = "0123456789abcdef"[address & 15];
++		address >>= 4;
++	} while (address);
++	memcpy(out, "0x", 2);
++	const size_t length = (size_t)(digits + sizeof(digits) - p);
++	memcpy(out + 2, p, length);
++	return out + 2 + length;
 +}
 +
- CheckedRow check_fixed(Decoder &decoder, unsigned opcode)
- {
- 	CheckedRow row;
-@@ -583,6 +614,8 @@ int main()
- 				CheckedRow row;
- 				if (!cls && fixed_opcode(op, wide))
- 					row = check_fixed(decoder, op);
-+				else if (cls == 3 && (op & 0xf0) == 0x90)
-+					row = check_setcc(decoder, op, regs);
- 				else if (relative_opcode(cls, op)) {
- 					form = X86_SIMPLE_RELATIVE;
- 					row = check_relative(decoder, wide, cls,
+ /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
+ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			   uint16_t *insn_size,
+@@ -20,11 +39,11 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	const unsigned lead = rex != 0;
+ 	const uint8_t opcode = code[lead], modrm = code[lead + 1];
+ 	const unsigned mod = modrm >> 6, rm = modrm & 7;
+-	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const bool sib = rm == 4, disp32_only = !mod && rm == 5;
+ 	const unsigned offset = lead + 2 + sib;
+-	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
++	const unsigned disp_size = mod == 2 || disp32_only ? 4 : mod;
+ 	const unsigned length = offset + disp_size;
+-	if (size < length || (rip && !wide))
++	if (size < length)
+ 		return false;
+ 
+ 	unsigned base_reg = rm;
+@@ -81,24 +100,28 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		       11);
+ 		out += 11;
+ 	}
+-	if (rip) {
+-		memcpy(out, "rip", 3);
+-		out += 3;
++	if (disp32_only && !wide) {
++		out = writeAbsoluteAddress(out, (uint32_t)displacement);
+ 	} else {
+-		memcpy(out, base->name, sizeof(base->name));
+-		out += base->length;
+-	}
+-	if (index) {
+-		memcpy(out, " + ", 3);
+-		out += 3;
+-		memcpy(out, index->name, sizeof(index->name));
+-		out += index->length;
+-		if (scale_bits) {
+-			*out++ = '*';
+-			*out++ = (char)('0' + (1u << scale_bits));
++		if (disp32_only) {
++			memcpy(out, "rip", 3);
++			out += 3;
++		} else {
++			memcpy(out, base->name, sizeof(base->name));
++			out += base->length;
++		}
++		if (index) {
++			memcpy(out, " + ", 3);
++			out += 3;
++			memcpy(out, index->name, sizeof(index->name));
++			out += index->length;
++			if (scale_bits) {
++				*out++ = '*';
++				*out++ = (char)('0' + (1u << scale_bits));
++			}
+ 		}
++		out = X86_writeDisplacement(out, displacement);
+ 	}
+-	out = X86_writeDisplacement(out, displacement);
+ 	*out++ = ']';
+ 	if (!load && !push) {
+ 		memcpy(out, ", ", 2);
+@@ -110,7 +133,9 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		cs_x86 *x = &insn->detail->x86;
+ 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
+ 		mem->type = X86_OP_MEM;
+-		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
++		mem->mem.base = disp32_only ?
++					(wide ? X86_REG_RIP : X86_REG_INVALID) :
++					(x86_reg)base->reg;
+ 		mem->mem.scale = 1 << scale_bits;
+ 		if (index)
+ 			mem->mem.index = (x86_reg)index->reg;
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..b94056c9 100644
+index 6990d510..ddf3c0c6 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -64,6 +64,14 @@ static bool check_branches(csh handles[2])
+@@ -64,6 +64,34 @@ static bool check_branches(csh handles[2])
  					return false;
  		}
  	}
-+	for (unsigned opcode = 0x90; opcode <= 0x9f; ++opcode)
-+		for (unsigned mr = 0; mr < 256; ++mr) {
-+			uint8_t bytes[8] = { 0x0f, (uint8_t)opcode,
-+					     (uint8_t)mr };
-+			for (size_t size = 1; size <= sizeof(bytes); ++size)
-+				if (!compare(handles, bytes, size, mr))
-+					return false;
-+		}
++	/* mod=00, r/m=101 selects absolute disp32 or RIP-relative by mode. */
++	static const uint32_t addresses[] = { 0,	 1,	     9,
++					      10,	 0x7f,	     0x80,
++					      0x100,	 0x7fffffff, 0x80000000,
++					      UINT32_MAX };
++	static const uint8_t memory_opcodes[] = { 0x00, 0x01, 0x03, 0x29, 0x39,
++						  0x84, 0x85, 0x88, 0x89, 0x8a,
++						  0x8b, 0x8d, 0xff };
++	for (size_t i = 0; i < sizeof(memory_opcodes); ++i)
++		for (unsigned reg = 0; reg < 8; ++reg)
++			for (size_t a = 0;
++			     a < sizeof(addresses) / sizeof(addresses[0]);
++			     ++a) {
++				uint8_t bytes[] = { memory_opcodes[i],
++						    (uint8_t)(reg * 8 + 5),
++						    0,
++						    0,
++						    0,
++						    0 };
++				for (unsigned j = 0; j < 4; ++j)
++					bytes[j + 2] = (uint8_t)(addresses[a] >>
++								 (8 * j));
++				for (size_t size = 1; size <= sizeof(bytes);
++				     ++size)
++					if (!compare(handles, bytes, size,
++						     (unsigned)a))
++						return false;
++			}
  	return true;
  }
  
