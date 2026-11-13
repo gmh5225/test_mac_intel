@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <dlfcn.h>
 #include <exception>
+#include <mach/mach.h>
 #include <pthread.h>
 #include <sched.h>
 #include <signal.h>
@@ -97,10 +98,20 @@ int main(int argc, char **argv) {
   action.sa_sigaction = observe;
   action.sa_flags = SA_SIGINFO | (alternate ? SA_ONSTACK : 0);
   sigemptyset(&action.sa_mask);
-  if (sigaction(SIGUSR1,&action,nullptr) || pthread_sigmask(SIG_SETMASK,nullptr,&beforeMask)) return 6;
+  if (sigaction(site.AtProtectedCall ? SIGTRAP : SIGUSR1,&action,nullptr) || pthread_sigmask(SIG_SETMASK,nullptr,&beforeMask)) return 6;
   exception = std::make_exception_ptr(Marker{73});
-  pthread_t monitor;
-  if (pthread_create(&monitor,nullptr,interrupt,nullptr)) return 7;
+  pthread_t monitor{};
+  if (site.AtProtectedCall) {
+    arm_debug_state64_t debug{};
+    debug.__bvr[0] = site.Begin;
+    // DBGBCR: enable, EL0 match, all four instruction bytes.
+    debug.__bcr[0] = (0xfu << 5) | (2u << 1) | 1u;
+    auto thread = mach_thread_self();
+    auto result = thread_set_state(thread,ARM_DEBUG_STATE64,
+        reinterpret_cast<thread_state_t>(&debug),ARM_DEBUG_STATE64_COUNT);
+    mach_port_deallocate(mach_task_self(),thread);
+    if (result != KERN_SUCCESS) return 7;
+  } else if (pthread_create(&monitor,nullptr,interrupt,nullptr)) return 7;
   try {
     Outer outer;
     try {
@@ -114,5 +125,5 @@ int main(int argc, char **argv) {
   } catch (const Marker &m) {
     if (trace != expected*10+2 || m.value != 73 || std::current_exception()!=exception) return 16;
   }
-  return pthread_join(monitor,nullptr) || !handled.load() || dlclose(image);
+  return (!site.AtProtectedCall && pthread_join(monitor,nullptr)) || !handled.load() || dlclose(image);
 }
