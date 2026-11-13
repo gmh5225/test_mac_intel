@@ -1,7 +1,7 @@
-name: Build NeverD with the regenerated four-backend decoder and live fork LLVM sources
+name: Build and measure the complete NeverD four-backend decoder using current fork LLVM sources and AArch64 immediate scan
 on:
   push:
-    branches: [codex/neverd-four-source-default-printer]
+    branches: [codex/neverd-four-aarch64-scan-source]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: regenerated-production
+          name: a64-scan-production
           path: product-evidence/
           retention-days: 14
