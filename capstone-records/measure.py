@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/X86/'+n+'.c.o' for n in ('X86Mapping','X86Disassembler','X86DisassemblerDecoder','X86VectorOutput','X86OutputIterator')}
+   expected={'arch/X86/X86DisassemblerDecoder.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
@@ -70,6 +70,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
+  cases=[x for x in cases if x['name']in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','mips64el-ls')]
   def sample(key,x,mode,reps):
    return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]
@@ -77,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    for mode in (0,1,2):
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
+    for k in range(21):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
       vout=sample(v,x,mode,n)

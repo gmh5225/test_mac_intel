@@ -641,7 +641,7 @@ index ae1554b0..da53269e 100644
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 01559e08..8e6577c8 100644
+index 01559e08..f715832b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
@@ -670,6 +670,28 @@ index 01559e08..8e6577c8 100644
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+@@ -3752,6 +3762,21 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					  cs_insn *insn, uint16_t *insn_size,
+ 					  bool batch)
+ {
++#if defined(CAPSTONE_X86_VECTOR_OUTPUT) && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	/* A leading EVEX in ordinary long mode never denotes a legacy opcode.
++	 * Reuse the same validated public row as the fallback scan. */
++	if (size && code[0] == 0x62 && handle->mode == CS_MODE_64 &&
++	    handle->insn_id == X86_get_insn_id) {
++		X86ScanResult result;
++		if (!X86_scanEvexOutputForm(code, size, &result) &&
++		    !decodeScanResultGeneric((csh)(uintptr_t)handle, code, size,
++					     insn, &result, 0x62, true))
++			return false;
++		*insn_size = result.length;
++		finish_x86_scan(handle, insn, &result, code, batch, true);
++		return true;
++	}
++#endif
+ 	unsigned instructionID = 0;
+ 	uint16_t length;
+ 	int initial = tryInitialScanResult(handle, code, size, &instructionID,
 diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
 index ae3428b5..14aefc93 100644
 --- a/arch/X86/X86DisassemblerDecoder.h
