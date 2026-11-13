@@ -26,7 +26,7 @@ def main(w):
     old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
-    save('variants.json',dict(integer='published '+reference,compact='write hexadecimal pairs in place',output='generated padded vector register names'))
+    save('variants.json',dict(integer='published '+reference,aa='byte-identical published executable',output='isolated register, push and shift immediate records'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -35,8 +35,10 @@ def main(w):
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
-    for label in ('integer','compact','output'):
-        patches=[] if label=='integer' else [r/({'compact':'digits','output':'names'}[label]+'.patch')]
+    for label in ('integer','aa','output'):
+        if label=='aa':
+            exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
+        patches=[] if label=='integer' else [r/'dispatch.patch']
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = X86_disasmIter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
@@ -44,7 +46,7 @@ def main(w):
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
-    run(['git','apply',r/'names.patch'],'apply-census',tree)
+    run(['git','apply',r/'dispatch.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
     run(['clang++','-O2','-std=c++17','-I',tree/'include',r/'census.cpp',b/'libcapstone.a','-o',w/'census'],'census-link')
@@ -62,7 +64,7 @@ def main(w):
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
             for mode in [0,1,2]:
-                labels=['integer','compact','output','iced']+(['fast']if mode else [])
+                labels=['integer','aa','output','iced']+(['fast']if mode else [])
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
                 for i in range(15):
