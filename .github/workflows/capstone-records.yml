@@ -1,7 +1,7 @@
-name: Qualify integrated mixed GNU x86 scan and output on mixed
+name: Use production public scan and x86 text entry points for mixed paired controls
 on:
   push:
-    branches: [codex/capstone-gnu-mixed-integrated-executables]
+    branches: [codex/capstone-gnu-exact-entry-executables]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: integrated-gnu-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: gnu-exact-entry-executables-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

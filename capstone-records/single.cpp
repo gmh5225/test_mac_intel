@@ -100,7 +100,7 @@ static Result run(Session &session,const std::vector<uint8_t>&bytes_,unsigned re
     const uint8_t *cursor = bytes;
     size_t left = count;
     uint64_t ip = 0x100000;
-    auto iterate = session.bits >= 16 ? &X86_disasmIter : api.cs_disasm_iter;
+    auto iterate = session.bits >= 16 && session.mode ? &X86_disasmIter : api.cs_disasm_iter;
     while (left) {
       size_t offset = cursor - bytes;
       bool ok = iterate(handle, &cursor, &left, &ip, insn);
