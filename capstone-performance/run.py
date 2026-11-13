@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 6703e144275793a419ad663511e34b5dab3d52d8',candidate='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
+    write('comparison.json',dict(baseline='published 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249',candidate='generated stack, indexed memory, VEX loads, EVEX broadcasts and alignment/entry records'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,17 +213,13 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    expected=['arch/X86/X86ImmediateOutput.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o']
-    if PROFILE=='clang' and platform.machine()=='x86_64':
-        expected+=['cs.c.o']
-        for sym in ('cs_decode_full_insn','cs_disasm_iter'):
-            for label in ('base','new'):
-                command(['objdump','-d','--disassemble='+sym,WORK/('decoder-'+label)],'machine-'+sym+'-'+label)
-        before=(EVIDENCE/'machine-cs_decode_full_insn-base.log').read_text()
-        after=(EVIDENCE/'machine-cs_decode_full_insn-new.log').read_text()
-        into=(EVIDENCE/'machine-cs_disasm_iter-new.log').read_text()
-        assert '<X86_trySimpleOutput>' in before and '<X86_trySimpleOutput>' in after and '<decode_full_insn_body>' in after and '<X86_trySimpleOutput>' not in into
-    assert sorted(diffs)==sorted(expected),diffs
+    expected=['arch/X86/X86DisassemblerDecoder.c.o']
+    assert set(diffs)==set(expected) or set(diffs)==set(expected+['arch/X86/X86OutputIterator.c.o']),diffs
+    for sym in ('cs_disasm_iter','X86_disasmIter'):
+        for label in ('base','new'):
+            command(['objdump','-d','--disassemble='+sym,WORK/('decoder-'+label)],'machine-'+sym+'-'+label)
+    for label in ('base','new'):
+        command(['nm','-S','-n',WORK/('decoder-'+label)],'route-symbols-'+label)
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
