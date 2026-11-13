@@ -50,7 +50,7 @@ def main(w):
         a=standalone.index('  void *iced=iced_create(');z=standalone.index('  if(engine=="audit")',a)
         standalone=standalone[:a]+'  if (!insn || engine!="capstone") return 5;\n'+standalone[z:]
         a=standalone.index('  if(engine=="audit")');z=standalone.index('  if(engine!="capstone"',a)
-        standalone=standalone[:a]+standalone[z:]
+        standalone=standalone[:a]+'  {\n'+standalone[z:]
         a=standalone.index('        if(engine=="capstone") row=cs_span');z=standalone.index('\n',standalone.index('else iced_run',a))
         standalone=standalone[:a]+'        row=cs_span(bytes.data()+f.offset,f.size,handle,insn,f.ip,mode);'+standalone[z:]
         standalone=standalone.replace('iced_destroy(iced);','')
