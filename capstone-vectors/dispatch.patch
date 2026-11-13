@@ -1,629 +1,788 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 88d21fa2..1482e8d9 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -158,6 +158,8 @@ if(capstone_enabled_architectures STREQUAL "X86")
-     add_compile_definitions(CAPSTONE_X86_ONLY)
- elseif(capstone_enabled_architectures STREQUAL "MIPS;X86")
-     add_compile_definitions(CAPSTONE_X86_MIPS_ONLY)
-+elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-+    add_compile_definitions(CAPSTONE_ARM_AARCH64_MIPS_X86)
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "ARM")
-@@ -469,7 +471,8 @@ if(CAPSTONE_X86_SUPPORT)
-     )
-     # Use scalar/vector stores or libc for the fixed public output buffers.
-     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
--    if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86")
-+    if((capstone_enabled_architectures STREQUAL "X86" OR capstone_enabled_architectures STREQUAL "MIPS;X86"
-+        OR capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
-        AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
-        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
-diff --git a/Makefile b/Makefile
-index 1cb04b92..44471169 100644
---- a/Makefile
-+++ b/Makefile
-@@ -119,6 +119,8 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
- CFLAGS += -DCAPSTONE_X86_ONLY
- else ifeq ($(sort $(CAPSTONE_ARCHS)),mips x86)
- CFLAGS += -DCAPSTONE_X86_MIPS_ONLY
-+else ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64 arm mips x86)
-+CFLAGS += -DCAPSTONE_ARM_AARCH64_MIPS_X86
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
-@@ -664,8 +666,7 @@ else
- endif
- 
- # Match the Release x86 formatter tuning for the compiler's target.
--ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
--ifeq (,$(filter-out mips x86,$(CAPSTONE_ARCHS)))
-+ifneq (,$(filter -DCAPSTONE_X86_ONLY -DCAPSTONE_X86_MIPS_ONLY -DCAPSTONE_ARM_AARCH64_MIPS_X86,$(CFLAGS)))
- ifneq (,$(filter -O2 -O3,$(CFLAGS)))
- X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/dev/null | \
-     awk '$$2 == "__linux__" { linux_target=1 } $$2 == "__x86_64__" { x64=1 } \
-@@ -675,7 +676,6 @@ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/de
- $(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
- endif
- endif
--endif
- 
- $(OBJDIR)/%.o: %.c
- 	@mkdir -p $(@D)
-diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index cbaebc8f..bc81cee8 100644
---- a/arch/AArch64/AArch64Mapping.c
-+++ b/arch/AArch64/AArch64Mapping.c
-@@ -906,7 +906,13 @@ void AArch64_set_instr_map_data(MCInst *MI)
- 	map_groups(MI, aarch64_insns);
- }
- 
--#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
-+#if defined(CAPSTONE_AARCH64_DEDICATED_SCAN) || \
-+	(defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	 defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__))
-+#define CAPSTONE_AARCH64_SCAN_IMMEDIATES
-+#endif
-+
-+#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
- /* These A64 classes have no reserved operand encodings. For a text-free
-  * scan, the table's internal opcode suffices for the normal public mapper. */
- static unsigned scanImmediateOpcode(uint32_t word)
-@@ -938,7 +944,7 @@ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			    MCInst *MI, uint16_t *size, uint64_t address,
- 			    void *info)
- {
--#ifdef CAPSTONE_AARCH64_DEDICATED_SCAN
-+#ifdef CAPSTONE_AARCH64_SCAN_IMMEDIATES
- 	if (code_len >= 4 && MI->csh->no_text && !MI->flat_insn->detail &&
- 	    MI->csh->disasm == AArch64_getInstruction) {
- 		unsigned opcode = scanImmediateOpcode(readBytes32(MI, code));
-diff --git a/arch/ARM/ARMInstPrinter.c b/arch/ARM/ARMInstPrinter.c
-index ebe301e2..afe37a02 100644
---- a/arch/ARM/ARMInstPrinter.c
-+++ b/arch/ARM/ARMInstPrinter.c
-@@ -135,7 +135,7 @@ static inline void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
- 		unsigned Reg = MCOperand_getReg(Op);
- 		printRegName(O, Reg);
- 	} else if (MCOperand_isImm(Op)) {
--		SStream_concat(O, "%s", markup("<imm:"));
-+		ARM_printMarkup(O, "<imm:");
- 		SStream_concat1(O, '#');
- 		printInt64(O, MCOperand_getImm(Op));
- 		SStream_concat0(O, markup(">"));
-@@ -208,7 +208,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
- 		return;
+diff --git a/tests/unit/x86_amx_compute.c b/tests/unit/x86_amx_compute.c
+index 282ff027..20248a20 100644
+--- a/tests/unit/x86_amx_compute.c
++++ b/tests/unit/x86_amx_compute.c
+@@ -199,11 +199,13 @@ int main(void)
  	}
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[pc, ");
- 
- 	int32_t OffImm = (int32_t)MCOperand_getImm(MO1);
-@@ -216,7 +216,7 @@ static inline void printThumbLdrLabelOperand(MCInst *MI, unsigned OpNum,
- 	// Special value for #-0. All others are normal.
- 	if (OffImm == INT32_MIN)
- 		OffImm = 0;
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	printInt32Bang(O, OffImm);
- 	SStream_concat0(O, markup(">"));
- 	SStream_concat(O, "%s", "]");
-@@ -274,7 +274,7 @@ static inline void printAM2PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
- 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
- 	MCOperand *MO3 = MCInst_getOperand(MI, (Op + 2));
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 
-@@ -310,7 +310,7 @@ static inline void printAddrModeTBB(MCInst *MI, unsigned Op, SStream *O)
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_AddrModeTBB, Op);
- 	MCOperand *MO1 = MCInst_getOperand(MI, (Op));
- 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	SStream_concat0(O, ", ");
-@@ -324,7 +324,7 @@ static inline void printAddrModeTBH(MCInst *MI, unsigned Op, SStream *O)
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_AddrModeTBH, Op);
- 	MCOperand *MO1 = MCInst_getOperand(MI, (Op));
- 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	SStream_concat0(O, ", ");
-@@ -357,7 +357,7 @@ static inline void printAddrMode2OffsetOperand(MCInst *MI, unsigned OpNum,
- 
- 	if (!MCOperand_getReg(MO1)) {
- 		unsigned ImmOffs = ARM_AM_getAM2Offset(MCOperand_getImm(MO2));
--		SStream_concat(O, "%s", markup("<imm:"));
-+		ARM_printMarkup(O, "<imm:");
- 		SStream_concat1(O, '#');
- 		SStream_concat(O, "%s",
- 			       ARM_AM_getAddrOpcStr(
-@@ -387,7 +387,7 @@ static inline void printAM3PreOrOffsetIndexOp(MCInst *MI, unsigned Op,
- 	MCOperand *MO2 = MCInst_getOperand(MI, (Op + 1));
- 	MCOperand *MO3 = MCInst_getOperand(MI, (Op + 2));
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 
- 	printRegName(O, MCOperand_getReg(MO1));
-@@ -450,7 +450,7 @@ static inline void printAddrMode3OffsetOperand(MCInst *MI, unsigned OpNum,
- 	}
- 
- 	unsigned ImmOffs = ARM_AM_getAM3Offset(MCOperand_getImm(MO2));
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	SStream_concat1(O, '#');
- 	SStream_concat(
- 		O, "%s",
-@@ -465,7 +465,7 @@ static inline void printPostIdxImm8Operand(MCInst *MI, unsigned OpNum,
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_PostIdxImm8Operand, OpNum);
- 	MCOperand *MO = MCInst_getOperand(MI, (OpNum));
- 	unsigned Imm = MCOperand_getImm(MO);
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	SStream_concat1(O, '#');
- 	SStream_concat(O, "%s", ((Imm & 256) ? "" : "-"));
- 	printUInt32(O, (Imm & 0xff));
-@@ -489,7 +489,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_PostIdxImm8s4Operand, OpNum);
- 	MCOperand *MO = MCInst_getOperand(MI, (OpNum));
- 	unsigned Imm = MCOperand_getImm(MO);
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	SStream_concat1(O, '#');
- 	SStream_concat(O, "%s", ((Imm & 256) ? "" : "-"));
- 	printUInt32(O, (Imm & 0xff) << 2);
-@@ -506,7 +506,7 @@ static inline void printPostIdxImm8s4Operand(MCInst *MI, unsigned OpNum,
- 		MCOperand *MO1 = MCInst_getOperand(MI, (OpNum)); \
- 		MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1)); \
- \
--		SStream_concat(O, "%s", markup("<mem:")); \
-+		ARM_printMarkup(O, "<mem:"); \
- 		SStream_concat0(O, "["); \
- 		printRegName(O, MCOperand_getReg(MO1)); \
- 		SStream_concat0(O, ", "); \
-@@ -535,7 +535,7 @@ DEFINE_printMveAddrModeRQOperand(2);
- 		MCOperand *MO1 = MCInst_getOperand(MI, (OpNum)); \
- 		MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1)); \
- \
--		SStream_concat(O, "%s", markup("<mem:")); \
-+		ARM_printMarkup(O, "<mem:"); \
- 		SStream_concat0(O, "["); \
- 		printRegName(O, MCOperand_getReg(MO1)); \
- \
-@@ -569,7 +569,7 @@ DEFINE_printAddrMode5Operand(true);
- 			return; \
- 		} \
- \
--		SStream_concat(O, "%s", markup("<mem:")); \
-+		ARM_printMarkup(O, "<mem:"); \
- 		SStream_concat0(O, "["); \
- 		printRegName(O, MCOperand_getReg(MO1)); \
- \
-@@ -595,7 +595,7 @@ static inline void printAddrMode6Operand(MCInst *MI, unsigned OpNum, SStream *O)
- 	MCOperand *MO1 = MCInst_getOperand(MI, (OpNum));
- 	MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1));
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	if (MCOperand_getImm(MO2)) {
-@@ -610,7 +610,7 @@ static inline void printAddrMode7Operand(MCInst *MI, unsigned OpNum, SStream *O)
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_AddrMode7Operand, OpNum);
- 	MCOperand *MO1 = MCInst_getOperand(MI, (OpNum));
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	SStream_concat(O, "%s", "]");
-@@ -639,7 +639,7 @@ static inline void printBitfieldInvMaskImmOperand(MCInst *MI, unsigned OpNum,
- 	int32_t lsb = CountTrailingZeros_32(v);
- 	int32_t width = (32 - countLeadingZeros(v)) - lsb;
- 
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	SStream_concat1(O, '#');
- 	printInt32(O, lsb);
- 	SStream_concat(O, "%s%s%s", markup(">"), ", ", markup("<imm:"));
-@@ -963,7 +963,7 @@ static inline void printThumbS4ImmOperand(MCInst *MI, unsigned OpNum,
- 					  SStream *O)
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_ThumbS4ImmOperand, OpNum);
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	printInt64Bang(O, MCOperand_getImm(MCInst_getOperand(MI, (OpNum))) * 4);
- 	SStream_concat0(O, markup(">"));
- }
-@@ -972,7 +972,7 @@ static inline void printThumbSRImm(MCInst *MI, unsigned OpNum, SStream *O)
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_ThumbSRImm, OpNum);
- 	unsigned Imm = MCOperand_getImm(MCInst_getOperand(MI, (OpNum)));
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	printUInt32Bang(O, (Imm == 0 ? 32 : Imm));
- 	SStream_concat0(O, markup(">"));
- }
-@@ -1006,7 +1006,7 @@ static inline void printThumbAddrModeRROperand(MCInst *MI, unsigned Op,
- 		return;
- 	}
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	unsigned RegNum = MCOperand_getReg(MO2);
-@@ -1030,7 +1030,7 @@ static inline void printThumbAddrModeImm5SOperand(MCInst *MI, unsigned Op,
- 		return;
- 	}
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	unsigned ImmOffs = MCOperand_getImm(MO2);
-@@ -1107,7 +1107,7 @@ static inline void printT2SOOperand(MCInst *MI, unsigned OpNum, SStream *O)
- 			return; \
- 		} \
- \
--		SStream_concat(O, "%s", markup("<mem:")); \
-+		ARM_printMarkup(O, "<mem:"); \
- 		SStream_concat0(O, "["); \
- 		printRegName(O, MCOperand_getReg(MO1)); \
- \
-@@ -1143,7 +1143,7 @@ DEFINE_printAddrModeImm12Operand(true);
- 		MCOperand *MO1 = MCInst_getOperand(MI, (OpNum)); \
- 		MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1)); \
- \
--		SStream_concat(O, "%s", markup("<mem:")); \
-+		ARM_printMarkup(O, "<mem:"); \
- 		SStream_concat0(O, "["); \
- 		printRegName(O, MCOperand_getReg(MO1)); \
- \
-@@ -1185,7 +1185,7 @@ DEFINE_printT2AddrModeImm8Operand(false);
- 			return; \
- 		} \
- \
--		SStream_concat(O, "%s", markup("<mem:")); \
-+		ARM_printMarkup(O, "<mem:"); \
- 		SStream_concat0(O, "["); \
- 		printRegName(O, MCOperand_getReg(MO1)); \
- \
-@@ -1218,7 +1218,7 @@ static inline void printT2AddrModeImm0_1020s4Operand(MCInst *MI, unsigned OpNum,
- 	MCOperand *MO1 = MCInst_getOperand(MI, (OpNum));
- 	MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1));
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 	if (MCOperand_getImm(MO2)) {
-@@ -1277,7 +1277,7 @@ static inline void printT2AddrModeSoRegOperand(MCInst *MI, unsigned OpNum,
- 	MCOperand *MO2 = MCInst_getOperand(MI, (OpNum + 1));
- 	MCOperand *MO3 = MCInst_getOperand(MI, (OpNum + 2));
- 
--	SStream_concat(O, "%s", markup("<mem:"));
-+	ARM_printMarkup(O, "<mem:");
- 	SStream_concat0(O, "[");
- 	printRegName(O, MCOperand_getReg(MO1));
- 
-@@ -1298,7 +1298,7 @@ static inline void printFPImmOperand(MCInst *MI, unsigned OpNum, SStream *O)
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_FPImmOperand, OpNum);
- 	MCOperand *MO = MCInst_getOperand(MI, (OpNum));
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	printFloatBang(O, ARM_AM_getFPImmFloat(MCOperand_getImm(MO)));
- 	SStream_concat0(O, markup(">"));
- }
-@@ -1310,7 +1310,7 @@ static inline void printVMOVModImmOperand(MCInst *MI, unsigned OpNum,
- 	unsigned EncodedImm = MCOperand_getImm(MCInst_getOperand(MI, (OpNum)));
- 	unsigned EltBits;
- 	uint64_t Val = ARM_AM_decodeVMOVModImm(EncodedImm, &EltBits);
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	printUInt64Bang(O, Val);
- 	SStream_concat0(O, markup(">"));
- }
-@@ -1320,7 +1320,7 @@ static inline void printImmPlusOneOperand(MCInst *MI, unsigned OpNum,
- {
- 	ARM_add_cs_detail_0(MI, ARM_OP_GROUP_ImmPlusOneOperand, OpNum);
- 	unsigned Imm = MCOperand_getImm(MCInst_getOperand(MI, (OpNum)));
--	SStream_concat(O, "%s", markup("<imm:"));
-+	ARM_printMarkup(O, "<imm:");
- 	printUInt32Bang(O, Imm + 1);
- 	SStream_concat0(O, markup(">"));
- }
-diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 11e5e995..844ba11a 100644
---- a/arch/ARM/ARMMapping.c
-+++ b/arch/ARM/ARMMapping.c
-@@ -832,6 +832,11 @@ void ARM_check_updates_flags(MCInst *MI)
- #endif // CAPSTONE_DIET
- }
- 
-+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
-+#define ARM_GNU_MIXED_SCAN
+ 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+ 		success &= test_case(handle64, &cases[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle64, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+ 		success &= test_case(handle64, &cases[i], true);
 +#endif
-+
- void ARM_set_instr_map_data(MCInst *MI)
- {
- 	/* The ARM decoder indexes this same generated map for implicit effects. */
-@@ -848,6 +853,24 @@ bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 			MCInst *instr, uint16_t *size, uint64_t address,
- 			void *info)
- {
-+#ifdef ARM_GNU_MIXED_SCAN
-+	/* Every displacement is valid for these A32 immediate branches. */
-+	if (instr->csh->no_text && !instr->flat_insn->detail &&
-+	    instr->csh->mode == CS_MODE_ARM &&
-+	    instr->csh->disasm == ARM_getInstruction && code_len >= 4 &&
-+	    (code[3] & 0x0e) == 0x0a) {
-+		unsigned cond = code[3] >> 4;
-+		unsigned opcode = ARM_Bcc;
-+		if (cond == 15)
-+			opcode = ARM_BLXi;
-+		else if (code[3] & 1)
-+			opcode = cond == 14 ? ARM_BL : ARM_BL_pred;
-+		MCInst_setOpcode(instr, opcode);
-+		ARM_set_instr_map_data(instr);
-+		*size = 4;
-+		return true;
-+	}
-+#endif
- 	ARM_init_cs_detail(instr);
- 	DecodeStatus Result = ARM_LLVM_getInstruction(
- 		handle, code, code_len, instr, size, address, info);
-@@ -941,7 +964,7 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
- }
- #endif
- 
--#ifdef CAPSTONE_ARM_COPY_OPERAND_DEFAULTS
-+#if defined(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS) || defined(ARM_GNU_MIXED_SCAN)
- /* Unused operands have observable invalid indices and zeroed padding too. */
- #define ARM_EMPTY_OP \
- 	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
-diff --git a/arch/ARM/ARMMapping.h b/arch/ARM/ARMMapping.h
-index 6266d12b..98805f06 100644
---- a/arch/ARM/ARMMapping.h
-+++ b/arch/ARM/ARMMapping.h
-@@ -7,6 +7,7 @@
- #include "../../include/capstone/capstone.h"
- #include "../../utils.h"
- #include "../../Mapping.h"
-+#include "../../MCInstPrinter.h"
- #include "ARMBaseInfo.h"
- 
- typedef enum {
-@@ -21,6 +22,29 @@ ARMSysReg_lookupMClassSysRegByEncoding(uint16_t Encoding);
- // return name of register in friendly string
- const char *ARM_reg_name(csh handle, unsigned int reg);
- 
-+/* A disabled markup tag contributes no text. A callback can observe
-+ * even an empty argument, and a markup stream can close a pending tag. */
-+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
-+#define CAPSTONE_ARM_FORMAT_MARKUP
-+#endif
-+#if defined(CAPSTONE_ARM_FORMAT_MARKUP) && !defined(CAPSTONE_DIET) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && !defined(CAPSTONE_HAS_OSXKERNEL) && \
-+	!defined(_KERNEL_MODE) && !defined(_WIN32_WCE)
-+static inline void ARM_printMarkup(SStream *O, const char *tag)
-+{
-+	const char *text = markup(tag);
-+	if (!text[0] && cs_vsnprintf == cs_default_vsnprintf &&
-+	    !O->is_closed && !O->markup_stream && O->index < SSTREAM_BUF_LEN - 1) {
-+		O->buffer[O->index] = '\0';
-+		return;
-+	}
-+	SStream_concat(O, "%s", text);
-+}
+ 	success &= rejects(handle64, truncated, sizeof(truncated),
+ 			   "truncated compute encoding is rejected");
+ 	success &= is_not_amx_compute(handle64, bad_map, sizeof(bad_map),
+@@ -213,7 +215,11 @@ int main(void)
+ 	{
+ 		compute_case x_case = { { 0 }, X86_INS_TDPBSSD, "tdpbssd" };
+ 		memcpy(x_case.code, x_ignored, sizeof(x_case.code));
++#ifdef CAPSTONE_X86_ATT_DISABLE
++		success &= test_case(handle64, &x_case, false);
 +#else
-+#define ARM_printMarkup(stream, tag) SStream_concat((stream), "%s", markup(tag))
+ 		success &= test_case(handle64, &x_case, true);
 +#endif
-+
- void ARM_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info);
- 
- // given internal insn id, return public instruction ID
-diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..6b921f10 100644
---- a/arch/Mips/MipsDisassembler.c
-+++ b/arch/Mips/MipsDisassembler.c
-@@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
  	}
- }
+ 	success &= rejects(handle64, bad_b, sizeof(bad_b),
+ 			   "extended source is rejected");
+diff --git a/tests/unit/x86_amx_fp8_tf32.c b/tests/unit/x86_amx_fp8_tf32.c
+index 07ad0685..e2569243 100644
+--- a/tests/unit/x86_amx_fp8_tf32.c
++++ b/tests/unit/x86_amx_fp8_tf32.c
+@@ -243,11 +243,13 @@ int main(void)
  
-+#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
-+	defined(__x86_64__) && defined(__GNUC__) && !defined(__clang__)
-+#define CAPSTONE_MIPS_PRIMARY_DISPATCH
+ 	for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
+ 		success &= test_case(handle, &test_cases[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	for (i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); ++i)
+ 		success &= test_case(handle, &test_cases[i], true);
 +#endif
-+
- static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 				   const uint8_t *Bytes, size_t BytesLen,
- 				   uint64_t Address, SStream *CStream);
-@@ -1451,6 +1456,21 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ 	for (i = 0; i < sizeof(invalid_cases) / sizeof(invalid_cases[0]); ++i)
+ 		success &= rejects(handle, &invalid_cases[i]);
  
- 	cs_mode mode = Instr->csh->mode;
- 	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
-+	bool IsGP64, IsFP64;
-+#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
-+	uint64_t major;
-+	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
-+	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64) {
-+		/* The unextended modes use standard byte order and only the
-+		 * GP64, FP64, DSP and base tables below, in their usual order. */
-+		if (readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
-+				      IsBigEndian, false) == MCDisassembler_Fail)
-+			return MCDisassembler_Fail;
-+		*Size = 4;
-+		IsGP64 = IsFP64 = isa == CS_MODE_MIPS64;
-+		goto DecodeStandard;
-+	}
-+#endif
- 	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
- 	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
- 	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
-@@ -1459,8 +1479,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
- 	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
- 	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
--	bool IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
--	bool IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
-+	IsFP64 = Mips_getFeatureBits(mode, Mips_FeatureFP64Bit);
-+	IsGP64 = Mips_getFeatureBits(mode, Mips_FeatureGP64Bit);
- 	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
- 	// Only present in MIPS-I and MIPS-II
- 	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
-@@ -1684,6 +1704,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 			return Result;
- 	}
+diff --git a/tests/unit/x86_amx_tile_state.c b/tests/unit/x86_amx_tile_state.c
+index f4d270e9..1db7377c 100644
+--- a/tests/unit/x86_amx_tile_state.c
++++ b/tests/unit/x86_amx_tile_state.c
+@@ -205,6 +205,10 @@ static bool test_case(csh handle, const amx_case *test)
  
-+#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
-+DecodeStandard:
-+	/* A primary-opcode miss in these generated tables reaches Fail before
-+	 * any predicate, operand reader, or instruction state change. */
-+	major = UINT64_C(1) << (Insn >> 26);
-+	IsGP64 = IsGP64 && (major & DecoderTableMips6432_MAJOR_MASK);
-+	IsFP64 = IsFP64 && (major & DecoderTableMipsFP6432_MAJOR_MASK);
-+	const bool try_dsp = (major & DecoderTableMipsDSP32_MAJOR_MASK) != 0;
+ static bool test_att_syntax(csh handle)
+ {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
 +#else
-+	const bool try_dsp = true;
+ 	static const uint8_t load[] = { 0xc4, 0x82, 0x79, 0x4b, 0x14, 0x6c };
+ 	static const uint8_t store[] = { 0xc4, 0x82, 0x7a, 0x4b, 0x3c, 0xbe };
+ 	cs_insn *insn = NULL;
+@@ -259,6 +263,7 @@ static bool test_att_syntax(csh handle)
+ 				 CS_ERR_OK,
+ 			 "restore Intel syntax");
+ 	return success;
 +#endif
- 	if (IsGP64) {
- 		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
- 					     Address, NULL);
-@@ -1698,10 +1729,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
- 			return Result;
+ }
+ 
+ static bool expect_invalid(csh handle, const uint8_t *code, size_t code_size,
+diff --git a/tests/unit/x86_apx_cmov.c b/tests/unit/x86_apx_cmov.c
+index 0ae7aa50..23f9b8a3 100644
+--- a/tests/unit/x86_apx_cmov.c
++++ b/tests/unit/x86_apx_cmov.c
+@@ -559,7 +559,12 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (cc = 0; cc < 16; ++cc) {
+ 		for (nd = 0; nd < 2; ++nd) {
+@@ -572,17 +577,25 @@ int main(void)
+ 								intel, false, cc, nd != 0,
+ 								nf != 0, w != 0, pp,
+ 								number);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 							success &= check_register_case(
+ 								att, true, cc, nd != 0,
+ 								nf != 0, w != 0, pp,
+ 								number);
++#endif
+ 						}
+ 						success &= check_memory_case(
+ 							intel, false, false, nd != 0,
+ 							nf != 0, w != 0, pp, cc);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 						success &= check_memory_case(
+ 							att, true, true, nd != 0,
+ 							nf != 0, w != 0, pp, cc);
++#else
++						success &= check_memory_case(
++							intel, false, true, nd != 0,
++							nf != 0, w != 0, pp, cc);
++#endif
+ 					}
+ 				}
+ 			}
+diff --git a/tests/unit/x86_apx_evex_adx.c b/tests/unit/x86_apx_evex_adx.c
+index b8d57c77..f6332bec 100644
+--- a/tests/unit/x86_apx_evex_adx.c
++++ b/tests/unit/x86_apx_evex_adx.c
+@@ -82,6 +82,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	ok &= ck(dec(h, cx, 6, &i), "AT&T");
+ 	if (i) {
+@@ -90,6 +91,7 @@ int main(void)
+ 			 "AT&T text");
+ 		cs_free(i, 1);
+ 	}
++#endif
+ 	cs_close(&h);
+ 	return ok ? 0 : 1;
+ }
+diff --git a/tests/unit/x86_apx_evex_alu.c b/tests/unit/x86_apx_evex_alu.c
+index 3be65efe..c93e302c 100644
+--- a/tests/unit/x86_apx_evex_alu.c
++++ b/tests/unit/x86_apx_evex_alu.c
+@@ -273,9 +273,10 @@ static bool check_case(csh handle, const alu_operation *operation,
+ 			"destination and optional EFLAGS writes are exact");
  	}
  
--	Result = decodeInstruction_4(DecoderTableMipsDSP32, Instr, Insn,
--				     Address, NULL);
--	if (Result != MCDisassembler_Fail)
--		return Result;
-+	if (try_dsp) {
-+		Result = decodeInstruction_4(DecoderTableMipsDSP32, Instr, Insn,
-+					     Address, NULL);
-+		if (Result != MCDisassembler_Fail)
-+			return Result;
+-	cs_free(insn, count);
+-	if (success)
++	if (success) {
++		cs_free(insn, count);
+ 		return true;
 +	}
+ failed:
+ 	fprintf(stderr,
+ 		"case: op=%s width=%u reverse=%u nd=%u nf=%u seed=%u syntax=%s\n",
+@@ -641,6 +642,7 @@ int main(void)
+ 	success &= run_matrix(handle, operations,
+ 			      sizeof(operations) / sizeof(operations[0]),
+ 			      false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	if (success) {
+ 		success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 					   CS_OPT_SYNTAX_ATT) == CS_ERR_OK,
+@@ -649,6 +651,10 @@ int main(void)
+ 			handle, operations,
+ 			sizeof(operations) / sizeof(operations[0]), true);
+ 	}
++#else
++	success &= cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#endif
+ 	if (success) {
+ 		success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 					   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,
+diff --git a/tests/unit/x86_apx_evex_arithmetic.c b/tests/unit/x86_apx_evex_arithmetic.c
+index 81db7f66..c1549ba0 100644
+--- a/tests/unit/x86_apx_evex_arithmetic.c
++++ b/tests/unit/x86_apx_evex_arithmetic.c
+@@ -1077,7 +1077,9 @@ static bool test_encoding_anchors(csh handle)
+ 			 "immediate encoding matches current XED");
+ 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
+ 		success &= check_anchor(handle, &anchors[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		success &= check_anchor(handle, &anchors[i], true);
++#endif
+ 		if (!success)
+ 			return false;
+ 	}
+@@ -1255,7 +1257,9 @@ int main(void)
+ 		return 1;
+ 	}
+ 	success &= run_matrix(handle, false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= run_matrix(handle, true);
++#endif
+ 	success &= test_encoding_anchors(handle);
+ 	success &= test_invalid_encodings(handle);
+ 	encode_binary_register(wrong_mode_code, ADC_OPERATION, 4, false, false,
+diff --git a/tests/unit/x86_apx_evex_bmi_ternary.c b/tests/unit/x86_apx_evex_bmi_ternary.c
+index 7cb3c07f..4d1b3afc 100644
+--- a/tests/unit/x86_apx_evex_bmi_ternary.c
++++ b/tests/unit/x86_apx_evex_bmi_ternary.c
+@@ -79,6 +79,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	{
+ 		uint8_t c[] = { 0x62, 0xea, 0xf4, 0, 0xf2, 0xd3 };
+@@ -89,6 +90,7 @@ int main(void)
+ 			cs_free(i, 1);
+ 		}
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX BMI ternary failure\n");
+diff --git a/tests/unit/x86_apx_evex_ccmp.c b/tests/unit/x86_apx_evex_ccmp.c
+index 5270bbe6..80815387 100644
+--- a/tests/unit/x86_apx_evex_ccmp.c
++++ b/tests/unit/x86_apx_evex_ccmp.c
+@@ -32,9 +32,11 @@ int main(void)
+         X86_INS_CCMPO+k,names[k],"{dfv=sf,cf} r17d, r26d"); }
+     b[2]=0xac; b[3]=2;
+     ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpb","{dfv=sf,cf} r17, r26");
++#ifndef CAPSTONE_X86_ATT_DISABLE
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
+     ok &= check(h,b,sizeof(b),X86_INS_CCMPB,"ccmpbq","{dfv=sf,cf} %r26, %r17");
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
+     { const uint8_t m[]={0x62,0x6c,0x2c,0x02,0x39,0x11};
+       ok &= check(h,m,sizeof(m),X86_INS_CCMPB,"ccmpb",
+                   "{dfv=sf,cf} dword ptr [r17], r26d"); }
+diff --git a/tests/unit/x86_apx_evex_convert.c b/tests/unit/x86_apx_evex_convert.c
+index 4cd15f5a..f72020c3 100644
+--- a/tests/unit/x86_apx_evex_convert.c
++++ b/tests/unit/x86_apx_evex_convert.c
+@@ -64,10 +64,12 @@ int main(void) {
+     ok &= one(h, mw, sizeof(mw), X86_INS_MOVBE, "movbe", "r18, r19");
+     ok &= one(h, cw66, sizeof(cw66), X86_INS_CRC32, "crc32", "r18, r19");
+   }
++#ifndef CAPSTONE_X86_ATT_DISABLE
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+   ok &= one(h, cq, sizeof(cq), X86_INS_CRC32, "crc32q",
+             "%fs:0x20(%r29,%r14,4), %r26");
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+   for (unsigned k = 0; k < 4; k++) {
+     bad[3] = (uint8_t[]){0x00, 0x0c, 0x18, 0x28}[k];
+     if (cs_disasm(h, bad, sizeof(bad), 0, 1, &i)) {
+diff --git a/tests/unit/x86_apx_evex_count.c b/tests/unit/x86_apx_evex_count.c
+index c64efe61..8dee267f 100644
+--- a/tests/unit/x86_apx_evex_count.c
++++ b/tests/unit/x86_apx_evex_count.c
+@@ -210,7 +210,6 @@ static bool check_16_bit_text_and_size(csh handle)
+ 		uint8_t reg[] = { 0x62, 0xec, 0x7d, 0x08, form->opcode, 0xd3 };
+ 		uint8_t memory[] = { 0x64, 0x62, 0x8c, 0x79, 0x08,
+ 				     form->opcode, 0x54, 0xa5, 0x20 };
+-		char att_mnemonic[16];
+ 		size_t count;
  
- 	// Calling the auto-generated decoder function.
- 	Result = decodeInstruction_4(DecoderTableMips32, Instr, Insn, Address,
-diff --git a/arch/Mips/MipsGenDirectDecoder.inc b/arch/Mips/MipsGenDirectDecoder.inc
-index 7b2b3a08..4b1738be 100644
---- a/arch/Mips/MipsGenDirectDecoder.inc
-+++ b/arch/Mips/MipsGenDirectDecoder.inc
-@@ -15309,6 +15309,8 @@ Decode:
- 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+ 		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+@@ -242,6 +241,8 @@ static bool check_16_bit_text_and_size(csh handle)
+ 			instruction = NULL;
+ 		}
+ 
++#ifndef CAPSTONE_X86_ATT_DISABLE
++		char att_mnemonic[16];
+ 		snprintf(att_mnemonic, sizeof(att_mnemonic), "%sw",
+ 			 form->mnemonic);
+ 		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+@@ -271,6 +272,7 @@ static bool check_16_bit_text_and_size(csh handle)
+ 			cs_free(instruction, count);
+ 			instruction = NULL;
+ 		}
++#endif
+ 	}
+ 	return ok;
  }
- 
-+#define DecoderTableMips6432_MAJOR_MASK UINT64_C(0x9090f0809f250001)
-+
- static DecodeStatus direct_DecoderTableMips6432(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
- {
- 	uint64_t CurFieldValue = 0;
-@@ -15905,6 +15907,8 @@ Decode:
- 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
+diff --git a/tests/unit/x86_apx_evex_ctest.c b/tests/unit/x86_apx_evex_ctest.c
+index 02e9329b..3309dede 100644
+--- a/tests/unit/x86_apx_evex_ctest.c
++++ b/tests/unit/x86_apx_evex_ctest.c
+@@ -48,9 +48,11 @@ int main(void)
+       ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
+       q[5]=0xc9;ok&=check(h,q,7,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17b, 7");
+       q[5]=0xd1;if(cs_disasm(h,q,7,0,1,&i)){ok=false;cs_free(i,1);}}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);
+     ok&=check(h,b,6,X86_INS_CTESTB,"ctestbq","{dfv=sf,cf} %r26, %r17");
+     cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
+     /* W overrides 66, byte forms ignore W, and byte immediates are
+      * zero-extended as for TEST. */
+     b[2]=0xad;ok&=check(h,b,6,X86_INS_CTESTB,"ctestb","{dfv=sf,cf} r17, r26");
+diff --git a/tests/unit/x86_apx_evex_direct_store.c b/tests/unit/x86_apx_evex_direct_store.c
+index 7bd41371..e4b31fe2 100644
+--- a/tests/unit/x86_apx_evex_direct_store.c
++++ b/tests/unit/x86_apx_evex_direct_store.c
+@@ -3,4 +3,8 @@
+ #include <stdio.h>
+ #include <string.h>
+ static bool ck(csh h,const uint8_t*b,unsigned id,const char*m,const char*o){cs_insn*i=NULL;bool ok=cs_disasm(h,b,9,0,1,&i)==1;if(ok){const cs_x86*x=&i->detail->x86;bool ac=(x->operands[0].type==X86_OP_MEM&&x->operands[0].access==CS_AC_WRITE&&x->operands[1].access==CS_AC_READ)||(x->operands[1].type==X86_OP_MEM&&x->operands[1].access==CS_AC_WRITE&&x->operands[0].access==CS_AC_READ);ok=i->id==id&&!strcmp(i->mnemonic,m)&&!strcmp(i->op_str,o)&&x->op_count==2&&ac&&x->eflags==0;}if(i)cs_free(i,1);return ok;}
+-int main(void){const uint8_t c[][9]={{0x64,0x62,0x0c,0xfc,8,0xf9,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7c,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfc,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7d,8,0x65,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfd,8,0x65,0x54,0xb5,0x20}};const unsigned ids[]={X86_INS_MOVDIRI,X86_INS_WRSSD,X86_INS_WRSSQ,X86_INS_WRUSSD,X86_INS_WRUSSQ};const char*mn[]={"movdiri","wrssd","wrssq","wrussd","wrussq"};const char*op[]={"qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26"};csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);for(unsigned k=0;k<5;k++)ok&=ck(h,c[k],ids[k],mn[k],op[k]);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,c[0],X86_INS_MOVDIRI,"movdiriq","%r26, %fs:0x20(%r29,%r14,4)");cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);uint8_t bad[9];memcpy(bad,c[0],9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}memcpy(bad,c[1],9);bad[5]=0x66;bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX direct store failure\n");return ok?0:1;}
++int main(void){const uint8_t c[][9]={{0x64,0x62,0x0c,0xfc,8,0xf9,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7c,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfc,8,0x66,0x54,0xb5,0x20},{0x64,0x62,0x0c,0x7d,8,0x65,0x54,0xb5,0x20},{0x64,0x62,0x0c,0xfd,8,0x65,0x54,0xb5,0x20}};const unsigned ids[]={X86_INS_MOVDIRI,X86_INS_WRSSD,X86_INS_WRSSQ,X86_INS_WRUSSD,X86_INS_WRUSSQ};const char*mn[]={"movdiri","wrssd","wrssq","wrussd","wrussq"};const char*op[]={"qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26","dword ptr fs:[r29 + r14*4 + 0x20], r26d","qword ptr fs:[r29 + r14*4 + 0x20], r26"};csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);for(unsigned k=0;k<5;k++)ok&=ck(h,c[k],ids[k],mn[k],op[k]);
++#ifndef CAPSTONE_X86_ATT_DISABLE
++	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,c[0],X86_INS_MOVDIRI,"movdiriq","%r26, %fs:0x20(%r29,%r14,4)");cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
++uint8_t bad[9];memcpy(bad,c[0],9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}memcpy(bad,c[1],9);bad[5]=0x66;bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX direct store failure\n");return ok?0:1;}
+diff --git a/tests/unit/x86_apx_evex_double_shift.c b/tests/unit/x86_apx_evex_double_shift.c
+index 7b8e6832..d90a09fa 100644
+--- a/tests/unit/x86_apx_evex_double_shift.c
++++ b/tests/unit/x86_apx_evex_double_shift.c
+@@ -28,7 +28,9 @@ int main(void)
+ 	{const uint8_t w66[]={0x62,0xf4,0xfd,0x10,0xa5,0xc1};const uint8_t hex[]={0x62,0xf4,0xfd,0x08,0x24,0xc1,0xbf};
+ 	ok&=ck(h,w66,sizeof(w66),X86_INS_SHLD,"shld","r16, rcx, rax, cl",4,false);
+ 	ok&=ck(h,hex,sizeof(hex),X86_INS_SHLD,"shld","rcx, rax, 0xbf",3,false);}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,e,sizeof(e),X86_INS_SHRD,"{nf} shrdq","%cl, %r26, %fs:0x20(%r29,%r14,4), %r17",4,true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
+ 	for(unsigned k=0;k<4;k++){bad[3]=(uint8_t[]){0x09,0x28,0x48,0x88}[k];if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}
+ 	bad[2]=0x7e;bad[3]=8;if(cs_disasm(h,bad,sizeof(bad),0,1,&i)){ok=false;cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX double shift failure\n");return ok?0:1;
  }
+diff --git a/tests/unit/x86_apx_evex_enqueue.c b/tests/unit/x86_apx_evex_enqueue.c
+index a263c442..b6a7b1cb 100644
+--- a/tests/unit/x86_apx_evex_enqueue.c
++++ b/tests/unit/x86_apx_evex_enqueue.c
+@@ -3,4 +3,8 @@
+ #include <stdio.h>
+ #include <string.h>
+ static bool ck(csh h,const uint8_t*b,unsigned id,const char*m,const char*o,bool flags){cs_insn*i=NULL;bool ok=cs_disasm(h,b,9,0,1,&i)==1;if(ok){const cs_x86*x=&i->detail->x86;const cs_x86_op*mem=x->operands[0].type==X86_OP_MEM?&x->operands[0]:&x->operands[1];const cs_x86_op*reg=x->operands[0].type==X86_OP_REG?&x->operands[0]:&x->operands[1];ok=i->id==id&&!strcmp(i->mnemonic,m)&&!strcmp(i->op_str,o)&&x->op_count==2&&mem->size==64&&mem->access==CS_AC_READ&&reg->size==8&&reg->access==CS_AC_READ&&(flags?x->eflags!=0:x->eflags==0);}if(i)cs_free(i,1);return ok;}
+-int main(void){const uint8_t a[]={0x64,0x62,0x0c,0x7f,8,0xf8,0x54,0xb5,0x20},b[]={0x64,0x62,0x0c,0x7e,8,0xf8,0x54,0xb5,0x20},c[]={0x64,0x62,0x0c,0x7d,8,0xf8,0x54,0xb5,0x20};uint8_t bad[9];csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,b,X86_INS_ENQCMDS,"enqcmds","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,c,X86_INS_MOVDIR64B,"movdir64b","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",false);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","%fs:0x20(%r29,%r14,4), %r26",true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);memcpy(bad,a,9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}/* The register form of the F2 opcode is URDMSR. */memcpy(bad,a,9);bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)!=1)ok=false;else{ok&=i->id==X86_INS_URDMSR&&i->size==7&&!strcmp(i->op_str,"r27, r26");cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX enqueue failure\n");return ok?0:1;}
++int main(void){const uint8_t a[]={0x64,0x62,0x0c,0x7f,8,0xf8,0x54,0xb5,0x20},b[]={0x64,0x62,0x0c,0x7e,8,0xf8,0x54,0xb5,0x20},c[]={0x64,0x62,0x0c,0x7d,8,0xf8,0x54,0xb5,0x20};uint8_t bad[9];csh h;cs_insn*i=NULL;bool ok=true;if(cs_open(CS_ARCH_X86,CS_MODE_64,&h))return 1;cs_option(h,CS_OPT_DETAIL,CS_OPT_ON);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,b,X86_INS_ENQCMDS,"enqcmds","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",true);ok&=ck(h,c,X86_INS_MOVDIR64B,"movdir64b","r26, zmmword ptr fs:[r29 + r14*4 + 0x20]",false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
++	cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_ATT);ok&=ck(h,a,X86_INS_ENQCMD,"enqcmd","%fs:0x20(%r29,%r14,4), %r26",true);cs_option(h,CS_OPT_SYNTAX,CS_OPT_SYNTAX_INTEL);
++#endif
++memcpy(bad,a,9);for(unsigned k=0;k<4;k++){bad[4]=(uint8_t[]){0,4,0x18,0x28}[k];if(cs_disasm(h,bad,9,0,1,&i)){ok=false;cs_free(i,1);i=NULL;}}/* The register form of the F2 opcode is URDMSR. */memcpy(bad,a,9);bad[6]=0xd3;if(cs_disasm(h,bad,7,0,1,&i)!=1)ok=false;else{ok&=i->id==X86_INS_URDMSR&&i->size==7&&!strcmp(i->op_str,"r27, r26");cs_free(i,1);}cs_close(&h);if(!ok)fprintf(stderr,"APX enqueue failure\n");return ok?0:1;}
+diff --git a/tests/unit/x86_apx_evex_existing_gpr.c b/tests/unit/x86_apx_evex_existing_gpr.c
+index 780fb1a0..3dadd3c2 100644
+--- a/tests/unit/x86_apx_evex_existing_gpr.c
++++ b/tests/unit/x86_apx_evex_existing_gpr.c
+@@ -249,6 +249,7 @@ int main(void)
+ 		"zmm1 {k2}, zmmword ptr [r29 + zmm30*4]", X86_REG_R29,
+ 		X86_REG_ZMM30, 4, 0);
  
-+#define DecoderTableMipsDSP32_MAJOR_MASK UINT64_C(0x0000080800000000)
-+
- static DecodeStatus direct_DecoderTableMipsDSP32(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
- {
- 	uint64_t CurFieldValue = 0;
-@@ -15940,6 +15944,8 @@ Decode:
- 	return decodeToMCInst_4(S, DecodeIdx, insn, MI, Address, Decoder, &DecodeComplete);
- }
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "setup", "select AT&T syntax");
+@@ -258,7 +259,7 @@ int main(void)
+ 		"0x40(%r29, %r30, 4), %zmm1 {%k3} {z}", X86_REG_R29,
+ 		X86_REG_R30, 4, 0x40);
+ 	success &= check_gpr_source(handle, true);
+-
++#endif
+ 	success &= rejects_outside_64_bit(gpr_source, sizeof(gpr_source));
+ 	cs_close(&handle);
+ 	return success ? 0 : 1;
+diff --git a/tests/unit/x86_apx_evex_imul.c b/tests/unit/x86_apx_evex_imul.c
+index ec0a96c5..c4e59004 100644
+--- a/tests/unit/x86_apx_evex_imul.c
++++ b/tests/unit/x86_apx_evex_imul.c
+@@ -545,7 +545,9 @@ static bool test_encoding_anchors(csh handle)
+ 			 "64-bit NDD+NF IMUL encoding matches current XED");
+ 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
+ 		success &= check_anchor(handle, &anchors[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		success &= check_anchor(handle, &anchors[i], true);
++#endif
+ 		if (!success)
+ 			return false;
+ 	}
+@@ -787,6 +789,7 @@ static bool test_immediate_and_one_operand_forms(csh handle)
+ 		insn = NULL;
+ 	}
  
-+#define DecoderTableMipsFP6432_MAJOR_MASK UINT64_C(0x20200000000a0000)
-+
- static DecodeStatus direct_DecoderTableMipsFP6432(MCInst *MI, uint32_t insn, uint64_t Address, const void *Decoder)
- {
- 	uint64_t CurFieldValue = 0;
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d3566525..d6775ef0 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -24,7 +24,8 @@
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax for extended IMUL forms");
+@@ -797,6 +800,7 @@ static bool test_immediate_and_one_operand_forms(csh handle)
+ 	success &= decodes_as(handle, imul_f7_nf, sizeof(imul_f7_nf),
+ 			      X86_INS_IMUL, "{nf} imulq", "%r19",
+ 			      "IMUL F7 AT&T form is exact");
++#endif
+ 	memcpy(invalid, imul6b_zu_nf, sizeof(imul6b_zu_nf));
+ 	invalid[2] ^= 0x08;
+ 	success &= rejects(handle, invalid, sizeof(imul6b_zu_nf),
+@@ -915,7 +919,9 @@ int main(void)
+ 	}
+ 	success &= test_encoding_anchors(handle);
+ 	success &= run_matrix(handle, false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= run_matrix(handle, true);
++#endif
+ 	success &= test_legal_variants(handle);
+ 	success &= test_immediate_and_one_operand_forms(handle);
+ 	success &= test_invalid_encodings(handle);
+diff --git a/tests/unit/x86_apx_evex_invalidate.c b/tests/unit/x86_apx_evex_invalidate.c
+index ffc78ade..e0730161 100644
+--- a/tests/unit/x86_apx_evex_invalidate.c
++++ b/tests/unit/x86_apx_evex_invalidate.c
+@@ -45,9 +45,11 @@ int main(void) {
+     const uint8_t a[] = {0x64, 0x67, 0x62, 0xec, 0x7a, 8, 0xf2, 0x11};
+     ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid",
+              "r18, xmmword ptr fs:[r17d]");
++#ifndef CAPSTONE_X86_ATT_DISABLE
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+     ok &= ck(h, a, sizeof(a), X86_INS_INVPCID, "invpcid", "%fs:(%r17d), %r18");
+     cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+   }
+   {
+     uint8_t x[] = {0x62, 0xec, 0x7e, 8, 0xf0, 0xd1};
+diff --git a/tests/unit/x86_apx_evex_movrs.c b/tests/unit/x86_apx_evex_movrs.c
+index 27681272..49a45dca 100644
+--- a/tests/unit/x86_apx_evex_movrs.c
++++ b/tests/unit/x86_apx_evex_movrs.c
+@@ -47,9 +47,11 @@ int main(void) {
+            "r26d, dword ptr fs:[r29 + r28*4 + 0x20]", X86_REG_R26D, 4);
+   ok &= ck(h, x4a32, sizeof(x4a32), "movrs",
+            "r26d, dword ptr fs:[r29d + r28d*4 + 0x20]", X86_REG_R26D, 4);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+   ok &= ck(h, b64, sizeof(b64), "movrsq", "%fs:(%r17d), %r18", X86_REG_R18, 8);
+   cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
++#endif
+   /* W selects 64-bit operands over 66, as in XED; the byte form is W0. */
+   {
+     const uint8_t w66[] = {0x62, 0xec, 0xfd, 8, 0x8b, 0x11};
+diff --git a/tests/unit/x86_apx_evex_msr.c b/tests/unit/x86_apx_evex_msr.c
+index d54ef441..946ee8df 100644
+--- a/tests/unit/x86_apx_evex_msr.c
++++ b/tests/unit/x86_apx_evex_msr.c
+@@ -130,6 +130,10 @@ static bool check_implicit_msr(void)
+ 			return false;
+ 		cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+ 		for (syntax = 0; syntax < 2; ++syntax) {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++			if (syntax)
++				break;
++#endif
+ 			cs_option(handle, CS_OPT_SYNTAX,
+ 				  syntax ? CS_OPT_SYNTAX_ATT :
+ 					   CS_OPT_SYNTAX_INTEL);
+@@ -377,6 +381,10 @@ int main(void)
+ 		return 1;
+ 	ok = cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK;
+ 	for (syntax = 0; syntax < 2; ++syntax) {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++		if (syntax)
++			break;
++#endif
+ 		ok &= cs_option(handle, CS_OPT_SYNTAX,
+ 				syntax ? CS_OPT_SYNTAX_ATT :
+ 					 CS_OPT_SYNTAX_INTEL) == CS_ERR_OK;
+diff --git a/tests/unit/x86_apx_evex_mul_div.c b/tests/unit/x86_apx_evex_mul_div.c
+index 51044169..8f7ec059 100644
+--- a/tests/unit/x86_apx_evex_mul_div.c
++++ b/tests/unit/x86_apx_evex_mul_div.c
+@@ -36,6 +36,7 @@ int main(void)
+ 				i = NULL;
+ 			}
+ 		}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	{
+ 		uint8_t c[] = { 0x62, 0xec, 0xfd, 8, 0xf7, 0xf3 };
+@@ -46,6 +47,7 @@ int main(void)
+ 			cs_free(i, 1);
+ 		}
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX MUL/DIV focused failure\n");
+diff --git a/tests/unit/x86_apx_evex_rao.c b/tests/unit/x86_apx_evex_rao.c
+index 442c2278..07f01457 100644
+--- a/tests/unit/x86_apx_evex_rao.c
++++ b/tests/unit/x86_apx_evex_rao.c
+@@ -81,12 +81,13 @@ int main(void)
+ 	}
  
- #if defined(__linux__) && defined(__GNUC__) && \
-     ((defined(CAPSTONE_MIPS_ONLY) && defined(__aarch64__)) || \
--     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__) && !defined(__clang__)))
-+     ((defined(CAPSTONE_X86_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
-+      defined(__x86_64__) && !defined(__clang__)))
- #define MIPS_DIRECT_MAPPING
- #endif
+ 	code[3] = 0xff;
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	ok &= check_case(handle, code, sizeof(code), X86_INS_AOR, "aorq",
+ 			 "%r26, %fs:0x20(%r29,%r14,4)", X86_REG_R29,
+ 			 X86_REG_R14, 8);
+ 	cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_INTEL);
+-
++#endif
+ 	code[3] = 0x78;
+ 	code[7] = 0xa5;
+ 	ok &= check_case(handle, code, sizeof(code), X86_INS_AADD, "aadd",
+diff --git a/tests/unit/x86_apx_evex_shift_rotate.c b/tests/unit/x86_apx_evex_shift_rotate.c
+index ac6e44c1..0e49a6ff 100644
+--- a/tests/unit/x86_apx_evex_shift_rotate.c
++++ b/tests/unit/x86_apx_evex_shift_rotate.c
+@@ -772,7 +772,9 @@ static bool test_encoding_anchors(csh handle)
+ 		      "memory SHR encoding matches current XED");
+ 	for (i = 0; i < sizeof(anchors) / sizeof(anchors[0]); ++i) {
+ 		success &= check_anchor(handle, &anchors[i], false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 		success &= check_anchor(handle, &anchors[i], true);
++#endif
+ 		if (!success)
+ 			return false;
+ 	}
+@@ -1017,7 +1019,9 @@ int main(void)
+ 	}
+ 	success &= test_encoding_anchors(handle);
+ 	success &= run_matrix(handle, false);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= run_matrix(handle, true);
++#endif
+ 	success &= test_legal_variants(handle);
+ 	success &= test_invalid_encodings(handle);
+ 	cs_close(&handle);
+diff --git a/tests/unit/x86_apx_evex_unary.c b/tests/unit/x86_apx_evex_unary.c
+index 6e6f3c2f..b5348896 100644
+--- a/tests/unit/x86_apx_evex_unary.c
++++ b/tests/unit/x86_apx_evex_unary.c
+@@ -64,6 +64,7 @@ int main(void)
+ 			i = NULL;
+ 		}
+ 	}
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	cs_option(h, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
+ 	b[4] = 0xf7;
+ 	b[5] = 0xdb;
+@@ -74,6 +75,7 @@ int main(void)
+ 		      !strcmp(i->op_str, "%r19, %r17");
+ 		cs_free(i, 1);
+ 	}
++#endif
+ 	cs_close(&h);
+ 	if (!ok)
+ 		fprintf(stderr, "APX unary focused failure\n");
+diff --git a/tests/unit/x86_apx_evex_vector_gpr.c b/tests/unit/x86_apx_evex_vector_gpr.c
+index 059315be..0b03e901 100644
+--- a/tests/unit/x86_apx_evex_vector_gpr.c
++++ b/tests/unit/x86_apx_evex_vector_gpr.c
+@@ -216,8 +216,12 @@ int main(void)
+ 		for (index = 0; index < sizeof(cases) / sizeof(cases[0]);
+ 		     ++index)
+ 			success &= check_case(handle, &cases[index], att_syntax);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++		break;
++#else
+ 		if (att_syntax)
+ 			break;
++#endif
+ 	}
  
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..6e53751a 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -334,7 +334,7 @@ __attribute__((noinline))
- #endif
- static int
- decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
--		      size_t code_len, cs_mode mode,
-+		      size_t code_len, cs_mode mode, MCInst *scan, uint16_t *size,
- 		      bool *scalar_compare_p2_normalized,
- 		      uint8_t *original_scalar_compare_p2)
- {
-@@ -582,6 +582,12 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 	success &= rejects(handle, zero_without_mask, CS_MODE_64,
+diff --git a/tests/unit/x86_apx_push2_pop2.c b/tests/unit/x86_apx_push2_pop2.c
+index ab252b2d..5463c1f0 100644
+--- a/tests/unit/x86_apx_push2_pop2.c
++++ b/tests/unit/x86_apx_push2_pop2.c
+@@ -179,14 +179,21 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (push_index = 0; push_index < 2; ++push_index) {
+ 		for (ppx_index = 0; ppx_index < 2; ++ppx_index) {
+ 			success &= check_case(intel, false, push_index != 0,
+ 					      ppx_index != 0, 29, 20);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 			success &= check_case(att, true, push_index != 0,
+ 					      ppx_index != 0, 29, 20);
++#endif
  		}
  	}
  
-+	/* The scan readers validate and translate each operand together. When
-+	 * normalization changed any bytes, restore the original EVEX fields
-+	 * before translation as required by the raw decoder. */
-+	if (scan && decode_code == code)
-+		return decodeInstructionScan(insn, code, code_len, mode, scan,
-+					     size);
- 	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
+diff --git a/tests/unit/x86_apx_rex2.c b/tests/unit/x86_apx_rex2.c
+index fc025de0..67f19e92 100644
+--- a/tests/unit/x86_apx_rex2.c
++++ b/tests/unit/x86_apx_rex2.c
+@@ -190,6 +190,10 @@ static bool test_register_names(csh handle)
  
- 	/* No further byte reads follow decoding; keep the input pointer valid
-@@ -639,11 +645,15 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 	bool result;
+ static bool test_att_detail_order(csh handle)
+ {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
+ 	static const uint8_t addq[] = { 0xd5, 0x5d, 0x01, 0xc7 };
+ 	cs_insn *insn = NULL;
+ 	bool success = true;
+@@ -253,6 +257,7 @@ static bool test_att_detail_order(csh handle)
+ 				 CS_ERR_OK,
+ 			 "restore Intel syntax");
+ 	return success;
++#endif
+ }
  
- 	InternalInstruction insn = { 0 };
--	if (extension_opcode == 0x62)
-+	const bool scan = scanOnly || (handle->no_text && !handle->detail_opt);
-+	if (extension_opcode == 0x62) {
- 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
-+					    scan ? instr : NULL, size,
- 					    &scalar_compare_p2_normalized,
- 					    &original_scalar_compare_p2);
--	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
-+		if (ret == X86_SCAN_COMPLETE)
-+			return true;
-+	} else if (scan) {
- 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
- 					    instr, size);
- 		if (ret != X86_SCAN_RAW_READY)
-@@ -664,7 +674,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 		*size = (uint16_t)insn.length;
+ /* mov dword ptr [r16], eax: REX2.B4 extends the ModR/M base. */
+diff --git a/tests/unit/x86_apx_rex2_alu.c b/tests/unit/x86_apx_rex2_alu.c
+index e67bcdd1..c5982221 100644
+--- a/tests/unit/x86_apx_rex2_alu.c
++++ b/tests/unit/x86_apx_rex2_alu.c
+@@ -337,6 +337,7 @@ static bool test_fixed_forms(csh handle, uint64_t add_eflags)
+ 	return success;
+ }
  
- 		prepareTranslation(&insn);
--		if (scanOnly || (handle->no_text && !handle->detail_opt))
-+		if (scan)
- 			return !translateInstruction(instr, &insn, false);
- 		result = operands_ready ||
- 			 !translateInstruction(instr, &insn, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
+ 			  const char *mnemonic, const char *op_str,
+ 			  x86_reg first_reg, uint8_t first_access,
+@@ -370,9 +371,14 @@ static bool test_att_case(csh handle, const uint8_t *code, size_t code_size,
+ 	cs_free(insn, count);
+ 	return success;
+ }
++#endif
+ 
+ static bool test_att_syntax(csh handle)
+ {
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	return cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
+ 	static const uint8_t reverse_subq[] = { 0xd5, 0x5d, 0x2b, 0xc7 };
+ 	static const uint8_t reverse_cmpb[] = { 0xd5, 0x55, 0x3a, 0xc7 };
+ 	static const uint8_t testw[] = { 0x66, 0xd5, 0x55, 0x85, 0xc7 };
+@@ -398,6 +404,7 @@ static bool test_att_syntax(csh handle)
+ 				 CS_ERR_OK,
+ 			 "restore Intel syntax");
+ 	return success;
++#endif
+ }
+ 
+ static bool test_invalid(csh handle, const uint8_t *code, size_t code_size,
+diff --git a/tests/unit/x86_apx_rex2_push_pop.c b/tests/unit/x86_apx_rex2_push_pop.c
+index 05f8e28b..20b99c0c 100644
+--- a/tests/unit/x86_apx_rex2_push_pop.c
++++ b/tests/unit/x86_apx_rex2_push_pop.c
+@@ -176,15 +176,22 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (push = 0; push < 2; ++push) {
+ 		for (hint = 0; hint < 2; ++hint) {
+ 			for (number = 0; number < 32; ++number) {
+ 				success &= check_case(intel, false, push != 0,
+ 						      hint != 0, false, number);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 				success &= check_case(att, true, push != 0,
+ 						      hint != 0, false, number);
++#endif
+ 			}
+ 		}
+ 		for (number = 0; number < 32; ++number) {
+diff --git a/tests/unit/x86_apx_setcc.c b/tests/unit/x86_apx_setcc.c
+index f415cd8d..241fbf74 100644
+--- a/tests/unit/x86_apx_setcc.c
++++ b/tests/unit/x86_apx_setcc.c
+@@ -316,7 +316,12 @@ int main(void)
+ 	}
+ 	cs_option(intel, CS_OPT_DETAIL, CS_OPT_ON);
+ 	cs_option(att, CS_OPT_DETAIL, CS_OPT_ON);
+-	cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT);
++#ifdef CAPSTONE_X86_ATT_DISABLE
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
++		   CS_ERR_X86_ATT;
++#else
++	success &= cs_option(att, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) == CS_ERR_OK;
++#endif
+ 
+ 	for (cc = 0; cc < 16; ++cc) {
+ 		for (zu = 0; zu < 2; ++zu) {
+@@ -325,18 +330,24 @@ int main(void)
+ 					success &= check_register_case(
+ 						intel, false, cc, zu != 0, w != 0,
+ 						number);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 					success &= check_register_case(
+ 						att, true, cc, zu != 0, w != 0,
+ 						number);
++#endif
+ 				}
+ 			}
+ 		}
+ 	}
+ 	success &= check_memory_case(intel, false, false, false);
+ 	success &= check_memory_case(intel, false, false, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check_memory_case(att, true, false, true);
++#endif
+ 	success &= check_memory_case(intel, false, true, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check_memory_case(att, true, true, true);
++#endif
+ 	success &= check_addr32_displacement_forms(intel);
+ 
+ 	encode_register(invalid, 5, true, false, 29);
+diff --git a/tests/unit/x86_evex_detail.c b/tests/unit/x86_evex_detail.c
+index 28c23faa..ebe6293c 100644
+--- a/tests/unit/x86_evex_detail.c
++++ b/tests/unit/x86_evex_detail.c
+@@ -206,10 +206,12 @@ int main(void)
+ 	}
+ 
+ 	success &= test_broadcast(handle);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	success &= test_broadcast(handle);
++#endif
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX,
+ 				   CS_OPT_SYNTAX_INTEL) == CS_ERR_OK,
+ 			 "restore Intel syntax");
+diff --git a/tests/unit/x86_evex_mask_conversion_access.c b/tests/unit/x86_evex_mask_conversion_access.c
+index 994ad59c..b65a523c 100644
+--- a/tests/unit/x86_evex_mask_conversion_access.c
++++ b/tests/unit/x86_evex_mask_conversion_access.c
+@@ -271,8 +271,12 @@ int main(void)
+ 		  1,
+ 		  64 },
+ 	};
+-	static const cs_opt_value syntaxes[] = { CS_OPT_SYNTAX_INTEL,
+-						 CS_OPT_SYNTAX_ATT };
++	static const cs_opt_value syntaxes[] = {
++		CS_OPT_SYNTAX_INTEL,
++#ifndef CAPSTONE_X86_ATT_DISABLE
++		CS_OPT_SYNTAX_ATT,
++#endif
++	};
+ 	csh handle = 0;
+ 	bool success = true;
+ 
+diff --git a/tests/unit/x86_evex_vpcmp_id.c b/tests/unit/x86_evex_vpcmp_id.c
+index 48e99bc6..1a30e853 100644
+--- a/tests/unit/x86_evex_vpcmp_id.c
++++ b/tests/unit/x86_evex_vpcmp_id.c
+@@ -65,10 +65,12 @@ int main(void)
+ 		return 1;
+ 	}
+ 	success &= test_vpcmp(handle, true);
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	success &= test_vpcmp(handle, true);
++#endif
+ 	cs_close(&handle);
+ 	return success ? 0 : 1;
+ }
+diff --git a/tests/unit/x86_evex_vpcmp_mask_size.c b/tests/unit/x86_evex_vpcmp_mask_size.c
+index 3b31dc8c..8942d52c 100644
+--- a/tests/unit/x86_evex_vpcmp_mask_size.c
++++ b/tests/unit/x86_evex_vpcmp_mask_size.c
+@@ -204,10 +204,12 @@ int main(void)
+ 	}
+ 
+ 	success &= run_matrix(handle, "Intel");
++#ifndef CAPSTONE_X86_ATT_DISABLE
+ 	success &= check(cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_ATT) ==
+ 				 CS_ERR_OK,
+ 			 "select AT&T syntax");
+ 	success &= run_matrix(handle, "AT&T");
++#endif
+ 	cs_close(&handle);
+ 	return success ? 0 : 1;
+ }
 diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
-index ae1554b0..da53269e 100644
+index ae1554b0..c79ff999 100644
 --- a/arch/X86/X86Disassembler.h
 +++ b/arch/X86/X86Disassembler.h
-@@ -47,6 +47,16 @@ typedef struct X86ScanResult {
+@@ -47,6 +47,17 @@ typedef struct X86ScanResult {
  	uint8_t popcode_adjust;
  } X86ScanResult;
  
@@ -633,418 +792,38 @@ index ae1554b0..da53269e 100644
 +	!defined(_WIN32_WCE)
 +#include "../../cs_priv.h"
 +#define CAPSTONE_X86_VECTOR_OUTPUT
-+CAPSTONE_INTERNAL bool X86_scanEvexOutputForm(const uint8_t *code, size_t size,
-+					     X86ScanResult *result);
++CAPSTONE_INTERNAL unsigned X86_scanLegacySSERegister(const uint8_t *code,
++						     size_t size, bool wide,
++						     uint16_t *size_out);
 +#endif
 +
  bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
  				  size_t code_len, cs_insn *insn,
  				  X86ScanResult *result);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 01559e08..8e6577c8 100644
+index 01559e08..8b98ab0b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -2946,7 +2946,8 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
-  * The generated terminal row already provides the public ID and extent. */
- #if defined(__linux__) && defined(__GNUC__) && !defined(__clang__) && \
-     ((defined(CAPSTONE_X86_ONLY) && (defined(__x86_64__) || defined(__aarch64__))) || \
--     (defined(CAPSTONE_X86_MIPS_ONLY) && defined(__x86_64__)))
-+     ((defined(CAPSTONE_X86_MIPS_ONLY) || defined(CAPSTONE_ARM_AARCH64_MIPS_X86)) && \
-+      defined(__x86_64__)))
- #define X86_COMPACT_PUBLIC_HEADER
- #endif
- 
-@@ -3366,6 +3367,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
- 			return true;
- 		}
- 	}
-+#endif
-+#ifdef CAPSTONE_X86_VECTOR_OUTPUT
-+	/* Only complete ordinary forms verified by the full decoder have rows.
-+     * The adapter above still owns its callback and all misses use the
-+     * feature decoder's original order, including malformed prefixes. */
-+	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
-+	    handle->insn_id == X86_get_insn_id &&
-+	    X86_scanEvexOutputForm(code, code_len, result))
-+		return true;
- #endif
- 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
- 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
-index ae3428b5..14aefc93 100644
---- a/arch/X86/X86DisassemblerDecoder.h
-+++ b/arch/X86/X86DisassemblerDecoder.h
-@@ -707,8 +707,8 @@ enum X86DecodeScanResult {
-  * mcInst retains raw decoding with only 0/-1 results. Only RAW_READY promises
-  * a materialized raw instruction; COMPLETE supplies the finished scan output.
-  * The caller selects scan
-- * after extension dispatch; EVEX remains raw so the backend keeps its existing
-- * prefix normalization and restoration order. */
-+ * after extension dispatch. EVEX encodings that need prefix normalization
-+ * use the raw decoder until their original fields have been restored. */
- int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
- 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
- 			  uint16_t *size);
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..92c55fd2 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -58,8 +58,8 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 		},
- 		{
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			65535, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
-+			0, 0, 0, 0, 0, 0, 0, 0, 65535, 65535, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -132,8 +132,8 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 		},
- 		{
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			65535, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
-+			0, 0, 0, 0, 0, 0, 0, 0, 65535, 65535, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..4bb68e90 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -631,6 +631,32 @@ static const uint8_t vex_shift_plans[3][8][4] = {
- 		{ 19, 20, 19, 20 },
- 	},
- };
-+static const struct VectorOutputRow evex_byte_shifts[2][2][3] = {
-+	{
-+		{
-+			{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+		},
-+		{
-+			{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSRLDQ, "vpsrldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+		},
-+	},
-+	{
-+		{
-+			{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+		},
-+		{
-+			{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+			{ X86_INS_VPSLLDQ, "vpslldq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+		},
-+	},
-+};
- static const struct VectorOutputRow broadcast_rows[2][3] = {
- 	{
- 		{ 0 },
-@@ -643,6 +669,44 @@ static const struct VectorOutputRow broadcast_rows[2][3] = {
- 		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
- 	},
- };
-+static const struct VectorOutputRow evex_load_rows[3][2][3] = {
-+	{
-+		{
-+			{ X86_INS_VMOVDQA32, "vmovdqa32", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQA32, "vmovdqa32", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQA32, "vmovdqa32", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		},
-+		{
-+			{ X86_INS_VMOVDQA64, "vmovdqa64", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQA64, "vmovdqa64", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQA64, "vmovdqa64", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		},
-+	},
-+	{
-+		{
-+			{ X86_INS_VMOVDQU32, "vmovdqu32", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU32, "vmovdqu32", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU32, "vmovdqu32", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		},
-+		{
-+			{ X86_INS_VMOVDQU64, "vmovdqu64", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU64, "vmovdqu64", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU64, "vmovdqu64", 1, { 134, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		},
-+	},
-+	{
-+		{
-+			{ X86_INS_VMOVDQU8, "vmovdqu8", 2, { 164, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU8, "vmovdqu8", 2, { 164, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU8, "vmovdqu8", 1, { 164, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		},
-+		{
-+			{ X86_INS_VMOVDQU16, "vmovdqu16", 2, { 164, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU16, "vmovdqu16", 2, { 164, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+			{ X86_INS_VMOVDQU16, "vmovdqu16", 1, { 164, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		},
-+	},
-+};
- struct VexRipLoad {
- 	unsigned id; char mnemonic[12], address[20];
- 	uint8_t address_length, length_code, reg_size, mem_size, reg_access, mem_access, group_count, groups[4];
-@@ -788,6 +852,16 @@ static const struct VectorOutputRow legacy_register_rows[] = {
- 	{ X86_INS_PADDB, "paddb", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
- 	{ X86_INS_PADDW, "paddw", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
- 	{ X86_INS_PADDD, "paddd", 1, { 149, 0, 0, 0 }, { 3, 1, 0, 0 }, 0 },
-+	{ X86_INS_PSRLW, "psrlw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRAW, "psraw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLW, "psllw", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRLD, "psrld", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRAD, "psrad", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLD, "pslld", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRLQ, "psrlq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSRLDQ, "psrldq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLQ, "psllq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
-+	{ X86_INS_PSLLDQ, "pslldq", 1, { 149, 0, 0, 0 }, { 3, 0, 0, 0 }, 1 },
- };
- /* Low seven bits index legacy_register_rows; bit 7 reverses the operands. */
- static const uint8_t legacy_register_plans[256] = {
-@@ -808,3 +882,34 @@ static const uint8_t legacy_register_plans[256] = {
- 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
- 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
- };
-+static const uint8_t legacy_shift_plans[3][8] = {
-+	{ 0, 0, 82, 0, 83, 0, 84, 0, },
-+	{ 0, 0, 85, 0, 86, 0, 87, 0, },
-+	{ 0, 0, 88, 89, 0, 0, 90, 91, },
-+};
-+static const struct VectorOutputRow legacy_memory_moves[3][6] = {
-+	{
-+		{ X86_INS_MOVUPS, "movups", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVUPS, "movups", 1, { 148, 0, 0, 0 }, { 1, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVAPS, "movaps", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVAPS, "movaps", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ 0 },
-+		{ 0 },
-+	},
-+	{
-+		{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 1, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVAPD, "movapd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVAPD, "movapd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVDQA, "movdqa", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVDQA, "movdqa", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	},
-+	{
-+		{ 0 },
-+		{ 0 },
-+		{ 0 },
-+		{ 0 },
-+		{ X86_INS_MOVDQU, "movdqu", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+		{ X86_INS_MOVDQU, "movdqu", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	},
-+};
-diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 44c4930b..a6faf0af 100644
---- a/arch/X86/X86ImmediateOutput.c
-+++ b/arch/X86/X86ImmediateOutput.c
-@@ -45,8 +45,7 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 	*insn_size = insn->size = length;
- 	insn->id = row->id;
- 	memcpy(insn->bytes, code, length);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = insn->op_str;
- 	if (value < 0)
-@@ -74,8 +73,7 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)(offset + 4);
- 	memcpy(insn->bytes, code, insn->size);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
- 	char *out = insn->op_str + reg->length;
-@@ -125,8 +123,7 @@ static void writeRegisterImmediate(cs_insn *insn,
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)(offset + imm_size);
- 	memcpy(insn->bytes, code, insn->size);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
- 	char *out = insn->op_str + reg->length;
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 461ae5e4..193740cc 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -4907,39 +4907,68 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 	default:
- 		return X86_FEATURE_NOT_HANDLED;
- 	case 1:
--		return decode_apx_kmov(handle, code, code_len, instr, size);
--	case 2:
--		result = decode_apx_evex_vector_gpr(handle, code, code_len,
-+		if (code_len - offset < 6)
-+			return X86_FEATURE_INVALID;
-+		if (code[offset + 4] >= 0x90 && code[offset + 4] <= 0x93)
-+			return decode_apx_kmov(handle, code, code_len, instr,
-+					       size);
-+		return X86_FEATURE_NOT_HANDLED;
-+	case 2: {
-+		/* Several promoted families reject a truncated EVEX opcode. After
-+         * the opcode is present only handlers for that opcode can match. */
-+		if (code_len - offset < 5)
-+			return X86_FEATURE_INVALID;
-+		const uint8_t op = code[offset + 4];
-+		if (op >= 0xe0 && op <= 0xef)
-+			return decode_apx_cmpccxadd(handle, code, code_len,
- 						    instr, size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		result = decode_apx_cmpccxadd(handle, code, code_len, instr,
--					      size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		result = decode_amx(handle, code, code_len, instr, size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		result = decode_apx_pdep_pext(handle, code, code_len, instr,
-+		switch (op) {
-+		case 0x49:
-+		case 0x4a:
-+		case 0x4b:
-+		case 0x6d:
-+			return decode_amx(handle, code, code_len, instr, size);
-+		case 0x7a:
-+		case 0x7b:
-+		case 0x7c:
-+			return decode_apx_evex_vector_gpr(
-+				handle, code, code_len, instr, size);
-+		case 0xf2:
-+			return decode_apx_bmi_ternary(handle, code, code_len,
-+						      instr, size);
-+		case 0xf3:
-+			return decode_apx_bls(handle, code, code_len, instr,
- 					      size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		result = decode_apx_bmi_ternary(handle, code, code_len, instr,
-+		case 0xf5:
-+			result = decode_apx_pdep_pext(handle, code, code_len,
-+						      instr, size);
-+			if (result != X86_FEATURE_NOT_HANDLED)
-+				return result;
-+			return decode_apx_bmi_ternary(handle, code, code_len,
-+						      instr, size);
-+		case 0xf6:
-+			return decode_apx_mulx(handle, code, code_len, instr,
-+					       size);
-+		case 0xf7:
-+			return decode_apx_bextr(handle, code, code_len, instr,
- 						size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		result = decode_apx_bls(handle, code, code_len, instr, size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		result = decode_apx_bextr(handle, code, code_len, instr, size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		return decode_apx_mulx(handle, code, code_len, instr, size);
-+		default:
-+			return X86_FEATURE_NOT_HANDLED;
-+		}
-+	}
- 	case 3:
--		result = decode_amx(handle, code, code_len, instr, size);
--		if (result != X86_FEATURE_NOT_HANDLED)
--			return result;
--		return decode_apx_rorx(handle, code, code_len, instr, size);
-+		if (code_len - offset < 5)
-+			return X86_FEATURE_INVALID;
-+		switch (code[offset + 4]) {
-+		case 0x07:
-+		case 0x77:
-+			return decode_amx(handle, code, code_len, instr, size);
-+		case 0xf0:
-+			return decode_apx_rorx(handle, code, code_len, instr,
-+					       size);
-+		default:
-+			return X86_FEATURE_NOT_HANDLED;
-+		}
- 	case 4:
- 		result = decode_apx_direct_store(handle, code, code_len, instr,
- 						 size);
-diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index bd0f6c94..d0a5c762 100644
---- a/arch/X86/X86MemoryOutput.c
-+++ b/arch/X86/X86MemoryOutput.c
-@@ -60,8 +60,7 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)length;
- 	memcpy(insn->bytes, code, length);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = insn->op_str;
- 	if (load) {
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..e5779bce 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
- 		if (plan == X86_PLAN_VECTOR)
--			return X86_writeVectorOutput(code, size, insn,
--						     insn_size,
--						     x86_simple_registers[3],
--						     wide);
-+			return X86_writeVectorOutput(
-+				code, size, insn, insn_size,
-+				x86_simple_registers[wide ? 3 : 2], wide);
- 		unsigned row;
- 		const struct X86SimpleRegister *reg = NULL;
- 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
-@@ -121,8 +120,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	uint64_t target = 0;
- 	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
- 	insn->id = row->id;
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	insn->bytes[0] = code[0];
- 	if (form == X86_SIMPLE_FIXED) {
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..8ee079c0 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -68,6 +68,15 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
- 		      bool wide);
- 
-+/* The generated row already pads its spelling with zero bytes. */
-+static inline void X86_writeMnemonic(cs_insn *insn, const char *spelling,
-+				     size_t row_size)
-+{
-+	memcpy(insn->mnemonic, spelling, row_size);
-+	memset(insn->mnemonic + row_size, 0,
-+	       sizeof(insn->mnemonic) - row_size);
-+}
-+
- static inline char *X86_writeDisp8(char *out, int displacement)
+@@ -3404,6 +3404,17 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  {
- 	if (displacement) {
+ 	unsigned instructionID = 0;
+ 	const cs_mode mode = ((cs_struct *)(uintptr_t)ud)->mode;
++#ifdef CAPSTONE_X86_VECTOR_OUTPUT
++	if (code_len && code[0] == 0x66 &&
++	    (mode == CS_MODE_32 || mode == CS_MODE_64) &&
++	    ((cs_struct *)(uintptr_t)ud)->insn_id == X86_get_insn_id) {
++		instructionID = X86_scanLegacySSERegister(
++			code, code_len, mode == CS_MODE_64, &result->length);
++		if (instructionID)
++			return completeTerminalScanResult(result, instructionID,
++						  X86_SCAN_COMPLETE);
++	}
++#endif
+ 	int status;
+ 	if (mode & CS_MODE_16)
+ 		status = tryLegacyPrefixedScan(code, code_len, CS_MODE_16,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..b3c79075 100644
+index 6df1472d..65925122 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -3,10 +3,8 @@
@@ -1060,1544 +839,57 @@ index 6df1472d..b3c79075 100644
  #include "X86SimpleOutput.h"
  struct PaddingOutput {
  	unsigned id;
-@@ -32,6 +30,22 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 	return out;
- }
- 
-+static inline void writeVectorImmediate(char *out, unsigned value)
-+{
-+	memcpy(out, ", ", 2);
-+	out += 2;
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		memcpy(out, "0x", 2);
-+		out += 2;
-+		if (value >= 16)
-+			*out++ = digits[value >> 4];
-+		*out = digits[value & 15];
-+	}
-+}
-+
- static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 				 uint16_t *insn_size,
- 				 const struct VectorOutputRow *row,
-@@ -43,29 +57,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
- 	memcpy(insn->bytes, code, len);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
- 	for (unsigned n = 1; n != reg_count; ++n) {
- 		memcpy(out, ", ", 2);
- 		out = writeVectorRegister(out + 2, ll, regs[n]);
- 	}
--	if (row->immediate) {
--		const unsigned value = code[prefix + 2];
--		memcpy(out, ", ", 2);
--		out += 2;
--		if (value <= HEX_THRESHOLD) {
--			*out = (char)('0' + value);
--		} else {
--			static const char digits[] = "0123456789abcdef";
--			memcpy(out, "0x", 2);
--			out += 2;
--			if (value >= 16)
--				*out++ = digits[value >> 4];
--			*out = digits[value & 15];
--		}
--	}
-+	if (row->immediate)
-+		writeVectorImmediate(out, code[prefix + 2]);
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
- 		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -101,9 +101,102 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -254,22 +252,42 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
  	return true;
  }
  
--static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
--			       uint16_t *insn_size,
--			       const struct X86SimpleRegister *regs);
-+static bool writeEvexMemoryOutput(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister *regs);
-+
-+/* Both callers have selected the unprefixed 64-bit EVEX register form. */
-+static inline const struct VectorOutputRow *evexRegisterRow(const uint8_t *code,
-+							    size_t size)
++/* The caller has consumed the mandatory 66 prefix. Only ordinary SSE
++ * register forms have generated rows. */
++static inline unsigned legacyRegisterPlan(const uint8_t *code, size_t size,
++					  bool wide, unsigned *length)
 +{
-+	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
-+	    (code[3] & 0x60) == 0x60)
-+		return NULL;
-+	const unsigned ll = code[3] >> 5;
-+	const unsigned w = code[2] >> 7;
-+	const unsigned key = ((code[1] & 15) << 8) | code[4];
-+	if (key == 0x173) {
-+		/* R and R' are unextended for the canonical /3 and /7 forms. */
-+		if (size < 7 || (code[1] & 0x90) != 0x90 ||
-+		    (code[5] & 0x18) != 0x18)
-+			return NULL;
-+		return &evex_byte_shifts[(code[5] >> 5) & 1][w][ll];
-+	}
-+	const struct VectorOutputRow *row = evexOutputRow(key, w, ll);
-+	if (!row || (row->immediate && size < 7))
-+		return NULL;
-+	if ((key & ~0x22u) == 0x319 &&
-+	    ((code[2] & 0x78) != 0x78 || !(code[3] & 8)))
-+		return NULL;
-+	return row;
++	if (size < 4)
++		return 0;
++	const bool has_rex = wide && (code[1] & 0xf0) == 0x40;
++	*length = 4 + has_rex;
++	if (size < *length || code[1 + has_rex] != 0x0f ||
++	    code[3 + has_rex] < 0xc0)
++		return 0;
++	return legacy_register_plans[code[2 + has_rex]];
 +}
 +
-+static inline const struct VectorOutputRow *
-+evexMemoryRow(const uint8_t *code, size_t size, unsigned *source_width,
-+	      unsigned *instruction_length)
++unsigned X86_scanLegacySSERegister(const uint8_t *code, size_t size,
++				   bool wide, uint16_t *size_out)
 +{
-+	if (size < 6 || (code[2] & 0x7c) != 0x7c || (code[3] & 0x9f) != 8)
-+		return NULL;
-+	const unsigned ll = code[3] >> 5, w = code[2] >> 7, pp = code[2] & 3;
-+	const uint8_t modrm = code[5];
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	if (ll >= 3 || mod >= 3)
-+		return NULL;
-+	const unsigned key = ((code[1] & 15) << 8) | code[4];
-+	const struct VectorOutputRow *row;
-+	unsigned memory_ll;
-+	if (key == 0x16f && pp) {
-+		row = &evex_load_rows[pp - 1][w][ll];
-+		memory_ll = ll;
-+	} else if (key == 0x21a && pp == 1 && mod < 2) {
-+		row = &broadcast_rows[w][ll];
-+		memory_ll = 0;
-+	} else {
-+		return NULL;
-+	}
-+	const bool sib = rm == 4, rip = !mod && rm == 5;
-+	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
-+	const unsigned length = offset + disp_size;
-+	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
-+	if (!row->id || size < length)
-+		return NULL;
-+	if (sib) {
-+		const uint8_t encoding = code[6];
-+		const unsigned index = ((rxb & 2) << 2) | ((encoding >> 3) & 7);
-+		/* Keep no-base and explicit RIZ spellings on the general path. */
-+		if ((!mod && (encoding & 7) == 5) ||
-+		    (index == 4 && encoding != 0x24))
-+			return NULL;
-+	}
-+	*source_width = memory_ll;
-+	*instruction_length = length;
-+	return row;
-+}
-+
-+bool X86_scanEvexOutputForm(const uint8_t *code, size_t size,
-+			    X86ScanResult *result)
-+{
-+	if (size < 6 || code[0] != 0x62)
-+		return false;
-+	const struct VectorOutputRow *row;
 +	unsigned length;
-+	if (code[5] < 0xc0) {
-+		unsigned source_width;
-+		row = evexMemoryRow(code, size, &source_width, &length);
-+		if (!row)
-+			return false;
-+	} else {
-+		row = evexRegisterRow(code, size);
-+		if (!row)
-+			return false;
-+		length = 6 + row->immediate;
-+	}
-+	result->opcode = 0;
-+	result->opcode_pub = row->id;
-+	result->length = (uint16_t)length;
-+	result->popcode_adjust = 0;
-+	return true;
++	const unsigned plan = legacyRegisterPlan(code, size, wide, &length);
++	if (!plan)
++		return 0;
++	*size_out = (uint16_t)length;
++	return legacy_register_rows[plan & 127].id;
 +}
- 
- #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -111,32 +204,31 @@ __declspec(noinline)
- __attribute__((noinline))
- #endif
- static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
--			    uint16_t *insn_size,
--			    const struct X86SimpleRegister *address_regs)
-+			 uint16_t *insn_size,
-+			 const struct X86SimpleRegister *address_regs)
++
+ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ 				      cs_insn *insn, uint16_t *insn_size,
+ 				      bool wide)
  {
- 	if (size >= 6 && code[5] < 0xc0)
--		return writeEvexBroadcast(code, size, insn, insn_size,
--					  address_regs);
--	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
--	    (code[3] & 0x60) == 0x60)
-+		return writeEvexMemoryOutput(code, size, insn, insn_size,
-+					     address_regs);
-+	const struct VectorOutputRow *row = evexRegisterRow(code, size);
-+	if (!row)
- 		return false;
- 	const unsigned ll = code[3] >> 5;
- 	const unsigned w = code[2] >> 7;
- 	const unsigned key = ((code[1] & 15) << 8) | code[4];
--	const struct VectorOutputRow *row = evexOutputRow(key, w, ll);
--	if (!row || (row->immediate && size < 7))
+-	if (size < 4)
 -		return false;
- 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
- 	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
- 					  (~(unsigned)code[1] & 16),
- 				  ((~(unsigned)code[2] >> 3) & 15) |
- 					  ((~(unsigned)code[3] & 8) << 1),
- 				  (code[5] & 7) | ((rxb & 3) << 3) };
-+	if (key == 0x173)
-+		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
-+					    0x40 | (w << 3) | rxb, ll, regs + 1,
-+					    2);
- 	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
-      * the full-width source, and reserve vvvv/V'. */
- 	if ((key & ~0x22u) == 0x319) {
--		if ((code[2] & 0x78) != 0x78 || !(code[3] & 8))
--			return false;
- 		const unsigned pair[] = { regs[2], regs[0] };
- 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
- 					    0x40 | (w << 3) | rxb,
-@@ -189,8 +281,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
- 	memcpy(insn->bytes, code, len);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, ll, dst);
- 	if (fma) {
-@@ -261,30 +352,37 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 	if (size < 4)
- 		return false;
- 	const bool has_rex = wide && (code[1] & 0xf0) == 0x40;
+-	const bool has_rex = wide && (code[1] & 0xf0) == 0x40;
 -	const unsigned length = 4 + has_rex;
 -	if (size < length || code[1 + has_rex] != 0x0f)
-+	const unsigned header = 4 + has_rex;
-+	if (size < header || code[1 + has_rex] != 0x0f)
- 		return false;
- 	const uint8_t opcode = code[2 + has_rex];
+-		return false;
+-	const uint8_t opcode = code[2 + has_rex];
 -	const unsigned plan = legacy_register_plans[opcode];
- 	const uint8_t modrm = code[3 + has_rex];
+-	const uint8_t modrm = code[3 + has_rex];
 -	if (!plan || modrm < 0xc0)
-+	const bool shift = opcode >= 0x71 && opcode <= 0x73;
-+	const unsigned plan =
-+		shift ? legacy_shift_plans[opcode - 0x71][(modrm >> 3) & 7] :
-+			legacy_register_plans[opcode];
-+	const unsigned length = header + shift;
-+	if (!plan || modrm < 0xc0 || size < length)
++	unsigned length;
++	const unsigned plan = legacyRegisterPlan(code, size, wide, &length);
++	if (!plan)
  		return false;
- 
+-
++	const bool has_rex = length == 5;
++	const uint8_t opcode = code[length - 2], modrm = code[length - 1];
  	const struct VectorOutputRow *row = &legacy_register_rows[plan & 127];
  	const uint8_t rex = has_rex ? code[1] : 0;
  	const unsigned reg = ((modrm >> 3) & 7) | ((rex & 4) << 1);
- 	const unsigned rm = (modrm & 7) | ((rex & 1) << 3);
--	const unsigned first = plan & 128 ? rm : reg;
-+	const unsigned first = shift || (plan & 128) ? rm : reg;
- 	const unsigned second = plan & 128 ? reg : rm;
- 	*insn_size = insn->size = (uint16_t)length;
- 	insn->id = row->id;
- 	memcpy(insn->bytes, code, length);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, 0, first);
--	memcpy(out, ", ", 2);
--	writeVectorRegister(out + 2, 0, second);
-+	if (shift)
-+		writeVectorImmediate(out, code[header]);
-+	else {
-+		memcpy(out, ", ", 2);
-+		writeVectorRegister(out + 2, 0, second);
-+	}
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
- 		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-@@ -297,9 +395,9 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 		x->rex = rex;
- 		x->addr_size = wide ? 8 : 4;
- 		x->modrm = modrm;
--		x->encoding.modrm_offset = (uint8_t)(length - 1);
-+		x->encoding.modrm_offset = (uint8_t)(header - 1);
- 		x->op_count = 2;
--		for (unsigned i = 0; i < 2; ++i) {
-+		for (unsigned i = 0; i < (shift ? 1u : 2u); ++i) {
- 			cs_x86_op *op = &x->operands[i];
- 			op->type = X86_OP_REG;
- 			op->reg =
-@@ -307,6 +405,15 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 			op->size = 16;
- 			op->access = (cs_ac_type)row->access[i];
- 		}
-+		if (shift) {
-+			cs_x86_op *imm = &x->operands[1];
-+			imm->type = X86_OP_IMM;
-+			imm->imm = code[header];
-+			imm->size = 1;
-+			imm->access = (cs_ac_type)row->access[1];
-+			x->encoding.imm_offset = (uint8_t)header;
-+			x->encoding.imm_size = 1;
-+		}
- 	}
- 	return true;
- }
-@@ -329,8 +436,7 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
- 	insn->id = row->id;
- 	*insn_size = insn->size = 8;
- 	memcpy(insn->bytes, code, 8);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, row->length_code, dst);
- 	memcpy(out, row->address, sizeof(row->address));
-@@ -501,18 +607,132 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
- 				    0x40 | (w << 3) | rxb, ll, regs, 3);
- }
- 
-+/* Ordinary packed SSE moves with a base and displacement, including the
-+ * canonical [esp]/[rsp] SIB. Other address spellings use the full printer. */
-+static bool writeLegacyMemoryMove(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister *regs,
-+				  bool wide)
-+{
-+	const uint8_t mandatory = code[0] == 0x0f ? 0 : code[0];
-+	unsigned pos = mandatory != 0;
-+	if (size <= pos)
-+		return false;
-+	const uint8_t rex = wide && (code[pos] & 0xf0) == 0x40 ? code[pos++] : 0;
-+	if (size < pos + 3 || code[pos] != 0x0f)
-+		return false;
-+	const uint8_t opcode = code[pos + 1], modrm = code[pos + 2];
-+	unsigned slot;
-+	switch (opcode) {
-+	case 0x10:
-+	case 0x11:
-+		slot = opcode & 1;
-+		break;
-+	case 0x28:
-+	case 0x29:
-+		slot = 2 + (opcode & 1);
-+		break;
-+	case 0x6f:
-+		slot = 4;
-+		break;
-+	case 0x7f:
-+		slot = 5;
-+		break;
-+	default:
-+		return false;
-+	}
-+	const struct VectorOutputRow *row =
-+		&legacy_memory_moves[mandatory == 0x66 ? 1 : mandatory ? 2 : 0][slot];
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	if (!row->id || mod == 3 || (!mod && rm == 5))
-+		return false;
-+	const bool sib = rm == 4, store = slot & 1;
-+	const unsigned disp_size = mod == 2 ? 4 : mod;
-+	const unsigned offset = pos + 3 + sib, length = offset + disp_size;
-+	if (size < length || (sib && (code[pos + 3] != 0x24 || (rex & 2))))
-+		return false;
-+	const unsigned vector = ((modrm >> 3) & 7) | ((rex & 4) << 1);
-+	const struct X86SimpleRegister *base = &regs[rm | ((rex & 1) << 3)];
-+	const int32_t disp = disp_size == 4 ? X86_readDisp32(code + offset) :
-+			     disp_size ? (int8_t)code[offset] : 0;
-+
-+	insn->id = row->id;
-+	*insn_size = insn->size = (uint16_t)length;
-+	memcpy(insn->bytes, code, length);
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
-+	memset(insn->op_str, 0, sizeof(insn->op_str));
-+	char *out = insn->op_str;
-+	if (!store) {
-+		out = writeVectorRegister(out, 0, vector);
-+		memcpy(out, ", ", 2);
-+		out += 2;
-+	}
-+	memcpy(out, "xmmword ptr [", 13);
-+	out += 13;
-+	memcpy(out, base->name, sizeof(base->name));
-+	out = X86_writeDisplacement(out + base->length, disp);
-+	*out++ = ']';
-+	if (store) {
-+		memcpy(out, ", ", 2);
-+		writeVectorRegister(out + 2, 0, vector);
-+	}
-+	if (insn->detail) {
-+		cs_detail *d = insn->detail;
-+		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
-+		memcpy(d->groups, row->groups, sizeof(row->groups));
-+		d->groups_count = row->group_count;
-+		cs_x86 *x = &d->x86;
-+		x->prefix[2] = mandatory == 0x66 ? mandatory : 0;
-+		x->opcode[0] = 0x0f;
-+		x->opcode[1] = opcode;
-+		x->addr_size = wide ? 8 : 4;
-+		x->rex = rex;
-+		x->modrm = modrm;
-+		x->encoding.modrm_offset = (uint8_t)(pos + 2);
-+		if (disp_size) {
-+			x->encoding.disp_offset = (uint8_t)offset;
-+			x->encoding.disp_size = (uint8_t)disp_size;
-+		}
-+		if (sib) {
-+			x->sib = 0x24;
-+			x->sib_base = (x86_reg)base->reg;
-+			x->sib_scale = 1;
-+		}
-+		x->op_count = 2;
-+		cs_x86_op *reg = &x->operands[store];
-+		reg->type = X86_OP_REG;
-+		reg->reg = (x86_reg)(X86_REG_XMM0 + vector);
-+		reg->size = 16;
-+		reg->access = (cs_ac_type)row->access[store];
-+		cs_x86_op *mem = &x->operands[!store];
-+		mem->type = X86_OP_MEM;
-+		mem->size = 16;
-+		mem->access = (cs_ac_type)row->access[!store];
-+		mem->mem.base = (x86_reg)base->reg;
-+		mem->mem.scale = 1;
-+		mem->mem.disp = x->disp = disp;
-+	}
-+	return true;
-+}
-+
- bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 			   uint16_t *insn_size,
- 			   const struct X86SimpleRegister *regs, bool wide)
- {
--	if (code[0] == 0x0f || code[0] == 0xf3 ||
-+	if ((code[0] == 0x0f && size >= 2 && code[1] == 0x1f) ||
-+	    (code[0] == 0xf3 && size >= 3 && code[1] == 0x0f &&
-+	     code[2] == 0x1e) ||
- 	    (code[0] == 0x66 && size >= 2 &&
- 	     (code[1] == 0x90 ||
- 	      (size >= 3 && code[1] == 0x0f && code[2] == 0x1f))))
- 		return writePaddingOutput(code, size, insn, insn_size, wide);
--	if (code[0] == 0x66)
--		return writeLegacyRegisterOutput(code, size, insn, insn_size,
--						 wide);
-+	if (code[0] == 0x66) {
-+		const unsigned offset = 1 + (wide && size > 1 && (code[1] & 0xf0) == 0x40);
-+		if (size > offset + 2 && code[offset + 2] >= 0xc0)
-+			return writeLegacyRegisterOutput(code, size, insn, insn_size, wide);
-+	}
-+	if (code[0] == 0x0f || code[0] == 0xf3 || code[0] == 0x66)
-+		return writeLegacyMemoryMove(code, size, insn, insn_size, regs, wide);
- 	if (code[0] == 0x62)
- 		return writeEvexOutput(code, size, insn, insn_size, regs);
- 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -530,52 +750,63 @@ __declspec(noinline)
- #elif defined(__GNUC__)
- __attribute__((noinline))
- #endif
--static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
--			       uint16_t *insn_size,
--			       const struct X86SimpleRegister *regs)
-+static bool writeEvexMemoryOutput(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister *regs)
- {
--	if (size < 6 || (code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
--	    (code[3] & 0x9f) != 8 || code[4] != 0x1a)
-+	unsigned memory_ll, length;
-+	const struct VectorOutputRow *row =
-+		evexMemoryRow(code, size, &memory_ll, &length);
-+	if (!row)
- 		return false;
- 	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
- 	const uint8_t modrm = code[5];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
--	if (ll >= 3 || mod > 1 || (!mod && rm == 5))
--		return false;
--	const struct VectorOutputRow *row = &broadcast_rows[w][ll];
--	const bool sib = rm == 4;
--	const unsigned offset = 6 + sib, length = offset + mod;
-+	const bool sib = rm == 4, rip = !mod && rm == 5;
-+	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
- 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
--	if (!row->id || size < length ||
--	    (sib && ((rxb & 2) || code[6] != 0x24)))
--		return false;
- 	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
- 			     (~(unsigned)code[1] & 16);
--	const struct X86SimpleRegister *base = &regs[rm | ((rxb & 1) << 3)];
--	const int displacement = mod ? (int8_t)code[offset] * 16 : 0;
-+	const unsigned base_number = sib ? (code[6] & 7) : rm;
-+	const struct X86SimpleRegister *base =
-+		&regs[base_number | ((rxb & 1) << 3)];
-+	const unsigned index_number =
-+		sib ? (((rxb & 2) << 2) | ((code[6] >> 3) & 7)) : 4;
-+	const struct X86SimpleRegister *index =
-+		index_number == 4 ? NULL : &regs[index_number];
-+	const unsigned scale = sib ? 1u << (code[6] >> 6) : 1;
-+	const unsigned width = 16u << memory_ll;
-+	const int32_t displacement =
-+		disp_size == 4 ? X86_readDisp32(code + offset) :
-+		mod	       ? (int8_t)code[offset] * (int32_t)width :
-+				 0;
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)length;
- 	memcpy(insn->bytes, code, length);
--	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
--	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
-+	X86_writeMnemonic(insn, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, ll, dst);
- 	memcpy(out, ", xmmword ptr [", 15);
-+	out[2] = "xyz"[memory_ll];
- 	out += 15;
--	memcpy(out, base->name, sizeof(base->name));
--	out += base->length;
--	if (displacement) {
--		const unsigned mag = displacement < 0 ?
--					     (unsigned)-displacement :
--					     (unsigned)displacement;
--		memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
--		out += 5;
--		static const char digits[] = "0123456789abcdef";
--		if (mag >= 256)
--			*out++ = digits[mag >> 8];
--		*out++ = digits[(mag >> 4) & 15];
--		*out++ = '0';
-+	if (rip) {
-+		memcpy(out, "rip", 3);
-+		out += 3;
-+	} else {
-+		memcpy(out, base->name, sizeof(base->name));
-+		out += base->length;
- 	}
-+	if (index) {
-+		memcpy(out, " + ", 3);
-+		out += 3;
-+		memcpy(out, index->name, sizeof(index->name));
-+		out += index->length;
-+		if (scale != 1) {
-+			*out++ = '*';
-+			*out++ = (char)('0' + scale);
-+		}
-+	}
-+	out = X86_writeDisplacement(out, displacement);
- 	*out = ']';
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
-@@ -588,13 +819,15 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 		x->addr_size = 8;
- 		x->modrm = modrm;
- 		x->encoding.modrm_offset = 5;
--		if (mod) {
-+		if (disp_size) {
- 			x->encoding.disp_offset = (uint8_t)offset;
--			x->encoding.disp_size = 1;
-+			x->encoding.disp_size = (uint8_t)disp_size;
- 		}
- 		if (sib) {
- 			x->sib = code[6];
--			x->sib_scale = 1;
-+			x->sib_scale = (int8_t)scale;
-+			if (index)
-+				x->sib_index = (x86_reg)index->reg;
- 			x->sib_base = (x86_reg)base->reg;
- 		}
- 		x->op_count = 2;
-@@ -608,9 +841,11 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 		op->access = (cs_ac_type)row->access[0];
- 		op = &x->operands[1];
- 		op->type = X86_OP_MEM;
--		op->size = 16;
--		op->mem.base = (x86_reg)base->reg;
--		op->mem.scale = 1;
-+		op->size = (uint8_t)width;
-+		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-+		op->mem.scale = (int32_t)scale;
-+		if (index)
-+			op->mem.index = (x86_reg)index->reg;
- 		op->mem.disp = x->disp = displacement;
- 		op->access = (cs_ac_type)row->access[1];
- 	}
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py b/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
-index 1dd31e59..37010f31 100755
---- a/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/CppTranslator.py
-@@ -303,7 +303,7 @@ class Translator:
-                 case GetOperandRegImm.__name__:
-                     patch = GetOperandRegImm(p)
-                 case StreamOperations.__name__:
--                    patch = StreamOperations(p)
-+                    patch = StreamOperations(p, self.arch)
-                 case SubtargetInfoParam.__name__:
-                     patch = SubtargetInfoParam(p)
-                 case SizeAssignment.__name__:
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-index c74ca4e1..90ed45ef 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/Tests/test_patches.py
-@@ -634,6 +634,20 @@ public:
-         syntax = b"{ int y = 1; int x = 1; OS << x; }"
-         self.check_patching_result(patch, syntax, b"printInt32(OS, x);")
- 
-+    def test_arm_single_markup_before_operand(self):
-+        source = b"""{ O << markup("<imm:") << '#' << amount; }"""
-+        suffix = b"SStream_concat1(O, '#');\nSStream_concat0(O, amount);"
-+        self.check_patching_result(
-+            StreamOperations(0, "ARM"),
-+            source,
-+            b'ARM_printMarkup(O, "<imm:");\n' + suffix,
-+        )
-+        self.check_patching_result(
-+            StreamOperations(0, "AArch64"),
-+            source,
-+            b'SStream_concat(O, "%s", markup("<imm:"));\n' + suffix,
-+        )
-+
-     def test_streamoperation_string_groups(self):
-         patch = StreamOperations(0)
-         for syntax, expected in [
-diff --git a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-index e507eae0..6068ef0f 100644
---- a/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-+++ b/suite/auto-sync/src/autosync/cpptranslator/patches/StreamOperation.py
-@@ -13,8 +13,9 @@ class StreamOperations(Patch):
-     to      SStream_concat(OS, ...)
-     """
- 
--    def __init__(self, priority: int):
-+    def __init__(self, priority: int, arch: str = ""):
-         super().__init__(priority)
-+        self.arch = arch
- 
-     def get_search_pattern(self) -> str:
-         return (
-@@ -30,8 +31,18 @@ class StreamOperations(Patch):
-     def get_main_capture_name(self) -> str:
-         return "stream"
- 
--    @staticmethod
--    def _concat_strings(s_name: bytes, ops: list[Node], src: bytes) -> bytes:
-+    def _concat_strings(self, s_name: bytes, ops: list[Node], src: bytes) -> bytes:
-+        if self.arch == "ARM" and len(ops) == 1 and ops[0].type == "call_expression":
-+            function = ops[0].child_by_field_name("function")
-+            arguments = ops[0].child_by_field_name("arguments")
-+            if (
-+                function is not None
-+                and get_text_from_node(src, function) == b"markup"
-+                and arguments is not None
-+                and len(arguments.named_children) == 1
-+            ):
-+                tag = get_text_from_node(src, arguments.named_children[0])
-+                return b"ARM_printMarkup(" + s_name + b", " + tag + b");\n"
-         args = b", ".join(get_text_from_node(src, op) for op in ops)
-         if len(ops) == 2:
-             return b"SStream_concat2(" + s_name + b", " + args + b");\n"
-diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
-index 30482037..29a72009 100644
---- a/suite/synctools/fixed_len_decoder.py
-+++ b/suite/synctools/fixed_len_decoder.py
-@@ -144,6 +144,22 @@ def successors(n):
-     return [n.end] + ([] if n.target is None else [n.target])
- 
- 
-+def primary_opcode_mask(nodes):
-+    """A top-level miss must reach Fail without modifying the instruction."""
-+    root = nodes[0]
-+    require(root.op == "ExtractField" and root.args == (26, 6),
-+            "Review MIPS primary opcode field")
-+    node = nodes[root.end]
-+    mask = 0
-+    while node.op == "FilterValue":
-+        value = node.args[0]
-+        require(value < 64, "Invalid MIPS primary opcode")
-+        mask |= 1 << value
-+        node = nodes[node.target]
-+    require(node.op == "Fail", "Review MIPS primary opcode fallback")
-+    return mask
-+
-+
- def emit(name, nodes, width, w):
-     incoming = {p: set() for p in nodes}
-     for p, n in nodes.items():
-@@ -274,6 +290,11 @@ def main():
-                 "Review changed decoder input width before regenerating",
-             )
-             nodes = parse(body)
-+            if arch == "Mips" and name in (
-+                "DecoderTableMips6432", "DecoderTableMipsFP6432", "DecoderTableMipsDSP32"
-+            ):
-+                mask = primary_opcode_mask(nodes)
-+                output.append(f"#define {name}_MAJOR_MASK UINT64_C(0x{mask:016x})")
-             output.append(emit(name, nodes, width, w))
-             counts.append((name, len(nodes)))
-         for w, width in sorted(set(inputs.values())):
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..e0fc9ad0 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -618,6 +618,8 @@ int main()
- 	// Reserve unprefixed EVEX for its own verified vector output records.
- 	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
- 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
-+	for (unsigned op : { 0x10u, 0x11u, 0x28u, 0x29u })
-+		plans[0][3][op] = plans[1][3][op] = X86_PLAN_VECTOR;
- 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
- 	plans[1][0][0x62] = X86_PLAN_VECTOR;
- 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
-diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..0163d27f 100644
---- a/suite/synctools/x86_vector_output.cpp
-+++ b/suite/synctools/x86_vector_output.cpp
-@@ -94,6 +94,61 @@ std::string fields(const Bytes4 &array)
- 	       ", " + std::to_string(array[3]) + " }";
- }
- 
-+// Rebuild both vector operands, the immediate and all public encoding fields.
-+std::string two_register_immediate_row(Decoder &decoder,
-+				       const uint8_t (&bytes)[7],
-+				       unsigned dst_width, unsigned dst,
-+				       unsigned src_width, unsigned src)
-+{
-+	const unsigned value = bytes[6];
-+	const char *names[] = { "xmm", "ymm", "zmm" };
-+	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
-+	unsigned id = decoder.decode(bytes, sizeof(bytes));
-+	if (!id)
-+		return {};
-+	const auto &insn = *decoder.insn;
-+	const auto &d = *insn.detail;
-+	if (insn.is_alias || insn.usesAliasDetails || insn.illegal ||
-+	    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
-+	    d.regs_write_count || d.groups_count > 4)
-+		return {};
-+	cs_x86 x{};
-+	std::memcpy(x.opcode, bytes, 4);
-+	x.rex = uint8_t(0x40 | (bytes[2] >> 7) << 3 |
-+			((~unsigned(bytes[1]) >> 5) & 7));
-+	x.addr_size = 8;
-+	x.modrm = bytes[5];
-+	x.encoding.modrm_offset = 5;
-+	x.encoding.imm_offset = 6;
-+	x.encoding.imm_size = 1;
-+	x.op_count = 3;
-+	Bytes4 access{}, groups{};
-+	std::copy_n(d.groups, d.groups_count, groups.begin());
-+	for (unsigned n = 0; n < 3; ++n) {
-+		x.operands[n].access = d.x86.operands[n].access;
-+		access[n] = unsigned(x.operands[n].access);
-+	}
-+	x.operands[0].type = X86_OP_REG;
-+	x.operands[0].reg = x86_reg(bases[dst_width] + dst);
-+	x.operands[0].size = uint8_t(16 << dst_width);
-+	x.operands[1].type = X86_OP_REG;
-+	x.operands[1].reg = x86_reg(bases[src_width] + src);
-+	x.operands[1].size = uint8_t(16 << src_width);
-+	x.operands[2].type = X86_OP_IMM;
-+	x.operands[2].size = 1;
-+	x.operands[2].imm = value;
-+	char text[64];
-+	std::snprintf(text, sizeof(text),
-+		      value <= 9 ? "%s%u, %s%u, %u" : "%s%u, %s%u, 0x%x",
-+		      names[dst_width], dst, names[src_width], src, value);
-+	if (std::strcmp(text, insn.op_str) ||
-+	    std::memcmp(&x, &d.x86, sizeof(x)))
-+		return {};
-+	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
-+	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
-+	       fields(access) + ", 1 }";
-+}
-+
- // EVEX extracts have a narrower r/m destination, a full-width reg source,
- // and a reserved vvvv field. Reconstruct the entire public record before
- // admitting a width, including the ignored or effective W bit in REX.
-@@ -101,8 +156,6 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
- 			   unsigned ll)
- {
- 	const unsigned dst_width = (form.opcode & 2) ? 1 : 0;
--	const char *names[] = { "xmm", "ymm", "zmm" };
--	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
- 	std::string row;
- 	for (unsigned i = 0; i < 1024; ++i) {
- 		unsigned dst = i & 31, src = i >> 5, value = (i * 37) & 255;
-@@ -115,51 +168,10 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
- 				    uint8_t(form.opcode),
- 				    uint8_t(0xc0 | (src & 7) << 3 | (dst & 7)),
- 				    uint8_t(value) };
--		unsigned id = decoder.decode(bytes, sizeof(bytes));
--		if (!id)
-+		const std::string record = two_register_immediate_row(
-+			decoder, bytes, dst_width, dst, ll, src);
-+		if (record.empty())
- 			return {};
--		const auto &insn = *decoder.insn;
--		const auto &d = *insn.detail;
--		if (insn.is_alias || insn.usesAliasDetails || insn.illegal ||
--		    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
--		    d.regs_write_count || d.groups_count > 4)
--			return {};
--		cs_x86 x{};
--		std::memcpy(x.opcode, bytes, 4);
--		x.rex = uint8_t(0x40 | (w << 3) | (ext >> 5));
--		x.addr_size = 8;
--		x.modrm = bytes[5];
--		x.encoding.modrm_offset = 5;
--		x.encoding.imm_offset = 6;
--		x.encoding.imm_size = 1;
--		x.op_count = 3;
--		Bytes4 access{}, groups{};
--		std::copy_n(d.groups, d.groups_count, groups.begin());
--		for (unsigned n = 0; n < 3; ++n) {
--			x.operands[n].access = d.x86.operands[n].access;
--			access[n] = unsigned(x.operands[n].access);
--		}
--		x.operands[0].type = X86_OP_REG;
--		x.operands[0].reg = x86_reg(bases[dst_width] + dst);
--		x.operands[0].size = uint8_t(16 << dst_width);
--		x.operands[1].type = X86_OP_REG;
--		x.operands[1].reg = x86_reg(bases[ll] + src);
--		x.operands[1].size = uint8_t(16 << ll);
--		x.operands[2].type = X86_OP_IMM;
--		x.operands[2].size = 1;
--		x.operands[2].imm = value;
--		char text[64];
--		std::snprintf(text, sizeof(text),
--			      value <= 9 ? "%s%u, %s%u, %u" :
--					   "%s%u, %s%u, 0x%x",
--			      names[dst_width], dst, names[ll], src, value);
--		if (std::strcmp(text, insn.op_str) ||
--		    std::memcmp(&x, &d.x86, sizeof(x)))
--			return {};
--		std::string record =
--			"{ " + decoder.symbol(id) + ", \"" + insn.mnemonic +
--			"\", " + std::to_string(d.groups_count) + ", " +
--			fields(groups) + ", " + fields(access) + ", 1 }";
- 		if (i && record != row)
- 			return {};
- 		row = record;
-@@ -167,6 +179,54 @@ std::string extract_record(Decoder &decoder, const Form &form, unsigned w,
- 	return row;
- }
- 
-+// EVEX.66.0F 73 /3 and /7 select the operation with ModR/M.reg. The
-+// destination comes from vvvv/V' and the source comes from r/m, X and B.
-+void emit_evex_byte_shifts(Decoder &decoder)
-+{
-+	std::puts(
-+		"static const struct VectorOutputRow evex_byte_shifts[2][2][3] = {");
-+	for (unsigned group : { 3u, 7u }) {
-+		std::puts("\t{");
-+		for (unsigned w = 0; w < 2; ++w) {
-+			std::puts("\t\t{");
-+			for (unsigned ll = 0; ll < 3; ++ll) {
-+				std::string row;
-+				for (unsigned pair = 0; pair < 1024; ++pair) {
-+					const unsigned dst = pair >> 5,
-+						       src = pair & 31;
-+					const unsigned ext = ((src & 8) << 2) |
-+							     ((src & 16) << 2);
-+					const uint8_t bytes[] = {
-+						0x62,
-+						uint8_t(0xf1 ^ ext),
-+						uint8_t(w << 7 |
-+							((~dst & 15) << 3) | 5),
-+						uint8_t(ll << 5 |
-+							((~dst & 16) >> 1)),
-+						0x73,
-+						uint8_t(0xc0 | group << 3 |
-+							(src & 7)),
-+						uint8_t(pair * 37)
-+					};
-+					auto actual =
-+						two_register_immediate_row(
-+							decoder, bytes, ll, dst,
-+							ll, src);
-+					if (actual.empty() ||
-+					    (pair && actual != row))
-+						throw std::runtime_error(
-+							"unexpected EVEX byte shift");
-+					row = actual;
-+				}
-+				std::printf("\t\t\t%s,\n", row.c_str());
-+			}
-+			std::puts("\t\t},");
-+		}
-+		std::puts("\t},");
-+	}
-+	std::puts("};");
-+}
-+
- std::string output_record(Decoder &decoder, const Form &form, unsigned w,
- 			  unsigned ll)
- {
-@@ -285,13 +345,16 @@ void emit_vex_indexed(Decoder &decoder)
- // can be recovered from the prefix, opcode and ModR/M. Generate against
- // the ordinary decoder so special encodings and aliases retain its behavior.
- std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
--				unsigned opcode, unsigned modrm, bool reverse)
-+				unsigned opcode, unsigned modrm, bool reverse,
-+				bool shift = false, unsigned immediate = 0)
- {
--	uint8_t bytes[5] = { 0x66, uint8_t(rex), 0x0f, uint8_t(opcode),
--			     uint8_t(modrm) };
--	const unsigned size = rex ? 5 : 4;
-+	uint8_t bytes[] = { 0x66,	    uint8_t(rex),
-+			    0x0f,	    uint8_t(opcode),
-+			    uint8_t(modrm), uint8_t(immediate) };
-+	const unsigned header = rex ? 5 : 4;
-+	const unsigned size = header + unsigned(shift);
- 	if (!rex)
--		std::memmove(bytes + 1, bytes + 2, 3);
-+		std::memmove(bytes + 1, bytes + 2, 4);
- 	const unsigned id = decoder.decode(bytes, size);
- 	if (!id)
- 		return {};
-@@ -312,27 +375,161 @@ std::string legacy_register_row(Decoder &decoder, bool wide, unsigned rex,
- 	expected.rex = uint8_t(rex);
- 	expected.addr_size = wide ? 8 : 4;
- 	expected.modrm = uint8_t(modrm);
--	expected.encoding.modrm_offset = uint8_t(size - 1);
-+	expected.encoding.modrm_offset = uint8_t(header - 1);
- 	expected.op_count = 2;
- 	Bytes4 access{}, groups{};
- 	std::copy_n(d.groups, d.groups_count, groups.begin());
--	for (unsigned i = 0; i < 2; ++i) {
-+	for (unsigned i = 0; i < (shift ? 1u : 2u); ++i) {
- 		auto &op = expected.operands[i];
- 		op.type = X86_OP_REG;
--		op.reg = x86_reg(X86_REG_XMM0 + nums[i]);
-+		op.reg = x86_reg(X86_REG_XMM0 + (shift ? rm : nums[i]));
- 		op.size = 16;
- 		op.access = x.operands[i].access;
- 		access[i] = unsigned(op.access);
- 	}
--	const auto text = "xmm" + std::to_string(nums[0]) + ", xmm" +
--			  std::to_string(nums[1]);
-+	std::string text;
-+	if (shift) {
-+		auto &imm = expected.operands[1];
-+		imm.type = X86_OP_IMM;
-+		imm.imm = immediate;
-+		imm.size = 1;
-+		imm.access = x.operands[1].access;
-+		access[1] = unsigned(imm.access);
-+		expected.encoding.imm_offset = uint8_t(header);
-+		expected.encoding.imm_size = 1;
-+		char number[8];
-+		std::snprintf(number, sizeof(number),
-+			      immediate <= 9 ? "%u" : "0x%x", immediate);
-+		text = "xmm" + std::to_string(rm) + ", " + number;
-+	} else {
-+		text = "xmm" + std::to_string(nums[0]) + ", xmm" +
-+		       std::to_string(nums[1]);
-+	}
- 	if (text != insn.op_str || std::memcmp(&expected, &x, sizeof(x)))
- 		return {};
-+	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
-+	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
-+	       fields(access) + ", " + std::to_string(unsigned(shift)) + " }";
-+}
-+
-+// Derive the move's implicit effects and verify the public address, encoding,
-+// operand order and spelling before assigning a fast row.
-+std::string legacy_move_row(Decoder &decoder, bool wide, unsigned prefix,
-+			    unsigned rex, unsigned opcode, unsigned modrm,
-+			    bool store)
-+{
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	const bool sib = rm == 4;
-+	const unsigned disp_size = mod == 2 ? 4 : mod;
-+	std::vector<uint8_t> bytes;
-+	if (prefix)
-+		bytes.push_back(uint8_t(prefix));
-+	if (rex)
-+		bytes.push_back(uint8_t(rex));
-+	bytes.push_back(0x0f);
-+	bytes.push_back(uint8_t(opcode));
-+	const unsigned mr_offset = unsigned(bytes.size());
-+	bytes.push_back(uint8_t(modrm));
-+	if (sib)
-+		bytes.push_back(0x24);
-+	const unsigned offset = unsigned(bytes.size());
-+	const int disp = disp_size == 4 ? -65536 : disp_size ? -16 : 0;
-+	for (unsigned n = 0; n < disp_size; ++n)
-+		bytes.push_back(uint8_t(uint32_t(disp) >> (8 * n)));
-+	const auto id = decoder.decode(bytes.data(), unsigned(bytes.size()));
-+	if (!id)
-+		return {};
-+	const auto &insn = *decoder.insn;
-+	const auto &d = *insn.detail;
-+	if (insn.is_alias || insn.usesAliasDetails || insn.illegal ||
-+	    std::strlen(insn.mnemonic) >= 16 || d.regs_read_count ||
-+	    d.regs_write_count || d.groups_count > 4 || d.writeback)
-+		return {};
-+	static const x86_reg gpr64[] = { X86_REG_RAX, X86_REG_RCX, X86_REG_RDX,
-+		X86_REG_RBX, X86_REG_RSP, X86_REG_RBP, X86_REG_RSI, X86_REG_RDI,
-+		X86_REG_R8, X86_REG_R9, X86_REG_R10, X86_REG_R11,
-+		X86_REG_R12, X86_REG_R13, X86_REG_R14, X86_REG_R15 };
-+	static const x86_reg gpr32[] = { X86_REG_EAX, X86_REG_ECX, X86_REG_EDX,
-+		X86_REG_EBX, X86_REG_ESP, X86_REG_EBP, X86_REG_ESI, X86_REG_EDI };
-+	const auto base = wide ? gpr64[rm | ((rex & 1) << 3)] : gpr32[rm];
-+	const auto vector = x86_reg(X86_REG_XMM0 + ((modrm >> 3) & 7) + ((rex & 4) << 1));
-+	cs_x86 x{};
-+	x.prefix[2] = prefix == 0x66 ? 0x66 : 0;
-+	x.opcode[0] = 0x0f;
-+	x.opcode[1] = uint8_t(opcode);
-+	x.rex = uint8_t(rex);
-+	x.addr_size = wide ? 8 : 4;
-+	x.modrm = uint8_t(modrm);
-+	x.encoding.modrm_offset = uint8_t(mr_offset);
-+	if (disp_size) {
-+		x.encoding.disp_offset = uint8_t(offset);
-+		x.encoding.disp_size = uint8_t(disp_size);
-+	}
-+	if (sib) {
-+		x.sib = 0x24;
-+		x.sib_base = base;
-+		x.sib_scale = 1;
-+	}
-+	x.op_count = 2;
-+	auto &reg = x.operands[store];
-+	auto &mem = x.operands[!store];
-+	reg.type = X86_OP_REG;
-+	reg.reg = vector;
-+	mem.type = X86_OP_MEM;
-+	mem.mem.base = base;
-+	mem.mem.scale = 1;
-+	mem.mem.disp = x.disp = disp;
-+	Bytes4 groups{}, access{};
-+	std::copy_n(d.groups, d.groups_count, groups.begin());
-+	for (unsigned n = 0; n < 2; ++n) {
-+		x.operands[n].size = 16;
-+		x.operands[n].access = d.x86.operands[n].access;
-+		access[n] = unsigned(x.operands[n].access);
-+	}
-+	const std::string address = std::string("xmmword ptr [") +
-+		cs_reg_name(decoder.handle, base) +
-+		(disp == -16 ? " - 0x10]" : disp ? " - 0x10000]" : "]");
-+	const std::string spelling = cs_reg_name(decoder.handle, vector);
-+	if ((store ? address + ", " + spelling : spelling + ", " + address) != insn.op_str ||
-+	    std::memcmp(&x, &d.x86, sizeof(x)))
-+		return {};
- 	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
- 	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
- 	       fields(access) + ", 0 }";
- }
- 
-+void emit_legacy_memory_moves(Decoder &narrow, Decoder &wide)
-+{
-+	std::puts("static const struct VectorOutputRow legacy_memory_moves[3][6] = {");
-+	for (unsigned prefix : { 0u, 0x66u, 0xf3u }) {
-+		std::puts("\t{");
-+		for (unsigned op : { 0x10u, 0x11u, 0x28u, 0x29u, 0x6fu, 0x7fu }) {
-+			const bool store = op == 0x11 || op == 0x29 || op == 0x7f;
-+			const bool packed = op >= 0x6f ? prefix != 0 : prefix != 0xf3;
-+			std::string row;
-+			if (packed) {
-+				row = legacy_move_row(narrow, false, prefix, 0, op, 0x59, store);
-+				if (row.empty())
-+					throw std::runtime_error("missing packed move row " + std::to_string(prefix) + "/" + std::to_string(op));
-+				for (unsigned variant = 0; variant < 18; ++variant) {
-+					const bool mode64 = variant != 0;
-+					const unsigned rex = variant >= 2 ? 0x40 + variant - 2 : 0;
-+					for (unsigned mr = 0; mr < 0xc0; ++mr) {
-+						const unsigned rm = mr & 7;
-+						if ((! (mr >> 6) && rm == 5) || (rm == 4 && (rex & 2)))
-+							continue;
-+						if (legacy_move_row(mode64 ? wide : narrow, mode64, prefix, rex, op, mr, store) != row)
-+							throw std::runtime_error("nonuniform packed move row " + std::to_string(prefix) + "/" + std::to_string(op) + "/" + std::to_string(variant) + "/" + std::to_string(mr));
-+					}
-+				}
-+			}
-+			std::printf("\t\t%s,\n", row.empty() ? "{ 0 }" : row.c_str());
-+		}
-+		std::puts("\t},");
-+	}
-+	std::puts("};");
-+}
-+
- void emit_legacy_registers(Decoder &wide)
- {
- 	Decoder narrow(CS_MODE_32);
-@@ -374,6 +571,35 @@ void emit_legacy_registers(Decoder &wide)
- 			rows.push_back(row);
- 		plans[opcode] = index | (reverse ? 128 : 0);
- 	}
-+	// Groups 12 through 14 select the SSE2 shift by ModR/M.reg.
-+	std::array<std::array<unsigned, 8>, 3> shift_plans{};
-+	for (unsigned index = 0; index < shift_plans.size(); ++index) {
-+		for (unsigned group = 0; group < 8; ++group) {
-+			const unsigned opcode = 0x71 + index;
-+			const unsigned modrm = 0xc0 | (group << 3);
-+			const auto row = legacy_register_row(narrow, false, 0,
-+							     opcode, modrm,
-+							     false, true, 0);
-+			if (row.empty())
-+				continue;
-+			for (unsigned prefix = 0; prefix < 18; ++prefix) {
-+				const unsigned rex =
-+					prefix >= 2 ? 0x40 + prefix - 2 : 0;
-+				for (unsigned value = 0; value <= 255; ++value)
-+					if (legacy_register_row(
-+						    prefix ? wide : narrow,
-+						    prefix != 0, rex, opcode,
-+						    modrm | (value & 7), false,
-+						    true, value) != row)
-+						throw std::runtime_error(
-+							"nonuniform SSE2 shift encoding");
-+			}
-+			rows.push_back(row);
-+			shift_plans[index][group] = unsigned(rows.size());
-+		}
-+	}
-+	if (!shift_plans[1][2] || !shift_plans[1][6] || rows.size() >= 128)
-+		throw std::runtime_error("missing SSE2 immediate shift rows");
- 	if (!plans[0x6f] || !plans[0x7f] || !plans[0x61] || !plans[0xfe])
- 		throw std::runtime_error("missing SSE2 register forms");
- 	std::puts(
-@@ -389,6 +615,14 @@ void emit_legacy_registers(Decoder &wide)
- 		std::putchar('\n');
- 	}
- 	std::puts("};");
-+	std::puts("static const uint8_t legacy_shift_plans[3][8] = {");
-+	for (const auto &plan : shift_plans) {
-+		std::printf("\t{");
-+		for (unsigned row : plan)
-+			std::printf(" %u,", row);
-+		std::puts(" },");
-+	}
-+	std::puts("};");
- 	std::fprintf(stderr, "%zu legacy register rows, %llu 32-bit probes\n",
- 		     rows.size(),
- 		     static_cast<unsigned long long>(narrow.probes));
-@@ -891,6 +1125,114 @@ void emit_vex_registers(Decoder &decoder)
- 	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
- 		     rows.size(), widths.size() - 1);
- }
-+// EVEX.0F 6F memory loads use a full-vector tuple for compressed disp8.
-+// Check the tuple at its signed extremes and the complete public x86 detail.
-+void emit_evex_load_rows(Decoder &decoder)
-+{
-+	std::puts(
-+		"static const struct VectorOutputRow evex_load_rows[3][2][3] = {");
-+	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
-+	const char *prefix[] = { "xmm", "ymm", "zmm" };
-+	unsigned valid_rows = 0;
-+	for (unsigned pp = 1; pp <= 3; ++pp) {
-+		std::puts("\t{");
-+		for (unsigned w = 0; w < 2; ++w) {
-+			std::puts("\t\t{");
-+			for (unsigned ll = 0; ll < 3; ++ll) {
-+				std::string row;
-+				const unsigned width = 16u << ll;
-+				for (int disp : { 1, -128, 127 }) {
-+					uint8_t bytes[] = {
-+						0x62,
-+						0xf1,
-+						uint8_t(w << 7 | 0x7c | pp),
-+						uint8_t(8 | ll << 5),
-+						0x6f,
-+						0x58,
-+						uint8_t(disp)
-+					};
-+					auto id = decoder.decode(bytes,
-+								 sizeof(bytes));
-+					if (!id) {
-+						row.clear();
-+						break;
-+					}
-+					const auto &insn = *decoder.insn;
-+					const auto &d = *insn.detail;
-+					cs_x86 expect{};
-+					std::copy_n(bytes, 4, expect.opcode);
-+					expect.rex = uint8_t(0x40 | w << 3);
-+					expect.addr_size = 8;
-+					expect.modrm = bytes[5];
-+					expect.disp = int(width) * disp;
-+					expect.encoding.modrm_offset = 5;
-+					expect.encoding.disp_offset = 6;
-+					expect.encoding.disp_size = 1;
-+					expect.op_count = 2;
-+					auto &reg = expect.operands[0];
-+					reg.type = X86_OP_REG;
-+					reg.reg = x86_reg(bases[ll] + 3);
-+					reg.size = width;
-+					reg.access = CS_AC_WRITE;
-+					auto &mem = expect.operands[1];
-+					mem.type = X86_OP_MEM;
-+					mem.size = width;
-+					mem.mem.base = X86_REG_RAX;
-+					mem.mem.scale = 1;
-+					mem.mem.disp = expect.disp;
-+					mem.access = CS_AC_READ;
-+					char text[96];
-+					std::snprintf(
-+						text, sizeof(text),
-+						"%s3, %sword ptr [rax %c 0x%x]",
-+						prefix[ll], prefix[ll],
-+						disp < 0 ? '-' : '+',
-+						unsigned(disp < 0 ? -disp :
-+								    disp) *
-+							width);
-+					if (insn.illegal || insn.is_alias ||
-+					    insn.usesAliasDetails ||
-+					    std::strlen(insn.mnemonic) >= 16 ||
-+					    d.regs_read_count ||
-+					    d.regs_write_count ||
-+					    d.groups_count > 4 ||
-+					    std::strcmp(text, insn.op_str) ||
-+					    std::memcmp(&expect, &d.x86,
-+							sizeof(expect))) {
-+						row.clear();
-+						break;
-+					}
-+					Bytes4 groups{};
-+					std::copy_n(d.groups, d.groups_count,
-+						    groups.begin());
-+					std::string next =
-+						"{ " + decoder.symbol(id) +
-+						", \"" + insn.mnemonic +
-+						"\", " +
-+						std::to_string(d.groups_count) +
-+						", " + fields(groups) +
-+						", { 2, 1, 0, 0 }, 0 }";
-+					if (!row.empty() && row != next) {
-+						row.clear();
-+						break;
-+					}
-+					row = next;
-+				}
-+				valid_rows += !row.empty();
-+				std::printf("\t\t\t%s,\n", row.empty() ?
-+								   "{ 0 }" :
-+								   row.c_str());
-+			}
-+			std::puts("\t\t},");
-+		}
-+		std::puts("\t},");
-+	}
-+	if (!valid_rows)
-+		throw std::runtime_error("missing EVEX vector load rows");
-+	std::puts("};");
-+	std::fprintf(stderr, "%u EVEX vector load rows\n", valid_rows);
-+}
-+
- void emit_output(Decoder &decoder)
- {
- 	std::vector<std::string> records;
-@@ -938,11 +1280,14 @@ void emit_output(Decoder &decoder)
- 	emit_vex_indexed(decoder);
- 	emit_vex_registers(decoder);
- 	emit_vex_shifts(decoder);
-+	emit_evex_byte_shifts(decoder);
- 	emit_broadcast_rows(decoder);
-+	emit_evex_load_rows(decoder);
- 	emit_vex_rip_loads(decoder);
- 	Decoder padding32(CS_MODE_32);
- 	emit_padding_rows(padding32, decoder);
- 	emit_legacy_registers(decoder);
-+	emit_legacy_memory_moves(padding32, decoder);
- }
- }
- 
-diff --git a/tests/unit/x86_scan_adapter.c b/tests/unit/x86_scan_adapter.c
-index a352123c..b3ae8053 100644
---- a/tests/unit/x86_scan_adapter.c
-+++ b/tests/unit/x86_scan_adapter.c
-@@ -108,6 +108,20 @@ int main(void)
- 		for (size_t i = expected; i < sizeof(insn->bytes); ++i)
- 			CHECK(insn->bytes[i] == 0xa5);
- 	}
-+	/* Valid ordinary rows may still be overridden by the registered adapter. */
-+	static const uint8_t known[] = { 0x62, 0xf1, 0x6d, 0x48, 0xef, 0xd9 };
-+	const uint8_t *row_cursor = known;
-+	size_t row_left = sizeof(known);
-+	uint64_t row_ip = 0x1000;
-+	state.calls = 0;
-+	state.result = (X86_INS_NOP << 8) | sizeof(known);
-+	CHECK(cs_disasm_iter(handle, &row_cursor, &row_left, &row_ip, insn));
-+	CHECK(state.calls == 1 && row_left == 0 && insn->id == X86_INS_NOP);
-+	state.result = 0;
-+	row_cursor = known;
-+	row_left = sizeof(known);
-+	CHECK(cs_disasm_iter(handle, &row_cursor, &row_left, &row_ip, insn));
-+	CHECK(state.calls == 2 && row_left == 0 && insn->id == X86_INS_VPXORD);
- 	/* Changing bitness disables the old profile until explicitly rebound. */
- 	CHECK(cs_option(handle, CS_OPT_MODE, CS_MODE_32) == CS_ERR_OK);
- 	state.calls = 0;
-diff --git a/tests/unit/x86_scan_batch.c b/tests/unit/x86_scan_batch.c
-index 771fefb7..4d51efb4 100644
---- a/tests/unit/x86_scan_batch.c
-+++ b/tests/unit/x86_scan_batch.c
-@@ -174,6 +174,53 @@ static bool check_public_ids(csh handle, cs_insn *insn, size_t mode_index)
- 	return true;
- }
- 
-+#ifndef CAPSTONE_X86_REDUCE
-+static bool check_evex_registers(csh handle)
-+{
-+	static const uint8_t opcodes[] = { 0xef, 0xdc, 0xdd, 0xde, 0xdf,
-+					   0x44, 0x25, 0x19, 0x1b, 0x39,
-+					   0x3b, 0xfe, 0x00 };
-+	static const uint8_t maps[] = { 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 1, 2 };
-+	csh full;
-+	CHECK(cs_open(CS_ARCH_X86, CS_MODE_64, &full) == CS_ERR_OK);
-+	CHECK(cs_option(full, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK);
-+	cs_opt_mnem name = { X86_INS_UD2, "ud2" };
-+	CHECK(cs_option(full, CS_OPT_MNEMONIC, (size_t)&name) == CS_ERR_OK);
-+	cs_insn *insn = cs_malloc(full);
-+	CHECK(insn);
-+	for (size_t op = 0; op < sizeof(opcodes); ++op)
-+		for (unsigned p = 0; p < 256; ++p) {
-+			uint8_t bytes[] = {
-+				0x62,
-+				(uint8_t)((p & 0xf0) | maps[op]),
-+				(uint8_t)((p & 1) ? 0xfd : ((p & 0xf8) | 5)),
-+				(uint8_t)p,
-+				opcodes[op],
-+				(uint8_t)(0xc0 | (p & 63)),
-+				(uint8_t)(p ^ 0x81)
-+			};
-+			for (size_t n = 5; n <= sizeof(bytes); ++n) {
-+				uint32_t packed = 0;
-+				X86ScanBatchResult got = X86_scanBatch(
-+					handle, bytes, n, 0, &packed, 1);
-+				const uint8_t *cursor = bytes;
-+				size_t left = n;
-+				uint64_t address = 0;
-+				const bool ok = cs_disasm_iter(
-+					full, &cursor, &left, &address, insn);
-+				CHECK(got.count == (size_t)ok &&
-+				      got.bytes == n - left);
-+				if (ok)
-+					CHECK(packed ==
-+					      ((insn->id << 8) | insn->size));
-+			}
-+		}
-+	cs_free(insn, 1);
-+	cs_close(&full);
-+	return true;
-+}
-+#endif
-+
- static bool check_mixed_modes(void)
- {
- 	const cs_mode modes[] = { CS_MODE_16 | CS_MODE_64,
-@@ -225,6 +272,10 @@ static bool check(void)
- 		cs_insn *insn = cs_malloc(handle);
- 		CHECK(insn);
- 		CHECK(check_public_ids(handle, insn, m));
-+#ifndef CAPSTONE_X86_REDUCE
-+		if (modes[m] == CS_MODE_64)
-+			CHECK(check_evex_registers(handle));
-+#endif
- 		for (size_t offset = 0; offset < sizeof(code); ++offset)
- 			for (size_t size = 0; size <= sizeof(code) - offset;
- 			     ++size)
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..9532cd5d 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -42,6 +42,38 @@ static bool compare(csh handles[2], const uint8_t *input, size_t length,
- 	return false;
- }
- 
-+static bool check_legacy_memory_moves(csh handles[2], cs_mode mode)
-+{
-+	const uint8_t prefixes[] = { 0, 0x66, 0xf3 };
-+	const uint8_t ops[] = { 0x10, 0x11, 0x28, 0x29, 0x6f, 0x7f };
-+	const uint8_t tails[] = { 0, 4, 5, 0x44, 0x51, 0x85, 0x84, 0xff };
-+	const uint8_t sibs[] = { 0x24, 0x65, 0xc1 };
-+	const uint32_t disps[] = { 0, 9, 10, 0x7f, 0x80, 0x80000000, 0xffffffff };
-+	for (unsigned p = 0; p < sizeof(prefixes); ++p)
-+		for (unsigned o = 0; o < sizeof(ops); ++o)
-+			for (unsigned v = 0; v < (mode == CS_MODE_64 ? 17u : 1u); ++v)
-+				for (unsigned m = 0; m < sizeof(tails); ++m)
-+					for (unsigned j = 0; j < sizeof(disps)/sizeof(disps[0]); ++j) {
-+						uint8_t bytes[12];
-+						unsigned n = 0;
-+						if (prefixes[p])
-+							bytes[n++] = prefixes[p];
-+						if (v)
-+							bytes[n++] = (uint8_t)(0x3f + v);
-+						bytes[n++] = 0x0f;
-+						bytes[n++] = ops[o];
-+						bytes[n++] = tails[m];
-+						if ((tails[m] & 7) == 4)
-+							bytes[n++] = sibs[j % sizeof(sibs)];
-+						for (unsigned k = 0; k < 4; ++k)
-+							bytes[n++] = (uint8_t)(disps[j] >> (8 * k));
-+						for (unsigned left = 1; left <= n; ++left)
-+							if (!compare(handles, bytes, left, j * 37))
-+								return false;
-+					}
-+	return true;
-+}
-+
- static bool check_branches(csh handles[2])
- {
- 	const uint32_t bits[] = { 0,	1,    9,	  10,	     0x7f,
-@@ -354,10 +386,68 @@ static bool check_evex_extract(csh handles[2])
- 
- static bool check_evex(csh handles[2])
- {
-+	for (unsigned sib = 0; sib < 256; ++sib)
-+		for (unsigned ext = 0; ext < 16; ++ext)
-+			for (unsigned mod = 0; mod < 3; ++mod) {
-+				uint8_t b[] = { 0x62,
-+						(uint8_t)(ext << 4 | 1),
-+						(uint8_t)(0x7d |
-+							  ((sib & 1) << 7)),
-+						(uint8_t)((sib % 3) << 5 | 8),
-+						0x6f,
-+						(uint8_t)(mod << 6 | 0x1c),
-+						(uint8_t)sib,
-+						0x80,
-+						0xff,
-+						0,
-+						0x80 };
-+				size_t n = 7 + (mod == 2 || (!mod &&
-+							     (sib & 7) == 5) ?
-+							4 :
-+							mod);
-+				if (!compare(handles, b, n, sib) ||
-+				    !compare(handles, b, n - 1, ext))
-+					return false;
-+			}
-+
-+	static const uint32_t disps[] = { 0,	      1,	  9,	     10,
-+					  0x7fffffff, 0x80000000, 0xffffffff };
-+	for (unsigned p = 0; p < 16; ++p)
-+		for (unsigned wl = 0; wl < 8; ++wl)
-+			for (unsigned form = 0; form < 4; ++form)
-+				for (unsigned i = 0;
-+				     i < sizeof(disps) / sizeof(disps[0]);
-+				     ++i) {
-+					const uint32_t d = disps[i];
-+					uint8_t b[] = {
-+						0x62,
-+						(uint8_t)(p << 4 |
-+							  (form == 3 ? 2 : 1)),
-+						(uint8_t)((wl >> 2) << 7 |
-+							  0x7c |
-+							  (form == 3 ?
-+								   1 :
-+								   form + 1)),
-+						(uint8_t)((wl & 3) << 5 | 8),
-+						(uint8_t)(form == 3 ? 0x1a :
-+								      0x6f),
-+						0x3d,
-+						(uint8_t)d,
-+						(uint8_t)(d >> 8),
-+						(uint8_t)(d >> 16),
-+						(uint8_t)(d >> 24)
-+					};
-+					if (!compare(handles, b, sizeof(b),
-+						     i) ||
-+					    !compare(handles, b, sizeof(b) - 1,
-+						     p))
-+						return false;
-+				}
-+
- 	static const uint16_t forms[] = { 0x1ef, 0x2dc, 0x2dd, 0x2de, 0x2df,
--					  0x344, 0x325, 0x1fe, 0x200 };
--	static const uint8_t tails[] = { 0,    4,    0x45, 0x85,
--					 0xc0, 0xcb, 0xf7, 0xff };
-+					  0x344, 0x325, 0x1fe, 0x200, 0x173 };
-+	static const uint8_t tails[] = { 0,    4,    0x45, 0x85, 0xc0, 0xcb,
-+					 0xf7, 0xff, 0xd8, 0xdf, 0xf8 };
- 	for (unsigned i = 0; i < sizeof(forms) / sizeof(forms[0]); ++i)
- 		for (unsigned reg = 0; reg < 32; ++reg)
- 			for (unsigned wl = 0; wl < 8; ++wl)
-@@ -458,6 +548,18 @@ static bool check_legacy_vectors(csh handles[2], cs_mode mode)
- 					     0xa5))
- 					return false;
- 			}
-+	for (unsigned group = 0; group < 8; ++group)
-+		for (unsigned opcode = 0x71; opcode <= 0x73; ++opcode)
-+			for (unsigned value = 0; value <= 255; ++value) {
-+				uint8_t bytes[] = { 0x66, 0x0f, (uint8_t)opcode,
-+						    (uint8_t)(0xc0 |
-+							      group << 3 |
-+							      (value & 7)),
-+						    (uint8_t)value };
-+				if (!compare(handles, bytes, sizeof(bytes),
-+					     value))
-+					return false;
-+			}
- 	return true;
- }
- 
-@@ -738,6 +840,50 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
- 	return true;
- }
- 
-+static bool check_evex_vector_loads(csh handles[2])
-+{
-+	for (unsigned pp = 0; pp < 4; ++pp)
-+		for (unsigned ext = 0; ext < 16; ++ext)
-+			for (unsigned wl = 0; wl < 8; ++wl)
-+				for (unsigned mr = 0; mr < 256; ++mr) {
-+					uint8_t b[] = {
-+						0x62,
-+						(uint8_t)(ext << 4 | 1),
-+						(uint8_t)((wl >> 2) << 7 |
-+							  0x7c | pp),
-+						(uint8_t)(8 | (wl & 3) << 5),
-+						0x6f,
-+						(uint8_t)mr,
-+						0x24,
-+						0x80,
-+						0xff,
-+						0x7f,
-+						0x80
-+					};
-+					for (unsigned variant = 0; variant < 3;
-+					     ++variant) {
-+						if (variant == 1) {
-+							b[6] ^= mr * 13;
-+							b[7] ^= mr * 17;
-+						}
-+						if (variant == 2) {
-+							b[2] ^= 1u << (ext & 7);
-+							b[3] ^= 1u << (mr & 7);
-+						}
-+						if (!compare(handles, b,
-+							     sizeof(b),
-+							     ext + mr) ||
-+						    !compare(handles, b,
-+							     (mr + wl +
-+							      variant) %
-+								     sizeof(b),
-+							     wl + mr))
-+							return false;
-+					}
-+				}
-+	return true;
-+}
-+
- static bool check_mode(cs_mode mode)
- {
- 	csh handles[2] = { 0 };
-@@ -765,11 +911,14 @@ static bool check_mode(cs_mode mode)
- 		    !check_push_memory(handles, mode) ||
- 		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
- 		    !check_rex_stack(handles) ||
--		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
-+		    (mode == CS_MODE_64 &&
-+		     (!check_broadcast(handles) ||
-+		      !check_evex_vector_loads(handles))) ||
- 		    !check_padding(handles) ||
- 		    !check_alu_memory(handles, mode) ||
- 		    !check_alu_immediates(handles, mode) ||
- 		    !check_legacy_vectors(handles, mode) ||
-+		    !check_legacy_memory_moves(handles, mode) ||
- 		    (mode == CS_MODE_64 &&
- 		     (!check_evex(handles) || !check_evex_extract(handles) ||
- 		      (!check_vex_register_forms(handles) ||

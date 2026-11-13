@@ -1,7 +1,7 @@
-name: Isolate padded mnemonic byte stores across five hosts on real i386 amd64 and SIMD library functions
+name: Measure shared SSE register row scanning on real i386 amd64 and SIMD libraries
 on:
   push:
-    branches: [codex/capstone-generated-mnemonic-stores]
+    branches: [codex/capstone-legacy-sse-shared-row-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: fixed-mnemonic-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: sse-row-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
