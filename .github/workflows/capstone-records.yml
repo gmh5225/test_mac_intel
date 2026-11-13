@@ -1,7 +1,7 @@
-name: Qualify the release ARM32 detail delta alone across twelve builds and three real ARM executables
+name: Retest ARM text, ARM detail, PE32 and MIPS independently on Intel and Apple Silicon
 on:
   push:
-    branches: [codex/capstone-current-arm-public-defaults]
+    branches: [codex/capstone-arm-text-detail-macos-recheck]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,18 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15, cc: clang, archs: arm }
-          - { host: macos-15, cc: clang, archs: four }
-          - { host: macos-15-intel, cc: clang, archs: arm }
-          - { host: macos-15-intel, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: arm }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: arm }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: arm }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: arm }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
+          - { host: macos-15, cc: clang, archs: arm, repeat: 1 }
+          - { host: macos-15, cc: clang, archs: arm, repeat: 2 }
+          - { host: macos-15, cc: clang, archs: four, repeat: 1 }
+          - { host: macos-15, cc: clang, archs: four, repeat: 2 }
+          - { host: macos-15-intel, cc: clang, archs: arm, repeat: 1 }
+          - { host: macos-15-intel, cc: clang, archs: arm, repeat: 2 }
+          - { host: macos-15-intel, cc: clang, archs: four, repeat: 1 }
+          - { host: macos-15-intel, cc: clang, archs: four, repeat: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -46,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-arm-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mac-arm-extents-${{ matrix.repeat }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

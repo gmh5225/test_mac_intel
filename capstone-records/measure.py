@@ -52,9 +52,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   data=[]
   for x in cases:
    for mode in (0,1,2):
+    if (x['name'],mode) not in {('arm-sort',1),('arm-cp',1),('arm-sort',2),('arm-cp',2),('mips64el-ls',1),('putty-32-0.85',2)}:continue
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
     runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(19):
+    for k in range(35):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
       vout=sample(v,x,mode,n)
