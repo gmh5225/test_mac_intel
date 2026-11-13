@@ -152,7 +152,7 @@ def prepare():
     command(['git','apply',SOURCE/'integer.patch'],'apply-integer-base',base)
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-private-iterator',WORK/'new')
-    write('comparison.json', dict(baseline='x86 integer output on public Linux dedicated and mixed private iterator, same routes on both sides', candidate='admit EVEX in the existing cold extension reader, format from canonical scalar/vector rows'))
+    write('comparison.json',dict(baseline='published 2fc94937190ef9224bf797851dec71ff10c2c85c',candidate='isolated Linux EVEX scan and stack, immediate and SIMD output records'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -205,7 +205,8 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert set(changed[1])-set(changed[0])=={'arch/X86/X86VectorOutput.c.o'} and set(changed[0])<=set(changed[1])
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert set(diffs)=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'},diffs
+    assert diffs==['arch/X86/X86OutputIterator.c.o'],diffs
+    assert sha(WORK/'single-base')==sha(WORK/'single-new'), 'mixed public executable changed'
     if os.environ['MIXED_CC']=='gcc':
         command(['clang++','-O2','-std=c++17','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'compile-full-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
@@ -361,15 +362,11 @@ def measure():
             raise RuntimeError('CPU affinity did not take effect')
         write('affinity.json', dict(original=allowed, selected=actual,
                                    scope='measurement parent and every inherited child'))
-    controls = [c for c in cases if (c['name'],c['mode']) in {('mips64el-ls','detail'),('putty-32-0.85','scan'),('simd64','scan')}]
-    cycles=13; duration=180_000_000
-    measure_panel('null', controls,cycles,['base','new','base_aa','new_aa'],duration)
-    for panel,consumer in [('x86','decoder'),('other','single'),('window','window'),('open','open')]:
-        choices=[c for c in cases if c['consumer']==consumer]
-        if not choices:
-            continue
-        variants=['base','new','base_aa','new_aa']+(['iced','iced_aa'] if consumer in ('decoder','window') else [])
-        measure_panel(panel,choices,cycles,variants,duration)
+    checks = [c for c in cases if c['consumer']=='decoder' and c['name'] in ('putty-32-0.85','putty-64-0.85','scalar32','scalar64','simd64','amd64-ls')]
+    controls = [c for c in cases if c['consumer']=='single' and c['name'] in ('arm-cp','arm64-ls','mips64el-ls','mips64el-sort')]
+    assert checks and controls
+    measure_panel('x86',checks,15,['base','new','base_aa','new_aa','iced','iced_aa'],190000000)
+    measure_panel('other',controls,9,['base','new','base_aa','new_aa'],190000000)
     write('measured.json', dict(complete=True, finished=datetime.datetime.now().astimezone().isoformat()))
 
 

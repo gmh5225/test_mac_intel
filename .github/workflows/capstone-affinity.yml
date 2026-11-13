@@ -1,9 +1,9 @@
-name: Qualify shared cold EVEX lookup and x86-only object changes in mixed
+name: Verify isolated x86 vector and scalar output against current Capstone next on mixed
 
 on:
   workflow_dispatch:
   push:
-    branches: [codex/capstone-cold-evex-mixed]
+    branches: [codex/capstone-isolated-vector-mixed]
     paths:
       - capstone-performance/**
       - .github/workflows/capstone-affinity.yml
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: capstone-cold-evex-mixed
+  group: capstone-isolated-vector-mixed
   cancel-in-progress: false
 
 jobs:
@@ -54,7 +54,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cold-evex-mixed-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: isolated-vector-mixed-${{ matrix.cc }}-${{ matrix.host }}-${{ matrix.baseline }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: capstone-evidence/
           if-no-files-found: error
           retention-days: 14
