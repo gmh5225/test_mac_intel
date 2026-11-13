@@ -1,7 +1,5 @@
-#include <array>
-#include <cstdio>
-#include <cstring>
 #include "neverd/decode/Decoder.h"
+#include <cstdlib>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -32,7 +30,60 @@ static int all_xbegin_targets() {
     return 0;
 }
 
+static int rendered_xbegin_targets() {
+  Decoder decoder;
+  if (!decoder.init(Arch::X86)) return 10;
+  unsigned count = 0;
+  for (auto syntax : {CS_OPT_SYNTAX_INTEL, CS_OPT_SYNTAX_ATT}) {
+    if (cs_option(decoder.getHandle(), CS_OPT_SYNTAX, syntax) != CS_ERR_OK)
+      return 11;
+    for (bool detail : {false, true}) {
+      decoder.setText(true);
+      decoder.setDetail(detail);
+      for (bool address_prefix : {false, true}) for (bool rel16 : {false, true})
+        for (uint32_t bits : {0u, 1u, 0xffffu, 0x7fffu, 0x8000u,
+                              0x34128000u, 0x80000000u, 0xffffffffu}) {
+          std::array<uint8_t, 8> bytes{};
+          size_t n = 0;
+          if (address_prefix) bytes[n++] = 0x67;
+          if (rel16) bytes[n++] = 0x66;
+          bytes[n++] = 0xc7;
+          bytes[n++] = 0xf8;
+          for (unsigned j = 0; j < (rel16 ? 2u : 4u); ++j)
+            bytes[n++] = static_cast<uint8_t>(bits >> (8 * j));
+          uint32_t displacement = bits;
+          if (rel16)
+            displacement = (bits & 0xffffu) | ((bits & 0x8000u) ? 0xffff0000u : 0u);
+          for (uint32_t ip : {0u, 0x1000u, 0xfffffffbu, 0xffffffffu})
+            for (unsigned route = 0; route < 3; ++route) {
+              DecodedInsn insn{};
+              int length = route == 0 ? decoder.decodeOne(bytes.data(), n, ip, insn)
+                         : route == 1 ? decoder.decodeOneLight(bytes.data(), n, ip, insn)
+                                      : decoder.decodeOneForLift(bytes.data(), n, ip, insn);
+              if (length != static_cast<int>(n) || !insn.Raw || insn.Id != X86_INS_XBEGIN)
+                return 12;
+              char *end = nullptr;
+              const char *operand = insn.Raw->op_str;
+              uint32_t expected = ip + static_cast<uint32_t>(n) + displacement;
+              if (!*operand || std::strtoull(operand, &end, 0) != expected || *end ||
+                  (detail && (!insn.Raw->detail || insn.Raw->detail->x86.op_count != 1 ||
+                   insn.Raw->detail->x86.operands[0].type != X86_OP_IMM ||
+                   static_cast<uint64_t>(insn.Raw->detail->x86.operands[0].imm) != expected))) {
+                std::fprintf(stderr, "syntax=%u detail=%u address-prefix=%u rel16=%u bits=%x ip=%x route=%u expected=%x operand=%s\n",
+                             unsigned(syntax), detail, address_prefix, rel16, bits, ip, route, expected, operand);
+                return 13;
+              }
+              ++count;
+            }
+        }
+    }
+  }
+  std::printf("%u rendered i386 targets checked across text-only and text+detail\n", count);
+  return 0;
+}
+
 int main(int argc,char**argv) {
+  if(argc==2 && std::strcmp(argv[1],"--rendered-xbegin")==0)return rendered_xbegin_targets();
   if(argc==2 && std::strcmp(argv[1],"--xbegin")==0)return all_xbegin_targets();
   FILE* trace=argc>1?std::fopen(argv[1],"wb"):nullptr;
   if(argc>1&&!trace)return 5;

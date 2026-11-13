@@ -1,7 +1,7 @@
-name: Verify native NeverD with Capstone-owned XBEGIN targets and displacement widths
+name: Compare current NeverD x86 records and rendered branch targets with one owner
 on:
   push:
-    branches: [codex/capstone-canonical-x86-product]
+    branches: [codex/neverd-canonical-x86-release]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 78210f23e22f2292250acc84135de5067684e32d
+          ref: a2d35a9bf25d2e17ccb3d96aeee63748bef15fa8
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: canonical-x86-product
+          name: validated-x86-neverd
           path: product-evidence/
           retention-days: 14
