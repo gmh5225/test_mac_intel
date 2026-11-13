@@ -1,7 +1,7 @@
-name: Qualify the release ARM32 detail delta alone across twelve builds and three real ARM executables
+name: Qualify dedicated ARM operand construction and verify byte-identical mixed consumers
 on:
   push:
-    branches: [codex/capstone-current-arm-public-defaults]
+    branches: [codex/capstone-arm-isolated-operand-init]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-arm-defaults-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-defaults-isolated-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

@@ -1,11 +1,42 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d1d78862..97022689 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -158,6 +158,10 @@ if(capstone_enabled_architectures STREQUAL "X86")
+     add_compile_definitions(CAPSTONE_X86_ONLY)
+ endif()
+ 
++if(capstone_enabled_architectures STREQUAL "ARM")
++    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS)
++endif()
++
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+     add_compile_definitions(CAPSTONE_MIPS_ONLY)
+ endif()
+diff --git a/Makefile b/Makefile
+index 80398b9b..7595372a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -119,6 +119,10 @@ ifeq ($(sort $(CAPSTONE_ARCHS)),x86)
+ CFLAGS += -DCAPSTONE_X86_ONLY
+ endif
+ 
++ifeq ($(sort $(CAPSTONE_ARCHS)),arm)
++CFLAGS += -DCAPSTONE_ARM_COPY_OPERAND_DEFAULTS
++endif
++
+ ifeq ($(sort $(CAPSTONE_ARCHS)),mips)
+ CFLAGS += -DCAPSTONE_MIPS_ONLY
+ endif
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index ae49e100..186209be 100644
+index ae49e100..11e5e995 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -941,27 +941,43 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+@@ -941,6 +941,46 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
  #endif
  
++#ifdef CAPSTONE_ARM_COPY_OPERAND_DEFAULTS
 +/* Unused operands have observable invalid indices and zeroed padding too. */
 +#define ARM_EMPTY_OP \
 +	{ .vector_index = -1, .type = ARM_OP_INVALID, .neon_lane = -1 }
@@ -27,28 +58,13 @@ index ae49e100..186209be 100644
 +		 1 :
 +		 -1];
 +
- void ARM_setup_op(cs_arm_op *op)
- {
--	memset(op, 0, sizeof(cs_arm_op));
--	op->type = ARM_OP_INVALID;
--	op->vector_index = -1;
--	op->neon_lane = -1;
++void ARM_setup_op(cs_arm_op *op)
++{
 +	memcpy(op, arm_empty_operands, sizeof(*op));
- }
- 
- void ARM_init_cs_detail(MCInst *MI)
- {
--	if (detail_is_set(MI)) {
--		unsigned int i;
--
--		memset(get_detail(MI), 0,
--		       offsetof(cs_detail, arm) + sizeof(cs_arm));
--
--		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
--			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
--		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
--		ARM_get_detail(MI)->vcc = ARMVCC_None;
--	}
++}
++
++void ARM_init_cs_detail(MCInst *MI)
++{
 +	if (!detail_is_set(MI))
 +		return;
 +	cs_detail *detail = get_detail(MI);
@@ -58,6 +74,16 @@ index ae49e100..186209be 100644
 +	detail->arm.vcc = ARMVCC_None;
 +	memcpy(detail->arm.operands, arm_empty_operands,
 +	       sizeof(arm_empty_operands));
++}
++#else
+ void ARM_setup_op(cs_arm_op *op)
+ {
+ 	memset(op, 0, sizeof(cs_arm_op));
+@@ -963,6 +1003,7 @@ void ARM_init_cs_detail(MCInst *MI)
+ 		ARM_get_detail(MI)->vcc = ARMVCC_None;
+ 	}
  }
++#endif
  
  static uint64_t t_add_pc(MCInst *MI, uint64_t v)
+ {
