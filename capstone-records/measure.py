@@ -23,6 +23,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
   all_inputs=corpus.prepare(r,t,e,run)
   choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls'} if mixed else set())
+  choices.update(('mips64el-r2-ls','mips64el-r2-cp','mips64el-r2-sort'))
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
@@ -56,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/ARM/ARMMapping.c.o'}
+   expected={'arch/Mips/MipsDisassembler.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
@@ -70,7 +71,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  cases=[x for x in cases if x['name']in ('arm-ls','arm-cp','arm-sort','putty-32-0.85','arm64-ls','mips64el-ls')]
+  cases=[x for x in cases if x['name']in ('mips64el-r2-ls','mips64el-r2-cp','mips64el-r2-sort','putty-32-0.85','arm64-ls','arm-cp','mips64el-ls')]
   def sample(key,x,mode,reps):
    return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]

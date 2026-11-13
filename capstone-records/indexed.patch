@@ -513,7 +513,7 @@ index 6266d12b..98805f06 100644
  
  // given internal insn id, return public instruction ID
 diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
-index 25f13d10..6b921f10 100644
+index 25f13d10..0d1d4de7 100644
 --- a/arch/Mips/MipsDisassembler.c
 +++ b/arch/Mips/MipsDisassembler.c
 @@ -228,6 +228,11 @@ bool Mips_getFeatureBits(unsigned int mode, unsigned int feature)
@@ -528,7 +528,7 @@ index 25f13d10..6b921f10 100644
  static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  				   const uint8_t *Bytes, size_t BytesLen,
  				   uint64_t Address, SStream *CStream);
-@@ -1451,6 +1456,21 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1451,6 +1456,25 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  
  	cs_mode mode = Instr->csh->mode;
  	bool IsBigEndian = mode & CS_MODE_BIG_ENDIAN;
@@ -536,21 +536,25 @@ index 25f13d10..6b921f10 100644
 +#ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
 +	uint64_t major;
 +	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
-+	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64) {
-+		/* The unextended modes use standard byte order and only the
-+		 * GP64, FP64, DSP and base tables below, in their usual order. */
++	const unsigned standard = CS_MODE_MIPS32 | CS_MODE_MIPS32R2 |
++				  CS_MODE_MIPS64 | CS_MODE_MIPS64R2;
++	if ((isa & standard) && !(isa & ~standard)) {
++		/* These base and R2 modes share the general table order. The
++         * mode predicates inside each table still use the original mode. */
 +		if (readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
-+				      IsBigEndian, false) == MCDisassembler_Fail)
++				      IsBigEndian,
++				      false) == MCDisassembler_Fail)
 +			return MCDisassembler_Fail;
 +		*Size = 4;
-+		IsGP64 = IsFP64 = isa == CS_MODE_MIPS64;
++		IsGP64 = Mips_getFeatureBits(isa, Mips_FeatureGP64Bit);
++		IsFP64 = Mips_getFeatureBits(isa, Mips_FeatureFP64Bit);
 +		goto DecodeStandard;
 +	}
 +#endif
  	bool IsMicroMips = Mips_getFeatureBits(mode, Mips_FeatureMicroMips);
  	bool IsNanoMips = Mips_getFeatureBits(mode, Mips_FeatureNanoMips);
  	bool IsMips32r6 = Mips_getFeatureBits(mode, Mips_FeatureMips32r6);
-@@ -1459,8 +1479,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1459,8 +1483,8 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  	bool IsMips16 = Mips_getFeatureBits(mode, Mips_FeatureMips16);
  	bool IsCnMips = Mips_getFeatureBits(mode, Mips_FeatureCnMips);
  	bool IsCnMipsP = Mips_getFeatureBits(mode, Mips_FeatureCnMipsP);
@@ -561,7 +565,7 @@ index 25f13d10..6b921f10 100644
  	bool IsPTR64 = Mips_getFeatureBits(mode, Mips_FeaturePTR64Bit);
  	// Only present in MIPS-I and MIPS-II
  	bool HasCOP3 = !Mips_getFeatureBits(mode, Mips_FeatureMips32) &&
-@@ -1684,6 +1704,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1684,6 +1708,17 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
@@ -579,7 +583,7 @@ index 25f13d10..6b921f10 100644
  	if (IsGP64) {
  		Result = decodeInstruction_4(DecoderTableMips6432, Instr, Insn,
  					     Address, NULL);
-@@ -1698,10 +1729,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+@@ -1698,10 +1733,12 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
  			return Result;
  	}
  
