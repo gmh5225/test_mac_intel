@@ -150,7 +150,7 @@ def prepare():
     command(['git', 'init', WORK / 'new'], 'new-init')
     build('base')
     command(['git','apply',SOURCE/'candidate.patch'],'apply-release',WORK/'new')
-    write('comparison.json',dict(baseline='published 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249',candidate='large fallback frame isolated behind the stable scan caller with all writers held fixed'))
+    write('comparison.json',dict(baseline='published 01ce67005793c4369e64b509e5ec8f9cb2945d98',candidate='MOV memory immediate through the address writer'))
     build('new')
     for label in ['base', 'new']:
         fields = (WORK / (label+'-build/CMakeCache.txt')).read_text().splitlines()
@@ -213,7 +213,7 @@ panic = "abort"
         changed.append({str(f.relative_to(root)):sha(f) for f in root.rglob('*.o')})
     assert changed[0].keys()==changed[1].keys()
     diffs=[k for k in changed[0] if changed[0][k]!=changed[1][k]]
-    assert sorted(diffs)==['arch/X86/X86ImmediateOutput.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o'],diffs
+    assert {'arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o'} <= set(diffs) <= {'arch/X86/X86ImmediateOutput.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86OutputIterator.c.o'},diffs
     if PROFILE == 'gcc' and platform.machine() == 'x86_64':
         command(['clang++','-std=c++17','-O2','-I',WORK/'new/include',SOURCE/'complete-scan.cpp','-ldl','-o',WORK/'complete-scan'],'build-complete-scan')
         command([WORK/'complete-scan',libraries['base'],libraries['new']],'complete-scan')
