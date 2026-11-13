@@ -1,7 +1,7 @@
-name: Verify the ARM defaults and both layout extents with supported C99 compilers
+name: Build the ARM-only defaults using MSVC, DIET, sanitizers and mixed Windows
 on:
   push:
-    branches: [codex/capstone-portable-arm-operand-storage]
+    branches: [codex/capstone-dedicated-arm-storage-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -12,14 +12,11 @@ jobs:
       matrix:
         include:
           - { cc: MD, profile: dedicated, forms: combined, host: windows-2022 }
-          - { cc: MT, profile: four, forms: combined, host: windows-2022 }
-          - { cc: MD, profile: intel, forms: combined, host: windows-2022 }
-          - { cc: MD, profile: reduced, forms: combined, host: windows-2022 }
-          - { cc: MT, profile: diet, forms: combined, host: windows-2022 }
-          - { cc: gcc, profile: adapter, forms: combined, host: ubuntu-24.04 }
-          - { cc: clang, profile: sanitize, forms: combined, host: ubuntu-24.04 }
-          - { cc: gcc, profile: reduced, forms: combined, host: ubuntu-24.04-arm }
+          - { cc: MT, profile: dedicated, forms: combined, host: windows-2022 }
+          - { cc: MD, profile: diet, forms: combined, host: windows-2022 }
           - { cc: gcc, profile: diet, forms: combined, host: ubuntu-24.04-arm }
+          - { cc: clang, profile: sanitize, forms: combined, host: ubuntu-24.04 }
+          - { cc: MT, profile: four, forms: combined, host: windows-2022 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -34,13 +31,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5fd738f8fa8a61c9471a3c54c4ac2e69bad8a249
+          ref: ea3443bd943f583b65005dc1af9fae94850b6de7
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: portable-arm-storage-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: isolated-arm-storage-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
