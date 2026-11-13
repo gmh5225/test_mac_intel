@@ -1,7 +1,7 @@
-name: Verify combined x86 public output inside the full NeverD dev decoder with LLVM fork sources
+name: Verify expanded operand records with an isolated fallback in product
 on:
   push:
-    branches: [codex/neverd-combined-memory-vector-records]
+    branches: [codex/neverd-expanded-operand-output]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 02fb652602c69a1c0268a3da23c89c73d170f3e3
+          ref: fc9fadbf57b992d99064a1175fd0cc80cbe13938
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: neverd-combined-writers
+          name: neverd-expanded-operand-output
           path: product-evidence/
           retention-days: 14
