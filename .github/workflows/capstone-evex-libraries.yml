@@ -1,7 +1,7 @@
-name: Measure Use the fused operand reader after unchanged EVEX prefix validation on real Debian functions versus both iced formatters
+name: Measure generated unmasked EVEX operand read and validation fusion in libraries
 on:
   push:
-    branches: [codex/capstone-evex-scan-owner-libraries]
+    branches: [codex/capstone-evex-fused-shapes-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-scan-owner-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-fused-shapes-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
