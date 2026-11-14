@@ -1,5 +1,44 @@
 {
-  "neverd": "ec6aef393de122fefb9b02c6bebc4957f6a88f14",
+  "neverd": "282246091fd89bd1cfa1ccb4035208aa3d15a596",
   "capstone": "75da2329204825bb0bd15e574ab58c45b5019dcc",
-  "patch_sha256": "7a4045cc47206a158c8c1caeb0d53f488bf0287b85b7accfd003913c8105a4ca"
+  "variants": {
+    "legacy-shifts": {
+      "source": "round1024-legacy-vector-shifts",
+      "patch": "legacy-shifts.patch",
+      "patch_sha256": "68f0f4a9872d19af0f543eb5eb83b89ff3869a6f9cfec2671de6749f4f8a6ca4",
+      "tree": "864a3b8255c14451ee0d33f827d896a8a148c7af",
+      "changed": [
+        "X86VectorOutput.c.o"
+      ],
+      "added": []
+    },
+    "mode-scan": {
+      "source": "round1025-gcc11-mode-scan",
+      "patch": "mode-scan.patch",
+      "patch_sha256": "57e0349f0fc724c84d0da1e824a349d09b7e25c82a40856c8b565b2446b59c39",
+      "tree": "503d76be889d55abf721d04694f40fb65f204960",
+      "changed": [
+        "X86DisassemblerDecoder.c.o",
+        "X86VectorOutput.c.o",
+        "X86OutputIterator.c.o",
+        "X86ImmediateOutput.c.o",
+        "X86MemoryOutput.c.o"
+      ],
+      "added": []
+    },
+    "evex-memory": {
+      "source": "round1023-shared-evex-memory-scan",
+      "patch": "evex-memory.patch",
+      "patch_sha256": "6d2de2ae86754eeec57aee324731b99a77ba7b4564347e335d01631665dbd426",
+      "tree": "53d56bdaf99c143064ea95ea690101d40a0829dc",
+      "changed": [
+        "X86DisassemblerDecoder.c.o",
+        "X86VectorOutput.c.o"
+      ],
+      "added": [
+        "X86EvexMemoryOutput.c.o"
+      ]
+    }
+  },
+  "llvm": "live main fork source; prebuilt disabled"
 }

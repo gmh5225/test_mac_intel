@@ -10,6 +10,8 @@ def command(args,label,cwd=None):
 def rev(d):return sp.check_output(['git','-C',d,'rev-parse','HEAD'],text=True).strip()
 cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 expected=json.loads((r/'inputs.json').read_text())
+variants=expected['variants']
+write('inputs',expected)
 assert rev(nd)==expected['neverd'] and rev(cs)==expected['capstone']
 write('sources',dict(neverd=rev(nd),capstone=rev(cs),llvm_fork=rev(ll),llvm_source=str(ll)))
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
@@ -51,13 +53,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  for label in ('base','candidate'):
+  for label in ['base',*variants]:
    ref=expected['capstone']
    assert rev(cs)==ref
-   if label=='candidate':
-    change=r/'candidate.patch'
-    assert hashlib.sha256(change.read_bytes()).hexdigest()==expected['patch_sha256']
-    command(['git','apply',change],'apply-native-combined-output',cs)
+   if label!='base':
+    change=r/variants[label]['patch']
+    assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
+    command(['git','apply',change],'apply-'+label,cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
@@ -85,13 +87,21 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     base_objects=json.loads((out/'base-objects.json').read_text())
     new_files=sorted(set(objects)-set(base_objects))
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
-    write('capstone-objects',dict(added=new_files,changed=changed))
-    assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'X86MemoryOutput.c.o','X86OutputIterator.c.o','X86ImmediateOutput.c.o','X86VectorOutput.c.o','X86DisassemblerDecoder.c.o'},changed
+    write(label+'-capstone-objects',dict(added=new_files,changed=changed))
+    assert {Path(k).name for k in new_files}==set(variants[label]['added']),new_files
+    assert {Path(k).name for k in changed}==set(variants[label]['changed']),changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
+   command(['git','add','-A'],'stage-receipt-'+label,cs)
+   source_tree=sp.check_output(['git','write-tree'],cwd=cs,text=True).strip()
+   write(label+'-source-tree',dict(tree=source_tree,parent=ref))
+   if label!='base':
+    assert source_tree==variants[label]['tree'],(label,source_tree,variants[label]['tree'])
+   command(['git','reset','--hard',ref],'restore-'+label,cs)
+   assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
+
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==2
+  write('products',identities);assert len(set(identities.values()))==1+len(variants)
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def measure(name,case,mode,reps):
@@ -107,7 +117,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     # A long full text and a tiny compiler fixture have very different costs.
     start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(100000/start)))
     row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(('base-copy','candidate')):
+    for idx,label in enumerate(['base-copy',*variants]):
      plans=[]
      for cycle in range(15):
       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
@@ -120,6 +130,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
     row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne']))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne'],variants=list(variants)))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
