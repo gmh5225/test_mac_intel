@@ -1,7 +1,7 @@
-name: Copy admitted vector bytes and prefixes at their bounded lengths profiles
+name: Verify TEST accumulator read-only metadata and unchanged executable sections
 on:
   push:
-    branches: [codex/capstone-vector-bounded-copies-profiles]
+    branches: [codex/capstone-test-access-metadata-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-bounded-copies-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: test-access-metadata-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

@@ -1,5 +1,5 @@
 from pathlib import Path
-import json, os, shutil, subprocess, tempfile
+import json, os, shutil, subprocess, tempfile, hashlib, struct, platform
 root=Path(__file__).resolve().parent
 source=root.parent/'source'
 evidence=root.parent/'evidence'
@@ -33,9 +33,36 @@ try:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]+(['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers'] if compiler=='gcc' else [])
     profile_options={'dedicated':['-DCAPSTONE_ARM_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
     run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
-    units=['api','x86_scan_batch','x86_relative_jump']
+    baseline_code=None
+    def mapping_sections():
+        path,=b.rglob('X86Mapping.c.o')
+        data=path.read_bytes();assert data[:6]==bytes([127,69,76,70,2,1])
+        start=struct.unpack_from('<Q',data,40)[0]
+        stride,count,names=struct.unpack_from('<HHH',data,58)
+        layout=struct.Struct('<IIQQQQIIQQ')
+        rows=[layout.unpack_from(data,start+i*stride)for i in range(count)]
+        strings=data[rows[names][4]:rows[names][4]+rows[names][5]]
+        code={};allocated={}
+        for row in rows:
+            name=strings[row[0]:strings.index(0,row[0])].decode()
+            if row[2]&2:allocated[name]=dict(size=row[5],alignment=row[8])
+            if row[2]&4:code[name]=dict(size=row[5],sha256=hashlib.sha256(data[row[4]:row[4]+row[5]]).hexdigest())
+        assert code
+        return dict(code=code,allocated=allocated)
+    if platform.system()=='Linux':
+        originals={}
+        for name in ('arch/X86/X86Mapping.c','arch/X86/X86MappingInsnOp.inc'):
+            path=source/name;originals[path]=path.read_bytes()
+            path.write_bytes(subprocess.check_output(['git','show','HEAD:'+name],cwd=source))
+        try:
+            run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'baseline-mapping')
+            baseline_code=mapping_sections()
+            save('baseline-mapping-sections',baseline_code)
+        finally:
+            for path,data in originals.items():path.write_bytes(data)
+    units=['api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
     if profile not in ('diet','reduced'):
-        units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_reg_access','x86_evex_reserved_fields','x86_memory_scale','mips_scan','detail_option']
+        units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
     if profile=='adapter':units+=['x86_scan_adapter']
     if profile not in ('diet','reduced'):
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
@@ -43,6 +70,17 @@ try:
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
+    if platform.system()=='Linux' and platform.machine()=='x86_64' and profile=='four':
+        target=root_build/'test-hardware'
+        run([compiler,'-O2',root/'hardware.c','-o',target],'hardware-compile')
+        run([target],'hardware-test')
+        save('hardware-host',dict(cpu=Path('/proc/cpuinfo').read_text()))
+    if baseline_code is not None:
+        actual=mapping_sections()
+        save('candidate-mapping-sections',actual)
+        assert baseline_code==actual,('TEST metadata fix changed executable bytes or allocation sizes',baseline_code,actual)
+        save('metadata-code-proof',dict(executable_sections_identical=True,allocated_section_sizes_identical=True))
+    run(['git','apply','--reverse','--check','suite/auto-sync/inc_patches/X86/01_test_accumulator_access.patch'],'imported-patch')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
