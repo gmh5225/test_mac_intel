@@ -48,6 +48,11 @@ try:
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
         result=subprocess.check_output([generator],cwd=source)
         assert result==(source/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
+    if profile=='adapter':
+        generator=root_build/'vector-output-generator'
+        run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
+        result=subprocess.check_output([generator],cwd=source)
+        assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())

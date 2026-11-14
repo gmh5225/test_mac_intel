@@ -1,7 +1,7 @@
-name: Qualify shared EVEX row scan in full DIET reduced adapter Windows and macOS configurations
+name: Qualify inline shared EVEX register admission in profiles
 on:
   push:
-    branches: [codex/capstone-evex-register-scan-profiles]
+    branches: [codex/capstone-evex-inline-admission-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-register-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: evex-inline-admission-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
