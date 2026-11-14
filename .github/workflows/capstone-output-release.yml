@@ -1,7 +1,7 @@
-name: Verify initial VEX32 scan and shared complete output profiles
+name: Verify isolated complete VEX32 output profiles
 on:
   push:
-    branches: [codex/capstone-vex32-initial-scan-profiles]
+    branches: [codex/capstone-vex32-isolated-output-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -48,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-initial-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex32-isolated-output-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
