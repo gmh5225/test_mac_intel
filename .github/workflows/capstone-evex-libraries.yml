@@ -1,7 +1,7 @@
-name: Profile physical 64-instruction x86 batch scanning on frozen VEX32 variants
+name: R1113 profile VEX32 admission at the existing prefix rejection
 on:
   push:
-    branches: [codex/capstone-vex32-batch-cost]
+    branches: [codex/capstone-vex32-prefix-rejection-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,13 +11,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: gcc, replica: one }
-          - { host: ubuntu-24.04, cc: clang, replica: one }
-          - { host: ubuntu-24.04, cc: gcc, replica: one }
+          - { host: ubuntu-22.04, cc: gcc, replica: single }
+          - { host: ubuntu-22.04, cc: gcc, replica: batch }
+          - { host: ubuntu-24.04, cc: clang, replica: single }
+          - { host: ubuntu-24.04, cc: clang, replica: batch }
+          - { host: ubuntu-24.04, cc: gcc, replica: single }
+          - { host: ubuntu-24.04, cc: gcc, replica: batch }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
       CC: ${{ matrix.cc }}
+      ENTRY: ${{ matrix.replica }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -40,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-batch-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-prefix-rejection-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

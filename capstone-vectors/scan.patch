@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..ffd6de20 100644
+index 63dcc538..444d026b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -98,36 +98,162 @@ index 63dcc538..ffd6de20 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3654,10 +3655,28 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3092,12 +3093,33 @@ enum { X86_SCAN_NOT_HANDLED = 3 };
+ 
+ /* Only the compact readers see this state. Generic/raw decoding starts its
+  * own state if the generated table has no terminal for this header. */
++#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++/* The legacy reader already rejected this prefix. Keep VEX admission off
++ * successful scalar paths, and retain exact mode and bare-prefix checks. */
++X86_DECODE_INLINE int tryRejectedVex32Prefix(const uint8_t *code, size_t size,
++					     cs_mode initialMode, size_t offset,
++					     unsigned *id, uint16_t *length)
++{
++	if (initialMode != CS_MODE_32 || offset || size < 2 ||
++	    code[0] != 0xc5 || (code[1] & 0xc0) != 0xc0)
++		return X86_SCAN_NOT_HANDLED;
++	const uint32_t packed = X86_readVex32PublicPlan(code, size);
++	if (!packed)
++		return X86_SCAN_NOT_HANDLED;
++	if (packed == UINT32_MAX)
++		return X86_SCAN_INVALID;
++	*id = packed >> 8;
++	*length = (uint16_t)(packed & 0xff);
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
+ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ 					  cs_mode mode, uint8_t opcode,
+ 					  size_t opcodeOffset,
+ 					  unsigned *instructionID,
+ 					  uint16_t *size, bool publicID,
+-					  bool readerFlags)
++					  bool readerFlags, cs_mode initialMode)
+ {
+ 	if (opcodeOffset >= 2)
+ 		return X86_SCAN_NOT_HANDLED;
+@@ -3107,8 +3129,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+ 		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
+ 		(insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
+ 	if ((feature_prefix_flags[opcode] & prefixMask) ||
+-	    (opcodeOffset && !isREX(&insn, code[0])))
++	    (opcodeOffset && !isREX(&insn, code[0]))) {
++#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++		if (publicID && mode == CS_MODE_32)
++			return tryRejectedVex32Prefix(code, codeSize,
++						      initialMode, opcodeOffset,
++						      instructionID, size);
++#endif
+ 		return X86_SCAN_NOT_HANDLED;
++	}
+ 	readSimpleLegacyPrefix(&insn, opcodeOffset);
+ 	int opcodeResult = readOpcode(&insn, true, true);
+ 	if (opcodeResult)
+@@ -3249,7 +3278,7 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
+ 	unsigned instructionID;
+ 	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
+ 					   opcodeOffset, &instructionID, size,
+-					   false, false);
++					   false, false, 0);
+ 	if (terminal != X86_SCAN_NOT_HANDLED) {
+ 		if (terminal != X86_SCAN_COMPLETE)
+ 			return false;
+@@ -3521,7 +3550,8 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 						size_t size, cs_mode mode,
+ 						uint8_t opcode, unsigned offset,
+-						unsigned *id, uint16_t *length)
++						unsigned *id, uint16_t *length,
++						cs_mode initialMode)
+ {
+ 	const bool wide = mode == CS_MODE_64;
+ 	const uint8_t rex = offset ? code[0] : 0;
+@@ -3529,8 +3559,14 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 				  FEATURE_VEX2_XOP |
+ 				  (wide ? FEATURE_REX_PREFIX : 0);
+ 	if ((feature_prefix_flags[opcode] & rejected) ||
+-	    (opcode == 0x90 && bFromREX(rex)))
++	    (opcode == 0x90 && bFromREX(rex))) {
++#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++		if (mode == CS_MODE_32)
++			return tryRejectedVex32Prefix(code, size, initialMode,
++						      offset, id, length);
++#endif
+ 		return X86_SCAN_NOT_HANDLED;
++	}
+ 	bool escaped = opcode == 0x0f;
+ 	unsigned end = offset + 1;
+ 	if (escaped) {
+@@ -3609,7 +3645,8 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+ 					   cs_mode mode, bool feature64,
+ 					   unsigned *instructionID,
+-					   uint16_t *size, bool readerFlags)
++					   uint16_t *size, bool readerFlags,
++					   cs_mode initialMode)
+ {
+ 	if (!code_len || (mode == CS_MODE_64) != feature64)
+ 		return X86_SCAN_NOT_HANDLED;
+@@ -3633,10 +3670,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+ 	if (readerFlags)
+ 		return scanInitialPublicTerminal(code, code_len, mode, opcode,
+ 						 (unsigned)offset,
+-						 instructionID, size);
++						 instructionID, size,
++						 initialMode);
+ #endif
+ 	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
+-				   instructionID, size, true, readerFlags);
++				   instructionID, size, true, readerFlags,
++				   initialMode);
+ }
+ 
+ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3649,15 +3688,15 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_64,
+ 					       feature64, instructionID, length,
+-					       readerFlags);
++					       readerFlags, handle->mode);
+ 	else if (handle->mode & CS_MODE_16)
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
  					       feature64, instructionID, length,
- 					       readerFlags);
--	else
-+	else {
+-					       readerFlags);
++					       readerFlags, handle->mode);
+ 	else
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
  					       feature64, instructionID, length,
- 					       readerFlags);
-+#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+		/* A successful legacy terminal keeps its existing return. Admit
-+         * VEX2 only after that reader rejects the header. */
-+		if (initial == X86_SCAN_NOT_HANDLED &&
-+		    handle->mode == CS_MODE_32 && code_len >= 2 &&
-+		    code[0] == 0xc5 && (code[1] & 0xc0) == 0xc0) {
-+			const uint32_t packed =
-+				X86_readVex32PublicPlan(code, code_len);
-+			if (packed) {
-+				if (packed == UINT32_MAX)
-+					return X86_SCAN_INVALID;
-+				*instructionID = packed >> 8;
-+				*length = (uint16_t)(packed & 0xff);
-+				return X86_SCAN_COMPLETE;
-+			}
-+		}
-+#endif
-+	}
+-					       readerFlags);
++					       readerFlags, handle->mode);
  	return initial;
  }
  
+@@ -3687,18 +3726,18 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
+ 					     opcodeOffset, &instructionID,
+-					     &result->length, true,
+-					     readerFlags);
++					     &result->length, true, readerFlags,
++					     0);
+ 	else if (handle->mode & CS_MODE_16)
+ 		status = trySimpleLegacyScan(code, code_len, CS_MODE_16, opcode,
+ 					     opcodeOffset, &instructionID,
+-					     &result->length, true,
+-					     readerFlags);
++					     &result->length, true, readerFlags,
++					     0);
+ 	else
+ 		status = trySimpleLegacyScan(code, code_len, CS_MODE_32, opcode,
+ 					     opcodeOffset, &instructionID,
+-					     &result->length, true,
+-					     readerFlags);
++					     &result->length, true, readerFlags,
++					     0);
+ 	if (status != X86_SCAN_NOT_HANDLED)
+ 		return completeTerminalScanResult(result, instructionID,
+ 						  status);
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..7aeea4a1 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
