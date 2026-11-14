@@ -128,7 +128,7 @@ index 63dcc538..af3ba9ca 100644
  }
  
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..7aeea4a1 100644
+index a976814e..38cacf94 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -136,7 +136,7 @@ index a976814e..7aeea4a1 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
 -			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 65531, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
  			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
@@ -771,36 +771,36 @@ index 00000000..7817a761
 +
 +#endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..fd2ad030 100644
+index 11e8578a..db82616f 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -81,6 +81,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 						     insn_size,
- 						     x86_simple_registers[3],
- 						     wide);
-+		if (plan == X86_PLAN_VEX32)
-+			return X86_writeVex32Output(code, size, insn, insn_size,
-+						    x86_simple_registers[2]);
+@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+-			return X86_writeVectorOutput(code, size, insn,
+-						     insn_size,
+-						     x86_simple_registers[3],
+-						     wide);
++			return X86_writePlannedVectorOutput(
++				code, size, insn, insn_size,
++				x86_simple_registers, wide);
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..39d27324 100644
+index 7675273f..b8b2f6ca 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -51,6 +51,8 @@ enum X86SimpleForm {
- /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
- #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
- #define X86_PLAN_VECTOR UINT16_MAX
-+/* Keep low bits RELATIVE to bypass the legacy register-pair ModR/M reader. */
-+#define X86_PLAN_VEX32 (X86_PLAN_VECTOR - 4u)
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
- 
-@@ -68,6 +70,11 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -68,6 +68,16 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
  		      bool wide);
  
++/* Keep vector-mode selection outside the shared scalar output iterator. */
++CAPSTONE_INTERNAL bool X86_writePlannedVectorOutput(
++	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
++	const struct X86SimpleRegister regs[4][16], bool wide);
++
 +/* The caller selects a bare 32-bit VEX2 output plan. */
 +CAPSTONE_INTERNAL bool
 +X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
@@ -811,10 +811,10 @@ index 7675273f..39d27324 100644
  	if (displacement) {
 diff --git a/arch/X86/X86VexOutput32.c b/arch/X86/X86VexOutput32.c
 new file mode 100644
-index 00000000..a8bca338
+index 00000000..a40e998e
 --- /dev/null
 +++ b/arch/X86/X86VexOutput32.c
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,206 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1005,6 +1005,19 @@ index 00000000..a8bca338
 +		insn->detail->x86.rex = 0;
 +	}
 +	return true;
++}
++/* Existing vector plans include legacy padding in both modes. Only bare
++ * 32-bit VEX2 enters the new writer; other plans retain their old owner. */
++bool X86_writePlannedVectorOutput(const uint8_t *code, size_t size,
++				  cs_insn *insn, uint16_t *insn_size,
++				  const struct X86SimpleRegister regs[4][16],
++				  bool wide)
++{
++	if (!wide && code[0] == 0xc5)
++		return X86_writeVex32Output(code, size, insn, insn_size,
++					    regs[2]);
++	return X86_writeVectorOutput(code, size, insn, insn_size, regs[3],
++				     wide);
 +}
 +#endif
 +#endif
@@ -1296,14 +1309,14 @@ index 48c6fb41..33fbbfa2 100644
      ]
      generated = [(path, generated_output(emit)) for path, emit in outputs]
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..2a342f31 100644
+index ccc4f0de..4dd0b003 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -621,6 +621,7 @@ int main()
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
-+	plans[0][0][0xc5] = X86_PLAN_VEX32;
++	plans[0][0][0xc5] = X86_PLAN_VECTOR;
  	plans[1][0][0xc5] = X86_PLAN_VECTOR;
  	for (unsigned wide = 0; wide < 2; ++wide) {
  		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
