@@ -1,7 +1,7 @@
-name: Qualify SSE memory and vector register formatting in current NeverD with live LLVM fork source
+name: Qualify compact MIPS and vector register names in actual NeverD with live LLVM source
 on:
   push:
-    branches: [codex/capstone-memory-names-product]
+    branches: [codex/capstone-compact-name-tables-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-memory-names
+          name: product-compact-name-tables
           path: product-evidence/
           retention-days: 14

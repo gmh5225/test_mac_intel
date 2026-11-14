@@ -36,6 +36,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   write('compiler',dict(c=sp.check_output(['gcc','--version'],text=True).splitlines()[0],cxx=sp.check_output(['g++','--version'],text=True).splitlines()[0],cpu=next(x for x in Path('/proc/cpuinfo').read_text().splitlines()if x.startswith('model name'))))
   command(['cmake','--build',build,'--target','LLVMSwiftDemangle','--parallel','4'],'swift-demangle-from-source')
+  def llvm_identity():
+   modified=sp.check_output(['git','-C',ll,'diff','--binary','HEAD'])
+   untracked=sp.check_output(['git','-C',ll,'ls-files','--others','--exclude-standard','-z']).split(b'\0')
+   extras={os.fsdecode(name):hashlib.sha256((ll/os.fsdecode(name)).read_bytes()).hexdigest() for name in untracked if name}
+   return dict(revision=rev(ll),tracked_diff_sha256=hashlib.sha256(modified).hexdigest(),untracked=extras)
+  llvm_reference=llvm_identity()
+  write('llvm-baseline-identity',llvm_reference)
   products={}
   import struct,collections
   def compare(left,right,label):
@@ -61,6 +68,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
+   llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
+   assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
    command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
@@ -81,6 +90,10 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert rev(cs)==ref
    snapshot=json.loads((build/'.neverd-deps/snapshot.json').read_text())
    write(label+'-snapshot',snapshot)
+   identities={name:{key:value[key] for key in ('repository','branch','commit','sha256')} for name,value in snapshot['sources'].items()}
+   write(label+'-managed-source-identity',identities)
+   if label=='base':managed_reference=identities
+   else:assert identities==managed_reference,(label,'Managed dependency source changed during comparison')
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
    objects={str(f.relative_to(roots[0])):hashlib.sha256(f.read_bytes()).hexdigest() for f in roots[0].rglob('*.o')};write(label+'-objects',objects)
    if label!='base':
