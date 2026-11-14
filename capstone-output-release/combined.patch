@@ -1,29 +1,80 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..201163b2 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -42,7 +42,10 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	const unsigned len = prefix + 2 + row->immediate;
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
--	memcpy(insn->bytes, code, len);
-+	/* VEX/EVEX register rows have two to four prefix bytes, a ModR/M,
-+	 * and at most one immediate: the accepted extent is four to seven. */
-+	memcpy(insn->bytes, code, 4);
-+	memcpy(insn->bytes + len - 4, code + len - 4, 4);
- 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
- 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
-@@ -72,7 +75,11 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 		memcpy(d->groups, row->groups, sizeof(row->groups));
- 		d->groups_count = row->group_count;
- 		cs_x86 *x = &d->x86;
--		memcpy(x->opcode, code, prefix);
-+		memcpy(x->opcode, code, 2);
-+		if (prefix == 4)
-+			memcpy(x->opcode + 2, code + 2, 2);
-+		else if (prefix == 3)
-+			x->opcode[2] = code[2];
- 		x->addr_size = 8;
- 		x->rex = (uint8_t)rex;
- 		x->modrm = code[prefix + 1];
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index bd0f6c94..9041e8d4 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -9,7 +9,7 @@
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
+ 
+-/* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
++/* No-base SIB and long-mode RIZ spellings retain the general printer. */
+ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			   uint16_t *insn_size,
+ 			   const struct X86SimpleOutput *row,
+@@ -36,12 +36,12 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 					   ((encoding >> 3) & 7);
+ 		base_reg = encoding & 7;
+ 		if ((!mod && base_reg == 5) ||
+-		    (index_reg == 4 && encoding != 0x24))
++		    (wide && index_reg == 4 && encoding != 0x24))
+ 			return false;
+-		if (index_reg != 4) {
++		/* The Intel printer hides EIZ; detail retains the encoded scale. */
++		scale_bits = encoding >> 6;
++		if (index_reg != 4)
+ 			index = &regs[wide ? 3 : 2][index_reg];
+-			scale_bits = encoding >> 6;
+-		}
+ 	}
+ 
+ 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6990d510..7f68e4ea 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -738,6 +738,35 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_absent_sib_index(csh handles[2])
++{
++	const uint8_t opcodes[] = { 0x01, 0x03, 0x29, 0x2b, 0x39, 0x3b, 0x84,
++				    0x85, 0x88, 0x89, 0x8a, 0x8b, 0x8d, 0xff };
++	for (unsigned op = 0; op < sizeof(opcodes); ++op)
++		for (unsigned mod = 0; mod < 4; ++mod)
++			for (unsigned base = 0; base < 8; ++base)
++				for (unsigned scale = 0; scale < 4; ++scale) {
++					uint8_t code[] = {
++						opcodes[op],
++						(uint8_t)((mod << 6) | 0x34),
++						(uint8_t)((scale << 6) | 0x20 |
++							  base),
++						0x80,
++						0xff,
++						0xff,
++						0xff
++					};
++					for (unsigned length = 0;
++					     length <= sizeof(code); ++length)
++						if (!compare(handles, code,
++							     length,
++							     op + mod + base +
++								     scale))
++							return false;
++				}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -753,7 +782,8 @@ static bool check_mode(cs_mode mode)
+ 			if (cs_option(handles[side], CS_OPT_DETAIL,
+ 				      detail ? CS_OPT_ON : CS_OPT_OFF))
+ 				goto done;
+-		if (!check_branches(handles) || !check_memory(handles, mode) ||
++		if (!check_absent_sib_index(handles) ||
++		    !check_branches(handles) || !check_memory(handles, mode) ||
+ 		    !check_lea(handles, mode) ||
+ 		    !check_mov_disp32(handles, mode) ||
+ 		    !check_group1(handles, mode) ||

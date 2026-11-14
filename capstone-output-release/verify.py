@@ -22,7 +22,7 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='75da2329204825bb0bd15e574ab58c45b5019dcc'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='6c93c31134d5396095ba4e63db58548317d6f5b9'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
@@ -33,9 +33,9 @@ try:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]+(['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers'] if compiler=='gcc' else [])
     profile_options={'dedicated':['-DCAPSTONE_ARM_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
     run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
-    units=['api','x86_scan_batch','x86_relative_jump']
+    units=['api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
     if profile not in ('diet','reduced'):
-        units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_reg_access','x86_evex_reserved_fields','x86_memory_scale','mips_scan','detail_option']
+        units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
     if profile=='adapter':units+=['x86_scan_adapter']
     if profile not in ('diet','reduced'):
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
