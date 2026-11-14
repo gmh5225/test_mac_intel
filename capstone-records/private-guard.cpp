@@ -52,10 +52,10 @@ int main(int argc,char **argv) {
   bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);
   for(unsigned n=0;n<8192;++n){
    uint8_t bytes[15];for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;
-   const unsigned mandatory[]={0,0x66,0xf3,0xf2};const unsigned op[]={0x10,0x11,0x28,0x29,0x6f,0x7f};
-   if(mandatory[n&3])bytes[k++]=mandatory[n&3];
-   unsigned rex=(n/4)%17;if(rex)bytes[k++]=0x3f+rex;
-   bytes[k++]=0x0f;bytes[k++]=op[(n/68)%6];bytes[k++]=(uint8_t)(n>>3);bytes[k++]=(uint8_t)(n*37);
+   const unsigned op[]={0x6f,0x7f,0xe5,0xf5,0xfd,0xfe,0xef,0xc6,0x71,0x72,0x73};
+   bytes[0]=(n&1)?0xc4:0xc5;bytes[1]=(uint8_t)(n>>1);
+   if(bytes[0]==0xc5){bytes[2]=op[(n/512)%11];bytes[3]=(uint8_t)(n>>3);}
+   else {bytes[2]=(uint8_t)(n>>5);bytes[3]=op[(n/512)%11];bytes[4]=(uint8_t)(n>>3);}
    for(unsigned length=0;length<=15;++length){auto input=memory+page-length;std::memcpy(input,bytes,length);compare(x,y,input,length,detail);}
   }
  }

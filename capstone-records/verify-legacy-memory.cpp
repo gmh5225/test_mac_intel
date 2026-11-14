@@ -48,24 +48,36 @@ int main(int argc,char**argv) {
  auto hit=(Hit)dlsym(b.library,"cs_test_owned_hit");
  if(!hit)throw std::runtime_error("missing owned hit export");
  {
-  Machine m(b,CS_MODE_64,true,true,false);
+  for(cs_mode hit_mode:{CS_MODE_32,CS_MODE_64}) {
+  Machine m(b,hit_mode,true,true,false);
   cs_insn insn{};cs_detail detail{};insn.detail=&detail;
-  const uint8_t bytes[]={0xf3,0x0f,0x6f,0x58,0x10};
+  const uint8_t bytes[]={0xc5,0xf1,0xef,0xc3};
   if(!hit(m.handle,bytes,sizeof(bytes),&insn))
    throw std::runtime_error("candidate fast path was not exercised");
+  const uint8_t mem[]={0xc5,0xf5,0xf5,0x50,0x10};
+  if(!hit(m.handle,mem,sizeof(mem),&insn))throw std::runtime_error("candidate memory fast path was not exercised");
+  }
  }
  for(cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags) {
   bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);uint8_t bytes[15];
-  for(unsigned mandatory:{0u,0x66u,0xf3u,0xf2u})for(unsigned prefix=0;prefix<=(mode==CS_MODE_64?16u:0u);++prefix)
-   for(unsigned op:{0x10u,0x11u,0x28u,0x29u,0x6fu,0x7fu})
-    for(unsigned mr=0;mr<256;++mr)for(unsigned sb=0;sb<((mr&7)==4?256u:1u);++sb) {
-     for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;
-     if(mandatory)bytes[k++]=mandatory;
-     if(prefix)bytes[k++]=0x3f+prefix;
-     bytes[k++]=0x0f;bytes[k++]=op;bytes[k++]=mr;
-     if((mr&7)==4)bytes[k++]=sb;
-     compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%11,detail);
-    }
+  for(unsigned prefix=0;prefix<=(mode==CS_MODE_64?16u:0u);++prefix)for(unsigned op=0;op<256;++op)for(unsigned mr=0xc0;mr<=0xff;++mr){
+   for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;bytes[k++]=0x66;if(prefix)bytes[k++]=0x3f+prefix;
+   bytes[k++]=0x0f;bytes[k++]=op;bytes[k++]=mr;
+   compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%7,detail);
+  }
+  for(unsigned flags=0;flags<256;++flags)for(unsigned op=0;op<256;++op)for(unsigned mr=0;mr<=0xff;mr+=7){
+   for(auto &v:bytes)v=(uint8_t)random_word();bytes[0]=0xc5;bytes[1]=flags;bytes[2]=op;bytes[3]=mr;
+   compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%7,detail);
+  }
+  for(unsigned n=0;n<262144;++n){
+   for(auto &v:bytes)v=(uint8_t)random_word();
+   const unsigned opcodes[]={0xef,0xdc,0xdd,0xde,0xdf,0x44,0x25,0x00,0xfe,0x19,0x1b,0x39,0x3b,0x71,0x72,0x73};
+   bytes[0]=0x62;bytes[1]=((n>>2)&0xf0)|(1+n%3);bytes[2]=((n>>6)&0xf8)|5;
+   bytes[3]=((n>>5)&0x60)|8;bytes[4]=opcodes[(n>>10)&15];bytes[5]=0xc0|(n&63);
+   compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%9,detail);
+   bytes[0]=0xc4;bytes[1]=((n>>2)&0xe0)|(1+n%3);bytes[2]=((n>>6)&0xfc)|1;bytes[3]=opcodes[(n>>10)&15];bytes[4]=0xc0|(n&63);
+   compare(x,y,bytes,15,detail);
+  }
   for(unsigned n=0;n<65536;++n) {
    for(auto &v:bytes)v=(uint8_t)random_word();
    unsigned off=n%8==0?1:n%8==1?2:0;
