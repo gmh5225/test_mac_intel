@@ -1,7 +1,7 @@
-name: Measure Enter bare VEX2 plans before the general prefix and operand reader on PE32, PE64, ARM64 and MIPS in five compiler environments
+name: Compare scalar scan code generation and dynamic costs across VEX prototypes
 on:
   push:
-    branches: [codex/capstone-vex2-terminal-entry-mixed]
+    branches: [codex/capstone-scan-path-costs]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,13 +29,15 @@ jobs:
           ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Install dynamic instruction profiler
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
+      - name: Compare generated assembly, dynamic instructions, branch simulation and native timing
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-terminal-entry-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: scan-path-costs-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
