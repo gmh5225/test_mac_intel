@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in product
+name: Qualify native scan with compact output dispatch and the GCC 11 scan repair in product
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-product]
+    branches: [codex/capstone-gcc11-inline-scan-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: e82ed485b27e07826843f37d6eb9e80272e61ce1
+          ref: ec6aef393de122fefb9b02c6bebc4957f6a88f14
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-native-combined-boundary
+          name: product-gcc11-inline-scan
           path: product-evidence/
           retention-days: 14
