@@ -1,7 +1,7 @@
-name: Verify initial VEX32 scan and shared complete output libraries
+name: Verify isolated complete VEX32 output libraries
 on:
   push:
-    branches: [codex/capstone-vex32-initial-scan-libraries]
+    branches: [codex/capstone-vex32-isolated-output-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-initial-scan-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex32-isolated-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
