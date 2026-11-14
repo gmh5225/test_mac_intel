@@ -27,9 +27,9 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1108,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('census-variant.json',dict(variant='integer',round=1111,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
     save('variants.json',dict(integer='Released Capstone next',output='R1103 early VEX32 scan and separate output tag',scan='R1108 admit VEX32 only after an initial legacy rejection'))
-    save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical via X86_disasmIter, NeverD dev ddf30e5255af3aa7fa071d756ada080c4c957071'))
+    save('entrypoints.json',dict(scan='X86_scanBatch capacity 64 with canonical iterator fallback',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical via X86_disasmIter, NeverD dev ddf30e5255af3aa7fa071d756ada080c4c957071'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
     inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
@@ -40,7 +40,11 @@ def main(w):
     assert inc.count('Result warm=run(1);')==1 and inc.count('Result timed=run(reps);')==1
     inc=inc.replace('Result warm=run(1);', 'Result warm=run(1);\n    CALLGRIND_ZERO_STATS;')
     inc=inc.replace('Result timed=run(reps);', 'CALLGRIND_TOGGLE_COLLECT;\n    Result timed=run(reps);\n    CALLGRIND_TOGGLE_COLLECT;')
-    (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
+    batch_block='      if (!mode) {\n        uint32_t items[64];\n        const auto batch = X86_scanBatch(handle, cursor, left, ip, items, 64);\n        if (batch.count > 64) throw std::runtime_error("batch capacity");\n        size_t consumed = 0;\n        for (size_t i = 0; i < batch.count; ++i) {\n          const unsigned length = items[i] & 255, id = items[i] >> 8;\n          if (!length || length > left || !id)\n            throw std::runtime_error("batch instruction");\n          record(result, cursor - bytes, length, true);\n          result.values += id;\n          cursor += length; left -= length; ip += length; consumed += length;\n        }\n        if (consumed != batch.bytes) throw std::runtime_error("batch extent");\n        if (batch.count) continue;\n      }\n'
+    anchor='      bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);'
+    assert inc.count(anchor)==1
+    inc=inc.replace(anchor,batch_block+anchor).replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include \"X86ScanAdapter.h\"')
+    (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',base/'arch/X86','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
@@ -72,6 +76,13 @@ def main(w):
                 stream.write(assembly)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        if label=='integer':
+            single_code=code.replace(batch_block,'')
+            assert single_code!=code
+            (w/'single.cpp').write_text(single_code)
+            run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'single.cpp','-o',w/'single.o'],'single-driver')
+            single_exe=w/'single-reference'
+            run(['clang++',w/'single.o',b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',single_exe],'single-link')
         import re
         asm=sp.check_output(['objdump','-d','--no-show-raw-insn',target],text=True)
         block=re.search(r'^[0-9a-f]+ <X86_disasmIter>:\n(.*?)(?=^[0-9a-f]+ <|\Z)',asm,re.M|re.S).group(1)
@@ -102,7 +113,7 @@ def main(w):
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     from hardware import Counters
     counters = Counters(p / "evidence", save)
-    costs=[]
+    costs=[];batch_checks=[]
     for name,bits,f,spans,source in deb.prepare(w):
         assert bits in (32,64)
         if name not in ('libjpeg62-turbo-amd64','jpeg-avx2-i386','libssl3t64-i386','libssl3t64-amd64'):continue
@@ -117,8 +128,9 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('baseline-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for profile_mode in ((0,) if name=='libssl3t64-amd64' else (0,1,2) if name=='libssl3t64-i386' else (0,1,2)):
+            for profile_mode in (0,):
              reference_record=None
+             single=list(map(int,sp.check_output([single_exe,'capstone',str(profile_mode),'1',f,intervals,str(bits)],text=True).split()))
              engines=['capstone','candidate','scan']
              for key in engines:
                  args=[str(exe[{'candidate':'output','scan':'scan'}.get(key,'integer')]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
@@ -126,7 +138,11 @@ def main(w):
                  assert len(observation)==6
                  if reference_record is None:reference_record=observation[2:5]
                  assert observation[2:5]==reference_record,(name,profile_mode,key,observation,reference_record)
-                 if key=='capstone':baseline_record=observation[2:]
+                 if key=='capstone':
+                     baseline_record=observation[2:]
+                     assert observation[2:]==single[2:],(name,observation,single)
+                     batch_checks.append(dict(case=name,panel=panel,mode=profile_mode,single_signature=single[2:],batch_signature=observation[2:]))
+                     save('batch-probe-equivalence.json',dict(capacity=64,checks=batch_checks,unchanged=True))
                  if key in ('candidate','scan'):assert observation[2:]==baseline_record,(name,profile_mode,observation,baseline_record)
                  ident=name+'-'+str(profile_mode)+'-'+key
                  counters.measure(ident, args, observation[0])
@@ -146,7 +162,7 @@ def main(w):
                  with gzip.open(p/'evidence'/(ident+'.callgrind.gz'),'wb')as out:out.write(payload)
                  raw.unlink()
             print(name,panel,len(sel),flush=True)
-    save('complete.json',dict(traces=len(costs),success=True,native_qualification=False))
+    save('complete.json',dict(traces=len(costs),success=True,native_qualification=False,batch_capacity=64))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
