@@ -1,0 +1,127 @@
+diff --git a/arch/AArch64/AArch64Disassembler.c b/arch/AArch64/AArch64Disassembler.c
+index 9cc0ce60..4f792932 100644
+--- a/arch/AArch64/AArch64Disassembler.c
++++ b/arch/AArch64/AArch64Disassembler.c
+@@ -417,6 +417,7 @@ static DecodeStatus getInstruction(csh handle, const uint8_t *Bytes,
+ 	return MCDisassembler_Fail;
+ }
+ 
++CS_DECODE_ALIGN
+ DecodeStatus AArch64_LLVM_getInstruction(csh handle, const uint8_t *Bytes,
+ 					 size_t ByteLen, MCInst *MI,
+ 					 uint16_t *Size, uint64_t Address,
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index e82eaaa5..94f91424 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -942,6 +942,7 @@ static unsigned scanImmediateOpcode(uint32_t word)
+ }
+ #endif
+ 
++CS_DECODE_ALIGN
+ bool AArch64_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			    MCInst *MI, uint16_t *size, uint64_t address,
+ 			    void *info)
+diff --git a/arch/ARM/ARMDisassembler.c b/arch/ARM/ARMDisassembler.c
+index d7e183f8..060db68d 100644
+--- a/arch/ARM/ARMDisassembler.c
++++ b/arch/ARM/ARMDisassembler.c
+@@ -7300,6 +7300,7 @@ static DecodeStatus DecodeT2AddSubSPImm(MCInst *Inst, unsigned Insn,
+ 	return DS;
+ }
+ 
++CS_DECODE_ALIGN
+ DecodeStatus ARM_LLVM_getInstruction(csh handle, const uint8_t *code,
+ 				     size_t code_len, MCInst *instr,
+ 				     uint16_t *size, uint64_t address,
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index 37f3b9a4..ec0b7019 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -883,6 +883,7 @@ static unsigned armScanImmediateOpcode(const uint8_t *code)
+ }
+ #endif
+ 
++CS_DECODE_ALIGN
+ bool ARM_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *info)
+diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
+index d57235c9..4e4d4677 100644
+--- a/arch/Mips/MipsDisassembler.c
++++ b/arch/Mips/MipsDisassembler.c
+@@ -3500,6 +3500,7 @@ static DecodeStatus DecodeBranchConflictNM(MCInst *Inst, uint32_t Insn,
+ 		return MCDisassembler_Fail;
+ }
+ 
++CS_DECODE_ALIGN
+ DecodeStatus Mips_LLVM_getInstruction(MCInst *Instr, uint64_t *Size,
+ 				      const uint8_t *Bytes, size_t BytesLen,
+ 				      uint64_t Address, SStream *CStream)
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index d6775ef0..21b456cf 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -297,6 +297,7 @@ void Mips_set_instr_map_data(MCInst *MI)
+ #endif
+ }
+ 
++CS_DECODE_ALIGN
+ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
+ 			 MCInst *instr, uint16_t *size, uint64_t address,
+ 			 void *info)
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..1b98fd84 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -723,6 +723,7 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ }
+ 
+ // Public interface for the disassembler
++CS_DECODE_ALIGN
+ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 			MCInst *instr, uint16_t *size, uint64_t address,
+ 			void *_info)
+@@ -766,6 +767,7 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 					     extension_opcode, false);
+ }
+ 
++CS_DECODE_ALIGN
+ bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+ 				       size_t code_len, MCInst *instr,
+ 				       uint16_t *size, uint8_t extension_opcode)
+diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
+index 28ae2a67..e667669b 100644
+--- a/arch/X86/X86FeatureExtension.h
++++ b/arch/X86/X86FeatureExtension.h
+@@ -9,11 +9,7 @@
+ #include "../../cs_priv.h"
+ 
+ /* Keep scan entries and hot tables aligned when adjacent cold code changes. */
+-#if defined(__GNUC__)
+-#define X86_DECODE_ALIGN __attribute__((aligned(128)))
+-#else
+-#define X86_DECODE_ALIGN
+-#endif
++#define X86_DECODE_ALIGN CS_DECODE_ALIGN
+ 
+ // Keep source-owned instruction extensions outside the generated opcode range.
+ #define X86_FEATURE_OPCODE_BASE 0x10000U
+diff --git a/cs_priv.h b/cs_priv.h
+index 903415e8..f4c3c09d 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -11,6 +11,13 @@
+ #define CAPSTONE_INTERNAL
+ #endif
+ 
++/* Keep hot decoder entry alignment stable as adjacent output code grows. */
++#if defined(__GNUC__)
++#define CS_DECODE_ALIGN __attribute__((aligned(128)))
++#else
++#define CS_DECODE_ALIGN
++#endif
++
+ /* Keep iterator state in registers across private decoder calls. Every
+  * declaration and definition uses the same internal calling convention. */
+ #if defined(__clang__) && (defined(__aarch64__) || defined(__x86_64__))
