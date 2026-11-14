@@ -1,7 +1,7 @@
-name: Compare warmed output prefix instruction costs
+name: Separate VEX output and scan steady state costs
 on:
   push:
-    branches: [codex/capstone-warmed-prefix-instruction-cost]
+    branches: [codex/capstone-vex-steady-state-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: warmed-prefix-instruction-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-steady-state-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

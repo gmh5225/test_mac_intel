@@ -1,0 +1,443 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..0e06c605 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+ #endif
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result);
++					 uint8_t prefix, X86ScanResult *result,
++					 cs_mode mode);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+@@ -3316,8 +3317,8 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 		if (tryExtension &&
+ 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+ 		    code[0] == 0xc4) {
+-			const int status = tryVexTerminalScan(code, code_len,
+-							      code[0], result);
++			const int status = tryVexTerminalScan(
++				code, code_len, code[0], result, CS_MODE_64);
+ 			if (status != X86_SCAN_NOT_HANDLED)
+ 				return status == X86_SCAN_COMPLETE;
+ 		}
+@@ -3372,8 +3373,8 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+ 			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+ 				     X86_VEX_FEATURE_NONE)) {
+-		const int status =
+-			tryVexTerminalScan(code, code_len, code[0], result);
++		const int status = tryVexTerminalScan(code, code_len, code[0],
++						      result, CS_MODE_64);
+ 		if (status != X86_SCAN_NOT_HANDLED)
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
+@@ -3424,11 +3425,73 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ 	return completeTerminalScanResult(result, instructionID, status);
+ }
+ 
++#if X86_HAS_VEX2_PUBLIC_PLANS || defined(X86_COMPACT_PUBLIC_HEADER)
++/* An unprefixed 32- or 64-bit address uses the same SIB and displacement extents. */
++X86_DECODE_INLINE unsigned scanMemoryEnd(const uint8_t *code, size_t size,
++					 unsigned end, unsigned modrm)
++{
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	static const uint8_t extra[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					     { 1, 1, 1, 1, 2, 1, 1, 1 },
++					     { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	if ((modrm & 0xc7) == 4) {
++		if (end >= size)
++			return 16;
++		if ((code[end] & 7) == 5)
++			end += 4;
++	}
++	end += extra[mod][rm];
++	return end;
++}
++#endif
++
++#if X86_HAS_VEX2_PUBLIC_PLANS
++/* The caller has recognized a bare C5 VEX prefix. These generated plans
++ * have one public ID and one validation result for every ModR/M byte. */
++X86_DECODE_INLINE int tryVex2PublicPlan(const uint8_t *code, size_t size,
++					X86ScanResult *result)
++{
++	if (size < 3)
++		return X86_SCAN_INVALID;
++	const unsigned payload = code[1];
++	const unsigned plan = x86Vex2PublicPlans[payload & 7][code[2]];
++	if (!plan)
++		return X86_SCAN_NOT_HANDLED;
++	if ((plan & 2) && vvvvFromVEX2of2(payload))
++		return X86_SCAN_INVALID;
++	unsigned end = 3;
++	if (plan & 4) {
++		if (size == 3)
++			return X86_SCAN_INVALID;
++		const unsigned modrm = code[3];
++		end = 4;
++		if (modrm < 0xc0)
++			end = scanMemoryEnd(code, size, end, modrm);
++	}
++	end += plan & 1;
++	if (end > size)
++		return X86_SCAN_INVALID;
++	result->opcode = 0;
++	result->opcode_pub = plan >> 3;
++	result->length = (uint16_t)end;
++	result->popcode_adjust = 0;
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++					 uint8_t prefix, X86ScanResult *result,
++					 cs_mode mode)
+ {
++#if X86_HAS_VEX2_PUBLIC_PLANS
++	if (prefix == 0xc5) {
++		const int status = tryVex2PublicPlan(code, code_len, result);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status;
++	}
++#endif
+ 	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	initializeInstructionHeader(&insn, code, code_len, mode);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3495,7 +3558,8 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ 			      cs_insn *insn, X86ScanResult *result,
+ 			      uint8_t prefix)
+ {
+-	int status = tryVexTerminalScan(code, code_len, prefix, result);
++	int status =
++		tryVexTerminalScan(code, code_len, prefix, result, CS_MODE_64);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+@@ -3571,25 +3635,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 		}
+ 		++end;
+ 		if (modrm < 0xc0) {
+-			const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 			if (mode == CS_MODE_16) {
+ 				static const uint8_t displacement[] = { 0, 1,
+ 									2 };
+-				end += displacement[mod] +
++				end += displacement[modrm >> 6] +
+ 				       ((modrm & 0xc7) == 6 ? 2 : 0);
+ 			} else {
+-				static const uint8_t extra[3][8] = {
+-					{ 0, 0, 0, 0, 1, 4, 0, 0 },
+-					{ 1, 1, 1, 1, 2, 1, 1, 1 },
+-					{ 4, 4, 4, 4, 5, 4, 4, 4 }
+-				};
+-				if ((modrm & 0xc7) == 4) {
+-					if (end >= size)
+-						return X86_SCAN_INVALID;
+-					if ((code[end] & 7) == 5)
+-						end += 4;
+-				}
+-				end += extra[mod][rm];
++				end = scanMemoryEnd(code, size, end, modrm);
+ 			}
+ 		}
+ 	}
+@@ -3679,6 +3731,20 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+ 						     result, 0xc5);
++#if !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	/* In 32-bit mode a leading C5 is LDS unless the next two bits are
++	 * set. An actual VEX2 uses the same W=0 opcode row and an ordinary
++	 * 32-bit address. Other operand shapes retain the source decoder. */
++	if (opcodeOffset == 0 && opcode == 0xc5 && handle->mode == CS_MODE_32 &&
++	    code_len >= 2 && (code[1] & 0xc0) == 0xc0) {
++		const int status = tryVexTerminalScan(code, code_len, opcode,
++						      result, CS_MODE_32);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status == X86_SCAN_COMPLETE;
++		return decodeScanResultGeneric(ud, code, code_len, insn, result,
++					       opcode, false);
++	}
++#endif
+ 
+ 	unsigned instructionID = 0;
+ 	/* Constant bitness folds the terminal readers' mode and size tests.
+diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
+index 2c0da2cd..c374d24e 100644
+--- a/arch/X86/X86GenVexScan.inc
++++ b/arch/X86/X86GenVexScan.inc
+@@ -61,6 +61,8 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+ 	},
+ };
+ 
++#define X86_HAS_VEX2_PUBLIC_PLANS 0
++
+ /* 1570 admitted UIDs, 9 immediate patterns. */
+ enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
+        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
+@@ -381,6 +383,155 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+ 	},
+ };
+ 
++#define X86_HAS_VEX2_PUBLIC_PLANS 1
++/* Public ID, ModR/M extent, reserved vvvv and imm8 by L/pp/opcode. */
++static const uint16_t x86Vex2PublicPlans[8][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8414, 8414, 0, 0, 11788, 11772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8190, 8190, 0, 0, 0, 0, 11758, 6430,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11670, 11470, 11294, 6212, 6196, 8540, 11804, 6084, 8484, 6526, 6462, 11708, 8124, 6804, 8068,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 11818, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11653, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8406, 8406, 0, 0, 11780, 11764, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8182, 8182, 0, 0, 0, 0, 11750, 6422,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11662, 0, 0, 6204, 6188, 8532, 11796, 6076, 8476, 6478, 6518, 11700, 8116, 6796, 8060,
++		11140, 11164, 11148, 8604, 8956, 8980, 8964, 8620, 11108, 11132, 11116, 8596, 11156, 11124, 8206, 8230,
++		10751, 0, 0, 0, 8908, 8932, 8916, 0, 0, 0, 0, 0, 7900, 7916, 8206, 8230,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 9693, 0, 11645, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6108, 10948, 10908, 10916, 8644, 10348, 8174, 0, 10996, 11004, 9956, 8740, 8668, 8676, 9892, 8724,
++		8748, 10892, 10852, 8756, 10316, 10324, 6646, 0, 10980, 10988, 9948, 10420, 8652, 8660, 9884, 11188,
++		0, 10844, 10804, 10812, 10364, 9836, 10532, 0, 10956, 11012, 10964, 10972, 8628, 8684, 8636, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8390, 0, 0, 0, 8382, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6612, 0, 6726, 6630, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11684, 11476, 11300, 0, 0, 0, 0, 6100, 8500, 6620, 6678, 11724, 8140, 6820, 8084,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		10759, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8174, 8270,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6454, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6604, 0, 6710, 6582, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11676, 0, 0, 0, 0, 0, 0, 6092, 8492, 6588, 0, 11716, 8132, 6812, 8076,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		10767, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7908, 7924, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6470, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8414, 8414, 0, 0, 11788, 11772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8190, 8190, 0, 0, 0, 0, 11758, 6430,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11670, 11470, 11294, 6212, 6196, 8540, 11804, 6084, 8484, 6526, 6462, 11708, 8124, 6804, 8068,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 11810, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11653, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8406, 8406, 0, 0, 11780, 11764, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8182, 8182, 0, 0, 0, 0, 11750, 6422,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11662, 0, 0, 6204, 6188, 8532, 11796, 6076, 8476, 6478, 6518, 11700, 8116, 6796, 8060,
++		11140, 11164, 11148, 8604, 8956, 8980, 8964, 8620, 11108, 11132, 11116, 8596, 11156, 11124, 0, 8230,
++		10751, 0, 0, 0, 8908, 8932, 8916, 0, 0, 0, 0, 0, 7900, 7916, 0, 8230,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11645, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6108, 10948, 10908, 10916, 8644, 10348, 0, 0, 10996, 11004, 9956, 8740, 8668, 8676, 9892, 8724,
++		8748, 10892, 10852, 8756, 10316, 10324, 6646, 0, 10980, 10988, 9948, 10420, 8652, 8660, 9884, 11188,
++		0, 10844, 10804, 10812, 10364, 9836, 10532, 0, 10956, 11012, 10964, 10972, 8628, 8684, 8636, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8390, 0, 0, 0, 8382, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6612, 0, 6726, 6630, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11684, 11476, 11300, 0, 0, 0, 0, 6100, 8500, 6620, 6678, 11724, 8140, 6820, 8084,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		10759, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6454, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6604, 0, 6710, 6582, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11676, 0, 0, 0, 0, 0, 0, 6092, 8492, 6588, 0, 11716, 8132, 6812, 8076,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		10767, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7908, 7924, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6470, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++};
++
+ /* 4512 admitted UIDs, 10 immediate patterns. */
+ enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
+        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..44c34074 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1158,7 +1158,68 @@ def vex_scan_form(operands, register_form):
+     return True
+ 
+ 
+-def emit_vex_scan_rows(suffix):
++def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
++                    metadata, patterns):
++    """Collapse identical ModR/M outcomes into one public ID and operand extent."""
++    ids = tables.parse_ids(source, contexts)
++    maps = tables.parse_maps(
++        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++        names[:4] if suffix else names, len(contexts),
++    )
++    _, indices, rows = maps[1]
++    tails = {number: len(lengths) for lengths, number in patterns.items()
++             if not lengths or lengths == ("1",)}
++    out = []
++    for selector in range(8):
++        attributes = attrs["ATTR_VEX"] | pp[selector & 3]
++        if selector & 4:
++            attributes |= attrs["ATTR_VEXL"]
++        index = indices[contexts.index(context_values[attributes])]
++        long_index = indices[contexts.index(context_values[attributes | attrs["ATTR_64BIT"]])]
++        tables.require(index == long_index, "VEX2 opcode map differs by bitness")
++        row = rows[index - 1] if index else [("MODRM_ONEENTRY", 0)] * 256
++        plans = []
++        for opcode, (kind, offset) in enumerate(row):
++            def plan(modrm):
++                uid = tables.source_id(ids, kind, offset, modrm)
++                if not uid or uid >= len(metadata) or not metadata[uid]:
++                    return 0
++                word = metadata[uid]
++                public_id, flags = word >> 8, word & 255
++                if not public_id or (flags >> 4) not in tails:
++                    return 0
++                has_modrm = kind != "MODRM_ONEENTRY" or bool(flags & 4)
++                form = 2 if modrm >= 0xc0 else 1
++                if has_modrm and not flags & form:
++                    return 0
++                tables.require(public_id < 8192, "VEX2 public ID exceeds 13 bits")
++                return ((public_id << 3) | (int(has_modrm) << 2)
++                        | (int(not flags & 8) << 1) | tails[flags >> 4])
++
++            # These opcodes retain the general ID and size repairs of tryVexTerminalScan.
++            if opcode == 0xae or 0x82 <= opcode <= 0x8f:
++                plans.append(0)
++                continue
++            candidate = plan(0)
++            if candidate and all(plan(mr) == candidate for mr in range(1, 256)):
++                plans.append(candidate)
++            else:
++                plans.append(0)
++        out.append(plans)
++    if not any(any(row) for row in out):
++        return ["#define X86_HAS_VEX2_PUBLIC_PLANS 0", ""]
++    lines = ["#define X86_HAS_VEX2_PUBLIC_PLANS 1",
++             "/* Public ID, ModR/M extent, reserved vvvv and imm8 by L/pp/opcode. */",
++             "static const uint16_t x86Vex2PublicPlans[8][256] = {"]
++    for row in out:
++        lines.append("\t{")
++        for i in range(0, len(row), 16):
++            lines.append("\t\t" + ", ".join(map(str, row[i:i + 16])) + ",")
++        lines.append("\t},")
++    return lines + ["};", ""]
++
++
++def emit_vex_scan_rows(suffix, metadata, patterns):
+     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+     contexts, kinds, names = tables.parse_common(common)
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+@@ -1204,12 +1265,18 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            # A two-byte VEX has map 1 and W=0. Its 32-bit reader uses
++            # these same entries with the address and operand sizes of its mode.
++            if name == names[1] and key < 8:
++                other = indices[contexts.index(context_values[attributes & ~attrs["ATTR_64BIT"]])]
++                tables.require(row == other, "VEX2 row differs between 32 and 64 bits")
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+         lines.append("\t},")
+     lines += ["};", ""]
+-    return lines
++    return lines + emit_vex2_plans(suffix, source, contexts, names, context_values,
++                                   attrs, pp, metadata, patterns)
+ 
+ 
+ def emit_vex_scan(suffix):
+@@ -1279,7 +1346,7 @@ def emit_vex_scan(suffix):
+             ]
+         lines.append("\t\treturn X86_SCAN_COMPLETE;")
+     lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
+-    return "\n".join(emit_vex_scan_rows(suffix) + lines)
++    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns) + lines)
+ 
+ 
+ def emit_writemask_opcodes(suffix):
