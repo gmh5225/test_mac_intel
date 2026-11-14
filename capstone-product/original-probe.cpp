@@ -11,7 +11,7 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  if (argc != 5) return 2;
+  if (argc != 5 && argc != 6) return 2;
   std::ifstream f(argv[1], std::ios::binary);
   if (!f) return 2;
   std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), {});
@@ -27,15 +27,30 @@ int main(int argc, char **argv) {
   if (!decoder.init(arch)) return 3;
   decoder.setDetail(mode == 2);
   decoder.setText(mode != 0);
+  struct Span { size_t start, size; uint64_t address; };
+  std::vector<Span> spans{{0, bytes.size(), 0x100000}};
+  if (argc == 6) {
+    std::ifstream input(argv[5]);
+    if (!input) return 2;
+    spans.clear();
+    Span span;
+    while (input >> span.start) {
+      if (!(input >> span.size >> span.address) || !span.size ||
+          span.start > bytes.size() || span.size > bytes.size()-span.start) return 2;
+      spans.push_back(span);
+    }
+    if (!input.eof() || spans.empty()) return 2;
+  }
   uint64_t accepted = 0, rejected = 0, value = 0, boundary = 14695981039346656037ull;
   const auto start = std::clock();
   for (int rep = 0; rep < repeats; ++rep) {
-    for (size_t off = 0; off < bytes.size();) {
+    for (const Span &span : spans) {
+    for (size_t off = span.start; off < span.start+span.size;) {
       neverd::DecodedInsn insn{};
       auto code = bytes.data() + off;
-      auto left = bytes.size() - off;
-      int count = mode == 2 ? decoder.decodeOne(code, left, 0x100000 + off, insn)
-                            : decoder.decodeOneLight(code, left, 0x100000 + off, insn);
+      auto left = span.start+span.size - off;
+      int count = mode == 2 ? decoder.decodeOne(code, left, span.address + off-span.start, insn)
+                            : decoder.decodeOneLight(code, left, span.address + off-span.start, insn);
       if (count <= 0) {
         ++rejected;
         boundary = (boundary ^ off) * 1099511628211ull;
@@ -60,6 +75,7 @@ int main(int argc, char **argv) {
         value += arm ? insn.Raw->detail->aarch64.op_count : a32 ? insn.Raw->detail->arm.op_count : mips ? insn.Raw->detail->mips.op_count : insn.Raw->detail->x86.op_count;
       }
       off += size_t(count);
+    }
     }
   }
   std::printf("%lld %llu %llu %llu %llu\n", (long long)(std::clock()-start),

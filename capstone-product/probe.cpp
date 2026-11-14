@@ -20,13 +20,14 @@ int main(int argc, char **argv) {
   const bool a32 = target == "arm", mips = target == "mips64el";
   const int mode = std::stoi(argv[3]), repeats = std::stoi(argv[4]);
   if (bytes.empty() || (!arm && !a32 && !mips && target != "32" && target != "64") ||
-      mode < 0 || mode > 2 || repeats < 1) return 2;
+      mode < 0 || mode > 3 || repeats < 1) return 2;
+  if (mode == 3 && (arm || a32 || mips)) return 2;
   const auto arch = a32 ? neverd::Arch::ARM : mips ? neverd::Arch::MIPS64EL : arm ? neverd::Arch::AArch64 :
                     target == "32" ? neverd::Arch::X86 : neverd::Arch::X64;
   neverd::Decoder decoder;
   if (!decoder.init(arch)) return 3;
   decoder.setDetail(mode == 2);
-  decoder.setText(mode != 0);
+  decoder.setText(mode == 1 || mode == 2);
   struct Span { size_t start, size; uint64_t address; };
   std::vector<Span> spans{{0, bytes.size(), 0x100000}};
   if (argc == 6) {
@@ -46,9 +47,27 @@ int main(int argc, char **argv) {
   for (int rep = 0; rep < repeats; ++rep) {
     for (const Span &span : spans) {
     for (size_t off = span.start; off < span.start+span.size;) {
-      neverd::DecodedInsn insn{};
       auto code = bytes.data() + off;
       auto left = span.start+span.size - off;
+      if (mode == 3) {
+        // X86CallScan uses this same 64-instruction prefix and falls back to
+        // decodeOneLight when the physical classifier stops.
+        uint32_t instructions[64];
+        const size_t count = decoder.classifyX86Prefix(
+            {code, left}, span.address + off-span.start, instructions);
+        if (count > 64) return 7;
+        for (size_t i = 0; i < count; ++i) {
+          const unsigned length = instructions[i] & 255;
+          if (!length || length > left || !(instructions[i] >> 8)) return 4;
+          ++accepted;
+          boundary = (boundary ^ ((off << 5) | length)) * 1099511628211ull;
+          value += instructions[i] >> 8;
+          off += length;
+          left -= length;
+        }
+        if (count) continue;
+      }
+      neverd::DecodedInsn insn{};
       int count = mode == 2 ? decoder.decodeOne(code, left, span.address + off-span.start, insn)
                             : decoder.decodeOneLight(code, left, span.address + off-span.start, insn);
       if (count <= 0) {
@@ -61,7 +80,7 @@ int main(int argc, char **argv) {
       ++accepted;
       boundary = (boundary ^ ((off << 5) | unsigned(count))) * 1099511628211ull;
       value += insn.Id;
-      if (mode) {
+      if (mode == 1 || mode == 2) {
         value += std::strlen(insn.Raw->mnemonic) + std::strlen(insn.Raw->op_str);
       }
       if (mode == 2) {

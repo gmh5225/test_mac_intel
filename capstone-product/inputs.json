@@ -15,10 +15,24 @@
         "X86VexScan.c.o",
         "X86VexOutput32.c.o"
       ]
+    },
+    "byte-vex32": {
+      "source": "round1105-vex32-byte-plans",
+      "patch": "byte-vex32.patch",
+      "patch_sha256": "f0142ed6edccfa43daa6e54db6cf0e3bfb89f7f7d1bd7fdab6bcf503ef91ac01",
+      "tree": "e59c7a0c2835262adf8b5515625001536336d9b7",
+      "changed": [
+        "X86DisassemblerDecoder.c.o",
+        "X86OutputIterator.c.o"
+      ],
+      "added": [
+        "X86VexScan.c.o",
+        "X86VexOutput32.c.o"
+      ]
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Initial VEX32 admission, shared canonical metadata and direct 32-bit output are measured together; active archive members exclude leftover objects."
+  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Initial VEX32 admission with packed versus byte-indexed shared output selectors; includes the actual 64-instruction classifyX86Prefix route and decodeOneLight fallback used by X86CallScan. All old probe cases and new batch signatures are checked before timing."
 }
