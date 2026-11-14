@@ -26,7 +26,7 @@ try:
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree=='b3788bdf53155bff630544114572c97910e384eb',tested_tree
+    assert tested_tree=='c17a25a59d3a74fba30377f004a71ed730c50f53',tested_tree
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
@@ -57,8 +57,8 @@ try:
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
         result=subprocess.check_output([generator],cwd=source)
         assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-        result=subprocess.check_output([generator,'--vex32-memory'],cwd=source)
-        assert result==(source/'arch/X86/X86GenVex32MemoryOutput.inc').read_bytes()
+        result=subprocess.check_output([generator,'--vex32-output'],cwd=source)
+        assert result==(source/'arch/X86/X86GenVex32Output.inc').read_bytes()
     if profile=='adapter':
         make_build=root_build/'make-build'
         run(['make','-j4','CAPSTONE_ARCHS=x86','CAPSTONE_BUILD_CORE_ONLY=yes','CC='+compiler,'BUILDDIR='+str(make_build),str(make_build/'libcapstone.a')],'make-static')
