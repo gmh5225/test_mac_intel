@@ -1,7 +1,7 @@
-name: Measure compact VEX32 public plans with shared length rows
+name: Diagnose VEX32 reader side effects and GCC batch-loop expansion
 on:
   push:
-    branches: [codex/capstone-compact-vex32-cost]
+    branches: [codex/capstone-pure-vex32-plan-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-vex32-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: pure-vex32-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
