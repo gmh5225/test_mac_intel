@@ -49,9 +49,9 @@ def main(w):
         assert len(objects[label])>30
         if label=='output':
             changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
-            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86MemoryOutput',)},changed
+            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86Mapping','X86DisassemblerDecoder')},changed
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
-        for component in ('X86MemoryOutput','X86DisassemblerDecoder'):
+        for component in ('X86Mapping','X86DisassemblerDecoder'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
