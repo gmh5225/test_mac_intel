@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in libraries
+name: Qualify complete native scan and EVEX output changes in libraries
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-libraries]
+    branches: [codex/capstone-native-evex-shift-release-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-combined-boundary-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: native-evex-shift-release-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
