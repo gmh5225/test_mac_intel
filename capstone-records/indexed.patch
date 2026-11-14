@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..fe75199a 100644
+index 63dcc538..25b66b8c 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3424,11 +3424,77 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
@@ -97,59 +97,7 @@ index 63dcc538..fe75199a 100644
  /* Constant C5 admission folds the unused three-byte prefix handling. */
  X86_DECODE_INLINE bool
  decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
-@@ -3515,9 +3588,24 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
- 					     prefix);
- }
- 
-+#if defined(X86_COMPACT_PUBLIC_HEADER) && X86_HAS_VEX2_PUBLIC_PLANS
-+/* Return the completed ID and length by value so the legacy reader's
-+ * output locals remain in registers across this cold boundary. Zero and
-+ * UINT32_MAX encode the two non-complete statuses. */
-+static __attribute__((noinline)) uint32_t
-+scanInitialVex2PublicPlan(const uint8_t *code, size_t size)
-+{
-+	X86ScanResult result;
-+	const int status = tryVex2PublicPlan(code, size, &result);
-+	if (status != X86_SCAN_COMPLETE)
-+		return status == X86_SCAN_INVALID ? UINT32_MAX : 0;
-+	return (result.opcode_pub << 4) | result.length;
-+}
-+#endif
-+
- #ifdef X86_COMPACT_PUBLIC_HEADER
--/* This entry sees only a one- or two-byte legacy opcode and at most one
-- * REX. The generated descriptor supplies both public ID and operand shape. */
-+/* A common legacy opcode or bare VEX2 prefix selects a generated plan
-+ * carrying its public ID, legality checks and operand extent. */
- X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
- 						size_t size, cs_mode mode,
- 						uint8_t opcode, unsigned offset,
-@@ -3529,8 +3617,23 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
- 				  FEATURE_VEX2_XOP |
- 				  (wide ? FEATURE_REX_PREFIX : 0);
- 	if ((feature_prefix_flags[opcode] & rejected) ||
--	    (opcode == 0x90 && bFromREX(rex)))
-+	    (opcode == 0x90 && bFromREX(rex))) {
-+#if X86_HAS_VEX2_PUBLIC_PLANS
-+		if (opcode == 0xc5 && !offset && mode != CS_MODE_16 &&
-+		    size >= 2 && (wide || (code[1] & 0xc0) == 0xc0)) {
-+			const uint32_t terminal =
-+				scanInitialVex2PublicPlan(code, size);
-+			if (terminal == UINT32_MAX)
-+				return X86_SCAN_INVALID;
-+			if (!terminal)
-+				return X86_SCAN_NOT_HANDLED;
-+			*id = terminal >> 4;
-+			*length = (uint16_t)(terminal & 15);
-+			return X86_SCAN_COMPLETE;
-+		}
-+#endif
- 		return X86_SCAN_NOT_HANDLED;
-+	}
- 	bool escaped = opcode == 0x0f;
- 	unsigned end = offset + 1;
- 	if (escaped) {
-@@ -3661,7 +3764,13 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3661,12 +3734,30 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  	return initial;
  }
  
@@ -163,7 +111,24 @@ index 63dcc538..fe75199a 100644
  getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  				     size_t code_len, cs_insn *insn,
  				     X86ScanResult *result, bool readerFlags)
-@@ -3676,9 +3785,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ {
+ 	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
++#if defined(X86_COMPACT_PUBLIC_HEADER) && X86_HAS_VEX2_PUBLIC_PLANS
++	/* Common legacy terminals finish before this outlined entry. A bare
++     * VEX2 prefix can select its checked plan before the extension walk. */
++	if (readerFlags && code_len >= 2 && code[0] == 0xc5 &&
++	    (handle->mode == CS_MODE_64 ||
++	     (handle->mode == CS_MODE_32 && (code[1] & 0xc0) == 0xc0))) {
++		const int status = tryVex2PublicPlan(code, code_len, result);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status == X86_SCAN_COMPLETE;
++	}
++#endif
++
+ 	uint8_t opcode;
+ 	size_t opcodeOffset;
+ 	bool extension = X86_mayDecodeFeatureExtensionImpl(
+@@ -3676,9 +3767,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, opcode, extension);
  	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
