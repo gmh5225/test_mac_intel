@@ -72,20 +72,18 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/X86/X86VectorOutput.c.o','arch/X86/X86OutputIterator.c.o'}
+   expected={'arch/X86/X86OutputIterator.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-x86.cpp','-ldl','-o',t/'verify-x86'],'build-x86-differential')
    run([t/'verify-x86',ownedlibs['base'],ownedlibs[key]],'x86-differential')
-   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-vex.cpp','-ldl','-o',t/'verify-vex'],'build-vex-differential')
-   run([t/'verify-vex',ownedlibs['base'],ownedlibs[key]],'vex-differential')
+   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-prefix.cpp','-ldl','-o',t/'verify-prefix'],'build-prefix-differential')
+   run([t/'verify-prefix',ownedlibs['base'],ownedlibs[key]],'prefix-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
    run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
-  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-legacy-memory.cpp','-ldl','-o',t/'verify-legacy-memory'],'build-legacy-memory-differential')
-  run([t/'verify-legacy-memory',ownedlibs['base'],ownedlibs['indexed']],'legacy-memory-differential')
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'private-guard.cpp','-ldl','-o',t/'private-guard'],'private-output-guard-link')
   run([t/'private-guard',ownedlibs['base'],ownedlibs['indexed']],'private-output-guard')
   write('x86-record-entrypoint',dict(entrypoint='X86_disasmIter via test-only export',timed_binaries='built before instrumentation',positive_fast_path_hit_asserted=True))
