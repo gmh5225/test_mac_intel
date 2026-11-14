@@ -58,9 +58,22 @@ def main(w):
                 stream.write(assembly)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
+        (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
+
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
+    payloads={key:path.read_bytes()for key,path in exe.items()}
+    assert payloads['integer']==payloads['aa']
+    maximum=max(map(len,payloads.values()))
+    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
+    image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
+    image_inode=image.stat().st_ino
+    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
+    launches=['images','same-argv','same-file']
+    if probe.returncode==0:launches.append('same-file-fixed')
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,purpose='Diagnostic only: preserve previous regressions; compare launch conditions without changing compiled code.'))
     run(['git','apply',r/'dispatch.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -68,10 +81,11 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
+        if name not in ('libjpeg62-turbo-amd64','libzstd1-amd64','jpeg-avx2-i386'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name!='jpeg-avx2-i386' else ['simd-functions']):
+        for panel in ['simd-functions']:
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -80,16 +94,35 @@ def main(w):
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
             for mode in [0,1,2]:
-                labels=['integer','aa','output','iced']+(['fast']if mode else [])
-                def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
-                probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
-                for i in range(15):
-                    order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
-                    cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
-                md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+                def measure(lib,n,launch):
+                    tail=['capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
+                    if launch=='images':
+                        command=[str(exe[lib]),*tail];executable=None
+                    elif launch=='same-argv':
+                        command=[str(image),*tail];executable=str(exe[lib])
+                    else:
+                        with image.open('r+b')as out:
+                            assert out.write(padded[lib])==maximum
+                        assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
+                        command=[str(image),*tail];executable=None
+                        if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
+                    return list(map(int,sp.check_output(command,executable=executable).split()))
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','output']
+                for i in range(21):
+                    launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
+                    for launch in launch_order:
+                        order=labels[i%len(labels):]+labels[:i%len(labels)]
+                        obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
+                        assert len({tuple(v[2:])for k,v in obs})==1,(name,mode,launch,obs)
+                        cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
+                for launch,observations in cycles.items():
+                    md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
+                    row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
+                    reported.append(row)
+                save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    save('complete.json',dict(cases=len(reported),success=True))
+    save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})

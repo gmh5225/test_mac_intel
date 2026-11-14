@@ -1,7 +1,7 @@
-name: Append existing short MIPS names and dollar prefix together libraries
+name: Isolate argv image identity and ASLR in native output timings
 on:
   push:
-    branches: [codex/capstone-mips-existing-name-append-libraries]
+    branches: [codex/capstone-native-launch-controls-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -14,8 +14,6 @@ jobs:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -41,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-existing-name-append-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: native-launch-controls-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
