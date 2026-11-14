@@ -1,7 +1,7 @@
-name: Qualify VEX output for 32 and 64-bit instructions with address selection inside the memory writer profiles
+name: Keep the VEX2 base-memory writer out of the shared vector entry profiles
 on:
   push:
-    branches: [codex/capstone-vex-output-late-bank-profiles]
+    branches: [codex/capstone-vex-memory-call-boundary-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-output-late-bank-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex-memory-call-boundary-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
