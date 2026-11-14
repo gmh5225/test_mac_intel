@@ -1,134 +1,85 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 1482e8d9..0402f756 100644
+index 1482e8d9..a6b54d37 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -496,10 +496,15 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -496,10 +496,12 @@ if(CAPSTONE_X86_SUPPORT)
          endif()
      endif()
      set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
 +    set(SOURCES_X86_OUTPUT32 arch/X86/X86VexOutput32.c)
-+    set(SOURCES_X86_SCAN arch/X86/X86VexScan.c)
      set(HEADERS_X86
          arch/X86/X86BaseInfo.h
          arch/X86/X86Disassembler.h
          arch/X86/X86DisassemblerDecoder.h
-+        arch/X86/X86VexScan.h
-+        arch/X86/X86GenVexPublicPlans.inc
 +        arch/X86/X86GenVex32Output.inc
          arch/X86/X86DisassemblerDecoderCommon.h
          arch/X86/X86FeatureExtension.h
          arch/X86/X86GenAsmWriter.inc
-@@ -522,6 +527,9 @@ if(CAPSTONE_X86_SUPPORT)
+@@ -522,6 +524,7 @@ if(CAPSTONE_X86_SUPPORT)
          arch/X86/X86BaseInfo.h
          arch/X86/X86Disassembler.h
          arch/X86/X86DisassemblerDecoder.h
-+        arch/X86/X86VexScan.h
-+        arch/X86/X86GenVexPublicPlans.inc
 +        arch/X86/X86GenVex32Output.inc
          arch/X86/X86DisassemblerDecoderCommon.h
          arch/X86/X86FeatureExtension.h
          arch/X86/X86GenAsmWriter.inc
-@@ -976,6 +984,8 @@ set(ALL_SOURCES
+@@ -976,6 +979,7 @@ set(ALL_SOURCES
      ${SOURCES_ARC}
      # Keep the numeric helper outside the existing printer and backend layout.
      ${SOURCES_X86_NUMBERS}
 +    ${SOURCES_X86_OUTPUT32}
-+    ${SOURCES_X86_SCAN}
  )
  
  set(ALL_HEADERS
-@@ -1062,7 +1072,7 @@ source_group("Source\\Mips" FILES ${SOURCES_MIPS})
+@@ -1062,7 +1066,7 @@ source_group("Source\\Mips" FILES ${SOURCES_MIPS})
  source_group("Source\\PowerPC" FILES ${SOURCES_PPC})
  source_group("Source\\Sparc" FILES ${SOURCES_SPARC})
  source_group("Source\\SystemZ" FILES ${SOURCES_SYSTEMZ})
 -source_group("Source\\X86" FILES ${SOURCES_X86} ${SOURCES_X86_NUMBERS})
-+source_group("Source\\X86" FILES ${SOURCES_X86} ${SOURCES_X86_NUMBERS} ${SOURCES_X86_OUTPUT32} ${SOURCES_X86_SCAN})
++source_group("Source\\X86" FILES ${SOURCES_X86} ${SOURCES_X86_NUMBERS} ${SOURCES_X86_OUTPUT32})
  source_group("Source\\XCore" FILES ${SOURCES_XCORE})
  source_group("Source\\M68K" FILES ${SOURCES_M68K})
  source_group("Source\\TMS320C64x" FILES ${SOURCES_TMS320C64X})
 diff --git a/Makefile b/Makefile
-index 44471169..fbef9f97 100644
+index 44471169..4f3788d2 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -253,6 +253,8 @@ DEP_X86 += $(wildcard arch/X86/X86*.inc)
+@@ -253,6 +253,7 @@ DEP_X86 += $(wildcard arch/X86/X86*.inc)
  
  LIBOBJ_X86 =
  LIBOBJ_X86_NUMBERS =
 +LIBOBJ_X86_OUTPUT32 =
-+LIBOBJ_X86_SCAN =
  ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
  	CFLAGS += -DCAPSTONE_HAS_X86
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86DisassemblerDecoder.o
-@@ -273,6 +275,8 @@ endif
+@@ -273,6 +274,7 @@ endif
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
  	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
  	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
 +	LIBOBJ_X86_OUTPUT32 += $(OBJDIR)/arch/X86/X86VexOutput32.o
-+	LIBOBJ_X86_SCAN += $(OBJDIR)/arch/X86/X86VexScan.o
  endif
  
  
-@@ -426,7 +430,7 @@ LIBOBJ += $(OBJDIR)/cs.o $(OBJDIR)/utils.o $(OBJDIR)/SStream.o $(OBJDIR)/MCInstr
+@@ -426,7 +428,7 @@ LIBOBJ += $(OBJDIR)/cs.o $(OBJDIR)/utils.o $(OBJDIR)/SStream.o $(OBJDIR)/MCInstr
  LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ_PPC) $(LIBOBJ_RISCV) $(LIBOBJ_SPARC) $(LIBOBJ_SYSZ) $(LIBOBJ_SH)
  LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
  LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
 -LIBOBJ += $(LIBOBJ_X86_NUMBERS)
-+LIBOBJ += $(LIBOBJ_X86_NUMBERS) $(LIBOBJ_X86_OUTPUT32) $(LIBOBJ_X86_SCAN)
++LIBOBJ += $(LIBOBJ_X86_NUMBERS) $(LIBOBJ_X86_OUTPUT32)
  
  
  ifeq ($(PKG_EXTRA),)
-@@ -546,7 +550,7 @@ $(LIBOBJ_PPC): $(DEP_PPC)
+@@ -546,7 +548,7 @@ $(LIBOBJ_PPC): $(DEP_PPC)
  $(LIBOBJ_SH): $(DEP_SH)
  $(LIBOBJ_SPARC): $(DEP_SPARC)
  $(LIBOBJ_SYSZ): $(DEP_SYSZ)
 -$(LIBOBJ_X86): $(DEP_X86)
-+$(LIBOBJ_X86) $(LIBOBJ_X86_OUTPUT32) $(LIBOBJ_X86_SCAN): $(DEP_X86) arch/X86/X86VexScan.h
++$(LIBOBJ_X86) $(LIBOBJ_X86_OUTPUT32): $(DEP_X86)
  $(LIBOBJ_XCORE): $(DEP_XCORE)
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..af3ba9ca 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -36,6 +36,7 @@
- #include "X86FeatureExtension.h"
- #include "X86DisassemblerTranslator.h"
- #include "X86ScanAdapter.h"
-+#include "X86VexScan.h"
- #include "X86InstPrinterCommon.h"
- 
- #if defined(_MSC_VER)
-@@ -3654,10 +3655,27 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
- 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
- 					       feature64, instructionID, length,
- 					       readerFlags);
--	else
-+	else {
-+#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+		/* Enter the existing 32-bit arm before the legacy probes. The
-+         * packed scalar result keeps the caller's output addresses local. */
-+		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
-+		    code[0] == 0xc5 && (code[1] & 0xc0) == 0xc0) {
-+			const uint32_t packed =
-+				X86_readVex32PublicPlan(code, code_len);
-+			if (packed) {
-+				if (packed == UINT32_MAX)
-+					return X86_SCAN_INVALID;
-+				*instructionID = packed >> 8;
-+				*length = (uint16_t)(packed & 0xff);
-+				return X86_SCAN_COMPLETE;
-+			}
-+		}
-+#endif
- 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
- 					       feature64, instructionID, length,
- 					       readerFlags);
-+	}
- 	return initial;
- }
- 
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..7aeea4a1 100644
+index a976814e..38cacf94 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -136,7 +87,7 @@ index a976814e..7aeea4a1 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
 -			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 65531, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
  			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
@@ -771,36 +722,36 @@ index 00000000..7817a761
 +
 +#endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..fd2ad030 100644
+index 11e8578a..db82616f 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -81,6 +81,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 						     insn_size,
- 						     x86_simple_registers[3],
- 						     wide);
-+		if (plan == X86_PLAN_VEX32)
-+			return X86_writeVex32Output(code, size, insn, insn_size,
-+						    x86_simple_registers[2]);
+@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+-			return X86_writeVectorOutput(code, size, insn,
+-						     insn_size,
+-						     x86_simple_registers[3],
+-						     wide);
++			return X86_writePlannedVectorOutput(
++				code, size, insn, insn_size,
++				x86_simple_registers, wide);
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..39d27324 100644
+index 7675273f..b8b2f6ca 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -51,6 +51,8 @@ enum X86SimpleForm {
- /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
- #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
- #define X86_PLAN_VECTOR UINT16_MAX
-+/* Keep low bits RELATIVE to bypass the legacy register-pair ModR/M reader. */
-+#define X86_PLAN_VEX32 (X86_PLAN_VECTOR - 4u)
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
- 
-@@ -68,6 +70,11 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -68,6 +68,16 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
  		      bool wide);
  
++/* Keep vector-mode selection outside the shared scalar output iterator. */
++CAPSTONE_INTERNAL bool X86_writePlannedVectorOutput(
++	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
++	const struct X86SimpleRegister regs[4][16], bool wide);
++
 +/* The caller selects a bare 32-bit VEX2 output plan. */
 +CAPSTONE_INTERNAL bool
 +X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
@@ -811,10 +762,10 @@ index 7675273f..39d27324 100644
  	if (displacement) {
 diff --git a/arch/X86/X86VexOutput32.c b/arch/X86/X86VexOutput32.c
 new file mode 100644
-index 00000000..a8bca338
+index 00000000..a40e998e
 --- /dev/null
 +++ b/arch/X86/X86VexOutput32.c
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,206 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1006,116 +957,20 @@ index 00000000..a8bca338
 +	}
 +	return true;
 +}
-+#endif
-+#endif
-diff --git a/arch/X86/X86VexScan.c b/arch/X86/X86VexScan.c
-new file mode 100644
-index 00000000..c0bf2665
---- /dev/null
-+++ b/arch/X86/X86VexScan.c
-@@ -0,0 +1,75 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+#ifdef CAPSTONE_HAS_X86
-+#define X86_DEFINE_VEX2_PUBLIC_PLANS
-+#include "X86VexScan.h"
-+#include "X86DisassemblerDecoder.h"
-+
-+#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+/* Every admitted plan has the same public ID, reserved-vvvv rule and
-+ * immediate extent as all of its canonical ModR/M outcomes. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST uint32_t
-+X86_readVex32PublicPlan(const uint8_t *code, size_t size)
++/* Existing vector plans include legacy padding in both modes. Only bare
++ * 32-bit VEX2 enters the new writer; other plans retain their old owner. */
++bool X86_writePlannedVectorOutput(const uint8_t *code, size_t size,
++				  cs_insn *insn, uint16_t *insn_size,
++				  const struct X86SimpleRegister regs[4][16],
++				  bool wide)
 +{
-+	if (size < 3)
-+		return UINT32_MAX;
-+	const unsigned payload = code[1];
-+	unsigned plan = x86Vex2PublicPlans[payload & 3][code[2]];
-+	if (plan & (X86_VEX2_PUBLIC_LENGTH | X86_VEX2_PUBLIC_GROUP)) {
-+#if X86_HAS_VEX2_LENGTH_PLANS
-+		if (plan & X86_VEX2_PUBLIC_LENGTH)
-+			plan = x86Vex2LengthPlans[plan &
-+						  (X86_VEX2_PUBLIC_LENGTH - 1)]
-+						 [(payload >> 2) & 1];
-+#endif
-+#if X86_HAS_VEX2_PUBLIC_GROUPS
-+		if (plan & X86_VEX2_PUBLIC_GROUP) {
-+			if (size < 4)
-+				return UINT32_MAX;
-+			const unsigned modrm = code[3];
-+			plan = x86Vex2PublicGroups[plan &
-+						   (X86_VEX2_PUBLIC_GROUP - 1)]
-+						  [((modrm >> 3) & 7) +
-+						   (modrm >= 0xc0 ? 8 : 0)];
-+		}
-+#endif
-+	}
-+	if (!plan)
-+		return 0;
-+	if ((plan & 2) && vvvvFromVEX2of2(payload))
-+		return UINT32_MAX;
-+	unsigned end = 3;
-+	if (plan & 4) {
-+		if (size < 4)
-+			return UINT32_MAX;
-+		const unsigned modrm = code[3];
-+		end = 4;
-+		if (modrm < 0xc0) {
-+			const unsigned mod = modrm >> 6, rm = modrm & 7;
-+			static const uint8_t extra[3][8] = {
-+				{ 0, 0, 0, 0, 1, 4, 0, 0 },
-+				{ 1, 1, 1, 1, 2, 1, 1, 1 },
-+				{ 4, 4, 4, 4, 5, 4, 4, 4 }
-+			};
-+			if ((modrm & 0xc7) == 4) {
-+				if (end >= size)
-+					return UINT32_MAX;
-+				if ((code[end] & 7) == 5)
-+					end += 4;
-+			}
-+			end += extra[mod][rm];
-+		}
-+	}
-+	end += plan & 1;
-+	if (end > size)
-+		return UINT32_MAX;
-+	return ((plan >> 3) << 8) | end;
++	if (!wide && code[0] == 0xc5)
++		return X86_writeVex32Output(code, size, insn, insn_size,
++					    regs[2]);
++	return X86_writeVectorOutput(code, size, insn, insn_size, regs[3],
++				     wide);
 +}
 +#endif
-+
-+#endif
-diff --git a/arch/X86/X86VexScan.h b/arch/X86/X86VexScan.h
-new file mode 100644
-index 00000000..eb3ae30e
---- /dev/null
-+++ b/arch/X86/X86VexScan.h
-@@ -0,0 +1,22 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+#ifndef CS_X86_VEX_SCAN_H
-+#define CS_X86_VEX_SCAN_H
-+
-+#include "../../cs_priv.h"
-+#include "X86GenVexPublicPlans.inc"
-+
-+#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+/* The caller admits a bare 32-bit VEX2 prefix. Return (public_id << 8) |
-+ * length for a complete instruction, zero for canonical fallback, or
-+ * UINT32_MAX for an invalid encoding. The reader only reads input and
-+ * immutable generated tables; it has no state or output-pointer effects. */
-+#if defined(__GNUC__)
-+__attribute__((pure))
-+#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST uint32_t
-+X86_readVex32PublicPlan(const uint8_t *code, size_t size);
-+
-+#endif
-+
 +#endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
 index 48c6fb41..33fbbfa2 100644
@@ -1296,14 +1151,14 @@ index 48c6fb41..33fbbfa2 100644
      ]
      generated = [(path, generated_output(emit)) for path, emit in outputs]
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..2a342f31 100644
+index ccc4f0de..4dd0b003 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
 @@ -621,6 +621,7 @@ int main()
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
-+	plans[0][0][0xc5] = X86_PLAN_VEX32;
++	plans[0][0][0xc5] = X86_PLAN_VECTOR;
  	plans[1][0][0xc5] = X86_PLAN_VECTOR;
  	for (unsigned wide = 0; wide < 2; ++wide) {
  		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
