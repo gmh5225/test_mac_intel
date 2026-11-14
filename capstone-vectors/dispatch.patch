@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..38cacf94 100644
+index a976814e..efffe12f 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -7,12 +7,45 @@ index a976814e..38cacf94 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
 -			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 65535, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
  			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..00cef894 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -631,6 +631,10 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+ 		{ 19, 20, 19, 20 },
+ 	},
+ };
++static const struct VectorOutputRow vex2_move_rows[2] = {
++	{ X86_INS_VMOVDQA, "vmovdqa", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVDQU, "vmovdqu", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++};
+ static const struct VectorOutputRow broadcast_rows[2][3] = {
+ 	{
+ 		{ 0 },
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..20263b76 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+-			return X86_writeVectorOutput(code, size, insn,
+-						     insn_size,
+-						     x86_simple_registers[3],
+-						     wide);
++			return X86_writeVectorOutput(
++				code, size, insn, insn_size,
++				x86_simple_registers[wide ? 3 : 2], wide);
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..d0194c2c 100644
+index 6df1472d..bbae9684 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -37,7 +37,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
@@ -46,7 +79,7 @@ index 6df1472d..d0194c2c 100644
  }
  
  /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-@@ -465,7 +465,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -465,15 +465,31 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
   * Memory forms and unsupported vector widths fall back before any output. */
  static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				   cs_insn *insn, uint16_t *insn_size,
@@ -54,8 +87,24 @@ index 6df1472d..d0194c2c 100644
 +				   unsigned prefix, bool wide)
  {
  	const unsigned flags = code[prefix - 1];
++	// C5 encodes the extended reg bit, an ordinary r/m register and reserved vvvv.
++	if (prefix == 2 && (flags & 0x78) == 0x78 && (code[2] | 0x10) == 0x7f &&
++	    ((flags & 3) == 1 || (flags & 3) == 2)) {
++		const unsigned modrm = code[3], ll = (flags >> 2) & 1;
++		const unsigned ext = (~flags >> 5) & 4;
++		const unsigned reg = ((modrm >> 3) & 7) | (ext << 1),
++			       rm = modrm & 7;
++		const bool reverse = code[2] == 0x7f;
++		const unsigned operands[] = { reverse ? rm : reg,
++					      reverse ? reg : rm };
++		return writeVectorRegisters(code, insn, insn_size,
++					    &vex2_move_rows[(flags & 3) - 1], 2,
++					    ll, wide ? 0x40 | ext : 0, ll,
++					    operands, 2, wide ? 8 : 4);
++	}
  	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
-@@ -474,6 +474,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 	if ((flags & 3) != 1 || !map || map > 3)
+ 		return false;
  	const unsigned ll = (flags >> 2) & 1;
  	const unsigned w = prefix == 3 && (flags & 0x80);
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & (prefix == 2 ? 4 : 7);
@@ -63,7 +112,7 @@ index 6df1472d..d0194c2c 100644
  	const unsigned modrm = code[prefix + 1];
  	const unsigned opcode = code[prefix];
  	if (map == 1 && opcode >= 0x71 && opcode <= 0x73) {
-@@ -485,7 +486,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -485,7 +501,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  					  (modrm & 7) | ((rxb & 1) << 3) };
  		return writeVectorRegisters(code, insn, insn_size,
  					    &vex_shift_rows[index], prefix, ll,
@@ -72,7 +121,7 @@ index 6df1472d..d0194c2c 100644
  	}
  	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
  	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -497,8 +498,8 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -497,8 +513,88 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
  				  (~flags >> 3) & 15,
  				  (modrm & 7) | ((rxb & 1) << 3) };
@@ -80,16 +129,107 @@ index 6df1472d..d0194c2c 100644
 -				    0x40 | (w << 3) | rxb, ll, regs, 3);
 +	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll, rex,
 +				    ll, regs, 3, wide ? 8 : 4);
++}
++
++/* C5 packed integer move with a base register and an optional displacement.
++ * SIB, absolute addressing and extended EVEX forms keep their normal printer. */
++static bool writeVex2MoveMemory(const uint8_t *code, size_t size, cs_insn *insn,
++				uint16_t *insn_size,
++				const struct X86SimpleRegister *regs, bool wide)
++{
++	const unsigned flags = code[1], pp = flags & 3, opcode = code[2],
++		       modrm = code[3];
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	if ((opcode | 0x10) != 0x7f || (flags & 0x78) != 0x78 ||
++	    (pp != 1 && pp != 2) || rm == 4 || (mod == 0 && rm == 5))
++		return false;
++	const unsigned disp_bytes = mod == 2 ? 4 : mod, length = 4 + disp_bytes;
++	if (size < length)
++		return false;
++	const int32_t disp = mod == 2 ? X86_readDisp32(code + 4) :
++			     mod      ? (int8_t)code[4] :
++					0;
++	const bool store = opcode == 0x7f;
++	const unsigned ll = (flags >> 2) & 1, extension = (~flags >> 5) & 4;
++	const unsigned number = ((modrm >> 3) & 7) | (extension << 1);
++	const struct VectorOutputRow *row = &vex2_move_rows[pp - 1];
++	*insn_size = insn->size = (uint16_t)length;
++	insn->id = row->id;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = insn->op_str;
++	if (!store) {
++		out = writeVectorRegister(out, ll, number);
++		memcpy(out, ", ", 2);
++		out += 2;
++	}
++	memcpy(out, "xmmword ptr [", 13);
++	out[0] = "xy"[ll];
++	out += 13;
++	const struct X86SimpleRegister *base = &regs[rm];
++	memcpy(out, base->name, sizeof(base->name));
++	out += base->length;
++	out = X86_writeDisplacement(out, disp);
++	*out++ = ']';
++	if (store) {
++		memcpy(out, ", ", 2);
++		writeVectorRegister(out + 2, ll, number);
++	}
++	if (insn->detail) {
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		memcpy(d->groups, row->groups, sizeof(row->groups));
++		d->groups_count = row->group_count;
++		cs_x86 *x = &d->x86;
++		memcpy(x->opcode, code, 2);
++		x->rex = wide ? (uint8_t)(0x40 | extension) : 0;
++		x->addr_size = wide ? 8 : 4;
++		x->modrm = (uint8_t)modrm;
++		x->encoding.modrm_offset = 3;
++		x->disp = disp;
++		if (mod) {
++			x->encoding.disp_size = (uint8_t)disp_bytes;
++			x->encoding.disp_offset = 4;
++		}
++		x->op_count = 2;
++		cs_x86_op *reg = &x->operands[store],
++			  *mem = &x->operands[!store];
++		reg->type = X86_OP_REG;
++		reg->size = (uint8_t)(16 << ll);
++		reg->reg =
++			(x86_reg)((ll ? X86_REG_YMM0 : X86_REG_XMM0) + number);
++		reg->access = (cs_ac_type)row->access[store];
++		mem->type = X86_OP_MEM;
++		mem->size = reg->size;
++		mem->mem.base = (x86_reg)base->reg;
++		mem->mem.scale = 1;
++		mem->mem.disp = disp;
++		mem->access = (cs_ac_type)row->access[!store];
++	}
++	return true;
  }
  
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
-@@ -513,6 +514,14 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,6 +609,25 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
  						 wide);
++	if (code[0] == 0xc5 && size >= 4 && code[3] < 0xc0 &&
++	    (wide || (code[1] & 0xc0) == 0xc0) &&
++	    writeVex2MoveMemory(code, size, insn, insn_size, regs, wide))
++		return true;
++	if (!wide && code[0] == 0xc4) {
++		/* An ordinary 32-bit VEX3 register uses no extension and no high
++         * source register. C4 with a memory ModR/M is the legacy LES. */
++		return size >= 5 && (code[1] == 0xe2 || code[1] == 0xe3) &&
++		       (code[2] & 0xc0) == 0x40 && code[4] >= 0xc0 &&
++		       writeVexRegisterOutput(code, size, insn, insn_size, 3,
++					      false);
++	}
 +	if (!wide) {
-+		/* C5 is LDS in legacy mode unless ModR/M.mod is 3. Only VEX2
-+         * register forms share the generated rows and need no address decoder. */
++		/* The two high bits distinguish a VEX2 prefix from the LDS ModR/M. */
 +		return code[0] == 0xc5 && size >= 4 &&
 +		       (code[1] & 0xc0) == 0xc0 && code[3] >= 0xc0 &&
 +		       writeVexRegisterOutput(code, size, insn, insn_size, 2,
@@ -98,7 +238,7 @@ index 6df1472d..d0194c2c 100644
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -520,7 +529,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -520,7 +635,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
@@ -108,44 +248,170 @@ index 6df1472d..d0194c2c 100644
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..38ae3cc6 100644
+index ccc4f0de..fe7b96b4 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -621,7 +621,7 @@ int main()
+@@ -620,8 +620,8 @@ int main()
+ 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
- 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
+-	plans[1][0][0xc4] = X86_PLAN_VECTOR;
 -	plans[1][0][0xc5] = X86_PLAN_VECTOR;
++	plans[0][0][0xc4] = plans[1][0][0xc4] = X86_PLAN_VECTOR;
 +	plans[0][0][0xc5] = plans[1][0][0xc5] = X86_PLAN_VECTOR;
  	for (unsigned wide = 0; wide < 2; ++wide) {
  		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
  			for (unsigned alu = 1; alu < 0x40; alu += 8) {
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..04065e5d 100644
+index 834c2488..dc6f528e 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -671,7 +671,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
- 			     unsigned w, unsigned ll, unsigned rxb,
- 			     unsigned dst, unsigned src, unsigned rm,
- 			     bool short_prefix, bool immediate, unsigned value,
+@@ -664,26 +664,12 @@ void emit_vex_rip_loads(Decoder &decoder)
+ 	std::puts("};");
+ }
+ 
+-// Match ordinary NDS register operands against the complete canonical record.
+-// Opcodes with aliases, exceptional register sizes or immediate-dependent text
+-// keep using the general decoder.
+-std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+-			     unsigned w, unsigned ll, unsigned rxb,
+-			     unsigned dst, unsigned src, unsigned rm,
+-			     bool short_prefix, bool immediate, unsigned value,
 -			     bool group_shift = false)
-+			     bool group_shift = false, bool wide = true)
++std::string checked_vex_registers(Decoder &decoder, const uint8_t *bytes,
++				  unsigned prefix, bool wide, unsigned rex_bits,
++				  unsigned ll, const unsigned *numbers,
++				  unsigned reg_count, bool immediate)
  {
- 	const unsigned prefix = short_prefix ? 2 : 3;
- 	const unsigned length = prefix + 2 + immediate;
-@@ -700,8 +700,8 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
- 				     rm | ((rxb & 1) << 3) };
+-	const unsigned prefix = short_prefix ? 2 : 3;
+-	const unsigned length = prefix + 2 + immediate;
+-	uint8_t bytes[6] = {};
+-	bytes[0] = short_prefix ? 0xc5 : 0xc4;
+-	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
+-	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
+-				    (~src & 15) << 3 | ll << 2 | 1);
+-	bytes[prefix] = uint8_t(opcode);
+-	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
+-	bytes[prefix + 2] = uint8_t(value);
+-	unsigned id = decoder.decode(bytes, length);
++	unsigned id = decoder.decode(bytes, prefix + 2 + immediate);
+ 	if (!id)
+ 		return {};
+ 	const cs_insn &insn = *decoder.insn;
+@@ -692,16 +678,12 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
+ 	    std::strlen(insn.mnemonic) >= 16 || detail.regs_read_count ||
+ 	    detail.regs_write_count || detail.groups_count > 4 ||
+-	    x.op_count != (group_shift ? 2u : 3u) + immediate)
++	    x.op_count != reg_count + immediate)
+ 		return {};
+-	const unsigned reg_count = group_shift ? 2 : 3;
+-	const unsigned numbers[] = { group_shift ? src : dst | ((rxb & 4) << 1),
+-				     group_shift ? rm | ((rxb & 1) << 3) : src,
+-				     rm | ((rxb & 1) << 3) };
  	cs_x86 expected{};
  	std::memcpy(expected.opcode, bytes, prefix);
 -	expected.addr_size = 8;
 -	expected.rex = uint8_t(0x40 | w << 3 | rxb);
 +	expected.addr_size = wide ? 8 : 4;
-+	expected.rex = wide ? uint8_t(0x40 | w << 3 | rxb) : 0;
++	expected.rex = wide ? uint8_t(0x40 | rex_bits) : 0;
  	expected.modrm = bytes[prefix + 1];
  	expected.encoding.modrm_offset = uint8_t(prefix + 1);
  	expected.op_count = uint8_t(reg_count + immediate);
-@@ -745,7 +745,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+@@ -722,6 +704,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 		text += std::to_string(numbers[i]);
+ 	}
+ 	if (immediate) {
++		const unsigned value = bytes[prefix + 2];
+ 		auto &op = expected.operands[reg_count];
+ 		op.type = X86_OP_IMM;
+ 		op.imm = value;
+@@ -743,9 +726,91 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 	       ", " + fields(access) + ", " + std::to_string(immediate) + " }";
+ }
  
++// Match ordinary NDS register operands against the complete canonical record.
++// Opcodes with aliases, exceptional register sizes or immediate-dependent text
++// keep using the general decoder.
++std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
++			     unsigned w, unsigned ll, unsigned rxb,
++			     unsigned dst, unsigned src, unsigned rm,
++			     bool short_prefix, bool immediate, unsigned value,
++			     bool group_shift = false, bool wide = true)
++{
++	const unsigned prefix = short_prefix ? 2 : 3;
++	uint8_t bytes[6] = {};
++	bytes[0] = short_prefix ? 0xc5 : 0xc4;
++	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
++	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
++				    (~src & 15) << 3 | ll << 2 | 1);
++	bytes[prefix] = uint8_t(opcode);
++	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
++	bytes[prefix + 2] = uint8_t(value);
++	const unsigned numbers[] = { group_shift ? src : dst | ((rxb & 4) << 1),
++				     group_shift ? rm | ((rxb & 1) << 3) : src,
++				     rm | ((rxb & 1) << 3) };
++	return checked_vex_registers(decoder, bytes, prefix, wide,
++				     (w << 3) | rxb, ll, numbers,
++				     group_shift ? 2 : 3, immediate);
++}
++
++// Both directions of the VEX2 packed move use the same two public operands.
++// Check every encodable register pair, width and bitness before sharing a row.
++void emit_vex2_moves(Decoder &wide, Decoder &narrow)
++{
++	std::puts("static const struct VectorOutputRow vex2_move_rows[2] = {");
++	for (unsigned pp : { 1u, 2u }) {
++		std::string row;
++		for (unsigned opcode : { 0x6fu, 0x7fu }) {
++			for (bool long_mode : { false, true }) {
++				auto &decoder = long_mode ? wide : narrow;
++				for (unsigned ll : { 0u, 1u }) {
++					for (unsigned pair = 0;
++					     pair < (long_mode ? 128u : 64u);
++					     ++pair) {
++						const unsigned reg = pair >> 3,
++							       rm = pair & 7;
++						const uint8_t bytes[] = {
++							0xc5,
++							uint8_t((reg < 8 ?
++									 0xf8 :
++									 0x78) |
++								ll << 2 | pp),
++							uint8_t(opcode),
++							uint8_t(0xc0 |
++								((reg & 7)
++								 << 3) |
++								rm)
++						};
++						const unsigned operands[] = {
++							opcode == 0x6f ? reg :
++									 rm,
++							opcode == 0x6f ? rm :
++									 reg
++						};
++						const auto value =
++							checked_vex_registers(
++								decoder, bytes,
++								2, long_mode,
++								reg < 8 ? 0 : 4,
++								ll, operands, 2,
++								false);
++						if (value.empty() ||
++						    (!row.empty() &&
++						     row != value))
++							throw std::runtime_error(
++								"inconsistent VEX2 packed move register operands");
++						row = value;
++					}
++				}
++			}
++		}
++		std::printf("\t%s,\n", row.c_str());
++	}
++	std::puts("};");
++}
++
  // VEX groups 12-14 encode the operation in ModR/M.reg, the destination
  // in vvvv and the only source register in ModR/M.r/m.
 -void emit_vex_shifts(Decoder &decoder)
@@ -153,7 +419,7 @@ index 834c2488..04065e5d 100644
  {
  	unsigned plans[3][8][4] = {};
  	std::vector<std::string> rows;
-@@ -771,6 +771,18 @@ void emit_vex_shifts(Decoder &decoder)
+@@ -771,6 +836,18 @@ void emit_vex_shifts(Decoder &decoder)
  						 probe(k, true) == value);
  				if (!valid)
  					continue;
@@ -172,7 +438,7 @@ index 834c2488..04065e5d 100644
  				auto index = static_cast<unsigned>(
  					std::find(rows.begin(), rows.end(),
  						  value) -
-@@ -800,7 +812,7 @@ void emit_vex_shifts(Decoder &decoder)
+@@ -800,7 +877,7 @@ void emit_vex_shifts(Decoder &decoder)
  	std::fprintf(stderr, "%zu VEX immediate shift rows\n", rows.size());
  }
  
@@ -181,7 +447,7 @@ index 834c2488..04065e5d 100644
  {
  	std::vector<std::string> rows;
  	std::vector<Bytes4> widths(1);
-@@ -843,6 +855,21 @@ void emit_vex_registers(Decoder &decoder)
+@@ -843,6 +920,34 @@ void emit_vex_registers(Decoder &decoder)
  				}
  				if (!uniform)
  					continue;
@@ -200,10 +466,23 @@ index 834c2488..04065e5d 100644
 +								"inconsistent i386 VEX2 register row");
 +					}
 +				}
++				if (map >= 2 && w == 0) {
++					for (unsigned n = 0; n < 512; ++n) {
++						if (vex_register_row(
++							    narrow, map, opcode,
++							    w, ll, 0, n & 7,
++							    (n >> 3) & 7,
++							    n >> 6, false, imm,
++							    n & 255, false,
++							    false) != row)
++							throw std::runtime_error(
++								"inconsistent i386 VEX3 register row");
++					}
++				}
  				const auto it = std::find(rows.begin(),
  							  rows.end(), row);
  				const unsigned index =
-@@ -936,8 +963,9 @@ void emit_output(Decoder &decoder)
+@@ -936,8 +1041,10 @@ void emit_output(Decoder &decoder)
  	}
  	std::puts("\tdefault: return NULL;\n\t}\n}");
  	emit_vex_indexed(decoder);
@@ -212,14 +491,15 @@ index 834c2488..04065e5d 100644
 +	Decoder narrow_vex(CS_MODE_32);
 +	emit_vex_registers(decoder, narrow_vex);
 +	emit_vex_shifts(decoder, narrow_vex);
++	emit_vex2_moves(decoder, narrow_vex);
  	emit_broadcast_rows(decoder);
  	emit_vex_rip_loads(decoder);
  	Decoder padding32(CS_MODE_32);
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index 6990d510..63df9e07 100644
+index 6990d510..cd379056 100644
 --- a/tests/unit/x86_simple_output.c
 +++ b/tests/unit/x86_simple_output.c
-@@ -738,6 +738,29 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+@@ -738,6 +738,109 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
  	return true;
  }
  
@@ -246,14 +526,97 @@ index 6990d510..63df9e07 100644
 +	return true;
 +}
 +
++static bool check_vex2_moves(csh handles[2])
++{
++	for (unsigned flags = 0; flags < 256; ++flags) {
++		for (unsigned modrm = 0xc0; modrm < 256; ++modrm) {
++			for (unsigned op = 0x6f; op <= 0x7f; op += 0x10) {
++				uint8_t bytes[] = { 0xc5, (uint8_t)flags,
++						    (uint8_t)op,
++						    (uint8_t)modrm };
++				if (!compare(handles, bytes, sizeof(bytes),
++					     flags + modrm))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool check_vex2_move_memory(csh handles[2])
++{
++	const uint32_t disps[] = { 0,	       1,	  9,	10,
++				   0x7f,       0x80,	  0xff, 0x12345678,
++				   0x80000000, 0xffffffff };
++	for (unsigned flags = 0; flags < 256; ++flags) {
++		for (unsigned mr = 0; mr < 0xc0; ++mr) {
++			for (unsigned op = 0x6f; op <= 0x7f; op += 16) {
++				uint8_t bytes[] = { 0xc5,
++						    (uint8_t)flags,
++						    (uint8_t)op,
++						    (uint8_t)mr,
++						    0,
++						    0,
++						    0,
++						    0,
++						    0 };
++				unsigned seed = flags + mr + op;
++				uint32_t disp =
++					disps[seed % (sizeof(disps) /
++						      sizeof(disps[0]))];
++				for (unsigned j = 0; j < 4; ++j)
++					bytes[4 + j] =
++						(uint8_t)(disp >> (j * 8));
++				if (!compare(handles, bytes, sizeof(bytes),
++					     seed) ||
++				    !compare(handles, bytes,
++					     seed % sizeof(bytes), seed))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool check_i386_vex3(csh handles[2])
++{
++	static const uint8_t prefixes[] = { 0x02, 0x42, 0x82, 0xc2, 0xc3,
++					    0xe1, 0xe2, 0xe3, 0xe4 };
++	for (unsigned i = 0; i < sizeof(prefixes); ++i) {
++		for (unsigned op = 0; op < 256; ++op) {
++			for (unsigned value = 0; value < 32; ++value) {
++				const unsigned seed = op + value + prefixes[i];
++				uint8_t bytes[] = {
++					0xc4,
++					prefixes[i],
++					(uint8_t)((value << 3) |
++						  ((op + value) & 7)),
++					(uint8_t)op,
++					(uint8_t)(0xc0 | (seed & 63)),
++					(uint8_t)seed
++				};
++				if (!compare(handles, bytes, sizeof(bytes),
++					     seed) ||
++				    !compare(handles, bytes,
++					     seed % sizeof(bytes), seed))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
  static bool check_mode(cs_mode mode)
  {
  	csh handles[2] = { 0 };
-@@ -766,6 +789,7 @@ static bool check_mode(cs_mode mode)
+@@ -766,6 +869,10 @@ static bool check_mode(cs_mode mode)
  		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
  		    !check_rex_stack(handles) ||
  		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
-+		    (mode == CS_MODE_32 && !check_i386_vex2(handles)) ||
++		    (mode == CS_MODE_32 && (!check_i386_vex2(handles) ||
++					    !check_i386_vex3(handles))) ||
++		    !check_vex2_moves(handles) ||
++		    !check_vex2_move_memory(handles) ||
  		    !check_padding(handles) ||
  		    !check_alu_memory(handles, mode) ||
  		    !check_alu_immediates(handles, mode) ||
