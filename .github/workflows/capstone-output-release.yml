@@ -1,7 +1,7 @@
-name: Qualify SSE immediate shift output in profiles
+name: Qualify shared SSE memory operand output in profiles
 on:
   push:
-    branches: [codex/capstone-legacy-vector-shifts-profiles]
+    branches: [codex/capstone-legacy-vector-memory-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -21,6 +21,10 @@ jobs:
           - { cc: gcc, profile: four, forms: combined, host: ubuntu-22.04 }
           - { cc: clang, profile: four, forms: combined, host: macos-15 }
           - { cc: MT, profile: intel, forms: combined, host: windows-2022 }
+          - { cc: MD, profile: intel, forms: combined, host: windows-2022 }
+          - { cc: gcc, profile: dedicated, forms: combined, host: ubuntu-22.04 }
+          - { cc: gcc, profile: dedicated, forms: combined, host: ubuntu-24.04 }
+          - { cc: clang, profile: sanitize, forms: combined, host: ubuntu-24.04 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -42,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-vector-shifts-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: legacy-vector-memory-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
