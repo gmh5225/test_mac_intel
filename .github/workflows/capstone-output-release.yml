@@ -1,7 +1,7 @@
-name: Requalify deduplicated MIPS names on current Capstone next profiles
+name: Append existing short MIPS names and dollar prefix together profiles
 on:
   push:
-    branches: [codex/capstone-mips-deduplicated-current-profiles]
+    branches: [codex/capstone-mips-existing-name-append-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-deduplicated-current-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: mips-existing-name-append-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
