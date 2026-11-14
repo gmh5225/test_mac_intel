@@ -1,7 +1,7 @@
-name: Qualify exact MIPS patch in current NeverD production decoder
+name: Measure fixed detail initialization and isolated VEX32 in current NeverD
 on:
   push:
-    branches: [codex/capstone-qualified-mips-product]
+    branches: [codex/capstone-current-decoder-costs]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 7694f1f575cbde3757df0ad89fe957d5daaaf8d0
+          ref: a352ad07ac9aab3a4257b0600a6ce7c2c001c228
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -36,8 +36,8 @@ jobs:
         run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
-          CC: gcc
-          CXX: g++
+          CC: clang
+          CXX: clang++
         run: python3 capstone-product/product.py
       - name: Clean temporary source exports
         if: always()
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-qualified-mips
+          name: product-current-decoder-costs
           path: product-evidence/
           retention-days: 14

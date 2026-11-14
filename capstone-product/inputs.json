@@ -1,18 +1,34 @@
 {
-  "neverd": "7694f1f575cbde3757df0ad89fe957d5daaaf8d0",
-  "capstone": "6c93c31134d5396095ba4e63db58548317d6f5b9",
+  "neverd": "a352ad07ac9aab3a4257b0600a6ce7c2c001c228",
+  "capstone": "729680277dd762704ea3270291b7a75318f51583",
   "variants": {
-    "qualified-mips": {
-      "source": "round1069-qualified-mips-name-append",
-      "patch": "qualified-mips.patch",
-      "patch_sha256": "41857f08ca4b582e2ee479a5f91a5ba64661a38d3f8de2391a24b6b65ff8007a",
-      "tree": "5daec3facff22f41c6fdcff7bfaf73827199f58c",
+    "fixed-detail-clear": {
+      "source": "round1080-fixed-detail-clear",
+      "patch": "fixed-detail-clear.patch",
+      "patch_sha256": "17eef0226992ee5f2a8dbb5c41ae7a453a9b289b70f1376226e36eac30588938",
+      "tree": "d36e8cf7af84cffc14c017ea0122363220a4c734",
       "changed": [
-        "MipsInstPrinter.c.o"
+        "X86Disassembler.c.o",
+        "X86OutputIterator.c.o",
+        "X86MemoryOutput.c.o",
+        "X86ImmediateOutput.c.o",
+        "X86VectorOutput.c.o"
+      ],
+      "added": []
+    },
+    "outlined-vex32": {
+      "source": "round1081-outlined-vex32-terminal",
+      "patch": "outlined-vex32.patch",
+      "patch_sha256": "3569d8de274625f1b7acf2e9625c368a6ea82f3082a0a08c8d37860bd78e0c47",
+      "tree": "355cd339d81f1918da6983d12002133802c921ce",
+      "changed": [
+        "X86DisassemblerDecoder.c.o"
       ],
       "added": []
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A."
+  "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
+  "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+  "scope": "Independent diagnostic candidates; passing this workload alone does not authorize release."
 }

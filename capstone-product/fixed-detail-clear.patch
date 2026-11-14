@@ -1,0 +1,109 @@
+diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
+index b88dfbc7..83496544 100644
+--- a/arch/X86/X86Disassembler.c
++++ b/arch/X86/X86Disassembler.c
+@@ -740,8 +740,8 @@ bool X86_getInstruction(csh ud, const uint8_t *code, size_t code_len,
+ 		//memset(instr->flat_insn->detail, 0, sizeof(cs_detail));
+ 
+ 		// 2. Only the part relevant to x86
+-		memset(instr->flat_insn->detail, 0,
+-		       offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(instr->flat_insn->detail,
++			      offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 
+ 		// 3. The relevant part except for x86.operands
+ 		// sizeof(cs_x86) is 0x1c0, sizeof(x86.operands) is 0x180
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..4d1be3de 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -119,7 +119,7 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 					 uint8_t modrm, uint16_t first,
+ 					 uint16_t second)
+ {
+-	memset(detail, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++	cs_zero_fixed(detail, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 	memcpy(detail->regs_read, row->reads, sizeof(row->reads));
+ 	memcpy(detail->regs_write, row->writes, sizeof(row->writes));
+ 	memcpy(detail->groups, row->groups, sizeof(row->groups));
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..daa8caa3 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -68,7 +68,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	}
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(d, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+@@ -214,7 +214,7 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+ 	*out = ']';
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(d, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+@@ -287,7 +287,7 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ 	writeVectorRegister(out + 2, 0, second);
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(d, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+@@ -338,7 +338,7 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+ 	*X86_writeDisplacement(out, displacement) = ']';
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(d, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+@@ -432,7 +432,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	memcpy(insn->op_str, p->operands, sizeof(p->operands));
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(d, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 		d->groups_count = (uint8_t)p->group_count;
+ 		memcpy(d->groups, p->groups, sizeof(p->groups));
+ 		cs_x86 *x = &d->x86;
+@@ -579,7 +579,7 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 	*out = ']';
+ 	if (insn->detail) {
+ 		cs_detail *d = insn->detail;
+-		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		cs_zero_fixed(d, offsetof(cs_detail, x86) + sizeof(cs_x86));
+ 		d->groups_count = row->group_count;
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		cs_x86 *x = &d->x86;
+diff --git a/utils.h b/utils.h
+index 75cdc0e7..c870a352 100644
+--- a/utils.h
++++ b/utils.h
+@@ -13,6 +13,18 @@
+ #endif
+ #include "cs_priv.h"
+ 
++/* Fixed public records can be cleared without a general libc dispatch.
++ * The length is a compile-time constant; every byte is still initialized. */
++#if defined(__clang__)
++#if __has_builtin(__builtin_memset_inline)
++#define cs_zero_fixed(buffer, length) \
++	__builtin_memset_inline((buffer), 0, (length))
++#endif
++#endif
++#ifndef cs_zero_fixed
++#define cs_zero_fixed(buffer, length) memset((buffer), 0, (length))
++#endif
++
+ // threshold number, so above this number will be printed in hexa mode
+ #define HEX_THRESHOLD 9
+ 
