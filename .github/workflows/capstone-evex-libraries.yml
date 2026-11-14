@@ -1,7 +1,7 @@
-name: Measure by-value VEX2 terminals and preserve the common scalar path in libraries
+name: Measure VEX2 plans inside the outlined fallback and preserve common iterator work in libraries
 on:
   push:
-    branches: [codex/capstone-vex2-value-return-libraries]
+    branches: [codex/capstone-vex2-fallback-entry-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-value-return-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex2-fallback-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
