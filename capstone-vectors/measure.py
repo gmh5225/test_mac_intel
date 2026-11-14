@@ -21,8 +21,17 @@ try:
         '-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON',
         '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
  run(['cmake','-S',source,'-B',build,*flags],'configure')
- for label in ['integer','output','opaque','scan']:
-  if label!='integer':run(['git','apply',r/('dispatch.patch'if label=='output'else 'scan.patch')],'apply-'+label,source)
+ for label in ['integer','output','leaf','local','opaque']:
+  if label!='integer':run(['git','apply',r/('dispatch.patch'if label in ('output','leaf','local')else 'scan.patch')],'apply-'+label,source)
+  if label=='leaf':
+   path=source/'arch/X86/X86VexScan.h';text=path.read_text();marker='CAPSTONE_INTERNAL CS_PRESERVE_MOST int'
+   assert text.count(marker)==1;path.write_text(text.replace(marker,'__attribute__((leaf))\n'+marker))
+  if label=='local':
+   path=source/'arch/X86/X86DisassemblerDecoder.c';text=path.read_text()
+   marker='const int status =\n\t\t\tX86_scanVex32PublicPlan(code, code_len, result);'
+   assert text.count(marker)==1
+   text=text.replace(marker,'X86ScanResult local_result;\n\t\tconst int status = X86_scanVex32PublicPlan(code, code_len, &local_result);\n\t\tif (status == X86_SCAN_COMPLETE) *result = local_result;')
+   path.write_text(text)
   if label=='opaque':
    path=source/'arch/X86/X86VexScan.h';text=path.read_text();assert text.count('__attribute__((pure))')==1
    path.write_text(text.replace('__attribute__((pure))',''))
@@ -30,16 +39,16 @@ try:
   obj=build/'CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o'
   entries=json.loads((build/'compile_commands.json').read_text());entry,=[v for v in entries if Path(v['file']).name=='X86DisassemblerDecoder.c']
   args=entry.get('arguments')or shlex.split(entry['command']);diagnostic=work/'diagnostic.o';args[args.index('-o')+1]=str(diagnostic)
-  dumps={key:work/(label+'-'+key+'.txt')for key in ['einline','inline','unswitch']}
-  args.extend(['-fdump-tree-einline-details='+str(dumps['einline']),'-fdump-ipa-inline-details='+str(dumps['inline']),'-fdump-tree-unswitch-details='+str(dumps['unswitch'])])
+  dumps={key:work/(label+'-'+key+'.txt')for key in ['einline','inline','unswitch','alias','optimized','modref']}
+  args.extend(['-fdump-tree-einline-details='+str(dumps['einline']),'-fdump-ipa-inline-details='+str(dumps['inline']),'-fdump-tree-unswitch-details='+str(dumps['unswitch']),'-fdump-tree-alias-details='+str(dumps['alias']),'-fdump-tree-optimized='+str(dumps['optimized']),'-fdump-ipa-modref='+str(dumps['modref'])])
   run(args,'diagnose-'+label,entry['directory']);assert sha(obj)==sha(diagnostic),'diagnostic flags changed code'
   metadata={}
   for key,path in dumps.items():
    text=path.read_text();metadata[key]=dict(sha256=sha(path),bytes=path.stat().st_size)
-   if key=='inline':
-    with gzip.open(evidence/(label+'-ipa-inline.txt.gz'),'wt')as out:out.write(text)
+   if key in ('inline','modref'):
+    with gzip.open(evidence/(label+'-ipa-'+key+'.txt.gz'),'wt')as out:out.write(text)
     events=[line for line in text.splitlines()if re.search('Inlin|inlin|size|growth',line)and any(name in line for name in ['X86_scanBatch','decodeScanResult','readVex','scanVex','decodeVex','decodeLegacy','consumeByte'])]
-    save(label+'-inline-events',events)
+    save(label+'-'+key+'-events',events)
    else:
     blocks={}
     for name in ['X86_scanBatch','decodeScanResultFallback','decodeScanResultGeneric']:
@@ -54,7 +63,7 @@ try:
   with gzip.open(evidence/(label+'-decoder.asm.gz'),'wb')as out:out.write(sp.check_output(['objdump','-dr',obj]))
   diagnostic.unlink()
   run(['git','reset','--hard',reference],'restore-'+label,source);run(['git','clean','-fdx'],'clean-'+label,source)
- save('complete',dict(variants=4,exact_object_identity=True,native_qualification=False))
+ save('complete',dict(variants=5,exact_object_identity=True,native_qualification=False))
 finally:
  files=[v for v in work.rglob('*')if v.is_file()];size=sum(v.stat().st_size for v in files)
  shutil.rmtree(work);save('cleanup',dict(removed=not work.exists(),bytes=size,files=len(files)))
