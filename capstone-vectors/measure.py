@@ -37,6 +37,15 @@ def main(w):
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
+    scripts={}
+    owners='*X86OutputIterator.c.o *X86VectorOutput.c.o'
+    for control,sections in (
+        ('code', '.capstone_output_code : { *X86OutputIterator.c.o(.text .text.*) *X86VectorOutput.c.o(.text .text.*) }'),
+        ('data', '.capstone_output_data : { *X86OutputIterator.c.o(.rodata .rodata.*) *X86VectorOutput.c.o(.rodata .rodata.*) }'),
+        ('both', '.capstone_output_code : { *X86OutputIterator.c.o(.text .text.*) *X86VectorOutput.c.o(.text .text.*) } .capstone_output_data : { *X86OutputIterator.c.o(.rodata .rodata.*) *X86VectorOutput.c.o(.rodata .rodata.*) }'),
+    ):
+        scripts[control]=w/(control+'.ld')
+        scripts[control].write_text('SECTIONS { '+sections+' } INSERT AFTER .bss;\n')
     for label in ('integer','aa','output'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
@@ -52,9 +61,41 @@ def main(w):
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        for control,script in scripts.items():
+            name=control+'-'+label
+            target=w/name
+            run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-Wl,-T,'+str(script),'-o',target],'link-'+name)
+            exe[name]=target
+        for name in [label]+[control+'-'+label for control in scripts]:
+            (p/'evidence'/(name+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',exe[name]]))
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
+    import re
+    from elftools.elf.elffile import ELFFile
+    symbols={}
+    code_hashes={}
+    for name in exe:
+        if name=='aa':continue
+        rows=(p/'evidence'/(name+'-symbols.txt')).read_text().splitlines()
+        entries={m[4]:(int(m[1],16),int(m[2],16),m[3]) for line in rows if (m:=re.match(r'^(\w+) (\w+) ([TtRr]) (.+)$',line))}
+        symbols[name]={k:v for k,v in entries.items() if k.startswith(('x86Disassembler','index_x86Disassembler','x86Vex','tryInitialScanResult','decodeInstructionScan')) or k in ('cs_disasm_iter','X86_getInstructionScanResult')}
+        hashes={}
+        with exe[name].open('rb') as fd:
+            elf=ELFFile(fd)
+            for symbol,(address,size,kind) in symbols[name].items():
+                section=next((section for section in elf.iter_sections() if section['sh_addr']<=address and address+size<=section['sh_addr']+section['sh_size']),None)
+                if section is not None:
+                    offset=address-section['sh_addr']
+                    hashes[symbol]=hashlib.sha256(section.data()[offset:offset+size]).hexdigest()
+        code_hashes[name]=hashes
+    save('scan-symbols.json',symbols)
+    save('scan-section-bytes.json',code_hashes)
+    save('placement-differences.json',{
+        control:dict(addresses=[k for k in symbols[prefix+'integer'] if symbols[prefix+'integer'][k]!=symbols[prefix+'output'].get(k)],
+                     bytes=[k for k in code_hashes[prefix+'integer'] if code_hashes[prefix+'integer'][k]!=code_hashes[prefix+'output'].get(k)])
+        for control,prefix in [('ordinary',''),('code','code-'),('data','data-'),('both','both-')]
+    })
     run(['git','apply',r/'dispatch.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -62,6 +103,7 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
+        if name!='libssl3t64-amd64':continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
@@ -73,15 +115,15 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                labels=['integer','aa','output','iced']+(['fast']if mode else [])
+            for mode in [0]:
+                labels=list(exe)
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(60e6/max(1,probe[0])));cycles=[]
                 for i in range(15):
                     order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={k:md('iced',k)for k in exe},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+                row=dict(placement_pairs={control:md(control+'-integer',control+'-output') for control in scripts},case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
