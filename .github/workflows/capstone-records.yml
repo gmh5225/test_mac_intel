@@ -1,7 +1,7 @@
-name: Time generated i386 VEX2 register formatting and detail on PE32, PE64 and mixed-architecture controls
+name: Measure VEX2 full-width arithmetic memory operands and two-register Intel formatting on PE32, PE64, ARM64 and MIPS in five compiler environments
 on:
   push:
-    branches: [codex/capstone-i386-vex2-output-mixed]
+    branches: [codex/capstone-vex2-base-memory-arithmetic-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex2-output-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex2-base-memory-arithmetic-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
