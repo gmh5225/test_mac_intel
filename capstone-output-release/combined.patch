@@ -40,12 +40,50 @@ index 44471169..ee4dd5d8 100644
  endif
  endif
  
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..671dce69 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -46,6 +46,15 @@ typedef struct X86ScanResult {
+ 	uint16_t length;
+ 	uint8_t popcode_adjust;
+ } X86ScanResult;
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define CAPSTONE_X86_VECTOR_OUTPUT
++CAPSTONE_INTERNAL bool X86_scanEvexMemoryOutput(const uint8_t *code,
++						size_t size,
++						X86ScanResult *result);
++#endif
+ 
+ bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
+ 				  size_t code_len, cs_insn *insn,
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..5a770474 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3367,6 +3367,13 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return true;
+ 		}
+ 	}
++#endif
++#ifdef CAPSTONE_X86_VECTOR_OUTPUT
++	/* Preserve adapter precedence and custom public ID mapping. */
++	if (opcode == 0x62 && handle->mode == CS_MODE_64 &&
++	    handle->insn_id == X86_get_insn_id &&
++	    X86_scanEvexMemoryOutput(code, code_len, result))
++		return true;
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
 diff --git a/arch/X86/X86EvexMemoryOutput.c b/arch/X86/X86EvexMemoryOutput.c
 new file mode 100644
-index 00000000..2a0c93f2
+index 00000000..e079a0a7
 --- /dev/null
 +++ b/arch/X86/X86EvexMemoryOutput.c
-@@ -0,0 +1,167 @@
+@@ -0,0 +1,187 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -56,6 +94,7 @@ index 00000000..2a0c93f2
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
 +#include "X86SimpleOutput.h"
++#include "X86Disassembler.h"
 +#include "X86GenEvexMemoryOutput.inc"
 +static char *writeVectorRegister(char *out, unsigned length_code,
 +				 unsigned number)
@@ -106,6 +145,25 @@ index 00000000..2a0c93f2
 +	*source_width = memory_ll;
 +	*instruction_length = length;
 +	return row;
++}
++
++/* The output path and scan path use the same checked row and byte extent.
++ * Unsupported encodings still go through the complete source decoder. */
++bool X86_scanEvexMemoryOutput(const uint8_t *code, size_t size,
++			      X86ScanResult *result)
++{
++	if (!size || code[0] != 0x62)
++		return false;
++	unsigned width, length;
++	const struct EvexMemoryOutputRow *row =
++		evexMemoryRow(code, size, &width, &length);
++	if (!row)
++		return false;
++	result->opcode = 0;
++	result->opcode_pub = row->id;
++	result->length = (uint16_t)length;
++	result->popcode_adjust = 0;
++	return true;
 +}
 +
 +bool X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,

@@ -1,7 +1,7 @@
-name: Qualify generated EVEX memory output in an independent compilation unit in profiles
+name: Qualify shared EVEX memory scan and output in profiles
 on:
   push:
-    branches: [codex/capstone-evex-memory-module-profiles]
+    branches: [codex/capstone-shared-evex-memory-scan-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-memory-module-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: shared-evex-memory-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
