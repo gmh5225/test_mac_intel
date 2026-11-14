@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..10ac019b 100644
+index 63dcc538..fe902354 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -255,6 +255,49 @@ index 63dcc538..10ac019b 100644
  	if (status != X86_SCAN_NOT_HANDLED)
  		return completeTerminalScanResult(result, instructionID,
  						  status);
+@@ -3798,17 +3838,32 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 	cs_insn insn = { 0 };
+ 	handle->errnum = CS_ERR_OK;
+ 	while (batch.count < capacity && size) {
+-		X86ScanResult result;
++		unsigned instructionID = 0;
++		uint16_t length;
+ 		insn.address = address;
+-		if (!getInstructionScanResult(ud, code, size, &insn, &result,
+-					      false))
+-			break;
+-		finish_x86_scan(handle, &insn, &result, code, false, false);
+-		output[batch.count++] = (insn.id << 8) | result.length;
+-		batch.bytes += result.length;
+-		code += result.length;
+-		size -= result.length;
+-		address += result.length;
++		const int initial = tryInitialScanResult(
++			handle, code, size, &instructionID, &length, false);
++		if (initial == X86_SCAN_NOT_HANDLED) {
++			X86ScanResult result;
++			if (!getInstructionScanResultAfterInitial(
++				    ud, code, size, &insn, &result, false))
++				break;
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++			length = result.length;
++		} else {
++			if (initial != X86_SCAN_COMPLETE)
++				break;
++			/* Keep terminal fields outside the escaped fallback result. */
++			X86ScanResult result = { 0, instructionID, length, 0 };
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++		}
++		output[batch.count++] = (insn.id << 8) | length;
++		batch.bytes += length;
++		code += length;
++		size -= length;
++		address += length;
+ 	}
+ 	return batch;
+ }
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..7aeea4a1 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
