@@ -2,27 +2,38 @@
   "neverd": "ae9d2d7b25d1f7b4e61b851e0ff8bc771e9c6bd4",
   "capstone": "75da2329204825bb0bd15e574ab58c45b5019dcc",
   "variants": {
-    "legacy-memory": {
-      "source": "round1031-legacy-vector-memory",
-      "patch": "legacy-memory.patch",
-      "patch_sha256": "59d7bd8fb7d645b67fec9cd7df4e3bbead958cb3ec6a6b4410cc01c42b24394e",
-      "tree": "381e1089ca5d7cfc29c38eb70240508c39ab803c",
+    "sse-memory": {
+      "source": "round1040-legacy-memory-late-bank",
+      "patch": "sse-memory.patch",
+      "patch_sha256": "de7a90d54508d3398e7c0726de8412f521a57e04871057807c954994c18d0393",
+      "tree": "8e2bdb7480c8a13b4669ce7be0320d630344fa69",
       "changed": [
         "X86VectorOutput.c.o",
         "X86OutputIterator.c.o"
       ],
       "added": []
     },
-    "register-names": {
-      "source": "round1032-vector-register-names",
-      "patch": "register-names.patch",
-      "patch_sha256": "20a552a236fa3e33b61740ac9c7870e86889338b22584d7fa7a2988d3eeb9069",
-      "tree": "6da74948e4e0af084887ba5f9ca4304fb2d2d1b2",
+    "vex-output": {
+      "source": "round1041-vex-output-late-bank",
+      "patch": "vex-output.patch",
+      "patch_sha256": "7dff653e507a1899d7fb8fcf87bf6d318194949d92634e3a98035adb994a415e",
+      "tree": "fd2ad6118fd77c40305b83f5ffd7e5ac72c6e63b",
       "changed": [
-        "X86VectorOutput.c.o"
+        "X86VectorOutput.c.o",
+        "X86OutputIterator.c.o"
+      ],
+      "added": []
+    },
+    "mips-outlined": {
+      "source": "round1043-mips-outlined-register-names",
+      "patch": "mips-outlined.patch",
+      "patch_sha256": "8a743a892fb06f2ff4ec68e33311c8e9c1d81a1e42222e219e9f77dde093a1f5",
+      "tree": "002db6d9fa5f5890e1fd6b41f4a61b2934c3ebe5",
+      "changed": [
+        "MipsInstPrinter.c.o"
       ],
       "added": []
     }
   },
-  "llvm": "live main fork source; prebuilt disabled"
+  "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked"
 }
