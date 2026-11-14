@@ -1,35 +1,38 @@
 diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
-index 37f3b9a4..e81966a4 100644
+index 37f3b9a4..98355dad 100644
 --- a/arch/ARM/ARMMapping.c
 +++ b/arch/ARM/ARMMapping.c
-@@ -1033,14 +1033,19 @@ void ARM_init_cs_detail(MCInst *MI)
- 	       sizeof(arm_empty_operands));
+@@ -993,6 +993,12 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
  }
- #else
--void ARM_setup_op(cs_arm_op *op)
-+static inline void ARM_set_op_defaults(cs_arm_op *op)
- {
--	memset(op, 0, sizeof(cs_arm_op));
- 	op->type = ARM_OP_INVALID;
- 	op->vector_index = -1;
- 	op->neon_lane = -1;
- }
+ #endif
  
-+void ARM_setup_op(cs_arm_op *op)
-+{
-+	memset(op, 0, sizeof(cs_arm_op));
-+	ARM_set_op_defaults(op);
-+}
++typedef char ARMOperandDefaultsCoverTail
++	[offsetof(cs_arm, operands) + sizeof(((cs_arm *)0)->operands) ==
++			 sizeof(cs_arm) ?
++		 1 :
++		 -1];
 +
- void ARM_init_cs_detail(MCInst *MI)
+ #if defined(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS) || defined(ARM_GNU_MIXED_SCAN)
+ /* Unused operands have observable invalid indices and zeroed padding too. */
+ #define ARM_EMPTY_OP \
+@@ -1009,11 +1015,6 @@ static const cs_arm_op arm_empty_operands[] = {
+ /* Capstone builds as C99, including with MSVC. */
+ typedef char ARMOperandDefaultsCoverSlots
+ 	[ARR_SIZE(arm_empty_operands) == NUM_ARM_OPS ? 1 : -1];
+-typedef char ARMOperandDefaultsCoverTail
+-	[offsetof(cs_arm, operands) + sizeof(arm_empty_operands) ==
+-			 sizeof(cs_arm) ?
+-		 1 :
+-		 -1];
+ 
+ void ARM_setup_op(cs_arm_op *op)
  {
- 	if (detail_is_set(MI)) {
-@@ -1050,7 +1055,7 @@ void ARM_init_cs_detail(MCInst *MI)
- 		       offsetof(cs_detail, arm) + sizeof(cs_arm));
+@@ -1047,7 +1048,7 @@ void ARM_init_cs_detail(MCInst *MI)
+ 		unsigned int i;
+ 
+ 		memset(get_detail(MI), 0,
+-		       offsetof(cs_detail, arm) + sizeof(cs_arm));
++		       offsetof(cs_detail, arm) + offsetof(cs_arm, operands));
  
  		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
--			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
-+			ARM_set_op_defaults(&ARM_get_detail(MI)->operands[i]);
- 		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
- 		ARM_get_detail(MI)->vcc = ARMVCC_None;
- 	}
+ 			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);

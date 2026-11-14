@@ -51,23 +51,27 @@ try:
     cases=corpus.prepare(r,w,evidence,run)
     assert len(cases)==3
     costs=[];objects={}
-    for label in ['integer','scan']:
-        engine='capstone' if label=='integer' else 'scan'
-        if label=='scan':
-            run(['git','apply',patch],'apply')
+    for label in ['integer','output','scan']:
+        engine={'integer':'capstone','output':'candidate','scan':'scan'}[label]
+        if label!='integer':
+            run(['git','reset','--hard',inputs['capstone']],'reset-'+label)
+            variant_patch=r/'operand-defaults.patch' if label=='output' else patch
+            variant_meta=inputs['operand_defaults'] if label=='output' else meta
+            assert hashlib.sha256(variant_patch.read_bytes()).hexdigest()==variant_meta['sha256']
+            run(['git','apply',variant_patch],'apply-'+label)
             run(['git','add','-A'],'stage')
             tree=sp.check_output(['git','-C',source,'write-tree'],text=True).strip()
-            assert tree==meta['tree'],tree
-            save('candidate-tree.json',dict(tree=tree))
+            assert tree==variant_meta['tree'],tree
+            save(label+'-tree.json',dict(tree=tree))
         run(['cmake', '--build', build, '--target', 'capstone_static',
              '--parallel', '4'], 'build')
         objroot=build/'CMakeFiles/capstone.dir'
         objects[label]={str(f.relative_to(objroot)):hashlib.sha256(f.read_bytes()).hexdigest()for f in objroot.rglob('*.o')}
-        if label=='scan':
+        if label!='integer':
             changed={f for f in objects['integer']if objects['integer'][f]!=objects['scan'][f]}
             assert set(objects['integer'])==set(objects['scan'])
             assert changed==({'arch/ARM/ARMMapping.c.o'} if cc=='clang' else set()),changed
-            save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
+            save(label+'-object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
         exe = w / label
         run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
              '-I', source / 'include', r / 'single.cpp', build / 'libcapstone.a',
