@@ -19,7 +19,7 @@ index ae1554b0..b256a7b2 100644
  bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
  				  size_t code_len, cs_insn *insn,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..17250fc4 100644
+index 63dcc538..2d8434ea 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3368,6 +3368,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
@@ -38,7 +38,7 @@ index 63dcc538..17250fc4 100644
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
  			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
-@@ -3424,11 +3433,77 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3424,11 +3433,83 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  	return completeTerminalScanResult(result, instructionID, status);
  }
  
@@ -67,8 +67,14 @@ index 63dcc538..17250fc4 100644
 +#if X86_HAS_VEX2_PUBLIC_PLANS
 +/* The caller has recognized a bare C5 VEX prefix. These generated plans
 + * select a public ID and its operand checks together. */
-+X86_DECODE_INLINE int tryVex2PublicPlan(const uint8_t *code, size_t size,
-+					X86ScanResult *result)
++/* Bound the GCC 11 iterator's register pressure at the VEX2 plan reader. */
++#if defined(__x86_64__) && defined(__GNUC__) && __GNUC__ == 11 && \
++	!defined(__clang__)
++static __attribute__((noinline)) int
++#else
++X86_DECODE_INLINE int
++#endif
++tryVex2PublicPlan(const uint8_t *code, size_t size, X86ScanResult *result)
 +{
 +	if (size < 3)
 +		return X86_SCAN_INVALID;
@@ -119,7 +125,7 @@ index 63dcc538..17250fc4 100644
  	insn.readerCursor = 1;
  	if (readVexPrefix(&insn, prefix))
  		return X86_SCAN_INVALID;
-@@ -3489,6 +3564,13 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+@@ -3489,6 +3570,13 @@ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
  	return X86_SCAN_COMPLETE;
  }
  
@@ -133,7 +139,7 @@ index 63dcc538..17250fc4 100644
  /* Constant C5 admission folds the unused three-byte prefix handling. */
  X86_DECODE_INLINE bool
  decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
-@@ -3661,12 +3743,38 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3661,12 +3749,38 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  	return initial;
  }
  
@@ -172,7 +178,7 @@ index 63dcc538..17250fc4 100644
  	uint8_t opcode;
  	size_t opcodeOffset;
  	bool extension = X86_mayDecodeFeatureExtensionImpl(
-@@ -3676,9 +3784,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3676,9 +3790,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, opcode, extension);
  	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
@@ -210,62 +216,6 @@ index 63dcc538..17250fc4 100644
  
  	unsigned instructionID = 0;
  	/* Constant bitness folds the terminal readers' mode and size tests.
-@@ -3713,6 +3848,35 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
- 					opcode, false);
- }
- 
-+#if defined(__x86_64__) && defined(__GNUC__) && __GNUC__ == 11 && \
-+	!defined(__clang__)
-+/* GCC 11 needs the 32-bit legacy reader inline; the 64-bit iterator benefits
-+ * from retaining its compact outlined boundary. Both use the same reader. */
-+static __attribute__((noinline)) bool
-+getInstructionScanResultAfterInitialOutlined(csh ud, const uint8_t *code,
-+					     size_t code_len, cs_insn *insn,
-+					     X86ScanResult *result,
-+					     bool readerFlags)
-+{
-+	return getInstructionScanResultAfterInitial(ud, code, code_len, insn,
-+						    result, readerFlags);
-+}
-+X86_DECODE_INLINE bool getInstructionScanResultAfterInitialByMode(
-+	csh ud, const uint8_t *code, size_t code_len, cs_insn *insn,
-+	X86ScanResult *result, bool readerFlags)
-+{
-+	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
-+	if (handle->mode == CS_MODE_32)
-+		return getInstructionScanResultAfterInitial(
-+			ud, code, code_len, insn, result, readerFlags);
-+	return getInstructionScanResultAfterInitialOutlined(
-+		ud, code, code_len, insn, result, readerFlags);
-+}
-+#else
-+#define getInstructionScanResultAfterInitialByMode \
-+	getInstructionScanResultAfterInitial
-+#endif
-+
- X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
- 						size_t code_len, cs_insn *insn,
- 						X86ScanResult *result,
-@@ -3725,8 +3889,8 @@ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
- 	if (initial != X86_SCAN_NOT_HANDLED)
- 		return completeTerminalScanResult(result, instructionID,
- 						  initial);
--	return getInstructionScanResultAfterInitial(ud, code, code_len, insn,
--						    result, readerFlags);
-+	return getInstructionScanResultAfterInitialByMode(
-+		ud, code, code_len, insn, result, readerFlags);
- }
- 
- bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
-@@ -3759,7 +3923,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
- 					   &length, true);
- 	if (initial == X86_SCAN_NOT_HANDLED) {
- 		X86ScanResult result;
--		if (!getInstructionScanResultAfterInitial(
-+		if (!getInstructionScanResultAfterInitialByMode(
- 			    (csh)(uintptr_t)handle, code, size, insn, &result,
- 			    true))
- 			return false;
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..d831718e 100644
 --- a/arch/X86/X86GenSimpleOutput.inc

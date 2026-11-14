@@ -1,7 +1,7 @@
-name: Test mode-specific GCC11 scan inlining on the two affected CPU families
+name: Isolate GCC11 register pressure at the checked VEX2 plan reader
 on:
   push:
-    branches: [codex/capstone-gcc11-mode-scan]
+    branches: [codex/capstone-gcc11-vex2-boundary]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gcc11-mode-scan-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: gcc11-vex2-boundary-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
