@@ -1,7 +1,7 @@
-name: Measure VEX residual sensitivity to frozen object link order
+name: Isolate changed decoder object section sizes with frozen machine code
 on:
   push:
-    branches: [codex/capstone-vex-link-order]
+    branches: [codex/capstone-object-layout-isolation]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,7 @@ jobs:
         include:
           - { host: ubuntu-22.04, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-24.04, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -25,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5c6987afcec8c2f21e64575c5b9c5f442a5001ae
+          ref: 729680277dd762704ea3270291b7a75318f51583
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-link-order-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: object-layout-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

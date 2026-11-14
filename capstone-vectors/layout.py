@@ -1,144 +1,152 @@
-from collections import Counter
+"""Freeze compiler output; pad only the changed object's trailing section bytes."""
+from collections import Counter, defaultdict
 from pathlib import Path
 import hashlib
-import math
+import json
 import platform
-import random
-import re
-import shutil
-import statistics
+import struct
 import subprocess as sp
+from frozen_layout import Layouts as Original, sha, symbols
 
 
-def sha(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def elf(path):
+    data = path.read_bytes()
+    header = list(struct.unpack_from('<16sHHIQQQIHHHHHH', data))
+    assert header[0][:6] == b'\x7fELF\x02\x01' and header[1:3] == [1, 62]
+    assert header[5] == header[10] == 0 and header[8] == header[11] == 64
+    assert 0 < header[12] < 0xff00 and header[13] < header[12]
+    sections = [list(struct.unpack_from('<IIQQQQIIQQ', data, header[6] + 64*i))
+                for i in range(header[12])]
+    strings = sections[header[13]]
+    names = data[strings[4]:strings[4]+strings[5]]
+    def name(s):
+        end = names.index(b'\0', s[0])
+        return names[s[0]:end].decode()
+    return data, header, sections, [name(s) for s in sections]
 
 
-def symbols(path):
-    result = []
-    for line in sp.check_output(['nm', '-S', '--defined-only', path], text=True).splitlines():
-        parts = line.split()
-        if len(parts) == 4:
-            address, size, kind, name = parts
-        elif len(parts) == 3:
-            address, kind, name = parts
-            size = '0'
+def padded_object(source, target, requested):
+    data, header, sections, names = elf(source)
+    original = {name: data[s[4]:s[4]+s[5]] for name, s in zip(names, sections)
+                if s[1] not in (0, 8)}
+    chunks = bytearray(data[:64])
+    for index, s in enumerate(sections):
+        if s[1] == 0:
+            continue
+        align = max(1, s[8])
+        assert align & (align-1) == 0
+        chunks.extend(bytes((-len(chunks)) % align))
+        body = b'' if s[1] == 8 else original[names[index]]
+        s[4] = len(chunks)
+        if names[index] in requested:
+            size = requested[names[index]]
+            assert names[index] in ('.text', '.rodata') and size >= len(body)
+            assert s[1] == 1 and not s[2] & (16 | 32 | 2048)
+            body += (b'\x90' if names[index] == '.text' else b'\0') * (size-len(body))
+            s[5] = len(body)
+        chunks.extend(body)
+    chunks.extend(bytes((-len(chunks)) % 8))
+    header[6] = len(chunks)
+    for s in sections:
+        chunks.extend(struct.pack('<IIQQQQIIQQ', *s))
+    chunks[:64] = struct.pack('<16sHHIQQQIHHHHHH', *header)
+    target.write_bytes(chunks)
+    result, after, sections_after, names_after = elf(target)
+    assert names_after == names and after[1:6] == header[1:6]
+    for name, s in zip(names_after, sections_after):
+        if s[1] in (0, 8):
+            continue
+        body = result[s[4]:s[4]+s[5]]
+        if name in requested:
+            assert body[:len(original[name])] == original[name]
         else:
-            raise ValueError(line)
-        result.append((int(address, 16), int(size, 16), kind, name))
-    return result
+            assert body == original[name], name
+    assert symbols(source) == symbols(target), 'padding must preserve every original symbol'
+    return dict(original=sha(source), padded=sha(target),
+                sections={k: dict(original=len(original[k]), padded=v) for k,v in requested.items()},
+                original_section_prefixes_preserved=True,
+                other_section_bytes_including_symbols_and_relocations_preserved=True)
 
 
-class Layouts:
-    def __init__(self, work, evidence, save, run):
-        self.work, self.evidence, self.save, self.run = work, evidence, save, run
-        self.objects, self.executables, self.records, self.rows = {}, {}, {}, []
-
-    def capture(self, label, objroot, link_map, archive, consumer, executable):
-        objects = {p.name: p for p in objroot.rglob('*.o')}
-        assert len(objects) == len(list(objroot.rglob('*.o')))
-        names = re.findall(re.escape(str(archive)) + r'\(([^)]+)\)', link_map.read_text())
-        active = list(dict.fromkeys(names))
-        assert active and set(active) <= set(objects), (active, list(objects))
-        folder = self.work / ('frozen-' + label)
-        folder.mkdir()
-        self.objects[label] = {}
-        for name in active:
-            target = folder / name
-            shutil.copyfile(objects[name], target)
-            assert sha(target) == sha(objects[name])
-            self.objects[label][name] = target
-        self.executables[label] = executable
-        self.records[label] = dict(active_objects=active,
-                                   objects={name: sha(path) for name, path in self.objects[label].items()},
-                                   consumer=sha(consumer), executable=sha(executable))
-        self.save('frozen-link-inputs.json', self.records)
-
+class Layouts(Original):
     def prepare(self, consumer, iced):
         assert set(self.objects) == {'integer', 'scan'}
         assert set(self.objects['integer']) == set(self.objects['scan'])
         assert self.records['integer']['consumer'] == self.records['scan']['consumer'] == sha(consumer)
         names = self.records['integer']['active_objects']
-        self.payloads = {'archive': {label: path.read_bytes() for label, path in self.executables.items()}}
-        self.orders, self.symbol_map = {}, {}
-        for index in range(-1, 16):
-            order = list(names)
-            if index >= 0:
-                random.Random(107800 + index).shuffle(order)
-            layout = 'direct-control' if index < 0 else 'layout-%02d' % index
-            self.orders[layout] = order
-            content = {}
-            self.symbol_map[layout] = {}
+        changed = [n for n in names if self.records['integer']['objects'][n] != self.records['scan']['objects'][n]]
+        assert changed == ['X86DisassemblerDecoder.c.o'], changed
+        change = changed[0]
+        self.payloads = {'archive': {k: v.read_bytes() for k,v in self.executables.items()}}
+        sizes = defaultdict(list)
+        for label in ('integer', 'scan'):
+            data, header, sections, section_names = elf(self.objects[label][change])
+            for n, s in zip(section_names, sections):
+                if n in ('.text', '.rodata'):
+                    sizes[n].append(s[5])
+        assert set(sizes) == {'.text', '.rodata'} and all(len(v) == 2 for v in sizes.values())
+        targets = {k: (max(v)+63)//64*64 for k,v in sizes.items()}
+        all_names = Counter()
+        common_names = set()
+        for name in names:
+            for address, size, kind, symbol in symbols(self.objects['integer'][name]):
+                all_names[symbol] += 1
+                if name != change and kind.lower() in ('t', 'r', 'd', 'b'):
+                    common_names.add(symbol)
+        common_names = {s for s in common_names if all_names[s] == 1}
+        assert len(common_names) > 200
+        checks, pads = {}, {}
+        for layout in ('direct-control', 'text-padded', 'text-rodata-padded'):
+            content, symbol_maps = {}, {}
             for label in ('integer', 'scan'):
-                target = self.work / (layout + '-' + label)
-                objects = [self.objects[label][name] for name in order]
-                assert all(sha(path) == self.records[label]['objects'][path.name] for path in objects)
+                objects = [self.objects[label][name] for name in names]
+                assert all(sha(o) == self.records[label]['objects'][o.name] for o in objects)
+                if layout != 'direct-control':
+                    replacement = self.work / (layout+'-'+label+'.o')
+                    requested = {'.text': targets['.text']}
+                    if layout == 'text-rodata-padded':
+                        requested['.rodata'] = targets['.rodata']
+                    pads[layout+'/'+label] = padded_object(self.objects[label][change], replacement, requested)
+                    objects[names.index(change)] = replacement
+                target = self.work / (layout+'-'+label)
                 self.run(['clang++', consumer, *objects, iced, '-lpthread', '-ldl', '-lm', '-o', target],
-                         'link-' + layout + '-' + label)
+                         'link-'+layout+'-'+label)
                 current = symbols(target)
                 original = symbols(self.executables[label])
-                assert Counter((n, k, s) for a, n, k, s in current) == Counter((n, k, s) for a, n, k, s in original)
-                self.symbol_map[layout][label] = {s: [a, n] for a, n, k, s in current
-                                                 if s in ('cs_disasm_iter', 'X86_disasmIter',
-                                                          'X86_trySimpleOutput', 'decodeInstructionFull',
-                                                          'decodeGenericScan', 'X86_getInstruction')}
+                assert Counter((n,k,s) for a,n,k,s in current) == Counter((n,k,s) for a,n,k,s in original)
+                symbol_maps[label] = {s: [a,n,k] for a,n,k,s in current if s in common_names or s == '_end'}
+                (self.evidence/(layout+'-'+label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
+                (self.evidence/(layout+'-'+label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
                 content[label] = target.read_bytes()
                 target.unlink()
-            if index < 0:
-                self.save('direct-control.json', dict(symbol_multisets_equal=True,
-                          byte_identical_to_archive={k: content[k] == self.payloads['archive'][k] for k in content}))
+            assert symbol_maps['integer'].keys() == symbol_maps['scan'].keys()
+            differences = {s: dict(integer=symbol_maps['integer'][s], scan=symbol_maps['scan'][s])
+                           for s in symbol_maps['integer'] if symbol_maps['integer'][s] != symbol_maps['scan'][s]}
+            checks[layout] = dict(common_symbols_checked=len(symbol_maps['integer']), differences=differences,
+                                  all_common_symbol_addresses_equal=not differences)
+            if layout == 'direct-control':
+                equal = {k: content[k] == self.payloads['archive'][k] for k in content}
+                self.save('direct-control.json', dict(symbol_multisets_equal=True, byte_identical_to_archive=equal))
+                assert all(equal.values()), equal
             else:
                 self.payloads[layout] = content
-        self.save('link-orders.json', dict(seed_base=107800, orders=self.orders, symbol_addresses=self.symbol_map))
-        self.maximum = max(len(data) for pair in self.payloads.values() for data in pair.values())
+        self.save('object-padding.json', dict(target_sizes=targets, transformations=pads))
+        self.save('address-controls.json', checks)
+        # Record imperfect address isolation; do not mislabel it as a successful control.
+        self.maximum = max(len(v) for pair in self.payloads.values() for v in pair.values())
         for pair in self.payloads.values():
             for label, data in pair.items():
-                pair[label] = data + bytes(self.maximum - len(data))
+                pair[label] = data + bytes(self.maximum-len(data))
             pair['aa'] = pair['integer']
-        self.image = self.work / 'same-image'
-        self.image.write_bytes(self.payloads['archive']['integer'])
-        self.image.chmod(0o755)
+        self.image = self.work/'same-image'
+        self.image.write_bytes(self.payloads['archive']['integer']); self.image.chmod(0o755)
         self.inode = self.image.stat().st_ino
         probe = sp.run(['setarch', platform.machine(), '-R', '/bin/true'], capture_output=True, text=True)
         assert probe.returncode == 0, probe.stderr
-        self.save('layout-controls.json', dict(inode=self.inode, fixed_size=self.maximum,
-                  aslr_disabled=True, consumer_sha256=sha(consumer), permutations=16,
-                  original_archive_preserved=True, same_active_objects=True,
-                  padded_sha256={layout: {name: hashlib.sha256(v).hexdigest() for name, v in pair.items()}
-                                 for layout, pair in self.payloads.items()}))
-
-    def measure(self, name, panel, mode, data, intervals, bits):
-        def sample(layout, label, repetitions):
-            with self.image.open('r+b') as out:
-                assert out.write(self.payloads[layout][label]) == self.maximum
-            assert self.image.stat().st_ino == self.inode and self.image.stat().st_size == self.maximum
-            command = ['setarch', platform.machine(), '-R', str(self.image), 'capstone', str(mode),
-                       str(repetitions), str(data), str(intervals), str(bits)]
-            result = list(map(int, sp.check_output(command, text=True).split()))
-            assert len(result) == 6 and result[0] > 0 and result[2] > 0
-            return result
-
-        probe = sample('archive', 'integer', 1)
-        repetitions = max(1, math.ceil(60e6 / probe[0]))
-        reference = None
-        layouts = list(self.payloads)
-        random.Random(name + '/' + panel).shuffle(layouts)
-        for layout in layouts:
-            cycles = []
-            labels = ['integer', 'aa', 'scan']
-            for cycle in range(7):
-                order = labels[cycle % 3:] + labels[:cycle % 3]
-                observations = [(label, sample(layout, label, repetitions)) for label in order + order[::-1]]
-                for label, observation in observations:
-                    if reference is None:
-                        reference = observation[2:]
-                    assert observation[2:] == reference, (layout, label, name, mode)
-                times = {label: statistics.mean(v[0] / v[2] for who, v in observations if who == label)
-                         for label in labels}
-                cycles.append(dict(ns=times, gains={label: times['integer'] / times[label] for label in labels},
-                                   raw=observations))
-            self.rows.append(dict(case=name, panel=panel, mode=mode, layout=layout, repetitions=repetitions,
-                                  gain=statistics.median(c['gains']['scan'] for c in cycles),
-                                  aa=statistics.median(c['gains']['aa'] for c in cycles),
-                                  baseline_ns=statistics.median(c['ns']['integer'] for c in cycles), cycles=cycles))
-            self.save('layout-measurements.json', self.rows)
+        self.save('layout-controls.json', dict(inode=self.inode, fixed_size=self.maximum, aslr_disabled=True,
+                  consumer_sha256=sha(consumer), original_archive_preserved=True, same_active_objects=True,
+                  layouts=list(self.payloads), cycles=21,
+                  padded_sha256={layout:{name:hashlib.sha256(v).hexdigest() for name,v in pair.items()}
+                                 for layout,pair in self.payloads.items()},
+                  isolation_status=checks['text-rodata-padded']['all_common_symbol_addresses_equal'],
+                  scope='Object-tail padding only; instructions, symbols, relocations preserved. Internal addresses inside the changed Decoder object are not held fixed.'))
