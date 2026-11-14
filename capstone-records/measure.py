@@ -10,6 +10,7 @@ def run(args,label,cwd=None):
  if result:raise RuntimeError((label,(e/(label+'.log')).read_text()[-2000:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
 write('compiler',dict(cc=sp.check_output([cc,'--version'],text=True),clang=sp.check_output(['clang','--version'],text=True),host=platform.platform()))
+write('cpu',dict(cpu=Path('/proc/cpuinfo').read_text()))
 with tempfile.TemporaryDirectory(prefix='capstone-simd-work-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
@@ -19,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-simd-work-') as tmp:
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_CSTEST=OFF','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={}
-  for key in ('base','combined','shift','ordered','names'):
+  for key in ('base','combined','shift','joined'):
    if key!='base':run(['git','apply',r/(key+'.patch')],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+key)
    f=t/key;run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-Wl,-Map='+str(e/(key+'-link.map')),'-o',f],'link-'+key);bins[key]=f
@@ -36,7 +37,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-simd-work-') as tmp:
    write(key+'-functions',functions)
    with gzip.open(e/(key+'-assembly.gz'),'wb') as out:out.write(sp.check_output(['objdump','-dr',f]))
    objdir=b/'CMakeFiles/capstone.dir';objects[key]={str(q.relative_to(objdir)):sha(q) for q in objdir.rglob('*.o')}
-   if key=='ordered':assert objects[key]==objects['combined']
+   if key=='joined':
+    changed={name for name in objects[key] if objects[key][name]!=objects['combined'][name]}
+    assert changed=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86ImmediateOutput.c.o','arch/X86/X86VectorOutput.c.o'},changed
    if key!='base':run(['git','apply','-R',r/(key+'.patch')],'restore-'+key,s)
   write('objects',objects)
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa'])
@@ -56,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-simd-work-') as tmp:
    results.append(dict(mode=mode,repeats=reps,pairs=rows,median={k:statistics.median(v[k]for v in rows)for k in keys},result=reference));write('timings',results)
   profiles=[]
   for mode in (0,1,2):
-   for key in ('base','combined','shift','ordered','names'):
+   for key in ('base','combined','shift','joined'):
     ident=str(mode)+'-'+key;raw=t/(ident+'.callgrind')
     run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--collect-atstart=no','--toggle-collect=capstone_measure_run','--callgrind-out-file='+str(raw),bins[key],64,mode,t/'simd.text',1],'profile-'+ident)
     payload=raw.read_bytes();lines=payload.decode().splitlines();events=next(v.split()[1:]for v in lines if v.startswith('events:'));totals=next(v.split()[1:]for v in lines if v.startswith('summary:'))
