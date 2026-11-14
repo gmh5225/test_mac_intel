@@ -1,5 +1,5 @@
 from pathlib import Path
-import json, os, shutil, subprocess, tempfile
+import hashlib, json, os, platform, shutil, subprocess, tempfile
 root=Path(__file__).resolve().parent
 source=root.parent/'source'
 evidence=root.parent/'evidence'
@@ -23,27 +23,56 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='6c93c31134d5396095ba4e63db58548317d6f5b9'
-    run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
-    run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
-    if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if os.name=='nt':
         opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if compiler=='MT' else 'OFF')]
     else:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]+(['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers'] if compiler=='gcc' else [])
     profile_options={'dedicated':['-DCAPSTONE_ARM_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
-    run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
+    configure=['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])]
+    enabled=platform.system()=='Linux' and platform.machine()=='x86_64' and profile!='diet'
+    def apply(name,label):
+        run(['git','-c','core.autocrlf=false','apply',root/name],label)
+    def objects():
+        return {str(f.relative_to(b)):hashlib.sha256(f.read_bytes()).hexdigest()
+                for f in b.rglob('*') if f.is_file() and f.suffix in ('.o','.obj') and 'capstone.dir' in f.parts}
+    if enabled: apply('oracle.patch','oracle-apply')
+    run(configure,'oracle-configure')
+    run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],'oracle-build')
+    oracle=objects()
+    assert oracle, 'missing runtime objects'
+    run(['git','reset','--hard','6c93c31134d5396095ba4e63db58548317d6f5b9'],'reset-oracle')
+    run(['git','clean','-fd'],'clean-oracle')
+    apply(forms+'.patch','apply')
+    run(['git','add','-A'],'stage-tested-source')
+    tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
+    assert tested_tree=='5daec3facff22f41c6fdcff7bfaf73827199f58c', tested_tree
+    run(['python','suite/synctools/mips_register_names.py','--check'],'mips-generator')
+    run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
+    if profile=='adapter': run(['python','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
+    run(configure,'configure')
     units=['api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
     if profile not in ('diet','reduced'):
         units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
     if profile=='adapter':units+=['x86_scan_adapter']
+    if profile not in ('diet','dedicated'):
+        units+=['mips_register_names','mips_reglist_offset','mips_msa_control','mips16_word_order','mips16_immediates','mips16_memory_calls','mips16_shifts_hilo','mips16_frames','mips16e2']
     if profile not in ('diet','reduced'):
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
         units+=sorted(q for q in known if q in ('aarch64_memory_access','aarch64_post_index','aarch64_addressing'))
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
-    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    candidate=objects()
+    exact=profile!='sanitize' and os.name!='nt'
+    differences=sorted(f for f in set(oracle)|set(candidate) if oracle.get(f)!=candidate.get(f))
+    save('equivalence',dict(enabled=enabled,oracle='R1054' if enabled else 'baseline 6c93',
+         profile=profile,compiler=compiler,platform=platform.platform(),machine=platform.machine(),
+         tested_tree=tested_tree,checked=exact,identical=not differences,differences=differences,
+         unavailable_reason=None if exact else 'sanitizer source locations' if profile=='sanitize' else 'COFF timestamps',
+         oracle_objects=oracle,candidate_objects=candidate))
+    if exact: assert not differences, differences
+    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['mips_register_names_generator','arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
@@ -54,7 +83,7 @@ try:
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
         result=subprocess.check_output([generator],cwd=source)
         assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-    save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
+    save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units,tested_tree=tested_tree))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
     shutil.rmtree(root_build,onerror=clean_error)

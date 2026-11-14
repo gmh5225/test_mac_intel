@@ -1,7 +1,7 @@
-name: Select an output prefix class only for prefixed instructions profiles
+name: Qualify MIPS short names by runtime object identity
 on:
   push:
-    branches: [codex/capstone-conditional-output-prefix-profiles]
+    branches: [codex/capstone-qualified-mips-names-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -20,6 +20,9 @@ jobs:
           - { cc: gcc, profile: reduced, forms: combined, host: ubuntu-22.04 }
           - { cc: gcc, profile: four, forms: combined, host: ubuntu-22.04 }
           - { cc: clang, profile: four, forms: combined, host: macos-15 }
+          - { cc: clang, profile: four, forms: combined, host: ubuntu-24.04 }
+          - { cc: gcc, profile: four, forms: combined, host: ubuntu-24.04-arm }
+          - { cc: clang, profile: four, forms: combined, host: ubuntu-24.04-arm }
           - { cc: MT, profile: intel, forms: combined, host: windows-2022 }
           - { cc: MD, profile: intel, forms: combined, host: windows-2022 }
           - { cc: gcc, profile: dedicated, forms: combined, host: ubuntu-22.04 }
@@ -46,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: conditional-output-prefix-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: qualified-mips-names-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
