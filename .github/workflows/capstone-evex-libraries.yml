@@ -1,7 +1,7 @@
-name: Deduplicate short MIPS names and qualify cross-architecture performance libraries
+name: Requalify deduplicated MIPS names on current Capstone next libraries
 on:
   push:
-    branches: [codex/capstone-mips-deduplicated-names-libraries]
+    branches: [codex/capstone-mips-deduplicated-current-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
+          ref: 6c93c31134d5396095ba4e63db58548317d6f5b9
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-deduplicated-names-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: mips-deduplicated-current-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
