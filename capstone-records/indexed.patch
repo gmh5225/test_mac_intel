@@ -1111,7 +1111,7 @@ index 7675273f..a79fb177 100644
  static inline char *X86_writeDisp8(char *out, int displacement)
  {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..47d45d16 100644
+index 6df1472d..3fac1b66 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -8,6 +8,7 @@
@@ -1398,41 +1398,51 @@ index 6df1472d..47d45d16 100644
  	if (code[0] == 0x0f || code[0] == 0xf3 ||
  	    (code[0] == 0x66 && size >= 2 &&
  	     (code[1] == 0x90 ||
-@@ -513,6 +671,25 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,16 +671,38 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
  						 wide);
-+	if (code[0] == 0xc5 && size >= 4 && code[3] < 0xc0 &&
-+	    (wide || (code[1] & 0xc0) == 0xc0) &&
-+	    writeVex2BaseMemory(code, size, insn, insn_size, regs, wide))
-+		return true;
-+	if (!wide && code[0] == 0xc4) {
-+		/* An ordinary 32-bit VEX3 register uses no extension and no high
-+         * source register. C4 with a memory ModR/M is the legacy LES. */
-+		return size >= 5 && (code[1] == 0xe2 || code[1] == 0xe3) &&
++	if (code[0] == 0xc5) {
++		if (size < 4 || (!wide && (code[1] & 0xc0) != 0xc0))
++			return false;
++		const unsigned modrm = code[3];
++		if (modrm >= 0xc0)
++			return writeVexRegisterOutput(code, size, insn,
++						      insn_size, 2, wide);
++		if ((modrm & 7) == 4)
++			return wide && writeVexIndexedOutput(code, size, insn,
++							     insn_size, regs);
++		if ((modrm & 0xc7) == 5)
++			return wide &&
++			       writeVexRipLoad(code, size, insn, insn_size);
++		return writeVex2BaseMemory(code, size, insn, insn_size, regs,
++					   wide);
++	}
++	if (!wide) {
++		/* C4 uses the legacy LES reader unless its high prefix bits identify VEX. */
++		return code[0] == 0xc4 && size >= 5 &&
++		       (code[1] == 0xe2 || code[1] == 0xe3) &&
 +		       (code[2] & 0xc0) == 0x40 && code[4] >= 0xc0 &&
 +		       writeVexRegisterOutput(code, size, insn, insn_size, 3,
 +					      false);
 +	}
-+	if (!wide) {
-+		/* The two high bits distinguish a VEX2 prefix from the LDS ModR/M. */
-+		return code[0] == 0xc5 && size >= 4 &&
-+		       (code[1] & 0xc0) == 0xc0 && code[3] >= 0xc0 &&
-+		       writeVexRegisterOutput(code, size, insn, insn_size, 2,
-+					      false);
-+	}
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
- 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -520,7 +697,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
- 	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
- 		return writeVexRegisterOutput(code, size, insn, insn_size,
+-	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+-		return writeVexRipLoad(code, size, insn, insn_size);
+-	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+-	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
+-		return writeVexRegisterOutput(code, size, insn, insn_size,
 -					      prefix);
-+					      prefix, true);
++	if (size >= 5 && code[4] >= 0xc0)
++		return writeVexRegisterOutput(code, size, insn, insn_size, 3,
++					      true);
  	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
  }
++
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+  * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
+ #if defined(_MSC_VER)
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
 index 48c6fb41..208ecfdf 100644
 --- a/suite/synctools/x86_operand_specializations.py
