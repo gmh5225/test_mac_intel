@@ -1,7 +1,7 @@
-name: Verify direct branch selection of VEX32 output profiles
+name: Include new VEX32 module in established GCC output store policy profiles
 on:
   push:
-    branches: [codex/capstone-vex32-direct-mode-profiles]
+    branches: [codex/capstone-vex32-output-store-policy-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -48,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-direct-mode-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex32-output-store-policy-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
