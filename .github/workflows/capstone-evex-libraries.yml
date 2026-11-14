@@ -1,7 +1,7 @@
-name: Measure shared x86 metadata costs and table footprint
+name: Compare baseline Capstone and iced instruction-address costs
 on:
   push:
-    branches: [codex/capstone-x86-shared-implicit-metadata-profile]
+    branches: [codex/capstone-output-instruction-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: x86-shared-implicit-metadata-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: output-instruction-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
