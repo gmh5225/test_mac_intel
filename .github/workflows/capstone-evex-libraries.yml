@@ -1,7 +1,7 @@
-name: Measure Enter bare VEX2 plans before the general prefix and operand reader on real Debian functions versus both iced formatters
+name: Measure by-value VEX2 terminals and preserve the common scalar path in libraries
 on:
   push:
-    branches: [codex/capstone-vex2-terminal-entry-libraries]
+    branches: [codex/capstone-vex2-value-return-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
+          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-terminal-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex2-value-return-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

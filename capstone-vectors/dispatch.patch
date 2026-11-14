@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..0117c6ea 100644
+index 63dcc538..fe75199a 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3424,11 +3424,77 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
@@ -97,30 +97,34 @@ index 63dcc538..0117c6ea 100644
  /* Constant C5 admission folds the unused three-byte prefix handling. */
  X86_DECODE_INLINE bool
  decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
-@@ -3515,6 +3588,22 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3515,9 +3588,24 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
  					     prefix);
  }
  
 +#if defined(X86_COMPACT_PUBLIC_HEADER) && X86_HAS_VEX2_PUBLIC_PLANS
-+/* Keep the vector extent reader outside the common legacy terminal body. */
-+static __attribute__((noinline)) int
-+scanInitialVex2PublicPlan(const uint8_t *code, size_t size, unsigned *id,
-+			  uint16_t *length)
++/* Return the completed ID and length by value so the legacy reader's
++ * output locals remain in registers across this cold boundary. Zero and
++ * UINT32_MAX encode the two non-complete statuses. */
++static __attribute__((noinline)) uint32_t
++scanInitialVex2PublicPlan(const uint8_t *code, size_t size)
 +{
 +	X86ScanResult result;
 +	const int status = tryVex2PublicPlan(code, size, &result);
-+	if (status == X86_SCAN_COMPLETE) {
-+		*id = result.opcode_pub;
-+		*length = result.length;
-+	}
-+	return status;
++	if (status != X86_SCAN_COMPLETE)
++		return status == X86_SCAN_INVALID ? UINT32_MAX : 0;
++	return (result.opcode_pub << 4) | result.length;
 +}
 +#endif
 +
  #ifdef X86_COMPACT_PUBLIC_HEADER
- /* This entry sees only a one- or two-byte legacy opcode and at most one
-  * REX. The generated descriptor supplies both public ID and operand shape. */
-@@ -3529,8 +3618,15 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+-/* This entry sees only a one- or two-byte legacy opcode and at most one
+- * REX. The generated descriptor supplies both public ID and operand shape. */
++/* A common legacy opcode or bare VEX2 prefix selects a generated plan
++ * carrying its public ID, legality checks and operand extent. */
+ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 						size_t size, cs_mode mode,
+ 						uint8_t opcode, unsigned offset,
+@@ -3529,8 +3617,23 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  				  FEATURE_VEX2_XOP |
  				  (wide ? FEATURE_REX_PREFIX : 0);
  	if ((feature_prefix_flags[opcode] & rejected) ||
@@ -128,16 +132,24 @@ index 63dcc538..0117c6ea 100644
 +	    (opcode == 0x90 && bFromREX(rex))) {
 +#if X86_HAS_VEX2_PUBLIC_PLANS
 +		if (opcode == 0xc5 && !offset && mode != CS_MODE_16 &&
-+		    size >= 2 && (wide || (code[1] & 0xc0) == 0xc0))
-+			return scanInitialVex2PublicPlan(code, size, id,
-+							 length);
++		    size >= 2 && (wide || (code[1] & 0xc0) == 0xc0)) {
++			const uint32_t terminal =
++				scanInitialVex2PublicPlan(code, size);
++			if (terminal == UINT32_MAX)
++				return X86_SCAN_INVALID;
++			if (!terminal)
++				return X86_SCAN_NOT_HANDLED;
++			*id = terminal >> 4;
++			*length = (uint16_t)(terminal & 15);
++			return X86_SCAN_COMPLETE;
++		}
 +#endif
  		return X86_SCAN_NOT_HANDLED;
 +	}
  	bool escaped = opcode == 0x0f;
  	unsigned end = offset + 1;
  	if (escaped) {
-@@ -3661,7 +3757,13 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3661,7 +3764,13 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  	return initial;
  }
  
@@ -151,7 +163,7 @@ index 63dcc538..0117c6ea 100644
  getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  				     size_t code_len, cs_insn *insn,
  				     X86ScanResult *result, bool readerFlags)
-@@ -3676,9 +3778,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3676,9 +3785,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, opcode, extension);
  	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
