@@ -1,7 +1,7 @@
-name: Compare current VEX output and scan with launch controls mixed
+name: Qualify VEX2 plan call boundary mixed
 on:
   push:
-    branches: [codex/capstone-current-vex-controls-mixed]
+    branches: [codex/capstone-vex2-plan-call-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6c93c31134d5396095ba4e63db58548317d6f5b9
+          ref: 5c6987afcec8c2f21e64575c5b9c5f442a5001ae
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-vex-controls-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex2-plan-call-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
