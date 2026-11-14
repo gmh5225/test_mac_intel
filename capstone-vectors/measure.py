@@ -93,7 +93,7 @@ def main(w):
                     order=labels[i%len(labels):]+labels[:i%len(labels)];obs=[(k,measure(k,rep)) for k in order+order[::-1]];assert len({tuple(v[2:5])for k,v in obs})==1;assert len({tuple(v[2:])for k,v in obs if k in exe})==1
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
-                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
+                row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={},vs_fast={},cycles=cycles);reported.append(row);save('measurements.json',reported)
             for profile_mode in (0,1,2):
              for key in ('integer','output'):
                  ident=name+'-'+str(profile_mode)+'-'+key
