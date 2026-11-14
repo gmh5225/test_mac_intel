@@ -320,7 +320,7 @@ index 7675273f..ff940a14 100644
  static inline char *X86_writeDisp8(char *out, int displacement)
  {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..a61fa121 100644
+index 6df1472d..082a136d 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -37,7 +37,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
@@ -396,7 +396,7 @@ index 6df1472d..a61fa121 100644
  	}
  	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
  	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -497,13 +513,120 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -497,13 +513,125 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
  				  (~flags >> 3) & 15,
  				  (modrm & 7) | ((rxb & 1) << 3) };
@@ -407,6 +407,11 @@ index 6df1472d..a61fa121 100644
 +}
 +
 +/* Packed VEX moves and NDS arithmetic with a full-width base-memory operand. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
 +static bool writeVex2BaseMemory(const uint8_t *code, size_t size, cs_insn *insn,
 +				uint16_t *insn_size,
 +				const struct X86SimpleRegister banks[4][16],
@@ -520,7 +525,7 @@ index 6df1472d..a61fa121 100644
  {
  	if (code[0] == 0x0f || code[0] == 0xf3 ||
  	    (code[0] == 0x66 && size >= 2 &&
-@@ -513,15 +636,34 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,15 +641,34 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
  						 wide);

@@ -1,7 +1,7 @@
-name: Compare original and late address bank selection for VEX output on actual instruction bodies
+name: Keep the VEX2 base-memory writer out of the shared vector entry factor costs
 on:
   push:
-    branches: [codex/capstone-vex-output-late-bank-profile]
+    branches: [codex/capstone-vex-memory-call-boundary-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-output-late-bank-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-memory-call-boundary-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
