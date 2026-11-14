@@ -1,7 +1,7 @@
-name: Verify direct branch selection of VEX32 output mixed
+name: Replace vector register decimal spelling with fixed-width suffix copy mixed
 on:
   push:
-    branches: [codex/capstone-vex32-direct-mode-mixed]
+    branches: [codex/capstone-vector-name-suffix-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-direct-mode-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vector-name-suffix-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
