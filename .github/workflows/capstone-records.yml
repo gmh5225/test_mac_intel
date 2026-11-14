@@ -1,7 +1,7 @@
-name: Measure Share MOV memory-immediate address, text and complete-detail construction on PE32, PE64, ARM64 and MIPS in five compiler environments
+name: Qualify MOV memory-immediate formatting and full detail on current native Capstone in mixed
 on:
   push:
-    branches: [codex/capstone-mov-memory-immediate-mixed]
+    branches: [codex/capstone-mov-memory-current-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
+          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mov-memory-immediate-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mov-memory-current-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
