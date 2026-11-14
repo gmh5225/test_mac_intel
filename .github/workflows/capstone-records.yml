@@ -1,7 +1,7 @@
-name: Qualify SSE immediate shift output in mixed
+name: Verify mixed architecture timings and hot symbol addresses after ELF output layout isolation
 on:
   push:
-    branches: [codex/capstone-legacy-vector-shifts-mixed]
+    branches: [codex/capstone-output-layout-sections-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-vector-shifts-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: output-layout-sections-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

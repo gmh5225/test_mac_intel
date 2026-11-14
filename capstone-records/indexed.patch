@@ -1,12 +1,12 @@
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..529ea9e8 100644
+index 1d237cd1..a56f0873 100644
 --- a/arch/X86/X86GenVectorOutput.inc
 +++ b/arch/X86/X86GenVectorOutput.inc
 @@ -808,3 +808,35 @@ static const uint8_t legacy_register_plans[256] = {
  	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
  	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
  };
-+static const struct VectorOutputRow legacy_shift_rows[3][8] = {
++static const struct VectorOutputRow legacy_shift_rows[3][8] X86_OUTPUT_EXTENSION_DATA = {
 +	{
 +		{ 0 },
 +		{ 0 },
@@ -39,10 +39,28 @@ index 1d237cd1..529ea9e8 100644
 +	},
 +};
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..a0dfc655 100644
+index 6df1472d..e916b89b 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -254,6 +254,75 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+@@ -19,6 +19,17 @@ struct PaddingOutput {
+ 		index, scale;
+ };
+ 
++/* Keep newly generated output code and data separate from the existing
++ * decoder's ELF text and read-only data layout. Other targets use their
++ * ordinary compiler section placement. */
++#if defined(__ELF__) && defined(__GNUC__)
++#define X86_OUTPUT_EXTENSION_TEXT __attribute__((section("cs_x86_output")))
++#define X86_OUTPUT_EXTENSION_DATA __attribute__((section("cs_x86_output_data")))
++#else
++#define X86_OUTPUT_EXTENSION_TEXT
++#define X86_OUTPUT_EXTENSION_DATA
++#endif
++
+ #include "X86GenVectorOutput.inc"
+ static char *writeVectorRegister(char *out, unsigned length_code,
+ 				 unsigned number)
+@@ -254,6 +265,75 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
  	return true;
  }
  
@@ -51,10 +69,10 @@ index 6df1472d..a0dfc655 100644
 +#elif defined(__GNUC__)
 +__attribute__((noinline))
 +#endif
-+static bool writeLegacyShiftOutput(const uint8_t *code, size_t size,
-+				   cs_insn *insn, uint16_t *insn_size,
-+				   bool wide, unsigned opcode, unsigned modrm,
-+				   bool has_rex)
++X86_OUTPUT_EXTENSION_TEXT static bool
++writeLegacyShiftOutput(const uint8_t *code, size_t size, cs_insn *insn,
++		       uint16_t *insn_size, bool wide, unsigned opcode,
++		       unsigned modrm, bool has_rex)
 +{
 +	const unsigned length = 5 + has_rex;
 +	if (opcode < 0x71 || opcode > 0x73 || size < length)
@@ -118,7 +136,7 @@ index 6df1472d..a0dfc655 100644
  static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  				      cs_insn *insn, uint16_t *insn_size,
  				      bool wide)
-@@ -267,8 +336,11 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -267,8 +347,11 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	const uint8_t opcode = code[2 + has_rex];
  	const unsigned plan = legacy_register_plans[opcode];
  	const uint8_t modrm = code[3 + has_rex];
@@ -132,7 +150,7 @@ index 6df1472d..a0dfc655 100644
  	const struct VectorOutputRow *row = &legacy_register_rows[plan & 127];
  	const uint8_t rex = has_rex ? code[1] : 0;
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..84d86bc1 100644
+index 834c2488..0caa6c1f 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -891,6 +891,107 @@ void emit_vex_registers(Decoder &decoder)
@@ -204,7 +222,7 @@ index 834c2488..84d86bc1 100644
 +	Decoder narrow(CS_MODE_32);
 +	unsigned admitted = 0;
 +	std::puts(
-+		"static const struct VectorOutputRow legacy_shift_rows[3][8] = {");
++		"static const struct VectorOutputRow legacy_shift_rows[3][8] X86_OUTPUT_EXTENSION_DATA = {");
 +	for (unsigned opcode = 0x71; opcode <= 0x73; ++opcode) {
 +		std::puts("\t{");
 +		for (unsigned group = 0; group < 8; ++group) {
