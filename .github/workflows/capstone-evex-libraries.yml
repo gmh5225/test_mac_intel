@@ -1,7 +1,7 @@
-name: Keep the VEX2 base-memory writer out of the shared vector entry libraries
+name: Bound vector byte copies in the outlined VEX32 and VEX64 output path libraries
 on:
   push:
-    branches: [codex/capstone-vex-memory-call-boundary-libraries]
+    branches: [codex/capstone-vex-bounded-output-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-memory-call-boundary-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex-bounded-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
