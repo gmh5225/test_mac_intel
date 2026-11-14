@@ -1,7 +1,7 @@
-name: Factor decoder entry alignment from SSE output work in native and instruction-count comparisons
+name: Separate vector output work, register name lookups and PE32 regressions
 on:
   push:
-    branches: [codex/capstone-decoder-alignment-profile]
+    branches: [codex/capstone-vector-output-costs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: decoder-entry-alignment-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vector-output-costs-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
