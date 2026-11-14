@@ -722,35 +722,44 @@ index 00000000..7817a761
 +
 +#endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..db82616f 100644
+index 11e8578a..9e059068 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -76,11 +76,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return false;
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
- 		if (plan == X86_PLAN_VECTOR)
+-		if (plan == X86_PLAN_VECTOR)
 -			return X86_writeVectorOutput(code, size, insn,
 -						     insn_size,
 -						     x86_simple_registers[3],
 -						     wide);
-+			return X86_writePlannedVectorOutput(
-+				code, size, insn, insn_size,
-+				x86_simple_registers, wide);
++		if (plan == X86_PLAN_VECTOR) {
++			static bool (*const writers[2])(
++				const uint8_t *, size_t, cs_insn *, uint16_t *,
++				const struct X86SimpleRegister *,
++				bool) = { X86_writeVectorOutput32,
++					  X86_writeVectorOutput };
++			return writers[wide](code, size, insn, insn_size,
++					     x86_simple_registers[2 + wide],
++					     wide);
++		}
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..b8b2f6ca 100644
+index 7675273f..98d96336 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -68,6 +68,16 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -68,6 +68,17 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
  		      bool wide);
  
-+/* Keep vector-mode selection outside the shared scalar output iterator. */
-+CAPSTONE_INTERNAL bool X86_writePlannedVectorOutput(
-+	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
-+	const struct X86SimpleRegister regs[4][16], bool wide);
++/* The mode-specific vector plan also retains 32-bit padding and legacy SSE. */
++CAPSTONE_INTERNAL bool
++X86_writeVectorOutput32(const uint8_t *code, size_t size, cs_insn *insn,
++			uint16_t *insn_size,
++			const struct X86SimpleRegister *regs, bool wide);
 +
 +/* The caller selects a bare 32-bit VEX2 output plan. */
 +CAPSTONE_INTERNAL bool
@@ -762,10 +771,10 @@ index 7675273f..b8b2f6ca 100644
  	if (displacement) {
 diff --git a/arch/X86/X86VexOutput32.c b/arch/X86/X86VexOutput32.c
 new file mode 100644
-index 00000000..a40e998e
+index 00000000..0c4a9c2d
 --- /dev/null
 +++ b/arch/X86/X86VexOutput32.c
-@@ -0,0 +1,206 @@
+@@ -0,0 +1,204 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -957,19 +966,17 @@ index 00000000..a40e998e
 +	}
 +	return true;
 +}
-+/* Existing vector plans include legacy padding in both modes. Only bare
-+ * 32-bit VEX2 enters the new writer; other plans retain their old owner. */
-+bool X86_writePlannedVectorOutput(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister regs[4][16],
-+				  bool wide)
++/* This entry is selected only for 32-bit vector plans. Padding and legacy
++ * SSE keep their original reader; bare VEX2 uses the mode-specific records. */
++bool X86_writeVectorOutput32(const uint8_t *code, size_t size, cs_insn *insn,
++			     uint16_t *insn_size,
++			     const struct X86SimpleRegister *regs, bool wide)
 +{
-+	if (!wide && code[0] == 0xc5)
-+		return X86_writeVex32Output(code, size, insn, insn_size,
-+					    regs[2]);
-+	return X86_writeVectorOutput(code, size, insn, insn_size, regs[3],
-+				     wide);
++	if (code[0] == 0xc5)
++		return X86_writeVex32Output(code, size, insn, insn_size, regs);
++	return X86_writeVectorOutput(code, size, insn, insn_size, regs, wide);
 +}
++
 +#endif
 +#endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
@@ -1776,77 +1783,69 @@ index 6990d510..3698f0da 100644
  		for (unsigned op = 0; op < 256; ++op) {
  			uint8_t bytes[3] = { 0, (uint8_t)op, 0 };
 diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
-index 82c9453e..1e888acc 100644
+index 82c9453e..b7ecfe8a 100644
 --- a/xcode/Capstone.xcodeproj/project.pbxproj
 +++ b/xcode/Capstone.xcodeproj/project.pbxproj
-@@ -114,6 +114,8 @@
+@@ -114,6 +114,7 @@
  		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
  		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
  		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
-+		EC1089000000000000000001 /* X86VexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1089000000000000000004 /* X86VexScan.c */; };
 +		EC1093000000000000000001 /* X86VexOutput32.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1093000000000000000004 /* X86VexOutput32.c */; };
  		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
  		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
  		FE474FB619DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
-@@ -162,6 +164,8 @@
+@@ -162,6 +163,7 @@
  		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
  		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
  		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
-+		EC1089000000000000000002 /* X86VexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1089000000000000000004 /* X86VexScan.c */; };
 +		EC1093000000000000000002 /* X86VexOutput32.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1093000000000000000004 /* X86VexOutput32.c */; };
  		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
  		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
  		FE474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
-@@ -229,6 +233,8 @@
+@@ -229,6 +231,7 @@
  		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
  		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
  		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
-+		EC1089000000000000000003 /* X86VexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1089000000000000000004 /* X86VexScan.c */; };
 +		EC1093000000000000000003 /* X86VexOutput32.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1093000000000000000004 /* X86VexOutput32.c */; };
  		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
  		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
  		FEFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
-@@ -515,6 +521,8 @@
+@@ -515,6 +518,7 @@
  		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
  		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
  		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
-+		EC1089000000000000000004 /* X86VexScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VexScan.c; sourceTree = "<group>"; };
 +		EC1093000000000000000004 /* X86VexOutput32.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VexOutput32.c; sourceTree = "<group>"; };
  		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
  		DCFE243A19DDCD8800EF8EA9 /* X86DisassemblerDecoderCommon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoderCommon.h; sourceTree = "<group>"; };
  		DCFE243B19DDCD8800EF8EA9 /* X86GenAsmWriter.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = X86GenAsmWriter.inc; sourceTree = "<group>"; };
-@@ -990,6 +998,8 @@
+@@ -990,6 +994,7 @@
  				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
  				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
  				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
-+				EC1089000000000000000004 /* X86VexScan.c */,
 +				EC1093000000000000000004 /* X86VexOutput32.c */,
  				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
  				DCFE243A19DDCD8800EF8EA9 /* X86DisassemblerDecoderCommon.h */,
  				DCFE243B19DDCD8800EF8EA9 /* X86GenAsmWriter.inc */,
-@@ -1635,6 +1645,8 @@
+@@ -1635,6 +1640,7 @@
  				DC474FD619DE6FDA00BCA449 /* SystemZModule.c in Sources */,
  				DC474FCA19DE6FDA00BCA449 /* PPCDisassembler.c in Sources */,
  				DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */,
-+				EC1089000000000000000002 /* X86VexScan.c in Sources */,
 +				EC1093000000000000000002 /* X86VexOutput32.c in Sources */,
  				DC474FC819DE6FDA00BCA449 /* MipsMapping.c in Sources */,
  				DC474FD119DE6FDA00BCA449 /* SparcModule.c in Sources */,
  				DC474FDD19DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */,
-@@ -1751,6 +1763,8 @@
+@@ -1751,6 +1757,7 @@
  				DC20E70652D3871A8ABE7731 /* SparcDisassemblerExtension.c in Sources */,
  				DCFE246019DDCD9900EF8EA9 /* ARMInstPrinter.c in Sources */,
  				DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */,
-+				EC1089000000000000000003 /* X86VexScan.c in Sources */,
 +				EC1093000000000000000003 /* X86VexOutput32.c in Sources */,
  				DCFE248219DDCDB700EF8EA9 /* SystemZMCTargetDesc.c in Sources */,
  				DCFE247119DDCDA700EF8EA9 /* PPCMapping.c in Sources */,
  				DCFE246219DDCD9900EF8EA9 /* ARMModule.c in Sources */,
-@@ -1783,6 +1797,8 @@
+@@ -1783,6 +1790,7 @@
  				DC474FB219DE6FDA00BCA449 /* SystemZModule.c in Sources */,
  				DC474FA619DE6FDA00BCA449 /* PPCDisassembler.c in Sources */,
  				DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */,
-+				EC1089000000000000000001 /* X86VexScan.c in Sources */,
 +				EC1093000000000000000001 /* X86VexOutput32.c in Sources */,
  				DC474FA419DE6FDA00BCA449 /* MipsMapping.c in Sources */,
  				DC474FAD19DE6FDA00BCA449 /* SparcModule.c in Sources */,
