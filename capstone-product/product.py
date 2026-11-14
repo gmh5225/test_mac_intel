@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,json,os,random,shutil,statistics,subprocess as sp,sys,tempfile
+import hashlib,json,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
 import corpus
 r=Path(__file__).resolve().parent;root=r.parent;nd=root/'neverd';out=root/'product-evidence';out.mkdir(exist_ok=True)
 def write(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
@@ -116,10 +116,25 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities);assert len(set(identities.values()))==1+len(variants)
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
+  payloads={key:path.read_bytes() for key,path in products.items()}
+  assert payloads['base']==payloads['base-copy']
+  image=t/'same-image';maximum=max(map(len,payloads.values()))
+  padded={key:value+bytes(maximum-len(value)) for key,value in payloads.items()}
+  image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
+  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
+  launches=['images','same-file-fixed']
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest() for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest() for k,v in padded.items()}))
+  assert probe.returncode==0,probe.stderr
   os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def measure(name,case,mode,reps):
+  def measure(name,case,mode,reps,launch):
    sel=case['selector'] if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
-   ticks,*signature=map(int,sp.check_output(list(map(str,[products[name],case['path'],sel,mode,reps])),text=True).split())
+   tail=list(map(str,[case['path'],sel,mode,reps]))
+   if launch=='images':args=[str(products[name]),*tail]
+   else:
+    with image.open('r+b')as stream:assert stream.write(padded[name])==maximum
+    assert image.stat().st_ino==inode and image.stat().st_size==maximum
+    args=['setarch',platform.machine(),'-R',str(image),*tail]
+   ticks,*signature=map(int,sp.check_output(args,text=True).split())
    assert ticks>0 and signature[0]>0
    return ticks,signature
   results=[]
@@ -127,22 +142,23 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2):
     if mode not in cases_of_interest.get(case['name'],()):continue
-    # A long full text and a tiny compiler fixture have very different costs.
-    start,_=measure('base',case,mode,1);reps=max(1,min(20000,round(100000/start)))
-    row=dict(case=case['name'],mode=mode,reps=reps,pairs={});oracle=None
-    for idx,label in enumerate(['base-copy',*variants]):
-     plans=[]
-     for cycle in range(15):
-      order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
-      times={'base':[],label:[]}
-      for who in order:
-       ticks,sig=measure(who,case,mode,reps);times[who].append(ticks)
-       if oracle is None:oracle=sig
-       assert oracle==sig,(case['name'],mode,who,oracle,sig)
-      plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
-     row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
-    row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
+    for launch in launches:
+     # A long full text and a tiny compiler fixture have very different costs.
+     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(100000/start)))
+     row=dict(case=case['name'],mode=mode,launch=launch,reps=reps,pairs={});oracle=None
+     for idx,label in enumerate(['base-copy',*variants]):
+      plans=[]
+      for cycle in range(15):
+       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
+       times={'base':[],label:[]}
+       for who in order:
+        ticks,sig=measure(who,case,mode,reps,launch);times[who].append(ticks)
+        if oracle is None:oracle=sig
+        assert oracle==sig,(case['name'],mode,who,oracle,sig)
+       plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
+      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
+     row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};write('complete',dict(cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne'],variants=list(variants)))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==37*len(launches);write('complete',dict(launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne'],variants=list(variants)))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))

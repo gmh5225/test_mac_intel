@@ -1,7 +1,7 @@
-name: Qualify deduplicated MIPS names and direct TEST output in actual NeverD
+name: Qualify prefix and MIPS output on current NeverD with launch controls
 on:
   push:
-    branches: [codex/capstone-current-output-product]
+    branches: [codex/capstone-current-controlled-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 13fb60f2259f5e17497d847b780630aaefc04fdf
+          ref: 122cb0e7370c847e54fa748e57b042365a986d41
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-current-output
+          name: product-current-controlled-output
           path: product-evidence/
           retention-days: 14

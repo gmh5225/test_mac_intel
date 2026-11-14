@@ -1,5 +1,5 @@
 {
-  "neverd": "13fb60f2259f5e17497d847b780630aaefc04fdf",
+  "neverd": "122cb0e7370c847e54fa748e57b042365a986d41",
   "capstone": "6c93c31134d5396095ba4e63db58548317d6f5b9",
   "variants": {
     "mips-deduplicated": {
@@ -12,17 +12,17 @@
       ],
       "added": []
     },
-    "test-immediate": {
-      "source": "round1053-test-immediate-direct-output",
-      "patch": "test-immediate.patch",
-      "patch_sha256": "0b7a4855474f9fee2b2ad5655c513514f989ff08dcf56d4b3ce1e4430f85edd0",
-      "tree": "68b03db8701f48c12175e614fe684dc8db0db154",
+    "conditional-prefix": {
+      "source": "round1061-conditional-output-prefix",
+      "patch": "conditional-prefix.patch",
+      "patch_sha256": "ba3dd4908d38711aa4fd7009314c5ea250a186075b7d1c91a16218fe637ad354",
+      "tree": "6662a44b6efbaefe967f106c598add2d7018255a",
       "changed": [
-        "X86ImmediateOutput.c.o",
         "X86OutputIterator.c.o"
       ],
       "added": []
     }
   },
-  "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked"
+  "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+  "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A."
 }
