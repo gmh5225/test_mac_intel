@@ -2,11 +2,11 @@
   "neverd": "2c7e2c3591293c994b67747b65c232a679b70fb1",
   "capstone": "729680277dd762704ea3270291b7a75318f51583",
   "variants": {
-    "isolated-vex32": {
-      "source": "round1109-vex32-isolated-output",
-      "patch": "isolated-vex32.patch",
-      "patch_sha256": "7a1185b55e9b35bfaa188bafaacca7732efb05ccb9a83e8eeb97c9101a85731d",
-      "tree": "5185a5296091da485b2f4bbd8f0fbdce00e9cd7c",
+    "direct-vex32": {
+      "source": "round1116-vex32-direct-mode",
+      "patch": "direct-vex32.patch",
+      "patch_sha256": "4b21b6e282420d8e9804942637873fc4604f6a3ad09162a493ac9685ce7abc97",
+      "tree": "d80cb7e13080ea68bafd9d3238831fca343617e8",
       "changed": [
         "X86OutputIterator.c.o"
       ],
@@ -18,5 +18,5 @@
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Isolated complete VEX32 register/memory output, existing vector dispatch boundary, and unchanged released scanner; includes the actual 64-instruction classifyX86Prefix route and decodeOneLight fallback used by X86CallScan. All old probe cases and new batch signatures are checked before timing."
+  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Complete VEX32 register/memory output, direct mode branches at the existing vector dispatch boundary, corrected Xcode manifest, and unchanged released scanner; includes the actual 64-instruction classifyX86Prefix route and decodeOneLight fallback used by X86CallScan. All old probe cases and new batch signatures are checked before timing."
 }
