@@ -375,10 +375,10 @@ index 1d237cd1..e97b5c7c 100644
  	{
  		{ 0 },
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..971f1b0f 100644
+index 11e8578a..e4c7f00f 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -17,17 +17,22 @@
+@@ -17,17 +17,27 @@
  #include "X86SimpleOutput.h"
  #include "X86GenSimpleOutput.inc"
  
@@ -389,17 +389,22 @@ index 11e8578a..971f1b0f 100644
 +/* Bitness is selected once; the same body owns both output modes. */
 +#if defined(_MSC_VER)
 +#define X86_OUTPUT_INLINE static __forceinline
-+#define X86_OUTPUT_NOINLINE __declspec(noinline)
++#define X86_OUTPUT_MODE_BOUNDARY __declspec(noinline)
 +#elif defined(__GNUC__)
 +#define X86_OUTPUT_INLINE static inline __attribute__((always_inline))
-+#define X86_OUTPUT_NOINLINE __attribute__((noinline))
++#if defined(__clang__)
++#define X86_OUTPUT_MODE_BOUNDARY __attribute__((noinline))
  #else
 -static
-+#define X86_OUTPUT_INLINE static inline
-+#define X86_OUTPUT_NOINLINE
++/* GCC's existing output body is integrated into the iterator. */
++#define X86_OUTPUT_MODE_BOUNDARY inline __attribute__((always_inline))
  #endif
 -bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
 -			 cs_insn *insn, uint16_t *insn_size)
++#else
++#define X86_OUTPUT_INLINE static inline
++#define X86_OUTPUT_MODE_BOUNDARY
++#endif
 +X86_OUTPUT_INLINE bool writeSimpleOutputMode(cs_struct *handle,
 +					     const uint8_t *code, size_t size,
 +					     cs_insn *insn, uint16_t *insn_size,
@@ -409,7 +414,7 @@ index 11e8578a..971f1b0f 100644
  	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
  	const uint8_t rex = has_rex ? code[0] : 0;
  	const bool escaped = code[0] == 0x0f;
-@@ -64,8 +69,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -64,8 +74,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			return false;
  		}
  	}
@@ -420,7 +425,7 @@ index 11e8578a..971f1b0f 100644
  	    (handle->syntax != CS_OPT_SYNTAX_INTEL &&
  	     handle->syntax != CS_OPT_SYNTAX_DEFAULT) ||
  	    handle->disasm != X86_getInstruction ||
-@@ -79,7 +84,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -79,7 +89,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  		if (plan == X86_PLAN_VECTOR)
  			return X86_writeVectorOutput(code, size, insn,
  						     insn_size,
@@ -429,7 +434,7 @@ index 11e8578a..971f1b0f 100644
  						     wide);
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
-@@ -147,8 +152,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -147,8 +157,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  			delta = (int32_t)raw;
  		}
  		const uint16_t length = row->imm_offset + row->imm_size;
@@ -441,29 +446,29 @@ index 11e8578a..971f1b0f 100644
  		if (target <= HEX_THRESHOLD) {
  			insn->op_str[0] = (char)('0' + target);
  		} else {
-@@ -205,6 +211,40 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -205,6 +216,40 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  	return true;
  }
  
-+X86_OUTPUT_NOINLINE static bool trySimpleOutput32(cs_struct *handle,
-+						  const uint8_t *code,
-+						  size_t size, cs_insn *insn,
-+						  uint16_t *insn_size)
++X86_OUTPUT_MODE_BOUNDARY static bool
++trySimpleOutput32(cs_struct *handle, const uint8_t *code, size_t size,
++		  cs_insn *insn, uint16_t *insn_size)
 +{
 +	return writeSimpleOutputMode(handle, code, size, insn, insn_size,
 +				     false);
 +}
 +
-+X86_OUTPUT_NOINLINE static bool trySimpleOutput64(cs_struct *handle,
-+						  const uint8_t *code,
-+						  size_t size, cs_insn *insn,
-+						  uint16_t *insn_size)
++X86_OUTPUT_MODE_BOUNDARY static bool
++trySimpleOutput64(cs_struct *handle, const uint8_t *code, size_t size,
++		  cs_insn *insn, uint16_t *insn_size)
 +{
 +	return writeSimpleOutputMode(handle, code, size, insn, insn_size, true);
 +}
 +
 +#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
 +CAPSTONE_INTERNAL
++#elif defined(__GNUC__) && !defined(__clang__)
++static inline __attribute__((always_inline))
 +#else
 +static
 +#endif
@@ -477,7 +482,7 @@ index 11e8578a..971f1b0f 100644
 +	return false;
 +}
 +#undef X86_OUTPUT_INLINE
-+#undef X86_OUTPUT_NOINLINE
++#undef X86_OUTPUT_MODE_BOUNDARY
 +
  #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
  #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput

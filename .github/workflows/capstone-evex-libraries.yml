@@ -1,7 +1,7 @@
-name: Measure bitness specialization in the output dispatcher
+name: Measure bitness specialization with GCC iterator integration
 on:
   push:
-    branches: [codex/capstone-bitness-output-cost]
+    branches: [codex/capstone-bitness-inline-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bitness-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bitness-inline-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
