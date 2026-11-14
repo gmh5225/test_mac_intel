@@ -1,20 +1,106 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1482e8d9..fd028495 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -496,10 +496,13 @@ if(CAPSTONE_X86_SUPPORT)
+         endif()
+     endif()
+     set(SOURCES_X86_NUMBERS arch/X86/X86IntelInstPrinterNumbers.c)
++    set(SOURCES_X86_SCAN arch/X86/X86VexScan.c)
+     set(HEADERS_X86
+         arch/X86/X86BaseInfo.h
+         arch/X86/X86Disassembler.h
+         arch/X86/X86DisassemblerDecoder.h
++        arch/X86/X86VexScan.h
++        arch/X86/X86GenVexPublicPlans.inc
+         arch/X86/X86DisassemblerDecoderCommon.h
+         arch/X86/X86FeatureExtension.h
+         arch/X86/X86GenAsmWriter.inc
+@@ -522,6 +525,8 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86BaseInfo.h
+         arch/X86/X86Disassembler.h
+         arch/X86/X86DisassemblerDecoder.h
++        arch/X86/X86VexScan.h
++        arch/X86/X86GenVexPublicPlans.inc
+         arch/X86/X86DisassemblerDecoderCommon.h
+         arch/X86/X86FeatureExtension.h
+         arch/X86/X86GenAsmWriter.inc
+@@ -976,6 +981,7 @@ set(ALL_SOURCES
+     ${SOURCES_ARC}
+     # Keep the numeric helper outside the existing printer and backend layout.
+     ${SOURCES_X86_NUMBERS}
++    ${SOURCES_X86_SCAN}
+ )
+ 
+ set(ALL_HEADERS
+@@ -1062,7 +1068,7 @@ source_group("Source\\Mips" FILES ${SOURCES_MIPS})
+ source_group("Source\\PowerPC" FILES ${SOURCES_PPC})
+ source_group("Source\\Sparc" FILES ${SOURCES_SPARC})
+ source_group("Source\\SystemZ" FILES ${SOURCES_SYSTEMZ})
+-source_group("Source\\X86" FILES ${SOURCES_X86} ${SOURCES_X86_NUMBERS})
++source_group("Source\\X86" FILES ${SOURCES_X86} ${SOURCES_X86_NUMBERS} ${SOURCES_X86_SCAN})
+ source_group("Source\\XCore" FILES ${SOURCES_XCORE})
+ source_group("Source\\M68K" FILES ${SOURCES_M68K})
+ source_group("Source\\TMS320C64x" FILES ${SOURCES_TMS320C64X})
+diff --git a/Makefile b/Makefile
+index 44471169..a1a68d17 100644
+--- a/Makefile
++++ b/Makefile
+@@ -253,6 +253,7 @@ DEP_X86 += $(wildcard arch/X86/X86*.inc)
+ 
+ LIBOBJ_X86 =
+ LIBOBJ_X86_NUMBERS =
++LIBOBJ_X86_SCAN =
+ ifneq (,$(filter x86,$(CAPSTONE_ARCHS)))
+ 	CFLAGS += -DCAPSTONE_HAS_X86
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86DisassemblerDecoder.o
+@@ -273,6 +274,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
++	LIBOBJ_X86_SCAN += $(OBJDIR)/arch/X86/X86VexScan.o
+ endif
+ 
+ 
+@@ -426,7 +428,7 @@ LIBOBJ += $(OBJDIR)/cs.o $(OBJDIR)/utils.o $(OBJDIR)/SStream.o $(OBJDIR)/MCInstr
+ LIBOBJ += $(LIBOBJ_ARM) $(LIBOBJ_AARCH64) $(LIBOBJ_M68K) $(LIBOBJ_MIPS) $(LIBOBJ_PPC) $(LIBOBJ_RISCV) $(LIBOBJ_SPARC) $(LIBOBJ_SYSZ) $(LIBOBJ_SH)
+ LIBOBJ += $(LIBOBJ_X86) $(LIBOBJ_XCORE) $(LIBOBJ_TMS320C64X) $(LIBOBJ_M680X) $(LIBOBJ_EVM) $(LIBOBJ_MOS65XX) $(LIBOBJ_WASM) $(LIBOBJ_BPF)
+ LIBOBJ += $(LIBOBJ_TRICORE) $(LIBOBJ_ALPHA) $(LIBOBJ_HPPA) $(LIBOBJ_LOONGARCH) $(LIBOBJ_XTENSA) $(LIBOBJ_ARC)
+-LIBOBJ += $(LIBOBJ_X86_NUMBERS)
++LIBOBJ += $(LIBOBJ_X86_NUMBERS) $(LIBOBJ_X86_SCAN)
+ 
+ 
+ ifeq ($(PKG_EXTRA),)
+@@ -546,7 +548,7 @@ $(LIBOBJ_PPC): $(DEP_PPC)
+ $(LIBOBJ_SH): $(DEP_SH)
+ $(LIBOBJ_SPARC): $(DEP_SPARC)
+ $(LIBOBJ_SYSZ): $(DEP_SYSZ)
+-$(LIBOBJ_X86): $(DEP_X86)
++$(LIBOBJ_X86) $(LIBOBJ_X86_SCAN): $(DEP_X86) arch/X86/X86VexScan.h
+ $(LIBOBJ_XCORE): $(DEP_XCORE)
+ $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
+ $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..c858c684 100644
+index 63dcc538..fe889b4e 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3285,6 +3285,11 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
- X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
- 					 uint8_t prefix, X86ScanResult *result);
+@@ -36,6 +36,7 @@
+ #include "X86FeatureExtension.h"
+ #include "X86DisassemblerTranslator.h"
+ #include "X86ScanAdapter.h"
++#include "X86VexScan.h"
+ #include "X86InstPrinterCommon.h"
  
-+#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+static CS_PRESERVE_MOST int
-+scanVex32PublicPlan(const uint8_t *code, size_t size, X86ScanResult *result);
-+#endif
-+
- /* Only generic and extension decoding need an MCInst in the core scan path. */
  #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -3367,6 +3372,16 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+@@ -3088,7 +3089,6 @@ int decodeInstructionFull(struct InternalInstruction *insn, const uint8_t *code,
+ 				     false, mcInst);
+ }
+ 
+-enum { X86_SCAN_NOT_HANDLED = 3 };
+ 
+ /* Only the compact readers see this state. Generic/raw decoding starts its
+  * own state if the generated table has no terminal for this header. */
+@@ -3367,6 +3367,17 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
  			return true;
  		}
  	}
@@ -24,101 +110,45 @@ index 63dcc538..c858c684 100644
 +	 * additional reader in the existing fallback, outside the iterator. */
 +	if (handle->mode == CS_MODE_32 && code_len >= 2 && code[0] == 0xc5 &&
 +	    (code[1] & 0xc0) == 0xc0) {
-+		const int status = scanVex32PublicPlan(code, code_len, result);
++		const int status =
++			X86_scanVex32PublicPlan(code, code_len, result);
 +		if (status != X86_SCAN_NOT_HANDLED)
 +			return status == X86_SCAN_COMPLETE;
 +	}
  #endif
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
-@@ -3854,6 +3869,68 @@ CAPSTONE_INTERNAL uint16_t X86_scanCallTarget(csh ud, const uint8_t *code,
- 	return (uint16_t)insn.length;
- }
- 
-+#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+/* Every admitted plan has the same public ID, reserved-vvvv rule and
-+ * immediate extent as all of its canonical ModR/M outcomes. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+static CS_PRESERVE_MOST int
-+scanVex32PublicPlan(const uint8_t *code, size_t size, X86ScanResult *result)
-+{
-+	if (size < 3)
-+		return X86_SCAN_INVALID;
-+	const unsigned payload = code[1];
-+	unsigned plan = x86Vex2PublicPlans[payload & 7][code[2]];
-+#if X86_HAS_VEX2_PUBLIC_GROUPS
-+	if (plan & X86_VEX2_PUBLIC_GROUP) {
-+		if (size < 4)
-+			return X86_SCAN_INVALID;
-+		const unsigned modrm = code[3];
-+		plan = x86Vex2PublicGroups[plan & (X86_VEX2_PUBLIC_GROUP - 1)]
-+					  [((modrm >> 3) & 7) +
-+					   (modrm >= 0xc0 ? 8 : 0)];
-+	}
-+#endif
-+	if (!plan)
-+		return X86_SCAN_NOT_HANDLED;
-+	if ((plan & 2) && vvvvFromVEX2of2(payload))
-+		return X86_SCAN_INVALID;
-+	unsigned end = 3;
-+	if (plan & 4) {
-+		if (size < 4)
-+			return X86_SCAN_INVALID;
-+		const unsigned modrm = code[3];
-+		end = 4;
-+		if (modrm < 0xc0) {
-+			const unsigned mod = modrm >> 6, rm = modrm & 7;
-+			static const uint8_t extra[3][8] = {
-+				{ 0, 0, 0, 0, 1, 4, 0, 0 },
-+				{ 1, 1, 1, 1, 2, 1, 1, 1 },
-+				{ 4, 4, 4, 4, 5, 4, 4, 4 }
-+			};
-+			if ((modrm & 0xc7) == 4) {
-+				if (end >= size)
-+					return X86_SCAN_INVALID;
-+				if ((code[end] & 7) == 5)
-+					end += 4;
-+			}
-+			end += extra[mod][rm];
-+		}
-+	}
-+	end += plan & 1;
-+	if (end > size)
-+		return X86_SCAN_INVALID;
-+	result->opcode = 0;
-+	result->opcode_pub = plan >> 3;
-+	result->length = (uint16_t)end;
-+	result->popcode_adjust = 0;
-+	return X86_SCAN_COMPLETE;
-+}
-+#endif
-+
- #undef CS_DECODE_INLINE
- #undef CS_DECODE_LIKELY
- #undef CS_DECODE_UNLIKELY
-diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
-index 2c0da2cd..2c9f22dc 100644
---- a/arch/X86/X86GenVexScan.inc
-+++ b/arch/X86/X86GenVexScan.inc
-@@ -61,6 +61,9 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
- 	},
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..492ca8e6 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -698,7 +698,8 @@ struct MCInst;
+ enum X86DecodeScanResult {
+ 	X86_SCAN_INVALID = -1,
+ 	X86_SCAN_RAW_READY = 0,
+-	X86_SCAN_COMPLETE = 1
++	X86_SCAN_COMPLETE = 1,
++	X86_SCAN_NOT_HANDLED = 3
  };
  
+ /* With mcInst, COMPLETE includes scan translation and writes size; RAW_READY
+diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
+new file mode 100644
+index 00000000..0ee48591
+--- /dev/null
++++ b/arch/X86/X86GenVexPublicPlans.inc
+@@ -0,0 +1,189 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++/* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
++
++#ifdef CAPSTONE_X86_REDUCE
 +#define X86_HAS_VEX2_PUBLIC_PLANS 0
 +#define X86_HAS_VEX2_PUBLIC_GROUPS 0
 +
- /* 1570 admitted UIDs, 9 immediate patterns. */
- enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
-        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
-@@ -381,6 +384,183 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
- 	},
- };
- 
++#else
 +#define X86_HAS_VEX2_PUBLIC_PLANS 1
++#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS
 +/* Public plan or tagged ModR/M group by L/pp/opcode. */
 +static const uint16_t x86Vex2PublicPlans[8][256] = {
 +	{
@@ -294,15 +324,115 @@ index 2c0da2cd..2c9f22dc 100644
 +	{ 8374, 8374, 8374, 8374, 8374, 8374, 8374, 8374, 8372, 8372, 8372, 8372, 8372, 8372, 8372, 8372 },
 +	{ 8022, 8022, 8022, 8022, 8022, 8022, 8022, 8022, 0, 0, 0, 0, 0, 0, 0, 0 },
 +};
++#endif
 +
- /* 4512 admitted UIDs, 10 immediate patterns. */
- enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
-        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
++#endif
+diff --git a/arch/X86/X86VexScan.c b/arch/X86/X86VexScan.c
+new file mode 100644
+index 00000000..a341205b
+--- /dev/null
++++ b/arch/X86/X86VexScan.c
+@@ -0,0 +1,69 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#ifdef CAPSTONE_HAS_X86
++#define X86_DEFINE_VEX2_PUBLIC_PLANS
++#include "X86VexScan.h"
++
++#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++/* Every admitted plan has the same public ID, reserved-vvvv rule and
++ * immediate extent as all of its canonical ModR/M outcomes. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++CAPSTONE_INTERNAL CS_PRESERVE_MOST int
++X86_scanVex32PublicPlan(const uint8_t *code, size_t size, X86ScanResult *result)
++{
++	if (size < 3)
++		return X86_SCAN_INVALID;
++	const unsigned payload = code[1];
++	unsigned plan = x86Vex2PublicPlans[payload & 7][code[2]];
++#if X86_HAS_VEX2_PUBLIC_GROUPS
++	if (plan & X86_VEX2_PUBLIC_GROUP) {
++		if (size < 4)
++			return X86_SCAN_INVALID;
++		const unsigned modrm = code[3];
++		plan = x86Vex2PublicGroups[plan & (X86_VEX2_PUBLIC_GROUP - 1)]
++					  [((modrm >> 3) & 7) +
++					   (modrm >= 0xc0 ? 8 : 0)];
++	}
++#endif
++	if (!plan)
++		return X86_SCAN_NOT_HANDLED;
++	if ((plan & 2) && vvvvFromVEX2of2(payload))
++		return X86_SCAN_INVALID;
++	unsigned end = 3;
++	if (plan & 4) {
++		if (size < 4)
++			return X86_SCAN_INVALID;
++		const unsigned modrm = code[3];
++		end = 4;
++		if (modrm < 0xc0) {
++			const unsigned mod = modrm >> 6, rm = modrm & 7;
++			static const uint8_t extra[3][8] = {
++				{ 0, 0, 0, 0, 1, 4, 0, 0 },
++				{ 1, 1, 1, 1, 2, 1, 1, 1 },
++				{ 4, 4, 4, 4, 5, 4, 4, 4 }
++			};
++			if ((modrm & 0xc7) == 4) {
++				if (end >= size)
++					return X86_SCAN_INVALID;
++				if ((code[end] & 7) == 5)
++					end += 4;
++			}
++			end += extra[mod][rm];
++		}
++	}
++	end += plan & 1;
++	if (end > size)
++		return X86_SCAN_INVALID;
++	result->opcode = 0;
++	result->opcode_pub = plan >> 3;
++	result->length = (uint16_t)end;
++	result->popcode_adjust = 0;
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
++#endif
+diff --git a/arch/X86/X86VexScan.h b/arch/X86/X86VexScan.h
+new file mode 100644
+index 00000000..6f6e668e
+--- /dev/null
++++ b/arch/X86/X86VexScan.h
+@@ -0,0 +1,20 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++#ifndef CS_X86_VEX_SCAN_H
++#define CS_X86_VEX_SCAN_H
++
++#include "../../cs_priv.h"
++#include "X86Disassembler.h"
++#include "X86DisassemblerDecoder.h"
++#include "X86GenVexPublicPlans.inc"
++
++#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
++/* The caller admits a bare 32-bit VEX2 prefix. COMPLETE writes the public
++ * ID and extent; NOT_HANDLED retains the canonical decoder; INVALID rejects
++ * the encoding. Neither non-complete outcome writes the result. */
++CAPSTONE_INTERNAL CS_PRESERVE_MOST int
++X86_scanVex32PublicPlan(const uint8_t *code, size_t size,
++			X86ScanResult *result);
++#endif
++
++#endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index 48c6fb41..87495638 100644
+index 48c6fb41..628f6bfe 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
-@@ -1158,7 +1158,98 @@ def vex_scan_form(operands, register_form):
+@@ -1158,7 +1158,99 @@ def vex_scan_form(operands, register_form):
      return True
  
  
@@ -380,7 +510,8 @@ index 48c6fb41..87495638 100644
 +        return ["#define X86_HAS_VEX2_PUBLIC_PLANS 0",
 +                "#define X86_HAS_VEX2_PUBLIC_GROUPS 0", ""]
 +    lines = ["#define X86_HAS_VEX2_PUBLIC_PLANS 1",
-+             "/* Public plan or tagged ModR/M group by L/pp/opcode. */",
++             "#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS",
++        "/* Public plan or tagged ModR/M group by L/pp/opcode. */",
 +             "static const uint16_t x86Vex2PublicPlans[8][256] = {"]
 +    for row in out:
 +        lines.append("\t{")
@@ -395,14 +526,14 @@ index 48c6fb41..87495638 100644
 +        for group in groups:
 +            lines.append("\t{ " + ", ".join(map(str, group)) + " },")
 +        lines += ["};"]
-+    return lines + [""]
++    return lines + ["#endif", ""]
 +
 +
-+def emit_vex_scan_rows(suffix, metadata, patterns):
++def emit_vex_scan_rows(suffix, metadata, patterns, public_plans=False):
      common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
      contexts, kinds, names = tables.parse_common(common)
      source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
-@@ -1204,12 +1295,18 @@ def emit_vex_scan_rows(suffix):
+@@ -1204,15 +1296,23 @@ def emit_vex_scan_rows(suffix):
              if key & 8:
                  attributes |= attrs["ATTR_REXW"]
              row = indices[contexts.index(context_values[attributes])]
@@ -416,21 +547,34 @@ index 48c6fb41..87495638 100644
              )
          lines.append("\t},")
      lines += ["};", ""]
--    return lines
-+    return lines + emit_vex2_plans(suffix, source, contexts, names, context_values,
-+                                   attrs, pp, metadata, patterns)
++    if public_plans:
++        return emit_vex2_plans(suffix, source, contexts, names, context_values,
++                              attrs, pp, metadata, patterns)
+     return lines
  
  
- def emit_vex_scan(suffix):
-@@ -1279,7 +1376,7 @@ def emit_vex_scan(suffix):
+-def emit_vex_scan(suffix):
++def emit_vex_scan(suffix, public_plans=False):
+     # MODE_64BIT ordinary VEX registers are at most 15. Admitted classes have
+     # no gather, mask, register-limit or predicate-dependent opcode checks.
+     reads = dict(read_specializations(suffix))
+@@ -1279,7 +1379,7 @@ def emit_vex_scan(suffix):
              ]
          lines.append("\t\treturn X86_SCAN_COMPLETE;")
      lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
 -    return "\n".join(emit_vex_scan_rows(suffix) + lines)
-+    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns) + lines)
++    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns, public_plans) + ([] if public_plans else lines))
  
  
  def emit_writemask_opcodes(suffix):
+@@ -1342,6 +1442,7 @@ def main():
+         (SCAN_OUTPUT, emit_scan),
+         (TERMINAL_OUTPUT, emit_terminal),
+         (X86 / "X86GenVexScan.inc", emit_vex_scan),
++        (X86 / "X86GenVexPublicPlans.inc", lambda suffix: emit_vex_scan(suffix, True)),
+         (X86 / "X86GenWritemask.inc", emit_writemask_opcodes),
+     ]
+     generated = [(path, generated_output(emit)) for path, emit in outputs]
 diff --git a/tests/unit/x86_buffer_bounds.c b/tests/unit/x86_buffer_bounds.c
 index 57ee99b2..03abf6d5 100644
 --- a/tests/unit/x86_buffer_bounds.c
@@ -502,3 +646,71 @@ index 57ee99b2..03abf6d5 100644
  		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
  		{ CS_MODE_64,
  		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index 82c9453e..68936b27 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -114,6 +114,7 @@
+ 		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
+ 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
++		EC1089000000000000000001 /* X86VexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1089000000000000000004 /* X86VexScan.c */; };
+ 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+ 		FE474FB619DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
+@@ -162,6 +163,7 @@
+ 		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
+ 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
++		EC1089000000000000000002 /* X86VexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1089000000000000000004 /* X86VexScan.c */; };
+ 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+ 		FE474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
+@@ -229,6 +231,7 @@
+ 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
+ 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
++		EC1089000000000000000003 /* X86VexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = EC1089000000000000000004 /* X86VexScan.c */; };
+ 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+ 		FEFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterNumbers.c in Sources */ = {isa = PBXBuildFile; fileRef = FEFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterNumbers.c */; };
+@@ -515,6 +518,7 @@
+ 		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
+ 		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
+ 		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
++		EC1089000000000000000004 /* X86VexScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VexScan.c; sourceTree = "<group>"; };
+ 		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
+ 		DCFE243A19DDCD8800EF8EA9 /* X86DisassemblerDecoderCommon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoderCommon.h; sourceTree = "<group>"; };
+ 		DCFE243B19DDCD8800EF8EA9 /* X86GenAsmWriter.inc */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.pascal; path = X86GenAsmWriter.inc; sourceTree = "<group>"; };
+@@ -990,6 +994,7 @@
+ 				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
+ 				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
+ 				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
++				EC1089000000000000000004 /* X86VexScan.c */,
+ 				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
+ 				DCFE243A19DDCD8800EF8EA9 /* X86DisassemblerDecoderCommon.h */,
+ 				DCFE243B19DDCD8800EF8EA9 /* X86GenAsmWriter.inc */,
+@@ -1635,6 +1640,7 @@
+ 				DC474FD619DE6FDA00BCA449 /* SystemZModule.c in Sources */,
+ 				DC474FCA19DE6FDA00BCA449 /* PPCDisassembler.c in Sources */,
+ 				DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */,
++				EC1089000000000000000002 /* X86VexScan.c in Sources */,
+ 				DC474FC819DE6FDA00BCA449 /* MipsMapping.c in Sources */,
+ 				DC474FD119DE6FDA00BCA449 /* SparcModule.c in Sources */,
+ 				DC474FDD19DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */,
+@@ -1751,6 +1757,7 @@
+ 				DC20E70652D3871A8ABE7731 /* SparcDisassemblerExtension.c in Sources */,
+ 				DCFE246019DDCD9900EF8EA9 /* ARMInstPrinter.c in Sources */,
+ 				DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */,
++				EC1089000000000000000003 /* X86VexScan.c in Sources */,
+ 				DCFE248219DDCDB700EF8EA9 /* SystemZMCTargetDesc.c in Sources */,
+ 				DCFE247119DDCDA700EF8EA9 /* PPCMapping.c in Sources */,
+ 				DCFE246219DDCD9900EF8EA9 /* ARMModule.c in Sources */,
+@@ -1783,6 +1790,7 @@
+ 				DC474FB219DE6FDA00BCA449 /* SystemZModule.c in Sources */,
+ 				DC474FA619DE6FDA00BCA449 /* PPCDisassembler.c in Sources */,
+ 				DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */,
++				EC1089000000000000000001 /* X86VexScan.c in Sources */,
+ 				DC474FA419DE6FDA00BCA449 /* MipsMapping.c in Sources */,
+ 				DC474FAD19DE6FDA00BCA449 /* SparcModule.c in Sources */,
+ 				DC474FB919DE6FDA00BCA449 /* XCoreDisassembler.c in Sources */,
