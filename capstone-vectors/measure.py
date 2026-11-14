@@ -52,7 +52,7 @@ def main(w):
         assert len(objects[label])>30
         if label=='output':
             changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
-            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86OutputIterator','X86VectorOutput','X86DisassemblerDecoder','X86ImmediateOutput','X86MemoryOutput')},changed
+            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86OutputIterator','X86VectorOutput','X86DisassemblerDecoder','X86ImmediateOutput')},changed
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
