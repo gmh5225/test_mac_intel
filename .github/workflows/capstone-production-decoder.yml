@@ -1,7 +1,7 @@
-name: Verify VEX2 scan and public output in NeverD dev built with current fork LLVM
+name: Qualify integrated VEX2 operands, formatted records and separate generic iterator in product
 on:
   push:
-    branches: [codex/neverd-i386-vex2-scan-output]
+    branches: [codex/capstone-grouped-vex2-integrated-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 3653724cc3b3cbd40d329f25b4bd4cf6e67e0156
+          ref: 6db8eba6f3d52522bd30d282b71bdcfd4fd9ac3c
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-vex2-scan-and-records
+          name: product-grouped-vex2-integrated
           path: product-evidence/
           retention-days: 14
