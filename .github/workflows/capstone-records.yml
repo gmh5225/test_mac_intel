@@ -1,7 +1,7 @@
-name: Time generated i386 VEX2 register formatting and detail on PE32, PE64 and mixed-architecture controls
+name: Measure Use the fused operand reader after unchanged EVEX prefix validation on PE32, PE64, ARM64 and MIPS in five compiler environments
 on:
   push:
-    branches: [codex/capstone-i386-vex2-output-mixed]
+    branches: [codex/capstone-evex-scan-owner-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
+          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex2-output-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-scan-owner-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
