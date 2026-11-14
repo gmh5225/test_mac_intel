@@ -1,7 +1,7 @@
-name: Separate EVEX memory output savings from JPEG and Zstd SIMD regressions
+name: Measure layout isolation with identical SSE output work and final executable addresses
 on:
   push:
-    branches: [codex/capstone-evex-output-work]
+    branches: [codex/capstone-output-layout-sections-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-output-work-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: output-layout-sections-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
