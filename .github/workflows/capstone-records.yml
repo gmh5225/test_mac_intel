@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in mixed
+name: Measure shared EVEX byte-shift rows in mixed
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-mixed]
+    branches: [codex/capstone-evex-byte-shift-current-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-combined-boundary-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-byte-shift-current-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
