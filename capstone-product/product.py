@@ -1,6 +1,7 @@
 from pathlib import Path
 import hashlib,json,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
 import corpus
+import avx_corpus
 r=Path(__file__).resolve().parent;root=r.parent;nd=root/'neverd';out=root/'product-evidence';out.mkdir(exist_ok=True)
 def write(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def command(args,label,cwd=None):
@@ -21,8 +22,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   cases=corpus.prepare(r,t,out,command)
   cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
   assert len(cases)==14
+  original_cases=list(cases)
+  cases.append(avx_corpus.prepare(r,t,out,command))
+  assert len(cases)==15
   shutil.copyfile(r/'probe.cpp',nd/'capstone-product.cpp');cm=nd/'CMakeLists.txt'
   cm.write_text(cm.read_text()+'\nadd_executable(capstone-product capstone-product.cpp)\ntarget_link_libraries(capstone-product PRIVATE NeverDDecode)\n')
+  shutil.copyfile(r/'original-probe.cpp',nd/'capstone-product-legacy.cpp')
+  with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
@@ -60,7 +66,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
-   command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
+   targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests']
+   if label=='base':targets.append('capstone-product-legacy')
+   command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
@@ -77,6 +85,17 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     compare(t/'base.trace',trace,label);trace.unlink()
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
+   if label=='base':
+    legacy,=list(build.rglob('capstone-product-legacy'));checks=[]
+    for case in original_cases:
+     sel=case['selector'] if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
+     for mode in (0,1,2):
+      tail=list(map(str,[case['path'],sel,mode,1]))
+      old=list(map(int,sp.check_output([legacy,*tail],text=True).split()))[1:]
+      new=list(map(int,sp.check_output([prod,*tail],text=True).split()))[1:]
+      assert old==new,(case['name'],mode,old,new)
+      checks.append(dict(case=case['name'],mode=mode,signature=new))
+    write('original-probe-equivalence',dict(checks=checks,unchanged=True))
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
@@ -122,6 +141,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   def measure(name,case,mode,reps,launch):
    sel=case['selector'] if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
    tail=list(map(str,[case['path'],sel,mode,reps]))
+   if 'intervals' in case:tail.append(case['intervals'])
    if launch=='images':args=[str(products[name]),*tail]
    else:
     with image.open('r+b')as stream:assert stream.write(padded[name])==maximum
@@ -129,9 +149,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     args=['setarch',platform.machine(),'-R',str(image),*tail]
    ticks,*signature=map(int,sp.check_output(args,text=True).split())
    assert ticks>0 and signature[0]>0
+   if 'expected_instructions' in case:
+    assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
    return ticks,signature
   results=[]
-  cases_of_interest={'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
+  cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2):
     if mode not in cases_of_interest.get(case['name'],()):continue
@@ -152,6 +174,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
      row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==37*len(launches);write('complete',dict(launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne'],variants=list(variants)))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==40*len(launches);write('complete',dict(launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne'],variants=list(variants)))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))

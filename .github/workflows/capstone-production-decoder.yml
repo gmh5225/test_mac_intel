@@ -1,7 +1,7 @@
-name: Validate grouped VEX32 fallback in current NeverD with source LLVM
+name: Validate current NeverD decoder on real AVX32 and cross-architecture workloads
 on:
   push:
-    branches: [codex/capstone-grouped-vex32-product]
+    branches: [codex/capstone-avx32-current-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 633a7092a8ece2ab479ad536cf0d0498eaf133b0
+          ref: 2c7e2c3591293c994b67747b65c232a679b70fb1
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,6 +31,10 @@ jobs:
             libc
             third-party
           persist-credentials: false
+      - name: Prepare ELF fixture reader
+        run: |
+          python3 -m venv "$RUNNER_TEMP/capstone-product-venv"
+          "$RUNNER_TEMP/capstone-product-venv/bin/python" -m pip install pyelftools==0.32
       - name: Initialize source dependencies
         working-directory: neverd
         run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
@@ -38,13 +42,13 @@ jobs:
         env:
           CC: clang
           CXX: clang++
-        run: python3 capstone-product/product.py
+        run: '"$RUNNER_TEMP/capstone-product-venv/bin/python" capstone-product/product.py'
       - name: Clean temporary source exports
         if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/neverd"
+        run: rm -rf -- "$GITHUB_WORKSPACE/neverd" "$RUNNER_TEMP/capstone-product-venv"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-grouped-vex32
+          name: product-avx32-current
           path: product-evidence/
           retention-days: 14

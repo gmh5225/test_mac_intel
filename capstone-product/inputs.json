@@ -1,20 +1,34 @@
 {
-  "neverd": "633a7092a8ece2ab479ad536cf0d0498eaf133b0",
+  "neverd": "2c7e2c3591293c994b67747b65c232a679b70fb1",
   "capstone": "729680277dd762704ea3270291b7a75318f51583",
   "variants": {
-    "grouped-vex32": {
-      "source": "round1084-vex32-grouped-fallback",
-      "patch": "grouped-vex32.patch",
-      "patch_sha256": "84b15bc65fc2c07ca85776f3cf518802ed0337dc7ef249b4fdea33e774b77904",
-      "tree": "68de3d0ccbf2fc1f52d26d5d2ceb4baa3c9218bb",
+    "pure-vex32": {
+      "source": "round1091-pure-vex32-plan-boundary",
+      "patch": "pure-vex32.patch",
+      "patch_sha256": "0667b6caa89478cdbeeff90464aa38fa6f0ff52d572cb9aa5bb6d63a45d52dfc",
+      "tree": "3fe3bd89946167cace93b266de74c51f491cdcbf",
       "changed": [
         "X86DisassemblerDecoder.c.o"
       ],
-      "added": []
+      "added": [
+        "X86VexScan.c.o"
+      ]
+    },
+    "vex32-output-module": {
+      "source": "round1093-vex32-output-module",
+      "patch": "vex32-output-module.patch",
+      "patch_sha256": "53eb3a6ca49e24010a8ef9ed38de4280bb4fda82971f872e43e98016f49a6aba",
+      "tree": "b4431335c4983c4b528e9e6397851fed8fc18375",
+      "changed": [
+        "X86OutputIterator.c.o"
+      ],
+      "added": [
+        "X86VexOutput32.c.o"
+      ]
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD integration for grouped VEX2 plans in the existing 32-bit fallback; source-built latest fork LLVM, full record equality, real workload timing and byte-identical A/A. Full cross-configuration qualification is separate."
+  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Candidates are compared separately, not combined."
 }
