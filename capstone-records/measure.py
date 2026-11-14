@@ -35,10 +35,30 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    if key!='base':run(['git','apply',variant],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-Wl,-Map='+str(e/(key+'-link.map')),'-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
-   whole=t/('whole-'+key)
-   run(['clang++',t/'single.o','-Wl,--whole-archive',b/'libcapstone.a','-Wl,--no-whole-archive','-lm','-Wl,-Map='+str(e/('whole-'+key+'-link.map')),'-o',whole],'link-whole-'+key)
-   bins['whole-'+key]=whole
-   for layout,executable in ((key,f),('whole-'+key,whole)):
+   whole=t/('ordered-'+key)
+   members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines()
+   paths={file.name:file for file in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+   assert len(members)==len(set(members)) and set(members)<=paths.keys()
+   ordered=list(members)
+   for prefix in ('ARM','AArch64','Mips'):
+    group=[name for name in members if name.startswith(prefix)]
+    if prefix=='ARM':
+     sequence=['ARMModule.c.o','ARMMapping.c.o','ARMDisassembler.c.o','ARMDisassemblerExtension.c.o','ARMInstPrinter.c.o','ARMBaseInfo.c.o']
+    elif prefix=='AArch64':
+     sequence=['AArch64Module.c.o','AArch64Mapping.c.o','AArch64Disassembler.c.o','AArch64DisassemblerExtension.c.o','AArch64InstPrinter.c.o','AArch64BaseInfo.c.o']
+    else:
+     sequence=['MipsModule.c.o','MipsMapping.c.o','MipsDisassembler.c.o','MipsInstPrinter.c.o']
+    assert set(group)==set(sequence)
+    offset=min(ordered.index(name) for name in group)
+    ordered=[name for name in ordered if name not in group]
+    ordered[offset:offset]=sequence
+   archive=t/('ordered-'+key+'.a')
+   run(['ar','qc',archive,*[paths[name] for name in ordered]],'archive-'+key)
+   run(['ranlib',archive],'archive-index-'+key)
+   write('archive-'+key,dict(original=members,ordered=ordered))
+   run(['clang++',t/'single.o',archive,'-lm','-Wl,-Map='+str(e/('ordered-'+key+'-link.map')),'-o',whole],'link-ordered-'+key)
+   bins['ordered-'+key]=whole
+   for layout,executable in ((key,f),('ordered-'+key,whole)):
     symbols=sp.check_output(['nm','-n','-S','--defined-only',executable],text=True)
     (e/(layout+'-symbols.txt')).write_text(symbols)
     sections=sp.check_output(['objdump','-h',executable],text=True)
@@ -97,7 +117,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for x in cases:
    for mode in (0,1,2):
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','whole-base','whole-indexed','aa']
+    runs=[];reference=None;keys=['base','indexed','ordered-base','ordered-indexed','aa']
     for k in range(21):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
@@ -106,13 +126,13 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
       assert reference==(vout['first'],vout['result'])
       ticks[v].append(vout['cpu_ns'])
      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-     runs[-1]['whole-gain']=sum(ticks['whole-base'])/sum(ticks['whole-indexed'])
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys+['whole-gain']},result=reference));write('timings',data)
+     runs[-1]['ordered-gain']=sum(ticks['ordered-base'])/sum(ticks['ordered-indexed'])
+    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys+['ordered-gain']},result=reference));write('timings',data)
   profiles=[]
   for x in cases:
    for mode in (0,1,2):
     if (x['name'],mode) not in (('mips64el-ls',0),('arm64-ls',1)):continue
-    for key in ('base','indexed','whole-base','whole-indexed'):
+    for key in ('base','indexed','ordered-base','ordered-indexed'):
      ident=x['name']+'-'+str(mode)+'-'+key
      raw=t/(ident+'.callgrind')
      run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes',

@@ -1,7 +1,7 @@
-name: Control static archive extraction order to isolate cross-architecture layout effects
+name: Keep architecture modules before their decoder dependencies in static archives
 on:
   push:
-    branches: [codex/capstone-controlled-archive-layout]
+    branches: [codex/capstone-archive-dependency-order]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: controlled-archive-layout-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: archive-dependency-order-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
