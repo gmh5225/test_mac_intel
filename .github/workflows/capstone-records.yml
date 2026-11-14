@@ -1,7 +1,7 @@
-name: Time standard MIPS revision 2 scan in the released four-backend library with PE32, PE64 and ARM controls
+name: Measure MIPS32r2 and MIPS64r2 primary decode alone, including PE and ARM controls
 on:
   push:
-    branches: [codex/capstone-mips-r2-scan-only]
+    branches: [codex/capstone-mips-r2-primary-decoder]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-r2-scan-only-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mips-r2-primary-only-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
