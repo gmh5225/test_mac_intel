@@ -1,7 +1,7 @@
-name: Diagnose PE32 function scan regressions with exact linked code, CPU model and dynamic work
+name: Separate EVEX memory output savings from JPEG and Zstd SIMD regressions
 on:
   push:
-    branches: [codex/capstone-pe32-function-work]
+    branches: [codex/capstone-evex-output-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,7 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc, replica: one }
           - { host: ubuntu-22.04, cc: gcc, replica: one }
-          - { host: ubuntu-22.04, cc: gcc, replica: two }
           - { host: ubuntu-24.04, cc: clang, replica: one }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
@@ -41,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pe32-function-work-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-output-work-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

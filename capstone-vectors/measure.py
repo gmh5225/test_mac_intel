@@ -38,10 +38,10 @@ def main(w):
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
-    for label in ('integer','aa','combined','output'):
+    for label in ('integer','aa','output'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/('combined.patch' if label=='combined' else 'dispatch.patch')]
+        patches=[] if label=='integer' else [r/'dispatch.patch']
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
@@ -49,7 +49,7 @@ def main(w):
         assert len(objects[label])>30
         if label=='output':
             changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
-            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86OutputIterator','X86VectorOutput','X86DisassemblerDecoder','X86ImmediateOutput','X86MemoryOutput')},changed
+            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86VectorOutput',)},changed
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         for component in ('X86VectorOutput','X86DisassemblerDecoder'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
@@ -58,8 +58,6 @@ def main(w):
                 stream.write(assembly)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
-        if label=='output':
-            assert {n for n in objects[label]if objects[label][n]!=objects['combined'][n]}=={'arch/X86/X86VectorOutput.c.o'}
         save('object-digests.json',objects)
         symbols=sp.check_output(['nm','-n','-S','--defined-only',target],text=True)
         (p/'evidence'/(label+'-symbols.txt')).write_text(symbols)
@@ -75,11 +73,11 @@ def main(w):
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     costs=[]
     for name,bits,f,spans,source in deb.prepare(w):
-        if bits!=32 or name=='jpeg-avx2-i386':continue
+        if bits!=64:continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in ['all-functions']:
+        for panel in ['simd-functions']:
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -87,8 +85,8 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0]:
-                labels=['integer','aa','combined','output']
+            for mode in [0,1,2]:
+                labels=['integer','aa','output']
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(160e6/max(1,probe[0])));cycles=[]
                 for i in range(21):
@@ -96,26 +94,27 @@ def main(w):
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
                 row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
-            for key in ('integer','combined','output'):
-                ident=name+'-'+key
-                raw=w/(ident+'.callgrind')
-                run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--collect-atstart=no','--toggle-collect=cs_disasm_iter','--callgrind-out-file='+str(raw),str(exe[key]),'capstone','0','1',str(f),str(intervals),str(bits)],'profile-'+ident)
-                payload=raw.read_bytes();lines=payload.decode().splitlines()
-                events=next(q.split()[1:]for q in lines if q.startswith('events:'))
-                totals=next(q.split()[1:]for q in lines if q.startswith('summary:'))
-                counts=dict(zip(events,map(int,totals)));assert counts['Ir']>0
-                costs.append(dict(case=name,variant=key,counts=counts))
-                save('dynamic-costs.json',costs)
-                for inclusive in ('yes','no'):
-                    (p/'evidence'/(ident+'-'+inclusive+'.txt')).write_bytes(sp.check_output(['callgrind_annotate','--inclusive='+inclusive,'--tree=both','--threshold=99.9','--auto=no',raw]))
-                with gzip.open(p/'evidence'/(ident+'.callgrind.gz'),'wb')as out:out.write(payload)
-                raw.unlink()
-                perf=shutil.which('perf')
-                if perf:
-                    args=[perf,'stat','-x',',','-e','cycles,instructions,branches,branch-misses,cache-references,cache-misses','-o',str(p/'evidence'/(ident+'-perf.csv')),'--',str(exe[key]),'capstone','0',str(rep),str(f),str(intervals),str(bits)]
-                    with (p/'evidence'/(ident+'-perf-status.log')).open('w')as out:
-                        result=sp.run(args,stdout=out,stderr=sp.STDOUT)
-                        out.write('exit_status='+str(result.returncode)+'\n')
+            for profile_mode in (0,1,2):
+             for key in ('integer','output'):
+                 ident=name+'-'+str(profile_mode)+'-'+key
+                 raw=w/(ident+'.callgrind')
+                 run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--collect-atstart=no','--toggle-collect='+('cs_disasm_iter' if profile_mode==0 else 'X86_disasmIter'),'--callgrind-out-file='+str(raw),str(exe[key]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)],'profile-'+ident)
+                 payload=raw.read_bytes();lines=payload.decode().splitlines()
+                 events=next(q.split()[1:]for q in lines if q.startswith('events:'))
+                 totals=next(q.split()[1:]for q in lines if q.startswith('summary:'))
+                 counts=dict(zip(events,map(int,totals)));assert counts['Ir']>0
+                 costs.append(dict(case=name,mode=profile_mode,variant=key,counts=counts))
+                 save('dynamic-costs.json',costs)
+                 for inclusive in ('yes','no'):
+                     (p/'evidence'/(ident+'-'+inclusive+'.txt')).write_bytes(sp.check_output(['callgrind_annotate','--inclusive='+inclusive,'--tree=both','--threshold=99.9','--auto=no',raw]))
+                 with gzip.open(p/'evidence'/(ident+'.callgrind.gz'),'wb')as out:out.write(payload)
+                 raw.unlink()
+                 perf=shutil.which('perf')
+                 if perf:
+                     args=['sudo','-n',perf,'stat','-x',',','-e','cycles,instructions,branches,branch-misses,cache-references,cache-misses','-o',str(p/'evidence'/(ident+'-perf.csv')),'--',str(exe[key]),'capstone',str(profile_mode),str(rep),str(f),str(intervals),str(bits)]
+                     with (p/'evidence'/(ident+'-perf-status.log')).open('w')as out:
+                         result=sp.run(args,stdout=out,stderr=sp.STDOUT)
+                         out.write('exit_status='+str(result.returncode)+'\n')
             print(name,panel,len(sel),flush=True)
     save('complete.json',dict(cases=len(reported),success=True))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
