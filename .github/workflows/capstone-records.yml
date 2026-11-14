@@ -1,7 +1,7 @@
-name: Replace vector register decimal spelling with fixed-width suffix copy mixed
+name: Validate compiler-specific batch result lifetimes mixed
 on:
   push:
-    branches: [codex/capstone-vector-name-suffix-mixed]
+    branches: [codex/capstone-clang-batch-state-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-name-suffix-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: clang-batch-state-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
