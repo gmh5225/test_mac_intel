@@ -1,7 +1,7 @@
-name: Qualify output bitness with GCC iterator integration mixed
+name: Verify outlined VEX32 terminal state mixed
 on:
   push:
-    branches: [codex/capstone-bitness-inline-mixed]
+    branches: [codex/capstone-outlined-vex32-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5c6987afcec8c2f21e64575c5b9c5f442a5001ae
+          ref: 729680277dd762704ea3270291b7a75318f51583
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bitness-inline-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: outlined-vex32-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
