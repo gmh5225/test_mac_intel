@@ -1,12 +1,231 @@
-diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..963411c7 100644
---- a/arch/X86/X86GenVectorOutput.inc
-+++ b/arch/X86/X86GenVectorOutput.inc
-@@ -643,6 +643,44 @@ static const struct VectorOutputRow broadcast_rows[2][3] = {
- 		{ X86_INS_VBROADCASTF64X2, "vbroadcastf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
- 	},
- };
-+static const struct VectorOutputRow evex_load_rows[3][2][3] = {
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1482e8d9..50c3245b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -468,6 +468,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86MemoryOutput.c
+         arch/X86/X86OutputIterator.c
+         arch/X86/X86VectorOutput.c
++        arch/X86/X86EvexMemoryOutput.c
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+@@ -476,7 +477,7 @@ if(CAPSTONE_X86_SUPPORT)
+        AND CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        AND CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SIZEOF_VOID_P EQUAL 8
+        AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+-        set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c
++        set_property(SOURCE arch/X86/X86ImmediateOutput.c arch/X86/X86MemoryOutput.c arch/X86/X86OutputIterator.c arch/X86/X86VectorOutput.c arch/X86/X86EvexMemoryOutput.c
+             APPEND PROPERTY COMPILE_OPTIONS "$<$<CONFIG:Release>:-mstringop-strategy=libcall>")
+     endif()
+     # MSVC can inline the decoder into the public iterator under LTCG, giving
+diff --git a/Makefile b/Makefile
+index 44471169..ee4dd5d8 100644
+--- a/Makefile
++++ b/Makefile
+@@ -272,6 +272,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+@@ -673,7 +674,7 @@ X86_OUTPUT_STORE_FLAG := $(shell $(CC) $(CFLAGS) -dM -E -x c - < /dev/null 2>/de
+          $$2 == "__GNUC__" { gcc=1 } $$2 == "__clang__" { clang_cc=1 } \
+          $$2 == "__SIZEOF_POINTER__" { ptr=$$3 } \
+          END { if (linux_target && x64 && gcc && !clang_cc && ptr==8) print "-mstringop-strategy=libcall" }')
+-$(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
++$(OBJDIR)/arch/X86/X86ImmediateOutput.o $(OBJDIR)/arch/X86/X86MemoryOutput.o $(OBJDIR)/arch/X86/X86OutputIterator.o $(OBJDIR)/arch/X86/X86VectorOutput.o $(OBJDIR)/arch/X86/X86EvexMemoryOutput.o: CFLAGS += $(X86_OUTPUT_STORE_FLAG)
+ endif
+ endif
+ 
+diff --git a/arch/X86/X86EvexMemoryOutput.c b/arch/X86/X86EvexMemoryOutput.c
+new file mode 100644
+index 00000000..2a0c93f2
+--- /dev/null
++++ b/arch/X86/X86EvexMemoryOutput.c
+@@ -0,0 +1,167 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86SimpleOutput.h"
++#include "X86GenEvexMemoryOutput.inc"
++static char *writeVectorRegister(char *out, unsigned length_code,
++				 unsigned number)
++{
++	*out++ = "xyz"[length_code];
++	*out++ = 'm';
++	*out++ = 'm';
++	if (number >= 10)
++		*out++ = (char)('0' + number / 10);
++	*out++ = (char)('0' + number % 10);
++	return out;
++}
++
++static inline const struct EvexMemoryOutputRow *
++evexMemoryRow(const uint8_t *code, size_t size, unsigned *source_width,
++	      unsigned *instruction_length)
++{
++	if (size < 6 || (code[2] & 0x7c) != 0x7c || (code[3] & 0x9f) != 8)
++		return NULL;
++	const unsigned ll = code[3] >> 5, w = code[2] >> 7, pp = code[2] & 3;
++	const uint8_t modrm = code[5];
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	if (ll >= 3 || mod >= 3)
++		return NULL;
++	const unsigned key = ((code[1] & 15) << 8) | code[4];
++	const struct EvexMemoryOutputRow *row;
++	unsigned memory_ll;
++	if (key == 0x16f && pp) {
++		row = &evex_load_rows[pp - 1][w][ll];
++		memory_ll = ll;
++	} else {
++		return NULL;
++	}
++	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
++	const unsigned length = offset + disp_size;
++	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
++	if (!row->id || size < length)
++		return NULL;
++	if (sib) {
++		const uint8_t encoding = code[6];
++		const unsigned index = ((rxb & 2) << 2) | ((encoding >> 3) & 7);
++		/* Keep no-base and explicit RIZ spellings on the general path. */
++		if ((!mod && (encoding & 7) == 5) ||
++		    (index == 4 && encoding != 0x24))
++			return NULL;
++	}
++	*source_width = memory_ll;
++	*instruction_length = length;
++	return row;
++}
++
++bool X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			       uint16_t *insn_size,
++			       const struct X86SimpleRegister *regs)
++{
++	unsigned memory_ll, length;
++	const struct EvexMemoryOutputRow *row =
++		evexMemoryRow(code, size, &memory_ll, &length);
++	if (!row)
++		return false;
++	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
++	const uint8_t modrm = code[5];
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
++	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
++	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
++			     (~(unsigned)code[1] & 16);
++	const unsigned base_number = sib ? (code[6] & 7) : rm;
++	const struct X86SimpleRegister *base =
++		&regs[base_number | ((rxb & 1) << 3)];
++	const unsigned index_number =
++		sib ? (((rxb & 2) << 2) | ((code[6] >> 3) & 7)) : 4;
++	const struct X86SimpleRegister *index =
++		index_number == 4 ? NULL : &regs[index_number];
++	const unsigned scale = sib ? 1u << (code[6] >> 6) : 1;
++	const unsigned width = 16u << memory_ll;
++	const int32_t displacement =
++		disp_size == 4 ? X86_readDisp32(code + offset) :
++		mod	       ? (int8_t)code[offset] * (int32_t)width :
++				 0;
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)length;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = writeVectorRegister(insn->op_str, ll, dst);
++	memcpy(out, ", xmmword ptr [", 15);
++	out[2] = "xyz"[memory_ll];
++	out += 15;
++	if (rip) {
++		memcpy(out, "rip", 3);
++		out += 3;
++	} else {
++		memcpy(out, base->name, sizeof(base->name));
++		out += base->length;
++	}
++	if (index) {
++		memcpy(out, " + ", 3);
++		out += 3;
++		memcpy(out, index->name, sizeof(index->name));
++		out += index->length;
++		if (scale != 1) {
++			*out++ = '*';
++			*out++ = (char)('0' + scale);
++		}
++	}
++	out = X86_writeDisplacement(out, displacement);
++	*out = ']';
++	if (insn->detail) {
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		d->groups_count = row->group_count;
++		memcpy(d->groups, row->groups, sizeof(row->groups));
++		cs_x86 *x = &d->x86;
++		memcpy(x->opcode, code, sizeof(x->opcode));
++		x->rex = (uint8_t)(0x40 | w << 3 | rxb);
++		x->addr_size = 8;
++		x->modrm = modrm;
++		x->encoding.modrm_offset = 5;
++		if (disp_size) {
++			x->encoding.disp_offset = (uint8_t)offset;
++			x->encoding.disp_size = (uint8_t)disp_size;
++		}
++		if (sib) {
++			x->sib = code[6];
++			x->sib_scale = (int8_t)scale;
++			if (index)
++				x->sib_index = (x86_reg)index->reg;
++			x->sib_base = (x86_reg)base->reg;
++		}
++		x->op_count = 2;
++		cs_x86_op *op = &x->operands[0];
++		op->type = X86_OP_REG;
++		op->size = (uint8_t)(16u << ll);
++		static const x86_reg vector_bases[] = { X86_REG_XMM0,
++							X86_REG_YMM0,
++							X86_REG_ZMM0 };
++		op->reg = (x86_reg)(vector_bases[ll] + dst);
++		op->access = (cs_ac_type)row->access[0];
++		op = &x->operands[1];
++		op->type = X86_OP_MEM;
++		op->size = (uint8_t)width;
++		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
++		op->mem.scale = (int32_t)scale;
++		if (index)
++			op->mem.index = (x86_reg)index->reg;
++		op->mem.disp = x->disp = displacement;
++		op->access = (cs_ac_type)row->access[1];
++	}
++	return true;
++}
++
++#endif
++#endif
+diff --git a/arch/X86/X86GenEvexMemoryOutput.inc b/arch/X86/X86GenEvexMemoryOutput.inc
+new file mode 100644
+index 00000000..87b26d7c
+--- /dev/null
++++ b/arch/X86/X86GenEvexMemoryOutput.inc
+@@ -0,0 +1,44 @@
++/* Generated by suite/synctools/x86_vector_output.cpp. */
++struct EvexMemoryOutputRow {
++	uint16_t id;
++	char mnemonic[16];
++	uint8_t group_count, groups[4], access[4], immediate;
++};
++static const struct EvexMemoryOutputRow evex_load_rows[3][2][3] = {
 +	{
 +		{
 +			{ X86_INS_VMOVDQA32, "vmovdqa32", 2, { 134, 166, 0, 0 }, { 2, 1, 0, 0 }, 0 },
@@ -44,218 +263,52 @@ index 1d237cd1..963411c7 100644
 +		},
 +	},
 +};
- struct VexRipLoad {
- 	unsigned id; char mnemonic[12], address[20];
- 	uint8_t address_length, length_code, reg_size, mem_size, reg_access, mem_access, group_count, groups[4];
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..b8228910 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -54,6 +54,11 @@ enum X86SimpleForm {
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
++CAPSTONE_INTERNAL bool
++X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			  uint16_t *insn_size,
++			  const struct X86SimpleRegister *regs);
++
+ CAPSTONE_INTERNAL bool
+ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..4f7ef903 100644
+index 6df1472d..42afc292 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -101,9 +101,51 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	return true;
- }
- 
--static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
--			       uint16_t *insn_size,
--			       const struct X86SimpleRegister *regs);
-+static inline const struct VectorOutputRow *
-+evexMemoryRow(const uint8_t *code, size_t size, unsigned *source_width,
-+	      unsigned *instruction_length)
-+{
-+	if (size < 6 || (code[2] & 0x7c) != 0x7c || (code[3] & 0x9f) != 8)
-+		return NULL;
-+	const unsigned ll = code[3] >> 5, w = code[2] >> 7, pp = code[2] & 3;
-+	const uint8_t modrm = code[5];
-+	const unsigned mod = modrm >> 6, rm = modrm & 7;
-+	if (ll >= 3 || mod >= 3)
-+		return NULL;
-+	const unsigned key = ((code[1] & 15) << 8) | code[4];
-+	const struct VectorOutputRow *row;
-+	unsigned memory_ll;
-+	if (key == 0x16f && pp) {
-+		row = &evex_load_rows[pp - 1][w][ll];
-+		memory_ll = ll;
-+	} else if (key == 0x21a && pp == 1 && mod < 2) {
-+		row = &broadcast_rows[w][ll];
-+		memory_ll = 0;
-+	} else {
-+		return NULL;
-+	}
-+	const bool sib = rm == 4, rip = !mod && rm == 5;
-+	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
-+	const unsigned length = offset + disp_size;
-+	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
-+	if (!row->id || size < length)
-+		return NULL;
-+	if (sib) {
-+		const uint8_t encoding = code[6];
-+		const unsigned index = ((rxb & 2) << 2) | ((encoding >> 3) & 7);
-+		/* Keep no-base and explicit RIZ spellings on the general path. */
-+		if ((!mod && (encoding & 7) == 5) ||
-+		    (index == 4 && encoding != 0x24))
-+			return NULL;
-+	}
-+	*source_width = memory_ll;
-+	*instruction_length = length;
-+	return row;
-+}
+@@ -534,6 +534,10 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 			       uint16_t *insn_size,
+ 			       const struct X86SimpleRegister *regs)
+ {
++	if (size >= 6 && code[4] == 0x6f)
++		return X86_writeEvexMemoryOutput(code, size, insn, insn_size,
++						 regs);
 +
-+static bool writeEvexMemoryOutput(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister *regs);
- 
- #if defined(_MSC_VER)
- __declspec(noinline)
-@@ -115,8 +157,8 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 			    const struct X86SimpleRegister *address_regs)
- {
- 	if (size >= 6 && code[5] < 0xc0)
--		return writeEvexBroadcast(code, size, insn, insn_size,
--					  address_regs);
-+		return writeEvexMemoryOutput(code, size, insn, insn_size,
-+					     address_regs);
- 	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
- 	    (code[3] & 0x60) == 0x60)
+ 	if (size < 6 || (code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
+ 	    (code[3] & 0x9f) != 8 || code[4] != 0x1a)
  		return false;
-@@ -523,36 +565,42 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 					      prefix);
- 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
- }
--/* A regular base, an unmasked destination and a full 128-bit memory tuple.
-- * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
-+/* Unmasked loads and broadcasts share the parsed address in text and detail. */
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
- __attribute__((noinline))
- #endif
--static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
--			       uint16_t *insn_size,
--			       const struct X86SimpleRegister *regs)
-+static bool writeEvexMemoryOutput(const uint8_t *code, size_t size,
-+				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister *regs)
- {
--	if (size < 6 || (code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
--	    (code[3] & 0x9f) != 8 || code[4] != 0x1a)
-+	unsigned memory_ll, length;
-+	const struct VectorOutputRow *row =
-+		evexMemoryRow(code, size, &memory_ll, &length);
-+	if (!row)
- 		return false;
- 	const unsigned ll = code[3] >> 5, w = code[2] >> 7;
- 	const uint8_t modrm = code[5];
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
--	if (ll >= 3 || mod > 1 || (!mod && rm == 5))
--		return false;
--	const struct VectorOutputRow *row = &broadcast_rows[w][ll];
--	const bool sib = rm == 4;
--	const unsigned offset = 6 + sib, length = offset + mod;
-+	const bool sib = rm == 4, rip = !mod && rm == 5;
-+	const unsigned offset = 6 + sib, disp_size = mod == 2 || rip ? 4 : mod;
- 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
--	if (!row->id || size < length ||
--	    (sib && ((rxb & 2) || code[6] != 0x24)))
--		return false;
- 	const unsigned dst = ((modrm >> 3) & 7) | ((rxb & 4) << 1) |
- 			     (~(unsigned)code[1] & 16);
--	const struct X86SimpleRegister *base = &regs[rm | ((rxb & 1) << 3)];
--	const int displacement = mod ? (int8_t)code[offset] * 16 : 0;
-+	const unsigned base_number = sib ? (code[6] & 7) : rm;
-+	const struct X86SimpleRegister *base =
-+		&regs[base_number | ((rxb & 1) << 3)];
-+	const unsigned index_number =
-+		sib ? (((rxb & 2) << 2) | ((code[6] >> 3) & 7)) : 4;
-+	const struct X86SimpleRegister *index =
-+		index_number == 4 ? NULL : &regs[index_number];
-+	const unsigned scale = sib ? 1u << (code[6] >> 6) : 1;
-+	const unsigned width = 16u << memory_ll;
-+	const int32_t displacement =
-+		disp_size == 4 ? X86_readDisp32(code + offset) :
-+		mod	       ? (int8_t)code[offset] * (int32_t)width :
-+				 0;
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)length;
- 	memcpy(insn->bytes, code, length);
-@@ -561,21 +609,26 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
- 	char *out = writeVectorRegister(insn->op_str, ll, dst);
- 	memcpy(out, ", xmmword ptr [", 15);
-+	out[2] = "xyz"[memory_ll];
- 	out += 15;
--	memcpy(out, base->name, sizeof(base->name));
--	out += base->length;
--	if (displacement) {
--		const unsigned mag = displacement < 0 ?
--					     (unsigned)-displacement :
--					     (unsigned)displacement;
--		memcpy(out, displacement < 0 ? " - 0x" : " + 0x", 5);
--		out += 5;
--		static const char digits[] = "0123456789abcdef";
--		if (mag >= 256)
--			*out++ = digits[mag >> 8];
--		*out++ = digits[(mag >> 4) & 15];
--		*out++ = '0';
-+	if (rip) {
-+		memcpy(out, "rip", 3);
-+		out += 3;
-+	} else {
-+		memcpy(out, base->name, sizeof(base->name));
-+		out += base->length;
-+	}
-+	if (index) {
-+		memcpy(out, " + ", 3);
-+		out += 3;
-+		memcpy(out, index->name, sizeof(index->name));
-+		out += index->length;
-+		if (scale != 1) {
-+			*out++ = '*';
-+			*out++ = (char)('0' + scale);
-+		}
- 	}
-+	out = X86_writeDisplacement(out, displacement);
- 	*out = ']';
- 	if (insn->detail) {
- 		cs_detail *d = insn->detail;
-@@ -588,13 +641,15 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 		x->addr_size = 8;
- 		x->modrm = modrm;
- 		x->encoding.modrm_offset = 5;
--		if (mod) {
-+		if (disp_size) {
- 			x->encoding.disp_offset = (uint8_t)offset;
--			x->encoding.disp_size = 1;
-+			x->encoding.disp_size = (uint8_t)disp_size;
- 		}
- 		if (sib) {
- 			x->sib = code[6];
--			x->sib_scale = 1;
-+			x->sib_scale = (int8_t)scale;
-+			if (index)
-+				x->sib_index = (x86_reg)index->reg;
- 			x->sib_base = (x86_reg)base->reg;
- 		}
- 		x->op_count = 2;
-@@ -608,9 +663,11 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
- 		op->access = (cs_ac_type)row->access[0];
- 		op = &x->operands[1];
- 		op->type = X86_OP_MEM;
--		op->size = 16;
--		op->mem.base = (x86_reg)base->reg;
--		op->mem.scale = 1;
-+		op->size = (uint8_t)width;
-+		op->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-+		op->mem.scale = (int32_t)scale;
-+		if (index)
-+			op->mem.index = (x86_reg)index->reg;
- 		op->mem.disp = x->disp = displacement;
- 		op->access = (cs_ac_type)row->access[1];
- 	}
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 834c2488..8ba63a14 100644
+index 834c2488..bac51482 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -891,6 +891,114 @@ void emit_vex_registers(Decoder &decoder)
+@@ -1,7 +1,8 @@
+ /* Capstone Disassembly Engine */
+ /* SPDX-License-Identifier: BSD-3-Clause */
+ 
+-// Build against full x86 Capstone and redirect stdout to X86GenVectorOutput.inc.
++// Build against full x86 Capstone. The default output is X86GenVectorOutput.inc;
++// --evex-memory emits X86GenEvexMemoryOutput.inc.
+ #include <capstone/capstone.h>
+ #include <algorithm>
+ #include <array>
+@@ -891,6 +892,114 @@ void emit_vex_registers(Decoder &decoder)
  	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
  		     rows.size(), widths.size() - 1);
  }
@@ -264,7 +317,7 @@ index 834c2488..8ba63a14 100644
 +void emit_evex_load_rows(Decoder &decoder)
 +{
 +	std::puts(
-+		"static const struct VectorOutputRow evex_load_rows[3][2][3] = {");
++		"static const struct EvexMemoryOutputRow evex_load_rows[3][2][3] = {");
 +	const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0 };
 +	const char *prefix[] = { "xmm", "ymm", "zmm" };
 +	unsigned valid_rows = 0;
@@ -370,14 +423,30 @@ index 834c2488..8ba63a14 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -939,6 +1047,7 @@ void emit_output(Decoder &decoder)
- 	emit_vex_registers(decoder);
- 	emit_vex_shifts(decoder);
- 	emit_broadcast_rows(decoder);
-+	emit_evex_load_rows(decoder);
- 	emit_vex_rip_loads(decoder);
- 	Decoder padding32(CS_MODE_32);
- 	emit_padding_rows(padding32, decoder);
+@@ -946,11 +1055,21 @@ void emit_output(Decoder &decoder)
+ }
+ }
+ 
+-int main()
++int main(int argc, char **argv)
+ {
+ 	Decoder decoder;
+ 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
+-	emit_output(decoder);
++	if (argc == 1) {
++		emit_output(decoder);
++	} else if (argc == 2 && !std::strcmp(argv[1], "--evex-memory")) {
++		std::puts(
++			"struct EvexMemoryOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], immediate;\n};");
++		emit_evex_load_rows(decoder);
++	} else {
++		std::fputs("usage: x86_vector_output [--evex-memory]\n",
++			   stderr);
++		return 1;
++	}
+ 	std::fprintf(stderr, "%llu ordinary decoder probes\n",
+ 		     static_cast<unsigned long long>(decoder.probes));
+ }
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 6990d510..fb966813 100644
 --- a/tests/unit/x86_simple_output.c

@@ -53,6 +53,8 @@ try:
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
         result=subprocess.check_output([generator],cwd=source)
         assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
+        result=subprocess.check_output([generator,'--evex-memory'],cwd=source)
+        assert result==(source/'arch/X86/X86GenEvexMemoryOutput.inc').read_bytes()
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
