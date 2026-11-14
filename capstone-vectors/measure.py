@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1093,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',output='R1086 in-module VEX32 register helper',scan='R1093 separate VEX32 module calling unchanged vector writer'))
+    save('census-variant.json',dict(variant='integer',round=1095,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',output='R1093 isolated VEX32 register output',scan='R1095 canonical full-width VEX32 memory output'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical via X86_disasmIter, NeverD dev ddf30e5255af3aa7fa071d756ada080c4c957071'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -59,8 +59,6 @@ def main(w):
             added=set(objects[label])-set(objects['integer'])
             expected={'arch/X86/X86OutputIterator.c.o'}
             expected_added={'arch/X86/X86VexOutput32.c.o'}
-            if label=='output':
-                expected.add('arch/X86/X86VectorOutput.c.o');expected_added=set()
             assert changed==expected and added==expected_added,(label,changed,added)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
         for component in ('X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput'):
