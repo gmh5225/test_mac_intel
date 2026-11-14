@@ -1,7 +1,7 @@
-name: Qualify MOV memory-immediate formatting and full detail on current native Capstone in product
+name: Validate combined native scan, formatting and full detail changes in product
 on:
   push:
-    branches: [codex/capstone-mov-memory-current-product]
+    branches: [codex/capstone-native-combined-boundary-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-mov-memory-current
+          name: product-native-combined-boundary
           path: product-evidence/
           retention-days: 14
