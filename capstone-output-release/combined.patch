@@ -1,29 +1,37 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..201163b2 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -42,7 +42,10 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 	const unsigned len = prefix + 2 + row->immediate;
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
--	memcpy(insn->bytes, code, len);
-+	/* VEX/EVEX register rows have two to four prefix bytes, a ModR/M,
-+	 * and at most one immediate: the accepted extent is four to seven. */
-+	memcpy(insn->bytes, code, 4);
-+	memcpy(insn->bytes + len - 4, code + len - 4, 4);
- 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
- 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
- 	memset(insn->op_str, 0, sizeof(insn->op_str));
-@@ -72,7 +75,11 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 		memcpy(d->groups, row->groups, sizeof(row->groups));
- 		d->groups_count = row->group_count;
- 		cs_x86 *x = &d->x86;
--		memcpy(x->opcode, code, prefix);
-+		memcpy(x->opcode, code, 2);
-+		if (prefix == 4)
-+			memcpy(x->opcode + 2, code + 2, 2);
-+		else if (prefix == 3)
-+			x->opcode[2] = code[2];
- 		x->addr_size = 8;
- 		x->rex = (uint8_t)rex;
- 		x->modrm = code[prefix + 1];
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..49f5a5b9 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -28,16 +28,22 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			 cs_insn *insn, uint16_t *insn_size)
+ {
+ 	const bool wide = handle->mode == CS_MODE_64;
+-	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
+-	const uint8_t rex = has_rex ? code[0] : 0;
+-	const bool escaped = code[0] == 0x0f;
+-	const unsigned lead = has_rex || escaped;
+-	if (size <= lead)
+-		return false;
+-	const uint8_t opcode = code[lead];
+-	const unsigned prefix_class = escaped ? 3 :
+-				      has_rex ? ((rex & 8) ? 2 : 1) :
+-						0;
++	uint8_t opcode = code[0];
++	uint8_t rex = 0;
++	unsigned prefix_class = 0;
++	if (opcode == 0x0f || (wide && (opcode & 0xf0) == 0x40)) {
++		if (size < 2)
++			return false;
++		if (opcode == 0x0f) {
++			prefix_class = 3;
++		} else {
++			rex = opcode;
++			prefix_class = (rex & 8) ? 2 : 1;
++		}
++		opcode = code[1];
++	}
++	const bool has_rex = rex != 0;
++	const bool escaped = prefix_class == 3;
+ 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
+ 	if (!plan)
+ 		return false;
