@@ -1,7 +1,7 @@
-name: Keep the MIPS name writer in one function and qualify output and cross-architecture performance profiles
+name: Qualify compact MIPS register length metadata and fused prefix/name output profiles
 on:
   push:
-    branches: [codex/capstone-mips-outlined-register-names-profiles]
+    branches: [codex/capstone-mips-compact-name-lengths-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-outlined-register-names-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: mips-compact-name-lengths-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
