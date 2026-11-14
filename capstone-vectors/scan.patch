@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..444d026b 100644
+index 63dcc538..10ac019b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -104,13 +104,13 @@ index 63dcc538..444d026b 100644
   * own state if the generated table has no terminal for this header. */
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
 +/* The legacy reader already rejected this prefix. Keep VEX admission off
-+ * successful scalar paths, and retain exact mode and bare-prefix checks. */
++ * successful scalar paths, and reuse the initial caller's bitness check and retain bare-prefix checks. */
 +X86_DECODE_INLINE int tryRejectedVex32Prefix(const uint8_t *code, size_t size,
-+					     cs_mode initialMode, size_t offset,
++					     bool initialProbe, size_t offset,
 +					     unsigned *id, uint16_t *length)
 +{
-+	if (initialMode != CS_MODE_32 || offset || size < 2 ||
-+	    code[0] != 0xc5 || (code[1] & 0xc0) != 0xc0)
++	if (!initialProbe || offset || size < 2 || code[0] != 0xc5 ||
++	    (code[1] & 0xc0) != 0xc0)
 +		return X86_SCAN_NOT_HANDLED;
 +	const uint32_t packed = X86_readVex32PublicPlan(code, size);
 +	if (!packed)
@@ -129,11 +129,11 @@ index 63dcc538..444d026b 100644
  					  unsigned *instructionID,
  					  uint16_t *size, bool publicID,
 -					  bool readerFlags)
-+					  bool readerFlags, cs_mode initialMode)
++					  bool readerFlags, bool initialProbe)
  {
  	if (opcodeOffset >= 2)
  		return X86_SCAN_NOT_HANDLED;
-@@ -3107,8 +3129,15 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3107,8 +3129,16 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
  		(insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
  	if ((feature_prefix_flags[opcode] & prefixMask) ||
@@ -142,7 +142,8 @@ index 63dcc538..444d026b 100644
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
 +		if (publicID && mode == CS_MODE_32)
 +			return tryRejectedVex32Prefix(code, codeSize,
-+						      initialMode, opcodeOffset,
++						      initialProbe,
++						      opcodeOffset,
 +						      instructionID, size);
 +#endif
  		return X86_SCAN_NOT_HANDLED;
@@ -150,7 +151,7 @@ index 63dcc538..444d026b 100644
  	readSimpleLegacyPrefix(&insn, opcodeOffset);
  	int opcodeResult = readOpcode(&insn, true, true);
  	if (opcodeResult)
-@@ -3249,7 +3278,7 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
+@@ -3249,7 +3279,7 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
  	unsigned instructionID;
  	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
  					   opcodeOffset, &instructionID, size,
@@ -159,17 +160,17 @@ index 63dcc538..444d026b 100644
  	if (terminal != X86_SCAN_NOT_HANDLED) {
  		if (terminal != X86_SCAN_COMPLETE)
  			return false;
-@@ -3521,7 +3550,8 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3521,7 +3551,8 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
  X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  						size_t size, cs_mode mode,
  						uint8_t opcode, unsigned offset,
 -						unsigned *id, uint16_t *length)
 +						unsigned *id, uint16_t *length,
-+						cs_mode initialMode)
++						bool initialProbe)
  {
  	const bool wide = mode == CS_MODE_64;
  	const uint8_t rex = offset ? code[0] : 0;
-@@ -3529,8 +3559,14 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+@@ -3529,8 +3560,14 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  				  FEATURE_VEX2_XOP |
  				  (wide ? FEATURE_REX_PREFIX : 0);
  	if ((feature_prefix_flags[opcode] & rejected) ||
@@ -177,7 +178,7 @@ index 63dcc538..444d026b 100644
 +	    (opcode == 0x90 && bFromREX(rex))) {
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
 +		if (mode == CS_MODE_32)
-+			return tryRejectedVex32Prefix(code, size, initialMode,
++			return tryRejectedVex32Prefix(code, size, initialProbe,
 +						      offset, id, length);
 +#endif
  		return X86_SCAN_NOT_HANDLED;
@@ -185,51 +186,51 @@ index 63dcc538..444d026b 100644
  	bool escaped = opcode == 0x0f;
  	unsigned end = offset + 1;
  	if (escaped) {
-@@ -3609,7 +3645,8 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+@@ -3609,7 +3646,8 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
  					   cs_mode mode, bool feature64,
  					   unsigned *instructionID,
 -					   uint16_t *size, bool readerFlags)
 +					   uint16_t *size, bool readerFlags,
-+					   cs_mode initialMode)
++					   bool initialProbe)
  {
  	if (!code_len || (mode == CS_MODE_64) != feature64)
  		return X86_SCAN_NOT_HANDLED;
-@@ -3633,10 +3670,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+@@ -3633,10 +3671,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
  	if (readerFlags)
  		return scanInitialPublicTerminal(code, code_len, mode, opcode,
  						 (unsigned)offset,
 -						 instructionID, size);
 +						 instructionID, size,
-+						 initialMode);
++						 initialProbe);
  #endif
  	return trySimpleLegacyScan(code, code_len, mode, opcode, offset,
 -				   instructionID, size, true, readerFlags);
 +				   instructionID, size, true, readerFlags,
-+				   initialMode);
++				   initialProbe);
  }
  
  X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
-@@ -3649,15 +3688,15 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3649,15 +3689,15 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_64,
  					       feature64, instructionID, length,
 -					       readerFlags);
-+					       readerFlags, handle->mode);
++					       readerFlags, true);
  	else if (handle->mode & CS_MODE_16)
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
  					       feature64, instructionID, length,
 -					       readerFlags);
-+					       readerFlags, handle->mode);
++					       readerFlags, true);
  	else
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
  					       feature64, instructionID, length,
 -					       readerFlags);
-+					       readerFlags, handle->mode);
++					       readerFlags, true);
  	return initial;
  }
  
-@@ -3687,18 +3726,18 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3687,18 +3727,18 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
  		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
  					     opcodeOffset, &instructionID,
@@ -1966,6 +1967,89 @@ index 57ee99b2..03abf6d5 100644
  		{ CS_MODE_64, { 0xc5, 0xf8, 0x77 }, 3, X86_INS_VZEROUPPER, 3 },
  		{ CS_MODE_64,
  		  { 0xc4, 0xe1, 0x74, 0x58, 0xc2 },
+diff --git a/tests/unit/x86_scan_batch.c b/tests/unit/x86_scan_batch.c
+index 771fefb7..b2dff9d8 100644
+--- a/tests/unit/x86_scan_batch.c
++++ b/tests/unit/x86_scan_batch.c
+@@ -198,6 +198,71 @@ static bool check_mixed_modes(void)
+ 	return true;
+ }
+ 
++/* Keep the scan oracle on full decoding, including vendor and mixed bitness
++ * modes. An initial-prefix fast path must preserve the full reader's choice. */
++static bool check_vex_modes(void)
++{
++	static const uint8_t cases[][8] = {
++		{ 0xc5, 0xf8, 0x58, 0xc1 },
++		{ 0xc5, 0xe5, 0xfc, 0x44, 0x24, 0x7f },
++		{ 0xc5, 0xfd, 0x6f, 0x85, 0x12, 0x34, 0x56, 0x78 },
++		{ 0xc5, 0xf8, 0xc2, 0xc1, 0xff },
++		{ 0xc5, 0xf8, 0x77 },
++		{ 0xc5, 0xc0, 0xff, 0xff },
++		{ 0xc5, 0x00, 0x00, 0x00 },
++		{ 0x66, 0xc5, 0xf8, 0x58, 0xc1 },
++	};
++	const cs_mode vendors[] = { 0, CS_MODE_X86_INTEL, CS_MODE_X86_AMD };
++	csh scan = 0, full = 0;
++	CHECK(cs_open(CS_ARCH_X86, CS_MODE_32, &scan) == CS_ERR_OK);
++	CHECK(cs_open(CS_ARCH_X86, CS_MODE_32, &full) == CS_ERR_OK);
++	CHECK(cs_option(scan, CS_OPT_TEXT, CS_OPT_OFF) == CS_ERR_OK);
++	CHECK(cs_option(full, CS_OPT_TEXT, CS_OPT_OFF) == CS_ERR_OK);
++	CHECK(cs_option(full, CS_OPT_DETAIL, CS_OPT_ON) == CS_ERR_OK);
++	cs_insn *insn = cs_malloc(full);
++	CHECK(insn);
++	for (unsigned bits = 0; bits < 8; ++bits) {
++		const cs_mode bitness = (bits & 1 ? CS_MODE_16 : 0) |
++					(bits & 2 ? CS_MODE_32 : 0) |
++					(bits & 4 ? CS_MODE_64 : 0);
++		for (unsigned vendor = 0; vendor < 3; ++vendor) {
++			const cs_mode mode = bitness | vendors[vendor];
++			CHECK(cs_option(scan, CS_OPT_MODE, mode) == CS_ERR_OK);
++			CHECK(cs_option(full, CS_OPT_MODE, mode) == CS_ERR_OK);
++			for (unsigned c = 0;
++			     c < sizeof(cases) / sizeof(cases[0]); ++c)
++				for (size_t n = 0; n <= sizeof(cases[c]); ++n) {
++					uint32_t output[2] = {
++						UINT32_C(0xdeadbeef),
++						UINT32_C(0xdeadbeef)
++					};
++					const uint8_t *cursor = cases[c];
++					size_t left = n;
++					uint64_t address = UINT64_MAX - 2;
++					X86ScanBatchResult batch =
++						X86_scanBatch(scan, cursor, n,
++							      address, output,
++							      1);
++					const bool ok = cs_disasm_iter(
++						full, &cursor, &left, &address,
++						insn);
++					CHECK(batch.count == (size_t)ok);
++					CHECK(batch.bytes == n - left);
++					CHECK(output[0] ==
++					      (ok ? (insn->id << 8) |
++							       insn->size :
++						    UINT32_C(0xdeadbeef)));
++					CHECK(output[1] ==
++					      UINT32_C(0xdeadbeef));
++				}
++		}
++	}
++	cs_free(insn, 1);
++	cs_close(&scan);
++	cs_close(&full);
++	return true;
++}
++
+ static bool check(void)
+ {
+ 	static const uint8_t code[] = {
+@@ -281,5 +346,5 @@ static bool check(void)
+ 
+ int main(void)
+ {
+-	return check() && check_mixed_modes() ? 0 : 1;
++	return check() && check_mixed_modes() && check_vex_modes() ? 0 : 1;
+ }
 diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
 index 6990d510..3698f0da 100644
 --- a/tests/unit/x86_simple_output.c
