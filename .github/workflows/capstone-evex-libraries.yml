@@ -1,7 +1,7 @@
-name: Count runtime instructions and branch mispredictions for every held-out i386 AVX2 function
+name: Profile remaining native AVX2 and EVEX format and detail work against both iced formatters
 on:
   push:
-    branches: [codex/capstone-i386-avx2-work-profile]
+    branches: [codex/capstone-current-format-costs]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,6 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - { host: ubuntu-22.04, cc: gcc }
           - { host: ubuntu-24.04, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
@@ -24,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
+          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
       - name: Install the Callgrind instrumentation headers and binary
@@ -39,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-jpeg-work-${{ matrix.host }}-${{ matrix.cc }}
+          name: current-format-costs-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
