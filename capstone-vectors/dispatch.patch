@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..8d1bf393 100644
+index 63dcc538..62b81e1d 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
@@ -154,7 +154,28 @@ index 63dcc538..8d1bf393 100644
  			}
  		}
  	}
-@@ -3675,10 +3733,24 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3661,6 +3719,20 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 	return initial;
+ }
+ 
++#if !defined(CAPSTONE_X86_SCAN_ADAPTER)
++/* Isolate the 32-bit terminal reader's state from the legacy iterator. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static CS_PRESERVE_MOST int
++tryVex32TerminalScan(const uint8_t *code, size_t size, X86ScanResult *result)
++{
++	return tryVexTerminalScan(code, size, 0xc5, result, CS_MODE_32);
++}
++#endif
++
+ X86_DECODE_INLINE bool
+ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 				     size_t code_len, cs_insn *insn,
+@@ -3675,10 +3747,24 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  	if (extension || opcode == 0x62)
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, opcode, extension);
@@ -171,8 +192,8 @@ index 63dcc538..8d1bf393 100644
 +		 * VEX2 row then uses ordinary 32-bit address extents. */
 +		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
 +		    (code[1] & 0xc0) == 0xc0) {
-+			const int status = tryVexTerminalScan(
-+				code, code_len, opcode, result, CS_MODE_32);
++			const int status =
++				tryVex32TerminalScan(code, code_len, result);
 +			if (status != X86_SCAN_NOT_HANDLED)
 +				return status == X86_SCAN_COMPLETE;
 +			return decodeScanResultGeneric(ud, code, code_len, insn,
