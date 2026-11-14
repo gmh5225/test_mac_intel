@@ -1,7 +1,7 @@
-name: Move modulo into the two-digit vector register name branch libraries
+name: Copy admitted vector bytes and prefixes at their bounded lengths libraries
 on:
   push:
-    branches: [codex/capstone-vector-single-digit-libraries]
+    branches: [codex/capstone-vector-bounded-copies-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-single-digit-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vector-bounded-copies-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

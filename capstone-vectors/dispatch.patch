@@ -1,18 +1,29 @@
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..8eaa8e87 100644
+index 6df1472d..201163b2 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -26,9 +26,11 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 	*out++ = "xyz"[length_code];
- 	*out++ = 'm';
- 	*out++ = 'm';
--	if (number >= 10)
-+	if (number >= 10) {
- 		*out++ = (char)('0' + number / 10);
--	*out++ = (char)('0' + number % 10);
-+		number %= 10;
-+	}
-+	*out++ = (char)('0' + number);
- 	return out;
- }
- 
+@@ -42,7 +42,10 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	const unsigned len = prefix + 2 + row->immediate;
+ 	*insn_size = insn->size = (uint16_t)len;
+ 	insn->id = row->id;
+-	memcpy(insn->bytes, code, len);
++	/* VEX/EVEX register rows have two to four prefix bytes, a ModR/M,
++	 * and at most one immediate: the accepted extent is four to seven. */
++	memcpy(insn->bytes, code, 4);
++	memcpy(insn->bytes + len - 4, code + len - 4, 4);
+ 	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+@@ -72,7 +75,11 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		memcpy(d->groups, row->groups, sizeof(row->groups));
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+-		memcpy(x->opcode, code, prefix);
++		memcpy(x->opcode, code, 2);
++		if (prefix == 4)
++			memcpy(x->opcode + 2, code + 2, 2);
++		else if (prefix == 3)
++			x->opcode[2] = code[2];
+ 		x->addr_size = 8;
+ 		x->rex = (uint8_t)rex;
+ 		x->modrm = code[prefix + 1];
