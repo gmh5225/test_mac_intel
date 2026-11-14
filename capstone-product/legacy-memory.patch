@@ -1,0 +1,602 @@
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..0d50b264 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -58,8 +58,8 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 		},
+ 		{
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			65535, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
++			0, 0, 0, 0, 0, 0, 0, 0, 65535, 65535, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -95,7 +95,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
+ 		},
+ 		{
+-			861, 865, 862, 866, 0, 0, 0, 0, 869, 873, 870, 874, 0, 0, 0, 0,
++			861, 865, 862, 866, 0, 0, 0, 0, 869, 873, 870, 874, 0, 0, 0, 65535,
+ 			877, 881, 878, 882, 0, 0, 0, 0, 885, 889, 886, 890, 0, 0, 0, 0,
+ 			893, 897, 894, 898, 0, 0, 0, 0, 901, 905, 902, 906, 0, 0, 0, 0,
+ 			909, 913, 910, 914, 0, 0, 0, 0, 917, 921, 918, 922, 0, 0, 0, 0,
+@@ -113,7 +113,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
+ 		},
+ 		{
+-			861, 957, 862, 958, 0, 0, 0, 0, 869, 961, 870, 962, 0, 0, 0, 0,
++			861, 957, 862, 958, 0, 0, 0, 0, 869, 961, 870, 962, 0, 0, 0, 65535,
+ 			877, 965, 878, 966, 0, 0, 0, 0, 885, 969, 886, 970, 0, 0, 0, 0,
+ 			893, 973, 894, 974, 0, 0, 0, 0, 901, 977, 902, 978, 0, 0, 0, 0,
+ 			909, 981, 910, 982, 0, 0, 0, 0, 917, 985, 918, 986, 0, 0, 0, 0,
+@@ -132,8 +132,8 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 		},
+ 		{
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			65535, 65535, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
++			0, 0, 0, 0, 0, 0, 0, 0, 65535, 65535, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..b53ba44d 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -808,3 +808,34 @@ static const uint8_t legacy_register_plans[256] = {
+ 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
+ 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
+ };
++struct LegacyMoveOutputRow {
++	uint16_t id;
++	char mnemonic[8];
++	uint8_t group_count, groups[4], access[4], prefix[4];
++};
++static const struct LegacyMoveOutputRow legacy_move_rows[3][6] = {
++	{
++		{ X86_INS_MOVUPS, "movups", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 0, 0 } },
++		{ X86_INS_MOVUPS, "movups", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 0, 0 } },
++		{ X86_INS_MOVAPS, "movaps", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 0, 0 } },
++		{ X86_INS_MOVAPS, "movaps", 1, { 148, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 0, 0 } },
++		{ 0 },
++		{ 0 },
++	},
++	{
++		{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 102, 0 } },
++		{ X86_INS_MOVUPD, "movupd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 102, 0 } },
++		{ X86_INS_MOVAPD, "movapd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 102, 0 } },
++		{ X86_INS_MOVAPD, "movapd", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 102, 0 } },
++		{ X86_INS_MOVDQA, "movdqa", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 102, 0 } },
++		{ X86_INS_MOVDQA, "movdqa", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 102, 0 } },
++	},
++	{
++		{ 0 },
++		{ 0 },
++		{ 0 },
++		{ 0 },
++		{ X86_INS_MOVDQU, "movdqu", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 0, 0 } },
++		{ X86_INS_MOVDQU, "movdqu", 1, { 149, 0, 0, 0 }, { 2, 1, 0, 0 }, { 0, 0, 0, 0 } },
++	},
++};
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..20263b76 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
+-			return X86_writeVectorOutput(code, size, insn,
+-						     insn_size,
+-						     x86_simple_registers[3],
+-						     wide);
++			return X86_writeVectorOutput(
++				code, size, insn, insn_size,
++				x86_simple_registers[wide ? 3 : 2], wide);
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..49815bcd 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -254,9 +254,156 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+ 	return true;
+ }
+ 
++/* Packed SSE moves share one address parse between assembly and detail. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool writeLegacyMoveOutput(const uint8_t *code, size_t size,
++				  cs_insn *insn, uint16_t *insn_size,
++				  const struct X86SimpleRegister *regs,
++				  bool wide)
++{
++	const unsigned mandatory = code[0] == 0x66 ? 1 :
++				   code[0] == 0xf3 ? 2 :
++						     0;
++	const unsigned lead = mandatory != 0;
++	if (size <= lead)
++		return false;
++	const uint8_t rex = wide && (code[lead] & 0xf0) == 0x40 ? code[lead] :
++								  0;
++	const unsigned escape = lead + (rex != 0);
++	if (size < escape + 3 || code[escape] != 0x0f)
++		return false;
++	const uint8_t opcode = code[escape + 1], modrm = code[escape + 2];
++	unsigned slot;
++	if ((opcode & 0xfe) == 0x10)
++		slot = opcode & 1;
++	else if ((opcode & 0xfe) == 0x28)
++		slot = 2 + (opcode & 1);
++	else if (opcode == 0x6f || opcode == 0x7f)
++		slot = 4 + (opcode == 0x7f);
++	else
++		return false;
++	const struct LegacyMoveOutputRow *row =
++		&legacy_move_rows[mandatory][slot];
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	if (!row->id || mod == 3)
++		return false;
++	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const unsigned offset = escape + 3 + sib;
++	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
++	const unsigned length = offset + disp_size;
++	if (size < length || (rip && !wide))
++		return false;
++	unsigned base_reg = rm, scale = 0;
++	const struct X86SimpleRegister *index = NULL;
++	if (sib) {
++		const uint8_t encoding = code[offset - 1];
++		const unsigned index_reg = ((rex & 2) << 2) |
++					   ((encoding >> 3) & 7);
++		base_reg = encoding & 7;
++		if ((!mod && base_reg == 5) ||
++		    (index_reg == 4 && encoding != 0x24))
++			return false;
++		if (index_reg != 4) {
++			index = &regs[index_reg];
++			scale = encoding >> 6;
++		}
++	}
++	const struct X86SimpleRegister *base =
++		&regs[((rex & 1) << 3) | base_reg];
++	const unsigned number = ((modrm >> 3) & 7) | ((rex & 4) << 1);
++	const bool load = !(slot & 1);
++	const int32_t displacement =
++		disp_size == 1 ? (int8_t)code[offset] :
++		disp_size == 4 ? X86_readDisp32(code + offset) :
++				 0;
++	insn->id = row->id;
++	*insn_size = insn->size = (uint16_t)length;
++	memcpy(insn->bytes, code, length);
++	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
++	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->op_str, 0, sizeof(insn->op_str));
++	char *out = insn->op_str;
++	if (load) {
++		out = writeVectorRegister(out, 0, number);
++		memcpy(out, ", ", 2);
++		out += 2;
++	}
++	memcpy(out, "xmmword ptr [", 13);
++	out += 13;
++	if (rip) {
++		memcpy(out, "rip", 3);
++		out += 3;
++	} else {
++		memcpy(out, base->name, sizeof(base->name));
++		out += base->length;
++	}
++	if (index) {
++		memcpy(out, " + ", 3);
++		out += 3;
++		memcpy(out, index->name, sizeof(index->name));
++		out += index->length;
++		if (scale) {
++			*out++ = '*';
++			*out++ = (char)('0' + (1u << scale));
++		}
++	}
++	out = X86_writeDisplacement(out, displacement);
++	*out++ = ']';
++	if (!load) {
++		memcpy(out, ", ", 2);
++		writeVectorRegister(out + 2, 0, number);
++	}
++	if (insn->detail) {
++		cs_detail *d = insn->detail;
++		memset(d, 0, offsetof(cs_detail, x86) + sizeof(cs_x86));
++		d->groups_count = row->group_count;
++		memcpy(d->groups, row->groups, sizeof(row->groups));
++		cs_x86 *x = &d->x86;
++		memcpy(x->prefix, row->prefix, sizeof(row->prefix));
++		x->opcode[0] = 0x0f;
++		x->opcode[1] = opcode;
++		x->rex = rex;
++		x->addr_size = wide ? 8 : 4;
++		x->modrm = modrm;
++		x->encoding.modrm_offset = (uint8_t)(escape + 2);
++		if (disp_size) {
++			x->encoding.disp_offset = (uint8_t)offset;
++			x->encoding.disp_size = (uint8_t)disp_size;
++		}
++		x->disp = displacement;
++		x->op_count = 2;
++		for (unsigned i = 0; i < 2; ++i) {
++			x->operands[i].size = 16;
++			x->operands[i].access = (cs_ac_type)row->access[i];
++		}
++		cs_x86_op *reg = &x->operands[load ? 0 : 1];
++		reg->type = X86_OP_REG;
++		reg->reg = (x86_reg)(X86_REG_XMM0 + number);
++		cs_x86_op *mem = &x->operands[load ? 1 : 0];
++		mem->type = X86_OP_MEM;
++		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
++		mem->mem.scale = 1 << scale;
++		if (index)
++			mem->mem.index = (x86_reg)index->reg;
++		mem->mem.disp = displacement;
++		if (sib) {
++			x->sib = code[offset - 1];
++			x->sib_base = mem->mem.base;
++			x->sib_scale = (int8_t)mem->mem.scale;
++			x->sib_index = mem->mem.index;
++		}
++	}
++	return true;
++}
++
+ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ 				      cs_insn *insn, uint16_t *insn_size,
+-				      bool wide)
++				      bool wide,
++				      const struct X86SimpleRegister *regs)
+ {
+ 	if (size < 4)
+ 		return false;
+@@ -267,7 +414,10 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ 	const uint8_t opcode = code[2 + has_rex];
+ 	const unsigned plan = legacy_register_plans[opcode];
+ 	const uint8_t modrm = code[3 + has_rex];
+-	if (!plan || modrm < 0xc0)
++	if (modrm < 0xc0)
++		return writeLegacyMoveOutput(code, size, insn, insn_size, regs,
++					     wide);
++	if (!plan)
+ 		return false;
+ 
+ 	const struct VectorOutputRow *row = &legacy_register_rows[plan & 127];
+@@ -508,11 +658,18 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (code[0] == 0x0f || code[0] == 0xf3 ||
+ 	    (code[0] == 0x66 && size >= 2 &&
+ 	     (code[1] == 0x90 ||
+-	      (size >= 3 && code[1] == 0x0f && code[2] == 0x1f))))
+-		return writePaddingOutput(code, size, insn, insn_size, wide);
++	      (size >= 3 && code[1] == 0x0f && code[2] == 0x1f)))) {
++		if (writePaddingOutput(code, size, insn, insn_size, wide))
++			return true;
++		return writeLegacyMoveOutput(code, size, insn, insn_size, regs,
++					     wide);
++	}
+ 	if (code[0] == 0x66)
+ 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+-						 wide);
++						 wide, regs);
++	if (wide && (code[0] & 0xf0) == 0x40)
++		return writeLegacyMoveOutput(code, size, insn, insn_size, regs,
++					     wide);
+ 	if (code[0] == 0x62)
+ 		return writeEvexOutput(code, size, insn, insn_size, regs);
+ 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index ccc4f0de..1c18bd8d 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -619,6 +619,9 @@ int main()
+ 	plans[0][0][0x66] = plans[1][0][0x66] = X86_PLAN_VECTOR;
+ 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
+ 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
++	for (unsigned op : { 0x10u, 0x11u, 0x28u, 0x29u })
++		plans[0][3][op] = plans[1][3][op] = X86_PLAN_VECTOR;
++	plans[1][1][0x0f] = plans[1][2][0x0f] = X86_PLAN_VECTOR;
+ 	plans[1][0][0x62] = X86_PLAN_VECTOR;
+ 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
+ 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 834c2488..d85a1a46 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -891,6 +891,229 @@ void emit_vex_registers(Decoder &decoder)
+ 	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
+ 		     rows.size(), widths.size() - 1);
+ }
++std::string legacy_move_row(Decoder &decoder, bool wide, unsigned mandatory,
++			    unsigned rex, unsigned opcode, unsigned modrm,
++			    unsigned sib_byte, int32_t displacement)
++{
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	const bool sib = rm == 4, rip = !mod && rm == 5;
++	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
++	std::vector<uint8_t> bytes;
++	if (mandatory)
++		bytes.push_back(mandatory == 1 ? 0x66 : 0xf3);
++	if (rex)
++		bytes.push_back(uint8_t(rex));
++	const unsigned escape = unsigned(bytes.size());
++	bytes.insert(bytes.end(), { 0x0f, uint8_t(opcode), uint8_t(modrm) });
++	if (sib)
++		bytes.push_back(uint8_t(sib_byte));
++	const unsigned offset = unsigned(bytes.size());
++	for (unsigned n = 0; n < disp_size; ++n)
++		bytes.push_back(uint8_t(uint32_t(displacement) >> (n * 8)));
++	const unsigned id =
++		decoder.decode(bytes.data(), unsigned(bytes.size()));
++	if (!id)
++		return {};
++	const cs_insn &insn = *decoder.insn;
++	const cs_detail &d = *insn.detail;
++	const cs_x86 &actual = d.x86;
++	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
++	    std::strlen(insn.mnemonic) >= 8 || d.regs_read_count ||
++	    d.regs_write_count || d.groups_count > 4 || actual.op_count != 2)
++		return {};
++	const bool load = opcode == 0x10 || opcode == 0x28 || opcode == 0x6f;
++	unsigned base_number = rm | ((rex & 1) << 3);
++	x86_reg base = X86_REG_INVALID, index = X86_REG_INVALID;
++	unsigned scale = 1;
++	const x86_reg regs32[] = { X86_REG_EAX, X86_REG_ECX, X86_REG_EDX,
++				   X86_REG_EBX, X86_REG_ESP, X86_REG_EBP,
++				   X86_REG_ESI, X86_REG_EDI };
++	const x86_reg regs64[] = { X86_REG_RAX, X86_REG_RCX, X86_REG_RDX,
++				   X86_REG_RBX, X86_REG_RSP, X86_REG_RBP,
++				   X86_REG_RSI, X86_REG_RDI, X86_REG_R8,
++				   X86_REG_R9,	X86_REG_R10, X86_REG_R11,
++				   X86_REG_R12, X86_REG_R13, X86_REG_R14,
++				   X86_REG_R15 };
++	if (sib) {
++		base_number = (sib_byte & 7) | ((rex & 1) << 3);
++		const unsigned index_number = ((sib_byte >> 3) & 7) |
++					      ((rex & 2) << 2);
++		if (index_number != 4) {
++			index = wide ? regs64[index_number] :
++				       regs32[index_number];
++			scale = 1u << (sib_byte >> 6);
++		}
++	}
++	base = rip  ? X86_REG_RIP :
++	       wide ? regs64[base_number] :
++		      regs32[base_number];
++	cs_x86 expected{};
++	Bytes4 prefixes{}, groups{}, access{};
++	std::copy_n(actual.prefix, 4, prefixes.begin());
++	std::copy_n(actual.prefix, 4, expected.prefix);
++	std::copy_n(d.groups, d.groups_count, groups.begin());
++	expected.opcode[0] = 0x0f;
++	expected.opcode[1] = uint8_t(opcode);
++	expected.rex = uint8_t(rex);
++	expected.addr_size = wide ? 8 : 4;
++	expected.modrm = uint8_t(modrm);
++	expected.encoding.modrm_offset = uint8_t(escape + 2);
++	expected.op_count = 2;
++	if (disp_size) {
++		expected.encoding.disp_offset = uint8_t(offset);
++		expected.encoding.disp_size = uint8_t(disp_size);
++	}
++	const int32_t disp = disp_size == 1 ? int8_t(displacement) :
++			     disp_size == 4 ? displacement :
++					      0;
++	expected.disp = disp;
++	for (unsigned n = 0; n < 2; ++n) {
++		expected.operands[n].size = 16;
++		expected.operands[n].access = actual.operands[n].access;
++		access[n] = unsigned(actual.operands[n].access);
++	}
++	const unsigned number = ((modrm >> 3) & 7) | ((rex & 4) << 1);
++	auto &reg = expected.operands[load ? 0 : 1];
++	reg.type = X86_OP_REG;
++	reg.reg = x86_reg(X86_REG_XMM0 + number);
++	auto &mem = expected.operands[load ? 1 : 0];
++	mem.type = X86_OP_MEM;
++	mem.mem.base = base;
++	mem.mem.index = index;
++	mem.mem.scale = int(scale);
++	mem.mem.disp = disp;
++	if (sib) {
++		expected.sib = uint8_t(sib_byte);
++		expected.sib_base = base;
++		expected.sib_index = index;
++		expected.sib_scale = int8_t(scale);
++	}
++	std::string address = "xmmword ptr [" +
++			      std::string(cs_reg_name(decoder.handle, base));
++	if (index != X86_REG_INVALID) {
++		address +=
++			" + " + std::string(cs_reg_name(decoder.handle, index));
++		if (scale != 1)
++			address += "*" + std::to_string(scale);
++	}
++	if (disp) {
++		const uint32_t magnitude = disp < 0 ? 0u - uint32_t(disp) :
++						      uint32_t(disp);
++		char number_text[16];
++		if (magnitude <= 9)
++			std::snprintf(number_text, sizeof(number_text), "%u",
++				      magnitude);
++		else
++			std::snprintf(number_text, sizeof(number_text), "0x%x",
++				      magnitude);
++		address += std::string(disp < 0 ? " - " : " + ") + number_text;
++	}
++	address += "]";
++	const std::string vector = "xmm" + std::to_string(number);
++	const std::string text = load ? vector + ", " + address :
++					address + ", " + vector;
++	if (text != insn.op_str ||
++	    std::memcmp(&expected, &actual, sizeof(actual)))
++		return {};
++	return "{ " + decoder.symbol(id) + ", \"" + insn.mnemonic + "\", " +
++	       std::to_string(d.groups_count) + ", " + fields(groups) + ", " +
++	       fields(access) + ", " + fields(prefixes) + " }";
++}
++
++void emit_legacy_moves(Decoder &wide)
++{
++	Decoder narrow(CS_MODE_32);
++	const unsigned opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x6f, 0x7f };
++	const int32_t displacements[] = { 0,	1,	   9,	     10, 16,
++					  127,	128,	   -1,	     -9, -10,
++					  -128, INT32_MIN, INT32_MAX };
++	unsigned admitted = 0;
++	std::puts(
++		"struct LegacyMoveOutputRow {\n"
++		"\tuint16_t id;\n\tchar mnemonic[8];\n"
++		"\tuint8_t group_count, groups[4], access[4], prefix[4];\n"
++		"};\nstatic const struct LegacyMoveOutputRow legacy_move_rows[3][6] = {");
++	for (unsigned mandatory = 0; mandatory < 3; ++mandatory) {
++		std::puts("\t{");
++		for (unsigned opcode : opcodes) {
++			const auto row = legacy_move_row(wide, true, mandatory,
++							 0, opcode, 0x58, 0, 1);
++			if (row.empty()) {
++				std::puts("\t\t{ 0 },");
++				continue;
++			}
++			for (unsigned context = 0; context < 18; ++context) {
++				const bool mode64 = context != 0;
++				const unsigned rex =
++					context >= 2 ? 0x40 + context - 2 : 0;
++				for (unsigned mr = 0; mr < 0xc0; ++mr) {
++					const unsigned mod = mr >> 6,
++						       rm = mr & 7;
++					if (!mode64 && !mod && rm == 5)
++						continue;
++					for (unsigned sb :
++					     { 0u, 0x24u, 0x28u, 0x65u, 0x9cu,
++					       0xffu }) {
++						if (rm != 4 && sb != 0)
++							continue;
++						if (rm == 4 &&
++						    ((!mod && (sb & 7) == 5) ||
++						     ((((rex & 2) << 2) |
++						       ((sb >> 3) & 7)) == 4 &&
++						      sb != 0x24)))
++							continue;
++						for (int32_t disp :
++						     displacements) {
++							if (!mod && rm != 5 &&
++							    disp)
++								continue;
++							if (legacy_move_row(
++								    mode64 ?
++									    wide :
++									    narrow,
++								    mode64,
++								    mandatory,
++								    rex, opcode,
++								    mr, sb,
++								    disp) !=
++							    row)
++								throw std::runtime_error(
++									"nonuniform SSE memory form " +
++									std::to_string(
++										mandatory) +
++									":" +
++									std::to_string(
++										opcode) +
++									" context=" +
++									std::to_string(
++										context) +
++									" mr=" +
++									std::to_string(
++										mr) +
++									" sib=" +
++									std::to_string(
++										sb) +
++									" disp=" +
++									std::to_string(
++										disp));
++						}
++					}
++				}
++			}
++			++admitted;
++			std::printf("\t\t%s,\n", row.c_str());
++		}
++		std::puts("\t},");
++	}
++	std::puts("};");
++	if (admitted != 12)
++		throw std::runtime_error("missing packed SSE move forms: " +
++					 std::to_string(admitted));
++	std::fprintf(stderr,
++		     "%u packed SSE memory move rows, %llu narrow probes\n",
++		     admitted, static_cast<unsigned long long>(narrow.probes));
++}
++
+ void emit_output(Decoder &decoder)
+ {
+ 	std::vector<std::string> records;
+@@ -943,6 +1166,7 @@ void emit_output(Decoder &decoder)
+ 	Decoder padding32(CS_MODE_32);
+ 	emit_padding_rows(padding32, decoder);
+ 	emit_legacy_registers(decoder);
++	emit_legacy_moves(decoder);
+ }
+ }
+ 
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6990d510..1c5a5919 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -738,6 +738,36 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++static bool check_legacy_moves(csh handles[2], cs_mode mode)
++{
++	static const uint8_t prefixes[] = { 0, 0x66, 0xf3, 0xf2 };
++	static const uint8_t opcodes[] = { 0x10, 0x11, 0x28, 0x29, 0x6f, 0x7f };
++	static const uint32_t displacement[] = {
++		0, 1, 9, 10, 0x7f, 0x80, 0x7fffffff, 0x80000000, 0xffffffff
++	};
++	for (unsigned n = 0; n < 32768; ++n) {
++		uint8_t bytes[15] = { 0 };
++		const unsigned mandatory = prefixes[n % 4];
++		const unsigned rex = mode == CS_MODE_64 ? (n / 4) % 17 : 0;
++		unsigned length = 0;
++		if (mandatory)
++			bytes[length++] = (uint8_t)mandatory;
++		if (rex)
++			bytes[length++] = (uint8_t)(0x3f + rex);
++		bytes[length++] = 0x0f;
++		bytes[length++] = opcodes[(n / 68) % 6];
++		bytes[length++] = (uint8_t)(n >> 3);
++		bytes[length++] = (uint8_t)(n * 37);
++		const uint32_t value = displacement[n % 9];
++		for (unsigned i = 0; i < 4; ++i)
++			bytes[length++] = (uint8_t)(value >> (8 * i));
++		if (!compare(handles, bytes, sizeof(bytes), n) ||
++		    !compare(handles, bytes, n % length, n))
++			return false;
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -770,6 +800,7 @@ static bool check_mode(cs_mode mode)
+ 		    !check_alu_memory(handles, mode) ||
+ 		    !check_alu_immediates(handles, mode) ||
+ 		    !check_legacy_vectors(handles, mode) ||
++		    !check_legacy_moves(handles, mode) ||
+ 		    (mode == CS_MODE_64 &&
+ 		     (!check_evex(handles) || !check_evex_extract(handles) ||
+ 		      (!check_vex_register_forms(handles) ||

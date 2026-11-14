@@ -1,7 +1,7 @@
-name: Build latest fork LLVM source once and qualify three isolated Capstone output candidates
+name: Qualify SSE memory and vector register formatting in current NeverD with live LLVM fork source
 on:
   push:
-    branches: [codex/capstone-batch-output-product]
+    branches: [codex/capstone-memory-names-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 282246091fd89bd1cfa1ccb4035208aa3d15a596
+          ref: ae9d2d7b25d1f7b4e61b851e0ff8bc771e9c6bd4
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-batch-output
+          name: product-memory-names
           path: product-evidence/
           retention-days: 14
