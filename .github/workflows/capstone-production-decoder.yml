@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in product
+name: Qualify native scan with compact output dispatch in product
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-product]
+    branches: [codex/capstone-output-entry-routing-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-native-combined-boundary
+          name: product-output-entry-routing
           path: product-evidence/
           retention-days: 14
