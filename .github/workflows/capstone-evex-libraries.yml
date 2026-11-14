@@ -1,7 +1,7 @@
-name: Measure Packed move register direction, Intel formatting and full detail in both x86 modes on real Debian functions versus both iced formatters
+name: Count runtime instructions and branch mispredictions for every held-out i386 AVX2 function
 on:
   push:
-    branches: [codex/capstone-vex2-move-register-output-libraries]
+    branches: [codex/capstone-i386-avx2-work-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,10 +12,6 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-22.04, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -31,7 +27,9 @@ jobs:
           ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
           path: source
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - name: Install the Callgrind instrumentation headers and binary
+        run: sudo apt-get update -qq && sudo apt-get install -qy valgrind
+      - name: Compare instrumented work at identical real function boundaries
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -41,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-move-register-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: i386-jpeg-work-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
