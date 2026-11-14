@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
+import gzip,hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
@@ -34,7 +34,23 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':run(['git','apply',variant],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
-   link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
+   link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-Wl,-Map='+str(e/(key+'-link.map')),'-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
+   symbols=sp.check_output(['nm','-n','-S','--defined-only',f],text=True)
+   (e/(key+'-symbols.txt')).write_text(symbols)
+   sections=sp.check_output(['objdump','-h',f],text=True)
+   (e/(key+'-sections.txt')).write_text(sections)
+   section=next(line.split() for line in sections.splitlines() if len(line.split())>=7 and line.split()[1]=='.text')
+   vma,offset=int(section[3],16),int(section[5],16)
+   image=f.read_bytes()
+   functions=[]
+   for line in symbols.splitlines():
+    fields=line.split()
+    if len(fields)!=4 or fields[2] not in ('t','T'):continue
+    address,size=int(fields[0],16),int(fields[1],16)
+    content=image[offset+address-vma:offset+address-vma+size]
+    assert len(content)==size
+    functions.append(dict(name=fields[3],address=address,size=size,sha256=hashlib.sha256(content).hexdigest()))
+   write(key+'-functions',functions)
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
@@ -70,7 +86,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  cases=[x for x in cases if x['name']in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','mips64el-ls')]
+  cases=[x for x in cases if x['name']in ('putty-32-0.85','arm64-ls','mips64el-ls')]
   def sample(key,x,mode,reps):
    return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]
@@ -87,6 +103,27 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
       ticks[v].append(vout['cpu_ns'])
      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
     data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  profiles=[]
+  for x in cases:
+   for mode in (0,1,2):
+    for key in ('base','indexed'):
+     ident=x['name']+'-'+str(mode)+'-'+key
+     raw=t/(ident+'.callgrind')
+     run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes',
+          '--collect-atstart=no','--toggle-collect=cs_disasm_iter',
+          '--callgrind-out-file='+str(raw),bins[key],x['selector'],mode,x['path'],1],
+          'profile-'+ident)
+     payload=raw.read_text()
+     lines=payload.splitlines()
+     events=next(line.split()[1:] for line in lines if line.startswith('events:'))
+     totals=next(line.split()[1:] for line in lines if line.startswith('summary:'))
+     profiles.append(dict(case=x['name'],mode=mode,variant=key,counts=dict(zip(events,map(int,totals)))))
+     for inclusive in ('yes','no'):
+      report=sp.check_output(['callgrind_annotate','--inclusive='+inclusive,'--tree=both','--threshold=99.5','--auto=no',raw])
+      (e/(ident+'-'+inclusive+'.txt')).write_bytes(report)
+     with gzip.open(e/(ident+'.callgrind.gz'),'wb') as stream:stream.write(payload.encode())
+     raw.unlink()
+     write('dynamic-costs',profiles)
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
