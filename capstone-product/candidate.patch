@@ -1,21 +1,877 @@
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d6775ef0..79f30d8a 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -305,7 +305,15 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 	Mips_init_cs_detail(instr);
- /* These standard encodings have no extra operands to validate in a scan. */
- #ifdef MIPS_DIRECT_MAPPING
--	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
-+	cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
-+#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
-+	/* These standard encodings retain the same operands and public IDs in
-+     * revision 2. Extensions and mixed modes still use the full decoder. */
-+	if (mode == CS_MODE_MIPS32R2)
-+		mode = CS_MODE_MIPS32;
-+	else if (mode == CS_MODE_MIPS64R2)
-+		mode = CS_MODE_MIPS64;
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..0e06c605 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+ #endif
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result);
++					 uint8_t prefix, X86ScanResult *result,
++					 cs_mode mode);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+@@ -3316,8 +3317,8 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 		if (tryExtension &&
+ 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+ 		    code[0] == 0xc4) {
+-			const int status = tryVexTerminalScan(code, code_len,
+-							      code[0], result);
++			const int status = tryVexTerminalScan(
++				code, code_len, code[0], result, CS_MODE_64);
+ 			if (status != X86_SCAN_NOT_HANDLED)
+ 				return status == X86_SCAN_COMPLETE;
+ 		}
+@@ -3372,8 +3373,8 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+ 			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+ 				     X86_VEX_FEATURE_NONE)) {
+-		const int status =
+-			tryVexTerminalScan(code, code_len, code[0], result);
++		const int status = tryVexTerminalScan(code, code_len, code[0],
++						      result, CS_MODE_64);
+ 		if (status != X86_SCAN_NOT_HANDLED)
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
+@@ -3424,11 +3425,73 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ 	return completeTerminalScanResult(result, instructionID, status);
+ }
+ 
++#if X86_HAS_VEX2_PUBLIC_PLANS || defined(X86_COMPACT_PUBLIC_HEADER)
++/* An unprefixed 32- or 64-bit address uses the same SIB and displacement extents. */
++X86_DECODE_INLINE unsigned scanMemoryEnd(const uint8_t *code, size_t size,
++					 unsigned end, unsigned modrm)
++{
++	const unsigned mod = modrm >> 6, rm = modrm & 7;
++	static const uint8_t extra[3][8] = { { 0, 0, 0, 0, 1, 4, 0, 0 },
++					     { 1, 1, 1, 1, 2, 1, 1, 1 },
++					     { 4, 4, 4, 4, 5, 4, 4, 4 } };
++	if ((modrm & 0xc7) == 4) {
++		if (end >= size)
++			return 16;
++		if ((code[end] & 7) == 5)
++			end += 4;
++	}
++	end += extra[mod][rm];
++	return end;
++}
 +#endif
- 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
- 	    instr->csh->disasm == Mips_getInstruction &&
- 	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
++
++#if X86_HAS_VEX2_PUBLIC_PLANS
++/* The caller has recognized a bare C5 VEX prefix. These generated plans
++ * have one public ID and one validation result for every ModR/M byte. */
++X86_DECODE_INLINE int tryVex2PublicPlan(const uint8_t *code, size_t size,
++					X86ScanResult *result)
++{
++	if (size < 3)
++		return X86_SCAN_INVALID;
++	const unsigned payload = code[1];
++	const unsigned plan = x86Vex2PublicPlans[payload & 7][code[2]];
++	if (!plan)
++		return X86_SCAN_NOT_HANDLED;
++	if ((plan & 2) && vvvvFromVEX2of2(payload))
++		return X86_SCAN_INVALID;
++	unsigned end = 3;
++	if (plan & 4) {
++		if (size == 3)
++			return X86_SCAN_INVALID;
++		const unsigned modrm = code[3];
++		end = 4;
++		if (modrm < 0xc0)
++			end = scanMemoryEnd(code, size, end, modrm);
++	}
++	end += plan & 1;
++	if (end > size)
++		return X86_SCAN_INVALID;
++	result->opcode = 0;
++	result->opcode_pub = plan >> 3;
++	result->length = (uint16_t)end;
++	result->popcode_adjust = 0;
++	return X86_SCAN_COMPLETE;
++}
++#endif
++
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++					 uint8_t prefix, X86ScanResult *result,
++					 cs_mode mode)
+ {
++#if X86_HAS_VEX2_PUBLIC_PLANS
++	if (prefix == 0xc5) {
++		const int status = tryVex2PublicPlan(code, code_len, result);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status;
++	}
++#endif
+ 	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	initializeInstructionHeader(&insn, code, code_len, mode);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3495,7 +3558,8 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ 			      cs_insn *insn, X86ScanResult *result,
+ 			      uint8_t prefix)
+ {
+-	int status = tryVexTerminalScan(code, code_len, prefix, result);
++	int status =
++		tryVexTerminalScan(code, code_len, prefix, result, CS_MODE_64);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+@@ -3571,25 +3635,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+ 		}
+ 		++end;
+ 		if (modrm < 0xc0) {
+-			const unsigned mod = modrm >> 6, rm = modrm & 7;
+ 			if (mode == CS_MODE_16) {
+ 				static const uint8_t displacement[] = { 0, 1,
+ 									2 };
+-				end += displacement[mod] +
++				end += displacement[modrm >> 6] +
+ 				       ((modrm & 0xc7) == 6 ? 2 : 0);
+ 			} else {
+-				static const uint8_t extra[3][8] = {
+-					{ 0, 0, 0, 0, 1, 4, 0, 0 },
+-					{ 1, 1, 1, 1, 2, 1, 1, 1 },
+-					{ 4, 4, 4, 4, 5, 4, 4, 4 }
+-				};
+-				if ((modrm & 0xc7) == 4) {
+-					if (end >= size)
+-						return X86_SCAN_INVALID;
+-					if ((code[end] & 7) == 5)
+-						end += 4;
+-				}
+-				end += extra[mod][rm];
++				end = scanMemoryEnd(code, size, end, modrm);
+ 			}
+ 		}
+ 	}
+@@ -3679,6 +3731,20 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+ 						     result, 0xc5);
++#if !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	/* In 32-bit mode a leading C5 is LDS unless the next two bits are
++	 * set. An actual VEX2 uses the same W=0 opcode row and an ordinary
++	 * 32-bit address. Other operand shapes retain the source decoder. */
++	if (opcodeOffset == 0 && opcode == 0xc5 && handle->mode == CS_MODE_32 &&
++	    code_len >= 2 && (code[1] & 0xc0) == 0xc0) {
++		const int status = tryVexTerminalScan(code, code_len, opcode,
++						      result, CS_MODE_32);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status == X86_SCAN_COMPLETE;
++		return decodeScanResultGeneric(ud, code, code_len, insn, result,
++					       opcode, false);
++	}
++#endif
+ 
+ 	unsigned instructionID = 0;
+ 	/* Constant bitness folds the terminal readers' mode and size tests.
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..38cacf94 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
+ 			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
+ 			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..00cef894 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -631,6 +631,10 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+ 		{ 19, 20, 19, 20 },
+ 	},
+ };
++static const struct VectorOutputRow vex2_move_rows[2] = {
++	{ X86_INS_VMOVDQA, "vmovdqa", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVDQU, "vmovdqu", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++};
+ static const struct VectorOutputRow broadcast_rows[2][3] = {
+ 	{
+ 		{ 0 },
+diff --git a/arch/X86/X86GenVexScan.inc b/arch/X86/X86GenVexScan.inc
+index 2c0da2cd..c374d24e 100644
+--- a/arch/X86/X86GenVexScan.inc
++++ b/arch/X86/X86GenVexScan.inc
+@@ -61,6 +61,8 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+ 	},
+ };
+ 
++#define X86_HAS_VEX2_PUBLIC_PLANS 0
++
+ /* 1570 admitted UIDs, 9 immediate patterns. */
+ enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
+        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
+@@ -381,6 +383,155 @@ static const struct ModRMDecision *const x86VexScanRows[3][16] = {
+ 	},
+ };
+ 
++#define X86_HAS_VEX2_PUBLIC_PLANS 1
++/* Public ID, ModR/M extent, reserved vvvv and imm8 by L/pp/opcode. */
++static const uint16_t x86Vex2PublicPlans[8][256] = {
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8414, 8414, 0, 0, 11788, 11772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8190, 8190, 0, 0, 0, 0, 11758, 6430,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11670, 11470, 11294, 6212, 6196, 8540, 11804, 6084, 8484, 6526, 6462, 11708, 8124, 6804, 8068,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 11818, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11653, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8406, 8406, 0, 0, 11780, 11764, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8182, 8182, 0, 0, 0, 0, 11750, 6422,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11662, 0, 0, 6204, 6188, 8532, 11796, 6076, 8476, 6478, 6518, 11700, 8116, 6796, 8060,
++		11140, 11164, 11148, 8604, 8956, 8980, 8964, 8620, 11108, 11132, 11116, 8596, 11156, 11124, 8206, 8230,
++		10751, 0, 0, 0, 8908, 8932, 8916, 0, 0, 0, 0, 0, 7900, 7916, 8206, 8230,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 9693, 0, 11645, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6108, 10948, 10908, 10916, 8644, 10348, 8174, 0, 10996, 11004, 9956, 8740, 8668, 8676, 9892, 8724,
++		8748, 10892, 10852, 8756, 10316, 10324, 6646, 0, 10980, 10988, 9948, 10420, 8652, 8660, 9884, 11188,
++		0, 10844, 10804, 10812, 10364, 9836, 10532, 0, 10956, 11012, 10964, 10972, 8628, 8684, 8636, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8390, 0, 0, 0, 8382, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6612, 0, 6726, 6630, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11684, 11476, 11300, 0, 0, 0, 0, 6100, 8500, 6620, 6678, 11724, 8140, 6820, 8084,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		10759, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8174, 8270,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6454, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6604, 0, 6710, 6582, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11676, 0, 0, 0, 0, 0, 0, 6092, 8492, 6588, 0, 11716, 8132, 6812, 8076,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		10767, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7908, 7924, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6470, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8414, 8414, 0, 0, 11788, 11772, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8190, 8190, 0, 0, 0, 0, 11758, 6430,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11670, 11470, 11294, 6212, 6196, 8540, 11804, 6084, 8484, 6526, 6462, 11708, 8124, 6804, 8068,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 11810, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11653, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		8406, 8406, 0, 0, 11780, 11764, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 8182, 8182, 0, 0, 0, 0, 11750, 6422,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11662, 0, 0, 6204, 6188, 8532, 11796, 6076, 8476, 6478, 6518, 11700, 8116, 6796, 8060,
++		11140, 11164, 11148, 8604, 8956, 8980, 8964, 8620, 11108, 11132, 11116, 8596, 11156, 11124, 0, 8230,
++		10751, 0, 0, 0, 8908, 8932, 8916, 0, 0, 0, 0, 0, 7900, 7916, 0, 8230,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 11645, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6108, 10948, 10908, 10916, 8644, 10348, 0, 0, 10996, 11004, 9956, 8740, 8668, 8676, 9892, 8724,
++		8748, 10892, 10852, 8756, 10316, 10324, 6646, 0, 10980, 10988, 9948, 10420, 8652, 8660, 9884, 11188,
++		0, 10844, 10804, 10812, 10364, 9836, 10532, 0, 10956, 11012, 10964, 10972, 8628, 8684, 8636, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8390, 0, 0, 0, 8382, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6612, 0, 6726, 6630, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11684, 11476, 11300, 0, 0, 0, 0, 6100, 8500, 6620, 6678, 11724, 8140, 6820, 8084,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		10759, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8270,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6454, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++	{
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 8198, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 6604, 0, 6710, 6582, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 11676, 0, 0, 0, 0, 0, 0, 6092, 8492, 6588, 0, 11716, 8132, 6812, 8076,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		10767, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7908, 7924, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		6116, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 6470, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	},
++};
++
+ /* 4512 admitted UIDs, 10 immediate patterns. */
+ enum { X86_VEX_SCAN_MEMORY = 1, X86_VEX_SCAN_REGISTER = 2,
+        X86_VEX_SCAN_MODRM = 4, X86_VEX_SCAN_VVVV = 8,
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..875d5033 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -37,7 +37,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 				 const struct VectorOutputRow *row,
+ 				 unsigned prefix, unsigned ll, unsigned rex,
+ 				 unsigned first_ll, const unsigned *regs,
+-				 unsigned reg_count)
++				 unsigned reg_count, unsigned address_size)
+ {
+ 	const unsigned len = prefix + 2 + row->immediate;
+ 	*insn_size = insn->size = (uint16_t)len;
+@@ -73,7 +73,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		d->groups_count = row->group_count;
+ 		cs_x86 *x = &d->x86;
+ 		memcpy(x->opcode, code, prefix);
+-		x->addr_size = 8;
++		x->addr_size = (uint8_t)address_size;
+ 		x->rex = (uint8_t)rex;
+ 		x->modrm = code[prefix + 1];
+ 		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
+@@ -140,10 +140,10 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		const unsigned pair[] = { regs[2], regs[0] };
+ 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+ 					    0x40 | (w << 3) | rxb,
+-					    (key & 2) != 0, pair, 2);
++					    (key & 2) != 0, pair, 2, 8);
+ 	}
+ 	return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+-				    0x40 | (w << 3) | rxb, ll, regs, 3);
++				    0x40 | (w << 3) | rxb, ll, regs, 3, 8);
+ }
+ 
+ /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
+@@ -465,15 +465,31 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+  * Memory forms and unsupported vector widths fall back before any output. */
+ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 				   cs_insn *insn, uint16_t *insn_size,
+-				   unsigned prefix)
++				   unsigned prefix, bool wide)
+ {
+ 	const unsigned flags = code[prefix - 1];
++	// C5 encodes the extended reg bit, an ordinary r/m register and reserved vvvv.
++	if (prefix == 2 && (flags & 0x78) == 0x78 && (code[2] | 0x10) == 0x7f &&
++	    ((flags & 3) == 1 || (flags & 3) == 2)) {
++		const unsigned modrm = code[3], ll = (flags >> 2) & 1;
++		const unsigned ext = (~flags >> 5) & 4;
++		const unsigned reg = ((modrm >> 3) & 7) | (ext << 1),
++			       rm = modrm & 7;
++		const bool reverse = code[2] == 0x7f;
++		const unsigned operands[] = { reverse ? rm : reg,
++					      reverse ? reg : rm };
++		return writeVectorRegisters(code, insn, insn_size,
++					    &vex2_move_rows[(flags & 3) - 1], 2,
++					    ll, wide ? 0x40 | ext : 0, ll,
++					    operands, 2, wide ? 8 : 4);
++	}
+ 	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
+ 	if ((flags & 3) != 1 || !map || map > 3)
+ 		return false;
+ 	const unsigned ll = (flags >> 2) & 1;
+ 	const unsigned w = prefix == 3 && (flags & 0x80);
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & (prefix == 2 ? 4 : 7);
++	const unsigned rex = wide ? 0x40 | (w << 3) | rxb : 0;
+ 	const unsigned modrm = code[prefix + 1];
+ 	const unsigned opcode = code[prefix];
+ 	if (map == 1 && opcode >= 0x71 && opcode <= 0x73) {
+@@ -485,7 +501,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 					  (modrm & 7) | ((rxb & 1) << 3) };
+ 		return writeVectorRegisters(code, insn, insn_size,
+ 					    &vex_shift_rows[index], prefix, ll,
+-					    0x40 | (w << 3) | rxb, ll, regs, 2);
++					    rex, ll, regs, 2, wide ? 8 : 4);
+ 	}
+ 	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
+ 	const unsigned index = vex_register_widths[plan][w * 2 + ll];
+@@ -497,8 +513,8 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
+ 				  (~flags >> 3) & 15,
+ 				  (modrm & 7) | ((rxb & 1) << 3) };
+-	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,
+-				    0x40 | (w << 3) | rxb, ll, regs, 3);
++	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll, rex,
++				    ll, regs, 3, wide ? 8 : 4);
+ }
+ 
+ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,6 +529,14 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (code[0] == 0x66)
+ 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+ 						 wide);
++	if (!wide) {
++		/* C5 is LDS in legacy mode unless ModR/M.mod is 3. Only VEX2
++         * register forms share the generated rows and need no address decoder. */
++		return code[0] == 0xc5 && size >= 4 &&
++		       (code[1] & 0xc0) == 0xc0 && code[3] >= 0xc0 &&
++		       writeVexRegisterOutput(code, size, insn, insn_size, 2,
++					      false);
++	}
+ 	if (code[0] == 0x62)
+ 		return writeEvexOutput(code, size, insn, insn_size, regs);
+ 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+@@ -520,7 +544,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
+ 		return writeVexRegisterOutput(code, size, insn, insn_size,
+-					      prefix);
++					      prefix, true);
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
+ }
+ /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..44c34074 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1158,7 +1158,68 @@ def vex_scan_form(operands, register_form):
+     return True
+ 
+ 
+-def emit_vex_scan_rows(suffix):
++def emit_vex2_plans(suffix, source, contexts, names, context_values, attrs, pp,
++                    metadata, patterns):
++    """Collapse identical ModR/M outcomes into one public ID and operand extent."""
++    ids = tables.parse_ids(source, contexts)
++    maps = tables.parse_maps(
++        (X86 / f"X86GenDisassemblerTables{suffix}2.inc").read_text(),
++        names[:4] if suffix else names, len(contexts),
++    )
++    _, indices, rows = maps[1]
++    tails = {number: len(lengths) for lengths, number in patterns.items()
++             if not lengths or lengths == ("1",)}
++    out = []
++    for selector in range(8):
++        attributes = attrs["ATTR_VEX"] | pp[selector & 3]
++        if selector & 4:
++            attributes |= attrs["ATTR_VEXL"]
++        index = indices[contexts.index(context_values[attributes])]
++        long_index = indices[contexts.index(context_values[attributes | attrs["ATTR_64BIT"]])]
++        tables.require(index == long_index, "VEX2 opcode map differs by bitness")
++        row = rows[index - 1] if index else [("MODRM_ONEENTRY", 0)] * 256
++        plans = []
++        for opcode, (kind, offset) in enumerate(row):
++            def plan(modrm):
++                uid = tables.source_id(ids, kind, offset, modrm)
++                if not uid or uid >= len(metadata) or not metadata[uid]:
++                    return 0
++                word = metadata[uid]
++                public_id, flags = word >> 8, word & 255
++                if not public_id or (flags >> 4) not in tails:
++                    return 0
++                has_modrm = kind != "MODRM_ONEENTRY" or bool(flags & 4)
++                form = 2 if modrm >= 0xc0 else 1
++                if has_modrm and not flags & form:
++                    return 0
++                tables.require(public_id < 8192, "VEX2 public ID exceeds 13 bits")
++                return ((public_id << 3) | (int(has_modrm) << 2)
++                        | (int(not flags & 8) << 1) | tails[flags >> 4])
++
++            # These opcodes retain the general ID and size repairs of tryVexTerminalScan.
++            if opcode == 0xae or 0x82 <= opcode <= 0x8f:
++                plans.append(0)
++                continue
++            candidate = plan(0)
++            if candidate and all(plan(mr) == candidate for mr in range(1, 256)):
++                plans.append(candidate)
++            else:
++                plans.append(0)
++        out.append(plans)
++    if not any(any(row) for row in out):
++        return ["#define X86_HAS_VEX2_PUBLIC_PLANS 0", ""]
++    lines = ["#define X86_HAS_VEX2_PUBLIC_PLANS 1",
++             "/* Public ID, ModR/M extent, reserved vvvv and imm8 by L/pp/opcode. */",
++             "static const uint16_t x86Vex2PublicPlans[8][256] = {"]
++    for row in out:
++        lines.append("\t{")
++        for i in range(0, len(row), 16):
++            lines.append("\t\t" + ", ".join(map(str, row[i:i + 16])) + ",")
++        lines.append("\t},")
++    return lines + ["};", ""]
++
++
++def emit_vex_scan_rows(suffix, metadata, patterns):
+     common = (X86 / "X86DisassemblerDecoderCommon.h").read_text()
+     contexts, kinds, names = tables.parse_common(common)
+     source = (X86 / f"X86GenDisassemblerTables{suffix}.inc").read_text()
+@@ -1204,12 +1265,18 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            # A two-byte VEX has map 1 and W=0. Its 32-bit reader uses
++            # these same entries with the address and operand sizes of its mode.
++            if name == names[1] and key < 8:
++                other = indices[contexts.index(context_values[attributes & ~attrs["ATTR_64BIT"]])]
++                tables.require(row == other, "VEX2 row differs between 32 and 64 bits")
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
+         lines.append("\t},")
+     lines += ["};", ""]
+-    return lines
++    return lines + emit_vex2_plans(suffix, source, contexts, names, context_values,
++                                   attrs, pp, metadata, patterns)
+ 
+ 
+ def emit_vex_scan(suffix):
+@@ -1279,7 +1346,7 @@ def emit_vex_scan(suffix):
+             ]
+         lines.append("\t\treturn X86_SCAN_COMPLETE;")
+     lines += ["\tdefault:", "\t\treturn X86_SCAN_INVALID;", "\t}", "}"]
+-    return "\n".join(emit_vex_scan_rows(suffix) + lines)
++    return "\n".join(emit_vex_scan_rows(suffix, metadata, patterns) + lines)
+ 
+ 
+ def emit_writemask_opcodes(suffix):
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index ccc4f0de..38ae3cc6 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -621,7 +621,7 @@ int main()
+ 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
+ 	plans[1][0][0x62] = X86_PLAN_VECTOR;
+ 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
+-	plans[1][0][0xc5] = X86_PLAN_VECTOR;
++	plans[0][0][0xc5] = plans[1][0][0xc5] = X86_PLAN_VECTOR;
+ 	for (unsigned wide = 0; wide < 2; ++wide) {
+ 		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+ 			for (unsigned alu = 1; alu < 0x40; alu += 8) {
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 834c2488..5a176d1c 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -664,26 +664,12 @@ void emit_vex_rip_loads(Decoder &decoder)
+ 	std::puts("};");
+ }
+ 
+-// Match ordinary NDS register operands against the complete canonical record.
+-// Opcodes with aliases, exceptional register sizes or immediate-dependent text
+-// keep using the general decoder.
+-std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+-			     unsigned w, unsigned ll, unsigned rxb,
+-			     unsigned dst, unsigned src, unsigned rm,
+-			     bool short_prefix, bool immediate, unsigned value,
+-			     bool group_shift = false)
++std::string checked_vex_registers(Decoder &decoder, const uint8_t *bytes,
++				  unsigned prefix, bool wide, unsigned rex_bits,
++				  unsigned ll, const unsigned *numbers,
++				  unsigned reg_count, bool immediate)
+ {
+-	const unsigned prefix = short_prefix ? 2 : 3;
+-	const unsigned length = prefix + 2 + immediate;
+-	uint8_t bytes[6] = {};
+-	bytes[0] = short_prefix ? 0xc5 : 0xc4;
+-	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
+-	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
+-				    (~src & 15) << 3 | ll << 2 | 1);
+-	bytes[prefix] = uint8_t(opcode);
+-	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
+-	bytes[prefix + 2] = uint8_t(value);
+-	unsigned id = decoder.decode(bytes, length);
++	unsigned id = decoder.decode(bytes, prefix + 2 + immediate);
+ 	if (!id)
+ 		return {};
+ 	const cs_insn &insn = *decoder.insn;
+@@ -692,16 +678,12 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 	if (insn.illegal || insn.is_alias || insn.usesAliasDetails ||
+ 	    std::strlen(insn.mnemonic) >= 16 || detail.regs_read_count ||
+ 	    detail.regs_write_count || detail.groups_count > 4 ||
+-	    x.op_count != (group_shift ? 2u : 3u) + immediate)
++	    x.op_count != reg_count + immediate)
+ 		return {};
+-	const unsigned reg_count = group_shift ? 2 : 3;
+-	const unsigned numbers[] = { group_shift ? src : dst | ((rxb & 4) << 1),
+-				     group_shift ? rm | ((rxb & 1) << 3) : src,
+-				     rm | ((rxb & 1) << 3) };
+ 	cs_x86 expected{};
+ 	std::memcpy(expected.opcode, bytes, prefix);
+-	expected.addr_size = 8;
+-	expected.rex = uint8_t(0x40 | w << 3 | rxb);
++	expected.addr_size = wide ? 8 : 4;
++	expected.rex = wide ? uint8_t(0x40 | rex_bits) : 0;
+ 	expected.modrm = bytes[prefix + 1];
+ 	expected.encoding.modrm_offset = uint8_t(prefix + 1);
+ 	expected.op_count = uint8_t(reg_count + immediate);
+@@ -722,6 +704,7 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 		text += std::to_string(numbers[i]);
+ 	}
+ 	if (immediate) {
++		const unsigned value = bytes[prefix + 2];
+ 		auto &op = expected.operands[reg_count];
+ 		op.type = X86_OP_IMM;
+ 		op.imm = value;
+@@ -743,9 +726,91 @@ std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
+ 	       ", " + fields(access) + ", " + std::to_string(immediate) + " }";
+ }
+ 
++// Match ordinary NDS register operands against the complete canonical record.
++// Opcodes with aliases, exceptional register sizes or immediate-dependent text
++// keep using the general decoder.
++std::string vex_register_row(Decoder &decoder, unsigned map, unsigned opcode,
++			     unsigned w, unsigned ll, unsigned rxb,
++			     unsigned dst, unsigned src, unsigned rm,
++			     bool short_prefix, bool immediate, unsigned value,
++			     bool group_shift = false, bool wide = true)
++{
++	const unsigned prefix = short_prefix ? 2 : 3;
++	uint8_t bytes[6] = {};
++	bytes[0] = short_prefix ? 0xc5 : 0xc4;
++	bytes[1] = uint8_t((~rxb & 7) << 5 | map);
++	bytes[prefix - 1] = uint8_t((short_prefix ? (~rxb & 4) << 5 : w << 7) |
++				    (~src & 15) << 3 | ll << 2 | 1);
++	bytes[prefix] = uint8_t(opcode);
++	bytes[prefix + 1] = uint8_t(0xc0 | dst << 3 | rm);
++	bytes[prefix + 2] = uint8_t(value);
++	const unsigned numbers[] = { group_shift ? src : dst | ((rxb & 4) << 1),
++				     group_shift ? rm | ((rxb & 1) << 3) : src,
++				     rm | ((rxb & 1) << 3) };
++	return checked_vex_registers(decoder, bytes, prefix, wide,
++				     (w << 3) | rxb, ll, numbers,
++				     group_shift ? 2 : 3, immediate);
++}
++
++// Both directions of the VEX2 packed move use the same two public operands.
++// Check every encodable register pair, width and bitness before sharing a row.
++void emit_vex2_moves(Decoder &wide, Decoder &narrow)
++{
++	std::puts("static const struct VectorOutputRow vex2_move_rows[2] = {");
++	for (unsigned pp : { 1u, 2u }) {
++		std::string row;
++		for (unsigned opcode : { 0x6fu, 0x7fu }) {
++			for (bool long_mode : { false, true }) {
++				auto &decoder = long_mode ? wide : narrow;
++				for (unsigned ll : { 0u, 1u }) {
++					for (unsigned pair = 0;
++					     pair < (long_mode ? 128u : 64u);
++					     ++pair) {
++						const unsigned reg = pair >> 3,
++							       rm = pair & 7;
++						const uint8_t bytes[] = {
++							0xc5,
++							uint8_t((reg < 8 ?
++									 0xf8 :
++									 0x78) |
++								ll << 2 | pp),
++							uint8_t(opcode),
++							uint8_t(0xc0 |
++								((reg & 7)
++								 << 3) |
++								rm)
++						};
++						const unsigned operands[] = {
++							opcode == 0x6f ? reg :
++									 rm,
++							opcode == 0x6f ? rm :
++									 reg
++						};
++						const auto value =
++							checked_vex_registers(
++								decoder, bytes,
++								2, long_mode,
++								reg < 8 ? 0 : 4,
++								ll, operands, 2,
++								false);
++						if (value.empty() ||
++						    (!row.empty() &&
++						     row != value))
++							throw std::runtime_error(
++								"inconsistent VEX2 packed move register operands");
++						row = value;
++					}
++				}
++			}
++		}
++		std::printf("\t%s,\n", row.c_str());
++	}
++	std::puts("};");
++}
++
+ // VEX groups 12-14 encode the operation in ModR/M.reg, the destination
+ // in vvvv and the only source register in ModR/M.r/m.
+-void emit_vex_shifts(Decoder &decoder)
++void emit_vex_shifts(Decoder &decoder, Decoder &narrow)
+ {
+ 	unsigned plans[3][8][4] = {};
+ 	std::vector<std::string> rows;
+@@ -771,6 +836,18 @@ void emit_vex_shifts(Decoder &decoder)
+ 						 probe(k, true) == value);
+ 				if (!valid)
+ 					continue;
++				if (wl < 2) {
++					for (unsigned n = 0; n < 256; ++n) {
++						if (vex_register_row(
++							    narrow, 1, op, 0,
++							    wl, 0, group, n & 7,
++							    (n >> 3) & 7, true,
++							    true, n, true,
++							    false) != value)
++							throw std::runtime_error(
++								"inconsistent i386 VEX2 shift row");
++					}
++				}
+ 				auto index = static_cast<unsigned>(
+ 					std::find(rows.begin(), rows.end(),
+ 						  value) -
+@@ -800,7 +877,7 @@ void emit_vex_shifts(Decoder &decoder)
+ 	std::fprintf(stderr, "%zu VEX immediate shift rows\n", rows.size());
+ }
+ 
+-void emit_vex_registers(Decoder &decoder)
++void emit_vex_registers(Decoder &decoder, Decoder &narrow)
+ {
+ 	std::vector<std::string> rows;
+ 	std::vector<Bytes4> widths(1);
+@@ -843,6 +920,21 @@ void emit_vex_registers(Decoder &decoder)
+ 				}
+ 				if (!uniform)
+ 					continue;
++				// A 32-bit C5 VEX prefix admits only registers 0..7.
++				// Rebuild the complete i386 record before sharing its output row.
++				if (map == 1 && !w) {
++					for (unsigned n = 0; n < 512; ++n) {
++						if (vex_register_row(
++							    narrow, map, opcode,
++							    0, ll, 0, n & 7,
++							    (n >> 3) & 7,
++							    n >> 6, true, imm,
++							    n & 255, false,
++							    false) != row)
++							throw std::runtime_error(
++								"inconsistent i386 VEX2 register row");
++					}
++				}
+ 				const auto it = std::find(rows.begin(),
+ 							  rows.end(), row);
+ 				const unsigned index =
+@@ -936,8 +1028,10 @@ void emit_output(Decoder &decoder)
+ 	}
+ 	std::puts("\tdefault: return NULL;\n\t}\n}");
+ 	emit_vex_indexed(decoder);
+-	emit_vex_registers(decoder);
+-	emit_vex_shifts(decoder);
++	Decoder narrow_vex(CS_MODE_32);
++	emit_vex_registers(decoder, narrow_vex);
++	emit_vex_shifts(decoder, narrow_vex);
++	emit_vex2_moves(decoder, narrow_vex);
+ 	emit_broadcast_rows(decoder);
+ 	emit_vex_rip_loads(decoder);
+ 	Decoder padding32(CS_MODE_32);
+diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
+index 6990d510..2f678946 100644
+--- a/tests/unit/x86_simple_output.c
++++ b/tests/unit/x86_simple_output.c
+@@ -738,6 +738,46 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ 	return true;
+ }
+ 
++/* Compare VEX2 registers, truncated prefixes and the overlapping LDS encoding. */
++static bool check_i386_vex2(csh handles[2])
++{
++	for (unsigned p = 0; p < 256; ++p) {
++		for (unsigned op = 0; op < 256; ++op) {
++			for (unsigned n = 0; n < 8; ++n) {
++				const unsigned seed = p + op + n;
++				uint8_t bytes[] = {
++					0xc5, (uint8_t)p, (uint8_t)op,
++					(uint8_t)(0xc0 | (n << 3) | (seed & 7)),
++					(uint8_t)seed
++				};
++				if (!compare(handles, bytes, sizeof(bytes),
++					     seed) ||
++				    !compare(handles, bytes,
++					     seed % sizeof(bytes), seed))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool check_vex2_moves(csh handles[2])
++{
++	for (unsigned flags = 0; flags < 256; ++flags) {
++		for (unsigned modrm = 0xc0; modrm < 256; ++modrm) {
++			for (unsigned op = 0x6f; op <= 0x7f; op += 0x10) {
++				uint8_t bytes[] = { 0xc5, (uint8_t)flags,
++						    (uint8_t)op,
++						    (uint8_t)modrm };
++				if (!compare(handles, bytes, sizeof(bytes),
++					     flags + modrm))
++					return false;
++			}
++		}
++	}
++	return true;
++}
++
+ static bool check_mode(cs_mode mode)
+ {
+ 	csh handles[2] = { 0 };
+@@ -766,7 +806,8 @@ static bool check_mode(cs_mode mode)
+ 		    (mode == CS_MODE_64 && !check_vex_rip_loads(handles)) ||
+ 		    !check_rex_stack(handles) ||
+ 		    (mode == CS_MODE_64 && !check_broadcast(handles)) ||
+-		    !check_padding(handles) ||
++		    (mode == CS_MODE_32 && !check_i386_vex2(handles)) ||
++		    !check_vex2_moves(handles) || !check_padding(handles) ||
+ 		    !check_alu_memory(handles, mode) ||
+ 		    !check_alu_immediates(handles, mode) ||
+ 		    !check_legacy_vectors(handles, mode) ||

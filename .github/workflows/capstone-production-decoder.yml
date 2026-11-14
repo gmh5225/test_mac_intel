@@ -1,7 +1,7 @@
-name: Time standard MIPS revision 2 scan in the released NeverD decoder against live LLVM source
+name: Verify VEX2 scan and public output in NeverD dev built with current fork LLVM
 on:
   push:
-    branches: [codex/neverd-mips-r2-scan-only]
+    branches: [codex/neverd-i386-vex2-scan-output]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ddf30e5255af3aa7fa071d756ada080c4c957071
+          ref: 3653724cc3b3cbd40d329f25b4bd4cf6e67e0156
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-mips-r2-scan-only
+          name: product-vex2-scan-and-records
           path: product-evidence/
           retention-days: 14
