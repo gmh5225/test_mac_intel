@@ -1,7 +1,7 @@
-name: Measure standard MIPS r2 primary decoder in current NeverD dev and source LLVM
+name: Qualify MOV memory-immediate formatting and full detail on current native Capstone in product
 on:
   push:
-    branches: [codex/neverd-mips-r2-primary-decoder]
+    branches: [codex/capstone-mov-memory-current-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 6db8eba6f3d52522bd30d282b71bdcfd4fd9ac3c
+          ref: e82ed485b27e07826843f37d6eb9e80272e61ce1
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-mips-r2-primary-decoder
+          name: product-mov-memory-current
           path: product-evidence/
           retention-days: 14

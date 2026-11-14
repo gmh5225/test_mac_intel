@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label=='candidate':
     change=r/'candidate.patch'
     assert hashlib.sha256(change.read_bytes()).hexdigest()==expected['patch_sha256']
-    command(['git','apply',change],'apply-mips-scan',cs)
+    command(['git','apply',change],'apply-mov-memory-output',cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'MipsDisassembler.c.o'},changed
+    assert {'X86MemoryOutput.c.o','X86OutputIterator.c.o'} <= {Path(k).name for k in changed} <= {'X86MemoryOutput.c.o','X86OutputIterator.c.o','X86ImmediateOutput.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
