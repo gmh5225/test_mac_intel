@@ -22,7 +22,7 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='75da2329204825bb0bd15e574ab58c45b5019dcc'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='6c93c31134d5396095ba4e63db58548317d6f5b9'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
