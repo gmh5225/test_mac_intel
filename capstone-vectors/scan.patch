@@ -722,10 +722,10 @@ index 00000000..7817a761
 +
 +#endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..9e059068 100644
+index 11e8578a..9b1254a2 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -76,11 +76,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -76,11 +76,15 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  		return false;
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
@@ -735,20 +735,19 @@ index 11e8578a..9e059068 100644
 -						     x86_simple_registers[3],
 -						     wide);
 +		if (plan == X86_PLAN_VECTOR) {
-+			static bool (*const writers[2])(
-+				const uint8_t *, size_t, cs_insn *, uint16_t *,
-+				const struct X86SimpleRegister *,
-+				bool) = { X86_writeVectorOutput32,
-+					  X86_writeVectorOutput };
-+			return writers[wide](code, size, insn, insn_size,
-+					     x86_simple_registers[2 + wide],
-+					     wide);
++			if (wide)
++				return X86_writeVectorOutput(
++					code, size, insn, insn_size,
++					x86_simple_registers[3], true);
++			return X86_writeVectorOutput32(code, size, insn,
++						       insn_size,
++						       x86_simple_registers[2]);
 +		}
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..98d96336 100644
+index 7675273f..254b475c 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
 @@ -68,6 +68,17 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
@@ -759,7 +758,7 @@ index 7675273f..98d96336 100644
 +CAPSTONE_INTERNAL bool
 +X86_writeVectorOutput32(const uint8_t *code, size_t size, cs_insn *insn,
 +			uint16_t *insn_size,
-+			const struct X86SimpleRegister *regs, bool wide);
++			const struct X86SimpleRegister *regs);
 +
 +/* The caller selects a bare 32-bit VEX2 output plan. */
 +CAPSTONE_INTERNAL bool
@@ -771,7 +770,7 @@ index 7675273f..98d96336 100644
  	if (displacement) {
 diff --git a/arch/X86/X86VexOutput32.c b/arch/X86/X86VexOutput32.c
 new file mode 100644
-index 00000000..0c4a9c2d
+index 00000000..1e027b72
 --- /dev/null
 +++ b/arch/X86/X86VexOutput32.c
 @@ -0,0 +1,204 @@
@@ -970,11 +969,11 @@ index 00000000..0c4a9c2d
 + * SSE keep their original reader; bare VEX2 uses the mode-specific records. */
 +bool X86_writeVectorOutput32(const uint8_t *code, size_t size, cs_insn *insn,
 +			     uint16_t *insn_size,
-+			     const struct X86SimpleRegister *regs, bool wide)
++			     const struct X86SimpleRegister *regs)
 +{
 +	if (code[0] == 0xc5)
 +		return X86_writeVex32Output(code, size, insn, insn_size, regs);
-+	return X86_writeVectorOutput(code, size, insn, insn_size, regs, wide);
++	return X86_writeVectorOutput(code, size, insn, insn_size, regs, false);
 +}
 +
 +#endif
