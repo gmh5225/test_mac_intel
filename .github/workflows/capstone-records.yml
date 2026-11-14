@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in mixed
+name: Diagnose SIMD detail work and linked code across native output changes
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-mixed]
+    branches: [codex/capstone-simd-detail-work]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,9 +13,7 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc, archs: four }
           - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -32,13 +30,14 @@ jobs:
           ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind
+      - name: Compare SIMD details, register access and linked instructions
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-combined-boundary-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: simd-detail-work-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
