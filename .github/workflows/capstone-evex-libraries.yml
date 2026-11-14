@@ -1,7 +1,7 @@
-name: Qualify complete native scan and EVEX output changes in libraries
+name: Diagnose PE32 function scan regressions with exact linked code, CPU model and dynamic work
 on:
   push:
-    branches: [codex/capstone-native-evex-shift-release-libraries]
+    branches: [codex/capstone-pe32-function-work]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,11 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-22.04, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
+          - { host: ubuntu-24.04, cc: gcc, replica: one }
+          - { host: ubuntu-22.04, cc: gcc, replica: one }
+          - { host: ubuntu-22.04, cc: gcc, replica: two }
+          - { host: ubuntu-24.04, cc: clang, replica: one }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -31,7 +30,8 @@ jobs:
           ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
+      - name: Profile the exact 32-bit function-boundary workload and final executable
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-evex-shift-release-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: pe32-function-work-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
