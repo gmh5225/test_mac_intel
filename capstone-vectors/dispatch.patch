@@ -38,8 +38,21 @@ index 63dcc538..21f700c7 100644
  	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
  			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
  			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..2c9d9ac6 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -28,7 +28,7 @@ static const struct VectorOutputRow evex_output_rows[] = {
+ 	{ X86_INS_VPADDD, "vpaddd", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VPADDD, "vpaddd", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ };
+-static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
++X86_VECTOR_INLINE const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
+ {
+ 	switch (key) {
+ 	case 0x1ef: {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..2ab8c21a 100644
+index 6df1472d..8f06cb76 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -8,6 +8,7 @@
@@ -50,12 +63,28 @@ index 6df1472d..2ab8c21a 100644
  struct PaddingOutput {
  	unsigned id;
  	uint8_t length;
-@@ -105,6 +106,39 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -19,6 +20,15 @@ struct PaddingOutput {
+ 		index, scale;
+ };
+ 
++/* Keep shared row admission in each caller's generated code. */
++#if defined(_MSC_VER)
++#define X86_VECTOR_INLINE static __forceinline
++#elif defined(__GNUC__)
++#define X86_VECTOR_INLINE static inline __attribute__((always_inline))
++#else
++#define X86_VECTOR_INLINE static inline
++#endif
++
+ #include "X86GenVectorOutput.inc"
+ static char *writeVectorRegister(char *out, unsigned length_code,
+ 				 unsigned number)
+@@ -105,6 +115,39 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  			       uint16_t *insn_size,
  			       const struct X86SimpleRegister *regs);
  
 +/* Formatting and scan use the same admitted EVEX register forms. */
-+static const struct VectorOutputRow *evexRegisterOutputRow(const uint8_t *code,
++X86_VECTOR_INLINE const struct VectorOutputRow *evexRegisterOutputRow(const uint8_t *code,
 +							   size_t size)
 +{
 +	if (size < 6 || code[5] < 0xc0 || (code[2] & 7) != 5 ||
@@ -90,7 +119,7 @@ index 6df1472d..2ab8c21a 100644
  #if defined(_MSC_VER)
  __declspec(noinline)
  #elif defined(__GNUC__)
-@@ -117,15 +151,12 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -117,15 +160,12 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (size >= 6 && code[5] < 0xc0)
  		return writeEvexBroadcast(code, size, insn, insn_size,
  					  address_regs);
@@ -108,7 +137,7 @@ index 6df1472d..2ab8c21a 100644
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
  	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
  					  (~(unsigned)code[1] & 16),
-@@ -135,8 +166,6 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -135,8 +175,6 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
       * the full-width source, and reserve vvvv/V'. */
  	if ((key & ~0x22u) == 0x319) {
@@ -117,3 +146,16 @@ index 6df1472d..2ab8c21a 100644
  		const unsigned pair[] = { regs[2], regs[0] };
  		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
  					    0x40 | (w << 3) | rxb,
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 834c2488..5d75d50f 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -925,7 +925,7 @@ void emit_output(Decoder &decoder)
+ 	for (const auto &row : records)
+ 		std::printf("\t%s,\n", row.c_str());
+ 	std::puts(
+-		"};\nstatic const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)\n{\n\tswitch (key) {");
++		"};\nX86_VECTOR_INLINE const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)\n{\n\tswitch (key) {");
+ 	for (auto &[key, rows] : plans) {
+ 		std::printf(
+ 			"\tcase 0x%x: {\n\t\tstatic const uint8_t rows[2][3] = { { %u, %u, %u }, { %u, %u, %u } };\n",
