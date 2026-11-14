@@ -49,7 +49,7 @@ def main(w):
         assert len(objects[label])>30
         if label=='output':
             changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
-            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86VectorOutput',)},changed
+            assert changed=={'arch/X86/'+name+'.c.o' for name in ('X86VectorOutput','X86OutputIterator')},changed
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         for component in ('X86VectorOutput','X86DisassemblerDecoder'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
