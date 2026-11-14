@@ -1,7 +1,7 @@
-name: Copy admitted vector bytes and prefixes at their bounded lengths profiles
+name: Validate generated VEX2 scan plans on current Capstone profiles
 on:
   push:
-    branches: [codex/capstone-vector-bounded-copies-profiles]
+    branches: [codex/capstone-current-vex2-scan-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -39,13 +39,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
+          ref: 6c93c31134d5396095ba4e63db58548317d6f5b9
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-bounded-copies-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: current-vex2-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
