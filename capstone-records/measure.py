@@ -40,11 +40,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':
     run(['cmake','--build',b,'--target','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
-    target='arch/X86/X86VectorOutput.o'
+    target='arch/X86/X86EvexMemoryOutput.o'
     for archs,qualified in (('x86',True),('mips x86',True),('x86 arm mips aarch64',True),('arm x86',False),('mips arm x86',False),('mips aarch64 arm x86 riscv',False)):
      env={**os.environ,'CAPSTONE_ARCHS':archs,'CC':cc,'CXX':'g++' if cc=='gcc' else 'clang++','CAPSTONE_STATIC':'yes','CAPSTONE_SHARED':'no'}
      dry=sp.check_output(['make','-Bn',target],env=env,cwd=s,text=True)
-     compile=next(line for line in dry.splitlines() if ' -c ' in line and 'X86VectorOutput.c' in line)
+     compile=next(line for line in dry.splitlines() if ' -c ' in line and 'X86EvexMemoryOutput.c' in line)
      assert ('-mstringop-strategy=libcall' in compile)==(qualified and cc=='gcc' and platform.machine()=='x86_64'),(archs,cc,compile)
      assert ('-DCAPSTONE_ARM_AARCH64_MIPS_X86' in compile)==(len(archs.split())==4)
     write('make-profiles',dict(architecture_sets=6,cc=cc,target=target))
@@ -54,9 +54,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
-   changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
+   changed=[k for k,h in objects[key].items() if objects['base'].get(k)!=h]
    active=True
-   expected={'arch/X86/'+name+'.c.o' for name in ('X86VectorOutput',)}
+   expected={'arch/X86/'+name+'.c.o' for name in ('X86VectorOutput','X86EvexMemoryOutput')}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
