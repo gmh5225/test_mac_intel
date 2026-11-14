@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'MipsMapping.c.o'},changed
+    assert {Path(k).name for k in changed}=={'MipsDisassembler.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}

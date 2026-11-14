@@ -1,21 +1,27 @@
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d6775ef0..79f30d8a 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -305,7 +305,15 @@ bool Mips_getInstruction(csh handle, const uint8_t *code, size_t code_len,
- 	Mips_init_cs_detail(instr);
- /* These standard encodings have no extra operands to validate in a scan. */
- #ifdef MIPS_DIRECT_MAPPING
--	const cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
-+	cs_mode mode = instr->csh->mode & ~CS_MODE_BIG_ENDIAN;
-+#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
-+	/* These standard encodings retain the same operands and public IDs in
-+     * revision 2. Extensions and mixed modes still use the full decoder. */
-+	if (mode == CS_MODE_MIPS32R2)
-+		mode = CS_MODE_MIPS32;
-+	else if (mode == CS_MODE_MIPS64R2)
-+		mode = CS_MODE_MIPS64;
-+#endif
- 	if (code_len >= 4 && instr->csh->no_text && !instr->flat_insn->detail &&
- 	    instr->csh->disasm == Mips_getInstruction &&
- 	    (mode == CS_MODE_MIPS32 || mode == CS_MODE_MIPS64)) {
+diff --git a/arch/Mips/MipsDisassembler.c b/arch/Mips/MipsDisassembler.c
+index 09073747..c3092ecf 100644
+--- a/arch/Mips/MipsDisassembler.c
++++ b/arch/Mips/MipsDisassembler.c
+@@ -1460,14 +1460,19 @@ static DecodeStatus getInstruction(MCInst *Instr, uint64_t *Size,
+ #ifdef CAPSTONE_MIPS_PRIMARY_DISPATCH
+ 	uint64_t major;
+ 	const cs_mode isa = mode & ~CS_MODE_BIG_ENDIAN;
+-	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64) {
++	if (isa == CS_MODE_MIPS32 || isa == CS_MODE_MIPS64 ||
++	    isa == CS_MODE_MIPS32R2 || isa == CS_MODE_MIPS64R2) {
+ 		/* The unextended modes use standard byte order and only the
+ 		 * GP64, FP64, DSP and base tables below, in their usual order. */
+ 		if (readInstruction32(Bytes, BytesLen, Address, Size, &Insn,
+-				      IsBigEndian, false) == MCDisassembler_Fail)
++				      IsBigEndian,
++				      false) == MCDisassembler_Fail)
+ 			return MCDisassembler_Fail;
+ 		*Size = 4;
+-		IsGP64 = IsFP64 = isa == CS_MODE_MIPS64;
++		/* MIPS32r2 enables 64-bit FPRs but only MIPS64 enables 64-bit GPRs.
++         * The generated tables still evaluate all feature predicates on the original mode. */
++		IsGP64 = isa == CS_MODE_MIPS64 || isa == CS_MODE_MIPS64R2;
++		IsFP64 = isa != CS_MODE_MIPS32;
+ 		goto DecodeStandard;
+ 	}
+ #endif

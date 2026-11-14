@@ -1,7 +1,7 @@
-name: Time standard MIPS revision 2 scan in the released NeverD decoder against live LLVM source
+name: Measure standard MIPS r2 primary decoder in current NeverD dev and source LLVM
 on:
   push:
-    branches: [codex/neverd-mips-r2-scan-only]
+    branches: [codex/neverd-mips-r2-primary-decoder]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ddf30e5255af3aa7fa071d756ada080c4c957071
+          ref: 6db8eba6f3d52522bd30d282b71bdcfd4fd9ac3c
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-mips-r2-scan-only
+          name: product-mips-r2-primary-decoder
           path: product-evidence/
           retention-days: 14
