@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1084,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',output='R1081 outlined complete VEX32 terminal',scan='R1084 grouped VEX2 plans in the existing 32-bit fallback'))
+    save('census-variant.json',dict(variant='integer',round=1089,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',output='R1084 inline-module grouped VEX2 plans',scan='R1089 separate VEX2 plan module with original decoder metadata'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical via X86_disasmIter, NeverD dev ddf30e5255af3aa7fa071d756ada080c4c957071'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -55,10 +55,12 @@ def main(w):
         objects[label]={str(path.relative_to(objroot)):sha(path) for path in objroot.rglob('*.o')}
         assert len(objects[label])>30
         if label!='integer':
-            changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
+            changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
+            added=set(objects[label])-set(objects['integer'])
             expected={'arch/X86/X86DisassemblerDecoder.c.o'}
-            assert changed==expected,(label,changed,expected)
-            save('objects-'+label+'.json',dict(changed=sorted(changed),total=len(objects[label])))
+            expected_added={'arch/X86/X86VexScan.c.o'} if label=='scan' else set()
+            assert changed==expected and added==expected_added,(label,changed,added)
+            save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
         for component in ('X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
@@ -81,6 +83,19 @@ def main(w):
         iterator_shapes[label]=shape
         save('iterator-shape.json',dict(scope='Linked instruction sequence with external PC-relative addresses normalized; structural comparison, not semantic proof.',counts={k:len(v)for k,v in iterator_shapes.items()},equal_to_baseline={k:v==iterator_shapes['integer']for k,v in iterator_shapes.items()}))
         (p/'evidence'/(label+'-iterator-shape.txt')).write_text('\n'.join(shape)+'\n')
+        from elftools.elf.elffile import ELFFile
+        section_rows={}
+        with (objroot/'arch/X86/X86DisassemblerDecoder.c.o').open('rb')as stream:
+            elf=ELFFile(stream)
+            for section in elf.iter_sections():
+                if section['sh_flags'] & 2:
+                    section_rows[section.name]=dict(bytes=section['sh_size'],sha256=hashlib.sha256(section.data()).hexdigest())
+        save(label+'-decoder-sections.json',section_rows)
+        if label=='scan':
+            make_build=w/'make-build'
+            run(['make','-j4','CAPSTONE_ARCHS=x86','CAPSTONE_BUILD_CORE_ONLY=yes','CC='+os.environ['CC'],'BUILDDIR='+str(make_build),str(make_build/'libcapstone.a')],'make-static',tree)
+            run(['clang++','-O2','-std=c++17','-I'+str(tree),'-I'+str(tree/'include'),r/'module-guard.cpp',make_build/'libcapstone.a','-o',w/'module-guard'],'make-guard-link')
+            run([w/'module-guard'],'make-guard')
         save('object-digests.json',objects)
         symbols=sp.check_output(['nm','-n','-S','--defined-only',target],text=True)
         (p/'evidence'/(label+'-symbols.txt')).write_text(symbols)

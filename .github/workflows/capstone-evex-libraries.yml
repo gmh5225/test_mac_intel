@@ -1,7 +1,7 @@
-name: Measure grouped VEX2 plans only in the existing 32-bit fallback
+name: Measure isolated VEX32 public plan module and unchanged canonical metadata
 on:
   push:
-    branches: [codex/capstone-vex32-grouped-cost]
+    branches: [codex/capstone-vex32-plan-module-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-grouped-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-module-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
