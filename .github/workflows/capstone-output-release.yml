@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in profiles
+name: Qualify native scan with compact output dispatch and the GCC 11 scan repair in profiles
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-profiles]
+    branches: [codex/capstone-gcc11-inline-scan-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-combined-boundary-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: gcc11-inline-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
