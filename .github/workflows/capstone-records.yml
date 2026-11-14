@@ -1,7 +1,7 @@
-name: Qualify VEX2 plan call boundary mixed
+name: Qualify output bitness with GCC iterator integration mixed
 on:
   push:
-    branches: [codex/capstone-vex2-plan-call-mixed]
+    branches: [codex/capstone-bitness-inline-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-plan-call-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: bitness-inline-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
