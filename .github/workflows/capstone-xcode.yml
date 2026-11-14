@@ -1,0 +1,33 @@
+name: Validate the shipped Capstone Xcode project
+on:
+  push:
+    branches: [codex/capstone-vex32-xcode-manifest]
+    paths: [capstone-xcode/**, .github/workflows/capstone-xcode.yml]
+permissions:
+  contents: read
+jobs:
+  xcode:
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-xcode
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 729680277dd762704ea3270291b7a75318f51583
+          path: source
+          persist-credentials: false
+      - name: Build the original and corrected Xcode projects
+        run: python3 capstone-xcode/measure.py
+      - name: Remove disposable source checkout
+        if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: vex32-xcode-project
+          path: xcode-evidence/
+          retention-days: 14
