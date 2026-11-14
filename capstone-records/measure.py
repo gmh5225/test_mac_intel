@@ -68,8 +68,8 @@ try:
         objroot=build/'CMakeFiles/capstone.dir'
         objects[label]={str(f.relative_to(objroot)):hashlib.sha256(f.read_bytes()).hexdigest()for f in objroot.rglob('*.o')}
         if label!='integer':
-            changed={f for f in objects['integer']if objects['integer'][f]!=objects['scan'][f]}
-            assert set(objects['integer'])==set(objects['scan'])
+            changed={f for f in objects['integer']if objects['integer'][f]!=objects[label][f]}
+            assert set(objects['integer'])==set(objects[label])
             assert changed==({'arch/ARM/ARMMapping.c.o'} if cc=='clang' else set()),changed
             save(label+'-object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
         exe = w / label
