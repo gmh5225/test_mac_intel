@@ -16,7 +16,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference='535dfe10dcc2c3d8075f447631cbaf6694adc4cf'
+    reference='381e69c669afa3e0f2118f7b04d3e3375ce17307'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -48,7 +48,7 @@ def main(w):
         assert len(objects[label])>30
         if label=='output':
             changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
-            assert changed=={'arch/X86/'+n+'.c.o' for n in ('X86DisassemblerDecoder','X86Mapping','X86OutputIterator','X86VectorOutput')},changed
+            assert changed=={'arch/X86/X86DisassemblerDecoder.c.o'},changed
             save('objects.json',dict(changed=sorted(changed),total=len(objects[label])))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
@@ -65,8 +65,9 @@ def main(w):
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in ['all-functions','simd-functions']:
+        for panel in (['all-functions','simd-functions'] if name!='jpeg-avx2-i386' else ['simd-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
+            if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()

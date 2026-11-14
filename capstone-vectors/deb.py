@@ -12,6 +12,9 @@ def prepare(w):
  for arch,bits in [('amd64',64),('i386',32)]:
   name='main/binary-'+arch+'/Packages.xz';want=re.search(r'^ ([0-9a-f]{64})\s+\d+ '+re.escape(name)+'$',checks,re.M).group(1);idx=w/'Packages.xz';download(host+'dists/trixie/'+name,idx);data=idx.read_bytes();assert digest(data)==want;text=lzma.decompress(data).decode();idx.unlink()
   packages={b.split('\n',1)[0][9:]:b for b in text.split('\n\n') if b.startswith('Package: ')}
+  if arch=='i386':
+   from jpeg_archive import jpeg_avx2
+   items.append(jpeg_avx2(w,host,packages))
   for pkg,prefix in [('libjpeg62-turbo','libjpeg.so.'),('libzstd1','libzstd.so.'),('libssl3t64','libcrypto.so.')]:
    fields=dict(v.split(': ',1) for v in packages[pkg].splitlines() if not v.startswith(' ') and ': ' in v);url=host+fields['Filename'];f=w/(pkg+'.deb');download(url,f);assert digest(f.read_bytes())==fields['SHA256'];member=next(x for x in sp.check_output(['ar','t',f],text=True).splitlines() if x.startswith('data.tar'))
    payload=sp.check_output(['ar','p',f,member]);f.unlink()
