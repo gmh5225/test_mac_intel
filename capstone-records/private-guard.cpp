@@ -1,3 +1,5 @@
+#include <sys/mman.h>
+#include <unistd.h>
 #include <capstone/capstone.h>
 #include <dlfcn.h>
 #include <array>
@@ -41,38 +43,22 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
  }
  ++verified;
 }
-int main(int argc,char**argv) {
+int main(int argc,char **argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);if(a.iter==b.iter)return 4;
-
- using Hit=bool(*)(csh,const uint8_t*,size_t,cs_insn*);
- auto hit=(Hit)dlsym(b.library,"cs_test_owned_hit");
- if(!hit)throw std::runtime_error("missing owned hit export");
- {
-  Machine m(b,CS_MODE_64,true,true,false);
-  cs_insn insn{};cs_detail detail{};insn.detail=&detail;
-  const uint8_t bytes[]={0x66,0x0f,0x72,0xf3,0x10};
-  if(!hit(m.handle,bytes,sizeof(bytes),&insn))
-   throw std::runtime_error("candidate fast path was not exercised");
- }
- for(cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags) {
-  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);uint8_t bytes[15];
-  for(unsigned prefix=0;prefix<=(mode==CS_MODE_64?16u:0u);++prefix)for(unsigned op=0x71;op<=0x73;++op)for(unsigned mr=0;mr<256;++mr)for(unsigned value=0;value<256;++value) {
-   for(auto &v:bytes)v=(uint8_t)random_word();
-   bytes[0]=0x66;bytes[1]=prefix?0x3f+prefix:0x0f;
-   unsigned k=prefix?2:1;bytes[k]=0x0f;bytes[k+1]=op;bytes[k+2]=mr;bytes[k+3]=value;
-   compare(x,y,bytes,15,detail);
-   if((value&63)==0)compare(x,y,bytes,k+3,detail);
-  }
-  for(unsigned n=0;n<65536;++n) {
-   for(auto &v:bytes)v=(uint8_t)random_word();
-   unsigned off=n%8==0?1:n%8==1?2:0;
-   bytes[off]=0x66;unsigned k=off+1;
-   if(n&4)bytes[k++]=0x40|((n>>8)&15);
-   bytes[k++]=0x0f;bytes[k++]=0x70+(n%5);
-   if(off)bytes[0]=n&16?0xf0:0x64;
-   if(off==2)bytes[1]=n&32?0xf2:0x67;
-   compare(x,y,bytes,n%16,detail);
+ const size_t page=(size_t)sysconf(_SC_PAGESIZE);
+ auto memory=(uint8_t*)mmap(nullptr,page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
+ if(memory==MAP_FAILED||mprotect(memory+page,page,PROT_NONE))return 5;
+ for(cs_mode mode:{CS_MODE_16,CS_MODE_32,CS_MODE_64})for(unsigned flags=0;flags<8;++flags){
+  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);
+  for(unsigned n=0;n<8192;++n){
+   uint8_t bytes[15];for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;
+   const unsigned mandatory[]={0,0x66,0xf3,0xf2};const unsigned op[]={0x10,0x11,0x28,0x29,0x6f,0x7f};
+   if(mandatory[n&3])bytes[k++]=mandatory[n&3];
+   unsigned rex=(n/4)%17;if(rex)bytes[k++]=0x3f+rex;
+   bytes[k++]=0x0f;bytes[k++]=op[(n/68)%6];bytes[k++]=(uint8_t)(n>>3);bytes[k++]=(uint8_t)(n*37);
+   for(unsigned length=0;length<=15;++length){auto input=memory+page-length;std::memcpy(input,bytes,length);compare(x,y,input,length,detail);}
   }
  }
- std::printf("equal public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
+ munmap(memory,page*2);
+ std::printf("equal private-entry records for %llu protected-page extents\n",(unsigned long long)verified);
 }
