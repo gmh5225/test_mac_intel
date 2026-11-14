@@ -1,7 +1,7 @@
-name: Measure i386 VEX2 scan on PuTTY PE32, PE64 and mixed architectures
+name: Time generated i386 VEX2 register formatting and detail on PE32, PE64 and mixed-architecture controls
 on:
   push:
-    branches: [codex/capstone-i386-vex2-terminal-mixed]
+    branches: [codex/capstone-i386-vex2-output-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 381e69c669afa3e0f2118f7b04d3e3375ce17307
+          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex2-terminal-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: i386-vex2-output-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
