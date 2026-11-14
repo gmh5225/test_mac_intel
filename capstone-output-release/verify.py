@@ -41,9 +41,10 @@ try:
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
         units+=sorted(q for q in known if q in ('aarch64_memory_access','aarch64_post_index','aarch64_addressing'))
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
+    if profile!='diet':units+=['mips_register_names','mips_scan','mips_reglist_offset','mips16_immediates','mips16_memory_calls']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
-    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['mips_register_names_generator','arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')

@@ -1,7 +1,7 @@
-name: Qualify shared SSE memory operand output in profiles
+name: Qualify combined MIPS register prefix and name output in profiles
 on:
   push:
-    branches: [codex/capstone-legacy-vector-memory-profiles]
+    branches: [codex/capstone-mips-register-names-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-vector-memory-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: mips-register-names-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
