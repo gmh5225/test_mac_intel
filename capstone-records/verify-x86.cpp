@@ -50,6 +50,12 @@ int main(int argc,char**argv) {
    for(unsigned map=0;map<8;++map)for(unsigned p1:{0x04,0x05,0x06,0x07,0x84,0x85,0x86,0x87})for(unsigned ll=0;ll<4;++ll)for(unsigned op=0;op<256;++op)for(unsigned mr:{0,5,0x44,0x85,0xc0,0xc1,0xff}){
     for(auto &v:bytes)v=(uint8_t)random_word();bytes[0]=0x62;bytes[1]=(bytes[1]&0xf8)|map;bytes[2]=(bytes[2]&0x78)|p1;bytes[3]=(bytes[3]&0x9f)|(ll<<5);bytes[4]=op;bytes[5]=mr;compare(x,y,bytes,15,false);
    }
+  if(mode==CS_MODE_32 && !text && !detail && !skip) {
+    for(unsigned payload=0;payload<256;++payload) for(unsigned opcode=0;opcode<256;++opcode) for(unsigned mr=0;mr<256;mr+=3) {
+     uint8_t b[15]={0xc5,uint8_t(payload),uint8_t(opcode),uint8_t(mr),uint8_t(random_word()),0x80,0x7f,0xff,0x7f,0,2,3,0,4,0};
+     compare(x,y,b,15,false);compare(x,y,b,random_word()%12,false);
+    }
+   }
   for(unsigned i=0;i<65536;++i) {
    for(auto &v:bytes)v=(uint8_t)random_word();unsigned offset=i%8==0 ? 1 : i%8==1 ? 2 : 0;bytes[offset]=0x62;if(i%3)bytes[offset+2]|=4;
    if(offset)bytes[0]=(i&16) ? 0x67 : 0x64;if(offset==2)bytes[1]=(i&32) ? 0x48 : 0x66;
