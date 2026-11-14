@@ -14,15 +14,29 @@
         "X86VexScan.c.o"
       ]
     },
-    "vex32-output-module": {
-      "source": "round1093-vex32-output-module",
-      "patch": "vex32-output-module.patch",
-      "patch_sha256": "53eb3a6ca49e24010a8ef9ed38de4280bb4fda82971f872e43e98016f49a6aba",
-      "tree": "b4431335c4983c4b528e9e6397851fed8fc18375",
+    "memory-vex32": {
+      "source": "round1095-vex32-memory-output",
+      "patch": "memory-vex32.patch",
+      "patch_sha256": "e9e4dfbddef6bba2cb6b2a518a9c1f783c8c93e6be8b35c6092ec8d9cc31c8e2",
+      "tree": "1b25d035a43aa2953353bbd0d5fb142e22d8a5c6",
       "changed": [
         "X86OutputIterator.c.o"
       ],
       "added": [
+        "X86VexOutput32.c.o"
+      ]
+    },
+    "combined-vex32": {
+      "source": "round1099-vex32-plan-output",
+      "patch": "combined-vex32.patch",
+      "patch_sha256": "31b182f11af4eb2cffe8b7c690f875594b285bfa9df22dbceabed1150802b30d",
+      "tree": "b3788bdf53155bff630544114572c97910e384eb",
+      "changed": [
+        "X86DisassemblerDecoder.c.o",
+        "X86OutputIterator.c.o"
+      ],
+      "added": [
+        "X86VexScan.c.o",
         "X86VexOutput32.c.o"
       ]
     }
@@ -30,5 +44,5 @@
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Candidates are compared separately, not combined."
+  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Scanner, memory output and final combined candidate are each compared with the same baseline; active archive members exclude leftover objects from prior variants."
 }

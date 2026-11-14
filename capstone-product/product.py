@@ -107,7 +107,14 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label=='base':managed_reference=identities
    else:assert identities==managed_reference,(label,'Managed dependency source changed during comparison')
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
-   objects={str(f.relative_to(roots[0])):hashlib.sha256(f.read_bytes()).hexdigest() for f in roots[0].rglob('*.o')};write(label+'-objects',objects)
+   archives=list(build.rglob('libcapstone.a'));assert len(archives)==1,archives
+   members=sp.check_output(['ar','t',archives[0]],text=True).splitlines()
+   assert len(set(members))==len(members),members
+   disk={str(f.relative_to(roots[0])):f for f in roots[0].rglob('*.o')}
+   active={key:path for key,path in disk.items() if path.name in members}
+   assert len(active)==len(members) and {path.name for path in active.values()}==set(members),(members,list(active))
+   write(label+'-archive-members',dict(members=members,ignored_orphan_objects=sorted(set(disk)-set(active))))
+   objects={key:hashlib.sha256(path.read_bytes()).hexdigest() for key,path in active.items()};write(label+'-objects',objects)
    if label!='base':
     base_objects=json.loads((out/'base-objects.json').read_text())
     new_files=sorted(set(objects)-set(base_objects))
