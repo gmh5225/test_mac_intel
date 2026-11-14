@@ -2,35 +2,11 @@
   "neverd": "2c7e2c3591293c994b67747b65c232a679b70fb1",
   "capstone": "729680277dd762704ea3270291b7a75318f51583",
   "variants": {
-    "pure-vex32": {
-      "source": "round1091-pure-vex32-plan-boundary",
-      "patch": "pure-vex32.patch",
-      "patch_sha256": "0667b6caa89478cdbeeff90464aa38fa6f0ff52d572cb9aa5bb6d63a45d52dfc",
-      "tree": "3fe3bd89946167cace93b266de74c51f491cdcbf",
-      "changed": [
-        "X86DisassemblerDecoder.c.o"
-      ],
-      "added": [
-        "X86VexScan.c.o"
-      ]
-    },
-    "memory-vex32": {
-      "source": "round1095-vex32-memory-output",
-      "patch": "memory-vex32.patch",
-      "patch_sha256": "e9e4dfbddef6bba2cb6b2a518a9c1f783c8c93e6be8b35c6092ec8d9cc31c8e2",
-      "tree": "1b25d035a43aa2953353bbd0d5fb142e22d8a5c6",
-      "changed": [
-        "X86OutputIterator.c.o"
-      ],
-      "added": [
-        "X86VexOutput32.c.o"
-      ]
-    },
-    "combined-vex32": {
-      "source": "round1099-vex32-plan-output",
-      "patch": "combined-vex32.patch",
-      "patch_sha256": "31b182f11af4eb2cffe8b7c690f875594b285bfa9df22dbceabed1150802b30d",
-      "tree": "b3788bdf53155bff630544114572c97910e384eb",
+    "initial-vex32": {
+      "source": "round1103-vex32-initial-scan",
+      "patch": "initial-vex32.patch",
+      "patch_sha256": "cd5fb3ecbee648b923c2ec82a6da91e5e667ed5a8fdf5cea20ed5cc514564352",
+      "tree": "c17a25a59d3a74fba30377f004a71ed730c50f53",
       "changed": [
         "X86DisassemblerDecoder.c.o",
         "X86OutputIterator.c.o"
@@ -44,5 +20,5 @@
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Scanner, memory output and final combined candidate are each compared with the same baseline; active archive members exclude leftover objects from prior variants."
+  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Initial VEX32 admission, shared canonical metadata and direct 32-bit output are measured together; active archive members exclude leftover objects."
 }
