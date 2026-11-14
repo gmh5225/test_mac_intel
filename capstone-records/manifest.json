@@ -11,8 +11,8 @@
       "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
     },
     "candidate.patch": {
-      "experiment": "round594-aarch64-constructed-operands",
-      "sha256": "b8be0e0735a2b6113326386f62b60b8975f98535227b8785da2c9db4fbf0de61"
+      "experiment": "round591-compact-common-metadata",
+      "sha256": "fc86fc2ba33f308f48d36be7fe5b84a973a7f33fa48b6cba3f774721e8329bed"
     },
     "check-hint.c": {
       "experiment": "round357-x86-handle-lookup/check-lookup.c",
@@ -85,58 +85,10 @@
     "repair_census.cpp": {
       "sha256": "26d778aaa200a15f3881d732122b3fa3ede9ab790d8dc10ac721a16f6006be10",
       "experiment": "round574-legacy-memory-repair"
-    },
-    "indexed.patch": {
-      "description": "Native combined scalar and vector scan/output with shared validation",
-      "sha256": "2bb7835a060759f3d4bd12c878b2133b028b322686cfce356a147372adf8eb97"
-    },
-    "baseline.patch": {
-      "description": "Released four-backend Capstone",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    },
-    "verify-x86.cpp": {
-      "description": "Complete EVEX payload sweep, both native modes and all public options",
-      "sha256": "373a3e579afd506c82c55867117ef4a24f0f9b36fc68af9bb52cde0992eccc3b"
     }
   },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
   "inputs": [
-    {
-      "name": "arm-ls",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "ls",
-      "text_sha256": "c3ab7564ed458e2e97012a6436b80685573452630c13a2f5366bba908253c29e"
-    },
-    {
-      "name": "arm-sort",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "sort",
-      "text_sha256": "76987581cc48d7187eb2ad76293be2b89414d7277c22ad6093ce9b770169a824"
-    },
-    {
-      "name": "arm-cp",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
-      "kind": "deb",
-      "command": "cp",
-      "text_sha256": "82569bcb320c864a08cf37798b610396d1e1066f68758826e3294e561987d393"
-    },
-    {
-      "name": "mips64el-ls",
-      "selector": 4,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
-      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
-      "kind": "deb",
-      "command": "ls",
-      "text_sha256": "3b48cf397f99bbee260ba1c12f976a9b790cc44b120f8ae0dfad89384ca6a2fa"
-    },
     {
       "name": "putty-32-0.85",
       "selector": 32,
@@ -146,29 +98,37 @@
       "text_sha256": "f9269b449a06aac5daf0082b2fd07fbb6bfad5d99a6864b6a584e3b71c010953"
     },
     {
-      "name": "putty-64-0.85",
-      "selector": 64,
-      "url": "https://the.earth.li/~sgtatham/putty/0.85/w64/putty.exe",
-      "package_sha256": "d01fdb5aae8f112526040a39b0bfb9e27d813003178645e65f8d1cfdb2a26c87",
-      "kind": "pe",
-      "text_sha256": "c000443a8b8924ed28e75eec48a68f7a77dbb09b41244c60313d4c84237d32ab"
+      "name": "libjpeg62-turbo-i386",
+      "selector": 32,
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo_2.1.5-4_i386.deb",
+      "package_sha256": "d897f8cd7c76b85144d5b2f9f8798dbced8764539d5c0700f36a43611f09cca9",
+      "kind": "deb",
+      "member": "usr/lib/i386-linux-gnu/libjpeg.so.62.3.0",
+      "text_sha256": "25baf071e61d37dc7246fde17896af0fc578203fb013c3744460faa43a0818dc",
+      "binary_sha256": "fd4e4d886b844dc6860e93f47b3595207201b23495c47bee763ab5f69587e5dd",
+      "text_bytes": 325492
     },
     {
-      "name": "amd64-ls",
-      "selector": 64,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_amd64.deb",
-      "package_sha256": "1299ab6f9389a288eb2f5f3dd222c26cc777b9a2d5ecb6ee4cbd340cebcdada2",
+      "name": "libssl3t64-i386",
+      "selector": 32,
+      "url": "https://deb.debian.org/debian/pool/main/o/openssl/libssl3t64_3.5.7-1~deb13u2_i386.deb",
+      "package_sha256": "30cd19b3f34b9d688d3a373082ccc8907bff1e52efb7f344266eceed100bcd18",
       "kind": "deb",
-      "command": "ls"
+      "member": "usr/lib/i386-linux-gnu/libcrypto.so.3",
+      "text_sha256": "f744fce5bb1098e3ece5b928b06f01113d3e982a0c591741828522a23afdfde8",
+      "binary_sha256": "4b3a79c356fc2eafaf2b387f7a3149379b6c575b38aa0beaf04c105426da4480",
+      "text_bytes": 2817332
     },
     {
-      "name": "arm64-ls",
-      "selector": 0,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
-      "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
+      "name": "libzstd1-i386",
+      "selector": 32,
+      "url": "https://deb.debian.org/debian/pool/main/libz/libzstd/libzstd1_1.5.7+dfsg-1_i386.deb",
+      "package_sha256": "305f0ab5f16552c44906b3f3f6e9ad3eb33f6f857c3347fdf3bd987abd6989a9",
       "kind": "deb",
-      "command": "ls",
-      "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
+      "member": "usr/lib/i386-linux-gnu/libzstd.so.1.5.7",
+      "text_sha256": "f0d263fc2b0ce95aaefaca4dbd601d653f6790adbaed8df8d02325231c4acb06",
+      "binary_sha256": "11e071b1b7358d5593bdc5b6ffbbd2f038b792fcaca30ca85019030fef5278fc",
+      "text_bytes": 716484
     }
   ]
 }
