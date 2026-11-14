@@ -1,7 +1,7 @@
-name: Verify R2 and ARM immediate scanning and x86 output across ten supported configurations
+name: Qualify merged VEX2 operand validation and output in ten Capstone configurations
 on:
   push:
-    branches: [codex/capstone-standard-r2-release-profiles]
+    branches: [codex/capstone-vex2-records-ten-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -35,13 +35,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 9eaea5dec6e4b3b20a1a9802678405ae4500b52f
+          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-r2-profiles-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex2-scan-and-output-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
