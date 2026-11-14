@@ -1,7 +1,7 @@
-name: Qualify SSE memory output with address register selection only on the memory path profiles
+name: Qualify VEX output for 32 and 64-bit instructions with address selection inside the memory writer profiles
 on:
   push:
-    branches: [codex/capstone-legacy-memory-late-bank-profiles]
+    branches: [codex/capstone-vex-output-late-bank-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-memory-late-bank-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex-output-late-bank-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
