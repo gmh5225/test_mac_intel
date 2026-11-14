@@ -1,7 +1,7 @@
-name: Handle reserved-vvvv VEX immediate output from canonical register rows mixed
+name: Reuse the existing memory writer for absent-index i386 SIB mixed
 on:
   push:
-    branches: [codex/capstone-vex-unary-output-only-mixed]
+    branches: [codex/capstone-i386-sib-without-index-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
+          ref: 6c93c31134d5396095ba4e63db58548317d6f5b9
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-unary-output-only-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: i386-sib-without-index-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
