@@ -1,7 +1,7 @@
-name: Measure VEX2 plans inside the outlined fallback and preserve common iterator work in mixed
+name: Isolate GCC AArch64-host scan fallback effects on common PE64 and SIMD in mixed
 on:
   push:
-    branches: [codex/capstone-vex2-fallback-entry-mixed]
+    branches: [codex/capstone-arm-gcc-scan-boundary-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,8 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
+          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -38,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-fallback-entry-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-gcc-scan-boundary-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

@@ -89,7 +89,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
     data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
   for x in cases:
-   if x['name']!='putty-32-0.85':continue
+   if x['name']!='putty-64-0.85':continue
    costs={}
    for key in ('base','indexed'):
     profile=t/(key+'.callgrind')
