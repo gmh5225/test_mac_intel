@@ -1,7 +1,7 @@
-name: Diagnose VEX32 reader side effects and GCC batch-loop expansion
+name: Identify GCC VEX32 result-interface inlining decisions
 on:
   push:
-    branches: [codex/capstone-pure-vex32-plan-cost]
+    branches: [codex/capstone-vex32-inlining-cause]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,8 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: gcc, replica: one }
-          - { host: ubuntu-24.04, cc: clang, replica: one }
           - { host: ubuntu-24.04, cc: gcc, replica: one }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
@@ -29,8 +27,7 @@ jobs:
           ref: 729680277dd762704ea3270291b7a75318f51583
           path: source
           persist-credentials: false
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
-      - name: Profile the exact 32-bit function-boundary workload and final executable
+      - name: Capture compiler decisions and verify unchanged machine code
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -40,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pure-vex32-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-inline-cause-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
