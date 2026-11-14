@@ -51,16 +51,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       diffs=[(i-32,x[i],y[i])for i in range(length)if x[i]!=y[i]]
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
-  fix=r/'packed-move-metadata.patch'
-  assert hashlib.sha256(fix.read_bytes()).hexdigest()==expected['metadata_sha256']
-  command(['git','apply',fix],'packed-move-metadata-on-both',cs)
   for label in ('base','candidate'):
    ref=expected['capstone']
    assert rev(cs)==ref
    if label=='candidate':
     change=r/'candidate.patch'
     assert hashlib.sha256(change.read_bytes()).hexdigest()==expected['patch_sha256']
-    command(['git','apply',change],'apply-combined-writers',cs)
+    command(['git','apply',change],'apply-mips-scan',cs)
    command([sys.executable,nd/'scripts/build.py',build,'--target','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests','--parallel','4'],'product-'+label,nd)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
    tool=next(build.rglob('capstone-route'))
@@ -90,7 +87,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write('capstone-objects',dict(added=new_files,changed=changed))
     assert not new_files,new_files
-    assert {Path(k).name for k in changed}=={'AArch64InstPrinter.c.o','AArch64Mapping.c.o','ARMMapping.c.o','ARMInstPrinter.c.o','MipsDisassembler.c.o','MipsMapping.c.o','X86DisassemblerDecoder.c.o','X86ImmediateOutput.c.o','X86MemoryOutput.c.o','X86OutputIterator.c.o','X86VectorOutput.c.o'},changed
+    assert {Path(k).name for k in changed}=={'MipsMapping.c.o'},changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}

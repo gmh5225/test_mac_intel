@@ -1,7 +1,7 @@
-name: Verify production MIPS revision 2 and A32 V8 in the NeverD decoder built with current fork LLVM
+name: Time standard MIPS revision 2 scan in the released NeverD decoder against live LLVM source
 on:
   push:
-    branches: [codex/neverd-r2-v8-verified-metadata]
+    branches: [codex/neverd-mips-r2-scan-only]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: cef6b2630f10249ddf27554b51997af126a284cd
+          ref: ddf30e5255af3aa7fa071d756ada080c4c957071
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-standard-r2-v8
+          name: product-mips-r2-scan-only
           path: product-evidence/
           retention-days: 14
