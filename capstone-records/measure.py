@@ -32,7 +32,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','indexed'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
-   if key!='base':run(['git','apply',variant],'apply-'+key,s)
+   run(['git','apply',variant],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
    objdir=b/'CMakeFiles/capstone.dir'
@@ -51,12 +51,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
     run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan|aarch64_register_names_generator|arm_register_names_generator|fixed_len_decoder|fixed_len_decoder_newlines)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
-   if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
+   run(['git','apply','-R',variant],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
+   expected={'arch/X86/X86VectorOutput.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
