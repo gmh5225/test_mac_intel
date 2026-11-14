@@ -1,7 +1,7 @@
-name: Verify direct branch selection of VEX32 output libraries
+name: Include new VEX32 module in established GCC output store policy libraries
 on:
   push:
-    branches: [codex/capstone-vex32-direct-mode-libraries]
+    branches: [codex/capstone-vex32-output-store-policy-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-direct-mode-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex32-output-store-policy-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
