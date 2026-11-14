@@ -16,7 +16,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference='5c6987afcec8c2f21e64575c5b9c5f442a5001ae'
+    reference='729680277dd762704ea3270291b7a75318f51583'
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1076,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',output='R1065 VEX output',scan='R1076 inline bitness output specialization'))
+    save('census-variant.json',dict(variant='integer',round=1080,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',scan='R1080 fixed detail initialization'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Decoder::decodePhysical via X86_disasmIter, NeverD dev ddf30e5255af3aa7fa071d756ada080c4c957071'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -44,7 +44,7 @@ def main(w):
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
-    for label in ('integer','output','scan'):
+    for label in ('integer','scan'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
         patches=[] if label=='integer' else [r/({'aligned':'alignment.patch','output':'dispatch.patch','isolated':'isolated.patch','scan':'scan.patch'}[label])]
@@ -55,10 +55,10 @@ def main(w):
         assert len(objects[label])>30
         if label!='integer':
             changed={n for n in objects[label]if objects[label][n]!=objects['integer'][n]}
-            expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
+            expected={'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86MemoryOutput.c.o', 'arch/X86/X86Disassembler.c.o', 'arch/X86/X86VectorOutput.c.o', 'arch/X86/X86ImmediateOutput.c.o'}
             assert changed==expected,(label,changed,expected)
             save('objects-'+label+'.json',dict(changed=sorted(changed),total=len(objects[label])))
-        for component in ('X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput'):
+        for component in ('X86Disassembler','X86OutputIterator','X86MemoryOutput','X86ImmediateOutput','X86VectorOutput'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
@@ -95,7 +95,7 @@ def main(w):
             save('baseline-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
             for profile_mode in (1,2):
              reference_record=None
-             engines=['capstone','candidate','scan']
+             engines=['capstone','scan']
              for key in engines:
                  args=[str(exe[{'candidate':'output','scan':'scan'}.get(key,'integer')]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
                  observation=list(map(int,sp.check_output(args,text=True).split()))
