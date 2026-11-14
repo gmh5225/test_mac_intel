@@ -1,7 +1,7 @@
-name: Measure i386 VEX2 scan on AVX2 JPEG assembly, OpenSSL and zstd with both iced formatters
+name: Time generated i386 VEX2 register formatting and detail on real assembly and independent library functions with iced
 on:
   push:
-    branches: [codex/capstone-i386-vex2-terminal-libraries]
+    branches: [codex/capstone-i386-vex2-output-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 381e69c669afa3e0f2118f7b04d3e3375ce17307
+          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex2-terminal-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: i386-vex2-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
