@@ -1,0 +1,97 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..aea41e17 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
+ #endif
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result);
++					 uint8_t prefix, X86ScanResult *result,
++					 cs_mode mode);
+ 
+ /* Only generic and extension decoding need an MCInst in the core scan path. */
+ #if defined(_MSC_VER)
+@@ -3316,8 +3317,8 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 		if (tryExtension &&
+ 		    !(handle->mode & (CS_MODE_16 | CS_MODE_32)) && code_len &&
+ 		    code[0] == 0xc4) {
+-			const int status = tryVexTerminalScan(code, code_len,
+-							      code[0], result);
++			const int status = tryVexTerminalScan(
++				code, code_len, code[0], result, CS_MODE_64);
+ 			if (status != X86_SCAN_NOT_HANDLED)
+ 				return status == X86_SCAN_COMPLETE;
+ 		}
+@@ -3372,8 +3373,8 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+ 			     X86_vexFeatureFamily(code[1] & 0x1f, code[3]) ==
+ 				     X86_VEX_FEATURE_NONE)) {
+-		const int status =
+-			tryVexTerminalScan(code, code_len, code[0], result);
++		const int status = tryVexTerminalScan(code, code_len, code[0],
++						      result, CS_MODE_64);
+ 		if (status != X86_SCAN_NOT_HANDLED)
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
+@@ -3425,10 +3426,11 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+ }
+ 
+ X86_DECODE_INLINE int tryVexTerminalScan(const uint8_t *code, size_t code_len,
+-					 uint8_t prefix, X86ScanResult *result)
++					 uint8_t prefix, X86ScanResult *result,
++					 cs_mode mode)
+ {
+ 	InternalInstruction insn = { 0 };
+-	initializeInstructionHeader(&insn, code, code_len, CS_MODE_64);
++	initializeInstructionHeader(&insn, code, code_len, mode);
+ 	insn.readerCursor = 1;
+ 	if (readVexPrefix(&insn, prefix))
+ 		return X86_SCAN_INVALID;
+@@ -3495,7 +3497,8 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+ 			      cs_insn *insn, X86ScanResult *result,
+ 			      uint8_t prefix)
+ {
+-	int status = tryVexTerminalScan(code, code_len, prefix, result);
++	int status =
++		tryVexTerminalScan(code, code_len, prefix, result, CS_MODE_64);
+ 	if (status == X86_SCAN_NOT_HANDLED)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, prefix, false);
+@@ -3679,6 +3682,20 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+ 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+ 						     result, 0xc5);
++#if !defined(CAPSTONE_X86_SCAN_ADAPTER)
++	/* In 32-bit mode a leading C5 is LDS unless the next two bits are
++	 * set. An actual VEX2 uses the same W=0 opcode row and an ordinary
++	 * 32-bit address. Other operand shapes retain the source decoder. */
++	if (opcodeOffset == 0 && opcode == 0xc5 && handle->mode == CS_MODE_32 &&
++	    code_len >= 2 && (code[1] & 0xc0) == 0xc0) {
++		const int status = tryVexTerminalScan(code, code_len, opcode,
++						      result, CS_MODE_32);
++		if (status != X86_SCAN_NOT_HANDLED)
++			return status == X86_SCAN_COMPLETE;
++		return decodeScanResultGeneric(ud, code, code_len, insn, result,
++					       opcode, false);
++	}
++#endif
+ 
+ 	unsigned instructionID = 0;
+ 	/* Constant bitness folds the terminal readers' mode and size tests.
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..bb4e6ee0 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1204,6 +1204,11 @@ def emit_vex_scan_rows(suffix):
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
+             row = indices[contexts.index(context_values[attributes])]
++            # A two-byte VEX has map 1 and W=0. Its 32-bit reader uses
++            # these same entries with the address and operand sizes of its mode.
++            if name == names[1] and key < 8:
++                other = indices[contexts.index(context_values[attributes & ~attrs["ATTR_64BIT"]])]
++                tables.require(row == other, "VEX2 row differs between 32 and 64 bits")
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
+             )
