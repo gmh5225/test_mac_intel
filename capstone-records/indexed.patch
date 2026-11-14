@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..3fdd33ae 100644
+index 63dcc538..49b7c361 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3424,11 +3424,77 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
@@ -97,14 +97,15 @@ index 63dcc538..3fdd33ae 100644
  /* Constant C5 admission folds the unused three-byte prefix handling. */
  X86_DECODE_INLINE bool
  decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
-@@ -3661,12 +3734,31 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3661,12 +3734,32 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  	return initial;
  }
  
 +/* Keep vector, extension and prefixed readers off the initial legacy scan path
-+ * when the compiler emits the compact public iterator. */
++ * on GNU compilers where inlining grows the common iterator. */
 +#if defined(X86_COMPACT_PUBLIC_HEADER) || \
 +    (defined(__linux__) && defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__))
++#define X86_OUTLINE_PUBLIC_SCAN_FALLBACK
 +static __attribute__((noinline)) bool
 +#else
  X86_DECODE_INLINE bool
@@ -114,7 +115,7 @@ index 63dcc538..3fdd33ae 100644
  				     X86ScanResult *result, bool readerFlags)
  {
  	cs_struct *handle = (cs_struct *)(uintptr_t)ud;
-+#if defined(X86_COMPACT_PUBLIC_HEADER) && X86_HAS_VEX2_PUBLIC_PLANS
++#if defined(X86_OUTLINE_PUBLIC_SCAN_FALLBACK) && X86_HAS_VEX2_PUBLIC_PLANS
 +	/* Common legacy terminals finish before this outlined entry. A bare
 +     * VEX2 prefix can select its checked plan before the extension walk. */
 +	if (readerFlags && code_len >= 2 && code[0] == 0xc5 &&
@@ -129,7 +130,7 @@ index 63dcc538..3fdd33ae 100644
  	uint8_t opcode;
  	size_t opcodeOffset;
  	bool extension = X86_mayDecodeFeatureExtensionImpl(
-@@ -3676,9 +3768,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3676,9 +3769,36 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, opcode, extension);
  	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&

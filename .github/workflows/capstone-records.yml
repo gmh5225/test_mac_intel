@@ -1,7 +1,7 @@
-name: Isolate GCC AArch64-host scan fallback effects on common PE64 and SIMD in mixed
+name: Select VEX2 plans early in the outlined ARM-host GCC fallback in mixed
 on:
   push:
-    branches: [codex/capstone-arm-gcc-scan-boundary-mixed]
+    branches: [codex/capstone-arm-vex-early-selection-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-gcc-scan-boundary-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-vex-early-selection-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
