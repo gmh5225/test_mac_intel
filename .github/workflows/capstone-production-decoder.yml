@@ -1,7 +1,7 @@
-name: Qualify prefix and MIPS output on current NeverD with launch controls
+name: Qualify exact MIPS patch in current NeverD production decoder
 on:
   push:
-    branches: [codex/capstone-current-controlled-product]
+    branches: [codex/capstone-qualified-mips-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 122cb0e7370c847e54fa748e57b042365a986d41
+          ref: 7694f1f575cbde3757df0ad89fe957d5daaaf8d0
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-current-controlled-output
+          name: product-qualified-mips
           path: product-evidence/
           retention-days: 14
