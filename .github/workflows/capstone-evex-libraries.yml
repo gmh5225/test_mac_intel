@@ -1,7 +1,7 @@
-name: Measure VEX2 plans inside the outlined fallback and preserve common iterator work in libraries
+name: Isolate GCC AArch64-host scan fallback effects on common PE64 and SIMD in libraries
 on:
   push:
-    branches: [codex/capstone-vex2-fallback-entry-libraries]
+    branches: [codex/capstone-arm-gcc-scan-boundary-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,8 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-22.04, cc: gcc }
+          - { host: ubuntu-24.04-arm, cc: gcc }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -38,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-fallback-entry-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: arm-gcc-scan-boundary-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
