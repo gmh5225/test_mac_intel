@@ -1,7 +1,7 @@
 name: Validate current NeverD decoder on real AVX32 and cross-architecture workloads
 on:
   push:
-    branches: [codex/capstone-direct-vex32-product]
+    branches: [codex/capstone-isolated-core-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-direct-vex32
+          name: product-isolated-core
           path: product-evidence/
           retention-days: 14

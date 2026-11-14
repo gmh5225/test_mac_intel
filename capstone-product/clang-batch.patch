@@ -1,0 +1,49 @@
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..15270e1c 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3798,6 +3798,36 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 	cs_insn insn = { 0 };
+ 	handle->errnum = CS_ERR_OK;
+ 	while (batch.count < capacity && size) {
++#if defined(__clang__)
++		/* Separate lifetimes keep Clang's terminal fields out of the
++         * fallback result. GCC generates less work with the shared result. */
++		unsigned instructionID = 0;
++		uint16_t length;
++		insn.address = address;
++		const int initial = tryInitialScanResult(
++			handle, code, size, &instructionID, &length, false);
++		if (initial == X86_SCAN_NOT_HANDLED) {
++			X86ScanResult result;
++			if (!getInstructionScanResultAfterInitial(
++				    ud, code, size, &insn, &result, false))
++				break;
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++			length = result.length;
++		} else {
++			if (initial != X86_SCAN_COMPLETE)
++				break;
++			/* Keep terminal fields outside the escaped fallback result. */
++			X86ScanResult result = { 0, instructionID, length, 0 };
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++		}
++		output[batch.count++] = (insn.id << 8) | length;
++		batch.bytes += length;
++		code += length;
++		size -= length;
++		address += length;
++#else
+ 		X86ScanResult result;
+ 		insn.address = address;
+ 		if (!getInstructionScanResult(ud, code, size, &insn, &result,
+@@ -3809,6 +3839,7 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 		code += result.length;
+ 		size -= result.length;
+ 		address += result.length;
++#endif
+ 	}
+ 	return batch;
+ }
