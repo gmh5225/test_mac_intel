@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..8d983b8a 100644
+index 63dcc538..af3ba9ca 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -98,30 +98,35 @@ index 63dcc538..8d983b8a 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3378,6 +3379,23 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
- 			return status == X86_SCAN_COMPLETE;
- 		tryExtension = false;
- 	}
+@@ -3654,10 +3655,27 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+ 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
+ 					       feature64, instructionID, length,
+ 					       readerFlags);
+-	else
++	else {
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+	/* A 32-bit C5 is LDS unless the next two bits are set. Keep this
-+	 * additional reader in the existing fallback, outside the iterator. */
-+	if (handle->mode == CS_MODE_32 && code_len >= 2 && code[0] == 0xc5 &&
-+	    (code[1] & 0xc0) == 0xc0) {
-+		const uint32_t packed = X86_readVex32PublicPlan(code, code_len);
-+		if (packed) {
-+			if (packed == UINT32_MAX)
-+				return false;
-+			result->opcode = 0;
-+			result->opcode_pub = packed >> 8;
-+			result->length = (uint16_t)(packed & 0xff);
-+			result->popcode_adjust = 0;
-+			return true;
++		/* Enter the existing 32-bit arm before the legacy probes. The
++         * packed scalar result keeps the caller's output addresses local. */
++		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
++		    code[0] == 0xc5 && (code[1] & 0xc0) == 0xc0) {
++			const uint32_t packed =
++				X86_readVex32PublicPlan(code, code_len);
++			if (packed) {
++				if (packed == UINT32_MAX)
++					return X86_SCAN_INVALID;
++				*instructionID = packed >> 8;
++				*length = (uint16_t)(packed & 0xff);
++				return X86_SCAN_COMPLETE;
++			}
 +		}
-+	}
 +#endif
- 	return decodeScanResultGeneric(ud, code, code_len, insn, result, opcode,
- 				       tryExtension);
+ 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
+ 					       feature64, instructionID, length,
+ 					       readerFlags);
++	}
+ 	return initial;
  }
+ 
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..7aeea4a1 100644
 --- a/arch/X86/X86GenSimpleOutput.inc

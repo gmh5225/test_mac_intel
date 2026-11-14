@@ -1,7 +1,7 @@
-name: Measure VEX32 admission before legacy reader attempts
+name: Measure direct-byte selection of shared VEX32 output rows
 on:
   push:
-    branches: [codex/capstone-vex32-initial-scan-cost]
+    branches: [codex/capstone-vex32-byte-plans-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-initial-scan-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-byte-plans-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
