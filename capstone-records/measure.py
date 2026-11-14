@@ -55,7 +55,7 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
     ownedlibs[key]=t/('owned-'+key+'-'+libname);shutil.copy2(b/libname,ownedlibs[key])
    finally:iterator.write_text(original_iterator)
    if key!='base':
-    run(['cmake','--build',b,'--target','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
+    run(['cmake','--build',b,'--target','arm_post_index','mips_scan','mips_register_names','--parallel','4'],'build-test-'+key)
     target='arch/X86/X86VectorOutput.o'
     for archs,qualified in (('x86',True),('mips x86',True),('x86 arm mips aarch64',True),('arm x86',False),('mips arm x86',False),('mips aarch64 arm x86 riscv',False)):
      env={**os.environ,'CAPSTONE_ARCHS':archs,'CC':cc,'CXX':'g++' if cc=='gcc' else 'clang++','CAPSTONE_STATIC':'yes','CAPSTONE_SHARED':'no'}
@@ -64,7 +64,7 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
      assert ('-mstringop-strategy=libcall' in compile)==(qualified and cc=='gcc' and platform.machine()=='x86_64'),(archs,cc,compile)
      assert ('-DCAPSTONE_ARM_AARCH64_MIPS_X86' in compile)==(len(archs.split())==4)
     write('make-profiles',dict(architecture_sets=6,cc=cc,target=target))
-    run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan|aarch64_register_names_generator|arm_register_names_generator|fixed_len_decoder|fixed_len_decoder_newlines)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
+    run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan|mips_register_names|mips_register_names_generator|aarch64_register_names_generator|arm_register_names_generator|fixed_len_decoder|fixed_len_decoder_newlines)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
     run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
@@ -72,7 +72,7 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/'+a+'/'+a+c+'.c.o' for a in ('ARM','AArch64','Mips') for c in ('Mapping','Disassembler')}|{'arch/X86/X86Disassembler.c.o','arch/X86/X86VectorOutput.c.o'}
+   expected={'arch/Mips/MipsInstPrinter.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
@@ -84,9 +84,7 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
    run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
-  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-legacy-shifts.cpp','-ldl','-o',t/'verify-legacy-shifts'],'build-legacy-shifts-differential')
-  run([t/'verify-legacy-shifts',ownedlibs['base'],ownedlibs['indexed']],'legacy-shifts-differential')
-  write('x86-record-entrypoint',dict(entrypoint='X86_disasmIter via test-only export',timed_binaries='built before instrumentation',positive_fast_path_hit_asserted=True))
+  write('x86-record-entrypoint',dict(entrypoint='X86_disasmIter via test-only export',timed_binaries='built before instrumentation',positive_fast_path_hit_asserted=False,scope='No x86 implementation changes; private random and existing unit coverage retained'))
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
