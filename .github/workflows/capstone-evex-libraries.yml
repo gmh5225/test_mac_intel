@@ -1,7 +1,7 @@
-name: Measure absent-index SIB memory-output work and fallback coverage
+name: Measure shared x86 metadata costs and table footprint
 on:
   push:
-    branches: [codex/capstone-i386-sib-without-index-profile]
+    branches: [codex/capstone-x86-shared-implicit-metadata-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-sib-without-index-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-shared-implicit-metadata-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
