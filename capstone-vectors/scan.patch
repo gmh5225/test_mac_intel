@@ -1,29 +1,49 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..7d1ec7b3 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -23,13 +23,17 @@ struct PaddingOutput {
- static char *writeVectorRegister(char *out, unsigned length_code,
- 				 unsigned number)
- {
--	*out++ = "xyz"[length_code];
--	*out++ = 'm';
--	*out++ = 'm';
--	if (number >= 10)
--		*out++ = (char)('0' + number / 10);
--	*out++ = (char)('0' + number % 10);
--	return out;
-+	/* Callers clear op_str before writing. The four-byte suffix includes
-+     * the existing zero terminator for single-digit register numbers. */
-+	static const char suffixes[32][4] = {
-+		"mm0",	"mm1",	"mm2",	"mm3",	"mm4",	"mm5",	"mm6",	"mm7",
-+		"mm8",	"mm9",	"mm10", "mm11", "mm12", "mm13", "mm14", "mm15",
-+		"mm16", "mm17", "mm18", "mm19", "mm20", "mm21", "mm22", "mm23",
-+		"mm24", "mm25", "mm26", "mm27", "mm28", "mm29", "mm30", "mm31"
-+	};
-+	*out = "xyz"[length_code];
-+	memcpy(out + 1, suffixes[number], sizeof(suffixes[number]));
-+	return out + 4 + (number >= 10);
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..15270e1c 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3798,6 +3798,36 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 	cs_insn insn = { 0 };
+ 	handle->errnum = CS_ERR_OK;
+ 	while (batch.count < capacity && size) {
++#if defined(__clang__)
++		/* Separate lifetimes keep Clang's terminal fields out of the
++         * fallback result. GCC generates less work with the shared result. */
++		unsigned instructionID = 0;
++		uint16_t length;
++		insn.address = address;
++		const int initial = tryInitialScanResult(
++			handle, code, size, &instructionID, &length, false);
++		if (initial == X86_SCAN_NOT_HANDLED) {
++			X86ScanResult result;
++			if (!getInstructionScanResultAfterInitial(
++				    ud, code, size, &insn, &result, false))
++				break;
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++			length = result.length;
++		} else {
++			if (initial != X86_SCAN_COMPLETE)
++				break;
++			/* Keep terminal fields outside the escaped fallback result. */
++			X86ScanResult result = { 0, instructionID, length, 0 };
++			finish_x86_scan(handle, &insn, &result, code, false,
++					false);
++		}
++		output[batch.count++] = (insn.id << 8) | length;
++		batch.bytes += length;
++		code += length;
++		size -= length;
++		address += length;
++#else
+ 		X86ScanResult result;
+ 		insn.address = address;
+ 		if (!getInstructionScanResult(ud, code, size, &insn, &result,
+@@ -3809,6 +3839,7 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
+ 		code += result.length;
+ 		size -= result.length;
+ 		address += result.length;
++#endif
+ 	}
+ 	return batch;
  }
- 
- static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
