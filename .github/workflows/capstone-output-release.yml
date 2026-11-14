@@ -1,7 +1,7 @@
-name: Qualify merged VEX2 operand validation and output in ten Capstone configurations
+name: Qualify integrated VEX2 operands, formatted records and separate generic iterator in profiles
 on:
   push:
-    branches: [codex/capstone-vex2-records-ten-profiles]
+    branches: [codex/capstone-grouped-vex2-integrated-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-scan-and-output-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: grouped-vex2-integrated-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
