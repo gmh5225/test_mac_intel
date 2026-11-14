@@ -38,10 +38,10 @@ def main(w):
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
-    for label in ('integer','aa','combined','output'):
+    for label in ('integer','aa','combined','output','inlined'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/('combined.patch' if label=='combined' else 'dispatch.patch')]
+        patches=[] if label=='integer' else [r/('dispatch.patch' if label=='output' else label+'.patch')]
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
@@ -60,6 +60,9 @@ def main(w):
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
         if label=='output':
             assert {n for n in objects[label]if objects[label][n]!=objects['combined'][n]}=={'arch/X86/X86VectorOutput.c.o'}
+        if label=='inlined':
+            changed={name for name in objects[label] if objects[label][name]!=objects['combined'][name]}
+            assert changed==({'arch/X86/X86DisassemblerDecoder.c.o'} if os.environ['CC']=='gcc' else set()),changed
         save('object-digests.json',objects)
         symbols=sp.check_output(['nm','-n','-S','--defined-only',target],text=True)
         (p/'evidence'/(label+'-symbols.txt')).write_text(symbols)
@@ -88,7 +91,7 @@ def main(w):
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
             for mode in [0]:
-                labels=['integer','aa','combined','output']
+                labels=['integer','aa','combined','output','inlined']
                 def measure(lib,n):return list(map(int,sp.check_output([exe.get(lib,exe['integer']), 'capstone' if lib in exe else lib,str(mode),str(n),f,intervals,str(bits)]).split()))
                 probe=measure('integer',1);rep=max(1,math.ceil(160e6/max(1,probe[0])));cycles=[]
                 for i in range(21):
@@ -96,7 +99,7 @@ def main(w):
                     cycles.append(dict(ns={k:statistics.mean(v[0]/v[2] for who,v in obs if who==k) for k in labels},raw=obs))
                 md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b] for v in cycles)
                 row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in exe},vs_iced={},vs_fast={k:md('fast',k)for k in exe}if mode else {},cycles=cycles);reported.append(row);save('measurements.json',reported)
-            for key in ('integer','combined','output'):
+            for key in ('integer','combined','output','inlined'):
                 ident=name+'-'+key
                 raw=w/(ident+'.callgrind')
                 run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--collect-atstart=no','--toggle-collect=cs_disasm_iter','--callgrind-out-file='+str(raw),str(exe[key]),'capstone','0','1',str(f),str(intervals),str(bits)],'profile-'+ident)
@@ -112,7 +115,7 @@ def main(w):
                 raw.unlink()
                 perf=shutil.which('perf')
                 if perf:
-                    args=[perf,'stat','-x',',','-e','cycles,instructions,branches,branch-misses,cache-references,cache-misses','-o',str(p/'evidence'/(ident+'-perf.csv')),'--',str(exe[key]),'capstone','0',str(rep),str(f),str(intervals),str(bits)]
+                    args=['sudo','-n',perf,'stat','-x',',','-e','cycles:u,instructions:u,branches:u,branch-misses:u,cache-references:u,cache-misses:u','-o',str(p/'evidence'/(ident+'-perf.csv')),'--',str(exe[key]),'capstone','0',str(rep),str(f),str(intervals),str(bits)]
                     with (p/'evidence'/(ident+'-perf-status.log')).open('w')as out:
                         result=sp.run(args,stdout=out,stderr=sp.STDOUT)
                         out.write('exit_status='+str(result.returncode)+'\n')
