@@ -43,23 +43,53 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
 }
 int main(int argc,char**argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);if(a.iter==b.iter)return 4;
- for (cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags){
-  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip), y(b,mode,text,detail,skip);uint8_t bytes[15];
-  // Sweep conventional and reserved map, W, pp, vector length and ModR/M values.
-  if(mode==CS_MODE_64 && !text && !detail && !skip)
-   for(unsigned map=0;map<8;++map)for(unsigned p1:{0x04,0x05,0x06,0x07,0x84,0x85,0x86,0x87})for(unsigned ll=0;ll<4;++ll)for(unsigned op=0;op<256;++op)for(unsigned mr:{0,5,0x44,0x85,0xc0,0xc1,0xff}){
-    for(auto &v:bytes)v=(uint8_t)random_word();bytes[0]=0x62;bytes[1]=(bytes[1]&0xf8)|map;bytes[2]=(bytes[2]&0x78)|p1;bytes[3]=(bytes[3]&0x9f)|(ll<<5);bytes[4]=op;bytes[5]=mr;compare(x,y,bytes,15,false);
-   }
-  if((mode==CS_MODE_32 || mode==CS_MODE_64) && !text && !detail && !skip) {
-    for(unsigned payload=0;payload<256;++payload) for(unsigned opcode=0;opcode<256;++opcode) for(unsigned mr=0;mr<256;mr+=3) {
-     uint8_t b[15]={0xc5,uint8_t(payload),uint8_t(opcode),uint8_t(mr),uint8_t(random_word()),0x80,0x7f,0xff,0x7f,0,2,3,0,4,0};
-     compare(x,y,b,15,false);compare(x,y,b,random_word()%12,false);
-    }
-   }
-  for(unsigned i=0;i<65536;++i) {
-   for(auto &v:bytes)v=(uint8_t)random_word();unsigned offset=i%8==0 ? 1 : i%8==1 ? 2 : 0;bytes[offset]=0x62;if(i%3)bytes[offset+2]|=4;
-   if(offset)bytes[0]=(i&16) ? 0x67 : 0x64;if(offset==2)bytes[1]=(i&32) ? 0x48 : 0x66;
-   compare(x,y,bytes,i%16,detail);
+
+ using Hit=bool(*)(csh,const uint8_t*,size_t,cs_insn*);
+ auto hit=(Hit)dlsym(b.library,"cs_test_owned_hit");
+ if(!hit)throw std::runtime_error("missing owned hit export");
+ {
+  for(cs_mode hit_mode:{CS_MODE_32,CS_MODE_64}) {
+  Machine m(b,hit_mode,true,true,false);
+  cs_insn insn{};cs_detail detail{};insn.detail=&detail;
+  const uint8_t bytes[]={0xc5,0xf1,0xef,0xc3};
+  if(!hit(m.handle,bytes,sizeof(bytes),&insn))
+   throw std::runtime_error("candidate fast path was not exercised");
+  const uint8_t unary[]={0xc4,0xe3,0xfd,0x00,0xd3,0x1b};
+  if(!hit(m.handle,unary,sizeof(unary),&insn))throw std::runtime_error("candidate unary fast path was not exercised");
+  const uint8_t mem[]={0xc5,0xf5,0xf5,0x50,0x10};
+  if(!hit(m.handle,mem,sizeof(mem),&insn))throw std::runtime_error("candidate memory fast path was not exercised");
+  }
+ }
+ for(cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags) {
+  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);uint8_t bytes[15];
+  for(unsigned prefix=0;prefix<=(mode==CS_MODE_64?16u:0u);++prefix)for(unsigned op=0;op<256;++op)for(unsigned mr=0xc0;mr<=0xff;++mr){
+   for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;bytes[k++]=0x66;if(prefix)bytes[k++]=0x3f+prefix;
+   bytes[k++]=0x0f;bytes[k++]=op;bytes[k++]=mr;
+   compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%7,detail);
+  }
+  for(unsigned flags=0;flags<256;++flags)for(unsigned op=0;op<256;++op)for(unsigned mr=0;mr<=0xff;mr+=7){
+   for(auto &v:bytes)v=(uint8_t)random_word();bytes[0]=0xc5;bytes[1]=flags;bytes[2]=op;bytes[3]=mr;
+   compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%7,detail);
+  }
+  for(unsigned n=0;n<262144;++n){
+   for(auto &v:bytes)v=(uint8_t)random_word();
+   const unsigned opcodes[]={0xef,0xdc,0xdd,0xde,0xdf,0x44,0x25,0x00,0xfe,0x19,0x1b,0x39,0x3b,0x71,0x72,0x73,0x70,0x04};
+   bytes[0]=0x62;bytes[1]=((n>>2)&0xf0)|(1+n%3);bytes[2]=((n>>6)&0xf8)|5;
+   bytes[3]=((n>>5)&0x60)|8;bytes[4]=opcodes[(n>>10)%18];bytes[5]=0xc0|(n&63);
+   compare(x,y,bytes,15,detail);compare(x,y,bytes,random_word()%9,detail);
+   bytes[0]=0xc4;bytes[1]=((n>>2)&0xe0)|(1+n%3);bytes[2]=((n>>6)&0xfc)|1;bytes[3]=opcodes[(n>>10)%18];bytes[4]=0xc0|(n&63);
+   compare(x,y,bytes,15,detail);
+  }
+  for(unsigned n=0;n<65536;++n) {
+   for(auto &v:bytes)v=(uint8_t)random_word();
+   unsigned off=n%8==0?1:n%8==1?2:0;
+   unsigned k=off;
+   if(n&1)bytes[k++]=(n&2)?0xf3:0x66;
+   if(n&4)bytes[k++]=0x40|((n>>8)&15);
+   bytes[k++]=0x0f;bytes[k++]=(n&16)?0x10+(n%4):0x6f+(n%17);
+   if(off)bytes[0]=n&32?0xf0:0x64;
+   if(off==2)bytes[1]=n&64?0xf2:0x67;
+   compare(x,y,bytes,n%16,detail);
   }
  }
  std::printf("equal private-entry records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
