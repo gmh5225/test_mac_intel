@@ -1,7 +1,7 @@
-name: Qualify output call boundaries in actual NeverD with live LLVM source
+name: Qualify deduplicated MIPS names and direct TEST output in actual NeverD
 on:
   push:
-    branches: [codex/capstone-output-call-boundaries-product]
+    branches: [codex/capstone-current-output-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: ae9d2d7b25d1f7b4e61b851e0ff8bc771e9c6bd4
+          ref: 13fb60f2259f5e17497d847b780630aaefc04fdf
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-output-call-boundaries
+          name: product-current-output
           path: product-evidence/
           retention-days: 14
