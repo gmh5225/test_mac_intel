@@ -1,7 +1,7 @@
-name: Qualify compact default MIPS register prefix and name output in mixed
+name: Keep the MIPS name writer in one function and qualify output and cross-architecture performance mixed
 on:
   push:
-    branches: [codex/capstone-mips-default-register-names-mixed]
+    branches: [codex/capstone-mips-outlined-register-names-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-register-names-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mips-outlined-register-names-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
