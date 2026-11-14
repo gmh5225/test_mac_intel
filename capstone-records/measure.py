@@ -35,6 +35,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run(['git','apply',variant],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
+   (e/(key+'-iterator.asm')).write_bytes(sp.check_output(['objdump','-d','--disassemble=cs_disasm_iter',f]))
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
@@ -87,6 +88,18 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
       ticks[v].append(vout['cpu_ns'])
      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
     data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  for x in cases:
+   if x['name']!='putty-32-0.85':continue
+   costs={}
+   for key in ('base','indexed'):
+    profile=t/(key+'.callgrind')
+    run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--collect-atstart=no','--toggle-collect=cs_disasm_iter','--callgrind-out-file='+str(profile),bins[key],x['selector'],0,x['path'],1],'profile-'+key)
+    lines=profile.read_text().splitlines()
+    events=next(line.split()[1:] for line in lines if line.startswith('events:'))
+    totals=next(line.split()[1:] for line in lines if line.startswith('summary:'))
+    costs[key]=dict(zip(events,map(int,totals)))
+    (e/(key+'-calls.txt')).write_bytes(sp.check_output(['callgrind_annotate','--inclusive=yes','--tree=both','--threshold=99.5',profile]))
+   write('dynamic-costs',costs)
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
