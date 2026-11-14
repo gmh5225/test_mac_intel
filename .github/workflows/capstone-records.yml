@@ -1,7 +1,7 @@
-name: Verify isolated VEX32 public plan module mixed
+name: Verify pure scalar VEX32 plans mixed
 on:
   push:
-    branches: [codex/capstone-vex32-plan-module-mixed]
+    branches: [codex/capstone-pure-vex32-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-plan-module-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: pure-vex32-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
