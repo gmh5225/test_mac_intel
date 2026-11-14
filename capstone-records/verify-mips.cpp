@@ -46,8 +46,10 @@ int main(int argc,char **argv) {
  for(unsigned mode:{unsigned(CS_MODE_MIPS32),unsigned(CS_MODE_MIPS64),unsigned(CS_MODE_MIPS32R6),unsigned(CS_MODE_MIPS2),unsigned(CS_MODE_MIPS32R2),unsigned(CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS32|CS_MODE_MIPS32R2),unsigned(CS_MODE_MIPS64|CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS32|CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS32R2|CS_MODE_MIPS64R2),unsigned(CS_MODE_MIPS64R2|CS_MODE_MIPS_PTR64),unsigned(CS_MODE_MIPS64R5),unsigned(CS_MODE_MICRO|CS_MODE_MIPS32R2),unsigned(CS_MODE_MIPS32R2|CS_MODE_MIPS16)})
  for(unsigned endian:{0u,unsigned(CS_MODE_BIG_ENDIAN)}) {
   cs_mode m=cs_mode(mode|endian);
+  for(unsigned syntax:{0u,unsigned(CS_OPT_SYNTAX_NOREGNAME),unsigned(CS_OPT_SYNTAX_NO_DOLLAR),unsigned(CS_OPT_SYNTAX_NOREGNAME|CS_OPT_SYNTAX_NO_DOLLAR)})
   for(unsigned flags=0;flags<8;++flags) {
    bool detail=flags&2;Machine x(a,m,flags&1,detail,flags&4),y(b,m,flags&1,detail,flags&4);
+   if(a.option(x.handle,CS_OPT_SYNTAX,syntax)||b.option(y.handle,CS_OPT_SYNTAX,syntax))throw std::runtime_error("syntax");
    for(unsigned i=0;i<65536;++i) {
     unsigned word=i*2654435761u;uint8_t bytes[8]={};
     for(unsigned j=0;j<4;++j)bytes[endian?3-j:j]=uint8_t(word>>(8*j));
