@@ -1,7 +1,7 @@
-name: Requalify deduplicated MIPS names on current Capstone next libraries
+name: Append existing short MIPS names and dollar prefix together libraries
 on:
   push:
-    branches: [codex/capstone-mips-deduplicated-current-libraries]
+    branches: [codex/capstone-mips-existing-name-append-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-deduplicated-current-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: mips-existing-name-append-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
