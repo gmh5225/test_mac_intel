@@ -22,8 +22,11 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='6c93c31134d5396095ba4e63db58548317d6f5b9'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='5c6987afcec8c2f21e64575c5b9c5f442a5001ae'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
+    run(['git','add','-u'],'stage-tested-source')
+    tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
+    assert tested_tree=='26882746ed4a898ae18a15b419d95ef9939c99b5',tested_tree
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
@@ -54,7 +57,7 @@ try:
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
         result=subprocess.check_output([generator],cwd=source)
         assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-    save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
+    save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units,tested_tree=tested_tree))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
     shutil.rmtree(root_build,onerror=clean_error)

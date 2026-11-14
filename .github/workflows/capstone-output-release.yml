@@ -1,7 +1,7 @@
-name: Validate generated VEX2 scan plans on current Capstone profiles
+name: Qualify VEX2 plan call boundary profiles
 on:
   push:
-    branches: [codex/capstone-current-vex2-scan-profiles]
+    branches: [codex/capstone-vex2-plan-call-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -20,6 +20,8 @@ jobs:
           - { cc: gcc, profile: reduced, forms: combined, host: ubuntu-22.04 }
           - { cc: gcc, profile: four, forms: combined, host: ubuntu-22.04 }
           - { cc: clang, profile: four, forms: combined, host: macos-15 }
+          - { cc: gcc, profile: four, forms: combined, host: ubuntu-24.04-arm }
+          - { cc: clang, profile: four, forms: combined, host: ubuntu-24.04-arm }
           - { cc: MT, profile: intel, forms: combined, host: windows-2022 }
           - { cc: MD, profile: intel, forms: combined, host: windows-2022 }
           - { cc: gcc, profile: dedicated, forms: combined, host: ubuntu-22.04 }
@@ -39,13 +41,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 6c93c31134d5396095ba4e63db58548317d6f5b9
+          ref: 5c6987afcec8c2f21e64575c5b9c5f442a5001ae
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: current-vex2-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vex2-plan-call-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
