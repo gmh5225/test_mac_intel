@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    else:assert identities==managed_reference,(label,'Managed dependency source changed during comparison')
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
    archives=list(build.rglob('libcapstone.a'));assert len(archives)==1,archives
-   members=sp.check_output(['ar','t',archives[0]],text=True).splitlines()
+   members=[name for name in sp.check_output(['ar','t',archives[0]],text=True).splitlines() if name not in ('__.SYMDEF','__.SYMDEF SORTED')]
    assert len(set(members))==len(members),members
    disk={str(f.relative_to(roots[0])):f for f in roots[0].rglob('*.o')}
    active={key:path for key,path in disk.items() if path.name in members}
