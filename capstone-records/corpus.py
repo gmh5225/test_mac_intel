@@ -110,21 +110,5 @@ def prepare(source, scratch, evidence, command):
         target.write_bytes(text)
         cases.append(dict(row, path=str(target), bytes=len(text), text_sha256=actual,
                           binary_sha256=digest(binary), executable_was_run=False))
-    for name, bits, source_name, flags in [
-        ('scalar32', 32, 'scalar.c', ['-fno-vectorize', '-fno-slp-vectorize']),
-        ('scalar64', 64, 'scalar.c', ['-fno-vectorize', '-fno-slp-vectorize']),
-        ('simd64', 64, 'simd.c', ['-mavx2', '-mfma']),
-    ]:
-        target = corpus / (name + '.o')
-        triple = 'i686-unknown-linux-gnu' if bits == 32 else 'x86_64-unknown-linux-gnu'
-        command(['clang', '-target', triple, '-O3', '-ffreestanding', *flags,
-                 '-c', source / source_name, '-o', target], 'fixture-' + name)
-        text = elf_text(target.read_bytes())
-        path = corpus / (name + '.text')
-        path.write_bytes(text)
-        cases.append(dict(name=name, selector=bits, path=str(path), bytes=len(text),
-                          text_sha256=digest(text), source=source_name,
-                          source_sha256=digest((source / source_name).read_bytes()),
-                          executable_was_run=False))
     (evidence / 'corpus.json').write_text(json.dumps(cases, indent=2) + '\n')
     return cases

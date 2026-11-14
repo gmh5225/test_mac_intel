@@ -16,6 +16,8 @@
 #include <vector>
 #include <memory>
 #include <capstone/capstone.h>
+#include <cstring>
+#include <valgrind/callgrind.h>
 #include "arch/X86/X86ScanAdapter.h"
 struct API {
   decltype(&::cs_open) cs_open;
@@ -67,9 +69,7 @@ static void record(Result &r, size_t offset, size_t length, bool ok) {
     ++r.rejected;
 }
 static void text_value(Result &r, const char *s) {
-  size_t n = 0;
-  while (s[n])
-    ++n;
+  const size_t n = std::strlen(s);
   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
 }
 
@@ -92,7 +92,7 @@ struct Session {
  }
  ~Session(){api.cs_free(insn,1);api.cs_close(&handle);}
 };
-static Result run(Session &session,const std::vector<uint8_t>&bytes_,unsigned repeats){
+extern "C" __attribute__((noinline)) Result trace_span(Session &session,const std::vector<uint8_t>&bytes_,unsigned repeats){
  const API &api=session.api; csh handle=session.handle;cs_insn *insn=session.insn;unsigned mode=session.mode;
  const uint8_t *bytes=bytes_.data();size_t count=bytes_.size();
   Result result;
@@ -181,11 +181,14 @@ int main(int argc, char **argv) {
     std::ifstream f(argv[3], std::ios::binary);
     std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)), {});
     if (bytes.empty()) throw std::runtime_error("corpus");
-    const Result first = run(session, bytes, 1);
-    const Result expected = run(session, bytes, repeats);
+    const Result first = trace_span(session, bytes, 1);
+    const Result expected = trace_span(session, bytes, repeats);
     auto wall = std::chrono::steady_clock::now();
     double cpu = process_cpu_ns();
-    const Result measured = run(session, bytes, repeats);
+    CALLGRIND_ZERO_STATS;
+    CALLGRIND_TOGGLE_COLLECT;
+    const Result measured = trace_span(session, bytes, repeats);
+    CALLGRIND_TOGGLE_COLLECT;
     cpu = process_cpu_ns() - cpu;
     double elapsed = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - wall).count();
     if (!equal(expected, measured)) throw std::runtime_error("sample mismatch");
