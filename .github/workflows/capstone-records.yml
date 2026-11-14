@@ -1,7 +1,7 @@
-name: Move modulo into the two-digit vector register name branch mixed
+name: Copy admitted vector bytes and prefixes at their bounded lengths mixed
 on:
   push:
-    branches: [codex/capstone-vector-single-digit-mixed]
+    branches: [codex/capstone-vector-bounded-copies-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-single-digit-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vector-bounded-copies-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

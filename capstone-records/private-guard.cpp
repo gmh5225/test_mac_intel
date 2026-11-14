@@ -53,10 +53,33 @@ int main(int argc,char **argv) {
   for(unsigned n=0;n<8192;++n){
    uint8_t bytes[15];for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;
    const unsigned op[]={0xef,0xfe,0xd4,0x44,0x25,0x00,0x19,0x1b,0x39,0x3b,0x71,0x72,0x73};
-   if(n&1){bytes[0]=0x62;bytes[1]=(n&0xf0)|(1+n%3);bytes[2]=((n>>4)&0xf8)|5;
+   if(n%3==0){bytes[0]=0x62;bytes[1]=(n&0xf0)|(1+(n/3)%3);bytes[2]=((n>>4)&0xf8)|5;
     bytes[3]=((n>>2)&0x60)|8;bytes[4]=op[(n>>8)%13];bytes[5]=(uint8_t)(n>>1);
-   }else{bytes[0]=0xc5;bytes[1]=(uint8_t)(n>>4);bytes[2]=op[(n>>8)%13];bytes[3]=(uint8_t)(n>>1);}
+   }else if(n%3==1){bytes[0]=0xc5;bytes[1]=(uint8_t)(n>>4);bytes[2]=op[(n>>8)%13];bytes[3]=(uint8_t)(n>>1);}
+   else{bytes[0]=0xc4;bytes[1]=(n&0xe0)|(1+(n/3)%3);bytes[2]=(uint8_t)(n>>4);bytes[3]=op[(n>>8)%13];bytes[4]=(uint8_t)(n>>1);}
    for(unsigned length=0;length<=15;++length){auto input=memory+page-length;std::memcpy(input,bytes,length);compare(x,y,input,length,detail);}
+  }
+ }
+
+ {
+  Machine x(a,CS_MODE_64,true,true,false),y(b,CS_MODE_64,true,true,false);
+  using Hit=bool(*)(csh,const uint8_t*,size_t,cs_insn*);
+  auto hit=(Hit)dlsym(b.library,"cs_test_owned_hit");
+  if(!hit)throw std::runtime_error("missing hit probe");
+  const uint8_t cases[][7]={
+   {0xc5,0xf9,0xef,0xc0}, {0xc4,0xe1,0x79,0xef,0xc0},
+   {0x62,0xf1,0x7d,0x48,0xef,0xc0},
+   {0xc5,0xf9,0x72,0xf0,1}, {0xc4,0xe1,0x79,0x72,0xf0,1},
+   {0x62,0xf3,0xfd,0x48,0x3b,0xc0,1}
+  };
+  const unsigned lengths[]={4,5,6,5,6,7};
+  for(unsigned n=0;n<6;++n) {
+   auto input=memory+page-lengths[n];std::memcpy(input,cases[n],lengths[n]);
+   cs_insn insn{};
+   if(!hit(y.handle,input,lengths[n],&insn)) {
+    std::fprintf(stderr,"missing bounded copy hit %u\n",n);return 6;
+   }
+   compare(x,y,input,lengths[n],true);
   }
  }
  munmap(memory,page*2);
