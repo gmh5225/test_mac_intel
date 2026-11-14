@@ -40,74 +40,47 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
-   # Timed executables and object hashes above are uninstrumented.
-   iterator=s/'arch/X86/X86OutputIterator.c';original_iterator=iterator.read_text()
-   try:
-    iterator.write_text(original_iterator+'''
-CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_iter(csh h,const uint8_t **code,size_t *size,uint64_t *address,cs_insn *insn) {
- return X86_disasmIter(h,code,size,address,insn);
-}
-CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,size_t size,cs_insn *insn) {
- uint16_t length; return X86_trySimpleOutput((cs_struct *)(uintptr_t)h,code,size,insn,&length);
-}
-''')
-    run(['cmake','--build',b,'--target','capstone_shared','--parallel','4'],'owned-test-library-'+key)
-    ownedlibs[key]=t/('owned-'+key+'-'+libname);shutil.copy2(b/libname,ownedlibs[key])
-   finally:iterator.write_text(original_iterator)
-   if key!='base':
-    run(['cmake','--build',b,'--target','arm_post_index','mips_scan','--parallel','4'],'build-test-'+key)
-    target='arch/X86/X86VectorOutput.o'
-    for archs,qualified in (('x86',True),('mips x86',True),('x86 arm mips aarch64',True),('arm x86',False),('mips arm x86',False),('mips aarch64 arm x86 riscv',False)):
-     env={**os.environ,'CAPSTONE_ARCHS':archs,'CC':cc,'CXX':'g++' if cc=='gcc' else 'clang++','CAPSTONE_STATIC':'yes','CAPSTONE_SHARED':'no'}
-     dry=sp.check_output(['make','-Bn',target],env=env,cwd=s,text=True)
-     compile=next(line for line in dry.splitlines() if ' -c ' in line and 'X86VectorOutput.c' in line)
-     assert ('-mstringop-strategy=libcall' in compile)==(qualified and cc=='gcc' and platform.machine()=='x86_64'),(archs,cc,compile)
-     assert ('-DCAPSTONE_ARM_AARCH64_MIPS_X86' in compile)==(len(archs.split())==4)
-    write('make-profiles',dict(architecture_sets=6,cc=cc,target=target))
-    run(['ctest','--test-dir',b,'-R','^unit_(arm_post_index|mips_scan|aarch64_register_names_generator|arm_register_names_generator|fixed_len_decoder|fixed_len_decoder_newlines)$','--no-tests=error','--output-on-failure'],'owner-test-'+key)
-    run(['cmake','--build',b,'--target','x86_simple_output','x86_scan_batch','x86_encoding_accuracy','detail_option','--parallel','4'],'x86-test-build')
-    run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
-  for key in ('indexed',):
-   changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
-   active=True
-   expected={'arch/X86/X86OutputIterator.c.o'}
-   assert set(changed)==expected,(changed,expected)
-   write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
-   run([t/'verify',libs['base'],libs[key]],'differential-'+key)
-   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-x86.cpp','-ldl','-o',t/'verify-x86'],'build-x86-differential')
-   run([t/'verify-x86',ownedlibs['base'],ownedlibs[key]],'x86-differential')
-   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-prefix.cpp','-ldl','-o',t/'verify-prefix'],'build-prefix-differential')
-   run([t/'verify-prefix',ownedlibs['base'],ownedlibs[key]],'prefix-differential')
-   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
-   run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
-   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
-   run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
-  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'private-guard.cpp','-ldl','-o',t/'private-guard'],'private-output-guard-link')
-  run([t/'private-guard',ownedlibs['base'],ownedlibs['indexed']],'private-output-guard')
-  write('x86-record-entrypoint',dict(entrypoint='X86_disasmIter via test-only export',timed_binaries='built before instrumentation',positive_fast_path_hit_asserted=True))
+  changed=[k for k,h in objects['base'].items() if objects['indexed'][k]!=h]
+  assert set(changed)=={'arch/X86/X86OutputIterator.c.o'},changed
+  write('objects-indexed',dict(changed=changed,identical=len(objects['base'])-len(changed)))
+  active=True
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
+  payloads={key:path.read_bytes()for key,path in bins.items()}
+  assert payloads['base']==payloads['aa']
+  maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
+  image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
+  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
+  launches=['images']
+  if probe.returncode==0:launches.append('same-file-fixed')
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Exact R1061 source already passed 14 profiles and full differential; this run isolates launch conditions.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   cases=[x for x in cases if x['name']in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','mips64el-ls')]
-  def sample(key,x,mode,reps):
-   return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
+  def sample(key,x,mode,reps,launch):
+   tail=list(map(str,[x['selector'],mode,x['path'],reps]))
+   if launch=='images':args=[str(bins[key]),*tail]
+   else:
+    with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
+    assert image.stat().st_ino==inode and image.stat().st_size==maximum
+    args=['setarch',platform.machine(),'-R',str(image),*tail]
+   return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
    for mode in (0,1,2):
-    warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
-    for k in range(21):
-     seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-     for v in seq+seq[::-1]:
-      vout=sample(v,x,mode,n)
-      if reference is None:reference=(vout['first'],vout['result'])
-      assert reference==(vout['first'],vout['result'])
-      ticks[v].append(vout['cpu_ns'])
-     runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
+    for launch in launches:
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','indexed','aa']
+     for k in range(21):
+      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
+      for v in seq+seq[::-1]:
+       vout=sample(v,x,mode,n,launch)
+       if reference is None:reference=(vout['first'],vout['result'])
+       assert reference==(vout['first'],vout['result'])
+       ticks[v].append(vout['cpu_ns'])
+      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
+     data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,native_qualification=False))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
