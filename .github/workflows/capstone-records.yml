@@ -1,7 +1,7 @@
-name: Keep the VEX2 base-memory writer out of the shared vector entry mixed
+name: Bound vector byte copies in the outlined VEX32 and VEX64 output path mixed
 on:
   push:
-    branches: [codex/capstone-vex-memory-call-boundary-mixed]
+    branches: [codex/capstone-vex-bounded-output-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-memory-call-boundary-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex-bounded-output-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
