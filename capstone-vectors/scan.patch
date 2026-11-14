@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..0e06c605 100644
+index 63dcc538..8d1bf393 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
@@ -34,7 +34,7 @@ index 63dcc538..0e06c605 100644
  		if (status != X86_SCAN_NOT_HANDLED)
  			return status == X86_SCAN_COMPLETE;
  		tryExtension = false;
-@@ -3424,11 +3425,73 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3424,11 +3425,79 @@ decodeLegacyPrefixedResult(csh ud, const uint8_t *code, size_t code_len,
  	return completeTerminalScanResult(result, instructionID, status);
  }
  
@@ -61,8 +61,14 @@ index 63dcc538..0e06c605 100644
 +#if X86_HAS_VEX2_PUBLIC_PLANS
 +/* The caller has recognized a bare C5 VEX prefix. These generated plans
 + * have one public ID and one validation result for every ModR/M byte. */
-+X86_DECODE_INLINE int tryVex2PublicPlan(const uint8_t *code, size_t size,
-+					X86ScanResult *result)
++/* Keep the additional VEX plan's temporaries out of the legacy iterator. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static CS_PRESERVE_MOST int tryVex2PublicPlan(const uint8_t *code, size_t size,
++					      X86ScanResult *result)
 +{
 +	if (size < 3)
 +		return X86_SCAN_INVALID;
@@ -110,7 +116,7 @@ index 63dcc538..0e06c605 100644
  	insn.readerCursor = 1;
  	if (readVexPrefix(&insn, prefix))
  		return X86_SCAN_INVALID;
-@@ -3495,7 +3558,8 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
+@@ -3495,7 +3564,8 @@ decodeVexTerminalResultInline(csh ud, const uint8_t *code, size_t code_len,
  			      cs_insn *insn, X86ScanResult *result,
  			      uint8_t prefix)
  {
@@ -120,7 +126,7 @@ index 63dcc538..0e06c605 100644
  	if (status == X86_SCAN_NOT_HANDLED)
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, prefix, false);
-@@ -3571,25 +3635,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+@@ -3571,25 +3641,13 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  		}
  		++end;
  		if (modrm < 0xc0) {
@@ -148,24 +154,32 @@ index 63dcc538..0e06c605 100644
  			}
  		}
  	}
-@@ -3679,6 +3731,20 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
- 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
- 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
- 						     result, 0xc5);
+@@ -3675,10 +3733,24 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	if (extension || opcode == 0x62)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, opcode, extension);
+-	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
+-	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+-		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+-						     result, 0xc5);
++	if (opcode == 0xc5 && opcodeOffset == 0) {
++		if (readerFlags && !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
++			return decodeVexTerminalResultInline(
++				ud, code, code_len, insn, result, 0xc5);
 +#if !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+	/* In 32-bit mode a leading C5 is LDS unless the next two bits are
-+	 * set. An actual VEX2 uses the same W=0 opcode row and an ordinary
-+	 * 32-bit address. Other operand shapes retain the source decoder. */
-+	if (opcodeOffset == 0 && opcode == 0xc5 && handle->mode == CS_MODE_32 &&
-+	    code_len >= 2 && (code[1] & 0xc0) == 0xc0) {
-+		const int status = tryVexTerminalScan(code, code_len, opcode,
-+						      result, CS_MODE_32);
-+		if (status != X86_SCAN_NOT_HANDLED)
-+			return status == X86_SCAN_COMPLETE;
-+		return decodeScanResultGeneric(ud, code, code_len, insn, result,
-+					       opcode, false);
-+	}
++		/* A 32-bit C5 is LDS unless its next two bits are set. The
++		 * VEX2 row then uses ordinary 32-bit address extents. */
++		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
++		    (code[1] & 0xc0) == 0xc0) {
++			const int status = tryVexTerminalScan(
++				code, code_len, opcode, result, CS_MODE_32);
++			if (status != X86_SCAN_NOT_HANDLED)
++				return status == X86_SCAN_COMPLETE;
++			return decodeScanResultGeneric(ud, code, code_len, insn,
++						       result, opcode, false);
++		}
 +#endif
++	}
  
  	unsigned instructionID = 0;
  	/* Constant bitness folds the terminal readers' mode and size tests.
