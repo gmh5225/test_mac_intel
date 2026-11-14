@@ -1,7 +1,7 @@
-name: Measure VEX2 full-width arithmetic memory operands and two-register Intel formatting on real Debian functions versus both iced formatters
+name: Qualify integrated VEX2 operands, formatted records and separate generic iterator in libraries
 on:
   push:
-    branches: [codex/capstone-vex2-base-memory-arithmetic-libraries]
+    branches: [codex/capstone-grouped-vex2-integrated-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-base-memory-arithmetic-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: grouped-vex2-integrated-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
