@@ -1,7 +1,7 @@
-name: Qualify integrated VEX2 operands, formatted records and separate generic iterator in profiles
+name: Qualify MOV memory-immediate formatting and full detail on current native Capstone in profiles
 on:
   push:
-    branches: [codex/capstone-grouped-vex2-integrated-profiles]
+    branches: [codex/capstone-mov-memory-current-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -35,13 +35,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343
+          ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: grouped-vex2-integrated-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: mov-memory-current-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

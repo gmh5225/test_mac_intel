@@ -22,7 +22,7 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='a7787ac5c7c0ead02a3c46c85cdcfcb482dc6343'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='75da2329204825bb0bd15e574ab58c45b5019dcc'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
@@ -43,6 +43,11 @@ try:
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    if profile=='adapter':
+        generator=root_build/'simple-output-generator'
+        run(['c++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
+        result=subprocess.check_output([generator],cwd=source)
+        assert result==(source/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
