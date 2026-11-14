@@ -56,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/X86/'+name+'.c.o' for name in ('X86OutputIterator','X86VectorOutput','X86DisassemblerDecoder','X86ImmediateOutput','X86MemoryOutput')}
+   expected={'arch/X86/'+name+'.c.o' for name in ('X86VectorOutput',)}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
@@ -68,6 +68,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
    run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-evex-memory.cpp','-ldl','-o',t/'verify-evex-memory'],'build-evex-memory-differential')
+  run([t/'verify-evex-memory',libs['base'],libs['indexed']],'evex-memory-differential')
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
