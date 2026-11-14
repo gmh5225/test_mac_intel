@@ -1,7 +1,7 @@
-name: Qualify output bitness with GCC iterator integration profiles
+name: Verify fixed public x86 detail initialization profiles
 on:
   push:
-    branches: [codex/capstone-bitness-inline-profiles]
+    branches: [codex/capstone-fixed-detail-clear-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -41,13 +41,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 5c6987afcec8c2f21e64575c5b9c5f442a5001ae
+          ref: 729680277dd762704ea3270291b7a75318f51583
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bitness-inline-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: fixed-detail-clear-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

@@ -1,5 +1,5 @@
 from pathlib import Path
-import json, os, shutil, subprocess, tempfile
+import hashlib, json, os, shutil, subprocess, tempfile
 root=Path(__file__).resolve().parent
 source=root.parent/'source'
 evidence=root.parent/'evidence'
@@ -22,11 +22,11 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='5c6987afcec8c2f21e64575c5b9c5f442a5001ae'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='729680277dd762704ea3270291b7a75318f51583'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['git','add','-u'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree=='adde98f416e4cbd6d9a30a19c5a2ffc4b4c3d3d7',tested_tree
+    assert tested_tree=='d36e8cf7af84cffc14c017ea0122363220a4c734',tested_tree
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
@@ -45,7 +45,25 @@ try:
         units+=sorted(q for q in known if q in ('aarch64_memory_access','aarch64_post_index','aarch64_addressing'))
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
+    # Byte identity on the fallback compilers is stronger than repeated timing.
+    run(['git','apply','-R',root/(forms+'.patch')],'restore-baseline')
+    run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],'baseline-build')
+    def objects():
+        if os.name == 'nt': return {}
+        objroot=b/'CMakeFiles/capstone.dir'
+        return {str(f.relative_to(objroot)):hashlib.sha256(f.read_bytes()).hexdigest() for f in objroot.rglob('*.o')}
+    baseline_objects=objects()
+    baseline_archive=hashlib.sha256((b/'libcapstone.a').read_bytes()).hexdigest() if os.name!='nt' else None
+    run(['git','apply',root/(forms+'.patch')],'reapply-candidate')
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
+    if os.name!='nt':
+        candidate_objects=objects()
+        assert set(candidate_objects)==set(baseline_objects)
+        changed=[n for n in candidate_objects if candidate_objects[n]!=baseline_objects[n]]
+        candidate_archive=hashlib.sha256((b/'libcapstone.a').read_bytes()).hexdigest()
+        save('runtime-identity',dict(objects=len(candidate_objects),changed=changed,baseline_archive=baseline_archive,candidate_archive=candidate_archive))
+        if compiler=='gcc': assert not changed and baseline_archive==candidate_archive,(changed,baseline_archive,candidate_archive)
+
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
