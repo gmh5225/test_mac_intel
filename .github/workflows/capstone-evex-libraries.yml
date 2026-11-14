@@ -1,7 +1,7 @@
-name: Measure VEX2 call boundary and ordinary iterator cost
+name: Measure bitness specialization in the output dispatcher
 on:
   push:
-    branches: [codex/capstone-vex2-plan-call-cost]
+    branches: [codex/capstone-bitness-output-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-plan-call-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bitness-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
