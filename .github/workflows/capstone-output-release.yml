@@ -1,7 +1,7 @@
-name: Move modulo into the two-digit vector register name branch profiles
+name: Copy admitted vector bytes and prefixes at their bounded lengths profiles
 on:
   push:
-    branches: [codex/capstone-vector-single-digit-profiles]
+    branches: [codex/capstone-vector-bounded-copies-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,6 +46,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-single-digit-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vector-bounded-copies-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
