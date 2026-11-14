@@ -1,7 +1,7 @@
-name: Verify isolated VEX32 public plan module libraries
+name: Verify isolated VEX32 register output libraries
 on:
   push:
-    branches: [codex/capstone-vex32-plan-module-libraries]
+    branches: [codex/capstone-vex32-output-module-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-plan-module-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex32-output-module-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
