@@ -19,7 +19,7 @@ index ae1554b0..b256a7b2 100644
  bool X86_getInstructionScanResult(csh handle, const uint8_t *code,
  				  size_t code_len, cs_insn *insn,
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..a3d2b9a3 100644
+index 63dcc538..17250fc4 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3368,6 +3368,15 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
@@ -147,7 +147,7 @@ index 63dcc538..a3d2b9a3 100644
 +/* GCC 11 on x64 regresses ordinary 32-bit scan when this boundary is outlined.
 + * Keep its legacy path inline while retaining the early checked VEX2 plan. */
 +#if defined(X86_EARLY_VEX2_PUBLIC_PLAN) && \
-+    !(defined(__x86_64__) && __GNUC__ == 11)
++	!(defined(__x86_64__) && __GNUC__ == 11)
 +static __attribute__((noinline)) bool
 +#else
  X86_DECODE_INLINE bool
@@ -210,6 +210,62 @@ index 63dcc538..a3d2b9a3 100644
  
  	unsigned instructionID = 0;
  	/* Constant bitness folds the terminal readers' mode and size tests.
+@@ -3713,6 +3848,35 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 					opcode, false);
+ }
+ 
++#if defined(__x86_64__) && defined(__GNUC__) && __GNUC__ == 11 && \
++	!defined(__clang__)
++/* GCC 11 needs the 32-bit legacy reader inline; the 64-bit iterator benefits
++ * from retaining its compact outlined boundary. Both use the same reader. */
++static __attribute__((noinline)) bool
++getInstructionScanResultAfterInitialOutlined(csh ud, const uint8_t *code,
++					     size_t code_len, cs_insn *insn,
++					     X86ScanResult *result,
++					     bool readerFlags)
++{
++	return getInstructionScanResultAfterInitial(ud, code, code_len, insn,
++						    result, readerFlags);
++}
++X86_DECODE_INLINE bool getInstructionScanResultAfterInitialByMode(
++	csh ud, const uint8_t *code, size_t code_len, cs_insn *insn,
++	X86ScanResult *result, bool readerFlags)
++{
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	if (handle->mode == CS_MODE_32)
++		return getInstructionScanResultAfterInitial(
++			ud, code, code_len, insn, result, readerFlags);
++	return getInstructionScanResultAfterInitialOutlined(
++		ud, code, code_len, insn, result, readerFlags);
++}
++#else
++#define getInstructionScanResultAfterInitialByMode \
++	getInstructionScanResultAfterInitial
++#endif
++
+ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
+ 						size_t code_len, cs_insn *insn,
+ 						X86ScanResult *result,
+@@ -3725,8 +3889,8 @@ X86_DECODE_INLINE bool getInstructionScanResult(csh ud, const uint8_t *code,
+ 	if (initial != X86_SCAN_NOT_HANDLED)
+ 		return completeTerminalScanResult(result, instructionID,
+ 						  initial);
+-	return getInstructionScanResultAfterInitial(ud, code, code_len, insn,
+-						    result, readerFlags);
++	return getInstructionScanResultAfterInitialByMode(
++		ud, code, code_len, insn, result, readerFlags);
+ }
+ 
+ bool X86_getInstructionScanResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3759,7 +3923,7 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 					   &length, true);
+ 	if (initial == X86_SCAN_NOT_HANDLED) {
+ 		X86ScanResult result;
+-		if (!getInstructionScanResultAfterInitial(
++		if (!getInstructionScanResultAfterInitialByMode(
+ 			    (csh)(uintptr_t)handle, code, size, insn, &result,
+ 			    true))
+ 			return false;
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
 index a976814e..d831718e 100644
 --- a/arch/X86/X86GenSimpleOutput.inc

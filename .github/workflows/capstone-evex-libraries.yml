@@ -1,7 +1,7 @@
-name: Verify the complete output candidate with repaired scan on Intel Xeon 8573C
+name: Test mode-specific GCC11 scan inlining on the two affected CPU families
 on:
   push:
-    branches: [codex/capstone-gcc11-inline-scan-intel]
+    branches: [codex/capstone-gcc11-mode-scan]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -32,7 +32,7 @@ jobs:
           import json,os
           cpu=Path('/proc/cpuinfo').read_text()
           model=next(line.split(':',1)[1].strip()for line in cpu.splitlines()if line.startswith('model name'))
-          selected='8573C' in model
+          selected='8573C' in model or '7763' in model
           Path(os.environ['RUNNER_TEMP'],'scan-cpu-selection.json').write_text(json.dumps(dict(model=model,selected=selected,cpu=cpu),indent=2)+'\n')
           with open(os.environ['GITHUB_OUTPUT'],'a')as out:out.write('selected='+str(selected).lower()+'\n')
           print(model, 'selected='+str(selected).lower())
@@ -52,7 +52,7 @@ jobs:
       - if: steps.cpu.outputs.selected == 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
       - if: steps.cpu.outputs.selected == 'true'
-        name: Profile the exact 32-bit function-boundary workload and final executable
+        name: Compare 32-bit and 64-bit scan entry variants on identical workloads
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: gcc11-inline-scan-intel-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: gcc11-mode-scan-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
