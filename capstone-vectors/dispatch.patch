@@ -1,18 +1,29 @@
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..8eaa8e87 100644
+index 6df1472d..7d1ec7b3 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -26,9 +26,11 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 	*out++ = "xyz"[length_code];
- 	*out++ = 'm';
- 	*out++ = 'm';
+@@ -23,13 +23,17 @@ struct PaddingOutput {
+ static char *writeVectorRegister(char *out, unsigned length_code,
+ 				 unsigned number)
+ {
+-	*out++ = "xyz"[length_code];
+-	*out++ = 'm';
+-	*out++ = 'm';
 -	if (number >= 10)
-+	if (number >= 10) {
- 		*out++ = (char)('0' + number / 10);
+-		*out++ = (char)('0' + number / 10);
 -	*out++ = (char)('0' + number % 10);
-+		number %= 10;
-+	}
-+	*out++ = (char)('0' + number);
- 	return out;
+-	return out;
++	/* Callers clear op_str before writing. The four-byte suffix includes
++     * the existing zero terminator for single-digit register numbers. */
++	static const char suffixes[32][4] = {
++		"mm0",	"mm1",	"mm2",	"mm3",	"mm4",	"mm5",	"mm6",	"mm7",
++		"mm8",	"mm9",	"mm10", "mm11", "mm12", "mm13", "mm14", "mm15",
++		"mm16", "mm17", "mm18", "mm19", "mm20", "mm21", "mm22", "mm23",
++		"mm24", "mm25", "mm26", "mm27", "mm28", "mm29", "mm30", "mm31"
++	};
++	*out = "xyz"[length_code];
++	memcpy(out + 1, suffixes[number], sizeof(suffixes[number]));
++	return out + 4 + (number >= 10);
  }
  
+ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
