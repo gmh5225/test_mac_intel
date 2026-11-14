@@ -1,26 +1,12 @@
 {
-  "neverd": "a352ad07ac9aab3a4257b0600a6ce7c2c001c228",
+  "neverd": "633a7092a8ece2ab479ad536cf0d0498eaf133b0",
   "capstone": "729680277dd762704ea3270291b7a75318f51583",
   "variants": {
-    "fixed-detail-clear": {
-      "source": "round1080-fixed-detail-clear",
-      "patch": "fixed-detail-clear.patch",
-      "patch_sha256": "17eef0226992ee5f2a8dbb5c41ae7a453a9b289b70f1376226e36eac30588938",
-      "tree": "d36e8cf7af84cffc14c017ea0122363220a4c734",
-      "changed": [
-        "X86Disassembler.c.o",
-        "X86OutputIterator.c.o",
-        "X86MemoryOutput.c.o",
-        "X86ImmediateOutput.c.o",
-        "X86VectorOutput.c.o"
-      ],
-      "added": []
-    },
-    "outlined-vex32": {
-      "source": "round1081-outlined-vex32-terminal",
-      "patch": "outlined-vex32.patch",
-      "patch_sha256": "3569d8de274625f1b7acf2e9625c368a6ea82f3082a0a08c8d37860bd78e0c47",
-      "tree": "355cd339d81f1918da6983d12002133802c921ce",
+    "grouped-vex32": {
+      "source": "round1084-vex32-grouped-fallback",
+      "patch": "grouped-vex32.patch",
+      "patch_sha256": "84b15bc65fc2c07ca85776f3cf518802ed0337dc7ef249b4fdea33e774b77904",
+      "tree": "68de3d0ccbf2fc1f52d26d5d2ceb4baa3c9218bb",
       "changed": [
         "X86DisassemblerDecoder.c.o"
       ],
@@ -30,5 +16,5 @@
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Independent diagnostic candidates; passing this workload alone does not authorize release."
+  "scope": "Actual current NeverD integration for grouped VEX2 plans in the existing 32-bit fallback; source-built latest fork LLVM, full record equality, real workload timing and byte-identical A/A. Full cross-configuration qualification is separate."
 }
