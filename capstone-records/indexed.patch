@@ -82,31 +82,44 @@ index 1d237cd1..b53ba44d 100644
 +	},
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..20263b76 100644
+index 11e8578a..5fe9a9e3 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -77,10 +77,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+@@ -79,7 +79,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  		if (plan == X86_PLAN_VECTOR)
--			return X86_writeVectorOutput(code, size, insn,
--						     insn_size,
+ 			return X86_writeVectorOutput(code, size, insn,
+ 						     insn_size,
 -						     x86_simple_registers[3],
--						     wide);
-+			return X86_writeVectorOutput(
-+				code, size, insn, insn_size,
-+				x86_simple_registers[wide ? 3 : 2], wide);
++						     x86_simple_registers,
+ 						     wide);
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
- 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..ff940a14 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -65,8 +65,8 @@ CAPSTONE_INTERNAL void X86_writeImmediateOutput(
+ 
+ CAPSTONE_INTERNAL bool
+ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+-		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
+-		      bool wide);
++		      uint16_t *insn_size,
++		      const struct X86SimpleRegister banks[4][16], bool wide);
+ 
+ static inline char *X86_writeDisp8(char *out, int displacement)
+ {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..49815bcd 100644
+index 6df1472d..8936412b 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -254,9 +254,156 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+@@ -254,9 +254,157 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
  	return true;
  }
  
+-static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+-				      cs_insn *insn, uint16_t *insn_size,
+-				      bool wide)
 +/* Packed SSE moves share one address parse between assembly and detail. */
 +#if defined(_MSC_VER)
 +__declspec(noinline)
@@ -115,7 +128,7 @@ index 6df1472d..49815bcd 100644
 +#endif
 +static bool writeLegacyMoveOutput(const uint8_t *code, size_t size,
 +				  cs_insn *insn, uint16_t *insn_size,
-+				  const struct X86SimpleRegister *regs,
++				  const struct X86SimpleRegister banks[4][16],
 +				  bool wide)
 +{
 +	const unsigned mandatory = code[0] == 0x66 ? 1 :
@@ -150,6 +163,7 @@ index 6df1472d..49815bcd 100644
 +	const unsigned length = offset + disp_size;
 +	if (size < length || (rip && !wide))
 +		return false;
++	const struct X86SimpleRegister *regs = banks[wide ? 3 : 2];
 +	unsigned base_reg = rm, scale = 0;
 +	const struct X86SimpleRegister *index = NULL;
 +	if (sib) {
@@ -253,27 +267,33 @@ index 6df1472d..49815bcd 100644
 +	return true;
 +}
 +
- static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
- 				      cs_insn *insn, uint16_t *insn_size,
--				      bool wide)
-+				      bool wide,
-+				      const struct X86SimpleRegister *regs)
++static bool
++writeLegacyRegisterOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			  uint16_t *insn_size, bool wide,
++			  const struct X86SimpleRegister banks[4][16])
  {
  	if (size < 4)
  		return false;
-@@ -267,7 +414,10 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+@@ -267,7 +415,10 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
  	const uint8_t opcode = code[2 + has_rex];
  	const unsigned plan = legacy_register_plans[opcode];
  	const uint8_t modrm = code[3 + has_rex];
 -	if (!plan || modrm < 0xc0)
 +	if (modrm < 0xc0)
-+		return writeLegacyMoveOutput(code, size, insn, insn_size, regs,
++		return writeLegacyMoveOutput(code, size, insn, insn_size, banks,
 +					     wide);
 +	if (!plan)
  		return false;
  
  	const struct VectorOutputRow *row = &legacy_register_rows[plan & 127];
-@@ -508,11 +658,18 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -503,25 +654,33 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 
+ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			   uint16_t *insn_size,
+-			   const struct X86SimpleRegister *regs, bool wide)
++			   const struct X86SimpleRegister banks[4][16],
++			   bool wide)
+ {
  	if (code[0] == 0x0f || code[0] == 0xf3 ||
  	    (code[0] == 0x66 && size >= 2 &&
  	     (code[1] == 0x90 ||
@@ -282,19 +302,30 @@ index 6df1472d..49815bcd 100644
 +	      (size >= 3 && code[1] == 0x0f && code[2] == 0x1f)))) {
 +		if (writePaddingOutput(code, size, insn, insn_size, wide))
 +			return true;
-+		return writeLegacyMoveOutput(code, size, insn, insn_size, regs,
++		return writeLegacyMoveOutput(code, size, insn, insn_size, banks,
 +					     wide);
 +	}
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
 -						 wide);
-+						 wide, regs);
++						 wide, banks);
 +	if (wide && (code[0] & 0xf0) == 0x40)
-+		return writeLegacyMoveOutput(code, size, insn, insn_size, regs,
++		return writeLegacyMoveOutput(code, size, insn, insn_size, banks,
 +					     wide);
  	if (code[0] == 0x62)
- 		return writeEvexOutput(code, size, insn, insn_size, regs);
+-		return writeEvexOutput(code, size, insn, insn_size, regs);
++		return writeEvexOutput(code, size, insn, insn_size, banks[3]);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+ 		return writeVexRipLoad(code, size, insn, insn_size);
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
+ 		return writeVexRegisterOutput(code, size, insn, insn_size,
+ 					      prefix);
+-	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
++	return writeVexIndexedOutput(code, size, insn, insn_size, banks[3]);
+ }
+ /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+  * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 index ccc4f0de..1c18bd8d 100644
 --- a/suite/synctools/x86_simple_output.cpp

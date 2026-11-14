@@ -1,7 +1,7 @@
-name: Qualify shared SSE memory operand output in mixed
+name: Qualify SSE memory output with address register selection only on the memory path mixed
 on:
   push:
-    branches: [codex/capstone-legacy-vector-memory-mixed]
+    branches: [codex/capstone-legacy-memory-late-bank-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: legacy-vector-memory-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: legacy-memory-late-bank-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
