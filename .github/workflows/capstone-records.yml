@@ -1,7 +1,7 @@
-name: Qualify complete native VEX2 scan and formatted records against released Capstone in mixed
+name: Qualify dependency-ordered architecture objects with native scalar and vector output in mixed
 on:
   push:
-    branches: [codex/capstone-native-vex-current-mixed]
+    branches: [codex/capstone-native-archive-order-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-vex-current-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: native-archive-order-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
