@@ -1,7 +1,7 @@
-name: Isolate forced scan outlining on the reproduced Intel PE32 function workload
+name: Select Intel Xeon 8573C before testing the isolated scan inlining hypothesis
 on:
   push:
-    branches: [codex/capstone-scan-inline-diagnosis]
+    branches: [codex/capstone-intel8573-scan-check]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,29 +11,48 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, replica: one }
-          - { host: ubuntu-22.04, cc: gcc, replica: one }
-          - { host: ubuntu-22.04, cc: gcc, replica: two }
-          - { host: ubuntu-22.04, cc: gcc, replica: three }
-          - { host: ubuntu-22.04, cc: gcc, replica: four }
-          - { host: ubuntu-24.04, cc: clang, replica: one }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe2 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe3 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe4 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe5 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe6 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe7 }
+          - { host: ubuntu-22.04, cc: gcc, replica: probe8 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
       CC: ${{ matrix.cc }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Select the CPU that reproduced the regression
+        id: cpu
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          cpu=Path('/proc/cpuinfo').read_text()
+          model=next(line.split(':',1)[1].strip()for line in cpu.splitlines()if line.startswith('model name'))
+          selected='8573C' in model
+          Path(os.environ['RUNNER_TEMP'],'scan-cpu-selection.json').write_text(json.dumps(dict(model=model,selected=selected,cpu=cpu),indent=2)+'\n')
+          with open(os.environ['GITHUB_OUTPUT'],'a')as out:out.write('selected='+str(selected).lower()+'\n')
+          print(model, 'selected='+str(selected).lower())
+          PY
+      - if: steps.cpu.outputs.selected == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           sparse-checkout: capstone-vectors
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - if: steps.cpu.outputs.selected == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
           ref: 75da2329204825bb0bd15e574ab58c45b5019dcc
           path: source
           persist-credentials: false
-      - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
-      - name: Profile the exact 32-bit function-boundary workload and final executable
+      - if: steps.cpu.outputs.selected == 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
+      - if: steps.cpu.outputs.selected == 'true'
+        name: Profile the exact 32-bit function-boundary workload and final executable
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -41,8 +60,10 @@ jobs:
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
+        run: mkdir -p evidence && cp "$RUNNER_TEMP/scan-cpu-selection.json" evidence/
+      - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scan-inline-diagnosis-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: intel8573-scan-check-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
