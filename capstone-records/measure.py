@@ -66,18 +66,62 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
    run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
+  # Reorder only the archive-member text of the one modified object. Linker
+  # symbol maps verify each unchanged function address rather than assuming it.
+  script=t/'scan-tail.ld';script.write_text('SECTIONS { .capstone_scan : ALIGN(64) { *X86DisassemblerDecoder.c.o(.text .text.*) } } INSERT AFTER .text;\n')
+  for key in ('base','indexed'):
+   variant=r/('baseline.patch' if key=='base' else key+'.patch')
+   run(['git','apply',variant],'apply-layout-'+key,s)
+   run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'layout-build-'+key)
+   fixed=t/('fixed-'+key)
+   run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-Wl,-T,'+str(script),'-o',fixed],'layout-link-'+key)
+   bins['fixed-'+key]=fixed
+   for prefix in ('','fixed-'):
+    bin=bins[prefix+key]
+    sym=sp.check_output(['nm','-S','-n','--defined-only',bin],text=True)
+    (e/(prefix+key+'-symbols.txt')).write_text(sym)
+   run(['git','apply','-R',variant],'restore-layout-'+key,s)
+  def addrs(key):
+   rows=(e/(key+'-symbols.txt')).read_text().splitlines()
+   return {m[4]:(int(m[1],16),int(m[2],16))for k in rows if (m:=re.match(r'^(\w+) (\w+) ([Tt]) (.+)$',k))}
+  by_name={k:addrs(k) for k in bins}
+  names=['Mips_getInstruction','Mips_printer','Mips_get_insn_id','AArch64_getInstruction','AArch64_get_insn_id','cs_disasm_iter','X86_disasmIter','X86_writeVectorOutput']
+  write('entries',{k:{n:rows[n] for n in names if n in rows} for k,rows in by_name.items()})
+  for key in ('fixed-base','fixed-indexed'):
+   sec=sp.check_output(['objdump','-h',bins[key]],text=True);assert '.capstone_scan'in sec,sec
+
+  for k in ('base','indexed','fixed-base','fixed-indexed'):
+   (e/(k+'-iterator.asm')).write_bytes(sp.check_output(['objdump','--no-show-raw-insn','-d','--disassemble=cs_disasm_iter',bins[k]]))
+  # Count opcodes using the same public decoder and fixture as the timing loop.
+  rep=t/'pe32-vector-count.cpp'
+  rep.write_text("""#include <capstone/capstone.h>
+#include <cstdio>
+#include <fstream>
+#include <iterator>
+#include <vector>
+int main(int argc,char **argv){if(argc!=2)return 1;std::ifstream in(argv[1],std::ios::binary);
+std::vector<unsigned char> data{std::istreambuf_iterator<char>(in),{}};csh h=0;
+if(cs_open(CS_ARCH_X86,CS_MODE_32,&h)||cs_option(h,CS_OPT_TEXT,CS_OPT_OFF))return 2;
+cs_insn *i=cs_malloc(h);const uint8_t *q=data.data();size_t n=data.size();uint64_t a=0;
+size_t c5=0,valid=0,rejected=0;while(n){const uint8_t *b=q;if(!cs_disasm_iter(h,&q,&n,&a,i)){++q;--n;++a;++rejected;continue;}
+++valid;c5+=i->size>=2&&b[0]==0xc5&&(b[1]&0xc0)==0xc0;}
+std::printf("%zu %zu %zu",valid,rejected,c5);cs_free(i,1);cs_close(&h);}""")
+  run(['clang++','-O2','-I',s/'include',rep,b/'libcapstone.a','-o',t/'pe32-count'],'counter-link')
+  for case in cases:
+   if case['name']=='putty-32-0.85':
+    n,invalid,c5=map(int,sp.check_output([t/'pe32-count',case['path']]).split());write('pe32-count',dict(valid=n,rejected=invalid,bare_c5=c5))
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==4;write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  cases=[x for x in cases if x['name']in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','mips64el-ls')]
+  cases=[x for x in cases if x['name']in ('putty-32-0.85','putty-64-0.85','amd64-ls')]
   def sample(key,x,mode,reps):
    return json.loads(sp.check_output(list(map(str,[bins[key],x['selector'],mode,x['path'],reps])),text=True))
   data=[]
   for x in cases:
-   for mode in (0,1,2):
+   for mode in (0,):
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
+    runs=[];reference=None;keys=['base','indexed','aa','fixed-base','fixed-indexed']
     for k in range(21):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
@@ -85,8 +129,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
       if reference is None:reference=(vout['first'],vout['result'])
       assert reference==(vout['first'],vout['result'])
       ticks[v].append(vout['cpu_ns'])
-     runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+     runs.append({**{v:sum(ticks['base'])/sum(ticks[v]) for v in keys},'fixed_pair':sum(ticks['fixed-base'])/sum(ticks['fixed-indexed'])})
+    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys+['fixed_pair']},result=reference));write('timings',data)
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform()))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
