@@ -35,22 +35,26 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    if key!='base':run(['git','apply',variant],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-Wl,-Map='+str(e/(key+'-link.map')),'-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
-   symbols=sp.check_output(['nm','-n','-S','--defined-only',f],text=True)
-   (e/(key+'-symbols.txt')).write_text(symbols)
-   sections=sp.check_output(['objdump','-h',f],text=True)
-   (e/(key+'-sections.txt')).write_text(sections)
-   section=next(line.split() for line in sections.splitlines() if len(line.split())>=7 and line.split()[1]=='.text')
-   vma,offset=int(section[3],16),int(section[5],16)
-   image=f.read_bytes()
-   functions=[]
-   for line in symbols.splitlines():
-    fields=line.split()
-    if len(fields)!=4 or fields[2] not in ('t','T'):continue
-    address,size=int(fields[0],16),int(fields[1],16)
-    content=image[offset+address-vma:offset+address-vma+size]
-    assert len(content)==size
-    functions.append(dict(name=fields[3],address=address,size=size,sha256=hashlib.sha256(content).hexdigest()))
-   write(key+'-functions',functions)
+   whole=t/('whole-'+key)
+   run(['clang++',t/'single.o','-Wl,--whole-archive',b/'libcapstone.a','-Wl,--no-whole-archive','-lm','-Wl,-Map='+str(e/('whole-'+key+'-link.map')),'-o',whole],'link-whole-'+key)
+   bins['whole-'+key]=whole
+   for layout,executable in ((key,f),('whole-'+key,whole)):
+    symbols=sp.check_output(['nm','-n','-S','--defined-only',executable],text=True)
+    (e/(layout+'-symbols.txt')).write_text(symbols)
+    sections=sp.check_output(['objdump','-h',executable],text=True)
+    (e/(layout+'-sections.txt')).write_text(sections)
+    section=next(line.split() for line in sections.splitlines() if len(line.split())>=7 and line.split()[1]=='.text')
+    vma,offset=int(section[3],16),int(section[5],16)
+    image=executable.read_bytes()
+    functions=[]
+    for line in symbols.splitlines():
+     fields=line.split()
+     if len(fields)!=4 or fields[2] not in ('t','T'):continue
+     address,size=int(fields[0],16),int(fields[1],16)
+     content=image[offset+address-vma:offset+address-vma+size]
+     assert len(content)==size
+     functions.append(dict(name=fields[3],address=address,size=size,sha256=hashlib.sha256(content).hexdigest()))
+    write(layout+'-functions',functions)
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
@@ -82,7 +86,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
    run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(4 if active else 2);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -93,7 +97,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for x in cases:
    for mode in (0,1,2):
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
+    runs=[];reference=None;keys=['base','indexed','whole-base','whole-indexed','aa']
     for k in range(21):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
@@ -102,11 +106,13 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
       assert reference==(vout['first'],vout['result'])
       ticks[v].append(vout['cpu_ns'])
      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+     runs[-1]['whole-gain']=sum(ticks['whole-base'])/sum(ticks['whole-indexed'])
+    data.append(dict(case=x['name'],mode=mode,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys+['whole-gain']},result=reference));write('timings',data)
   profiles=[]
   for x in cases:
    for mode in (0,1,2):
-    for key in ('base','indexed'):
+    if (x['name'],mode) not in (('mips64el-ls',0),('arm64-ls',1)):continue
+    for key in ('base','indexed','whole-base','whole-indexed'):
      ident=x['name']+'-'+str(mode)+'-'+key
      raw=t/(ident+'.callgrind')
      run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes',
