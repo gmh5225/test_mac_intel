@@ -1,7 +1,7 @@
-name: Bound vector byte copies in the outlined VEX32 and VEX64 output path factor costs
+name: Handle reserved-vvvv VEX immediate output from canonical register rows factor costs
 on:
   push:
-    branches: [codex/capstone-vex-bounded-output-profile]
+    branches: [codex/capstone-vex-unary-output-only-profile]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-bounded-output-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex-unary-output-only-profile-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
