@@ -1,29 +1,48 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..7d1ec7b3 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -23,13 +23,17 @@ struct PaddingOutput {
- static char *writeVectorRegister(char *out, unsigned length_code,
- 				 unsigned number)
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..365b10c9 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -27,17 +27,36 @@ static
+ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			 cs_insn *insn, uint16_t *insn_size)
  {
--	*out++ = "xyz"[length_code];
--	*out++ = 'm';
--	*out++ = 'm';
--	if (number >= 10)
--		*out++ = (char)('0' + number / 10);
--	*out++ = (char)('0' + number % 10);
--	return out;
-+	/* Callers clear op_str before writing. The four-byte suffix includes
-+     * the existing zero terminator for single-digit register numbers. */
-+	static const char suffixes[32][4] = {
-+		"mm0",	"mm1",	"mm2",	"mm3",	"mm4",	"mm5",	"mm6",	"mm7",
-+		"mm8",	"mm9",	"mm10", "mm11", "mm12", "mm13", "mm14", "mm15",
-+		"mm16", "mm17", "mm18", "mm19", "mm20", "mm21", "mm22", "mm23",
-+		"mm24", "mm25", "mm26", "mm27", "mm28", "mm29", "mm30", "mm31"
-+	};
-+	*out = "xyz"[length_code];
-+	memcpy(out + 1, suffixes[number], sizeof(suffixes[number]));
-+	return out + 4 + (number >= 10);
- }
- 
- static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
++	static const uint16_t prefixes[2][256] = { { [0x0f] = 3 },
++						   {
++							   [0x0f] = 3,
++							   [0x40] = 0x4001,
++							   [0x41] = 0x4101,
++							   [0x42] = 0x4201,
++							   [0x43] = 0x4301,
++							   [0x44] = 0x4401,
++							   [0x45] = 0x4501,
++							   [0x46] = 0x4601,
++							   [0x47] = 0x4701,
++							   [0x48] = 0x4802,
++							   [0x49] = 0x4902,
++							   [0x4a] = 0x4a02,
++							   [0x4b] = 0x4b02,
++							   [0x4c] = 0x4c02,
++							   [0x4d] = 0x4d02,
++							   [0x4e] = 0x4e02,
++							   [0x4f] = 0x4f02,
++						   } };
+ 	const bool wide = handle->mode == CS_MODE_64;
+-	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
+-	const uint8_t rex = has_rex ? code[0] : 0;
+-	const bool escaped = code[0] == 0x0f;
+-	const unsigned lead = has_rex || escaped;
++	const unsigned prefix = prefixes[wide][code[0]];
++	const unsigned prefix_class = prefix & 3;
++	const uint8_t rex = (uint8_t)(prefix >> 8);
++	const bool has_rex = rex != 0;
++	const bool escaped = prefix_class == 3;
++	const unsigned lead = prefix_class != 0;
+ 	if (size <= lead)
+ 		return false;
+ 	const uint8_t opcode = code[lead];
+-	const unsigned prefix_class = escaped ? 3 :
+-				      has_rex ? ((rex & 8) ? 2 : 1) :
+-						0;
+ 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
+ 	if (!plan)
+ 		return false;
