@@ -1,7 +1,7 @@
-name: Measure VEX2 full-width arithmetic memory operands and two-register Intel formatting on PE32, PE64, ARM64 and MIPS in five compiler environments
+name: Qualify VEX2 scan, TEST and memory output with ordinary iterator in mixed
 on:
   push:
-    branches: [codex/capstone-vex2-base-memory-arithmetic-mixed]
+    branches: [codex/capstone-vex2-scan-test-output-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-base-memory-arithmetic-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex2-scan-test-output-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
