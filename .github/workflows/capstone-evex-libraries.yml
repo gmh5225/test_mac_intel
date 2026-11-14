@@ -1,7 +1,7 @@
-name: Qualify compact vector register digits in libraries
+name: Move modulo into the two-digit vector register name branch libraries
 on:
   push:
-    branches: [codex/capstone-vector-register-digits-libraries]
+    branches: [codex/capstone-vector-single-digit-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-register-digits-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vector-single-digit-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
