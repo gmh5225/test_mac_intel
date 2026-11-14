@@ -1,7 +1,7 @@
-name: Compare baseline Capstone and iced instruction-address costs
+name: Compare warmed output prefix instruction costs
 on:
   push:
-    branches: [codex/capstone-output-instruction-cost]
+    branches: [codex/capstone-warmed-prefix-instruction-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: output-instruction-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: warmed-prefix-instruction-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
