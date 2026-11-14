@@ -45,7 +45,7 @@ try:
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
-        run(['c++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
+        run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
         result=subprocess.check_output([generator],cwd=source)
         assert result==(source/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units))

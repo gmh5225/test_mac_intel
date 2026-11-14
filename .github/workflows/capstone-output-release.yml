@@ -1,7 +1,7 @@
-name: Qualify MOV memory-immediate formatting and full detail on current native Capstone in profiles
+name: Qualify shared EVEX row scan in full DIET reduced adapter Windows and macOS configurations
 on:
   push:
-    branches: [codex/capstone-mov-memory-current-profiles]
+    branches: [codex/capstone-evex-register-scan-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mov-memory-current-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: evex-register-scan-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
