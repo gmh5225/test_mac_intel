@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..0e06c605 100644
+index 63dcc538..939b02e0 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -3283,7 +3283,8 @@ CAPSTONE_INTERNAL bool X86_setScanAdapter(csh ud, cs_mode mode,
@@ -148,24 +148,32 @@ index 63dcc538..0e06c605 100644
  			}
  		}
  	}
-@@ -3679,6 +3731,20 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
- 	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
- 		return decodeVexTerminalResultInline(ud, code, code_len, insn,
- 						     result, 0xc5);
+@@ -3675,10 +3727,24 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+ 	if (extension || opcode == 0x62)
+ 		return decodeScanResultFallback(ud, code, code_len, insn,
+ 						result, opcode, extension);
+-	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
+-	    !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
+-		return decodeVexTerminalResultInline(ud, code, code_len, insn,
+-						     result, 0xc5);
++	if (opcode == 0xc5 && opcodeOffset == 0) {
++		if (readerFlags && !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
++			return decodeVexTerminalResultInline(
++				ud, code, code_len, insn, result, 0xc5);
 +#if !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+	/* In 32-bit mode a leading C5 is LDS unless the next two bits are
-+	 * set. An actual VEX2 uses the same W=0 opcode row and an ordinary
-+	 * 32-bit address. Other operand shapes retain the source decoder. */
-+	if (opcodeOffset == 0 && opcode == 0xc5 && handle->mode == CS_MODE_32 &&
-+	    code_len >= 2 && (code[1] & 0xc0) == 0xc0) {
-+		const int status = tryVexTerminalScan(code, code_len, opcode,
-+						      result, CS_MODE_32);
-+		if (status != X86_SCAN_NOT_HANDLED)
-+			return status == X86_SCAN_COMPLETE;
-+		return decodeScanResultGeneric(ud, code, code_len, insn, result,
-+					       opcode, false);
-+	}
++		/* A 32-bit C5 is LDS unless its next two bits are set. The
++		 * VEX2 row then uses ordinary 32-bit address extents. */
++		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
++		    (code[1] & 0xc0) == 0xc0) {
++			const int status = tryVexTerminalScan(
++				code, code_len, opcode, result, CS_MODE_32);
++			if (status != X86_SCAN_NOT_HANDLED)
++				return status == X86_SCAN_COMPLETE;
++			return decodeScanResultGeneric(ud, code, code_len, insn,
++						       result, opcode, false);
++		}
 +#endif
++	}
  
  	unsigned instructionID = 0;
  	/* Constant bitness folds the terminal readers' mode and size tests.
