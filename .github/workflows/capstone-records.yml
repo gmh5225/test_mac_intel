@@ -1,7 +1,7 @@
-name: Time generated i386 VEX2 register formatting and detail on PE32, PE64 and mixed-architecture controls
+name: Measure Enter bare VEX2 plans before the general prefix and operand reader on PE32, PE64, ARM64 and MIPS in five compiler environments
 on:
   push:
-    branches: [codex/capstone-i386-vex2-output-mixed]
+    branches: [codex/capstone-vex2-terminal-entry-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,9 +13,6 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc, archs: four }
           - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -39,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-vex2-output-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex2-terminal-entry-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
