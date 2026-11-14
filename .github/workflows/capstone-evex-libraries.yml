@@ -1,7 +1,7 @@
-name: Select Intel Xeon 8573C before testing the isolated scan inlining hypothesis
+name: Verify the complete output candidate with repaired scan on Intel Xeon 8573C
 on:
   push:
-    branches: [codex/capstone-intel8573-scan-check]
+    branches: [codex/capstone-gcc11-inline-scan-intel]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -64,6 +64,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: intel8573-scan-check-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: gcc11-inline-scan-intel-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

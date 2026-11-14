@@ -62,7 +62,7 @@ def main(w):
             assert {n for n in objects[label]if objects[label][n]!=objects['combined'][n]}=={'arch/X86/X86VectorOutput.c.o'}
         if label=='inlined':
             changed={name for name in objects[label] if objects[label][name]!=objects['combined'][name]}
-            assert changed==({'arch/X86/X86DisassemblerDecoder.c.o'} if os.environ['CC']=='gcc' else set()),changed
+            assert changed==({'arch/X86/'+name+'.c.o' for name in ('X86DisassemblerDecoder','X86OutputIterator','X86VectorOutput','X86ImmediateOutput')}),changed
         save('object-digests.json',objects)
         symbols=sp.check_output(['nm','-n','-S','--defined-only',target],text=True)
         (p/'evidence'/(label+'-symbols.txt')).write_text(symbols)
