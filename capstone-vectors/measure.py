@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1119,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',output='R1115 normalized initial mode',scan='R1119 separated terminal scalar and fallback state'))
+    save('census-variant.json',dict(variant='integer',round=1123,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',scan='R1123 terminal scalar and fallback state separation on release'))
     batch_enabled=os.environ['ENTRY']=='batch'
     save('entrypoints.json',dict(scan=('X86_scanBatch capacity 64 with canonical iterator fallback' if batch_enabled else 'cs_disasm_iter'),format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical entry cost diagnostic; actual NeverD products tested separately'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -51,7 +51,7 @@ def main(w):
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
     iterator_shapes={}
-    for label in ('integer','output','scan'):
+    for label in ('integer','scan'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
         patches=[] if label=='integer' else [r/({'aligned':'alignment.patch','output':'dispatch.patch','isolated':'isolated.patch','scan':'scan.patch'}[label])]
@@ -63,14 +63,10 @@ def main(w):
         if label!='integer':
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
-            expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
-            expected_added={'arch/X86/X86VexOutput32.c.o','arch/X86/X86VexScan.c.o'}
+            expected={'arch/X86/X86DisassemblerDecoder.c.o'}
+            expected_added=set()
             assert changed==expected and added==expected_added,(label,changed,added)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
-        if label=='scan':
-            delta={key for key in objects['output'] if objects['output'][key]!=objects['scan'][key]}
-            assert delta=={'arch/X86/X86DisassemblerDecoder.c.o'},(label,delta)
-            save('controlled-object-delta.json',dict(only_changed=sorted(delta),reference='R1115'))
         for component in ('X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
@@ -133,7 +129,7 @@ def main(w):
             for profile_mode in (0,):
              reference_record=None
              single=list(map(int,sp.check_output([single_exe,'capstone',str(profile_mode),'1',f,intervals,str(bits)],text=True).split()))
-             engines=['capstone','candidate','scan']
+             engines=['capstone','scan']
              for key in engines:
                  args=[str(exe[{'candidate':'output','scan':'scan'}.get(key,'integer')]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
                  observation=list(map(int,sp.check_output(args,text=True).split()))
