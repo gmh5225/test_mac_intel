@@ -72,14 +72,14 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
   for key in ('indexed',):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/X86/X86MemoryOutput.c.o'}
+   expected={'arch/X86/X86Mapping.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-x86.cpp','-ldl','-o',t/'verify-x86'],'build-x86-differential')
    run([t/'verify-x86',ownedlibs['base'],ownedlibs[key]],'x86-differential')
-   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-sib.cpp','-ldl','-o',t/'verify-sib'],'build-sib-differential')
-   run([t/'verify-sib',ownedlibs['base'],ownedlibs[key]],'sib-differential')
+   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-implicit.cpp','-ldl','-o',t/'verify-implicit'],'build-implicit-differential')
+   run([t/'verify-implicit',ownedlibs['base'],ownedlibs[key]],'implicit-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
    run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')

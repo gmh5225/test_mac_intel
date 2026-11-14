@@ -1,7 +1,7 @@
-name: Reuse the existing memory writer for absent-index i386 SIB mixed
+name: Share identical x86 implicit register and group metadata mixed
 on:
   push:
-    branches: [codex/capstone-i386-sib-without-index-mixed]
+    branches: [codex/capstone-x86-shared-implicit-metadata-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: i386-sib-without-index-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: x86-shared-implicit-metadata-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
