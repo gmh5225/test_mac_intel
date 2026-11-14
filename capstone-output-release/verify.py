@@ -25,6 +25,7 @@ try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='6c93c31134d5396095ba4e63db58548317d6f5b9'
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
+    run(['python','suite/synctools/x86_implicit_metadata.py','--check'],'implicit-metadata')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if os.name=='nt':
@@ -33,7 +34,7 @@ try:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]+(['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers'] if compiler=='gcc' else [])
     profile_options={'dedicated':['-DCAPSTONE_ARM_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
     run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
-    units=['api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
+    units=['api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option','x86_mapping_counts']
     if profile not in ('diet','reduced'):
         units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
     if profile=='adapter':units+=['x86_scan_adapter']
@@ -43,7 +44,7 @@ try:
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
-    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['x86_mapping_counts_generator','x86_mapping_counts_validation','x86_implicit_metadata_generator','arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
