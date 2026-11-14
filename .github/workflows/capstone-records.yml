@@ -1,7 +1,7 @@
-name: Verify decoder entry alignment across architectures with actual private x86 output coverage
+name: Separate alignment-only costs from added SSE output across all decoder backends
 on:
   push:
-    branches: [codex/capstone-decoder-alignment-mixed]
+    branches: [codex/capstone-decoder-alignment-factor]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: decoder-entry-alignment-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: decoder-alignment-factor-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

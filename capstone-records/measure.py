@@ -30,7 +30,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   bins={};objects={};libs={};ownedlibs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','indexed'):
+  for key in ('base','aligned','indexed'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':run(['git','apply',variant],'apply-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
@@ -69,25 +69,25 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
     run(['ctest','--test-dir',b,'-R','^unit_(x86_simple_output|x86_scan_batch|x86_encoding_accuracy|detail_option)$','--no-tests=error','--output-on-failure'],'x86-tests')
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify.cpp',*(['-ldl'] if platform.system()=='Linux' else []),'-o',t/'verify'],'build-differential')
-  for key in ('indexed',):
+  for key in ('aligned','indexed'):
    changed=[k for k,h in objects['base'].items() if objects[key][k]!=h]
    active=True
-   expected={'arch/'+a+'/'+a+c+'.c.o' for a in ('ARM','AArch64','Mips') for c in ('Mapping','Disassembler')}|{'arch/X86/X86Disassembler.c.o','arch/X86/X86VectorOutput.c.o'}
+   expected={'arch/'+a+'/'+a+c+'.c.o' for a in ('ARM','AArch64','Mips') for c in ('Mapping','Disassembler')}|{'arch/X86/X86Disassembler.c.o'}|({'arch/X86/X86VectorOutput.c.o'} if key=='indexed' else set())
    assert set(changed)==expected,(changed,expected)
    write('objects-'+key,dict(changed=changed,identical=len(objects['base'])-len(changed)))
    run([t/'verify',libs['base'],libs[key]],'differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-x86.cpp','-ldl','-o',t/'verify-x86'],'build-x86-differential')
-   run([t/'verify-x86',ownedlibs['base'],ownedlibs[key]],'x86-differential')
+   run([t/'verify-x86',ownedlibs['base'],ownedlibs[key]],'x86-differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-vex.cpp','-ldl','-o',t/'verify-vex'],'build-vex-differential')
-   run([t/'verify-vex',ownedlibs['base'],ownedlibs[key]],'vex-differential')
+   run([t/'verify-vex',ownedlibs['base'],ownedlibs[key]],'vex-differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-mips.cpp','-ldl','-o',t/'verify-mips'],'build-mips-differential')
-   run([t/'verify-mips',libs['base'],libs[key]],'mips-differential')
+   run([t/'verify-mips',libs['base'],libs[key]],'mips-differential-'+key)
    run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-a64.cpp','-ldl','-o',t/'verify-a64'],'build-a64-differential')
-   run([t/'verify-a64',libs['base'],libs[key]],'a64-differential')
+   run([t/'verify-a64',libs['base'],libs[key]],'a64-differential-'+key)
   run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-legacy-shifts.cpp','-ldl','-o',t/'verify-legacy-shifts'],'build-legacy-shifts-differential')
   run([t/'verify-legacy-shifts',ownedlibs['base'],ownedlibs['indexed']],'legacy-shifts-differential')
   write('x86-record-entrypoint',dict(entrypoint='X86_disasmIter via test-only export',timed_binaries='built before instrumentation',positive_fast_path_hit_asserted=True))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(3 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
@@ -98,7 +98,7 @@ CAPSTONE_EXPORT bool CAPSTONE_API cs_test_owned_hit(csh h,const uint8_t *code,si
   for x in cases:
    for mode in (0,1,2):
     warm=sample('base',x,mode,2);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-    runs=[];reference=None;keys=['base','indexed','aa']
+    runs=[];reference=None;keys=['base','aligned','indexed','aa']
     for k in range(21):
      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
      for v in seq+seq[::-1]:
