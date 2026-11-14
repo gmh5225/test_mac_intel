@@ -44,9 +44,10 @@ try:
     run(['git','reset','--hard','6c93c31134d5396095ba4e63db58548317d6f5b9'],'reset-oracle')
     run(['git','clean','-fd'],'clean-oracle')
     apply(forms+'.patch','apply')
+    apply('test-bound.patch','test-bound')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree=='5daec3facff22f41c6fdcff7bfaf73827199f58c', tested_tree
+    assert tested_tree=='1dec53adbca9cc5349905941f5d1d76478bb452e', tested_tree
     run(['python','suite/synctools/mips_register_names.py','--check'],'mips-generator')
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
