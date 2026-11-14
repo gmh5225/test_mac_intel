@@ -1111,7 +1111,7 @@ index 7675273f..a79fb177 100644
  static inline char *X86_writeDisp8(char *out, int displacement)
  {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..47d45d16 100644
+index 6df1472d..ebb0dbc6 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -8,6 +8,7 @@
@@ -1122,7 +1122,7 @@ index 6df1472d..47d45d16 100644
  struct PaddingOutput {
  	unsigned id;
  	uint8_t length;
-@@ -19,6 +20,13 @@ struct PaddingOutput {
+@@ -19,17 +20,27 @@ struct PaddingOutput {
  		index, scale;
  };
  
@@ -1136,7 +1136,28 @@ index 6df1472d..47d45d16 100644
  #include "X86GenVectorOutput.inc"
  static char *writeVectorRegister(char *out, unsigned length_code,
  				 unsigned number)
-@@ -37,7 +45,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ {
+-	*out++ = "xyz"[length_code];
+-	*out++ = 'm';
+-	*out++ = 'm';
+-	if (number >= 10)
+-		*out++ = (char)('0' + number / 10);
+-	*out++ = (char)('0' + number % 10);
+-	return out;
++	static const char prefixes[3][4] = { "xmm", "ymm", "zmm" };
++	static const char digits[32][2] = { "0",  "1",	"2",  "3",  "4",  "5",
++					    "6",  "7",	"8",  "9",  "10", "11",
++					    "12", "13", "14", "15", "16", "17",
++					    "18", "19", "20", "21", "22", "23",
++					    "24", "25", "26", "27", "28", "29",
++					    "30", "31" };
++	memcpy(out, prefixes[length_code], 4);
++	memcpy(out + 3, digits[number], 2);
++	return out + 4 + (number >= 10);
+ }
+ 
+ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -37,7 +48,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  				 const struct VectorOutputRow *row,
  				 unsigned prefix, unsigned ll, unsigned rex,
  				 unsigned first_ll, const unsigned *regs,
@@ -1145,7 +1166,7 @@ index 6df1472d..47d45d16 100644
  {
  	const unsigned len = prefix + 2 + row->immediate;
  	*insn_size = insn->size = (uint16_t)len;
-@@ -73,7 +81,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -73,7 +84,7 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  		d->groups_count = row->group_count;
  		cs_x86 *x = &d->x86;
  		memcpy(x->opcode, code, prefix);
@@ -1154,7 +1175,7 @@ index 6df1472d..47d45d16 100644
  		x->rex = (uint8_t)rex;
  		x->modrm = code[prefix + 1];
  		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
-@@ -105,6 +113,39 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -105,6 +116,39 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
  			       uint16_t *insn_size,
  			       const struct X86SimpleRegister *regs);
  
@@ -1194,7 +1215,7 @@ index 6df1472d..47d45d16 100644
  #if defined(_MSC_VER)
  __declspec(noinline)
  #elif defined(__GNUC__)
-@@ -117,15 +158,12 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -117,15 +161,12 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (size >= 6 && code[5] < 0xc0)
  		return writeEvexBroadcast(code, size, insn, insn_size,
  					  address_regs);
@@ -1212,7 +1233,7 @@ index 6df1472d..47d45d16 100644
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
  	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
  					  (~(unsigned)code[1] & 16),
-@@ -135,15 +173,13 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -135,15 +176,13 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
       * the full-width source, and reserve vvvv/V'. */
  	if ((key & ~0x22u) == 0x319) {
@@ -1230,7 +1251,7 @@ index 6df1472d..47d45d16 100644
  }
  
  /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-@@ -465,15 +501,31 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -465,15 +504,31 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
   * Memory forms and unsupported vector widths fall back before any output. */
  static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				   cs_insn *insn, uint16_t *insn_size,
@@ -1263,7 +1284,7 @@ index 6df1472d..47d45d16 100644
  	const unsigned modrm = code[prefix + 1];
  	const unsigned opcode = code[prefix];
  	if (map == 1 && opcode >= 0x71 && opcode <= 0x73) {
-@@ -485,7 +537,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -485,7 +540,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  					  (modrm & 7) | ((rxb & 1) << 3) };
  		return writeVectorRegisters(code, insn, insn_size,
  					    &vex_shift_rows[index], prefix, ll,
@@ -1272,7 +1293,7 @@ index 6df1472d..47d45d16 100644
  	}
  	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
  	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -497,14 +549,120 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -497,14 +552,120 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
  				  (~flags >> 3) & 15,
  				  (modrm & 7) | ((rxb & 1) << 3) };
@@ -1398,7 +1419,7 @@ index 6df1472d..47d45d16 100644
  	if (code[0] == 0x0f || code[0] == 0xf3 ||
  	    (code[0] == 0x66 && size >= 2 &&
  	     (code[1] == 0x90 ||
-@@ -513,6 +671,25 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -513,6 +674,25 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x66)
  		return writeLegacyRegisterOutput(code, size, insn, insn_size,
  						 wide);
@@ -1424,7 +1445,7 @@ index 6df1472d..47d45d16 100644
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
-@@ -520,7 +697,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -520,7 +700,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
