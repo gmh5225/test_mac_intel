@@ -1,7 +1,7 @@
-name: Measure combined VEX32 output-plan and scan ordering
+name: Measure canonical direct 32-bit register output
 on:
   push:
-    branches: [codex/capstone-vex32-plan-output-cost]
+    branches: [codex/capstone-vex32-direct-registers-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-plan-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-direct-registers-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

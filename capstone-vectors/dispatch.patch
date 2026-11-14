@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..8c90ab07 100644
+index 63dcc538..8d983b8a 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -98,11 +98,10 @@ index 63dcc538..8c90ab07 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3367,6 +3368,23 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
- 			return true;
- 		}
+@@ -3378,6 +3379,23 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return status == X86_SCAN_COMPLETE;
+ 		tryExtension = false;
  	}
-+#endif
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
 +	/* A 32-bit C5 is LDS unless the next two bits are set. Keep this
 +	 * additional reader in the existing fallback, outside the iterator. */
@@ -119,11 +118,12 @@ index 63dcc538..8c90ab07 100644
 +			return true;
 +		}
 +	}
- #endif
- 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
- 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
++#endif
+ 	return decodeScanResultGeneric(ud, code, code_len, insn, result, opcode,
+ 				       tryExtension);
+ }
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..38cacf94 100644
+index a976814e..7aeea4a1 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -131,7 +131,7 @@ index a976814e..38cacf94 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
 -			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 0, 65531, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
  			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
@@ -603,32 +603,33 @@ index 00000000..7817a761
 +
 +#endif
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..f247adcb 100644
+index 11e8578a..fd2ad030 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -76,11 +76,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		return false;
- 
- 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
--		if (plan == X86_PLAN_VECTOR)
-+		if (plan == X86_PLAN_VECTOR) {
-+			if (!wide && code[0] == 0xc5)
-+				return X86_writeVex32Output(
-+					code, size, insn, insn_size,
-+					x86_simple_registers[2]);
- 			return X86_writeVectorOutput(code, size, insn,
+@@ -81,6 +81,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  						     insn_size,
  						     x86_simple_registers[3],
  						     wide);
-+		}
++		if (plan == X86_PLAN_VEX32)
++			return X86_writeVex32Output(code, size, insn, insn_size,
++						    x86_simple_registers[2]);
  		unsigned row;
  		const struct X86SimpleRegister *reg = NULL;
  		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..d1c1badf 100644
+index 7675273f..39d27324 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
-@@ -68,6 +68,11 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -51,6 +51,8 @@ enum X86SimpleForm {
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++/* Keep low bits RELATIVE to bypass the legacy register-pair ModR/M reader. */
++#define X86_PLAN_VEX32 (X86_PLAN_VECTOR - 4u)
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
+@@ -68,6 +70,11 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
  		      bool wide);
  
@@ -1069,18 +1070,17 @@ index 48c6fb41..33fbbfa2 100644
      ]
      generated = [(path, generated_output(emit)) for path, emit in outputs]
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..38ae3cc6 100644
+index ccc4f0de..2a342f31 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -621,7 +621,7 @@ int main()
+@@ -621,6 +621,7 @@ int main()
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
--	plans[1][0][0xc5] = X86_PLAN_VECTOR;
-+	plans[0][0][0xc5] = plans[1][0][0xc5] = X86_PLAN_VECTOR;
++	plans[0][0][0xc5] = X86_PLAN_VEX32;
+ 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
  	for (unsigned wide = 0; wide < 2; ++wide) {
  		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
- 			for (unsigned alu = 1; alu < 0x40; alu += 8) {
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
 index 834c2488..3dc1e3e7 100644
 --- a/suite/synctools/x86_vector_output.cpp
