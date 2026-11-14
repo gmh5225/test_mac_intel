@@ -16,7 +16,7 @@ struct API {
  decltype(&cs_errno) error;
  explicit API(const char *file) {
   library=dlopen(file,RTLD_NOW|RTLD_LOCAL);if(!library)throw std::runtime_error(dlerror());
-  open=(decltype(open))dlsym(library,"cs_open");close=(decltype(close))dlsym(library,"cs_close");option=(decltype(option))dlsym(library,"cs_option");iter=(decltype(iter))dlsym(library,"cs_disasm_iter");error=(decltype(error))dlsym(library,"cs_errno");
+  open=(decltype(open))dlsym(library,"cs_open");close=(decltype(close))dlsym(library,"cs_close");option=(decltype(option))dlsym(library,"cs_option");iter=(decltype(iter))dlsym(library,"cs_test_owned_iter");error=(decltype(error))dlsym(library,"cs_errno");
   if(!open||!close||!option||!iter||!error)throw std::runtime_error("missing API");
  }
 };
@@ -56,5 +56,5 @@ int main(int argc,char**argv) {
    compare(x,y,bytes,i%16,detail);
   }
  }
- std::printf("equal public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
+ std::printf("equal private-entry records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
 }

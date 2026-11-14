@@ -16,7 +16,7 @@ struct API {
  decltype(&cs_errno) error;
  explicit API(const char *file) {
   library=dlopen(file,RTLD_NOW|RTLD_LOCAL);if(!library)throw std::runtime_error(dlerror());
-  open=(decltype(open))dlsym(library,"cs_open");close=(decltype(close))dlsym(library,"cs_close");option=(decltype(option))dlsym(library,"cs_option");iter=(decltype(iter))dlsym(library,"cs_disasm_iter");error=(decltype(error))dlsym(library,"cs_errno");
+  open=(decltype(open))dlsym(library,"cs_open");close=(decltype(close))dlsym(library,"cs_close");option=(decltype(option))dlsym(library,"cs_option");iter=(decltype(iter))dlsym(library,"cs_test_owned_iter");error=(decltype(error))dlsym(library,"cs_errno");
   if(!open||!close||!option||!iter||!error)throw std::runtime_error("missing API");
  }
 };
@@ -43,6 +43,17 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
 }
 int main(int argc,char**argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);if(a.iter==b.iter)return 4;
+
+ using Hit=bool(*)(csh,const uint8_t*,size_t,cs_insn*);
+ auto hit=(Hit)dlsym(b.library,"cs_test_owned_hit");
+ if(!hit)throw std::runtime_error("missing owned hit export");
+ {
+  Machine m(b,CS_MODE_64,true,true,false);
+  cs_insn insn{};cs_detail detail{};insn.detail=&detail;
+  const uint8_t bytes[]={0x66,0x0f,0x72,0xf3,0x10};
+  if(!hit(m.handle,bytes,sizeof(bytes),&insn))
+   throw std::runtime_error("candidate fast path was not exercised");
+ }
  for(cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags) {
   bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);uint8_t bytes[15];
   for(unsigned prefix=0;prefix<=(mode==CS_MODE_64?16u:0u);++prefix)for(unsigned op=0x71;op<=0x73;++op)for(unsigned mr=0;mr<256;++mr)for(unsigned value=0;value<256;++value) {
