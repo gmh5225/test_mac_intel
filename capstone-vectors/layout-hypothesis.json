@@ -1,0 +1,10 @@
+{
+  "candidate": "../round1074-vex2-plan-call-boundary",
+  "evidence": "Clang JPEG64 SIMD scan regresses about 3.5% in fixed-image timing despite slightly fewer warmed instructions. GCC11 SSL64 format also loses about 3.9% although only Decoder.o changes.",
+  "change": "No production code change. Freeze all compiler objects and consumer objects; relink the same active object set in 16 predetermined paired orders. Retain the original archive layout as a separate observation and byte-identical A/A in every layout.",
+  "limits": "This samples link order, not all stack or heap layouts, and is not a Stabilizer implementation. It cannot erase default-layout regressions or by itself authorize publication.",
+  "references": [
+    "https://people.cs.umass.edu/~emery/pubs/stabilizer-asplos13.pdf",
+    "https://www2.ccs.neu.edu/racket/Performance/mytkowicz.pdf"
+  ]
+}

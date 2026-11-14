@@ -1,6 +1,7 @@
 """Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
 from pathlib import Path
 import gzip, os, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
+from layout import Layouts
 r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
@@ -38,6 +39,7 @@ def main(w):
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
+    layouts=Layouts(w,p/'evidence',save,run)
     for label in ('integer','aa','scan'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
@@ -58,24 +60,15 @@ def main(w):
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
                 stream.write(assembly)
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
+        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-Wl,-Map='+str(w/('link-'+label+'.map')),'-o',target],'link-'+label);exe[label]=target
+        layouts.capture(label,objroot,w/('link-'+label+'.map'),b/'libcapstone.a',obj,target)
         (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
 
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
-    exe['iced']=exe['fast']=exe['integer']
-    payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['integer']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,purpose='Qualify R1074 original and controlled launches; retain all earlier prototype regressions separately.'))
+    layouts.prepare(w/'owned.o',ad/'target/release/libiced_compare.a')
     run(['git','apply',r/'scan.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -83,10 +76,11 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
+        if name not in ('libjpeg62-turbo-amd64','jpeg-avx2-i386','libssl3t64-amd64','libzstd1-amd64'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name!='jpeg-avx2-i386' else ['simd-functions']):
+        for panel in (['simd-functions'] if name in ('libjpeg62-turbo-amd64','jpeg-avx2-i386') else ['all-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -94,40 +88,11 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                def measure(lib,n,launch):
-                    tail=[lib if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
-                    if launch=='images':
-                        command=[str(exe[lib]),*tail];executable=None
-                    elif launch=='same-argv':
-                        command=[str(image),*tail];executable=str(exe[lib])
-                    else:
-                        with image.open('r+b')as out:
-                            assert out.write(padded[lib])==maximum
-                        assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                        command=[str(image),*tail];executable=None
-                        if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                    return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
-                for i in range(21):
-                    launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                    for launch in launch_order:
-                        order=labels[i%len(labels):]+labels[:i%len(labels)]
-                        obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                        assert all(len(v)==6 for k,v in obs)
-                        assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                        assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1,(name,mode,launch,obs)
-                        cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-                for launch,observations in cycles.items():
-                    md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                    row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=md('iced','scan')
-                    row['vs_fast']=md('fast','scan') if mode else None
-                    reported.append(row)
-                save('measurements.json',reported)
+            mode=1 if name=='libssl3t64-amd64' else 2 if name=='libzstd1-amd64' else 0
+            layouts.measure(name,panel,mode,f,intervals,bits)
             print(name,panel,len(sel),flush=True)
-    save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
+    assert len(layouts.rows)==68
+    save('complete.json',dict(cases=len(layouts.rows),success=True,native_qualification=False,scope='Link-order sensitivity of frozen objects; 16 predetermined permutations plus original archive layout',launches=['same-file-fixed']))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
