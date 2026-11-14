@@ -1,7 +1,7 @@
-name: Measure VEX32 admission before legacy reader attempts
+name: R1108 admit VEX32 only after an initial legacy rejection
 on:
   push:
-    branches: [codex/capstone-vex32-initial-scan-cost]
+    branches: [codex/capstone-vex32-after-legacy-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-initial-scan-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-after-legacy-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

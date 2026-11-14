@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..af3ba9ca 100644
+index 63dcc538..ffd6de20 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -98,16 +98,20 @@ index 63dcc538..af3ba9ca 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3654,10 +3655,27 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3654,10 +3655,28 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_16,
  					       feature64, instructionID, length,
  					       readerFlags);
 -	else
 +	else {
+ 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
+ 					       feature64, instructionID, length,
+ 					       readerFlags);
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+		/* Enter the existing 32-bit arm before the legacy probes. The
-+         * packed scalar result keeps the caller's output addresses local. */
-+		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
++		/* A successful legacy terminal keeps its existing return. Admit
++         * VEX2 only after that reader rejects the header. */
++		if (initial == X86_SCAN_NOT_HANDLED &&
++		    handle->mode == CS_MODE_32 && code_len >= 2 &&
 +		    code[0] == 0xc5 && (code[1] & 0xc0) == 0xc0) {
 +			const uint32_t packed =
 +				X86_readVex32PublicPlan(code, code_len);
@@ -120,9 +124,6 @@ index 63dcc538..af3ba9ca 100644
 +			}
 +		}
 +#endif
- 		initial = tryInitialLegacyScan(code, code_len, CS_MODE_32,
- 					       feature64, instructionID, length,
- 					       readerFlags);
 +	}
  	return initial;
  }
