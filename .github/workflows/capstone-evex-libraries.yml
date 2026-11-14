@@ -1,7 +1,7 @@
-name: Qualify EVEX memory output in libraries
+name: Qualify generated EVEX memory output in an independent compilation unit: libraries
 on:
   push:
-    branches: [codex/capstone-evex-memory-output-libraries]
+    branches: [codex/capstone-evex-memory-module-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-memory-output-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-memory-module-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
