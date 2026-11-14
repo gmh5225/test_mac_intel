@@ -1,7 +1,7 @@
-name: Validate combined native scan, formatting and full detail changes in libraries
+name: Qualify SSE immediate shift output in libraries
 on:
   push:
-    branches: [codex/capstone-native-combined-boundary-libraries]
+    branches: [codex/capstone-legacy-vector-shifts-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-combined-boundary-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: legacy-vector-shifts-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
