@@ -1,0 +1,26 @@
+{
+  "target": "arm64e-apple-macos15",
+  "optimizations": [
+    "-O0",
+    "-O2"
+  ],
+  "fixtures": [
+    {
+      "file": "fn.c",
+      "source": "typedef unsigned long long word; __attribute__((noinline)) word target(word x){return x+1;} word (*const slot)(word)=target; word apply(word(*fn)(word),word x){return fn(x);} void *auth(void *p){return __builtin_ptrauth_auth(p,0,0);}",
+      "markers": [
+        "_target@AUTH(ia,0)",
+        "autiza"
+      ]
+    },
+    {
+      "file": "class.m",
+      "source": "__attribute__((objc_root_class)) @interface ArmMetadata -(int)increment:(int)v; @end @implementation ArmMetadata -(int)increment:(int)v{return v+1;} @end",
+      "markers": [
+        "__OBJC_CLASS_RO_$_ArmMetadata@AUTH(da,25080,addr)",
+        "__OBJC_METACLASS_RO_$_ArmMetadata@AUTH(da,25080,addr)",
+        "-[ArmMetadata increment:]\"@AUTH(ia,0,addr)"
+      ]
+    }
+  ]
+}
