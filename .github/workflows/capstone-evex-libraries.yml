@@ -1,7 +1,7 @@
-name: R1115 profile canonical mode reuse in initial VEX32 admission
+name: R1117 measure the SIB byte inlining regression in single and batch scans
 on:
   push:
-    branches: [codex/capstone-vex32-normalized-mode-cost]
+    branches: [codex/capstone-vex32-sib-byte-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -44,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-normalized-mode-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-sib-byte-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

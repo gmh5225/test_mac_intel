@@ -87,7 +87,7 @@ index 44471169..fbef9f97 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..10ac019b 100644
+index 63dcc538..a8f9c4f0 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -98,7 +98,24 @@ index 63dcc538..10ac019b 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3092,12 +3093,33 @@ enum { X86_SCAN_NOT_HANDLED = 3 };
+@@ -261,6 +262,7 @@ static void unconsumeByte(struct InternalInstruction *insn)
+  *                  be populated with the data read.
+  * @return        - See consumeByte().
+  */
++CONSUME_FUNC(consumeUInt8, uint8_t)
+ CONSUME_FUNC(consumeInt8, int8_t)
+ CONSUME_FUNC(consumeInt16, int16_t)
+ CONSUME_FUNC(consumeInt32, int32_t)
+@@ -1674,7 +1676,7 @@ X86_DECODE_INLINE int readSIB(struct InternalInstruction *insn,
+ 		break;
+ 	}
+ 
+-	if (consumeByte(insn, &insn->sib))
++	if (consumeUInt8(insn, &insn->sib))
+ 		return -1;
+ 
+ 	if (materialize) {
+@@ -3092,12 +3094,33 @@ enum { X86_SCAN_NOT_HANDLED = 3 };
  
  /* Only the compact readers see this state. Generic/raw decoding starts its
   * own state if the generated table has no terminal for this header. */
@@ -133,7 +150,7 @@ index 63dcc538..10ac019b 100644
  {
  	if (opcodeOffset >= 2)
  		return X86_SCAN_NOT_HANDLED;
-@@ -3107,8 +3129,16 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
+@@ -3107,8 +3130,16 @@ X86_DECODE_INLINE int trySimpleLegacyScan(const uint8_t *code, size_t codeSize,
  		FEATURE_LEGACY_PREFIX | FEATURE_ESCAPE | FEATURE_VEX2_XOP |
  		(insn.mode == MODE_64BIT ? FEATURE_REX_PREFIX : 0);
  	if ((feature_prefix_flags[opcode] & prefixMask) ||
@@ -151,7 +168,7 @@ index 63dcc538..10ac019b 100644
  	readSimpleLegacyPrefix(&insn, opcodeOffset);
  	int opcodeResult = readOpcode(&insn, true, true);
  	if (opcodeResult)
-@@ -3249,7 +3279,7 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
+@@ -3249,7 +3280,7 @@ bool X86_getInstructionScan(csh ud, const uint8_t *code, size_t code_len,
  	unsigned instructionID;
  	int terminal = trySimpleLegacyScan(code, code_len, handle->mode, opcode,
  					   opcodeOffset, &instructionID, size,
@@ -160,7 +177,7 @@ index 63dcc538..10ac019b 100644
  	if (terminal != X86_SCAN_NOT_HANDLED) {
  		if (terminal != X86_SCAN_COMPLETE)
  			return false;
-@@ -3521,7 +3551,8 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
+@@ -3521,7 +3552,8 @@ decodeVexTerminalResult(csh ud, const uint8_t *code, size_t code_len,
  X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  						size_t size, cs_mode mode,
  						uint8_t opcode, unsigned offset,
@@ -170,7 +187,7 @@ index 63dcc538..10ac019b 100644
  {
  	const bool wide = mode == CS_MODE_64;
  	const uint8_t rex = offset ? code[0] : 0;
-@@ -3529,8 +3560,14 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+@@ -3529,8 +3561,14 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  				  FEATURE_VEX2_XOP |
  				  (wide ? FEATURE_REX_PREFIX : 0);
  	if ((feature_prefix_flags[opcode] & rejected) ||
@@ -186,7 +203,7 @@ index 63dcc538..10ac019b 100644
  	bool escaped = opcode == 0x0f;
  	unsigned end = offset + 1;
  	if (escaped) {
-@@ -3609,7 +3646,8 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
+@@ -3609,7 +3647,8 @@ X86_DECODE_INLINE int scanInitialPublicTerminal(const uint8_t *code,
  X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
  					   cs_mode mode, bool feature64,
  					   unsigned *instructionID,
@@ -196,7 +213,7 @@ index 63dcc538..10ac019b 100644
  {
  	if (!code_len || (mode == CS_MODE_64) != feature64)
  		return X86_SCAN_NOT_HANDLED;
-@@ -3633,10 +3671,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
+@@ -3633,10 +3672,12 @@ X86_DECODE_INLINE int tryInitialLegacyScan(const uint8_t *code, size_t code_len,
  	if (readerFlags)
  		return scanInitialPublicTerminal(code, code_len, mode, opcode,
  						 (unsigned)offset,
@@ -211,7 +228,7 @@ index 63dcc538..10ac019b 100644
  }
  
  X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
-@@ -3649,15 +3689,15 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
+@@ -3649,15 +3690,15 @@ X86_DECODE_INLINE int tryInitialScanResult(cs_struct *handle,
  	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
  		initial = tryInitialLegacyScan(code, code_len, CS_MODE_64,
  					       feature64, instructionID, length,
@@ -230,7 +247,7 @@ index 63dcc538..10ac019b 100644
  	return initial;
  }
  
-@@ -3687,18 +3727,18 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3687,18 +3728,18 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  	if (!(handle->mode & (CS_MODE_16 | CS_MODE_32)))
  		status = trySimpleLegacyScan(code, code_len, CS_MODE_64, opcode,
  					     opcodeOffset, &instructionID,

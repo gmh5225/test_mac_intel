@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1115,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',output='R1113 prefix rejection with live exact mode',scan='R1115 normalized initial mode with constant admission marker'))
+    save('census-variant.json',dict(variant='integer',round=1117,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',output='R1115 normalized initial mode',scan='R1117 keep SIB byte consumption inline using the existing bounded reader'))
     batch_enabled=os.environ['ENTRY']=='batch'
     save('entrypoints.json',dict(scan=('X86_scanBatch capacity 64 with canonical iterator fallback' if batch_enabled else 'cs_disasm_iter'),format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical entry cost diagnostic; actual NeverD products tested separately'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
@@ -70,7 +70,7 @@ def main(w):
         if label=='scan':
             delta={key for key in objects['output'] if objects['output'][key]!=objects['scan'][key]}
             assert delta=={'arch/X86/X86DisassemblerDecoder.c.o'},(label,delta)
-            save('controlled-object-delta.json',dict(only_changed=sorted(delta),reference='R1113'))
+            save('controlled-object-delta.json',dict(only_changed=sorted(delta),reference='R1115'))
         for component in ('X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
