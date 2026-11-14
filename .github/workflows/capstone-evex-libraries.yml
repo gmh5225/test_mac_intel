@@ -1,7 +1,7 @@
-name: Isolate GCC AArch64-host scan fallback effects on common PE64 and SIMD in libraries
+name: Select VEX2 plans early in the outlined ARM-host GCC fallback in libraries
 on:
   push:
-    branches: [codex/capstone-arm-gcc-scan-boundary-libraries]
+    branches: [codex/capstone-arm-vex-early-selection-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -37,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-gcc-scan-boundary-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: arm-vex-early-selection-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
