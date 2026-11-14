@@ -26,7 +26,7 @@ try:
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['git','add','-u'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree=='26882746ed4a898ae18a15b419d95ef9939c99b5',tested_tree
+    assert tested_tree=='adde98f416e4cbd6d9a30a19c5a2ffc4b4c3d3d7',tested_tree
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
