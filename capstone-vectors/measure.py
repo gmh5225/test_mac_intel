@@ -61,7 +61,8 @@ def main(w):
         if label!='integer':
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
-            expected={'arch/X86/X86VectorOutput.c.o','arch/X86/X86OutputIterator.c.o'}
+            expected={'arch/X86/X86VectorOutput.c.o','arch/X86/X86OutputIterator.c.o',
+                      'arch/X86/X86MemoryOutput.c.o','arch/X86/X86ImmediateOutput.c.o'}
             expected_added=set()
             assert changed==expected and added==expected_added,(label,changed,added)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
