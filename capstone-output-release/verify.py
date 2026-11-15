@@ -22,11 +22,11 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='defa77a3b8395499e6dfc991808ed8d1c8d83df1'
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree=='856019d1798f4d08cb6fcb9abedb51d8d523bb4a',tested_tree
+    assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
