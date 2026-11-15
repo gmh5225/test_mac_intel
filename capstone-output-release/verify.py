@@ -48,6 +48,7 @@ try:
     if profile=='alias-only':units=['mapping','api','mips_scan','aarch64_scan','aarch64_postprocess']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    assert 'runtime error:'not in(evidence/'tests.log').read_text()
     if profile=='all':
         run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
         run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_'],'all-unit-tests')
