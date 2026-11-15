@@ -7,6 +7,7 @@ import shutil
 import subprocess as sp
 import tempfile
 import corpus
+import layout
 
 r = Path(__file__).resolve().parent
 source = r.parent / 'source'
@@ -19,76 +20,105 @@ def save(name, value):
 
 
 def run(args, label):
-    with (evidence / (label + '.log')).open('wb') as log:
-        sp.run(list(map(str, args)), cwd=source, stdout=log,
-               stderr=sp.STDOUT, check=True)
+    print(label, flush=True)
+    with (evidence / (label + '.log')).open('wb') as out:
+        sp.run(list(map(str, args)), cwd=source, stdout=out, stderr=sp.STDOUT, check=True)
 
 
-w = Path(tempfile.mkdtemp(prefix='capstone-cross-architecture-cost-'))
+work = Path(tempfile.mkdtemp(prefix='capstone-tie-layout-'))
 try:
     inputs = json.loads((r / 'inputs.json').read_text())
-    assert sp.check_output(['git', '-C', source, 'rev-parse', 'HEAD'],
-                           text=True).strip() == inputs['capstone']
+    meta = inputs['candidate']
+    assert sp.check_output(['git', '-C', source, 'rev-parse', 'HEAD'], text=True).strip() == meta['parent']
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
+    assert layout.sha(r / 'candidate.patch') == meta['sha256']
     cc = os.environ['MEASURE_CC']
     save('inputs.json', inputs)
     save('cpu.json', dict(cpu=Path('/proc/cpuinfo').read_text(),
-                          compiler=sp.check_output([cc, '--version'], text=True)))
-    build = w / 'build'
-    run(['cmake', '-S', source, '-B', build, '-G', 'Ninja',
-         '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER=' + cc,
+                         compiler=sp.check_output([cc, '--version'], text=True)))
+    cases = [case for case in corpus.prepare(r, work, evidence, run)
+             if case['name'] in ('mips64el-ls', 'ppc64el-cp', 'loong64-ls')]
+    assert len(cases) == 3
+    consumer = work / 'consumer.o'
+    run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source, '-I', source / 'include',
+         '-c', r / 'single.cpp', '-o', consumer], 'consumer')
+    build = work / 'build'
+    run(['cmake', '-S', source, '-B', build, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
+         '-DCMAKE_C_COMPILER=' + cc,
          '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer ' +
-         ('-Wno-error=discarded-qualifiers' if cc == 'gcc' else
-          '-Wno-error=incompatible-pointer-types-discards-qualifiers'),
+         ('-Wno-error=discarded-qualifiers' if cc == 'gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),
          '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
-         *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in
-           ['X86', 'ARM', 'AARCH64', 'MIPS']],
+         *['-DCAPSTONE_' + name + '_SUPPORT=ON' for name in ('X86', 'ARM', 'AARCH64', 'MIPS', 'PPC', 'RISCV', 'LOONGARCH', 'ARC')],
          '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
          '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'], 'configure')
-    run(['cmake', '--build', build, '--target', 'capstone_static',
-         '--parallel', '4'], 'build')
-    exe = w / 'probe'
-    run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
-         '-I', source / 'include', r / 'single.cpp', build / 'libcapstone.a',
-         '-lm', '-o', exe], 'link')
-    with gzip.open(evidence / 'integer-linked-assembly.gz', 'wb') as out:
-        out.write(sp.check_output(['objdump', '-dr', exe]))
-    (evidence / 'integer-symbols.txt').write_bytes(
-        sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
-    cases = corpus.prepare(r, w, evidence, run)
-    assert len(cases) == 3
-    costs = []
-    for case in cases:
-        for mode in range(3):
-            name = case['name'] + '-' + str(mode) + '-capstone'
-            args = [str(exe), str(case['selector']), str(mode), case['path'], '1']
-            native = json.loads(sp.check_output(args, text=True))
-            raw = w / (name + '.callgrind')
-            run(['valgrind', '--tool=callgrind', '--cache-sim=yes',
-                 '--branch-sim=yes', '--dump-instr=yes', '--collect-jumps=yes',
-                 '--collect-atstart=no', '--callgrind-out-file=' + str(raw),
-                 *args], 'profile-' + name)
-            log = (evidence / ('profile-' + name + '.log')).read_text()
-            observed = [json.loads(line) for line in log.splitlines()
-                        if line.startswith('{') and '"first"' in line]
-            assert len(observed) == 1
-            assert observed[0]['first'] == native['first']
-            assert observed[0]['result'] == native['result']
-            payload = raw.read_bytes()
-            with gzip.open(evidence / (name + '.callgrind.gz'), 'wb') as out:
-                out.write(payload)
-            costs.append(dict(case=case['name'], mode=mode, variant='capstone',
-                              instructions=native['first']['instructions'],
-                              rejected=native['first']['rejected'],
-                              signature=native['first'], captured_passes=1,
-                              raw_sha256=hashlib.sha256(payload).hexdigest()))
-            save('instruction-costs.json', costs)
-            raw.unlink()
-    assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
-    save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=True, native_qualification=False))
+    captured, bins, objects = {}, dict(original={}, isolated={}), {}
+    for variant in ('integer', 'scan'):
+        run(['git', 'reset', '--hard', meta['parent']], 'reset-' + variant)
+        if variant == 'scan':
+            run(['git', 'apply', '--index', r / 'candidate.patch'], 'apply')
+            assert sp.check_output(['git', '-C', source, 'write-tree'], text=True).strip() == meta['tree']
+        for placement in ('original', 'isolated'):
+            if placement == 'isolated':
+                file = source / 'Mapping.c'
+                text = file.read_text()
+                anchor = 'const cs_ac_type mapping_get_op_access('
+                assert text.count(anchor) == 1
+                text = text.replace(anchor,
+                    '__attribute__((section("' + layout.SECTION + '")))\n' + anchor)
+                file.write_text(text)
+                save('diagnostic-source-' + variant + '.json', dict(
+                    only_added_attribute=True, mapping_sha256=layout.sha(file),
+                    source_diff=sp.check_output(['git', '-C', source, 'diff', '--', 'Mapping.c'], text=True)))
+            label = placement + '-' + variant
+            run(['cmake', '--build', build, '--target', 'capstone_static', '--parallel', '4'], 'build-' + label)
+            root = build / 'CMakeFiles/capstone.dir'
+            objects[label] = {str(p.relative_to(root)): layout.sha(p) for p in root.rglob('*.o')}
+            executable, linkmap = work / label, work / (label + '.map')
+            run(['clang++', consumer, build / 'libcapstone.a', '-lm', '-Wl,-Map=' + str(linkmap),
+                 '-o', executable], 'link-' + label)
+            captured[label] = layout.freeze_objects(root, build / 'libcapstone.a', linkmap,
+                                                    work / ('objects-' + label))
+            bins[placement][variant] = executable
+    base = objects['original-integer']
+    for label, hashes in objects.items():
+        assert hashes.keys() == base.keys()
+        differences = [name for name in base if base[name] != hashes[name]]
+        assert set(differences) <= {'Mapping.c.o'}, (label, differences)
+    save('object-controls.json', objects)
+    names = {tuple(p.name for p in paths) for paths in captured.values()}
+    assert len(names) == 1
+    isolated = {variant: next(p for p in captured['isolated-' + variant] if p.name == 'Mapping.c.o')
+                for variant in ('integer', 'scan')}
+    # Moving the sole changed function must leave the remaining instruction body identical.
+    assert layout.section_bytes(isolated['integer'], '.text') == layout.section_bytes(isolated['scan'], '.text')
+    capacity = (max(len(layout.section_bytes(p, layout.SECTION)) for p in isolated.values()) + 63) // 64 * 64
+    pads = {}
+    for variant, obj in isolated.items():
+        padded = work / ('padded-' + variant + '.o')
+        pads[variant] = layout.pad(obj, padded, capacity, work)
+        paths = [padded if p.name == 'Mapping.c.o' else p for p in captured['isolated-' + variant]]
+        target = work / ('controlled-' + variant)
+        run(['clang++', consumer, *paths, '-lm', '-o', target], 'link-controlled-' + variant)
+        bins['isolated'][variant] = target
+    save('padding.json', pads)
+    controls = {name: layout.compare_addresses(pair['integer'], pair['scan']) for name, pair in bins.items()}
+    save('address-controls.json', controls)
+    for placement, pair in bins.items():
+        for variant, target in pair.items():
+            (evidence / (placement + '-' + variant + '-symbols.txt')).write_bytes(
+                sp.check_output(['nm', '-S', '-n', '--defined-only', target]))
+            with gzip.open(evidence / (placement + '-' + variant + '-assembly.gz'), 'wb') as out:
+                out.write(sp.check_output(['objdump', '-dr', target]))
+    # Record imperfect isolation rather than silently claiming it is complete.
+    os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
+    rows = layout.measure(work, bins, cases, save)
+    assert len(rows) == 18
+    save('complete.json', dict(success=True, observations=len(rows), diagnostic_only=True,
+                               address_isolation=controls['isolated']['all_common_addresses_equal']))
 finally:
-    files = [f for f in w.rglob('*') if f.is_file()]
-    size = sum(f.stat().st_size for f in files)
-    shutil.rmtree(w)
-    save('cleanup.json', dict(removed=not w.exists(), bytes=size, files=len(files)))
+    sp.run(['git', '-C', source, 'reset', '--hard', json.loads((r / 'tree.json').read_text())['parent']],
+           stdout=sp.DEVNULL, check=True)
+    files = [p for p in work.rglob('*') if p.is_file()]
+    size = sum(p.stat().st_size for p in files)
+    shutil.rmtree(work)
+    save('cleanup.json', dict(removed=not work.exists(), files=len(files), bytes=size))
