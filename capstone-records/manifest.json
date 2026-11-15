@@ -1,7 +1,5 @@
 {
-  "capstone_revision": "729680277dd762704ea3270291b7a75318f51583",
-  "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
-  "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
+  "description": "Digest-pinned real ELF sections for seven non-x86 ISAs. No downloaded binary is executed.",
   "inputs": [
     {
       "name": "arm-cp",
@@ -29,7 +27,43 @@
       "kind": "deb",
       "command": "ls",
       "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
+    },
+    {
+      "name": "ppc64el-cp",
+      "selector": 3,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_ppc64el.deb",
+      "package_sha256": "e957dbba78571202de4302b94b977157d461c772f1710be8502e2ef920d7c124",
+      "kind": "deb",
+      "command": "cp",
+      "text_sha256": "2d343f9f02856a0fdc78d59701931dc3f50dce1a474b10c3440a703aee601c61"
+    },
+    {
+      "name": "riscv64-ls",
+      "selector": 2,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_riscv64.deb",
+      "package_sha256": "47b00d78d09c7921296f1b849cd04e5cdda7fd948abf17d8659efb906ac386d7",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "59520508376e30943d11d74866cd5b57c323aa8161f665b61862c19d32e1f487"
+    },
+    {
+      "name": "arc-ld-linux-arc",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/ld-linux-arc.so.2",
+      "text_sha256": "a863c07ded182d06db715a130cc348a858a1bc4b9a339aaee9f20c53b23bb46b"
+    },
+    {
+      "name": "loong64-ls",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
+      "kind": "deb",
+      "command": "ls",
+      "text_sha256": "79aee1454bea976cd0a7216849ce9852efabe3dbb7aaea15f2ddc8bb92eb3e7b"
     }
   ],
-  "x86_record_entrypoint": "X86_disasmIter; test-only exported wrapper, no wrapper in timed executables"
+  "capstone_revision": "317554d9bf62816db653124a16b23c17d3b3388b"
 }
