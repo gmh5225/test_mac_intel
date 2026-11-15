@@ -1,24 +1,19 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..3fa5ce26 100644
+index 63dcc538..2c0047d8 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -533,10 +533,13 @@ X86_DECODE_INLINE PrefixReadStatus readPrefixes(struct InternalInstruction *insn
- 		return readSimpleLegacyPrefix(insn, offset);
- 	}
- 
-+	const size_t prefixLimit = insn->codeSize < X86_MAX_INSTRUCTION_LENGTH ?
-+					   insn->codeSize :
-+					   X86_MAX_INSTRUCTION_LENGTH;
- 	while (isPrefix) {
--		/* If we fail reading prefixes, just stop here and let the opcode reader deal with it */
--		if (consumeByte(insn, &byte))
-+		if (insn->readerCursor >= prefixLimit)
- 			return PREFIX_READ_INVALID;
-+		byte = insn->code[insn->readerCursor++];
- 
- 		if (insn->readerCursor == 1 && (byte == 0xf2 || byte == 0xf3)) {
- 			// prefix requires next byte
-@@ -2933,7 +2936,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+@@ -2883,7 +2883,9 @@ initializeInstructionHeader(struct InternalInstruction *insn,
+ 			    const uint8_t *code, size_t codeSize, cs_mode mode)
+ {
+ 	insn->code = code;
+-	insn->codeSize = codeSize;
++	insn->codeSize = codeSize < X86_MAX_INSTRUCTION_LENGTH ?
++				 codeSize :
++				 X86_MAX_INSTRUCTION_LENGTH;
+ 	insn->readerCursor = 0;
+ 	if (x86_has_feature(mode, CS_MODE_16))
+ 		insn->mode = MODE_16BIT;
+@@ -2933,7 +2935,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	insn->length = insn->readerCursor;
  
  	// instruction length must be <= 15 to be valid
@@ -27,12 +22,12 @@ index 63dcc538..3fa5ce26 100644
  		return -1;
  
  	if (insn->operandSize == 0)
-@@ -3157,8 +3160,11 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+@@ -3156,9 +3158,11 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 	InternalInstruction insn = { 0 };
  	/* Retain the decoder's bitness priority for mixed mode flags. */
  	initializeInstructionHeader(&insn, code, code_len, mode);
++	code_len = insn.codeSize;
  	size_t offset = 0;
-+	if (insn.mode == MODE_16BIT && code_len > X86_MAX_INSTRUCTION_LENGTH)
-+		code_len = X86_MAX_INSTRUCTION_LENGTH;
  	/* Keep the 16-bit size-prefix loop small; other prefixes use the full reader. */
 -	while (offset < code_len && (insn.mode == MODE_16BIT || offset < 15)) {
 +	while (offset < code_len && (insn.mode == MODE_16BIT ||
@@ -40,7 +35,7 @@ index 63dcc538..3fa5ce26 100644
  		if (code[offset] == 0x66)
  			setOperandSizePrefix(&insn);
  		else if (code[offset] == 0x67)
-@@ -3175,7 +3181,7 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+@@ -3175,7 +3179,7 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
  		++offset;
  	}
  	if (!offset || offset == code_len ||
@@ -50,7 +45,7 @@ index 63dcc538..3fa5ce26 100644
  	const uint8_t opcode = code[offset];
  	if ((feature_prefix_flags[opcode] &
 diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 28ae2a67..0fb97afa 100644
+index 28ae2a67..636da661 100644
 --- a/arch/X86/X86FeatureExtension.h
 +++ b/arch/X86/X86FeatureExtension.h
 @@ -4,6 +4,9 @@
@@ -72,22 +67,16 @@ index 28ae2a67..0fb97afa 100644
  static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
  						     size_t code_len,
  						     bool is_64_bit,
-@@ -266,11 +269,14 @@ static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
+@@ -266,6 +269,9 @@ static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
  	const uint8_t prefix_mask = FEATURE_LEGACY_PREFIX |
  				    (is_64_bit ? FEATURE_REX_PREFIX : 0);
  	size_t offset = 0;
-+	const size_t prefix_limit = code_len < X86_MAX_INSTRUCTION_LENGTH ?
-+					    code_len :
-+					    X86_MAX_INSTRUCTION_LENGTH;
++	code_len = code_len < X86_MAX_INSTRUCTION_LENGTH ?
++			   code_len :
++			   X86_MAX_INSTRUCTION_LENGTH;
  
  	*opcode = 0;
  	if (opcodeOffset)
- 		*opcodeOffset = SIZE_MAX;
--	while (offset < code_len) {
-+	while (offset < prefix_limit) {
- 		uint8_t byte = code[offset];
- 		uint8_t flags = feature_prefix_flags[byte];
- 		++offset;
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index f1c3ab76..32600e11 100644
 --- a/tests/unit/CMakeLists.txt

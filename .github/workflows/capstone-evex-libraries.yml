@@ -1,7 +1,7 @@
-name: Measure merged X86 prefix read cost
+name: Measure shared X86 instruction window cost
 on:
   push:
-    branches: [codex/capstone-merged-prefix-read-cost]
+    branches: [codex/capstone-single-prefix-window-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: merged-prefix-read-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: single-prefix-window-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
