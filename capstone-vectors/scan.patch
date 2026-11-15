@@ -1,17 +1,38 @@
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..2d747235 100644
+index 11e8578a..90b473f8 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -35,9 +35,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size <= lead)
- 		return false;
- 	const uint8_t opcode = code[lead];
--	const unsigned prefix_class = escaped ? 3 :
--				      has_rex ? ((rex & 8) ? 2 : 1) :
--						0;
-+	const unsigned prefix_class = (unsigned)has_rex +
-+				      ((unsigned)has_rex & (code[0] >> 3)) +
-+				      3u * escaped;
- 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
- 	if (!plan)
- 		return false;
+@@ -28,6 +28,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			 cs_insn *insn, uint16_t *insn_size)
+ {
+ 	const bool wide = handle->mode == CS_MODE_64;
++	if ((!wide && handle->mode != CS_MODE_32) || handle->no_text ||
++	    handle->imm_unsigned || handle->mnem_list || handle->doing_mem ||
++	    (handle->syntax != CS_OPT_SYNTAX_INTEL &&
++	     handle->syntax != CS_OPT_SYNTAX_DEFAULT) ||
++	    handle->disasm != X86_getInstruction ||
++	    handle->insn_id != X86_get_insn_id ||
++	    handle->printer != X86_Intel_printInst ||
++	    handle->post_printer != X86_postprinter ||
++	    cs_vsnprintf != cs_default_vsnprintf)
++		return false;
+ 	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
+ 	const uint8_t rex = has_rex ? code[0] : 0;
+ 	const bool escaped = code[0] == 0x0f;
+@@ -64,16 +74,6 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
+-	if ((!wide && handle->mode != CS_MODE_32) || handle->no_text ||
+-	    handle->imm_unsigned || handle->mnem_list || handle->doing_mem ||
+-	    (handle->syntax != CS_OPT_SYNTAX_INTEL &&
+-	     handle->syntax != CS_OPT_SYNTAX_DEFAULT) ||
+-	    handle->disasm != X86_getInstruction ||
+-	    handle->insn_id != X86_get_insn_id ||
+-	    handle->printer != X86_Intel_printInst ||
+-	    handle->post_printer != X86_postprinter ||
+-	    cs_vsnprintf != cs_default_vsnprintf)
+-		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
+ 		if (plan == X86_PLAN_VECTOR)
