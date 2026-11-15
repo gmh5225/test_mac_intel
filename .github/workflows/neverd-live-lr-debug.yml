@@ -13,10 +13,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - id: source
+        run: python3 -c 'import json; print("revision=" + json.load(open("neverd-live-lr-debug/Debug.def"))["revision"])' >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/NeverD
-          ref: 88ae2ce19389dd72cf4df6f381f3f98052403ee0
+          ref: ${{ steps.source.outputs.revision }}
           path: neverd
           persist-credentials: false
           sparse-checkout: |

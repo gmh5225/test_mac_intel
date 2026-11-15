@@ -27,6 +27,13 @@ assert run("write-rules",[out/"writer",out/"rules"])==0
 assert run("compile-scope",["/usr/bin/clang++","-target",p["target"],"-O0","-DNEVERD_LIVE_LR","-dynamiclib",out/"scope.S","-o",out/"scope.dylib"])==0
 assert run("compile-driver",cc+["-DNEVERD_NONCALL_SCOPE",out/"driver.cpp","-o",out/"driver"])==0
 run("delivery",[out/"driver",out/"scope.dylib",out/"rules","0","0","1"])
+control=driver
+for old,new in p["control_replacements"]:
+ assert control.count(old)==1,(old,control.count(old))
+ control=control.replace(old,new)
+(out/"control.cpp").write_text(control)
+assert run("compile-control",cc+["-DNEVERD_NONCALL_SCOPE",out/"control.cpp","-o",out/"control"])==0
+run("delivery-control",[out/"control",out/"scope.dylib",out/"rules","0","0","1"])
 run("disassembly",["/usr/bin/otool","-tvV",out/"scope.dylib"])
-for name in ["writer","scope.dylib","driver"]:
+for name in ["writer","scope.dylib","driver","control"]:
  f=out/name;(out/(name+".sha256")).write_text(hashlib.sha256(f.read_bytes()).hexdigest());f.unlink()
