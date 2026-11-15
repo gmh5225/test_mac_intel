@@ -1,17 +1,23 @@
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..2d747235 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -35,9 +35,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size <= lead)
- 		return false;
- 	const uint8_t opcode = code[lead];
--	const unsigned prefix_class = escaped ? 3 :
--				      has_rex ? ((rex & 8) ? 2 : 1) :
--						0;
-+	const unsigned prefix_class = (unsigned)has_rex +
-+				      ((unsigned)has_rex & (code[0] >> 3)) +
-+				      3u * escaped;
- 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
- 	if (!plan)
- 		return false;
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..6029c9d3 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -83,10 +83,15 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		for (unsigned n = 0; n != reg_count; ++n) {
+ 			cs_x86_op *op = &x->operands[n];
+ 			op->type = X86_OP_REG;
+-			const unsigned width = n == 0 ? first_ll : ll;
+-			op->reg = (x86_reg)(bases[width] + regs[n]);
++			op->reg = (x86_reg)(bases[ll] + regs[n]);
+ 			op->access = (cs_ac_type)row->access[n];
+-			op->size = (uint8_t)(16 << width);
++			op->size = (uint8_t)(16 << ll);
++		}
++		/* Extract rows can give the destination a narrower width. */
++		if (first_ll != ll) {
++			x->operands[0].reg =
++				(x86_reg)(bases[first_ll] + regs[0]);
++			x->operands[0].size = (uint8_t)(16 << first_ll);
+ 		}
+ 		if (row->immediate) {
+ 			x->operands[reg_count].type = X86_OP_IMM;
