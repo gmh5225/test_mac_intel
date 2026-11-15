@@ -1,7 +1,7 @@
-name: Qualify merged X86 prefix read profiles
+name: Qualify inlined X86 prefix budget profiles
 on:
   push:
-    branches: [codex/capstone-merged-prefix-read-profiles]
+    branches: [codex/capstone-inline-prefix-budget-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -53,6 +53,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: merged-prefix-read-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: inline-prefix-budget-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
