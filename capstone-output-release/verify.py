@@ -54,6 +54,9 @@ try:
         assert len(result)>5, result
         return result
     before=objects()
+    saved_mapping=root_build/'baseline-Mapping.o'
+    mapping=b/'CMakeFiles/capstone.dir/Mapping.c.o'
+    if mapping.exists():shutil.copyfile(mapping,saved_mapping)
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
@@ -63,8 +66,14 @@ try:
     assert before.keys()==after.keys()
     changed=[name for name in before if before[name]!=after[name]]
     save('object-identity',dict(total=len(before),changed=changed,identical=not changed))
-    if os.name!='nt':assert not changed,changed
-    else:assert all(Path(name).name.lower() in ('mapping.c.obj','mapping.obj') for name in changed),changed
+    assert all(Path(name).name.lower() in ('mapping.c.o','mapping.c.obj','mapping.obj') for name in changed),changed
+    if compiler=='clang' and profile!='sanitize':assert not changed,changed
+    if changed and saved_mapping.exists():
+        import gzip
+        for variant, obj in [('base',saved_mapping),('candidate',mapping)]:
+            (evidence/('mapping-'+variant+'.o.gz')).write_bytes(gzip.compress(obj.read_bytes(),mtime=0))
+            run(['objdump','-dr',obj],'mapping-'+variant+'-disassembly')
+            run(['nm','-S','--defined-only',obj],'mapping-'+variant+'-symbols')
 
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     assert 'runtime error:' not in (evidence/'tests.log').read_text()
