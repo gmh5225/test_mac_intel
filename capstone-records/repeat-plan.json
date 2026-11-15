@@ -1,0 +1,22 @@
+{
+  "reason": "One of 144 rows had median 0.989428, with bimodal ordinary-launch timings; its fixed-launch counterpart was 1.005759. Preserve the initial observation and run one independent job before disposition.",
+  "host": "ubuntu-24.04",
+  "compiler": "gcc",
+  "cases": [
+    "arm-cp",
+    "arm64-ls"
+  ],
+  "modes": [
+    0,
+    1,
+    2
+  ],
+  "launches": [
+    "images",
+    "same-file-fixed"
+  ],
+  "pairs": 31,
+  "target_cpu_ms": 320,
+  "source_changes": false,
+  "acceptance": "All twelve repeat medians >=0.99 and all A/A medians within 1%; bootstrap lower bound >=0.99 for the originally flagged row. Initial row confidence interval must include 1.0. Do not rerun until a favorable result."
+}
