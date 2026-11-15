@@ -1,7 +1,7 @@
-name: Qualify canonical scalar SSE register output profiles
+name: Qualify scalar SSE output with one writer call site profiles
 on:
   push:
-    branches: [codex/capstone-scalar-prefix-dispatch-profiles]
+    branches: [codex/capstone-scalar-shared-call-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -53,6 +53,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-prefix-dispatch-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: scalar-shared-call-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
