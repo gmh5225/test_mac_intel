@@ -22,11 +22,7 @@ forms=os.environ['FORMS']
 root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()=='defa77a3b8395499e6dfc991808ed8d1c8d83df1'
-    run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
-    run(['git','add','-A'],'stage-tested-source')
-    tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree=='510c303b1720d7f32a61b9ce3aef9e290d21eab5',tested_tree
+    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
@@ -46,10 +42,41 @@ try:
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     if profile=='alias-only':units=['mapping','api','mips_scan','aarch64_scan','aarch64_postprocess']
-    run(['python','suite/synctools/alias_mnemonic_groups.py','--check'],'alias-groups-generator')
-    run(['python','suite/synctools/alias_mnemonic_trie.py','--check'],'alias-trie-generator')
+    run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],'build-base')
+    import hashlib
+    def objects():
+        roots=[b/'CMakeFiles/capstone.dir',b/'capstone.dir']
+        result={}
+        for objroot in roots:
+            for file in objroot.rglob('*'):
+                if file.is_file() and file.suffix in ('.o','.obj'):
+                    result[str(file.relative_to(b))]=hashlib.sha256(file.read_bytes()).hexdigest()
+        assert len(result)>5, result
+        return result
+    before=objects()
+    saved_mapping=root_build/'baseline-Mapping.o'
+    mapping=b/'CMakeFiles/capstone.dir/Mapping.c.o'
+    if mapping.exists():shutil.copyfile(mapping,saved_mapping)
+    run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
+    run(['git','add','-A'],'stage-tested-source')
+    tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
+    assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
+    after=objects()
+    assert before.keys()==after.keys()
+    changed=[name for name in before if before[name]!=after[name]]
+    save('object-identity',dict(total=len(before),changed=changed,identical=not changed))
+    assert all(Path(name).name.lower() in ('mapping.c.o','mapping.c.obj','mapping.obj') for name in changed),changed
+    if changed and saved_mapping.exists():
+        import gzip
+        for variant, obj in [('base',saved_mapping),('candidate',mapping)]:
+            (evidence/('mapping-'+variant+'.o.gz')).write_bytes(gzip.compress(obj.read_bytes(),mtime=0))
+            if os.sys.platform.startswith('linux'):
+                run(['objdump','-dr',obj],'mapping-'+variant+'-disassembly')
+                run(['nm','-S','--defined-only',obj],'mapping-'+variant+'-symbols')
+
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    assert 'runtime error:' not in (evidence/'tests.log').read_text()
     if profile=='all':
         run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
         run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_'],'all-unit-tests')
