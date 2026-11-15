@@ -1,0 +1,32 @@
+name: Diagnose live-LR signal delivery
+on:
+  push:
+    branches: [codex/neverd-arm64e-live-lr]
+    paths: [neverd-live-lr-debug/**, .github/workflows/neverd-live-lr-debug.yml]
+permissions:
+  contents: read
+jobs:
+  debug:
+    runs-on: macos-26
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 88ae2ce19389dd72cf4df6f381f3f98052403ee0
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: |
+            include/neverd/runtime
+            include/neverd/ir/intrinsics/AArch64
+            unittests/lift/aarch64
+      - run: python3 neverd-live-lr-debug/run.py
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: live-lr-debug
+          path: live-lr-debug-evidence/
+          retention-days: 7
