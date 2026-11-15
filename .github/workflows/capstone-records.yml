@@ -1,7 +1,7 @@
-name: Qualify MIPS operand reuse mixed
+name: Check shared operand bounds on real ISA corpora
 on:
   push:
-    branches: [codex/capstone-mips-operand-reuse-mixed]
+    branches: [codex/capstone-operand-bounds-real-corpus]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -14,8 +14,6 @@ jobs:
           - { host: ubuntu-24.04, cc: gcc, archs: four }
           - { host: ubuntu-22.04, cc: gcc, archs: four }
           - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -29,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: defa77a3b8395499e6dfc991808ed8d1c8d83df1
+          ref: dea9fee246c21a0045a2ea63a429f9147a6a1014
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mips-operand-reuse-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: operand-offset-bounds-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

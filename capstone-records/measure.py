@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   assert set(changed) == {'arch/Mips/MipsMapping.c.o'}, changed
+   assert set(changed) == {'Mapping.c.o'}, changed
    assert objects['base']['Mapping.c.o'] == objects[key]['Mapping.c.o']
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
