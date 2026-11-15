@@ -11,7 +11,7 @@ import statistics
 import struct
 import subprocess as sp
 
-SECTION = '.text.cs_tied_op_access'
+SECTION = '.cs_tied_op_access'
 
 
 def sha(path):
@@ -63,17 +63,20 @@ def freeze_objects(root, archive, linkmap, directory):
     return [directory / name for name in names]
 
 
-def pad(source, target, capacity, work):
-    raw = section_bytes(source, SECTION)
-    assert capacity >= len(raw)
-    payload = work / 'section.bin'
-    payload.write_bytes(raw + b'\x90' * (capacity - len(raw)))
-    sp.run(['objcopy', '--update-section', SECTION + '=' + str(payload),
-            '--set-section-alignment', SECTION + '=64', source, target], check=True)
-    assert section_bytes(target, SECTION) == payload.read_bytes()
-    assert symbols(source) == symbols(target)
-    return dict(source=sha(source), target=sha(target), before=len(raw), after=capacity,
-                original_instructions_preserved=True, original_symbols_preserved=True)
+def linker_script(work, capacity):
+    script = work / 'equal-function-size.ld'
+    script.write_text('SECTIONS { ' + SECTION + ' ALIGN(64) : { *(' + SECTION +
+                      ') . = ' + str(capacity) + '; } } INSERT AFTER .text;\n')
+    return script
+
+
+def check_calls(path):
+    assembly = sp.check_output(['objdump', '-dr', path], text=True)
+    body = re.search(r'^[0-9a-f]+ <mapping_get_op_access>:\n(.*?)(?=\n\n)',
+                     assembly, re.S | re.M)[1]
+    targets = re.findall(r'\bcall\s+[0-9a-f]+ <([^>]+)>', body)
+    assert targets == ['MCInst_opIsTied', 'MCInst_opIsTying'], targets
+    return dict(targets=targets, external_relocations_resolved=True)
 
 
 def compare_addresses(a, b):
@@ -105,6 +108,21 @@ def measure(work, bins, cases, save):
     save('launch-controls.json', dict(size=size, inode=inode, aslr_disabled=True,
         hashes={layout: {key: hashlib.sha256(data).hexdigest() for key, data in pair.items()}
                 for layout, pair in payload.items()}, cycles=21, retained_original_layout=True))
+    preflight = []
+    for case in cases:
+        for mode in range(3):
+            expected = None
+            for placement, pair in bins.items():
+                for variant, executable in pair.items():
+                    result = json.loads(sp.check_output([executable, str(case['selector']),
+                        str(mode), case['path'], '1'], text=True))
+                    signature = (result['first'], result['result'])
+                    if expected is None:
+                        expected = signature
+                    assert signature == expected, (case['name'], mode, placement, variant)
+                    preflight.append(dict(case=case['name'], mode=mode,
+                                          placement=placement, variant=variant))
+    save('preflight.json', dict(complete=True, checked=preflight))
     rows = []
     for case in cases:
         for mode in range(3):

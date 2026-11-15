@@ -92,15 +92,19 @@ try:
     # Moving the sole changed function must leave the remaining instruction body identical.
     assert layout.section_bytes(isolated['integer'], '.text') == layout.section_bytes(isolated['scan'], '.text')
     capacity = (max(len(layout.section_bytes(p, layout.SECTION)) for p in isolated.values()) + 63) // 64 * 64
-    pads = {}
-    for variant, obj in isolated.items():
-        padded = work / ('padded-' + variant + '.o')
-        pads[variant] = layout.pad(obj, padded, capacity, work)
-        paths = [padded if p.name == 'Mapping.c.o' else p for p in captured['isolated-' + variant]]
+    script = layout.linker_script(work, capacity)
+    save('linker-layout.json', dict(capacity=capacity, script=script.read_text(),
+                                   object_bytes_unchanged=True))
+    calls = {}
+    for variant in isolated:
+        paths = captured['isolated-' + variant]
         target = work / ('controlled-' + variant)
-        run(['clang++', consumer, *paths, '-lm', '-o', target], 'link-controlled-' + variant)
+        run(['clang++', consumer, *paths, '-lm', '-Wl,-T,' + str(script), '-o', target],
+            'link-controlled-' + variant)
+        assert len(layout.section_bytes(target, layout.SECTION)) == capacity
+        calls[variant] = layout.check_calls(target)
         bins['isolated'][variant] = target
-    save('padding.json', pads)
+    save('relocation-controls.json', calls)
     controls = {name: layout.compare_addresses(pair['integer'], pair['scan']) for name, pair in bins.items()}
     save('address-controls.json', controls)
     for placement, pair in bins.items():
