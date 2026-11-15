@@ -49,7 +49,7 @@ try:
     patch=r/'candidate.patch'
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==meta['sha256']
     cases=corpus.prepare(r,w,evidence,run)
-    assert len(cases)==7
+    assert len(cases)==2
     costs=[];objects={};signatures={}
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
@@ -66,7 +66,7 @@ try:
         if label=='scan':
             changed={f for f in objects['integer']if objects['integer'][f]!=objects[label][f]}
             assert set(objects['integer'])==set(objects[label])
-            assert changed=={'arch/PowerPC/PPCMapping.c.o','arch/ARC/ARCMapping.c.o','arch/LoongArch/LoongArchMapping.c.o'},changed
+            assert changed=={'arch/ARC/ARCDisassembler.c.o'},changed
             save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
         (evidence / (label+'-object-sizes.txt')).write_bytes(sp.check_output(['size', build/'libcapstone.a']))
         exe = w / label
@@ -78,13 +78,13 @@ try:
         (evidence / (label+'-symbols.txt')).write_bytes(
             sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
     from native import measure
-    selected=[v for v in cases if v['selector']in (2,3,11,12)]
-    assert len(selected)==4
+    selected=cases
+    assert len(selected)==2
     measure(w,selected,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=False, restored=True, native_qualification=True, scope='four additional ISAs, separate product qualification required'))
+                               source_unchanged=False, restored=True, native_qualification=True, scope='Real PE32 and PE64 controls with ARC enabled in the same library'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)
