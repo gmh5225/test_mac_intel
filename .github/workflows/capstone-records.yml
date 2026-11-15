@@ -1,24 +1,13 @@
-name: Measure shared bounded operand access after inlining
+name: Inspect ARM diagnostic ELF section placement
 on:
   push:
-    branches: [codex/capstone-inline-detail-guard-cost]
-    paths: [capstone-records/**, .github/workflows/capstone-records.yml]
+    branches: [codex/capstone-arm-layout-preflight]
 permissions:
   contents: read
 jobs:
-  cost:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-    runs-on: ${{ matrix.host }}
-    timeout-minutes: 45
-    env:
-      BUILD_ARCHS: ${{ matrix.archs }}
-      MEASURE_CC: ${{ matrix.cc }}
+  layout:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -27,18 +16,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: defa77a3b8395499e6dfc991808ed8d1c8d83df1
+          ref: 729680277dd762704ea3270291b7a75318f51583
           path: source
           persist-credentials: false
-      - name: Install instruction profiler
-        run: sudo apt-get update -qq && sudo apt-get install -y valgrind
-      - name: Profile one timed pass after complete warm-up
-        run: python3 capstone-records/measure.py
+      - run: |
+          python3 -m venv "$RUNNER_TEMP/elf"
+          "$RUNNER_TEMP/elf/bin/python" -m pip install pyelftools==0.32
+          "$RUNNER_TEMP/elf/bin/python" capstone-records/measure.py
       - if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+        run: rm -rf -- "$GITHUB_WORKSPACE/source" "$RUNNER_TEMP/elf"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: inline-detail-guard-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-layout-preflight
           path: evidence/
           retention-days: 14
