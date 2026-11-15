@@ -1,0 +1,38 @@
+name: Diagnose intentional x87 fault collection
+on:
+  push:
+    branches: [codex/capstone-x87-fault-collector]
+    paths: [capstone-hardware/**, .github/workflows/capstone-x87-fault-collector.yml]
+permissions:
+  contents: read
+jobs:
+  hardware:
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [gcc, clang]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-hardware
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 729680277dd762704ea3270291b7a75318f51583
+          path: source
+          persist-credentials: false
+      - name: Compare the published hardware test and child-only dump suppression
+        run: python3 capstone-hardware/driver.py
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: x87-fault-collector-${{ matrix.cc }}-${{ github.run_id }}
+          path: evidence/
+          retention-days: 14
