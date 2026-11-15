@@ -51,6 +51,7 @@ try:
                     'cs_free(i,n); return cs_close(&h); }\n')
     run(['cmake', '-S', s, '-B', b, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
          '-DCMAKE_C_COMPILER=gcc', '-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers',
+         '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer',
          '-DCMAKE_POSITION_INDEPENDENT_CODE=ON', '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
          *['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86', 'ARM', 'AARCH64', 'MIPS']],
          '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
