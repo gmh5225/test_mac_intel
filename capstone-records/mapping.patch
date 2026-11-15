@@ -1,0 +1,52 @@
+diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
+index b791c161..daa850b8 100644
+--- a/arch/ARC/ARCMapping.c
++++ b/arch/ARC/ARCMapping.c
+@@ -136,6 +136,8 @@ const insn_map arc_insns[] = {
+ void ARC_set_instr_map_data(MCInst *MI)
+ {
+ 	map_cs_id(MI, arc_insns, ARR_SIZE(arc_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, arc_insns);
+ 	map_implicit_writes(MI, arc_insns);
+ 	map_groups(MI, arc_insns);
+diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
+index 7c135b3f..fafa0459 100644
+--- a/arch/LoongArch/LoongArchMapping.c
++++ b/arch/LoongArch/LoongArchMapping.c
+@@ -390,6 +390,8 @@ void LoongArch_set_instr_map_data(MCInst *MI)
+ #endif
+ #else
+ 	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, loongarch_insns);
+ 	map_implicit_writes(MI, loongarch_insns);
+ 	map_groups(MI, loongarch_insns);
+diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
+index 6712b300..2c917b26 100644
+--- a/arch/PowerPC/PPCMapping.c
++++ b/arch/PowerPC/PPCMapping.c
+@@ -297,6 +297,8 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
+ void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
+ {
+ 	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ 	map_implicit_reads(MI, ppc_insns);
+ 	map_implicit_writes(MI, ppc_insns);
+ 	map_groups(MI, ppc_insns);
+diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
+index 711691be..7fa0e351 100644
+--- a/arch/SystemZ/SystemZMapping.c
++++ b/arch/SystemZ/SystemZMapping.c
+@@ -50,6 +50,8 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
+ 		return;
+ #else
+ 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
++	if (!MI->flat_insn->detail)
++		return;
+ #endif
+ 	map_implicit_reads(MI, systemz_insns);
+ 	map_implicit_writes(MI, systemz_insns);
