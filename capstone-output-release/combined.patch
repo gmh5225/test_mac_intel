@@ -1,460 +1,277 @@
-diff --git a/Mapping.c b/Mapping.c
-index b2be73de..61f4ee4e 100644
---- a/Mapping.c
-+++ b/Mapping.c
-@@ -59,28 +59,29 @@ const insn_map *lookup_insn_map(cs_struct *handle, unsigned short id)
- // Gives the id for the given @name if it is saved in @map.
- // Returns the id or -1 if not found.
- static int name2id_n(const name_map *map, int max, const char *name,
--		     size_t max_length)
-+		     size_t max_length, const uint16_t *indices)
- {
- 	CS_ASSERT_RET_VAL(map && name, -1);
- 	for (int i = 0; i < max; ++i) {
--		const char *entry = map[i].name;
-+		const name_map *item = &map[indices ? indices[i] : i];
-+		const char *entry = item->name;
- 		if (!entry)
- 			return -1;
- 		size_t j = 0;
- 		while (j < max_length && entry[j] == name[j]) {
- 			if (entry[j] == '\0')
--				return map[i].id;
-+				return item->id;
- 			++j;
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..6c9ae7dc 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -3,22 +3,22 @@
+ static const uint16_t x86_simple_plans[2][4][256] = {
+ 	{
+ 		{
+-			5, 9, 6, 10, 0, 0, 0, 0, 13, 17, 14, 18, 0, 0, 0, 0,
+-			21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
+-			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
+-			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
++			8197, 8201, 8198, 8202, 0, 0, 0, 0, 8205, 8209, 8206, 8210, 0, 0, 0, 0,
++			8213, 8217, 8214, 8218, 0, 0, 0, 0, 8221, 8225, 8222, 8226, 0, 0, 0, 0,
++			8229, 8233, 8230, 8234, 0, 0, 0, 0, 8237, 8241, 8238, 8242, 0, 0, 0, 0,
++			8245, 8249, 8246, 8250, 0, 0, 0, 0, 8253, 8257, 8254, 8258, 0, 0, 0, 0,
+ 			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
+ 			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
+-			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 32775, 0, 32768, 0, 32768, 0, 0, 0, 0, 0,
+ 			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
+-			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
++			0, 32770, 0, 32770, 8453, 8457, 269, 273, 8469, 8473, 8470, 8474, 0, 24862, 0, 0,
+ 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 0, 0, 0, 0, 0, 0, 0, 32772, 32772, 32772, 32772, 32772, 32772, 32772, 32772,
++			0, 32769, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
+ 			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
+-			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
++			0, 0, 0, 32775, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 25005,
+ 		},
+ 		{
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -58,7 +58,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 		},
+ 		{
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32775,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -77,62 +77,62 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 	},
+ 	{
+ 		{
+-			497, 501, 498, 502, 0, 0, 0, 0, 505, 509, 506, 510, 0, 0, 0, 0,
+-			513, 517, 514, 518, 0, 0, 0, 0, 521, 525, 522, 526, 0, 0, 0, 0,
+-			529, 533, 530, 534, 0, 0, 0, 0, 537, 541, 538, 542, 0, 0, 0, 0,
+-			545, 549, 546, 550, 0, 0, 0, 0, 553, 557, 554, 558, 0, 0, 0, 0,
++			8689, 8693, 8690, 8694, 0, 0, 0, 0, 8697, 8701, 8698, 8702, 0, 0, 0, 0,
++			8705, 8709, 8706, 8710, 0, 0, 0, 0, 8713, 8717, 8714, 8718, 0, 0, 0, 0,
++			8721, 8725, 8722, 8726, 0, 0, 0, 0, 8729, 8733, 8730, 8734, 0, 0, 0, 0,
++			8737, 8741, 8738, 8742, 0, 0, 0, 0, 8745, 8749, 8746, 8750, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
+-			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
++			0, 0, 32775, 0, 0, 0, 32775, 0, 32768, 0, 32768, 0, 0, 0, 0, 0,
+ 			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
+-			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
++			0, 32770, 0, 32770, 8881, 8885, 697, 701, 8897, 8901, 8898, 8902, 0, 25290, 0, 0,
+ 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 65533, 0, 772, 65535, 65535, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
++			0, 0, 0, 0, 0, 0, 0, 0, 32772, 32772, 32772, 32772, 32772, 32772, 32772, 32772,
++			0, 32769, 0, 772, 32775, 32775, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
+ 			0, 0, 0, 0, 0, 0, 0, 792, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 799, 803, 0, 807, 808, 812, 816, 820,
+-			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
++			0, 0, 0, 32775, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 25433,
+ 		},
+ 		{
+-			861, 865, 862, 866, 0, 0, 0, 0, 869, 873, 870, 874, 0, 0, 0, 0,
+-			877, 881, 878, 882, 0, 0, 0, 0, 885, 889, 886, 890, 0, 0, 0, 0,
+-			893, 897, 894, 898, 0, 0, 0, 0, 901, 905, 902, 906, 0, 0, 0, 0,
+-			909, 913, 910, 914, 0, 0, 0, 0, 917, 921, 918, 922, 0, 0, 0, 0,
++			9053, 9057, 9054, 9058, 0, 0, 0, 0, 9061, 9065, 9062, 9066, 0, 0, 0, 0,
++			9069, 9073, 9070, 9074, 0, 0, 0, 0, 9077, 9081, 9078, 9082, 0, 0, 0, 0,
++			9085, 9089, 9086, 9090, 0, 0, 0, 0, 9093, 9097, 9094, 9098, 0, 0, 0, 0,
++			9101, 9105, 9102, 9106, 0, 0, 0, 0, 9109, 9113, 9110, 9114, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
++			0, 32770, 0, 32770, 9117, 9121, 933, 937, 9133, 9137, 9134, 9138, 0, 25526, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 0, 0, 0, 0, 0, 0, 0, 32772, 32772, 32772, 32772, 32772, 32772, 32772, 32772,
++			0, 32769, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25529,
+ 		},
+ 		{
+-			861, 957, 862, 958, 0, 0, 0, 0, 869, 961, 870, 962, 0, 0, 0, 0,
+-			877, 965, 878, 966, 0, 0, 0, 0, 885, 969, 886, 970, 0, 0, 0, 0,
+-			893, 973, 894, 974, 0, 0, 0, 0, 901, 977, 902, 978, 0, 0, 0, 0,
+-			909, 981, 910, 982, 0, 0, 0, 0, 917, 985, 918, 986, 0, 0, 0, 0,
++			9053, 9149, 9054, 9150, 0, 0, 0, 0, 9061, 9153, 9062, 9154, 0, 0, 0, 0,
++			9069, 9157, 9070, 9158, 0, 0, 0, 0, 9077, 9161, 9078, 9162, 0, 0, 0, 0,
++			9085, 9165, 9086, 9166, 0, 0, 0, 0, 9093, 9169, 9094, 9170, 0, 0, 0, 0,
++			9101, 9173, 9102, 9174, 0, 0, 0, 0, 9109, 9177, 9110, 9178, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
++			0, 32770, 0, 32770, 9117, 9181, 933, 993, 9133, 9189, 9134, 9190, 0, 25578, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++			0, 32769, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 25529,
+ 		},
+ 		{
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
++			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32775,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..5401ad08 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -49,18 +49,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		modrm = code[1 + has_rex];
+ 		if (modrm < 0xc0) {
+-			/* The generated ALU, TEST and MOV register rows also
+-             * describe their memory forms. XCHG and immediates
+-             * require different memory records. */
+-			const bool alu = opcode < 0x40;
+-			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
+-						 (opcode & 0xfc) == 0x88;
+-			const bool push = opcode == 0xff &&
+-					  (modrm & 0x38) == 0x30;
+-			if (!alu && !test_or_mov && opcode != 0x8d && !push)
++			if (!(plan & X86_PLAN_MEMORY) ||
++			    (opcode == 0xff && (modrm & 0x38) != 0x30))
+ 				return false;
+ 			base_memory = true;
+-		} else if (opcode == 0x8d || opcode == 0xff) {
++		} else if (plan & X86_PLAN_MEMORY_ONLY) {
+ 			return false;
  		}
- 		if (j == max_length && entry[j] == '\0')
--			return map[i].id;
-+			return item->id;
  	}
- 	return -1;
- }
- 
- int name2id(const name_map *map, int max, const char *name)
- {
--	return name2id_n(map, max, name, (size_t)-1);
-+	return name2id_n(map, max, name, (size_t)-1, NULL);
- }
- 
- // Gives the name for the given @id if it is saved in @map.
-@@ -480,8 +481,18 @@ static inline bool char_ends_mnem(const char c, cs_arch arch)
- /// Sets an alternative id for some instruction.
- /// Or -1 if it fails.
- /// You must add (<ARCH>_INS_ALIAS_BEGIN + 1) to the id to get the real id.
--void map_set_alias_id(MCInst *MI, const SStream *O,
--		      const name_map *alias_mnem_id_map, int map_size)
-+/* Keep the original and indexed readers specialized at their callers. */
-+#if defined(_MSC_VER)
-+static __forceinline
-+#elif defined(__GNUC__)
-+static inline __attribute__((always_inline))
-+#else
-+static inline
-+#endif
-+	void map_set_alias_id_impl(MCInst *MI, const SStream *O,
-+				   const name_map *alias_mnem_id_map,
-+				   int map_size, const uint16_t *indices,
-+				   const uint16_t *offsets)
- {
- 	if (!MCInst_isAlias(MI)) {
- 		MI->flat_insn->alias_id = 0;
-@@ -499,16 +510,29 @@ void map_set_alias_id(MCInst *MI, const SStream *O,
- 		++i;
+@@ -91,7 +84,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else if (plan == X86_PLAN_MOV_REG_IMM32) {
+ 			if (size < 5u + has_rex)
+ 				return false;
+-			row = x86_simple_plans[wide][prefix_class][0x8b] >> 2;
++			row = (x86_simple_plans[wide][prefix_class][0x8b] &
++			       X86_PLAN_ROW_MASK) >>
++			      2;
+ 			reg = &x86_simple_registers[2][((rex & 1) << 3) |
+ 						       (opcode & 7)];
+ 		} else {
+@@ -100,8 +95,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			const unsigned group = (modrm >> 3) & 7;
+ 			row = plan == X86_PLAN_SHIFT_IMM8 ?
+ 				      x86_shift_rows[wide][prefix_class][group] :
+-				      x86_simple_plans[wide][prefix_class]
+-						      [(group << 3) | 1] >>
++				      (x86_simple_plans[wide][prefix_class]
++						       [(group << 3) | 1] &
++				       X86_PLAN_ROW_MASK) >>
+ 					      2;
+ 			reg = &x86_simple_registers[(rex & 8) ? 3 : 2]
+ 						   [((rex & 1) << 3) |
+@@ -111,7 +107,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 					 &x86_simple_outputs[row], reg);
+ 		return true;
  	}
- 	const char *alias_mnem = asm_str_buf + i;
-+	if (offsets) {
-+		const unsigned prefix = (unsigned char)*alias_mnem;
-+		const unsigned first = offsets[prefix];
-+		map_size = offsets[prefix + 1] - first;
-+		indices += first;
-+	}
- 	// Retain the existing 15-byte mnemonic limit.
- 	for (; j < 15; ++j, ++i) {
- 		if (char_ends_mnem(asm_str_buf[i], MI->csh->arch))
- 			break;
- 	}
- 
--	int alias_id = name2id_n(alias_mnem_id_map, map_size, alias_mnem, j);
-+	int alias_id =
-+		name2id_n(alias_mnem_id_map, map_size, alias_mnem, j, indices);
- 	MI->flat_insn->alias_id = alias_id < 0 ? 0 : alias_id;
- }
- 
-+void map_set_alias_id(MCInst *MI, const SStream *O, const name_map *map,
-+		      int map_size)
-+{
-+	map_set_alias_id_impl(MI, O, map, map_size, NULL, NULL);
-+}
-+
- #ifdef CAPSTONE_USE_ALIAS_TRIE
- void map_set_alias_id_trie(MCInst *MI, const SStream *O,
- 			   const alias_trie_node *trie, size_t trie_size)
-@@ -583,3 +607,12 @@ uint64_t enum_map_bin_search(const cs_enum_id_map *map, size_t map_len,
- 	*found = false;
- 	return UINT64_MAX;
- }
-+
-+#if !defined(CAPSTONE_USE_ALIAS_TRIE) && \
-+	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS))
-+void map_set_alias_id_grouped(MCInst *MI, const SStream *O, const name_map *map,
-+			      const uint16_t *indices, const uint16_t *offsets)
-+{
-+	map_set_alias_id_impl(MI, O, map, 0, indices, offsets);
-+}
-+#endif
-diff --git a/Mapping.h b/Mapping.h
-index 6f7281cd..f020afa7 100644
---- a/Mapping.h
-+++ b/Mapping.h
-@@ -296,6 +296,14 @@ bool map_use_alias_details(const MCInst *MI);
- void map_set_alias_id(MCInst *MI, const SStream *O,
- 		      const name_map *alias_mnem_id_map, int map_size);
- 
-+#if !defined(CAPSTONE_USE_ALIAS_TRIE) && \
-+	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS))
-+CAPSTONE_INTERNAL void map_set_alias_id_grouped(MCInst *MI, const SStream *O,
-+						const name_map *map,
-+						const uint16_t *indices,
-+						const uint16_t *offsets);
-+#endif
-+
- #ifdef CAPSTONE_USE_ALIAS_TRIE
- typedef struct {
- 	uint16_t offset;
-diff --git a/arch/AArch64/AArch64GenAliasGroups.inc b/arch/AArch64/AArch64GenAliasGroups.inc
-new file mode 100644
-index 00000000..bc9ebb17
---- /dev/null
-+++ b/arch/AArch64/AArch64GenAliasGroups.inc
-@@ -0,0 +1,47 @@
-+/* Generated by suite/synctools/alias_mnemonic_groups.py. */
-+static const uint16_t alias_group_indices[] = {
-+	0, 13, 15, 16, 17, 94, 95, 98, 99, 102, 103, 183, 368, 89, 175, 176,
-+	224, 225, 226, 227, 355, 356, 357, 358, 377, 378, 379, 14, 48, 88, 91, 107,
-+	118, 191, 192, 193, 194, 195, 258, 326, 327, 328, 362, 364, 365, 54, 86, 111,
-+	197, 198, 199, 329, 331, 333, 335, 363, 367, 56, 87, 177, 178, 55, 1, 2,
-+	50, 108, 170, 330, 332, 334, 366, 3, 12, 18, 20, 22, 25, 27, 30, 32,
-+	34, 38, 39, 61, 62, 63, 64, 65, 66, 67, 68, 70, 71, 72, 74, 105,
-+	171, 187, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213,
-+	218, 219, 220, 221, 248, 249, 250, 255, 256, 257, 262, 263, 264, 265, 266, 267,
-+	268, 269, 270, 271, 272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283,
-+	284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299,
-+	300, 301, 302, 303, 352, 353, 354, 360, 361, 372, 37, 79, 113, 114, 122, 123,
-+	180, 349, 80, 115, 116, 120, 121, 350, 351, 359, 53, 179, 228, 229, 230, 231,
-+	24, 29, 46, 47, 69, 75, 90, 92, 93, 96, 97, 100, 101, 106, 110, 323,
-+	324, 325, 182, 196, 371, 4, 5, 6, 7, 8, 9, 10, 11, 19, 21, 23,
-+	26, 28, 31, 33, 35, 36, 40, 41, 42, 43, 44, 45, 49, 51, 57, 58,
-+	59, 60, 73, 76, 77, 84, 85, 109, 112, 117, 119, 124, 125, 128, 129, 130,
-+	131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146,
-+	147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162,
-+	163, 164, 165, 166, 167, 168, 169, 172, 173, 174, 184, 185, 186, 214, 215, 216,
-+	217, 222, 223, 232, 233, 234, 235, 236, 237, 238, 239, 251, 252, 253, 254, 259,
-+	260, 261, 304, 305, 306, 307, 308, 309, 310, 311, 312, 313, 314, 315, 316, 317,
-+	318, 319, 320, 321, 322, 336, 339, 341, 343, 345, 347, 373, 375, 181, 369, 370,
-+	52, 126, 127, 188, 189, 190, 240, 241, 242, 243, 244, 245, 246, 247, 337, 338,
-+	340, 342, 344, 346, 348, 374, 376, 82, 83, 104, 81, 78,
-+};
-+
-+static const uint16_t alias_group_offsets[] = {
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 13, 27, 45, 57, 61, 62, 64, 64, 71, 71, 71, 170, 178, 186,
-+	192, 210, 210, 213, 349, 352, 375, 375, 377, 378, 379, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380, 380,
-+	380,
-+};
-diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index e82eaaa5..bcdbe607 100644
---- a/arch/AArch64/AArch64Mapping.c
-+++ b/arch/AArch64/AArch64Mapping.c
-@@ -165,6 +165,10 @@ static const name_map insn_alias_mnem_map[] = {
- };
- #endif
- 
-+#ifndef CAPSTONE_USE_ALIAS_TRIE
-+#include "AArch64GenAliasGroups.inc"
-+#endif
-+
- #ifdef CAPSTONE_USE_ALIAS_TRIE
- static const alias_trie_node alias_trie[] = {
- #include "AArch64GenAliasTrie.inc"
-@@ -1080,8 +1084,13 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	}
- 	AArch64_check_updates_flags(MI);
- 	AArch64_add_sysreg_alias_access(MI);
-+#ifdef CAPSTONE_USE_ALIAS_TRIE
- 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
- 			ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
-+#else
-+	map_set_alias_id_grouped(MI, O, insn_alias_mnem_map,
-+				 alias_group_indices, alias_group_offsets);
-+#endif
- 	int syntax_opt = MI->csh->syntax;
- 	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
- 		patch_cs_reg_alias(O->buffer);
-diff --git a/arch/Mips/MipsGenAliasGroups.inc b/arch/Mips/MipsGenAliasGroups.inc
-new file mode 100644
-index 00000000..222faa8e
---- /dev/null
-+++ b/arch/Mips/MipsGenAliasGroups.inc
-@@ -0,0 +1,30 @@
-+/* Generated by suite/synctools/alias_mnemonic_groups.py. */
-+static const uint16_t alias_group_indices[] = {
-+	0, 82, 83, 1, 2, 3, 9, 14, 15, 17, 47, 48, 65, 66, 85, 86,
-+	87, 88, 106, 107, 108, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41,
-+	42, 43, 44, 45, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-+	60, 61, 62, 63, 64, 19, 67, 68, 75, 76, 93, 95, 18, 94, 96, 29,
-+	10, 72, 73, 74, 81, 84, 77, 109, 8, 89, 90, 91, 92, 98, 99, 100,
-+	101, 102, 103, 104, 105, 4, 11, 12, 13, 30, 5, 6, 26, 7, 16, 27,
-+	28, 69, 70, 71, 80, 20, 21, 22, 23, 24, 25, 78, 79, 97,
-+};
-+
-+static const uint16_t alias_group_offsets[] = {
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 3, 21, 53, 60, 63, 63, 63, 64, 64, 70, 70, 72, 85, 90,
-+	90, 90, 90, 93, 101, 107, 107, 107, 109, 109, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110, 110,
-+	110,
-+};
-diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d6775ef0..02a79350 100644
---- a/arch/Mips/MipsMapping.c
-+++ b/arch/Mips/MipsMapping.c
-@@ -91,6 +91,10 @@ static const name_map insn_alias_mnem_map[] = {
- 	{ MIPS_INS_ALIAS_END, NULL },
+-	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
++	const struct X86SimpleOutput *row =
++		&x86_simple_outputs[(plan & X86_PLAN_ROW_MASK) >> 2];
+ 	if (base_memory)
+ 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
+ 					     x86_simple_registers);
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..7ca57b00 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -44,15 +44,16 @@ enum X86SimpleForm {
+ 	X86_SIMPLE_RELATIVE,
  };
  
-+#ifndef CAPSTONE_USE_ALIAS_TRIE
-+#include "MipsGenAliasGroups.inc"
-+#endif
-+
- #ifdef CAPSTONE_USE_ALIAS_TRIE
- static const alias_trie_node alias_trie[] = {
- #include "MipsGenAliasTrie.inc"
-@@ -459,8 +463,13 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
- 	}
- #endif
- #ifndef CAPSTONE_DIET
-+#ifdef CAPSTONE_USE_ALIAS_TRIE
- 	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
- 			ARR_SIZE(insn_alias_mnem_map), alias_trie);
-+#else
-+	map_set_alias_id_grouped(MI, O, insn_alias_mnem_map,
-+				 alias_group_indices, alias_group_offsets);
-+#endif
- #endif
- }
+-/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
+- * same register-only operand check as a register pair. */
+-#define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
+-
+-/* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+-#define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+-#define X86_PLAN_VECTOR UINT16_MAX
+-#define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+-#define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
++/* Ordinary plans carry memory admission beside their form and row index.
++ * Reserved writers retain the same low-bit ModR/M form. */
++#define X86_PLAN_ROW_MASK 0x1fffu
++#define X86_PLAN_MEMORY 0x2000u
++#define X86_PLAN_MEMORY_ONLY 0x4000u
++#define X86_PLAN_PUSH_IMMEDIATE 0x8000u
++#define X86_PLAN_SHIFT_IMM8 (0x8000u | X86_SIMPLE_RM_REG)
++#define X86_PLAN_GROUP1_IMMEDIATE (0x8000u | X86_SIMPLE_REG_RM)
++#define X86_PLAN_MOV_REG_IMM32 0x8004u
++#define X86_PLAN_VECTOR 0x8007u
  
-diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index da366bf8..41a57733 100644
---- a/suite/auto-sync/README.md
-+++ b/suite/auto-sync/README.md
-@@ -245,3 +245,10 @@ After updating an AArch64, Mips, PowerPC or Sparc alias mnemonic map, run
- `python3 suite/synctools/alias_mnemonic_trie.py` to regenerate the recognition
- table used in builds containing only these backends. The first map row for each
- spelling supplies its public alias ID.
-+
-+After updating AArch64 or Mips alias maps, also run
-+`python3 suite/synctools/alias_mnemonic_groups.py`. Mixed-backend builds use
-+these original-row indices grouped by first byte, avoiding a duplicate pointer table. Row order within each group remains
-+unchanged, so duplicate spellings retain their first public ID. Public name
-+queries keep the original ID-indexed map. The generated lookup requires
-+nonempty spellings; mnemonic delimiter and length rules remain in the reader.
-diff --git a/suite/synctools/alias_mnemonic_groups.py b/suite/synctools/alias_mnemonic_groups.py
-new file mode 100644
-index 00000000..ba8ac76a
---- /dev/null
-+++ b/suite/synctools/alias_mnemonic_groups.py
-@@ -0,0 +1,47 @@
-+#!/usr/bin/env python3
-+# SPDX-License-Identifier: BSD-3-Clause
-+"""Group alias row indices without duplicating the public name map."""
-+
-+import argparse
-+from pathlib import Path
-+
-+from alias_mnemonic_trie import read_names
-+
-+
-+def generate(directory):
-+    names = read_names(directory)
-+    if len(names) > 65535 or any(not name for name, _ in names):
-+        raise ValueError("Alias groups require nonempty names and 16-bit offsets")
-+    groups = [[] for _ in range(256)]
-+    for index, (name, enum) in enumerate(names):
-+        groups[name[0]].append(index)
-+    offsets = [0]
-+    rows = []
-+    for group in groups:
-+        rows.extend(group)
-+        offsets.append(len(rows))
-+    lines = [
-+        "/* Generated by suite/synctools/alias_mnemonic_groups.py. */",
-+        "static const uint16_t alias_group_indices[] = {",
-+    ]
-+    for i in range(0, len(rows), 16):
-+        lines.append("\t" + ", ".join(map(str, rows[i : i + 16])) + ",")
-+    lines.extend(["};", "", "static const uint16_t alias_group_offsets[] = {"])
-+    for i in range(0, len(offsets), 16):
-+        lines.append("\t" + ", ".join(map(str, offsets[i : i + 16])) + ",")
-+    return "\n".join(lines + ["};", ""])
-+
-+
-+if __name__ == "__main__":
-+    parser = argparse.ArgumentParser(description=__doc__)
-+    parser.add_argument("--check", action="store_true")
-+    args = parser.parse_args()
-+    root = Path(__file__).resolve().parents[2] / "arch"
-+    for arch in ("AArch64", "Mips"):
-+        target = root / arch / f"{arch}GenAliasGroups.inc"
-+        text = generate(target.parent)
-+        if args.check:
-+            if target.read_text() != text:
-+                raise SystemExit(f"Regenerate {target.name}")
-+        else:
-+            target.write_text(text)
-diff --git a/suite/synctools/alias_mnemonic_trie.py b/suite/synctools/alias_mnemonic_trie.py
-index 438bd32e..a9ea2461 100644
---- a/suite/synctools/alias_mnemonic_trie.py
-+++ b/suite/synctools/alias_mnemonic_trie.py
-@@ -8,7 +8,7 @@ from pathlib import Path
- import re
- 
- 
--def generate(directory):
-+def read_names(directory):
-     arch = "PPC" if directory.name == "PowerPC" else directory.name
-     source = (directory / f"{arch}Mapping.c").read_text()
-     declaration = "static const name_map insn_alias_mnem_map[] = {"
-@@ -17,9 +17,7 @@ def generate(directory):
-     body = body.replace(f'#include "{include}"', (directory / include).read_text())
-     body = re.sub(r"/\*.*?\*/|//[^\n]*", "", body, flags=re.S)
-     row = re.compile(
--        r'\s*\{\s*'
--        + arch.upper()
--        + r'_INS_ALIAS_(\w+)\s*,\s*(NULL|"[^"\\]*")\s*\},?'
-+        r"\s*\{\s*" + arch.upper() + r'_INS_ALIAS_(\w+)\s*,\s*(NULL|"[^"\\]*")\s*\},?'
-     )
-     names = []
-     cursor = 0
-@@ -35,6 +33,12 @@ def generate(directory):
-         names.append((match[2][1:-1].encode("ascii"), match[1]))
-     else:
-         raise ValueError(f"Missing {arch} alias terminator")
-+    return names
-+
-+
-+def generate(directory):
-+    arch = "PPC" if directory.name == "PowerPC" else directory.name
-+    names = read_names(directory)
-     # Slot zero is unused. A child is at parent.offset + its byte, and
-     # child.parent distinguishes overlapping sparse transition rows.
-     tree = {}
-diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
-index f1c3ab76..cba56ff0 100644
---- a/tests/unit/CMakeLists.txt
-+++ b/tests/unit/CMakeLists.txt
-@@ -207,3 +207,8 @@ if(CAPSTONE_X86_SUPPORT)
-     set_tests_properties(unit_x86_x87_environment_hardware PROPERTIES
-         SKIP_RETURN_CODE 77 TIMEOUT 120)
- endif()
-+
-+if(Python3_Interpreter_FOUND AND (CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_MIPS_SUPPORT))
-+    add_test(NAME unit_alias_mnemonic_groups_generator
-+        COMMAND "${Python3_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/suite/synctools/alias_mnemonic_groups.py" --check)
-+endif()
-diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
-index 7f588c14..949e2cb1 100644
---- a/tests/unit/mapping.c
-+++ b/tests/unit/mapping.c
-@@ -255,8 +255,67 @@ static bool test_full_group_map(void)
- 	return true;
- }
- 
-+#if !defined(CAPSTONE_USE_ALIAS_TRIE) && \
-+	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS))
-+static bool test_grouped_alias_lookup(void)
-+{
-+	static const name_map grouped[] = {
-+		{ 17, "move" },	    { 0, "zero" },
-+		{ 37, "\200" },	    { 31, "123456789abcdef" },
-+		{ -1, "negative" }, { 99, "move" },
-+		{ 23, "move.w" },
-+	};
-+	static const uint16_t indices[] = { 3, 0, 5, 6, 4, 1, 2 };
-+	uint16_t offsets[257];
-+	for (unsigned i = 0; i < ARR_SIZE(offsets); ++i)
-+		offsets[i] = (i > '1') + 3 * (i > 'm') + (i > 'n') + (i > 'z') +
-+			     (i > 128);
-+	static const struct {
-+		cs_arch arch;
-+		const char *text;
-+		unsigned expected;
-+	} cases[] = {
-+		{ CS_ARCH_AARCH64, " \tmove.w x0", 17 },
-+		{ CS_ARCH_MIPS, "move\tr0", 17 },
-+		{ CS_ARCH_PPC, "move.w r0", 23 },
-+		{ CS_ARCH_AARCH64, "123456789abcdef_suffix", 31 },
-+		{ CS_ARCH_MIPS, "123456789abcde", 0 },
-+		{ CS_ARCH_AARCH64, "\200 r0", 37 },
-+		{ CS_ARCH_MIPS, "negative", 0 },
-+		{ CS_ARCH_MIPS, "zero", 0 },
-+		{ CS_ARCH_MIPS, "missing", 0 },
-+		{ CS_ARCH_MIPS, " \t", 0 },
-+	};
-+	cs_struct handle = { 0 };
-+	cs_insn insn = { 0 };
-+	MCInst mi = { 0 };
-+	SStream stream = { 0 };
-+	mi.csh = &handle;
-+	mi.flat_insn = &insn;
-+	mi.isAliasInstr = true;
-+	for (unsigned i = 0; i < ARR_SIZE(cases); ++i) {
-+		handle.arch = cases[i].arch;
-+		strcpy(stream.buffer, cases[i].text);
-+		map_set_alias_id_grouped(&mi, &stream, grouped, indices,
-+					 offsets);
-+		if (insn.alias_id != cases[i].expected)
-+			return false;
-+	}
-+	mi.isAliasInstr = false;
-+	mi.csh = NULL;
-+	insn.alias_id = 99;
-+	map_set_alias_id_grouped(&mi, NULL, NULL, NULL, NULL);
-+	return insn.alias_id == 0;
-+}
-+#endif
-+
- int main(void)
- {
-+#if !defined(CAPSTONE_USE_ALIAS_TRIE) && \
-+	(defined(CAPSTONE_HAS_AARCH64) || defined(CAPSTONE_HAS_MIPS))
-+	if (!test_grouped_alias_lookup())
-+		return 1;
-+#endif
- #ifdef CAPSTONE_USE_ALIAS_TRIE
- 	if (!test_generated_alias_lookup())
- 		return 1;
+ CAPSTONE_INTERNAL bool
+ X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index ccc4f0de..96c65de5 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -512,7 +512,7 @@ void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
+ 							  uint8_t(rex), 0,
+ 							  nullptr, nullptr));
+ 		}
+-		if (rows.size() + 1 >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++		if (rows.size() + 1 >= ((X86_PLAN_ROW_MASK + 1u) >> 2))
+ 			throw std::runtime_error(
+ 				"too many fixed output records");
+ 		const uint16_t plan =
+@@ -606,10 +606,21 @@ int main()
+ 					rows.begin());
+ 				if (index == rows.size())
+ 					rows.push_back(row.fields);
+-				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++				if (index >= ((X86_PLAN_ROW_MASK + 1u) >> 2))
+ 					return 1;
++				unsigned admission = 0;
++				if (form == X86_SIMPLE_RM_REG ||
++				    form == X86_SIMPLE_REG_RM) {
++					if (op < 0x40 || (op & 0xfe) == 0x84 ||
++					    (op & 0xfc) == 0x88 || op == 0x8d ||
++					    op == 0xff)
++						admission |= X86_PLAN_MEMORY;
++					if (op == 0x8d || op == 0xff)
++						admission |=
++							X86_PLAN_MEMORY_ONLY;
++				}
+ 				plans[wide][cls][op] = static_cast<uint16_t>(
+-					(index << 2) | form);
++					(index << 2) | form | admission);
+ 				checked += row.encodings;
+ 				++admitted;
+ 			}
+@@ -656,7 +667,7 @@ int main()
+ 							 rows.end(),
+ 							 row.fields) -
+ 					       rows.begin();
+-				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++				if (index >= ((X86_PLAN_ROW_MASK + 1u) >> 2))
+ 					return 1;
+ 				if (index == rows.size())
+ 					rows.push_back(row.fields);
+@@ -671,7 +682,7 @@ int main()
+ 		for (unsigned index = 0; index < 2; ++index) {
+ 			const unsigned op = index ? 0x6a : 0x68;
+ 			CheckedRow row = check_push_immediate(decoder, op);
+-			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
++			if (rows.size() >= ((X86_PLAN_ROW_MASK + 1u) >> 2))
+ 				return 1;
+ 			pushes[wide][index] =
+ 				static_cast<uint16_t>(rows.size());
