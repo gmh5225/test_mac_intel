@@ -1,7 +1,7 @@
-name: Qualify canonical scalar SSE register output mixed
+name: Qualify scalar SSE output with one writer call site mixed
 on:
   push:
-    branches: [codex/capstone-scalar-prefix-dispatch-mixed]
+    branches: [codex/capstone-scalar-shared-call-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-prefix-dispatch-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: scalar-shared-call-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
