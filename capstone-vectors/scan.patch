@@ -1,17 +1,24 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..010c1527 100644
+index 63dcc538..3fa5ce26 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -534,6 +534,8 @@ X86_DECODE_INLINE PrefixReadStatus readPrefixes(struct InternalInstruction *insn
+@@ -533,10 +533,13 @@ X86_DECODE_INLINE PrefixReadStatus readPrefixes(struct InternalInstruction *insn
+ 		return readSimpleLegacyPrefix(insn, offset);
  	}
  
++	const size_t prefixLimit = insn->codeSize < X86_MAX_INSTRUCTION_LENGTH ?
++					   insn->codeSize :
++					   X86_MAX_INSTRUCTION_LENGTH;
  	while (isPrefix) {
-+		if (insn->readerCursor == X86_MAX_INSTRUCTION_LENGTH)
-+			return PREFIX_READ_INVALID;
- 		/* If we fail reading prefixes, just stop here and let the opcode reader deal with it */
- 		if (consumeByte(insn, &byte))
+-		/* If we fail reading prefixes, just stop here and let the opcode reader deal with it */
+-		if (consumeByte(insn, &byte))
++		if (insn->readerCursor >= prefixLimit)
  			return PREFIX_READ_INVALID;
-@@ -2933,7 +2935,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
++		byte = insn->code[insn->readerCursor++];
+ 
+ 		if (insn->readerCursor == 1 && (byte == 0xf2 || byte == 0xf3)) {
+ 			// prefix requires next byte
+@@ -2933,7 +2936,7 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
  	insn->length = insn->readerCursor;
  
  	// instruction length must be <= 15 to be valid
@@ -20,24 +27,25 @@ index 63dcc538..010c1527 100644
  		return -1;
  
  	if (insn->operandSize == 0)
-@@ -3158,7 +3160,7 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+@@ -3157,8 +3160,11 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
+ 	/* Retain the decoder's bitness priority for mixed mode flags. */
  	initializeInstructionHeader(&insn, code, code_len, mode);
  	size_t offset = 0;
++	if (insn.mode == MODE_16BIT && code_len > X86_MAX_INSTRUCTION_LENGTH)
++		code_len = X86_MAX_INSTRUCTION_LENGTH;
  	/* Keep the 16-bit size-prefix loop small; other prefixes use the full reader. */
 -	while (offset < code_len && (insn.mode == MODE_16BIT || offset < 15)) {
-+	while (offset < code_len && offset < X86_MAX_INSTRUCTION_LENGTH) {
++	while (offset < code_len && (insn.mode == MODE_16BIT ||
++				     offset < X86_MAX_INSTRUCTION_LENGTH)) {
  		if (code[offset] == 0x66)
  			setOperandSizePrefix(&insn);
  		else if (code[offset] == 0x67)
-@@ -3174,8 +3176,9 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
- 			break;
+@@ -3175,7 +3181,7 @@ tryLegacyPrefixedScan(const uint8_t *code, size_t code_len, cs_mode mode,
  		++offset;
  	}
--	if (!offset || offset == code_len ||
+ 	if (!offset || offset == code_len ||
 -	    (insn.mode != MODE_16BIT && offset == 15))
-+	if (offset == X86_MAX_INSTRUCTION_LENGTH)
-+		return X86_SCAN_INVALID;
-+	if (!offset || offset == code_len)
++	    (insn.mode != MODE_16BIT && offset == X86_MAX_INSTRUCTION_LENGTH))
  		return X86_SCAN_NOT_HANDLED;
  	const uint8_t opcode = code[offset];
  	if ((feature_prefix_flags[opcode] &
