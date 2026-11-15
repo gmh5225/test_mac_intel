@@ -29,7 +29,7 @@ def measure(w, cases, save):
         launches=launches, aslr_disable_returncode=probe.returncode,
         inode=inode, fixed_size=maximum,
         original_sha256={k: hashlib.sha256(v).hexdigest() for k, v in payloads.items()},
-        scope='Native shared operand-access qualification on PPC, RISCV, LoongArch and ARC; x86 and NeverD qualification are separate.'))
+        scope='Native shared operand-access qualification on ARM, AArch64, MIPS, PPC, RISCV, LoongArch and ARC; x86 and NeverD qualification are separate.'))
 
     def sample(key, case, mode, reps, launch):
         tail = list(map(str, [case['selector'], mode, case['path'], reps]))
@@ -66,4 +66,4 @@ def measure(w, cases, save):
                                  median={key: statistics.median(c[key] for c in cycles) for key in keys},
                                  result=reference))
                 save('timings.json', rows)
-    assert len(rows) == 24
+    assert len(rows) == 42

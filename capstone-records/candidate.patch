@@ -1,52 +1,231 @@
-diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
-index b791c161..daa850b8 100644
---- a/arch/ARC/ARCMapping.c
-+++ b/arch/ARC/ARCMapping.c
-@@ -136,6 +136,8 @@ const insn_map arc_insns[] = {
- void ARC_set_instr_map_data(MCInst *MI)
+diff --git a/arch/RISCV/RISCVDisassembler.c b/arch/RISCV/RISCVDisassembler.c
+index 5c59283f..e3ad180b 100644
+--- a/arch/RISCV/RISCVDisassembler.c
++++ b/arch/RISCV/RISCVDisassembler.c
+@@ -706,28 +706,36 @@ DecodeStatus RISCV_getInstruction(MCInst *MI, uint16_t *Size,
+ 			4, RISCV_FeatureVendorXSfvfnrclipxfqf,
+ 			DecoderTableXSfvfnrclipxfqf32,
+ 			"SiFive FP32-to-int8 Ranged Clip Instructions opcode table");
+-		TRY_TO_DECODE_FEATURE(
+-			4, RISCV_FeatureVendorXCVbitmanip,
+-			DecoderTableXCVbitmanip32,
+-			"CORE-V Bit Manipulation custom opcode table");
+-		TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCVelw,
+-				      DecoderTableXCVelw32,
+-				      "CORE-V Event load custom opcode table");
+-		TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCVmac,
+-				      DecoderTableXCVmac32,
+-				      "CORE-V MAC custom opcode table");
+-		TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCVmem,
+-				      DecoderTableXCVmem32,
+-				      "CORE-V MEM custom opcode table");
+-		TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCValu,
+-				      DecoderTableXCValu32,
+-				      "CORE-V ALU custom opcode table");
+-		TRY_TO_DECODE_FEATURE(
+-			4, RISCV_FeatureVendorXCVsimd, DecoderTableXCVsimd32,
+-			"CORE-V SIMD extensions custom opcode table");
+-		TRY_TO_DECODE_FEATURE(
+-			4, RISCV_FeatureVendorXCVbi, DecoderTableXCVbi32,
+-			"CORE-V Immediate Branching custom opcode table");
++		/* The generated condition excludes every Decode and TryDecode
++		 * path before querying or trying this ordered extension group. */
++		if ((Insn & RISCV_COREV_OPCODE_MASK) ==
++		    RISCV_COREV_OPCODE_VALUE) {
++			TRY_TO_DECODE_FEATURE(
++				4, RISCV_FeatureVendorXCVbitmanip,
++				DecoderTableXCVbitmanip32,
++				"CORE-V Bit Manipulation custom opcode table");
++			TRY_TO_DECODE_FEATURE(
++				4, RISCV_FeatureVendorXCVelw,
++				DecoderTableXCVelw32,
++				"CORE-V Event load custom opcode table");
++			TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCVmac,
++					      DecoderTableXCVmac32,
++					      "CORE-V MAC custom opcode table");
++			TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCVmem,
++					      DecoderTableXCVmem32,
++					      "CORE-V MEM custom opcode table");
++			TRY_TO_DECODE_FEATURE(4, RISCV_FeatureVendorXCValu,
++					      DecoderTableXCValu32,
++					      "CORE-V ALU custom opcode table");
++			TRY_TO_DECODE_FEATURE(
++				4, RISCV_FeatureVendorXCVsimd,
++				DecoderTableXCVsimd32,
++				"CORE-V SIMD extensions custom opcode table");
++			TRY_TO_DECODE_FEATURE(
++				4, RISCV_FeatureVendorXCVbi,
++				DecoderTableXCVbi32,
++				"CORE-V Immediate Branching custom opcode table");
++		}
+ 		TRY_TO_DECODE(4, true, DecoderTable32, "RISCV32 table");
+ 
+ 		return MCDisassembler_Fail;
+diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
+index 5ce47d48..0653ec85 100644
+--- a/arch/RISCV/RISCVGenDirectDecoder.inc
++++ b/arch/RISCV/RISCVGenDirectDecoder.inc
+@@ -15,6 +15,12 @@
+ 
+ /* Source SHA256: c79d27baa594023b9e350064f9ad7981dc952f267df01608ec1922889a0d66f0 */
+ 
++/* Every observable CORE-V decoder path matches these opcode bits. */
++
++#define RISCV_COREV_OPCODE_MASK UINT32_C(0xf)
++
++#define RISCV_COREV_OPCODE_VALUE UINT32_C(0xb)
++
+ static DecodeStatus direct_DecoderTable16(MCInst *MI, uint16_t insn, uint64_t Address, const void *Decoder)
  {
- 	map_cs_id(MI, arc_insns, ARR_SIZE(arc_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- 	map_implicit_reads(MI, arc_insns);
- 	map_implicit_writes(MI, arc_insns);
- 	map_groups(MI, arc_insns);
-diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
-index 7c135b3f..fafa0459 100644
---- a/arch/LoongArch/LoongArchMapping.c
-+++ b/arch/LoongArch/LoongArchMapping.c
-@@ -390,6 +390,8 @@ void LoongArch_set_instr_map_data(MCInst *MI)
- #endif
- #else
- 	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- 	map_implicit_reads(MI, loongarch_insns);
- 	map_implicit_writes(MI, loongarch_insns);
- 	map_groups(MI, loongarch_insns);
-diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index 6712b300..2c917b26 100644
---- a/arch/PowerPC/PPCMapping.c
-+++ b/arch/PowerPC/PPCMapping.c
-@@ -297,6 +297,8 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
- void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
- {
- 	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- 	map_implicit_reads(MI, ppc_insns);
- 	map_implicit_writes(MI, ppc_insns);
- 	map_groups(MI, ppc_insns);
-diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
-index 711691be..7fa0e351 100644
---- a/arch/SystemZ/SystemZMapping.c
-+++ b/arch/SystemZ/SystemZMapping.c
-@@ -50,6 +50,8 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
- 		return;
- #else
- 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- #endif
- 	map_implicit_reads(MI, systemz_insns);
- 	map_implicit_writes(MI, systemz_insns);
+ 	uint64_t CurFieldValue = 0;
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index 29a72009..bea45f48 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -144,6 +144,54 @@ def successors(n):
+     return [n.end] + ([] if n.target is None else [n.target])
+ 
+ 
++def observable_prefixes(nodes, bits=7):
++    """Conservatively admit any prefix that could reach an MCInst mutation."""
++    result = set()
++    for prefix in range(1 << bits):
++        pending = [(0, None)]
++        seen = set()
++        while pending:
++            position, field = pending.pop()
++            state = (position, field)
++            if state in seen:
++                continue
++            seen.add(state)
++            node = nodes[position]
++            if node.op in ("Decode", "TryDecode"):
++                result.add(prefix)
++                break
++            if node.op == "Fail":
++                continue
++            if node.op == "ExtractField":
++                pending.append((node.end, node.args))
++                continue
++            if node.op in ("FilterValue", "CheckField"):
++                if node.op == "FilterValue":
++                    compared, expected = field, node.args[0]
++                else:
++                    compared, expected = node.args[:2], node.args[2]
++                if compared is None:
++                    match, mismatch = expected == 0, expected != 0
++                else:
++                    start, length = compared
++                    known = max(0, min(length, bits - start))
++                    mask = (1 << known) - 1
++                    match = expected < (1 << length) and (expected & mask) == (
++                        (prefix >> start) & mask
++                    )
++                    mismatch = not match or known < length
++                if match:
++                    pending.append((node.end, field))
++                if mismatch:
++                    pending.append((node.target, field))
++                continue
++            # Predicates are pure queries; either answer remains possible.
++            assert node.op in ("CheckPredicate", "SoftFail"), node.op
++            pending.append((node.end, field))
++            if node.target is not None:
++                pending.append((node.target, field))
++    return result
++
+ def primary_opcode_mask(nodes):
+     """A top-level miss must reach Fail without modifying the instruction."""
+     root = nodes[0]
+@@ -279,6 +327,21 @@ def main():
+             "/* Branch lowering generated by suite/synctools/fixed_len_decoder.py. */",
+             f"/* Source SHA256: {hashlib.sha256(text.encode('utf-8')).hexdigest()} */",
+         ]
++        if arch == "RISCV":
++            prefixes = set()
++            for name, body in tables:
++                if name.startswith("DecoderTableXCV"):
++                    prefixes.update(observable_prefixes(parse(body)))
++            require(bool(prefixes), "No observable CORE-V decoder paths")
++            first = min(prefixes)
++            mask = 127
++            for value in prefixes:
++                mask &= ~(first ^ value)
++            output += [
++                "/* Every observable CORE-V decoder path matches these opcode bits. */",
++                f"#define RISCV_COREV_OPCODE_MASK UINT32_C(0x{mask:x})",
++                f"#define RISCV_COREV_OPCODE_VALUE UINT32_C(0x{first & mask:x})",
++            ]
+         counts = []
+         for name, body in tables:
+             encoded_width = int(name[-2:])
+diff --git a/tests/unit/test_fixed_len_decoder.py b/tests/unit/test_fixed_len_decoder.py
+index f3677119..5561705a 100644
+--- a/tests/unit/test_fixed_len_decoder.py
++++ b/tests/unit/test_fixed_len_decoder.py
+@@ -91,5 +91,65 @@ class CheckoutNewlines(unittest.TestCase):
+                         self.check(root)
+ 
+ 
++class ObservablePrefixes(unittest.TestCase):
++    def test_rejected_prefix_cannot_mutate_instruction(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("CheckField", (0, 7, 11), 1, 2),
++            1: n("Decode", (1, 0), 2),
++            2: n("Fail", (), 3),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {11})
++
++    def test_unknown_high_bits_keep_both_branches(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("ExtractField", (7, 1), 1),
++            1: n("FilterValue", (0,), 2, 4),
++            2: n("CheckField", (0, 7, 11), 3, 6),
++            3: n("Decode", (1, 0), 4),
++            4: n("CheckField", (0, 7, 43), 5, 6),
++            5: n("Decode", (2, 0), 6),
++            6: n("Fail", (), 7),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {11, 43})
++
++    def test_failed_try_decode_is_still_observable(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("CheckField", (0, 7, 91), 1, 2),
++            1: n("TryDecode", (1, 0), 2, 2),
++            2: n("Fail", (), 3),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {91})
++
++    def test_predicate_outcomes_and_merged_fields_are_preserved(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("CheckPredicate", (0,), 1, 2),
++            1: n("ExtractField", (0, 7), 3),
++            2: n("ExtractField", (1, 6), 3),
++            3: n("FilterValue", (5,), 4, 5),
++            4: n("Decode", (1, 0), 5),
++            5: n("Fail", (), 6),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {5, 10, 11})
++
++    def test_initial_field_and_unknown_field_cannot_create_false_rejection(self):
++        n = DECODER.Node
++        initial = {
++            0: n("FilterValue", (0,), 1, 2),
++            1: n("Decode", (1, 0), 2),
++            2: n("Fail", (), 3),
++        }
++        unknown = {
++            0: n("ExtractField", (7, 3), 1),
++            1: n("FilterValue", (3,), 2, 3),
++            2: n("Decode", (1, 0), 3),
++            3: n("Fail", (), 4),
++        }
++        for nodes in (initial, unknown):
++            self.assertEqual(DECODER.observable_prefixes(nodes), set(range(128)))
++
+ if __name__ == "__main__":
+     unittest.main()
