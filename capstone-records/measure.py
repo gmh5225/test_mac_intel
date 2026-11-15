@@ -96,14 +96,15 @@ try:
             selected={}
             for line in symbols.splitlines():
                 fields=line.split()
-                if len(fields)==4 and fields[-1] in ('capstone_layout_padding','trace_span','cs_disasm_iter','PPC_getInstruction','LoongArch_getInstruction','LoongArch_initMCInst','ARC_getInstruction'):
+                if len(fields)==4 and fields[-1] in ('capstone_layout_padding','trace_span','cs_version','cs_disasm_iter','PPC_getInstruction','LoongArch_getInstruction','LoongArch_initMCInst','ARC_getInstruction'):
                     selected[fields[-1]]=dict(address=int(fields[0],16),size=int(fields[1],16))
             if offset:
                 assert selected['capstone_layout_padding']['size']==offset
                 assert selected['trace_span']==linked[f'0-{label}']['symbols']['trace_span']
-                assert selected['cs_disasm_iter']['address'] != linked[f'0-{label}']['symbols']['cs_disasm_iter']['address']
+                assert selected['cs_version']['address'] == linked[f'0-{label}']['symbols']['cs_version']['address'] + offset
             linked[f'{offset}-{label}']=dict(sha256=hashlib.sha256(exe.read_bytes()).hexdigest(),symbols=selected)
     save('linked.json',linked)
+    save('layout-address-counts.json', {label + '/' + key: len({linked[f'{offset}-{label}']['symbols'][key]['address'] for offset in plan['padding_bytes']}) for label in ('integer','scan') for key in ('cs_disasm_iter','PPC_getInstruction','LoongArch_getInstruction','ARC_getInstruction')})
     from native import measure
     measure(w,cases,plan,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
