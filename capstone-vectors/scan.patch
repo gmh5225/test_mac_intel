@@ -1,24 +1,305 @@
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
+index b88dfbc7..d4d9108c 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
+@@ -332,11 +332,11 @@ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
  #endif
+-static int
+-decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+-		      size_t code_len, cs_mode mode,
+-		      bool *scalar_compare_p2_normalized,
+-		      uint8_t *original_scalar_compare_p2)
++static int decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
++				 size_t code_len, cs_mode mode,
++				 bool *scalar_compare_p2_normalized,
++				 uint8_t *original_scalar_compare_p2,
++				 MCInst *scanInst, uint16_t *scanSize)
+ {
+ 	const uint8_t *decode_code = code;
+ 	size_t decode_size = code_len;
+@@ -582,7 +582,14 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 		}
+ 	}
+ 
+-	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
++	/* APX restores register-extension state after decoding. Keep its
++	 * translation in the original order; other scan operands can share
++	 * the decoder's fused reader and validation dispatch. */
++	const int ret =
++		scanInst && !apx_evex_normalized ?
++			decodeInstructionScan(insn, decode_code, decode_size,
++					      mode, scanInst, scanSize) :
++			decodeInstruction(insn, decode_code, decode_size, mode);
+ 
+ 	/* No further byte reads follow decoding; keep the input pointer valid
+ 	 * when the local normalization buffer goes out of scope. */
+@@ -639,11 +646,16 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	bool result;
+ 
+ 	InternalInstruction insn = { 0 };
+-	if (extension_opcode == 0x62)
++	if (extension_opcode == 0x62) {
++		const bool scan = scanOnly ||
++				  (handle->no_text && !handle->detail_opt);
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+-					    &original_scalar_compare_p2);
+-	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
++					    &original_scalar_compare_p2,
++					    scan ? instr : NULL, size);
++		if (ret == X86_SCAN_COMPLETE)
++			return true;
++	} else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
+ 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
+ 					    instr, size);
+ 		if (ret != X86_SCAN_RAW_READY)
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..6c6ea557 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -202,7 +202,8 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
+  *                with the data read.
+  * @return      - 0 if the read was successful; nonzero otherwise.
+  */
+-static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
++X86_DECODE_INLINE int consumeByte(struct InternalInstruction *insn,
++				  uint8_t *byte)
+ {
+ 	size_t offset = insn->readerCursor;
+ 	if (offset >= insn->codeSize)
+diff --git a/arch/X86/X86DisassemblerDecoder.h b/arch/X86/X86DisassemblerDecoder.h
+index ae3428b5..0882b87b 100644
+--- a/arch/X86/X86DisassemblerDecoder.h
++++ b/arch/X86/X86DisassemblerDecoder.h
+@@ -706,9 +706,8 @@ enum X86DecodeScanResult {
+  * INVALID may leave size written if selected-case translation failed. NULL
+  * mcInst retains raw decoding with only 0/-1 results. Only RAW_READY promises
+  * a materialized raw instruction; COMPLETE supplies the finished scan output.
+- * The caller selects scan
+- * after extension dispatch; EVEX remains raw so the backend keeps its existing
+- * prefix normalization and restoration order. */
++ * The caller selects scan after extension dispatch. APX-normalized EVEX
++ * retains raw decoding so extension bits are restored before translation. */
+ int decodeInstructionScan(struct InternalInstruction *insn, const uint8_t *code,
+ 			  size_t codeSize, cs_mode mode, struct MCInst *mcInst,
+ 			  uint16_t *size);
+diff --git a/arch/X86/X86GenOperandScan.inc b/arch/X86/X86GenOperandScan.inc
+index 4b31cfd0..f427ebed 100644
+--- a/arch/X86/X86GenOperandScan.inc
++++ b/arch/X86/X86GenOperandScan.inc
+@@ -3,6 +3,36 @@
+ /* Generated by suite/synctools/x86_operand_specializations.py; do not edit. */
+ 
+ #ifdef CAPSTONE_X86_REDUCE
++static const uint8_t evex_register_scan_plans[] = {
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++};
++/* Register-only plans retain the canonical header and legality checks.
++ * Their operand translation emits no fields in a scan result. */
++if (insn->vectorExtensionType == TYPE_EVEX && insn->consumedModRM &&
++    modFromModRM(insn->modRM) == 3) {
++	const unsigned plan = evex_register_scan_plans[insn->spec->operands];
++	if (plan) {
++		insn->operands = &x86OperandSets[insn->spec->operands][0];
++		if (readVVVV(insn) || (!(plan & 2) && insn->vvvv != 0))
++			return X86_SCAN_INVALID;
++		for (unsigned n = 0; n < (plan >> 2); ++n)
++			if (readImmediateImpl(insn, 1, false))
++				return X86_SCAN_INVALID;
++		if (finishDecodedInstruction(insn, true))
++			return X86_SCAN_INVALID;
++		*size = (uint16_t)insn->length;
++		return beginTranslation(mcInst, insn) ? X86_SCAN_INVALID :
++						      X86_SCAN_COMPLETE;
++	}
++}
+ switch (insn->spec->operands) {
+ case 0:
+ {
+@@ -2217,6 +2247,85 @@ default:
+ 	break;
+ }
+ #else
++static const uint8_t evex_register_scan_plans[] = {
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0,
++	0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0,
++	0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 1, 0, 0,
++	0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
++	0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
++	0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
++	0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 5, 0, 0, 0, 0, 5,
++	5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0,
++	0, 1, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 7, 0, 0,
++	7, 0, 0, 7, 7, 0, 0, 0, 0, 7, 0, 7, 0, 7, 0, 0,
++	0, 0, 3, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0,
++	3, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0,
++	0, 0, 0, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 5, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 7, 0, 0, 0,
++	0, 0, 7, 0, 0, 0, 0, 3, 0, 0, 3, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1,
++	0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1,
++	0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0,
++	1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0, 0, 0,
++	0, 0, 0, 0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0,
++	0, 3, 0, 0, 7, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0,
++};
++/* Register-only plans retain the canonical header and legality checks.
++ * Their operand translation emits no fields in a scan result. */
++if (insn->vectorExtensionType == TYPE_EVEX && insn->consumedModRM &&
++    modFromModRM(insn->modRM) == 3) {
++	const unsigned plan = evex_register_scan_plans[insn->spec->operands];
++	if (plan) {
++		insn->operands = &x86OperandSets[insn->spec->operands][0];
++		if (readVVVV(insn) || (!(plan & 2) && insn->vvvv != 0))
++			return X86_SCAN_INVALID;
++		for (unsigned n = 0; n < (plan >> 2); ++n)
++			if (readImmediateImpl(insn, 1, false))
++				return X86_SCAN_INVALID;
++		if (finishDecodedInstruction(insn, true))
++			return X86_SCAN_INVALID;
++		*size = (uint16_t)insn->length;
++		return beginTranslation(mcInst, insn) ? X86_SCAN_INVALID :
++						      X86_SCAN_COMPLETE;
++	}
++}
+ switch (insn->spec->operands) {
+ case 0:
+ {
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..842531b7 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -319,8 +319,9 @@ def emit_translation(suffix):
+ def emit_scan(suffix):
+     translations_by_index = dict(translation_specializations(suffix))
+     groups = defaultdict(list)
++    plans = [0] * len(read_sets(X86 / f"X86GenDisassemblerTables{suffix}.inc"))
+     for index, operands in read_specializations(suffix):
+-        # Bound the fused code to scalar and three-operand VEX shapes.
++        # Keep memory and predicate-changing EVEX operands on their existing path.
+         scalar = all(
+             encoding in ENCODINGS and operand_type in TYPES
+             for encoding, operand_type in operands
+@@ -338,12 +339,50 @@ def emit_scan(suffix):
+                 for _, operand_type in operands
+             )
+         )
++        evex_registers = any(
++            encoding in RM_ENCODINGS - {"ENCODING_RM"} for encoding, _ in operands
++        ) and all(
++            encoding in RM_ENCODINGS | {"ENCODING_REG", "ENCODING_VVVV", "ENCODING_IB"}
++            and operand_type in {"TYPE_XMM", "TYPE_YMM", "TYPE_ZMM", "TYPE_UIMM8"}
++            for encoding, operand_type in operands
++        )
++        if index in translations_by_index and evex_registers:
++            # Vector classes admit every encoded register number. UIMM8 cannot
++            # change the opcode, and duplicate operands emit nothing in scan.
++            immediates = sum(encoding == "ENCODING_IB" for encoding, _ in operands)
++            has_vvvv = any(encoding == "ENCODING_VVVV" for encoding, _ in operands)
++            plans[index] = 1 | (int(has_vvvv) << 1) | (immediates << 2)
+         if index in translations_by_index and (scalar or vex):
+             # DUP is absent from the read sequence but remains significant to
+             # translation order and multiplicity. Both sequences identify a case.
+             groups[(operands, translations_by_index[index])].append(index)
+ 
+-    lines = ["switch (insn->spec->operands) {"]
++    lines = ["static const uint8_t evex_register_scan_plans[] = {"]
++    for first in range(0, len(plans), 16):
++        lines.append("\t" + ", ".join(map(str, plans[first : first + 16])) + ",")
++    lines += [
++        "};",
++        "/* Register-only plans retain the canonical header and legality checks.",
++        " * Their operand translation emits no fields in a scan result. */",
++        "if (insn->vectorExtensionType == TYPE_EVEX && insn->consumedModRM &&",
++        "    modFromModRM(insn->modRM) == 3) {",
++        "\tconst unsigned plan = evex_register_scan_plans[insn->spec->operands];",
++        "\tif (plan) {",
++        "\t\tinsn->operands = &x86OperandSets[insn->spec->operands][0];",
++        "\t\tif (readVVVV(insn) || (!(plan & 2) && insn->vvvv != 0))",
++        "\t\t\treturn X86_SCAN_INVALID;",
++        "\t\tfor (unsigned n = 0; n < (plan >> 2); ++n)",
++        "\t\t\tif (readImmediateImpl(insn, 1, false))",
++        "\t\t\t\treturn X86_SCAN_INVALID;",
++        "\t\tif (finishDecodedInstruction(insn, true))",
++        "\t\t\treturn X86_SCAN_INVALID;",
++        "\t\t*size = (uint16_t)insn->length;",
++        "\t\treturn beginTranslation(mcInst, insn) ? X86_SCAN_INVALID :",
++        "\t\t\t\t\t\t      X86_SCAN_COMPLETE;",
++        "\t}",
++        "}",
++        "switch (insn->spec->operands) {",
++    ]
+     for (reads, translations), indices in groups.items():
+         lines.extend(f"case {index}:" for index in indices)
+         lines.append("{")
+@@ -951,7 +990,11 @@ def emit_terminal(suffix):
+         f"readImmediateImpl(insn, {width}, false)": width
+         for width in IMMEDIATES.values()
+     }
+-    lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
++    lines.append(
++        "static const uint8_t x86LegacyImmediateBytes[3]["
++        + str(len(public_tails))
++        + "] = {"
++    )
+     for size, address_size in ((2, 2), (4, 4), (4, 8)):
+         extents = []
+         for tail in public_tails:
+@@ -962,7 +1005,9 @@ def emit_terminal(suffix):
+                     immediate = 0
+                 else:
+                     width = immediate_readers[call]
+-                    immediate = immediate if width == "insn->immediateSize" else int(width)
++                    immediate = (
++                        immediate if width == "insn->immediateSize" else int(width)
++                    )
+                     tables.require(immediate > 0, "Invalid immediate extent")
+                     total += immediate
+             extents.append(str(total))
