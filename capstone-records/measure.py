@@ -34,7 +34,15 @@ w = Path(tempfile.mkdtemp(prefix='capstone-mapping-presence-profile-'))
 try:
     assert sp.check_output(['git', 'rev-parse', 'HEAD'], cwd=source, text=True).strip() == meta['parent']
     assert not sp.check_output(['git', 'status', '--porcelain'], cwd=source)
-    assert hashlib.sha256((r / 'candidate.patch').read_bytes()).hexdigest() == meta['sha256']
+    patch = w / 'candidate.patch'
+    canonical = sp.check_output(['git','show','HEAD:capstone-records/candidate.patch'],cwd=r.parent)
+    checkout = (r / 'candidate.patch').read_bytes()
+    assert hashlib.sha256(canonical).hexdigest() == meta['sha256']
+    assert checkout == canonical or checkout.replace(b'\r\n',b'\n') == canonical
+    patch.write_bytes(canonical)
+    save('patch-source',dict(canonical_sha256=meta['sha256'],
+                            checkout_sha256=hashlib.sha256(checkout).hexdigest(),
+                            checkout_was_crlf=checkout != canonical))
     save('inputs', dict(candidate=meta, profile=profile, compiler=compiler, arches=arches))
     b = w / 'build'
     options = ['-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
@@ -66,7 +74,7 @@ try:
         extension = '.dylib' if os.uname().sysname == 'Darwin' else '.so'
         library = b / ('libcapstone' + extension)
         shutil.copyfile(library, w / ('base' + extension))
-    run(['git', '-c', 'core.autocrlf=false', 'apply', '--index', r / 'candidate.patch'], 'apply')
+    run(['git', '-c', 'core.autocrlf=false', 'apply', '--index', patch], 'apply')
     tree = sp.check_output(['git', 'write-tree'], cwd=source, text=True).strip()
     assert tree == meta['tree']
     run(['cmake', '--build', b, '--config', 'Release', '--parallel', '4'], 'candidate-build')

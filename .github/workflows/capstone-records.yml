@@ -1,7 +1,7 @@
-name: Validate backend detail guards on affected architectures
+name: Validate affected backend guards on Windows with canonical patch bytes
 on:
   push:
-    branches: [codex/capstone-mapping-presence-guard-profiles]
+    branches: [codex/capstone-mapping-presence-guard-windows]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,18 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: gcc, profile: default, archs: combined }
-          - { host: ubuntu-22.04, cc: gcc, profile: diet, archs: combined }
-          - { host: ubuntu-24.04, cc: gcc, profile: default, archs: combined }
-          - { host: ubuntu-24.04, cc: gcc, profile: diet, archs: combined }
-          - { host: ubuntu-24.04, cc: clang, profile: default, archs: combined }
-          - { host: ubuntu-24.04, cc: clang, profile: diet, archs: combined }
-          - { host: ubuntu-24.04, cc: clang, profile: sanitize, archs: combined }
-          - { host: ubuntu-24.04, cc: gcc, profile: default, archs: LOONGARCH }
-          - { host: ubuntu-24.04, cc: gcc, profile: default, archs: SYSTEMZ }
-          - { host: ubuntu-24.04-arm, cc: clang, profile: default, archs: combined }
-          - { host: ubuntu-24.04-arm, cc: gcc, profile: diet, archs: combined }
-          - { host: macos-15, cc: clang, profile: default, archs: combined }
           - { host: windows-2022, cc: MD, profile: default, archs: combined }
           - { host: windows-2022, cc: MT, profile: default, archs: combined }
     runs-on: ${{ matrix.host }}
