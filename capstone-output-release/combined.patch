@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..38cacf94 100644
+index a976814e..d3291c39 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -7,85 +7,149 @@ index a976814e..38cacf94 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
 -			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 0, X86_VEX32_REGISTER_PLAN, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
  			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..26e8c1a4 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -145,4 +145,12 @@ static inline void X86_writeSimpleDetail(cs_detail *detail,
+ 	}
+ }
+ 
++/* Enable the VEX32 register plan in the qualified four-backend profile. */
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__)
++#define X86_VEX32_REGISTER_PLAN X86_PLAN_VECTOR
++#else
++#define X86_VEX32_REGISTER_PLAN 0
++#endif
++
+ #endif
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..f3b8067b 100644
+index 6df1472d..6c19196d 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
-@@ -73,7 +73,8 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+@@ -73,7 +73,12 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
  		d->groups_count = row->group_count;
  		cs_x86 *x = &d->x86;
  		memcpy(x->opcode, code, prefix);
--		x->addr_size = 8;
++#if X86_VEX32_REGISTER_PLAN
 +		/* VEX and EVEX use a nonzero synthetic REX only in 64-bit mode. */
 +		x->addr_size = rex ? 8 : 4;
++#else
+ 		x->addr_size = 8;
++#endif
  		x->rex = (uint8_t)rex;
  		x->modrm = code[prefix + 1];
  		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
-@@ -465,15 +466,17 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -465,15 +470,27 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
   * Memory forms and unsupported vector widths fall back before any output. */
  static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  				   cs_insn *insn, uint16_t *insn_size,
--				   unsigned prefix)
++#if X86_VEX32_REGISTER_PLAN
 +				   unsigned prefix, bool wide)
++#else
+ 				   unsigned prefix)
++#endif
  {
  	const unsigned flags = code[prefix - 1];
  	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
--	if ((flags & 3) != 1 || !map || map > 3)
++#if X86_VEX32_REGISTER_PLAN
 +	if ((flags & 3) != 1 || !map || map > 3 ||
 +	    (!wide && (code[1] & 0xc0) != 0xc0))
++#else
+ 	if ((flags & 3) != 1 || !map || map > 3)
++#endif
  		return false;
  	const unsigned ll = (flags >> 2) & 1;
  	const unsigned w = prefix == 3 && (flags & 0x80);
  	const unsigned rxb = (~(unsigned)code[1] >> 5) & (prefix == 2 ? 4 : 7);
++#if X86_VEX32_REGISTER_PLAN
 +	const unsigned rex = wide ? 0x40 | (w << 3) | rxb : 0;
++#endif
  	const unsigned modrm = code[prefix + 1];
  	const unsigned opcode = code[prefix];
  	if (map == 1 && opcode >= 0x71 && opcode <= 0x73) {
-@@ -485,7 +488,7 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -485,7 +502,11 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  					  (modrm & 7) | ((rxb & 1) << 3) };
  		return writeVectorRegisters(code, insn, insn_size,
  					    &vex_shift_rows[index], prefix, ll,
--					    0x40 | (w << 3) | rxb, ll, regs, 2);
++#if X86_VEX32_REGISTER_PLAN
 +					    rex, ll, regs, 2);
++#else
+ 					    0x40 | (w << 3) | rxb, ll, regs, 2);
++#endif
  	}
  	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
  	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -497,8 +500,8 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+@@ -497,8 +518,13 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
  	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
  				  (~flags >> 3) & 15,
  				  (modrm & 7) | ((rxb & 1) << 3) };
--	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,
--				    0x40 | (w << 3) | rxb, ll, regs, 3);
++#if X86_VEX32_REGISTER_PLAN
 +	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll, rex,
 +				    ll, regs, 3);
++#else
+ 	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,
+ 				    0x40 | (w << 3) | rxb, ll, regs, 3);
++#endif
  }
  
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
-@@ -516,12 +519,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -516,12 +542,24 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
--		return writeVexRipLoad(code, size, insn, insn_size);
++#if X86_VEX32_REGISTER_PLAN
 +		return wide && writeVexRipLoad(code, size, insn, insn_size);
++#else
+ 		return writeVexRipLoad(code, size, insn, insn_size);
++#endif
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
--					      prefix);
--	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
++#if X86_VEX32_REGISTER_PLAN
 +					      prefix, wide);
++#else
+ 					      prefix);
++#endif
++#if X86_VEX32_REGISTER_PLAN
 +	return wide && writeVexIndexedOutput(code, size, insn, insn_size, regs);
++#else
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
++#endif
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
   * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..38ae3cc6 100644
+index ccc4f0de..3d0c1ef0 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -621,7 +621,7 @@ int main()
+@@ -538,9 +538,17 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					std::cout << (k ? " " : "");
++					if (&mode == &plans[0] &&
++					    &prefix == &mode[0] &&
++					    j + k == 0xc5)
++						std::cout
++							<< "X86_VEX32_REGISTER_PLAN";
++					else
++						std::cout << prefix[j + k];
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
+ 			}
+ 			std::cout << "\t\t},\n";
+@@ -621,7 +629,7 @@ int main()
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
