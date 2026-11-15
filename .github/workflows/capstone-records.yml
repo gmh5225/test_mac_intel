@@ -1,7 +1,7 @@
-name: Qualify cached x86 output-option eligibility mixed
+name: Qualify inline untied operand access mixed
 on:
   push:
-    branches: [codex/capstone-output-option-cache-mixed]
+    branches: [codex/capstone-inline-untied-access-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: output-option-cache-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: inline-untied-access-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

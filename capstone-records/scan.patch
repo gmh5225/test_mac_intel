@@ -1,247 +1,179 @@
-diff --git a/arch/X86/X86Module.c b/arch/X86/X86Module.c
-index 6fcbe3f4..de555cfc 100644
---- a/arch/X86/X86Module.c
-+++ b/arch/X86/X86Module.c
-@@ -10,6 +10,16 @@
- #include "X86Mapping.h"
- #include "X86Module.h"
+diff --git a/Mapping.c b/Mapping.c
+index b2be73de..f34ceca7 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -363,12 +363,8 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
+ 				       const map_insn_ops *insn_ops_map,
+ 				       size_t map_size)
+ {
+-	assert(MI);
+-	assert(MI->Opcode < map_size);
+-	assert(OpNum < sizeof(insn_ops_map[MI->Opcode].ops) /
+-			       sizeof(insn_ops_map[MI->Opcode].ops[0]));
+-
+-	cs_ac_type access = insn_ops_map[MI->Opcode].ops[OpNum].access;
++	cs_ac_type access =
++		mapping_get_op_access_raw(MI, OpNum, insn_ops_map, map_size);
+ 	if (MCInst_opIsTied(MI, OpNum) || MCInst_opIsTying(MI, OpNum))
+ 		access |= (access == CS_AC_READ) ? CS_AC_WRITE : CS_AC_READ;
+ 	return access;
+diff --git a/Mapping.h b/Mapping.h
+index 6f7281cd..74f39d79 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -59,6 +59,30 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
+ 				       const map_insn_ops *insn_ops_map,
+ 				       size_t map_size);
  
-+void X86_update_output_options(cs_struct *handle)
++/* The table lookup and its bounds have one owner for external and inline use. */
++static inline cs_ac_type
++mapping_get_op_access_raw(MCInst *MI, unsigned OpNum,
++			  const map_insn_ops *insn_ops_map, size_t map_size)
 +{
-+	handle->x86_output_eligible =
-+		(handle->mode == CS_MODE_32 || handle->mode == CS_MODE_64) &&
-+		!handle->no_text && !handle->imm_unsigned &&
-+		!handle->mnem_list &&
-+		(handle->syntax == CS_OPT_SYNTAX_INTEL ||
-+		 handle->syntax == CS_OPT_SYNTAX_DEFAULT);
++	assert(MI);
++	assert(MI->Opcode < map_size);
++	assert(OpNum < sizeof(insn_ops_map[MI->Opcode].ops) /
++			       sizeof(insn_ops_map[MI->Opcode].ops[0]));
++
++	return insn_ops_map[MI->Opcode].ops[OpNum].access;
 +}
 +
- cs_err X86_global_init(cs_struct *ud)
- {
- 	MCRegisterInfo *mri;
-@@ -43,6 +53,7 @@ cs_err X86_global_init(cs_struct *ud)
- 		ud->regsize_map = regsize_map_32;
- 
- 	X86_build_lookup_tables(ud);
-+	X86_update_output_options(ud);
- 
- 	return CS_ERR_OK;
- }
-@@ -102,6 +113,7 @@ cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value)
- 		break;
- 	}
- 
-+	X86_update_output_options(handle);
- 	return CS_ERR_OK;
- }
- 
-diff --git a/arch/X86/X86Module.h b/arch/X86/X86Module.h
-index 53d13ede..abead0f8 100644
---- a/arch/X86/X86Module.h
-+++ b/arch/X86/X86Module.h
-@@ -6,6 +6,8 @@
- 
- #include "../../utils.h"
- 
-+void X86_update_output_options(cs_struct *handle);
++/* No populated tie index exists when the initializer/writeback bound is zero. */
++static inline cs_ac_type
++mapping_get_op_access_inline(MCInst *MI, unsigned OpNum,
++			     const map_insn_ops *insn_ops_map, size_t map_size)
++{
++	assert(MI);
++	if (MI->tied_op_idx_size)
++		return mapping_get_op_access(MI, OpNum, insn_ops_map, map_size);
++	return mapping_get_op_access_raw(MI, OpNum, insn_ops_map, map_size);
++}
 +
- cs_err X86_global_init(cs_struct *ud);
- cs_err X86_option(cs_struct *handle, cs_opt_type type, size_t value);
- 
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..48c0c6aa 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -64,10 +64,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			return false;
- 		}
- 	}
--	if ((!wide && handle->mode != CS_MODE_32) || handle->no_text ||
--	    handle->imm_unsigned || handle->mnem_list || handle->doing_mem ||
--	    (handle->syntax != CS_OPT_SYNTAX_INTEL &&
--	     handle->syntax != CS_OPT_SYNTAX_DEFAULT) ||
-+	if (!handle->x86_output_eligible || handle->doing_mem ||
- 	    handle->disasm != X86_getInstruction ||
- 	    handle->insn_id != X86_get_insn_id ||
- 	    handle->printer != X86_Intel_printInst ||
-diff --git a/cs.c b/cs.c
-index b2db69da..cb5ebb03 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1300,10 +1300,18 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 
- 	case CS_OPT_UNSIGNED:
- 		handle->imm_unsigned = (cs_opt_value)value;
-+#ifdef CAPSTONE_HAS_X86
-+		if (handle->arch == CS_ARCH_X86)
-+			X86_update_output_options(handle);
-+#endif
- 		return CS_ERR_OK;
- 
- 	case CS_OPT_TEXT:
- 		handle->no_text = value == CS_OPT_OFF;
-+#ifdef CAPSTONE_HAS_X86
-+		if (handle->arch == CS_ARCH_X86)
-+			X86_update_output_options(handle);
-+#endif
- 		return CS_ERR_OK;
- 
- 	case CS_OPT_DETAIL:
-@@ -1379,6 +1387,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 					tmp->next = handle->mnem_list;
- 					handle->mnem_list = tmp;
- 				}
-+#ifdef CAPSTONE_HAS_X86
-+				if (handle->arch == CS_ARCH_X86)
-+					X86_update_output_options(handle);
-+#endif
- 				return CS_ERR_OK;
- 			} else {
- 				struct insn_mnem *prev, *tmp;
-@@ -1405,6 +1417,10 @@ cs_err CAPSTONE_API cs_option(csh ud, cs_opt_type type, uintptr_t value)
- 				}
- 			}
- 		}
-+#ifdef CAPSTONE_HAS_X86
-+		if (handle->arch == CS_ARCH_X86)
-+			X86_update_output_options(handle);
-+#endif
- 		return CS_ERR_OK;
- 
- 	case CS_OPT_MODE:
-diff --git a/cs_priv.h b/cs_priv.h
-index 903415e8..53bc17d5 100644
---- a/cs_priv.h
-+++ b/cs_priv.h
-@@ -122,6 +122,7 @@ struct cs_struct {
- 	int syntax; // asm syntax for simple printer such as ARM, Mips & PPC
- 	bool doing_mem; // handling memory operand in InstPrinter code
- 	bool doing_SME_Index; // handling a SME instruction that has index
-+	bool x86_output_eligible; // Options permit specialized x86 output.
- 	unsigned short *insn_cache; // index caching for mapping.c
- 	uint32_t *x86_insn_lut; // x86 id -> public id (high 16) and insns[] index
- 	uint32_t *x86_insn_reg_lut; // x86 packed Intel/ATT implicit register entries
+ /// Macro for easier access of operand types from the map.
+ /// Assumes the istruction operands map is called "insn_operands"
+ /// Only usable by `auto-sync` archs!
+@@ -90,9 +114,9 @@ mapping_get_op_type_diet(MCInst *MI, unsigned OpNum,
+ /// Only usable by `auto-sync` archs!
+ #ifndef CAPSTONE_DIET
+ #define map_get_op_access(MI, OpNum) \
+-	mapping_get_op_access(MI, OpNum, (const map_insn_ops *)insn_operands, \
+-			      sizeof(insn_operands) / \
+-				      sizeof(insn_operands[0]))
++	mapping_get_op_access_inline( \
++		MI, OpNum, (const map_insn_ops *)insn_operands, \
++		sizeof(insn_operands) / sizeof(insn_operands[0]))
+ #else
+ #define map_get_op_access(MI, OpNum) CS_AC_INVALID
+ #endif
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index e374be5e..a8dea9c8 100644
+index e374be5e..e3a34b82 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
-@@ -759,6 +759,12 @@ copy, append and free in their original order, even for empty or closed streams.
- The owning emitter is `PrinterCapstone::asmWriterEmitPrintAliasInstrBody` in
- the source-built NeverSight LLVM generator branch described by Auto-Sync.
+@@ -231,6 +231,13 @@ preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
+ operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
+ Register and immediate predicates retain the checks of both existing operand tags.
  
-+The private x86 direct-output entry caches whether mode, syntax, text, unsigned
-+immediates and custom mnemonics permit its specialized writers. Handle
-+initialization and successful changes to those options update the same predicate
-+in `X86Module.c`. Callback identity, memory-printing state and the global
-+formatter remain live checks at the output entry.
++`MCInst_handleWriteback` maintains an upper bound on populated tied-operand
++indices. The mapping macros read the shared access table inline when that bound
++is zero. Nonempty sets use the external mapper and its existing tie queries.
++Both paths share one checked raw table lookup; external mapping/query symbols
++remain available. `MCInst_clear` retains both tie indices and their bound, and
++complete initialization resets both.
 +
- The final public-output copy combines mnemonic extraction and the internal
- `|` prefix separator conversion. It retains the full output-buffer clearing,
- postprinter ordering and custom mnemonic replacement; the general stream
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index a72237dc..688dfded 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -738,6 +738,92 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
+ The private full x86 path uses `MCInst_InitX86` to initialize common and x86
+ metadata and the default first operand, leaving the other operand slots for
+ the decoder's append helpers. Those helpers set both operand tags and the
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 7f588c14..e5f9ffab 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -255,6 +255,79 @@ static bool test_full_group_map(void)
  	return true;
  }
  
-+static bool compare_option_inputs(csh handles[2])
++static bool check_operand_access(MCInst *mi, unsigned tied)
 +{
-+	const uint8_t inputs[][8] = {
-+		{ 0x90 },
-+		{ 0x50 },
-+		{ 0x6a, 0x80 },
-+		{ 0x83, 0xc0, 0x80 },
-+		{ 0xeb, 0xfc },
-+		{ 0x8b, 0xc1 },
-+		{ 0x8b, 0x44, 0x24, 0x80 },
-+		{ 0x66, 0x0f, 0xef, 0xc1 },
++	static const struct {
++		cs_ac_type base;
++		cs_ac_type tied;
++	} accesses[] = {
++		{ CS_AC_INVALID, CS_AC_READ },
++		{ CS_AC_READ, CS_AC_READ | CS_AC_WRITE },
++		{ CS_AC_WRITE, CS_AC_READ | CS_AC_WRITE },
++		{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ | CS_AC_WRITE },
 +	};
-+	for (unsigned i = 0; i < sizeof(inputs) / sizeof(inputs[0]); ++i)
-+		for (size_t length = 1; length <= sizeof(inputs[i]); ++length)
-+			if (!compare(handles, inputs[i], length, 0x80 + i))
++	map_insn_ops table = { 0 };
++	for (unsigned a = 0; a < sizeof(accesses) / sizeof(accesses[0]); ++a) {
++		for (unsigned op = 0; op < MAX_NO_INSN_MAP_OPS; ++op) {
++			table.ops[op].access = accesses[a].base;
++			cs_ac_type expected = (tied & (1u << op)) ?
++						      accesses[a].tied :
++						      accesses[a].base;
++			cs_ac_type actual =
++				mapping_get_op_access(mi, op, &table, 1);
++			cs_ac_type inlined =
++				mapping_get_op_access_inline(mi, op, &table, 1);
++			if (actual != expected || inlined != expected) {
++				fprintf(stderr,
++					"Operand %u: access %u with ties %#x: expected %u, got %u\n",
++					op, (unsigned)accesses[a].base, tied,
++					(unsigned)expected, (unsigned)actual);
 +				return false;
++			}
++		}
++	}
 +	return true;
 +}
 +
-+static bool check_option_transitions(csh handles[2], cs_mode mode)
++static bool test_operand_access(void)
 +{
-+	const struct {
-+		cs_opt_type option;
-+		uintptr_t value;
-+		cs_err error;
-+	} changes[] = {
-+		{ CS_OPT_UNSIGNED, CS_OPT_ON, CS_ERR_OK },
-+		{ CS_OPT_UNSIGNED, CS_OPT_OFF, CS_ERR_OK },
-+		{ CS_OPT_TEXT, CS_OPT_OFF, CS_ERR_OK },
-+		{ CS_OPT_UNSIGNED, CS_OPT_ON, CS_ERR_OK },
-+		{ CS_OPT_TEXT, CS_OPT_ON, CS_ERR_OK },
-+		{ CS_OPT_UNSIGNED, CS_OPT_OFF, CS_ERR_OK },
-+		{ CS_OPT_SYNTAX, CS_OPT_SYNTAX_MASM, CS_ERR_OK },
-+		{ CS_OPT_SYNTAX, CS_OPT_SYNTAX_DEFAULT, CS_ERR_OK },
-+		{ CS_OPT_SYNTAX, 0xffff, CS_ERR_OPTION },
-+		{ CS_OPT_MODE, CS_MODE_16, CS_ERR_OK },
-+		{ CS_OPT_MODE, CS_MODE_32, CS_ERR_OK },
-+		{ CS_OPT_MODE, CS_MODE_64, CS_ERR_OK },
-+		{ CS_OPT_MODE, CS_MODE_32 | CS_MODE_X86_INTEL, CS_ERR_OK },
-+		{ CS_OPT_MODE, CS_MODE_64 | CS_MODE_X86_AMD, CS_ERR_OK },
-+		{ CS_OPT_MODE, CS_MODE_32 | CS_MODE_X86_INTEL | CS_MODE_X86_AMD,
-+		  CS_ERR_OPTION },
-+		{ CS_OPT_MODE, CS_MODE_BIG_ENDIAN, CS_ERR_OPTION },
-+		{ CS_OPT_MODE, mode, CS_ERR_OK },
-+	};
-+	for (unsigned i = 0; i < sizeof(changes) / sizeof(changes[0]); ++i) {
-+		for (unsigned side = 0; side < 2; ++side)
-+			if (cs_option(handles[side], changes[i].option,
-+				      changes[i].value) != changes[i].error)
-+				return false;
-+		if (!compare_option_inputs(handles))
-+			return false;
-+	}
-+	for (unsigned side = 0; side < 2; ++side) {
-+		cs_err error = cs_option(handles[side], CS_OPT_SYNTAX,
-+					 CS_OPT_SYNTAX_ATT);
-+		if (error != CS_ERR_OK && error != CS_ERR_X86_ATT)
-+			return false;
-+	}
-+	if (!compare_option_inputs(handles))
++	MCInst mi;
++	MCOperandInfo ops[MAX_MC_OPS] = { 0 };
++	MCInstrDesc desc = { 0 };
++	cs_insn insn = { 0 };
++	MCInst_Init(&mi, CS_ARCH_ARM);
++	mi.flat_insn = &insn;
++	desc.NumOperands = MAX_MC_OPS;
++	desc.OpInfo = ops;
++	MCInst_handleWriteback(&mi, &desc, 1);
++	if (!check_operand_access(&mi, 0))
 +		return false;
-+	for (unsigned side = 0; side < 2; ++side)
-+		if (cs_option(handles[side], CS_OPT_SYNTAX,
-+			      CS_OPT_SYNTAX_INTEL))
-+			return false;
-+	const cs_opt_mnem mnemonics[] = {
-+		{ X86_INS_NOP, "pause_here" },
-+		{ X86_INS_PUSH, "stack_save" },
-+		{ X86_INS_NOP, "idle" },
-+		{ X86_INS_NOP, NULL },
-+		{ X86_INS_PUSH, NULL },
-+		{ X86_INS_PUSH, NULL },
-+		{ 0, "unused" },
-+	};
-+	for (unsigned i = 0; i < sizeof(mnemonics) / sizeof(mnemonics[0]);
-+	     ++i) {
-+		for (unsigned side = 0; side < 2; ++side)
-+			if (cs_option(handles[side], CS_OPT_MNEMONIC,
-+				      (uintptr_t)&mnemonics[i]))
-+				return false;
-+		if (!compare_option_inputs(handles))
-+			return false;
-+	}
-+	return true;
++
++	// Include duplicate destinations, a self-tie and the final MC operand.
++	ops[3].Constraints = CONSTRAINT_MCOI_TIED_TO(0);
++	ops[5].Constraints = CONSTRAINT_MCOI_TIED_TO(0);
++	ops[7].Constraints = CONSTRAINT_MCOI_TIED_TO(7);
++	ops[MAX_MC_OPS - 1].Constraints = CONSTRAINT_MCOI_TIED_TO(15);
++	MCInst_handleWriteback(&mi, &desc, 1);
++	const unsigned tied = 1u | (1u << 3) | (1u << 5) | (1u << 7) |
++			      (1u << 15);
++	if (!check_operand_access(&mi, tied))
++		return false;
++
++	// Clearing operands and replacing a shorter descriptor retain old ties.
++	MCInst_clear(&mi);
++	if (!check_operand_access(&mi, tied))
++		return false;
++	desc.NumOperands = 4;
++	ops[3].Constraints = CONSTRAINT_MCOI_TIED_TO(1);
++	MCInst_handleWriteback(&mi, &desc, 1);
++	if (!check_operand_access(&mi, tied | (1u << 1)))
++		return false;
++
++	MCInst_Init(&mi, CS_ARCH_ARM);
++	return check_operand_access(&mi, 0);
 +}
 +
- static bool check_mode(cs_mode mode)
+ int main(void)
  {
- 	csh handles[2] = { 0 };
-@@ -797,7 +883,8 @@ static bool check_mode(cs_mode mode)
- 			}
- 		}
- 	}
--	ok = check_callbacks(handles);
-+	ok = check_option_transitions(handles, mode) &&
-+	     check_callbacks(handles);
- done:
- 	for (unsigned i = 0; i < 2; ++i)
- 		if (handles[i])
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+@@ -265,7 +338,8 @@ int main(void)
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
++	return test_operand_access() && test_full_group_map() &&
++			       test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
