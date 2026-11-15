@@ -41,7 +41,7 @@ jobs:
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
           CC: gcc
-          CXX: g++
+          CXX: clang++
         run: '"$RUNNER_TEMP/capstone-product-venv/bin/python" capstone-product/product.py'
       - name: Clean temporary source exports
         if: always()
