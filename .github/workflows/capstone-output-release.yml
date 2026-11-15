@@ -1,4 +1,4 @@
-name: Qualify x86 memory admission in generated plans profiles
+name: Validate defined operand offset bounds across architectures
 on:
   push:
     branches: [codex/capstone-operand-offset-overflow-profiles]
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: defa77a3b8395499e6dfc991808ed8d1c8d83df1
+          ref: dea9fee246c21a0045a2ea63a429f9147a6a1014
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
