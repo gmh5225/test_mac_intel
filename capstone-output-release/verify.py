@@ -48,9 +48,9 @@ try:
     if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     if profile=='alias-only':units=['mapping','mcinst','api','mips_scan','aarch64_scan','aarch64_postprocess']
-    if profile != 'dedicated': units += ['mapping_compact_ops']
+    if profile != 'dedicated': units += ['mapping_pooled_ops']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
-    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['mapping_compact_ops_generator','mapping_diet_types_generator','mapping_diet_types_parser','arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
+    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['mapping_pooled_ops_generator','mapping_diet_types_generator','mapping_diet_types_parser','arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     assert 'runtime error:'not in(evidence/'tests.log').read_text()
     if profile=='all':
         run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
