@@ -107,6 +107,8 @@ def main(w):
             reported.append(factorial.measure(conditions,invoke,name,panel,mode,f,intervals,bits))
             save('factorial.json',reported)
             print(name,panel,mode,flush=True)
+        if name=='jpeg-avx2-i386':
+            save('hardware.json',factorial.hardware(conditions,invoke,w,f,intervals,bits))
     assert set(manifest)==set(selected) and len(reported)==6
     save('complete.json',dict(success=True,cases=len(reported),conditions=len(conditions),
         diagnostic_only=True,product_qualified=False))

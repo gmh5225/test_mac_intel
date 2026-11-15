@@ -13,6 +13,7 @@ import random
 import statistics
 import subprocess as sp
 import sys
+import shutil
 
 
 def setup(work, executables, save):
@@ -55,7 +56,7 @@ def setup(work, executables, save):
                        "with byte-identical A/A payload and original launches. "
                        "Each pathname retains its inode while payloads swap."))
 
-    def invoke(condition, tail):
+    def invoke(condition, tail, counter=None):
         code = condition["code"]
         if condition["kind"] == "original":
             command = [str(executables[code]), *tail]
@@ -69,6 +70,21 @@ def setup(work, executables, save):
                        argv0[condition["argv0"]], *tail]
             if condition["aslr"] == "fixed":
                 command = ["setarch", platform.machine(), "-R", *command]
+        if counter is not None:
+            perf = shutil.which('perf')
+            if not perf:
+                return dict(supported=False, reason='perf executable unavailable')
+            command = [perf, 'stat', '-x', ',', '-e',
+                       'cycles:u,instructions:u,branches:u,branch-misses:u',
+                       '-o', str(counter), '--', *command]
+            result = sp.run(command, capture_output=True, text=True)
+            raw = counter.read_text() if counter.exists() else ''
+            if result.returncode:
+                return dict(supported=False, returncode=result.returncode,
+                            stderr=result.stderr, raw=raw)
+            values = list(map(int, result.stdout.split()))
+            assert len(values) == 6
+            return dict(supported=True, raw=raw, result=values, stderr=result.stderr)
         values = list(map(int, sp.check_output(command).split()))
         assert len(values) == 6 and values[0] > 0 and values[2] > 0
         return values
@@ -100,3 +116,26 @@ def measure(conditions, invoke, case, panel, mode, file, intervals, bits):
         cycles.append(dict(ns=ns, raw=observed))
     return dict(case=case, panel=panel, mode=["scan", "format", "detail"][mode],
                 repetitions=repeats, cycles=cycles, signature=expected)
+
+
+def hardware(conditions, invoke, work, file, intervals, bits):
+    tail = ['capstone', '2', '1', str(file), str(intervals), str(bits)]
+    probe = invoke(conditions[0], tail)
+    repeats = max(1, math.ceil(600e6 / probe[0]))
+    tail[2] = str(repeats)
+    rows = []
+    rng = random.Random('matched-cpu-hardware')
+    expected = None
+    for cycle in range(7):
+        order = list(conditions)
+        rng.shuffle(order)
+        for condition in order:
+            result = invoke(condition, tail, counter=work/'hardware.csv')
+            rows.append(dict(cycle=cycle, condition=condition, **result))
+            if not result['supported']:
+                return dict(rows=rows, supported=False,
+                    scope='Whole process counters including exec wrapper and warmup; not timed-region counters.')
+            if expected is None: expected = result['result'][2:]
+            assert result['result'][2:] == expected
+    return dict(rows=rows, supported=True, repetitions=repeats,
+        scope='Whole process user counters including exec wrapper and warmup; native timed-region cycles remain separately recorded.')
