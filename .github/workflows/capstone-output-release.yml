@@ -1,7 +1,7 @@
-name: Validate compiler-specific batch result lifetimes profiles
+name: Qualify ARM detail header clear profiles
 on:
   push:
-    branches: [codex/capstone-clang-batch-state-profiles]
+    branches: [codex/capstone-arm-header-clear-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -27,6 +27,9 @@ jobs:
           - { cc: gcc, profile: dedicated, forms: combined, host: ubuntu-22.04 }
           - { cc: gcc, profile: dedicated, forms: combined, host: ubuntu-24.04 }
           - { cc: clang, profile: sanitize, forms: combined, host: ubuntu-24.04 }
+          - { cc: clang, profile: diet, forms: combined, host: ubuntu-24.04 }
+          - { cc: gcc, profile: all, forms: combined, host: ubuntu-24.04 }
+          - { cc: clang, profile: all, forms: combined, host: ubuntu-24.04 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -48,6 +51,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: clang-batch-state-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: arm-header-clear-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
