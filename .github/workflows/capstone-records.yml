@@ -1,24 +1,26 @@
-name: Measure RISC-V extension prefix admission
+name: Validate cstool RISC-V extension flags
 on:
   push:
-    branches: [codex/capstone-riscv-extension-admission-cost]
+    branches: [codex/capstone-cstool-riscv-bitmanip]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
 jobs:
-  cost:
+  verify:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
+          - { host: ubuntu-24.04, cc: gcc, diet: 'OFF' }
+          - { host: ubuntu-24.04, cc: gcc, diet: 'ON' }
+          - { host: macos-15, cc: clang, diet: 'OFF' }
+          - { host: windows-2022, cc: MD, diet: 'OFF' }
+          - { host: windows-2022, cc: MT, diet: 'OFF' }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 45
+    timeout-minutes: 35
     env:
-      BUILD_ARCHS: ${{ matrix.archs }}
-      MEASURE_CC: ${{ matrix.cc }}
+      TOOLCHAIN: ${{ matrix.cc }}
+      DIET: ${{ matrix.diet }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -30,15 +32,14 @@ jobs:
           ref: 317554d9bf62816db653124a16b23c17d3b3388b
           path: source
           persist-credentials: false
-      - name: Install instruction profiler
-        run: sudo apt-get update -qq && sudo apt-get install -y valgrind
-      - name: Profile one timed pass after complete warm-up
-        run: python3 capstone-records/measure.py
+      - name: Verify CLI option isolation and unchanged runtime objects
+        run: python capstone-records/measure.py
       - if: always()
+        shell: bash
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: riscv-extension-admission-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: cstool-riscv-bitmanip-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.diet }}
           path: evidence/
           retention-days: 14
