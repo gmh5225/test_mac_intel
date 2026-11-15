@@ -1,0 +1,109 @@
+{
+  "revision": "daf173daf53d77cd663854f04d47dbadea253712",
+  "fixture": "neverd/unittests/lift/aarch64/AArch64SignalResumeFixtures.def",
+  "include": "neverd/include",
+  "output": "live-lr-debug-evidence",
+  "target": "arm64e-apple-macosx15.0",
+  "timeout": 40,
+  "writer": "#include \"neverd/runtime/DarwinArm64eUnwindRow.h\"\n#include <cstdio>\nint main(int argc, char **argv) {\n if (argc != 2) return 1;\n auto *f = fopen(argv[1], \"wb\"); if (!f) return 2;\n NDDarwinArm64eExceptionSite site{20,24,true,0};\n NDDarwinArm64eUnwindRow row{}; row.CFAOffset=32;row.Signing=NDArm64eSignedIBWithCFA;\n NDDarwinArm64eVectorSaves vectors{};vectors.Complete=true;\n NDDarwinArm64eSavedGPR saved[]={{19,-24},{20,-32}};\n size_t count=2;\n fwrite(&site,sizeof(site),1,f);fwrite(&row,sizeof(row),1,f);\n fwrite(&vectors,sizeof(vectors),1,f);fwrite(&count,sizeof(count),1,f);fwrite(saved,sizeof(saved),1,f);\n return fclose(f);\n}\n",
+  "replacements": [
+    [
+      "static volatile sig_atomic_t signalRaised;",
+      "static volatile sig_atomic_t signalRaised;\nstatic volatile sig_atomic_t stage, debugTraps;\nstatic void timeout(int, siginfo_t *, void *c) {\n auto *uc = static_cast<ucontext_t *>(c);\n auto pc = arm_thread_state64_get_pc(uc->uc_mcontext->__ss);\n Dl_info i{}; dladdr((void *)pc, &i);\n fprintf(stderr,\"timeout stage=%d pc=%llx sp=%llx lr=%llx image=%s offset=%llx symbol=%s site=%llx\\n\",int(stage),(unsigned long long)pc,(unsigned long long)arm_thread_state64_get_sp(uc->uc_mcontext->__ss),(unsigned long long)arm_thread_state64_get_lr(uc->uc_mcontext->__ss),i.dli_fname?i.dli_fname:\"?\",(unsigned long long)(pc-(uintptr_t)i.dli_fbase),i.dli_sname?i.dli_sname:\"?\",(unsigned long long)site.Begin);\n _exit(90);\n}\n"
+    ],
+    [
+      "[[noreturn]] static void deliver(void *payload) {",
+      "[[noreturn]] static void deliver(void *payload) {\n stage=4; fprintf(stderr,\"deliver entered\\n\");\n unw_context_t c;unw_cursor_t u;unw_getcontext(&c);unw_init_local(&u,&c);\n for (int n=0;n<8;++n) {\n  unw_word_t pc,sp,lr,fp;unw_get_reg(&u,UNW_REG_IP,&pc);unw_get_reg(&u,UNW_REG_SP,&sp);unw_get_reg(&u,UNW_ARM64_LR,&lr);unw_get_reg(&u,UNW_ARM64_FP,&fp);\n  Dl_info i{};dladdr((void *)pc,&i);\n  fprintf(stderr,\"frame %d pc=%llx sp=%llx lr=%llx image=%s offset=%llx\\n\",n,(unsigned long long)pc,(unsigned long long)sp,(unsigned long long)lr,i.dli_fname?i.dli_fname:\"?\",(unsigned long long)(pc-(uintptr_t)i.dli_fbase));\n  unw_proc_info_t info{};unw_get_proc_info(&u,&info);\n  fprintf(stderr,\"  proc format=%llx start=%llx end=%llx gp=%llx\\n\",(unsigned long long)info.format,(unsigned long long)info.start_ip,(unsigned long long)info.end_ip,(unsigned long long)info.gp);\n  fprintf(stderr,\"  fp=%llx\",(unsigned long long)fp);\n  if(fp>=low && fp+16<=high)fprintf(stderr,\" slots=%llx,%llx\",(unsigned long long)*(uintptr_t*)fp,(unsigned long long)*((uintptr_t*)fp+1));\n  fprintf(stderr,\"\\n\");\n  if (n==3 && fp>=low && fp+16<=high) {\n   auto raw=*((uintptr_t*)fp+1);auto stripped=ptrauth_strip((void*)raw,ptrauth_key_return_address);\n   auto checked=(uintptr_t)ptrauth_sign_unauthenticated(stripped,ptrauth_key_return_address,fp+16);\n   fprintf(stderr,\"  main saved PAC match=%d expected=%llx\\n\",int(raw==checked),(unsigned long long)checked);\n  }\n  if(unw_step(&u)<=0)break;\n }\n"
+    ],
+    [
+      "  if (!active.load() || pc < site.Begin || pc >= site.End)",
+      "  if (debugTraps < 4) {\n    debugTraps = debugTraps + 1;\n    fprintf(stderr,\"registers x16=%llx x17=%llx x8=%llx x9=%llx\\n\",(unsigned long long)uc->uc_mcontext->__ss.__x[16],(unsigned long long)uc->uc_mcontext->__ss.__x[17],(unsigned long long)uc->uc_mcontext->__ss.__x[8],(unsigned long long)uc->uc_mcontext->__ss.__x[9]);\n    if(pc<site.Begin || pc>=site.End) {\n      auto *words=(const uint32_t *)(pc-256);\n      fprintf(stderr,\"code:\");for(int k=0;k<72;++k)fprintf(stderr,\" %08x\",words[k]);fprintf(stderr,\"\\n\");\n    }\n    const auto *insns = (const uint32_t *)(pc-16);\n    fprintf(stderr,\"insns=%08x %08x %08x %08x %08x %08x\\n\",insns[0],insns[1],insns[2],insns[3],insns[4],insns[5]);\n    fprintf(stderr,\"trap stage=%d pc=%llx offset=%lld x9=%llx active=%d\\n\",int(stage),(unsigned long long)pc,(long long)(pc-site.Begin),(unsigned long long)uc->uc_mcontext->__ss.__x[9],int(active.load()));\n  }\n  if (!active.load() || pc < site.Begin || pc >= site.End)"
+    ],
+    [
+      "  auto address = reinterpret_cast<uintptr_t>(&ctx);",
+      "  stage=1;\n  fprintf(stderr,\"original sp=%llx fp=%llx lr=%llx\\n\",(unsigned long long)arm_thread_state64_get_sp(uc->uc_mcontext->__ss),(unsigned long long)arm_thread_state64_get_fp(uc->uc_mcontext->__ss),(unsigned long long)arm_thread_state64_get_lr(uc->uc_mcontext->__ss));\n  auto address = reinterpret_cast<uintptr_t>(&ctx);"
+    ],
+    [
+      "  if (!ndDarwinArm64eDeliverSignalException(uc, site, row, saved, savedCount,",
+      "  stage=2;\n  if (!ndDarwinArm64eDeliverSignalException(uc, site, row, saved, savedCount,"
+    ],
+    [
+      "  active.store(false);",
+      "  stage=3; fprintf(stderr,\"scheduled bridge\\n\");\n  active.store(false);"
+    ],
+    [
+      "  alarm(30);",
+      "  struct sigaction deadline{}; deadline.sa_sigaction=timeout; deadline.sa_flags=SA_SIGINFO; sigemptyset(&deadline.sa_mask); sigaction(SIGALRM,&deadline,nullptr);\n  alarm(30);"
+    ],
+    [
+      "static void inspectLandingResume(ucontext_t *uc) {",
+      "static void inspectLandingResume(ucontext_t *uc) {\n stage=5;fprintf(stderr,\"resume inspect entered\\n\");"
+    ],
+    [
+      "  const auto sp = arm_thread_state64_get_sp(state);",
+      "  fprintf(stderr,\"resume regs x12=%llx x13=%llx x14=%llx x15=%llx x17=%llx expectedSP=%llx expectedLR=%llx\\n\",(unsigned long long)state.__x[12],(unsigned long long)state.__x[13],(unsigned long long)state.__x[14],(unsigned long long)state.__x[15],(unsigned long long)state.__x[17],(unsigned long long)interrupted.SP,(unsigned long long)interrupted.LR);\n  const auto sp = arm_thread_state64_get_sp(state);"
+    ],
+    [
+      "      unw_set_reg(&cursor, UNW_REG_SP, sp) || unw_step(&cursor) <= 0)",
+      "      unw_set_reg(&cursor, UNW_REG_SP, sp))"
+    ],
+    [
+      "  unw_word_t value;",
+      "  int step=unw_step(&cursor);\n  unw_word_t stepPC,stepSP;unw_get_reg(&cursor,UNW_REG_IP,&stepPC);unw_get_reg(&cursor,UNW_REG_SP,&stepSP);\n  fprintf(stderr,\"resume step=%d pc=%llx sp=%llx\\n\",step,(unsigned long long)stepPC,(unsigned long long)stepSP);\n  if(step<=0)_exit(24);\n  unw_word_t value;"
+    ]
+  ],
+  "header_replacements": [
+    [
+      "#include <unwind.h>",
+      "#include <unwind.h>\n#include <stdio.h>"
+    ],
+    [
+      "  unw_cursor_t *System = (unw_cursor_t *)Context;",
+      "  fprintf(stderr,\"personality actions=%d\\n\",(int)Actions);\n  unw_cursor_t *System = (unw_cursor_t *)Context;"
+    ],
+    [
+      "  if (Result == _URC_HANDLER_FOUND) {",
+      "  fprintf(stderr,\"original personality result=%d lr=%llx sourceSP=%llx virtual=%llx\\n\",(int)Result,(unsigned long long)CallerLR,(unsigned long long)InterruptedSP,(unsigned long long)VirtualReturn);\n  if (Result == _URC_HANDLER_FOUND) {"
+    ],
+    [
+      "    const uintptr_t LandingPad = _Unwind_GetIP(Context);",
+      "    const uintptr_t LandingPad = _Unwind_GetIP(Context);\n    fprintf(stderr,\"install lp=%llx\\n\",(unsigned long long)LandingPad);"
+    ],
+    [
+      "  return Result;",
+      "  fprintf(stderr,\"personality done\\n\");\n  return Result;"
+    ]
+  ],
+  "control_replacements": [
+    [
+      "    if (!row.SavedLR) {",
+      "    if (false) {"
+    ],
+    [
+      " && !resumeObserved)",
+      " && false)"
+    ]
+  ],
+  "cases": [
+    {
+      "name": "cpp-cleanup",
+      "objc": false,
+      "catch": false
+    },
+    {
+      "name": "cpp-catch",
+      "objc": false,
+      "catch": true
+    },
+    {
+      "name": "objc-cleanup",
+      "objc": true,
+      "catch": false
+    },
+    {
+      "name": "objc-catch",
+      "objc": true,
+      "catch": true
+    }
+  ]
+}
