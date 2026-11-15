@@ -1,7 +1,7 @@
-name: Measure output policy checks before plan decoding
+name: Measure scalar SSE prefix register output costs
 on:
   push:
-    branches: [codex/capstone-output-policy-first-cost]
+    branches: [codex/capstone-legacy-scalar-register-output-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: dea9fee246c21a0045a2ea63a429f9147a6a1014
+          ref: 0e6390fe9f8fa38c431ccbf7e8c54692afd3181e
           path: source
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: output-policy-first-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: legacy-scalar-register-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
