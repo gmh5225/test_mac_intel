@@ -453,9 +453,18 @@ index 00000000..fbb199d3
 +	380,
 +};
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index e82eaaa5..fc4fd99e 100644
+index e82eaaa5..31d6547f 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
+@@ -140,7 +140,7 @@ const insn_map aarch64_insns[] = {
+ #include "AArch64GenCSMappingInsn.inc"
+ };
+ 
+-#if !defined(CAPSTONE_DIET) || !defined(CAPSTONE_USE_ALIAS_TRIE)
++#ifndef CAPSTONE_DIET
+ static const name_map insn_alias_mnem_map[] = {
+ #include "AArch64GenCSAliasMnemMap.inc"
+ 	{ AARCH64_INS_ALIAS_CFP, "cfp" },
 @@ -165,6 +165,10 @@ static const name_map insn_alias_mnem_map[] = {
  };
  #endif
