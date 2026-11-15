@@ -1,24 +1,36 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
- #endif
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..1ba999f5 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	uint16_t attrMask;
+ 	uint16_t instructionID;
+ 	bool rexWOverridesOpSize;
++	const bool legacyVector = decoderMode != MODE_64BIT &&
++				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
+ 
+ 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
+ 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
+@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	}
+ 
+ 	/* The following clauses compensate for limitations of the tables. */
+-	if (decoderMode != MODE_64BIT &&
+-	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
++	if (legacyVector) {
+ 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
+ 			return -1;
+ 		}
+@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 
+ 		return 0;
+ 	}
+-	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
++	/* Legacy-mode vectors already resolved this unmodified mask before
++	 * W-bit disambiguation. The special addressing lookup above returns. */
++	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
+ 		return -1;
+-	}
+ 
+ 	if ((decoderMode == MODE_16BIT ||
+ 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&

@@ -1,7 +1,7 @@
-name: Qualify EVEX mask admission profiles
+name: Qualify legacy-mode vector opcode reuse profiles
 on:
   push:
-    branches: [codex/capstone-evex-mask-admission-profiles]
+    branches: [codex/capstone-vector-id-reuse-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -46,13 +46,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
+          ref: d4699957199ddbd9b01daa592b69f81bc59e2e7a
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-admission-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: vector-id-reuse-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
