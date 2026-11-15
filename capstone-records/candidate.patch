@@ -1,0 +1,90 @@
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index d6775ef0..7fcfbac8 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -530,16 +530,18 @@ static cs_ac_type Mips_map_op_access(MCInst *MI, unsigned OpNum)
+ 
+ static void Mips_set_detail_op_mem_reg(MCInst *MI, unsigned OpNum, mips_reg Reg)
+ {
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
+-	Mips_get_detail_op(MI, 0)->mem.base = Reg;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_MEM;
++	op->mem.base = Reg;
++	op->access = Mips_map_op_access(MI, OpNum);
+ }
+ 
+ static void Mips_set_detail_op_mem_disp(MCInst *MI, unsigned OpNum, int64_t Imm)
+ {
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
+-	Mips_get_detail_op(MI, 0)->mem.disp = Imm;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_MEM;
++	op->mem.disp = Imm;
++	op->access = Mips_map_op_access(MI, OpNum);
+ }
+ 
+ static void Mips_set_detail_op_imm(MCInst *MI, unsigned OpNum, int64_t Imm)
+@@ -552,9 +554,10 @@ static void Mips_set_detail_op_imm(MCInst *MI, unsigned OpNum, int64_t Imm)
+ 		return;
+ 	}
+ 
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_IMM;
+-	Mips_get_detail_op(MI, 0)->imm = Imm;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_IMM;
++	op->imm = Imm;
++	op->access = Mips_map_op_access(MI, OpNum);
+ 	Mips_inc_op_count(MI);
+ }
+ 
+@@ -568,10 +571,11 @@ static void Mips_set_detail_op_uimm(MCInst *MI, unsigned OpNum, uint64_t Imm)
+ 		return;
+ 	}
+ 
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_IMM;
+-	Mips_get_detail_op(MI, 0)->uimm = Imm;
+-	Mips_get_detail_op(MI, 0)->is_unsigned = true;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_IMM;
++	op->uimm = Imm;
++	op->is_unsigned = true;
++	op->access = Mips_map_op_access(MI, OpNum);
+ 	Mips_inc_op_count(MI);
+ }
+ 
+@@ -588,10 +592,11 @@ static void Mips_set_detail_op_reg(MCInst *MI, unsigned OpNum, mips_reg Reg,
+ 
+ 	CS_ASSERT(is_reglist ||
+ 		  (Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM) == CS_OP_REG);
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_REG;
+-	Mips_get_detail_op(MI, 0)->reg = Reg;
+-	Mips_get_detail_op(MI, 0)->is_reglist = is_reglist;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_REG;
++	op->reg = Reg;
++	op->is_reglist = is_reglist;
++	op->access = Mips_map_op_access(MI, OpNum);
+ 	Mips_inc_op_count(MI);
+ }
+ 
+@@ -677,10 +682,11 @@ static void Mips_set_detail_op_mem_nanomips(MCInst *MI, unsigned OpNum)
+ 	CS_ASSERT(doing_mem(MI));
+ 
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNum);
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_MEM;
+ 	// Base is a register, but nanoMips uses the Imm value as register.
+-	Mips_get_detail_op(MI, 0)->mem.base = MCOperand_getImm(Op);
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	op->mem.base = MCOperand_getImm(Op);
++	op->access = Mips_map_op_access(MI, OpNum);
+ }
+ 
+ static void Mips_set_detail_op_reglist(MCInst *MI, unsigned OpNum,
