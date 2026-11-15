@@ -108,6 +108,18 @@ def measure(work, cases, save):
     assert setup.returncode == 0, setup.stderr
     samples = []
     try:
+        smoke = work / 'perf-smoke.data'
+        check = sp.run([str(perf), 'record', '-q', '-B', '-e', 'cpu-clock:u', '-c', '1000000',
+                        '-o', str(smoke), '--', 'python3', '-c', 'sum(i*i for i in range(3000000))'],
+                       capture_output=True, text=True)
+        assert check.returncode == 0, check.stderr
+        export = sp.run([str(perf), 'script', '-i', str(smoke), '-F', 'ip,sym,symoff,dso', '--no-demangle'],
+                        capture_output=True, text=True)
+        save('perf-export-preflight.json', dict(record_returncode=check.returncode,
+             script_returncode=export.returncode, stderr=export.stderr,
+             lines=len(export.stdout.splitlines()), example=export.stdout.splitlines()[:5]))
+        assert export.returncode == 0 and export.stdout.strip(), export.stderr
+        smoke.unlink()
         unprofiled('before')
         for case, mode in selected:
             warm = checked(sp.check_output(command('integer', conditions[0], case, mode, 2), text=True), case, mode)
@@ -124,7 +136,7 @@ def measure(work, cases, save):
                     (evidence / (name + '-record.stderr')).write_text(proc.stderr)
                     assert proc.returncode == 0, (name, proc.returncode, proc.stderr[-2000:])
                     row = checked(proc.stdout, case, mode)
-                    script = sp.run([str(perf), 'script', '-i', str(data), '-F', 'ip,sym,dso', '--sym-offset'],
+                    script = sp.run([str(perf), 'script', '-i', str(data), '-F', 'ip,sym,symoff,dso', '--no-demangle'],
                                     capture_output=True, text=True)
                     (evidence / (name + '-script.stderr')).write_text(script.stderr)
                     assert script.returncode == 0, (name, script.stderr[-2000:])
