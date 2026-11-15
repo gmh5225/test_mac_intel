@@ -1,0 +1,173 @@
+diff --git a/arch/RISCV/RISCVGenDirectDecoder.inc b/arch/RISCV/RISCVGenDirectDecoder.inc
+index 5ce47d48..7de00aa2 100644
+--- a/arch/RISCV/RISCVGenDirectDecoder.inc
++++ b/arch/RISCV/RISCVGenDirectDecoder.inc
+@@ -17234,6 +17234,14 @@ static DecodeStatus directInstruction_4(const uint8_t *Table, MCInst *MI, uint32
+ 
+ {
+ 
++	/* A rejected prefix cannot reach Decode or TryDecode. */
++
++	if ((insn & UINT32_C(0xf)) != UINT32_C(0xb) &&
++
++	    (Table == DecoderTableXCValu32 || Table == DecoderTableXCVbi32 || Table == DecoderTableXCVbitmanip32 || Table == DecoderTableXCVelw32 || Table == DecoderTableXCVmac32 || Table == DecoderTableXCVmem32 || Table == DecoderTableXCVsimd32))
++
++		return MCDisassembler_Fail;
++
+ 	if (Table == DecoderTable32) return direct_DecoderTable32(MI, insn, Address, Decoder);
+ 
+ 	if (Table == DecoderTableRV32Zacas32) return direct_DecoderTableRV32Zacas32(MI, insn, Address, Decoder);
+diff --git a/suite/synctools/fixed_len_decoder.py b/suite/synctools/fixed_len_decoder.py
+index 29a72009..14122a16 100644
+--- a/suite/synctools/fixed_len_decoder.py
++++ b/suite/synctools/fixed_len_decoder.py
+@@ -144,6 +144,54 @@ def successors(n):
+     return [n.end] + ([] if n.target is None else [n.target])
+ 
+ 
++def observable_prefixes(nodes, bits=7):
++    """Conservatively admit any prefix that could reach an MCInst mutation."""
++    result = set()
++    for prefix in range(1 << bits):
++        pending = [(0, None)]
++        seen = set()
++        while pending:
++            position, field = pending.pop()
++            state = (position, field)
++            if state in seen:
++                continue
++            seen.add(state)
++            node = nodes[position]
++            if node.op in ("Decode", "TryDecode"):
++                result.add(prefix)
++                break
++            if node.op == "Fail":
++                continue
++            if node.op == "ExtractField":
++                pending.append((node.end, node.args))
++                continue
++            if node.op in ("FilterValue", "CheckField"):
++                if node.op == "FilterValue":
++                    compared, expected = field, node.args[0]
++                else:
++                    compared, expected = node.args[:2], node.args[2]
++                if compared is None:
++                    match, mismatch = expected == 0, expected != 0
++                else:
++                    start, length = compared
++                    known = max(0, min(length, bits - start))
++                    mask = (1 << known) - 1
++                    match = expected < (1 << length) and (expected & mask) == (
++                        (prefix >> start) & mask
++                    )
++                    mismatch = not match or known < length
++                if match:
++                    pending.append((node.end, field))
++                if mismatch:
++                    pending.append((node.target, field))
++                continue
++            # Predicates are pure queries; either answer remains possible.
++            assert node.op in ("CheckPredicate", "SoftFail"), node.op
++            pending.append((node.end, field))
++            if node.target is not None:
++                pending.append((node.target, field))
++    return result
++
+ def primary_opcode_mask(nodes):
+     """A top-level miss must reach Fail without modifying the instruction."""
+     root = nodes[0]
+@@ -305,6 +353,24 @@ def main():
+                 f"static DecodeStatus directInstruction_{w}(const uint8_t *Table, MCInst *MI, uint{width}_t insn, uint64_t Address, const void *Decoder)",
+                 "{",
+             ]
++            if arch == "RISCV" and w == 4:
++                corev = [n for n in selected if n.startswith("DecoderTableXCV")]
++                prefixes = set()
++                for name, body in tables:
++                    if name in corev:
++                        prefixes.update(observable_prefixes(parse(body)))
++                require(bool(prefixes), "No observable CORE-V decoder paths")
++                first = min(prefixes)
++                mask = 127
++                for value in prefixes:
++                    mask &= ~(first ^ value)
++                if mask:
++                    output += [
++                        "\t/* A rejected prefix cannot reach Decode or TryDecode. */",
++                        f"\tif ((insn & UINT32_C(0x{mask:x})) != UINT32_C(0x{first & mask:x}) &&",
++                        "\t    (" + " || ".join(f"Table == {n}" for n in corev) + "))",
++                        "\t\treturn MCDisassembler_Fail;",
++                    ]
+             for name in selected:
+                 output.append(
+                     f"\tif (Table == {name}) return direct_{name}(MI, insn, Address, Decoder);"
+diff --git a/tests/unit/test_fixed_len_decoder.py b/tests/unit/test_fixed_len_decoder.py
+index f3677119..5561705a 100644
+--- a/tests/unit/test_fixed_len_decoder.py
++++ b/tests/unit/test_fixed_len_decoder.py
+@@ -91,5 +91,65 @@ class CheckoutNewlines(unittest.TestCase):
+                         self.check(root)
+ 
+ 
++class ObservablePrefixes(unittest.TestCase):
++    def test_rejected_prefix_cannot_mutate_instruction(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("CheckField", (0, 7, 11), 1, 2),
++            1: n("Decode", (1, 0), 2),
++            2: n("Fail", (), 3),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {11})
++
++    def test_unknown_high_bits_keep_both_branches(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("ExtractField", (7, 1), 1),
++            1: n("FilterValue", (0,), 2, 4),
++            2: n("CheckField", (0, 7, 11), 3, 6),
++            3: n("Decode", (1, 0), 4),
++            4: n("CheckField", (0, 7, 43), 5, 6),
++            5: n("Decode", (2, 0), 6),
++            6: n("Fail", (), 7),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {11, 43})
++
++    def test_failed_try_decode_is_still_observable(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("CheckField", (0, 7, 91), 1, 2),
++            1: n("TryDecode", (1, 0), 2, 2),
++            2: n("Fail", (), 3),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {91})
++
++    def test_predicate_outcomes_and_merged_fields_are_preserved(self):
++        n = DECODER.Node
++        nodes = {
++            0: n("CheckPredicate", (0,), 1, 2),
++            1: n("ExtractField", (0, 7), 3),
++            2: n("ExtractField", (1, 6), 3),
++            3: n("FilterValue", (5,), 4, 5),
++            4: n("Decode", (1, 0), 5),
++            5: n("Fail", (), 6),
++        }
++        self.assertEqual(DECODER.observable_prefixes(nodes), {5, 10, 11})
++
++    def test_initial_field_and_unknown_field_cannot_create_false_rejection(self):
++        n = DECODER.Node
++        initial = {
++            0: n("FilterValue", (0,), 1, 2),
++            1: n("Decode", (1, 0), 2),
++            2: n("Fail", (), 3),
++        }
++        unknown = {
++            0: n("ExtractField", (7, 3), 1),
++            1: n("FilterValue", (3,), 2, 3),
++            2: n("Decode", (1, 0), 3),
++            3: n("Fail", (), 4),
++        }
++        for nodes in (initial, unknown):
++            self.assertEqual(DECODER.observable_prefixes(nodes), set(range(128)))
++
+ if __name__ == "__main__":
+     unittest.main()
