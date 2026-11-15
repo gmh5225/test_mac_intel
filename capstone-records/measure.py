@@ -51,6 +51,11 @@ try:
     cases=corpus.prepare(r,w,evidence,run)
     assert len(cases)==7
     costs=[];objects={};signatures={}
+    consumer = w / 'single.o'
+    run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-fPIE', '-I', source,
+         '-I', source / 'include', '-c', r / 'single.cpp', '-o', consumer], 'consumer')
+    save('consumer-object.json', dict(sha256=hashlib.sha256(consumer.read_bytes()).hexdigest(),
+                                    scope='One object linked into both ELF types and source variants.'))
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
         if label=='scan':
@@ -69,16 +74,17 @@ try:
             assert changed=={'Mapping.c.o','arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o','arch/PowerPC/PPCMapping.c.o','arch/RISCV/RISCVMapping.c.o','arch/LoongArch/LoongArchMapping.c.o','arch/ARC/ARCMapping.c.o'}, changed
             save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
         (evidence / (label+'-object-sizes.txt')).write_bytes(sp.check_output(['size', build/'libcapstone.a']))
-        exe = w / label
-        run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
-             '-I', source / 'include', r / 'single.cpp', build / 'libcapstone.a',
-             '-lm', '-o', exe], 'link')
-        with gzip.open(evidence / (label+'-linked-assembly.gz'), 'wb') as out:
-            out.write(sp.check_output(['objdump', '-dr', exe]))
-        (evidence / (label+'-symbols.txt')).write_bytes(
-            sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
+        for flavor, flag in [('pie', '-pie'), ('exec', '-no-pie')]:
+            exe = w / (flavor + '-' + label)
+            run(['clang++', flag, consumer, build / 'libcapstone.a', '-lm', '-o', exe], 'link-' + flavor + '-' + label)
+            header=sp.check_output(['readelf', '-hW', exe], text=True)
+            assert ('DYN (Position-Independent Executable file)' if flavor == 'pie' else 'EXEC (Executable file)') in header, header
+            (evidence / (flavor+'-'+label+'-elf.txt')).write_text(header + sp.check_output(['readelf', '-lW', exe], text=True))
+            with gzip.open(evidence / (flavor+'-'+label+'-linked-assembly.gz'), 'wb') as out:
+                out.write(sp.check_output(['objdump', '-dr', exe]))
+            (evidence / (flavor+'-'+label+'-symbols.txt')).write_bytes(
+                sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
     run(['clang', '-O2', r/'exec-launcher.c', '-o', w/'exec-launcher'], 'exec-launcher')
-    run([cc, '-O2', '-shared', '-fPIC', r/'reserve.c', '-o', w/'reserve.so'], 'reserve-library')
     from native import measure
     selected=[v for v in cases if v['selector']in (2,11)]
     assert len(selected)==2
@@ -86,7 +92,7 @@ try:
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=False, restored=True, native_qualification=False, scope='Controlled startup heap reservation; unchanged candidate and timed function'))
+                               source_unchanged=False, restored=True, native_qualification=False, scope='PIE versus ET_EXEC and ASLR factorial; unchanged source and consumer object'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)

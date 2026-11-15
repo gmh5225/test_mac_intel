@@ -1,7 +1,7 @@
-name: Diagnose compact mapping with controlled startup heap offsets
+name: Diagnose compact mapping with ELF load bias and ASLR
 on:
   push:
-    branches: [codex/capstone-compact-heap-layout]
+    branches: [codex/capstone-compact-load-bias]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-heap-layout-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: compact-load-bias-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
