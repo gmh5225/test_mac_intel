@@ -1,17 +1,137 @@
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index 44c4930b..36d6d010 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -45,8 +45,9 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
+ 	*insn_size = insn->size = length;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = insn->op_str;
+ 	if (value < 0)
+@@ -74,8 +75,9 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)(offset + 4);
+ 	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+ 	char *out = insn->op_str + reg->length;
+@@ -125,8 +127,9 @@ static void writeRegisterImmediate(cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)(offset + imm_size);
+ 	memcpy(insn->bytes, code, insn->size);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
+ 	char *out = insn->op_str + reg->length;
+diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
+index bd0f6c94..de2cef32 100644
+--- a/arch/X86/X86MemoryOutput.c
++++ b/arch/X86/X86MemoryOutput.c
+@@ -60,8 +60,9 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)length;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = insn->op_str;
+ 	if (load) {
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..2d747235 100644
+index 11e8578a..a8edc06e 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -35,9 +35,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size <= lead)
- 		return false;
- 	const uint8_t opcode = code[lead];
--	const unsigned prefix_class = escaped ? 3 :
--				      has_rex ? ((rex & 8) ? 2 : 1) :
--						0;
-+	const unsigned prefix_class = (unsigned)has_rex +
-+				      ((unsigned)has_rex & (code[0] >> 3)) +
-+				      3u * escaped;
- 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
- 	if (!plan)
- 		return false;
+@@ -121,8 +121,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	uint64_t target = 0;
+ 	uint16_t first = row->ops[0].reg, second = row->ops[1].reg;
+ 	insn->id = row->id;
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	insn->bytes[0] = code[0];
+ 	if (form == X86_SIMPLE_FIXED) {
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..3b8649e8 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -43,8 +43,9 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	*insn_size = insn->size = (uint16_t)len;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, len);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
+ 	for (unsigned n = 1; n != reg_count; ++n) {
+@@ -189,8 +190,9 @@ static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+ 	*insn_size = insn->size = (uint16_t)len;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, len);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, ll, dst);
+ 	if (fma) {
+@@ -279,8 +281,9 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+ 	*insn_size = insn->size = (uint16_t)length;
+ 	insn->id = row->id;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, 0, first);
+ 	memcpy(out, ", ", 2);
+@@ -329,8 +332,9 @@ static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = 8;
+ 	memcpy(insn->bytes, code, 8);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, row->length_code, dst);
+ 	memcpy(out, row->address, sizeof(row->address));
+@@ -426,8 +430,9 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = p->id;
+ 	*insn_size = insn->size = p->length;
+ 	memcpy(insn->bytes, code, p->length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, p->mnemonic, sizeof(p->mnemonic));
++	memset(insn->mnemonic + sizeof(p->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(p->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	memcpy(insn->op_str, p->operands, sizeof(p->operands));
+ 	if (insn->detail) {
+@@ -556,8 +561,9 @@ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 	insn->id = row->id;
+ 	*insn_size = insn->size = (uint16_t)length;
+ 	memcpy(insn->bytes, code, length);
+-	memset(insn->mnemonic, 0, sizeof(insn->mnemonic));
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
++	memset(insn->mnemonic + sizeof(row->mnemonic), 0,
++	       sizeof(insn->mnemonic) - sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, ll, dst);
+ 	memcpy(out, ", xmmword ptr [", 15);
