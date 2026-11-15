@@ -1,316 +1,73 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..4d0b0855 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -3,22 +3,22 @@
- static const uint16_t x86_simple_plans[2][4][256] = {
- 	{
- 		{
--			5, 9, 6, 10, 0, 0, 0, 0, 13, 17, 14, 18, 0, 0, 0, 0,
--			21, 25, 22, 26, 0, 0, 0, 0, 29, 33, 30, 34, 0, 0, 0, 0,
--			37, 41, 38, 42, 0, 0, 0, 0, 45, 49, 46, 50, 0, 0, 0, 0,
--			53, 57, 54, 58, 0, 0, 0, 0, 61, 65, 62, 66, 0, 0, 0, 0,
--			68, 72, 76, 80, 84, 88, 92, 96, 100, 104, 108, 112, 116, 120, 124, 128,
--			132, 136, 140, 144, 148, 152, 156, 160, 164, 168, 172, 176, 180, 184, 188, 192,
--			0, 0, 0, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
--			199, 203, 207, 211, 215, 219, 223, 227, 231, 235, 239, 243, 247, 251, 255, 259,
--			0, 65534, 0, 65534, 261, 265, 269, 273, 277, 281, 278, 282, 0, 286, 0, 0,
--			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
--			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
--			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
-+			21, 37, 22, 38, 0, 0, 0, 0, 53, 69, 54, 70, 0, 0, 0, 0,
-+			85, 101, 86, 102, 0, 0, 0, 0, 117, 133, 118, 134, 0, 0, 0, 0,
-+			149, 165, 150, 166, 0, 0, 0, 0, 181, 197, 182, 198, 0, 0, 0, 0,
-+			213, 229, 214, 230, 0, 0, 0, 0, 245, 261, 246, 262, 0, 0, 0, 0,
-+			272, 288, 304, 320, 336, 352, 368, 384, 400, 416, 432, 448, 464, 480, 496, 512,
-+			528, 544, 560, 576, 592, 608, 624, 640, 656, 672, 688, 704, 720, 736, 752, 768,
-+			0, 0, 0, 0, 0, 0, 65527, 0, 65520, 0, 65520, 0, 0, 0, 0, 0,
-+			787, 803, 819, 835, 851, 867, 883, 899, 915, 931, 947, 963, 979, 995, 1011, 1027,
-+			0, 65522, 0, 65522, 1045, 1061, 1073, 1089, 1109, 1125, 1110, 1126, 0, 1150, 0, 0,
-+			1152, 1168, 1184, 1200, 1216, 1232, 1248, 1264, 1280, 1296, 0, 0, 1312, 1328, 1344, 1360,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 65524, 65524, 65524, 65524, 65524, 65524, 65524, 65524,
-+			0, 65521, 0, 1376, 0, 0, 0, 0, 0, 1392, 0, 1408, 1424, 0, 0, 1440,
-+			0, 0, 0, 0, 0, 0, 0, 1456, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 1475, 1491, 0, 1507, 1520, 1536, 1552, 1568,
-+			0, 0, 0, 65527, 1584, 1600, 0, 0, 1616, 1632, 1648, 1664, 1680, 1696, 0, 1725,
- 		},
- 		{
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -58,14 +58,14 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 		},
- 		{
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65527,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			435, 439, 443, 447, 451, 455, 459, 463, 467, 471, 475, 479, 483, 487, 491, 495,
-+			1731, 1747, 1763, 1779, 1795, 1811, 1827, 1843, 1859, 1875, 1891, 1907, 1923, 1939, 1955, 1971,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -77,69 +77,69 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 	},
- 	{
- 		{
--			497, 501, 498, 502, 0, 0, 0, 0, 505, 509, 506, 510, 0, 0, 0, 0,
--			513, 517, 514, 518, 0, 0, 0, 0, 521, 525, 522, 526, 0, 0, 0, 0,
--			529, 533, 530, 534, 0, 0, 0, 0, 537, 541, 538, 542, 0, 0, 0, 0,
--			545, 549, 546, 550, 0, 0, 0, 0, 553, 557, 554, 558, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			560, 564, 568, 572, 576, 580, 584, 588, 592, 596, 600, 604, 608, 612, 616, 620,
--			0, 0, 65535, 0, 0, 0, 65535, 0, 65528, 0, 65528, 0, 0, 0, 0, 0,
--			627, 631, 635, 639, 643, 647, 651, 655, 659, 663, 667, 671, 675, 679, 683, 687,
--			0, 65534, 0, 65534, 689, 693, 697, 701, 705, 709, 706, 710, 0, 714, 0, 0,
--			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 772, 65535, 65535, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
--			0, 0, 0, 0, 0, 0, 0, 792, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 799, 803, 0, 807, 808, 812, 816, 820,
--			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
-+			1989, 2005, 1990, 2006, 0, 0, 0, 0, 2021, 2037, 2022, 2038, 0, 0, 0, 0,
-+			2053, 2069, 2054, 2070, 0, 0, 0, 0, 2085, 2101, 2086, 2102, 0, 0, 0, 0,
-+			2117, 2133, 2118, 2134, 0, 0, 0, 0, 2149, 2165, 2150, 2166, 0, 0, 0, 0,
-+			2181, 2197, 2182, 2198, 0, 0, 0, 0, 2213, 2229, 2214, 2230, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			2240, 2256, 2272, 2288, 2304, 2320, 2336, 2352, 2368, 2384, 2400, 2416, 2432, 2448, 2464, 2480,
-+			0, 0, 65527, 0, 0, 0, 65527, 0, 65520, 0, 65520, 0, 0, 0, 0, 0,
-+			2499, 2515, 2531, 2547, 2563, 2579, 2595, 2611, 2627, 2643, 2659, 2675, 2691, 2707, 2723, 2739,
-+			0, 65522, 0, 65522, 2757, 2773, 2785, 2801, 2821, 2837, 2822, 2838, 0, 2862, 0, 0,
-+			2864, 2880, 2896, 2912, 2928, 2944, 2960, 2976, 2992, 3008, 0, 0, 3024, 3040, 3056, 3072,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 65524, 65524, 65524, 65524, 65524, 65524, 65524, 65524,
-+			0, 65521, 0, 3088, 65527, 65527, 0, 0, 0, 3104, 0, 3120, 3136, 0, 0, 3152,
-+			0, 0, 0, 0, 0, 0, 0, 3168, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 3187, 3203, 0, 3219, 3232, 3248, 3264, 3280,
-+			0, 0, 0, 65527, 3296, 3312, 0, 0, 3328, 3344, 3360, 3376, 3392, 3408, 0, 3437,
- 		},
- 		{
--			861, 865, 862, 866, 0, 0, 0, 0, 869, 873, 870, 874, 0, 0, 0, 0,
--			877, 881, 878, 882, 0, 0, 0, 0, 885, 889, 886, 890, 0, 0, 0, 0,
--			893, 897, 894, 898, 0, 0, 0, 0, 901, 905, 902, 906, 0, 0, 0, 0,
--			909, 913, 910, 914, 0, 0, 0, 0, 917, 921, 918, 922, 0, 0, 0, 0,
-+			3445, 3461, 3446, 3462, 0, 0, 0, 0, 3477, 3493, 3478, 3494, 0, 0, 0, 0,
-+			3509, 3525, 3510, 3526, 0, 0, 0, 0, 3541, 3557, 3542, 3558, 0, 0, 0, 0,
-+			3573, 3589, 3574, 3590, 0, 0, 0, 0, 3605, 3621, 3606, 3622, 0, 0, 0, 0,
-+			3637, 3653, 3638, 3654, 0, 0, 0, 0, 3669, 3685, 3670, 3686, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
-+			4848, 4880, 4912, 4944, 4976, 5008, 5040, 5072, 5104, 5136, 5168, 5200, 5232, 5264, 5296, 5328,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65534, 0, 65534, 925, 929, 933, 937, 941, 945, 942, 946, 0, 950, 0, 0,
-+			0, 65522, 0, 65522, 3701, 3717, 3729, 3745, 3765, 3781, 3766, 3782, 0, 3806, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 0, 0, 0, 0, 0, 0, 0, 65524, 65524, 65524, 65524, 65524, 65524, 65524, 65524,
-+			0, 65521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3821,
- 		},
- 		{
--			861, 957, 862, 958, 0, 0, 0, 0, 869, 961, 870, 962, 0, 0, 0, 0,
--			877, 965, 878, 966, 0, 0, 0, 0, 885, 969, 886, 970, 0, 0, 0, 0,
--			893, 973, 894, 974, 0, 0, 0, 0, 901, 977, 902, 978, 0, 0, 0, 0,
--			909, 981, 910, 982, 0, 0, 0, 0, 917, 985, 918, 986, 0, 0, 0, 0,
-+			3445, 3829, 3446, 3830, 0, 0, 0, 0, 3477, 3845, 3478, 3846, 0, 0, 0, 0,
-+			3509, 3861, 3510, 3862, 0, 0, 0, 0, 3541, 3877, 3542, 3878, 0, 0, 0, 0,
-+			3573, 3893, 3574, 3894, 0, 0, 0, 0, 3605, 3909, 3606, 3910, 0, 0, 0, 0,
-+			3637, 3925, 3638, 3926, 0, 0, 0, 0, 3669, 3941, 3670, 3942, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			1212, 1220, 1228, 1236, 1244, 1252, 1260, 1268, 1276, 1284, 1292, 1300, 1308, 1316, 1324, 1332,
-+			4848, 4880, 4912, 4944, 4976, 5008, 5040, 5072, 5104, 5136, 5168, 5200, 5232, 5264, 5296, 5328,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65534, 0, 65534, 925, 989, 933, 993, 941, 997, 942, 998, 0, 1002, 0, 0,
-+			0, 65522, 0, 65522, 3701, 3957, 3729, 3969, 3765, 3989, 3766, 3990, 0, 4014, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 65521, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3821,
- 		},
- 		{
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65535,
-+			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 65527,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			1007, 1011, 1015, 1019, 1023, 1027, 1031, 1035, 1039, 1043, 1047, 1051, 1055, 1059, 1063, 1067,
-+			4019, 4035, 4051, 4067, 4083, 4099, 4115, 4131, 4147, 4163, 4179, 4195, 4211, 4227, 4243, 4259,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..3d76f988 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -49,18 +49,11 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			return false;
- 		modrm = code[1 + has_rex];
- 		if (modrm < 0xc0) {
--			/* The generated ALU, TEST and MOV register rows also
--             * describe their memory forms. XCHG and immediates
--             * require different memory records. */
--			const bool alu = opcode < 0x40;
--			const bool test_or_mov = (opcode & 0xfe) == 0x84 ||
--						 (opcode & 0xfc) == 0x88;
--			const bool push = opcode == 0xff &&
--					  (modrm & 0x38) == 0x30;
--			if (!alu && !test_or_mov && opcode != 0x8d && !push)
-+			if (!(plan & X86_PLAN_MEMORY) ||
-+			    (opcode == 0xff && (modrm & 0x38) != 0x30))
- 				return false;
- 			base_memory = true;
--		} else if (opcode == 0x8d || opcode == 0xff) {
-+		} else if (plan & X86_PLAN_MEMORY_ONLY) {
- 			return false;
- 		}
- 	}
-@@ -91,7 +84,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 		} else if (plan == X86_PLAN_MOV_REG_IMM32) {
- 			if (size < 5u + has_rex)
- 				return false;
--			row = x86_simple_plans[wide][prefix_class][0x8b] >> 2;
-+			row = x86_simple_plans[wide][prefix_class][0x8b] >>
-+			      X86_PLAN_ROW_SHIFT;
- 			reg = &x86_simple_registers[2][((rex & 1) << 3) |
- 						       (opcode & 7)];
- 		} else {
-@@ -102,7 +96,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 				      x86_shift_rows[wide][prefix_class][group] :
- 				      x86_simple_plans[wide][prefix_class]
- 						      [(group << 3) | 1] >>
--					      2;
-+					      X86_PLAN_ROW_SHIFT;
- 			reg = &x86_simple_registers[(rex & 8) ? 3 : 2]
- 						   [((rex & 1) << 3) |
- 						    (modrm & 7)];
-@@ -111,7 +105,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 					 &x86_simple_outputs[row], reg);
- 		return true;
- 	}
--	const struct X86SimpleOutput *row = &x86_simple_outputs[plan >> 2];
-+	const struct X86SimpleOutput *row =
-+		&x86_simple_outputs[plan >> X86_PLAN_ROW_SHIFT];
- 	if (base_memory)
- 		return X86_writeMemoryOutput(code, size, insn, insn_size, row,
- 					     x86_simple_registers);
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..037c1b93 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -44,15 +44,16 @@ enum X86SimpleForm {
- 	X86_SIMPLE_RELATIVE,
- };
+diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
+index 44c4930b..88a53130 100644
+--- a/arch/X86/X86ImmediateOutput.c
++++ b/arch/X86/X86ImmediateOutput.c
+@@ -9,22 +9,56 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
++#include "../../MathExtras.h"
  
--/* This plan gets its ALU row from ModR/M.reg. Its low bits select the
-- * same register-only operand check as a register pair. */
--#define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
--
--/* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
--#define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
--#define X86_PLAN_VECTOR UINT16_MAX
--#define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
--#define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
-+/* Ordinary plans carry their form and memory admission below the row index.
-+ * One shift removes all metadata when selecting the generated record. */
-+#define X86_PLAN_ROW_SHIFT 4
-+#define X86_PLAN_MEMORY 4u
-+#define X86_PLAN_MEMORY_ONLY 8u
-+#define X86_PLAN_PUSH_IMMEDIATE 0xfff0u
-+#define X86_PLAN_SHIFT_IMM8 (0xfff0u | X86_SIMPLE_RM_REG)
-+#define X86_PLAN_GROUP1_IMMEDIATE (0xfff0u | X86_SIMPLE_REG_RM)
-+#define X86_PLAN_MOV_REG_IMM32 0xfff4u
-+#define X86_PLAN_VECTOR 0xfff7u
+-static void writeUnsignedImmediate(char *out, uint64_t value)
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static void writeHexImmediate(char *out, uint64_t value)
+ {
+-	if (value <= HEX_THRESHOLD) {
+-		*out = (char)('0' + value);
+-	} else {
+-		static const char digits[] = "0123456789abcdef";
+-		char temp[16], *end = temp + sizeof(temp), *start = end;
+-		uint64_t n = value;
++	static const char pairs[] = "000102030405060708090a0b0c0d0e0f"
++				    "101112131415161718191a1b1c1d1e1f"
++				    "202122232425262728292a2b2c2d2e2f"
++				    "303132333435363738393a3b3c3d3e3f"
++				    "404142434445464748494a4b4c4d4e4f"
++				    "505152535455565758595a5b5c5d5e5f"
++				    "606162636465666768696a6b6c6d6e6f"
++				    "707172737475767778797a7b7c7d7e7f"
++				    "808182838485868788898a8b8c8d8e8f"
++				    "909192939495969798999a9b9c9d9e9f"
++				    "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf"
++				    "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
++				    "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf"
++				    "d0d1d2d3d4d5d6d7d8d9dadbdcdddedf"
++				    "e0e1e2e3e4e5e6e7e8e9eaebecedeeef"
++				    "f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
++
++	memcpy(out, "0x", 2);
++	out += 2;
++	if (value >= 256) {
++		const unsigned digits =
++			(67u - CountLeadingZeros_64(value)) / 4u;
++		char *end = out + digits;
+ 		do {
+-			*--start = digits[n & 15];
+-			n >>= 4;
+-		} while (n);
+-		memcpy(out, "0x", 2);
+-		memcpy(out + 2, start, end - start);
++			end -= 2;
++			memcpy(end, pairs + (value & 255) * 2, 2);
++			value >>= 8;
++		} while (value >= 256);
+ 	}
++	if (value < 16)
++		*out = "0123456789abcdef"[value];
++	else
++		memcpy(out, pairs + value * 2, 2);
++}
++
++static void writeUnsignedImmediate(char *out, uint64_t value)
++{
++	if (value <= HEX_THRESHOLD)
++		*out = (char)('0' + value);
++	else
++		writeHexImmediate(out, value);
+ }
  
- CAPSTONE_INTERNAL bool
- X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..657f5052 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -512,11 +512,12 @@ void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
- 							  uint8_t(rex), 0,
- 							  nullptr, nullptr));
- 		}
--		if (rows.size() + 1 >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+		if (rows.size() + 1 >=
-+		    (X86_PLAN_PUSH_IMMEDIATE >> X86_PLAN_ROW_SHIFT))
- 			throw std::runtime_error(
- 				"too many fixed output records");
--		const uint16_t plan =
--			uint16_t((rows.size() << 2) | X86_SIMPLE_FIXED);
-+		const uint16_t plan = uint16_t(
-+			(rows.size() << X86_PLAN_ROW_SHIFT) | X86_SIMPLE_FIXED);
- 		plans[1][1][opcode] = plans[1][2][opcode] = plan;
- 		for (const auto &entry : by_base) {
- 			rows.push_back(entry.fields);
-@@ -606,10 +607,23 @@ int main()
- 					rows.begin());
- 				if (index == rows.size())
- 					rows.push_back(row.fields);
--				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+				if (index >= (X86_PLAN_PUSH_IMMEDIATE >>
-+					      X86_PLAN_ROW_SHIFT))
- 					return 1;
-+				unsigned admission = 0;
-+				if (form == X86_SIMPLE_RM_REG ||
-+				    form == X86_SIMPLE_REG_RM) {
-+					if (op < 0x40 || (op & 0xfe) == 0x84 ||
-+					    (op & 0xfc) == 0x88 || op == 0x8d ||
-+					    op == 0xff)
-+						admission |= X86_PLAN_MEMORY;
-+					if (op == 0x8d || op == 0xff)
-+						admission |=
-+							X86_PLAN_MEMORY_ONLY;
-+				}
- 				plans[wide][cls][op] = static_cast<uint16_t>(
--					(index << 2) | form);
-+					(index << X86_PLAN_ROW_SHIFT) | form |
-+					admission);
- 				checked += row.encodings;
- 				++admitted;
- 			}
-@@ -656,7 +670,8 @@ int main()
- 							 rows.end(),
- 							 row.fields) -
- 					       rows.begin();
--				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+				if (index >= (X86_PLAN_PUSH_IMMEDIATE >>
-+					      X86_PLAN_ROW_SHIFT))
- 					return 1;
- 				if (index == rows.size())
- 					rows.push_back(row.fields);
-@@ -671,7 +686,8 @@ int main()
- 		for (unsigned index = 0; index < 2; ++index) {
- 			const unsigned op = index ? 0x6a : 0x68;
- 			CheckedRow row = check_push_immediate(decoder, op);
--			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+			if (rows.size() >=
-+			    (X86_PLAN_PUSH_IMMEDIATE >> X86_PLAN_ROW_SHIFT))
- 				return 1;
- 			pushes[wide][index] =
- 				static_cast<uint16_t>(rows.size());
+ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
