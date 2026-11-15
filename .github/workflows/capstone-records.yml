@@ -1,7 +1,7 @@
-name: Qualify integrated mode-correct VEX32 register output mixed
+name: Qualify integrated two- and three-byte VEX32 register output mixed
 on:
   push:
-    branches: [codex/capstone-vex32-integrated-registers-mixed]
+    branches: [codex/capstone-vex32-integrated-vex3-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-integrated-registers-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex32-integrated-vex3-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
