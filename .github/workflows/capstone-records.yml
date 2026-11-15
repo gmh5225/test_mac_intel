@@ -1,7 +1,7 @@
-name: Validate cstest CRT inheritance and configuration switches
+name: Validate MSVC static and shared artifacts and installed consumers
 on:
   push:
-    branches: [codex/capstone-cstest-msvc-runtime-artifacts]
+    branches: [codex/capstone-msvc-library-artifacts]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,15 +11,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, cc: MSVC, runtime: MT }
-          - { host: windows-2022, cc: MSVC, runtime: MD }
-          - { host: windows-2022, cc: MSVC, runtime: MD-explicit }
-          - { host: ubuntu-24.04, cc: gcc, runtime: default }
-          - { host: macos-15, cc: clang, runtime: default }
+          - { host: windows-2022, cc: MSVC, runtime: MT, libs: both }
+          - { host: windows-2022, cc: MSVC, runtime: MD, libs: both }
+          - { host: windows-2022, cc: MSVC, runtime: MD-explicit, libs: both }
+          - { host: windows-2022, cc: MSVC, runtime: MD, libs: static }
+          - { host: windows-2022, cc: MSVC, runtime: MD, libs: shared }
+          - { host: ubuntu-24.04, cc: gcc, runtime: default, libs: both }
+          - { host: macos-15, cc: clang, runtime: default, libs: both }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 40
     env:
       RUNTIME: ${{ matrix.runtime }}
+      LIBRARIES: ${{ matrix.libs }}
       TOOLCHAIN: ${{ matrix.cc }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -29,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
+          ref: 4c64c2a301ac0f15fc58500da3bccd8420e0e861
           path: source
           persist-credentials: false
       - name: Build and test before and after Release Debug Release switches
@@ -40,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cstest-msvc-runtime-${{ matrix.host }}-${{ matrix.runtime }}
+          name: msvc-library-artifacts-${{ matrix.host }}-${{ matrix.runtime }}-${{ matrix.libs }}
           path: evidence/
           retention-days: 14

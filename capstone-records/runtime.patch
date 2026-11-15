@@ -1,84 +1,32 @@
-diff --git a/suite/cstest/CMakeLists.txt b/suite/cstest/CMakeLists.txt
-index f256193a..1b1b026c 100644
---- a/suite/cstest/CMakeLists.txt
-+++ b/suite/cstest/CMakeLists.txt
-@@ -15,6 +15,15 @@ if(APPLE)
-         "-DCMAKE_OSX_SYSROOT:STRING=${CMAKE_OSX_SYSROOT}"
-         "-DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=${CMAKE_OSX_DEPLOYMENT_TARGET}")
- endif()
-+# Keep runtime generator expressions in the child projects so one build
-+# directory can switch between Release and Debug without changing CRT models.
-+set(CSTEST_MSVC_CMAKE_ARGS)
-+if(MSVC AND DEFINED CMAKE_MSVC_RUNTIME_LIBRARY)
-+    set(CSTEST_MSVC_INITIAL_CACHE "${CMAKE_CURRENT_BINARY_DIR}/msvc-runtime.cmake")
-+    configure_file(msvc-runtime.cmake.in "${CSTEST_MSVC_INITIAL_CACHE}" @ONLY)
-+    list(APPEND CSTEST_MSVC_CMAKE_ARGS "-C${CSTEST_MSVC_INITIAL_CACHE}")
-+endif()
+diff --git a/BUILDING.md b/BUILDING.md
+index de4ae2ce..3ed8f21c 100644
+--- a/BUILDING.md
++++ b/BUILDING.md
+@@ -30,6 +30,12 @@ cmake.exe --build build --config Release # For debug build change "Release" to "
+ cmake.exe --install build
+ ```
+ 
++When MSVC builds both static and shared libraries, the static archive is
++`capstone_static.lib`; `capstone.lib` is the import library for `capstone.dll`.
++A static-only build keeps the name `capstone.lib`. The CMake targets
++`capstone::capstone_static` and `capstone::capstone_shared` select the corresponding
++installed libraries in either configuration.
 +
- # ExternalProject uses our generator. Multi-config generators place each
- # archive in the active configuration's subdirectory.
- function(cstest_import_archive target file byproduct)
-@@ -51,6 +60,7 @@ ExternalProject_Add(cmocka_ext
-     URL_HASH SHA256=0994a7cd6b67c46b1cbfbb56c3b22ac379e1ac26fbe68e9cf7cea259b60e201c
-     CMAKE_ARGS
-         ${CSTEST_APPLE_CMAKE_ARGS}
-+        ${CSTEST_MSVC_CMAKE_ARGS}
-         -DBUILD_SHARED_LIBS=OFF
-         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
-@@ -87,6 +97,7 @@ if (NOT libyaml OR NOT LIBYAML_INCLUDE_DIRS)
-         # URL_HASH SHA256=e1884d0fa1eec8cf869ac6bebbf25391e81956aa2970267f974a9fa5e0b968e2
-         CMAKE_ARGS
-             ${CSTEST_APPLE_CMAKE_ARGS}
-+            ${CSTEST_MSVC_CMAKE_ARGS}
-             -DCMAKE_POLICY_VERSION_MINIMUM=3.5
-             -DBUILD_TESTING=OFF
-             -DBUILD_SHARED_LIBS=OFF
-@@ -123,6 +134,7 @@ ExternalProject_Add(libcyaml_ext
-     PATCH_COMMAND cmake -E copy_if_different ${EXTERNAL_PROJ_PATCH_DIR}/libcyaml/CMakeLists.txt ${LIBCYAML_SRC_DIR}
-     CMAKE_ARGS
-         ${CSTEST_APPLE_CMAKE_ARGS}
-+        ${CSTEST_MSVC_CMAKE_ARGS}
-         -DUSE_BUILT_LIBYAML=${USE_BUILT_LIBYAML}
-         -DLIBYAML_INCLUDE_DIRS=${LIBYAML_INCLUDE_DIRS}
-         -DLIBYAML_LIBRARY_DIRS=${LIBYAML_LIBRARY_DIRS}
-@@ -135,6 +147,15 @@ ExternalProject_Add(libcyaml_ext
-     INSTALL_COMMAND ""
- )
+ ## Tailor Capstone to your needs.
  
-+if(CSTEST_MSVC_INITIAL_CACHE)
-+    foreach(dependency cmocka_ext libyaml_ext libcyaml_ext)
-+        if(TARGET ${dependency})
-+            ExternalProject_Add_StepDependencies(${dependency} configure
-+                "${CSTEST_MSVC_INITIAL_CACHE}")
-+        endif()
-+    endforeach()
-+endif()
-+
- ExternalProject_Add_StepDependencies(libcyaml_ext patch
-     "${EXTERNAL_PROJ_PATCH_DIR}/libcyaml/CMakeLists.txt")
- 
-@@ -156,6 +177,12 @@ file(GLOB CSTEST_SRC ${CSTEST_DIR}/src/*.c)
- add_executable(cstest ${CSTEST_SRC})
- add_library(libcstest STATIC ${CSTEST_SRC})
- set_property(TARGET libcstest PROPERTY OUTPUT_NAME cstest)
-+if(MSVC)
-+    # cstest.exe also writes an import library and a linker PDB.
-+    set_target_properties(libcstest PROPERTIES
-+        OUTPUT_NAME cstest_static
-+        COMPILE_PDB_NAME cstest_static)
-+endif()
- 
- add_dependencies(cstest cmocka_ext)
- add_dependencies(cstest libcyaml_ext)
-diff --git a/suite/cstest/msvc-runtime.cmake.in b/suite/cstest/msvc-runtime.cmake.in
-new file mode 100644
-index 00000000..a31ca5ce
---- /dev/null
-+++ b/suite/cstest/msvc-runtime.cmake.in
-@@ -0,0 +1,5 @@
-+# External projects may predate CMP0091. Select its runtime abstraction before
-+# their first project() call, and preserve the parent's per-configuration value.
-+set(CMAKE_POLICY_DEFAULT_CMP0091 NEW CACHE STRING "" FORCE)
-+set(CMAKE_MSVC_RUNTIME_LIBRARY [==[@CMAKE_MSVC_RUNTIME_LIBRARY@]==]
-+    CACHE STRING "" FORCE)
+ Enable and disable options in the "configure" step (first `cmake` command from above).
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1482e8d9..201d315b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -1022,6 +1022,10 @@ if(CAPSTONE_BUILD_STATIC_LIBS)
+     add_library(capstone_static STATIC $<TARGET_OBJECTS:capstone>)
+     # Use normal capstone name. Otherwise we get libcapstone_static.a
+     set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone")
++    if(MSVC AND CAPSTONE_BUILD_SHARED_LIBS)
++        # The DLL import library also uses capstone.lib.
++        set_target_properties(capstone_static PROPERTIES OUTPUT_NAME "capstone_static")
++    endif()
+     target_include_directories(capstone_static PUBLIC
+         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+     )

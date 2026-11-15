@@ -14,6 +14,7 @@ evidence.mkdir()
 meta = json.loads((r / 'inputs.json').read_text())
 runtime = os.environ['RUNTIME']
 compiler = os.environ['TOOLCHAIN']
+libraries = os.environ['LIBRARIES']
 
 
 def save(name, value):
@@ -31,20 +32,22 @@ def git(*args):
     return sp.check_output(['git', *map(str, args)], cwd=source, text=True).strip()
 
 
-w = Path(tempfile.mkdtemp(prefix='capstone-cstest-runtime-'))
+w = Path(tempfile.mkdtemp(prefix='capstone-msvc-artifacts-'))
 try:
     assert git('rev-parse', 'HEAD') == meta['runtime']['parent']
     assert not git('status', '--porcelain')
     patches = {}
-    for name, entry in [('runtime', meta['runtime']), ('mapping', meta['combined']['mapping'])]:
+    for name, entry in [('runtime', meta['runtime'])]:
         data = sp.check_output(['git', 'show', 'HEAD:capstone-records/' + name + '.patch'], cwd=r.parent)
         assert hashlib.sha256(data).hexdigest() == entry['sha256']
         patches[name] = w / (name + '.patch')
         patches[name].write_bytes(data)
-    save('inputs', dict(**meta, compiler=compiler, runtime_choice=runtime))
+    save('inputs', dict(**meta, compiler=compiler, runtime_choice=runtime, libraries=libraries))
     b = w / 'build'
     options = ['-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-               '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF', '-DCAPSTONE_BUILD_SHARED_LIBS=ON',
+               '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
+               '-DCAPSTONE_BUILD_SHARED_LIBS=' + ('OFF' if libraries == 'static' else 'ON'),
+               '-DCAPSTONE_BUILD_STATIC_LIBS=' + ('OFF' if libraries == 'shared' else 'ON'),
                '-DCAPSTONE_BUILD_MACOS_THIN=ON', '-DCAPSTONE_BUILD_CSTEST=ON',
                '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
                *['-DCAPSTONE_' + a + '_SUPPORT=ON' for a in ('PPC', 'ARC', 'LOONGARCH', 'SYSTEMZ')]]
@@ -138,6 +141,45 @@ try:
             inspect_runtime(tag)
             phases.append(dict(label=label, config=config, tag=tag, tree=git('write-tree')))
 
+    def verify_install():
+        consumer = w / 'consumer'
+        consumer.mkdir()
+        (consumer / 'main.c').write_text("#include <capstone/capstone.h>\nint main(void) { csh h; const unsigned char code[] = {0x60,0,0,0}; cs_insn *i = 0; if (cs_open(CS_ARCH_PPC, CS_MODE_BIG_ENDIAN, &h)) return 1; size_t n = cs_disasm(h,code,4,0,1,&i); int ok = n == 1 && i->size == 4 && i->id == PPC_INS_NOP; cs_free(i,n); cs_close(&h); return !ok; }\n")
+        selected = ['static', 'shared'] if libraries == 'both' else [libraries]
+        cmake = 'cmake_minimum_required(VERSION 3.15)\nproject(consumer C)\nfind_package(capstone CONFIG REQUIRED)\n'
+        for kind in selected:
+            cmake += 'add_executable(' + kind + '_consumer main.c)\n'
+            cmake += 'target_link_libraries(' + kind + '_consumer PRIVATE capstone::capstone_' + kind + ')\n'
+        (consumer / 'CMakeLists.txt').write_text(cmake)
+        receipts = []
+        for config in (['Release', 'Debug'] if os.name == 'nt' else ['Release']):
+            prefix = w / ('install-' + config)
+            run(['cmake', '--install', b, '--config', config, '--prefix', prefix], 'install-' + config)
+            cb = w / ('consumer-' + config)
+            args = ['cmake', '-S', consumer, '-B', cb, '-DCMAKE_PREFIX_PATH=' + str(prefix), '-DCMAKE_BUILD_TYPE=' + config]
+            if os.name == 'nt':
+                literal = 'MultiThreaded$<$<CONFIG:Debug>:Debug>' + ('' if runtime == 'MT' else 'DLL')
+                args += ['-G', 'Visual Studio 17 2022', '-A', 'x64', '-DCMAKE_MSVC_RUNTIME_LIBRARY=' + literal]
+                os.environ['PATH'] = str(prefix / 'bin') + os.pathsep + os.environ['PATH']
+                expected = []
+                if 'static' in selected:
+                    expected.append('capstone_static.lib' if libraries == 'both' else 'capstone.lib')
+                if 'shared' in selected:
+                    expected.append('capstone.lib')
+                    assert (prefix / 'bin/capstone.dll').exists()
+                found = sorted(f.name for f in (prefix / 'lib').glob('*.lib'))
+                assert found == sorted(expected), (found, expected)
+            else:
+                args += ['-G', 'Ninja', '-DCMAKE_C_COMPILER=' + compiler]
+                found = sorted(f.name for f in (prefix / 'lib').glob('libcapstone*'))
+            run(args, 'consumer-configure-' + config)
+            run(['cmake', '--build', cb, '--config', config, '--parallel', '4'], 'consumer-build-' + config)
+            for kind in selected:
+                exe = cb / config / (kind + '_consumer.exe') if os.name == 'nt' else cb / (kind + '_consumer')
+                run([exe], 'consumer-run-' + config + '-' + kind)
+            receipts.append(dict(config=config, archives=found, consumers=selected))
+        save('installed-consumers', receipts)
+
     run(['cmake', '-S', source, '-B', b, *options], 'base-configure')
     inspect_pdb('base')
     if os.name != 'nt':
@@ -150,13 +192,16 @@ try:
     inspect_pdb('fixed')
     exercise('fixed', ['Release', 'Debug', 'Release'] if os.name == 'nt' else ['Release'])
     if os.name == 'nt':
-        run(['git', '-c', 'core.autocrlf=false', 'apply', '--index', patches['mapping']], 'apply-mapping')
-        assert git('write-tree') == meta['combined']['tree']
-        exercise('combined', ['Release', 'Debug', 'Release'])
+        # Force both final library targets to update from the same object change.
+        # Touching changes no tracked source bytes and preserves the frozen tree.
+        (source / 'cs.c').touch()
+        assert git('write-tree') == meta['runtime']['tree']
+        exercise('incremental', ['Release', 'Debug', 'Release'])
     else:
         assert objects() == original_objects
         save('object-identity', dict(equal=True, count=len(original_objects), sha256=original_objects))
-    save('complete', dict(success=True, runtime=runtime, compiler=compiler, phases=phases))
+    verify_install()
+    save('complete', dict(success=True, runtime=runtime, compiler=compiler, libraries=libraries, phases=phases))
 finally:
     amount = sum(p.stat().st_size for p in w.rglob('*') if p.is_file())
     def remove_readonly(fn, path, exc):
