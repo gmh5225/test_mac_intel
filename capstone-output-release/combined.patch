@@ -1,5 +1,5 @@
 diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..38cacf94 100644
+index a976814e..d3291c39 100644
 --- a/arch/X86/X86GenSimpleOutput.inc
 +++ b/arch/X86/X86GenSimpleOutput.inc
 @@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
@@ -7,12 +7,33 @@ index a976814e..38cacf94 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
 -			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 65535, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 0, X86_VEX32_REGISTER_PLAN, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
  			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..e2165783 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -51,6 +51,16 @@ enum X86SimpleForm {
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++
++/* This compiler/profile retains the VEX32 output gain without moving other
++ * backends onto slower paths. Other profiles keep their existing plan. */
++#if defined(CAPSTONE_ARM_AARCH64_MIPS_X86) && defined(__linux__) && \
++	defined(__aarch64__) && defined(__GNUC__) && !defined(__clang__)
++#define X86_VEX32_REGISTER_PLAN X86_PLAN_VECTOR
++#else
++#define X86_VEX32_REGISTER_PLAN 0
++#endif
++
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..f3b8067b 100644
+index 6df1472d..aeb94abf 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -73,7 +73,8 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
@@ -21,7 +42,7 @@ index 6df1472d..f3b8067b 100644
  		memcpy(x->opcode, code, prefix);
 -		x->addr_size = 8;
 +		/* VEX and EVEX use a nonzero synthetic REX only in 64-bit mode. */
-+		x->addr_size = rex ? 8 : 4;
++		x->addr_size = X86_VEX32_REGISTER_PLAN && !rex ? 4 : 8;
  		x->rex = (uint8_t)rex;
  		x->modrm = code[prefix + 1];
  		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
@@ -65,27 +86,51 @@ index 6df1472d..f3b8067b 100644
  }
  
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
-@@ -516,12 +519,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -515,13 +518,15 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 						 wide);
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
++	const bool vex_wide = !X86_VEX32_REGISTER_PLAN || wide;
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
 -		return writeVexRipLoad(code, size, insn, insn_size);
-+		return wide && writeVexRipLoad(code, size, insn, insn_size);
++		return vex_wide && writeVexRipLoad(code, size, insn, insn_size);
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
  	if (size >= prefix + 2 && code[prefix + 1] >= 0xc0)
  		return writeVexRegisterOutput(code, size, insn, insn_size,
 -					      prefix);
 -	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
-+					      prefix, wide);
-+	return wide && writeVexIndexedOutput(code, size, insn, insn_size, regs);
++					      prefix, vex_wide);
++	return vex_wide &&
++	       writeVexIndexedOutput(code, size, insn, insn_size, regs);
  }
  /* A regular base, an unmasked destination and a full 128-bit memory tuple.
   * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..38ae3cc6 100644
+index ccc4f0de..3d0c1ef0 100644
 --- a/suite/synctools/x86_simple_output.cpp
 +++ b/suite/synctools/x86_simple_output.cpp
-@@ -621,7 +621,7 @@ int main()
+@@ -538,9 +538,17 @@ void emit_tables(const PlanTable &plans, const RegisterTable &regs,
+ 			std::cout << "\t\t{\n";
+ 			for (unsigned j = 0; j < 256; j += 16) {
+ 				std::cout << "\t\t\t";
+-				for (unsigned k = 0; k < 16; ++k)
+-					std::cout << (k ? " " : "")
+-						  << prefix[j + k] << ',';
++				for (unsigned k = 0; k < 16; ++k) {
++					std::cout << (k ? " " : "");
++					if (&mode == &plans[0] &&
++					    &prefix == &mode[0] &&
++					    j + k == 0xc5)
++						std::cout
++							<< "X86_VEX32_REGISTER_PLAN";
++					else
++						std::cout << prefix[j + k];
++					std::cout << ',';
++				}
+ 				std::cout << '\n';
+ 			}
+ 			std::cout << "\t\t},\n";
+@@ -621,7 +629,7 @@ int main()
  	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
  	plans[1][0][0x62] = X86_PLAN_VECTOR;
  	plans[1][0][0xc4] = X86_PLAN_VECTOR;
