@@ -1,7 +1,7 @@
-name: Qualify empty-tie operand access profiles
+name: Qualify EVEX mask admission profiles
 on:
   push:
-    branches: [codex/capstone-empty-tie-dispatch-profiles]
+    branches: [codex/capstone-evex-mask-admission-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -53,6 +53,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: empty-tie-dispatch-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: evex-mask-admission-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
