@@ -1,7 +1,7 @@
-name: Qualify ARM detail initialization through native GCC AArch64 NeverD
+name: Qualify nonzero ARM defaults through current NeverD and source LLVM
 on:
   push:
-    branches: [codex/capstone-gnu-arm-product]
+    branches: [codex/capstone-arm-nonzero-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -18,7 +18,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 2c7e2c3591293c994b67747b65c232a679b70fb1
+          ref: 689d3a9637022e5615b2ffdcc1914e0b0b42a2c4
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-gnu-arm
+          name: product-arm-nonzero
           path: product-evidence/
           retention-days: 14
