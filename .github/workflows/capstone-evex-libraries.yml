@@ -1,7 +1,7 @@
-name: Qualify empty-tie operand access libraries
+name: Qualify inline tie queries libraries
 on:
   push:
-    branches: [codex/capstone-empty-tie-dispatch-libraries]
+    branches: [codex/capstone-inline-tie-queries-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: empty-tie-dispatch-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: inline-tie-queries-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
