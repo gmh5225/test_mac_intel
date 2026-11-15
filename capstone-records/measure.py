@@ -51,8 +51,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'Mapping.c.o','arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o'} if key=='indexed' else {'Mapping.c.o','arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o'}
-   assert set(changed)==expected,(key,changed,expected)
+   assert {'MCInstPrinter.c.o'} <= set(changed) <= {'MCInstPrinter.c.o','Mapping.c.o'}, (key,changed)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
@@ -65,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Compact operand metadata passed 77070336 public-record inputs and compiler checks of every type/access pair across twelve ISAs; preserve original and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Single-pointer alias result: complete records and callback state checked before timing; preserve original and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
