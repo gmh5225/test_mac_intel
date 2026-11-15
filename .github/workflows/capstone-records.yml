@@ -1,7 +1,7 @@
-name: Qualify merged X86 prefix read mixed
+name: Qualify inlined X86 prefix budget mixed
 on:
   push:
-    branches: [codex/capstone-merged-prefix-read-mixed]
+    branches: [codex/capstone-inline-prefix-budget-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: merged-prefix-read-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: inline-prefix-budget-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
