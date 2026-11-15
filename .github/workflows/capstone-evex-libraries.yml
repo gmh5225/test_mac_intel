@@ -1,7 +1,7 @@
-name: Qualify EVEX mask admission libraries
+name: Qualify bounded X86 prefix scanning libraries
 on:
   push:
-    branches: [codex/capstone-evex-mask-admission-libraries]
+    branches: [codex/capstone-bounded-prefix-scan-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-admission-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: bounded-prefix-scan-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
