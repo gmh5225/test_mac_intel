@@ -32,7 +32,13 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
-   if key!='base':run(['git','apply',variant],'apply-'+key,s)
+   if key!='base':
+    run(['git','apply',variant],'apply-'+key,s)
+    run(['git','add','-u'],'stage-tested-source',s)
+    tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
+    assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
+    write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
+    run(['git','reset','-q'],'unstage-tested-source',s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
    (e/(key+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',f]))
@@ -45,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'arch/X86/X86OutputIterator.c.o'} if key=='indexed' else {'arch/X86/X86OutputIterator.c.o'}
+   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'} if key=='indexed' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
@@ -59,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='R1143 has local complete-record and guard-page qualification; retain original and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Integrated VEX32 register writer has complete-record and protected input/output qualification; retain original and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
