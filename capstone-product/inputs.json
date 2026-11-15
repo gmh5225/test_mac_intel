@@ -1,21 +1,22 @@
 {
-  "neverd": "689d3a9637022e5615b2ffdcc1914e0b0b42a2c4",
-  "capstone": "defa77a3b8395499e6dfc991808ed8d1c8d83df1",
+  "neverd": "1aa3fd1d27f07e0f8a36c7655306375d29d5c16f",
+  "capstone": "dea9fee246c21a0045a2ea63a429f9147a6a1014",
   "variants": {
-    "gnu-arm-clear": {
-      "source": "round1140-arm-nonzero-defaults",
-      "patch": "gnu-arm-clear.patch",
-      "patch_sha256": "563dc7b17558e1dff16bd04c1c609a006c7012688abbcff8a6893a45fa5108ff",
-      "tree": "9eb7d256936f9837de027b255a04d3d878f28b1c",
+    "vex32-registers": {
+      "source": "round1159-vex32-integrated-registers",
+      "patch": "vex32-registers.patch",
+      "patch_sha256": "964da44192a3bebdd3d3dbb488ee2cfbb8a2aa86d6f4c46685f959044746f0ab",
+      "tree": "b6715faf82fe72b207c6e0e9b9d6d83c8be11f76",
       "changed": [
-        "ARMMapping.c.o"
+        "X86OutputIterator.c.o",
+        "X86VectorOutput.c.o"
       ],
       "added": []
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "compiler": "Capstone C built with GCC, NeverD C++ and latest fork LLVM source built with Clang, on Linux AArch64",
+  "compiler": "x86-64 Clang C/C++; AArch64 GCC C with Clang C++; latest fork LLVM compiled from source on both.",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Qualify the nonzero-only ARM operand defaults through current NeverD dev: 96 real PE32/PE64, scalar/SIMD and ARM/AArch64/MIPS observations with original and fixed-inode launches, paired A/A, complete public states, source-built latest fork LLVM and unchanged probes.",
+  "scope": "Qualify exact integrated VEX32 register output through latest NeverD dev: 96 real PE32/PE64, scalar/SIMD and ARM/AArch64/MIPS observations per host, original and fixed-inode launches, A/A, complete public states, source-built latest fork LLVM and unchanged probes.",
   "llvm_build_compatibility": "Three Clang-only diagnostic flags selected by C compiler ID for C sources; same patch for both variants, no LLVM algorithm changes, latest fork source and no prebuilt"
 }
