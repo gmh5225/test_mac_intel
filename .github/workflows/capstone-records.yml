@@ -1,7 +1,7 @@
-name: Qualify output prefix records mixed
+name: Qualify arithmetic prefix classes mixed
 on:
   push:
-    branches: [codex/capstone-output-prefix-records-mixed]
+    branches: [codex/capstone-prefix-arithmetic-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: output-prefix-records-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: prefix-arithmetic-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
