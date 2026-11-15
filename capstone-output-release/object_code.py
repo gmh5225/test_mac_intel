@@ -2,6 +2,15 @@ import hashlib,struct
 
 def code_sections(blob):
     rows=[]
+    if blob[:4] in (b'\xca\xfe\xba\xbe', b'\xca\xfe\xba\xbf'):
+        count=struct.unpack_from('>I',blob,4)[0]
+        wide=blob[:4]==b'\xca\xfe\xba\xbf'
+        for i in range(count):
+            entry=struct.unpack_from('>IIQQII'if wide else '>IIIII',blob,8+i*(32 if wide else 20))
+            cpu,subtype,off,length=entry[:4]
+            rows.extend(dict(architecture=f'{cpu:08x}:{subtype:08x}',**row)for row in code_sections(blob[off:off+length]))
+        assert rows
+        return rows
     if blob[:4]==b'\x7fELF':
         assert blob[4:6]==b'\x02\x01'
         shoff=struct.unpack_from('<Q',blob,40)[0]

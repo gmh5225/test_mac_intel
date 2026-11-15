@@ -24,6 +24,8 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
+    run(['git','-c','core.autocrlf=false','apply','--index',root/'prerequisite.patch'],'apply-prerequisite')
+    assert subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['baseline_tree']
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
     opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
@@ -54,16 +56,13 @@ try:
                     result[str(file.relative_to(b))]=hashlib.sha256(file.read_bytes()).hexdigest()
         assert len(result)>5, result
         return result
+    table='arch/X86/X86MappingInsnOp.inc'
+    original_table=(source/table).read_bytes()
     before=objects()
     mapping_names=[name for name in before if Path(name).name in ('X86Mapping.c.o','X86Mapping.c.obj','X86Mapping.obj')]
     assert len(mapping_names)==(0 if profile=='alias-only' else 1),mapping_names
     before_code={name:code_sections((b/name).read_bytes())for name in mapping_names}
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
-    overlay=source/'suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch'
-    run(['git','apply','-R',overlay],'overlay-reverse')
-    table='arch/X86/X86MappingInsnOp.inc'
-    assert (source/table).read_bytes()==subprocess.check_output(['git','show','HEAD:'+table],cwd=source)
-    run(['git','apply',overlay],'overlay-replay')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
     assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
@@ -73,9 +72,9 @@ try:
     changed=[name for name in before if before[name]!=after[name]]
     after_code={name:code_sections((b/name).read_bytes())for name in mapping_names}
     save('object-identity',dict(total=len(before),changed=changed,code_identical=before_code==after_code,before_code=before_code,after_code=after_code))
-    expected=set()if profile in ('diet','reduced','alias-only')else set(mapping_names)
+    expected=set()if profile in ('diet','alias-only')else set(mapping_names)
     assert set(changed)==expected,(changed,expected)
-    assert before_code==after_code,('table fix changed executable sections',before_code,after_code)
+    if not expected:assert before_code==after_code
 
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     assert 'runtime error:' not in (evidence/'tests.log').read_text()

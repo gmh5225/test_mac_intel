@@ -1,157 +1,75 @@
-diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
-index f016f383..8fb699cc 100644
---- a/arch/X86/X86MappingInsnOp.inc
-+++ b/arch/X86/X86MappingInsnOp.inc
-@@ -7679,22 +7679,22 @@
- },
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 16e68cf4..ca1da225 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -10390,6 +10390,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			switch (insn->id) {
+ 			default:
+ 				break;
++			case X86_INS_MOVSD:
++			case X86_INS_CMPSD:
++				// The public IDs also name scalar SSE instructions.
++				if (id != X86_MOVSL && id != X86_CMPSL)
++					break;
++				// fall through
+ 			case X86_INS_LODSB:
+ 			case X86_INS_LODSD:
+ 			case X86_INS_LODSQ:
+@@ -10455,12 +10461,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 				break;
  
- {	/* X86_MOVSDmr, X86_INS_MOVSD: movsd */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_MOVSDrm, X86_INS_MOVSD: movsd */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_MOVSDrr, X86_INS_MOVSD: movsd */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_MOVSDrr_REV, X86_INS_MOVSD: movsd	$dst $src2 */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
-@@ -7749,22 +7749,22 @@
- },
- 
- {	/* X86_MOVSSmr, X86_INS_MOVSS: movss */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_MOVSSrm, X86_INS_MOVSS: movss */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_MOVSSrr, X86_INS_MOVSS: movss */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
- {	/* X86_MOVSSrr_REV, X86_INS_MOVSS: movss	$dst $src2 */
--	X86_EFLAGS_TEST_DF,
-+	0,
- 	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
- },
- 
-diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index da366bf8..f9aed2bb 100644
---- a/suite/auto-sync/README.md
-+++ b/suite/auto-sync/README.md
-@@ -135,6 +135,9 @@ them, retain `suite/auto-sync/inc_patches/X86/01_test_accumulator_access.patch`
- if the source still marks `TEST EAX, imm32` as writing EAX. Apply the patch
- with `git apply` from the repository root and run `unit_x86_reg_access`;
- it checks accumulator widths and ModR/M equivalents with Intel and AT&T printers.
-+Apply `suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch` if regenerated
-+SSE `MOVSS`/`MOVSD` rows incorrectly test DF. `unit_x86_reg_access` checks their
-+register and memory forms while retaining DF reads for string moves.
- 
- After changing `X86ImmSize.inc` or either `X86GenInstrInfo*.inc` enum, run
- `python3 suite/synctools/x86_immediate_sizes.py`, then run it with `--check`.
-diff --git a/suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch b/suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch
-new file mode 100644
-index 00000000..bd61a842
---- /dev/null
-+++ b/suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch
-@@ -0,0 +1,59 @@
-+diff --git a/arch/X86/X86MappingInsnOp.inc b/arch/X86/X86MappingInsnOp.inc
-+--- a/arch/X86/X86MappingInsnOp.inc
-++++ b/arch/X86/X86MappingInsnOp.inc
-+@@ -7681,4 +7681,4 @@
-+ {	/* X86_MOVSDmr, X86_INS_MOVSD: movsd */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7686,4 +7686,4 @@
-+ {	/* X86_MOVSDrm, X86_INS_MOVSD: movsd */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7691,4 +7691,4 @@
-+ {	/* X86_MOVSDrr, X86_INS_MOVSD: movsd */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7696,4 +7696,4 @@
-+ {	/* X86_MOVSDrr_REV, X86_INS_MOVSD: movsd	$dst $src2 */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7751,4 +7751,4 @@
-+ {	/* X86_MOVSSmr, X86_INS_MOVSS: movss */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7756,4 +7756,4 @@
-+ {	/* X86_MOVSSrm, X86_INS_MOVSS: movss */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7761,4 +7761,4 @@
-+ {	/* X86_MOVSSrr, X86_INS_MOVSS: movss */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
-+@@ -7766,4 +7766,4 @@
-+ {	/* X86_MOVSSrr_REV, X86_INS_MOVSS: movss	$dst $src2 */
-+-	X86_EFLAGS_TEST_DF,
-++	0,
-+-	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-++	{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ, 0 }
-+ },
+ 			case X86_INS_CMPSB:
+-			case X86_INS_CMPSD:
+ 			case X86_INS_CMPSQ:
+ 			case X86_INS_CMPSW:
+ 			case X86_INS_MOVSB:
+ 			case X86_INS_MOVSW:
+-			case X86_INS_MOVSD:
+ 			case X86_INS_MOVSQ:
+ 				switch (mode) {
+ 				default:
+@@ -10609,15 +10613,19 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+ 			switch (insn->id) {
+ 			default:
+ 				break;
++			case X86_INS_MOVSD:
++			case X86_INS_CMPSD:
++				// The public IDs also name scalar SSE instructions.
++				if (id != X86_MOVSL && id != X86_CMPSL)
++					break;
++				// fall through
+ 			case X86_INS_LODSB:
+ 			case X86_INS_LODSD:
+ 			case X86_INS_LODSW:
+ 			case X86_INS_CMPSB:
+-			case X86_INS_CMPSD:
+ 			case X86_INS_CMPSW:
+ 			case X86_INS_MOVSB:
+ 			case X86_INS_MOVSW:
+-			case X86_INS_MOVSD:
+ 			case X86_INS_OUTSB:
+ 			case X86_INS_OUTSW:
+ 			case X86_INS_OUTSD:
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
-index 07d795a8..328cc88d 100644
+index 328cc88d..cd578e2e 100644
 --- a/tests/unit/x86_reg_access.c
 +++ b/tests/unit/x86_reg_access.c
-@@ -240,6 +240,159 @@ static bool check_test_operands(void)
+@@ -393,6 +393,136 @@ static bool check_scalar_move_flags(void)
  	return true;
  }
  
-+static bool check_scalar_move_flags(void)
++static bool check_scalar_segment_reads(void)
 +{
 +	const cs_mode modes[] = { CS_MODE_16, CS_MODE_32, CS_MODE_64 };
 +	for (unsigned mode = 0; mode < sizeof(modes) / sizeof(modes[0]);
 +	     ++mode) {
 +		csh h;
-+		if (cs_open(CS_ARCH_X86, modes[mode], &h) ||
-+		    cs_option(h, CS_OPT_DETAIL, CS_OPT_ON))
++		if (cs_open(CS_ARCH_X86, modes[mode], &h))
 +			return false;
++		if (cs_option(h, CS_OPT_DETAIL, CS_OPT_ON)) {
++			cs_close(&h);
++			return false;
++		}
 +		cs_insn *insn = cs_malloc(h);
 +		if (!insn) {
 +			cs_close(&h);
@@ -164,25 +82,33 @@ index 07d795a8..328cc88d 100644
 +						     CS_OPT_SYNTAX_INTEL);
 +			if (att && err == CS_ERR_X86_ATT)
 +				continue;
-+			if (err != CS_ERR_OK) {
++			if (err) {
 +				ok = false;
 +				break;
 +			}
-+			/* The shared MOVSD public ID also names a direction-dependent string move. */
-+			static const uint8_t strings[][3] = {
-+				{ 0xa4 },	{ 0xa5 },	{ 0x66, 0xa5 },
-+				{ 0x67, 0xa5 }, { 0xf3, 0xa5 }, { 0xf2, 0xa5 }
++			const uint8_t strings[][3] = {
++				{ 0xa4 },	{ 0xa5 },	{ 0xa6 },
++				{ 0xa7 },	{ 0x66, 0xa5 }, { 0x66, 0xa7 },
++				{ 0x67, 0xa5 }, { 0x67, 0xa7 }, { 0xf3, 0xa5 },
++				{ 0xf2, 0xa7 }
 +			};
 +			for (unsigned n = 0;
 +			     n < sizeof(strings) / sizeof(strings[0]); ++n) {
 +				const uint8_t *p = strings[n];
 +				size_t left = sizeof(strings[n]);
 +				uint64_t pc = 0;
-+				if (!cs_disasm_iter(h, &p, &left, &pc, insn) ||
-+				    insn->detail->x86.eflags !=
-+					    X86_EFLAGS_TEST_DF) {
++				if (!cs_disasm_iter(h, &p, &left, &pc, insn)) {
++					ok = false;
++					break;
++				}
++				bool ds = false;
++				for (unsigned i = 0;
++				     i < insn->detail->regs_read_count; ++i)
++					ds |= insn->detail->regs_read[i] ==
++					      X86_REG_DS;
++				if (ds != (modes[mode] != CS_MODE_64)) {
 +					fprintf(stderr,
-+						"string move DF: mode=%u syntax=%u case=%u\n",
++						"string DS: mode=%u syntax=%u case=%u\n",
 +						modes[mode], att, n);
 +					ok = false;
 +					break;
@@ -190,103 +116,69 @@ index 07d795a8..328cc88d 100644
 +			}
 +			if (cs_support(CS_SUPPORT_X86_REDUCE))
 +				continue;
-+			for (unsigned prefix = 0xf2; prefix <= 0xf3 && ok;
-+			     ++prefix)
-+				for (unsigned opcode = 0x10;
-+				     opcode <= 0x11 && ok; ++opcode)
-+					for (unsigned rex = 0;
-+					     rex <= (mode == 2 ? 16u : 0u) &&
-+					     ok;
-+					     ++rex)
-+						for (unsigned modrm = 0;
-+						     modrm < 256 && ok;
-+						     ++modrm) {
-+							uint8_t bytes[15] = { 0 },
-+								*end = bytes;
++			const uint8_t opcodes[] = { 0x10, 0x11, 0xc2 };
++			for (unsigned o = 0; o < sizeof(opcodes) && ok; ++o)
++				for (unsigned rex = 0;
++				     rex <= (modes[mode] == CS_MODE_64 ? 16u :
++									 0u) &&
++				     ok;
++				     ++rex)
++					for (unsigned mr = 0; mr < 256 && ok;
++					     ++mr) {
++						uint8_t bytes[15] = { 0 },
++							*end = bytes;
++						*end++ = 0xf2;
++						if (rex)
 +							*end++ =
-+								(uint8_t)prefix;
-+							if (rex)
-+								*end++ =
-+									(uint8_t)(0x3f +
-+										  rex);
-+							*end++ = 0x0f;
-+							*end++ =
-+								(uint8_t)opcode;
-+							*end++ = (uint8_t)modrm;
-+							*end++ = 0x24;
-+							*end++ = 0x80;
-+							*end++ = 0xff;
-+							const uint8_t *p =
-+								bytes;
-+							size_t left =
-+								sizeof(bytes);
-+							uint64_t pc = 0;
-+							if (!cs_disasm_iter(
-+								    h, &p,
++								(uint8_t)(0x3f +
++									  rex);
++						*end++ = 0x0f;
++						*end++ = opcodes[o];
++						*end++ = (uint8_t)mr;
++						*end++ = 0x24;
++						*end++ = 0x80;
++						*end++ = 0xff;
++						const uint8_t *p = bytes;
++						size_t left = sizeof(bytes);
++						uint64_t pc = 0;
++						if (!cs_disasm_iter(h, &p,
 +								    &left, &pc,
-+								    insn) ||
-+							    insn->id !=
-+								    (prefix == 0xf2 ?
-+									     X86_INS_MOVSD :
-+									     X86_INS_MOVSS) ||
-+							    insn->detail->x86.eflags !=
-+								    0) {
-+								fprintf(stderr,
-+									"scalar move flags: mode=%u syntax=%u prefix=%x opcode=%x rex=%u modrm=%x\n",
-+									modes[mode],
-+									att,
-+									prefix,
-+									opcode,
-+									rex,
-+									modrm);
-+								ok = false;
-+								break;
-+							}
++								    insn)) {
++							ok = false;
++							break;
++						}
++						if (insn->detail
++							    ->regs_read_count) {
++							fprintf(stderr,
++								"scalar DS: mode=%u syntax=%u opcode=%x rex=%u modrm=%x implicit=%u first=%u\n",
++								modes[mode],
++								att, opcodes[o],
++								rex, mr,
++								insn->detail
++									->regs_read_count,
++								insn->detail->regs_read
++									[0]);
++							ok = false;
++							break;
++						}
++						if (mr >= 0xc0) {
 +							cs_regs reads, writes;
 +							uint8_t nr, nw;
 +							if (cs_regs_access(
 +								    h, insn,
 +								    reads, &nr,
 +								    writes,
-+								    &nw) !=
-+							    CS_ERR_OK) {
++								    &nw)) {
 +								ok = false;
 +								break;
 +							}
-+							for (unsigned n = 0;
-+							     n < nr; ++n)
-+								if (reads[n] ==
-+								    X86_REG_EFLAGS)
-+									ok = false;
-+							for (unsigned n = 0;
-+							     n < nw; ++n)
-+								if (writes[n] ==
-+								    X86_REG_EFLAGS)
++							for (unsigned i = 0;
++							     i < nr; ++i)
++								if (reads[i] ==
++								    X86_REG_DS)
 +									ok = false;
 +						}
-+			/* Vector forms already have separate metadata and must retain zero flags. */
-+			static const uint8_t vectors[][6] = {
-+				{ 0xc5, 0xea, 0x10, 0xc1 },
-+				{ 0xc5, 0xeb, 0x11, 0xc1 },
-+				{ 0x62, 0xf1, 0x6e, 0x08, 0x10, 0xc1 },
-+				{ 0x62, 0xf1, 0xef, 0x08, 0x11, 0xc1 }
-+			};
-+			if (mode != 0)
-+				for (unsigned n = 0;
-+				     n < sizeof(vectors) / sizeof(vectors[0]) &&
-+				     ok;
-+				     ++n) {
-+					const uint8_t *p = vectors[n];
-+					size_t left = sizeof(vectors[n]);
-+					uint64_t pc = 0;
-+					if (!cs_disasm_iter(h, &p, &left, &pc,
-+							    insn) ||
-+					    insn->id !=
-+						    (n % 2 ? X86_INS_VMOVSD :
-+							     X86_INS_VMOVSS) ||
-+					    insn->detail->x86.eflags != 0)
-+						ok = false;
-+				}
++					}
 +		}
 +		cs_free(insn, 1);
 +		cs_close(&h);
@@ -299,13 +191,13 @@ index 07d795a8..328cc88d 100644
  int main(void)
  {
  	if (cs_support(CS_SUPPORT_DIET))
-@@ -251,7 +404,8 @@ int main(void)
- 		cs_close(&handle);
+@@ -405,7 +535,8 @@ int main(void)
  		return 1;
  	}
--	bool success = check_implicit_copies(handle) && check_test_operands();
-+	bool success = check_implicit_copies(handle) && check_test_operands() &&
-+		       check_scalar_move_flags();
+ 	bool success = check_implicit_copies(handle) && check_test_operands() &&
+-		       check_scalar_move_flags();
++		       check_scalar_move_flags() &&
++		       check_scalar_segment_reads();
  	cs_close(&handle);
  	return success ? 0 : 1;
  }
