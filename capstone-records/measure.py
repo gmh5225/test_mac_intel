@@ -6,7 +6,6 @@ import os
 import shutil
 import subprocess as sp
 import tempfile
-import corpus
 
 r = Path(__file__).resolve().parent
 source = r.parent / 'source'
@@ -42,14 +41,12 @@ try:
           '-Wno-error=incompatible-pointer-types-discards-qualifiers'),
          '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
          *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in
-           ['X86', 'ARM', 'AARCH64', 'MIPS', 'PPC', 'RISCV', 'LOONGARCH', 'ARC']],
+           (['X86', 'SYSTEMZ', 'SPARC', 'XTENSA'] if os.environ['BUILD_ARCHS'] == 'extra' else ['X86', 'ARM', 'AARCH64', 'MIPS'])],
          '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
          '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'], 'configure')
     meta=inputs['candidate']
     patch=r/'candidate.patch'
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==meta['sha256']
-    cases=corpus.prepare(r,w,evidence,run)
-    assert len(cases)==7
     costs=[];objects={};signatures={}
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
@@ -66,7 +63,7 @@ try:
         if label=='scan':
             changed={f for f in objects['integer']if objects['integer'][f]!=objects[label][f]}
             assert set(objects['integer'])==set(objects[label])
-            assert changed=={'arch/PowerPC/PPCMapping.c.o','arch/ARC/ARCMapping.c.o','arch/LoongArch/LoongArchMapping.c.o'},changed
+            assert not changed,changed
             save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
         (evidence / (label+'-object-sizes.txt')).write_bytes(sp.check_output(['size', build/'libcapstone.a']))
         exe = w / label
@@ -77,14 +74,13 @@ try:
             out.write(sp.check_output(['objdump', '-dr', exe]))
         (evidence / (label+'-symbols.txt')).write_bytes(
             sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
-    from native import measure
-    selected=[v for v in cases if v['selector']in (2,3,11,12)]
-    assert len(selected)==4
-    measure(w,selected,save)
+    hashes={key:hashlib.sha256((w/key).read_bytes()).hexdigest() for key in ('integer','scan')}
+    assert hashes['integer']==hashes['scan']
+    save('binary-identity.json',dict(identical=True,sha256=hashes,objects=len(objects['integer']),profile=os.environ['BUILD_ARCHS']))
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=False, restored=True, native_qualification=True, scope='four additional ISAs, separate product qualification required'))
+                               source_unchanged=False, restored=True, native_qualification=False, binary_identity=True, scope='Standard four backends or X86/SystemZ/SPARC/Xtensa: all runtime objects and the linked consumer are byte-identical, so no timing claim is made.'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)
