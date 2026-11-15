@@ -1,69 +1,100 @@
-"""Native measurement with independent images, fixed launches and A/A."""
+"""Unchanged timed decoder; control only payload and process launch arguments."""
 import hashlib
 import json
 import os
 import platform
+import random
 import shutil
 import statistics
 import subprocess as sp
 
 
-def measure(w, cases, save):
-    if hasattr(os, 'sched_getaffinity'):
-        os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
-    bins = {key: w / key for key in ('integer', 'scan', 'aa')}
-    shutil.copy2(bins['integer'], bins['aa'])
-    payloads = {key: path.read_bytes() for key, path in bins.items()}
-    assert payloads['integer'] == payloads['aa']
-    assert payloads['integer'] != payloads['scan']
-    maximum = max(map(len, payloads.values()))
-    padded = {key: value + bytes(maximum - len(value)) for key, value in payloads.items()}
-    image = w / 'same-image'
-    image.write_bytes(padded['integer'])
+def measure(work, cases, save):
+    os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
+    binaries = {name: work / name for name in ("integer", "aa", "scan")}
+    shutil.copy2(binaries["integer"], binaries["aa"])
+    payloads = {name: path.read_bytes() for name, path in binaries.items()}
+    assert payloads["integer"] == payloads["aa"] != payloads["scan"]
+    size = max(map(len, payloads.values()))
+    padded = {name: data + bytes(size - len(data)) for name, data in payloads.items()}
+    image = work / "same-image"
+    image.write_bytes(padded["integer"])
     image.chmod(0o755)
     inode = image.stat().st_ino
-    probe = sp.run(['setarch', platform.machine(), '-R', '/bin/true'], capture_output=True, text=True)
-    assert probe.returncode == 0, probe.stderr
-    launches = ['images', 'same-file-fixed']
-    save('launch-controls.json', dict(
-        launches=launches, aslr_disable_returncode=probe.returncode,
-        inode=inode, fixed_size=maximum,
+    check = sp.run(["setarch", platform.machine(), "-R", "/bin/true"],
+                   capture_output=True, text=True)
+    assert check.returncode == 0, check.stderr
+    conditions = [dict(name="fixed+" + str(n), padding=n, aslr=False)
+                  for n in (0, 16, 32, 48, 64, 128, 512)]
+    conditions.append(dict(name="random+0", padding=0, aslr=True))
+    save("launch-controls.json", dict(
+        conditions=conditions, image=str(image), inode=inode, size=size,
         original_sha256={k: hashlib.sha256(v).hexdigest() for k, v in payloads.items()},
-        scope='Native shared operand-access qualification on PPC, RISCV, LoongArch and ARC; x86 and NeverD qualification are separate.'))
+        aslr_disable_returncode=check.returncode,
+        environment_sha256=hashlib.sha256(b"\0".join(
+            os.fsencode(k + "=" + v) for k, v in os.environ.items())).hexdigest(),
+        environment_entries=len(os.environ),
+        scope="Diagnostic only. Same inode, size, pathname, input and timed code. "
+              "argv[0] length and ASLR are independent launch controls. "
+              "No particular cache or predictor mechanism is assumed."))
 
-    def sample(key, case, mode, reps, launch):
-        tail = list(map(str, [case['selector'], mode, case['path'], reps]))
-        if launch == 'images':
-            args = [str(bins[key]), *tail]
-        else:
-            with image.open('r+b') as out:
-                assert out.write(padded[key]) == maximum
-            assert image.stat().st_ino == inode and image.stat().st_size == maximum
-            args = ['setarch', platform.machine(), '-R', str(image), *tail]
-        return json.loads(sp.check_output(args, text=True))
+    def invoke(payload, condition, case, mode, repeats):
+        with image.open("r+b") as stream:
+            assert stream.write(padded[payload]) == size
+        assert image.stat().st_ino == inode and image.stat().st_size == size
+        argv0 = str(image) + "x" * condition["padding"]
+        command = [str(work / "exec-launcher"), str(image), argv0,
+                   str(case["selector"]), str(mode), case["path"], str(repeats)]
+        if not condition["aslr"]:
+            command = ["setarch", platform.machine(), "-R", *command]
+        result = json.loads(sp.check_output(command, text=True))
+        assert result["cpu_ns"] > 0 and result["wall_ns"] > 0
+        return result
 
-    rows = []
-    for case in cases:
-        for mode in range(3):
-            for launch in launches:
-                warm = sample('integer', case, mode, 2, launch)
-                reps = max(2, min(4000, round(2 * 160e6 / warm['cpu_ns'])))
-                cycles = []
-                reference = None
-                keys = ['integer', 'aa', 'scan']
-                for cycle in range(21):
-                    order = keys[cycle % 3:] + keys[:cycle % 3]
-                    ticks = {key: [] for key in keys}
-                    for key in order + order[::-1]:
-                        result = sample(key, case, mode, reps, launch)
-                        signature = (result['first'], result['result'])
-                        if reference is None:
-                            reference = signature
-                        assert signature == reference, (case['name'], mode, key)
-                        ticks[key].append(result['cpu_ns'])
-                    cycles.append({key: sum(ticks['integer']) / sum(ticks[key]) for key in keys})
-                rows.append(dict(case=case['name'], mode=mode, launch=launch, pairs=cycles,
-                                 median={key: statistics.median(c[key] for c in cycles) for key in keys},
-                                 result=reference))
-                save('timings.json', rows)
-    assert len(rows) == 24
+    selected = [(case, mode) for case in cases
+                for mode in ((1, 2) if case["selector"] == 11 else (2,))]
+    assert len(selected) == 3
+    preflight = []
+    for case, mode in selected:
+        expected = None
+        for condition in conditions:
+            for payload in payloads:
+                row = invoke(payload, condition, case, mode, 1)
+                signature = (row["first"], row["result"])
+                if expected is None:
+                    expected = signature
+                assert signature == expected, (case["name"], mode, condition, payload)
+        preflight.append(dict(case=case["name"], mode=mode, signature=expected,
+                              launches=len(conditions) * len(payloads)))
+    save("preflight.json", preflight)
+
+    observations = []
+    for case, mode in selected:
+        warm = invoke("integer", conditions[0], case, mode, 2)
+        repeats = max(2, min(4000, round(2 * 70e6 / warm["cpu_ns"])))
+        signature = None
+        cycles = []
+        rng = random.Random(case["name"] + "/" + str(mode))
+        for cycle in range(21):
+            order = [(condition, payload) for condition in conditions for payload in payloads]
+            rng.shuffle(order)
+            values = []
+            for condition, payload in order + order[::-1]:
+                row = invoke(payload, condition, case, mode, repeats)
+                current = (row["first"], row["result"])
+                if signature is None:
+                    signature = current
+                assert current == signature, (case["name"], mode, condition, payload)
+                values.append(dict(condition=condition["name"], payload=payload,
+                                   cpu_ns=row["cpu_ns"], wall_ns=row["wall_ns"]))
+            ns = {condition["name"]: {
+                payload: statistics.mean(x["cpu_ns"] for x in values
+                                         if x["condition"] == condition["name"] and
+                                         x["payload"] == payload)
+                for payload in payloads} for condition in conditions}
+            cycles.append(dict(raw=values, ns=ns))
+        observations.append(dict(case=case["name"], mode=mode, repetitions=repeats,
+                                 signature=signature, cycles=cycles))
+        save("factorial.json", observations)
+        print(case["name"], mode, "completed", flush=True)
+    assert len(observations) == 3

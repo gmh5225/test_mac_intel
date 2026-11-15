@@ -77,14 +77,15 @@ try:
             out.write(sp.check_output(['objdump', '-dr', exe]))
         (evidence / (label+'-symbols.txt')).write_bytes(
             sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
+    run(['clang', '-O2', r/'exec-launcher.c', '-o', w/'exec-launcher'], 'exec-launcher')
     from native import measure
-    selected=[v for v in cases if v['selector']in (2,3,11,12)]
-    assert len(selected)==4
+    selected=[v for v in cases if v['selector']in (2,11)]
+    assert len(selected)==2
     measure(w,selected,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=False, restored=True, native_qualification=True, scope='four additional ISAs, separate product qualification required'))
+                               source_unchanged=False, restored=True, native_qualification=False, scope='Controlled argv0 length and ASLR diagnostic; unchanged candidate and timed function'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)
