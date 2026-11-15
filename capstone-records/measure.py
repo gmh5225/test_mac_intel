@@ -51,13 +51,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'} if key=='indexed' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
-   assert set(changed)==expected,(key,changed,expected)
+   assert set(changed) == {'Mapping.c.o'}, changed
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm.cpp','-ldl','-o',t/'verify-records'],'records-link')
+  run([t/'verify-records',libs['base'],libs['scan']],'records')
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm-full.cpp','-ldl','-o',t/'verify-arm-full'],'arm-records-link')
+  run([t/'verify-arm-full',libs['base'],libs['scan']],'arm-records')
   payloads={key:path.read_bytes()for key,path in bins.items()}
   assert payloads['base']==payloads['aa']
   maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
@@ -65,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Integrated VEX32 register writer has complete-record and protected input/output qualification; retain original and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Widened int64_t operand offset addition in the shared Mapping owner; complete ARM/AArch64/MIPS records checked on this runner.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
