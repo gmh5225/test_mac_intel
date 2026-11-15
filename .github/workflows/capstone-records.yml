@@ -1,7 +1,7 @@
-name: Qualify integrated mode-correct VEX32 register output mixed
+name: Qualify canonical scalar SSE register output mixed
 on:
   push:
-    branches: [codex/capstone-vex32-integrated-registers-mixed]
+    branches: [codex/capstone-scalar-prefix-dispatch-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: dea9fee246c21a0045a2ea63a429f9147a6a1014
+          ref: fd61c821741da278075d406cd4c05131c28b1d7d
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-integrated-registers-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: scalar-prefix-dispatch-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
