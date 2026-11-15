@@ -1,24 +1,2904 @@
 diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
+index b88dfbc7..d4d9108c 100644
 --- a/arch/X86/X86Disassembler.c
 +++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
+@@ -332,11 +332,11 @@ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
  #endif
+-static int
+-decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+-		      size_t code_len, cs_mode mode,
+-		      bool *scalar_compare_p2_normalized,
+-		      uint8_t *original_scalar_compare_p2)
++static int decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
++				 size_t code_len, cs_mode mode,
++				 bool *scalar_compare_p2_normalized,
++				 uint8_t *original_scalar_compare_p2,
++				 MCInst *scanInst, uint16_t *scanSize)
+ {
+ 	const uint8_t *decode_code = code;
+ 	size_t decode_size = code_len;
+@@ -582,7 +582,14 @@ decodeEVEXInstruction(InternalInstruction *insn, const uint8_t *code,
+ 		}
+ 	}
+ 
+-	const int ret = decodeInstruction(insn, decode_code, decode_size, mode);
++	/* APX restores register-extension state after decoding. Keep its
++	 * translation in the original order; other scan operands can share
++	 * the decoder's fused reader and validation dispatch. */
++	const int ret =
++		scanInst && !apx_evex_normalized ?
++			decodeInstructionScan(insn, decode_code, decode_size,
++					      mode, scanInst, scanSize) :
++			decodeInstruction(insn, decode_code, decode_size, mode);
+ 
+ 	/* No further byte reads follow decoding; keep the input pointer valid
+ 	 * when the local normalization buffer goes out of scope. */
+@@ -639,11 +646,16 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
+ 	bool result;
+ 
+ 	InternalInstruction insn = { 0 };
+-	if (extension_opcode == 0x62)
++	if (extension_opcode == 0x62) {
++		const bool scan = scanOnly ||
++				  (handle->no_text && !handle->detail_opt);
+ 		ret = decodeEVEXInstruction(&insn, code, code_len, handle->mode,
+ 					    &scalar_compare_p2_normalized,
+-					    &original_scalar_compare_p2);
+-	else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
++					    &original_scalar_compare_p2,
++					    scan ? instr : NULL, size);
++		if (ret == X86_SCAN_COMPLETE)
++			return true;
++	} else if (scanOnly || (handle->no_text && !handle->detail_opt)) {
+ 		ret = decodeInstructionScan(&insn, code, code_len, handle->mode,
+ 					    instr, size);
+ 		if (ret != X86_SCAN_RAW_READY)
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..6c6ea557 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -202,7 +202,8 @@ static const struct InstructionSpecifier *specifierForUID(InstrUID uid)
+  *                with the data read.
+  * @return      - 0 if the read was successful; nonzero otherwise.
+  */
+-static int consumeByte(struct InternalInstruction *insn, uint8_t *byte)
++X86_DECODE_INLINE int consumeByte(struct InternalInstruction *insn,
++				  uint8_t *byte)
+ {
+ 	size_t offset = insn->readerCursor;
+ 	if (offset >= insn->codeSize)
+diff --git a/arch/X86/X86GenOperandScan.inc b/arch/X86/X86GenOperandScan.inc
+index 4b31cfd0..45b032a9 100644
+--- a/arch/X86/X86GenOperandScan.inc
++++ b/arch/X86/X86GenOperandScan.inc
+@@ -4488,7 +4488,7 @@ case 205:
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 235:
++case 211:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4498,7 +4498,7 @@ case 235:
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_XMM) ||
+ 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4506,7 +4506,7 @@ case 235:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+@@ -4514,7 +4514,7 @@ case 235:
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 236:
++case 220:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4522,17 +4522,17 @@ case 236:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_XMM) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+@@ -4540,7 +4540,7 @@ case 236:
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 481:
++case 229:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4548,17 +4548,17 @@ case 481:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_XMM) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R32 };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+@@ -4566,7 +4566,7 @@ case 481:
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 484:
++case 235:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4576,7 +4576,7 @@ case 484:
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_XMM) ||
+ 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4584,7 +4584,7 @@ case 484:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_M };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+@@ -4592,7 +4592,7 @@ case 484:
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 527:
++case 236:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4600,28 +4600,25 @@ case 527:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_YMM) ||
+-	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	if (translateRegRegister(mcInst, &op1, insn, false))
+-		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRM(mcInst, &op3, insn, false))
++	if (translateRM(mcInst, &op2, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 528:
++case 249:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4629,28 +4626,25 @@ case 528:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_YMM) ||
+-	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM))
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	if (translateRegRegister(mcInst, &op1, insn, false))
+-		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRM(mcInst, &op3, insn, false))
++	if (translateRM(mcInst, &op2, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 538:
++case 255:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4660,7 +4654,7 @@ case 538:
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_XMM) ||
+ 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4668,18 +4662,15 @@ case 538:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	if (translateRegRegister(mcInst, &op1, insn, false))
+-		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRM(mcInst, &op3, insn, false))
++	if (translateRM(mcInst, &op2, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 539:
++case 267:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4689,7 +4680,8 @@ case 539:
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_XMM) ||
+ 	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    readImmediate(insn, 1))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4697,18 +4689,19 @@ case 539:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	if (translateRegRegister(mcInst, &op1, insn, false))
+-		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRM(mcInst, &op3, insn, false))
++	if (translateRM(mcInst, &op2, insn, false))
+ 		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 572:
++case 276:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4717,8 +4710,9 @@ case 572:
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_YMM) ||
+-	    readVSIBOperand(insn, TYPE_MVSIBX, ENCODING_VSIB, hasVVVV, &needVVVV) ||
+-	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV))
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    readImmediate(insn, 1))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4726,19 +4720,19 @@ case 572:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBX };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
+-		return X86_SCAN_INVALID;
+-	if (translateRM(mcInst, &op3, insn, false))
++	if (translateRM(mcInst, &op2, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 576:
++case 285:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4746,29 +4740,30 @@ case 576:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_XMM) ||
+-	    readVSIBOperand(insn, TYPE_MVSIBX, ENCODING_VSIB, hasVVVV, &needVVVV) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64) ||
++	    readImmediate(insn, 1))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBX };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
+-		return X86_SCAN_INVALID;
+-	if (translateRM(mcInst, &op3, insn, false))
++	if (translateRM(mcInst, &op2, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 577:
++case 309:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4777,8 +4772,7 @@ case 577:
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_YMM) ||
+-	    readVSIBOperand(insn, TYPE_MVSIBY, ENCODING_VSIB, hasVVVV, &needVVVV) ||
+-	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV))
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD32))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4786,19 +4780,38 @@ case 577:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBY };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
++	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+-	if (translateRM(mcInst, &op3, insn, false))
++	return X86_SCAN_COMPLETE;
++}
++case 315:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD64))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 586:
++case 330:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4807,8 +4820,7 @@ case 586:
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+ 	    fixupRegisterOperand(insn, TYPE_XMM) ||
+-	    readVSIBOperand(insn, TYPE_MVSIBY, ENCODING_VSIB, hasVVVV, &needVVVV) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+@@ -4816,19 +4828,38 @@ case 586:
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+ 	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBY };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
++	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+-	if (translateRM(mcInst, &op3, insn, false))
++	return X86_SCAN_COMPLETE;
++}
++case 377:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 661:
++case 378:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4836,25 +4867,23 @@ case 661:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+-	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
+-	    fixupRegisterOperand(insn, TYPE_YMM))
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
+-	if (translateRM(mcInst, &op0, insn, false))
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
++	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 662:
++case 381:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4862,8 +4891,7 @@ case 662:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
+ 	    fixupRegisterOperand(insn, TYPE_XMM))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+@@ -4871,16 +4899,15 @@ case 662:
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
+ 	if (translateRM(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
++	if (translateRegRegister(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 685:
++case 386:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4888,25 +4915,23 @@ case 685:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
+-	    fixupRegisterOperand(insn, TYPE_XMM))
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    fixupRegisterOperand(insn, TYPE_YMM))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
+-	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
+ 	if (translateRM(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRegRegister(mcInst, &op2, insn, false))
++	if (translateRegRegister(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 686:
++case 391:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4914,23 +4939,23 @@ case 686:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
+-	    fixupRegisterOperand(insn, TYPE_R32))
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R32 };
+-	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R32 };
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
+ 	if (translateRM(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	if (translateRegRegister(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 687:
++case 402:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4938,23 +4963,23 @@ case 687:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_R32) ||
+-	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R32 };
+-	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 890:
++case 405:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4962,25 +4987,23 @@ case 890:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_XMM) ||
+-	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 891:
++case 415:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -4988,25 +5011,23 @@ case 891:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_XMM) ||
+-	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM) ||
+-	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
+-	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_YMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+ 	if (translateRM(mcInst, &op1, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+-case 904:
++case 421:
+ {
+ 	int hasVVVV, needVVVV;
+ 
+@@ -5014,22 +5035,2093 @@ case 904:
+ 	hasVVVV = !readVVVV(insn);
+ 	needVVVV = hasVVVV && (insn->vvvv != 0);
+ 	if ((!insn->consumedModRM && readModRM(insn)) ||
+-	    fixupRegisterOperand(insn, TYPE_YMM) ||
+-	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
+-	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64))
+ 		return X86_SCAN_INVALID;
+ 	if (needVVVV || finishDecodedInstruction(insn, true))
+ 		return X86_SCAN_INVALID;
+ 	*size = (uint16_t)insn->length;
+ 	if (beginTranslation(mcInst, insn))
+ 		return X86_SCAN_INVALID;
+-	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
+-	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
+ 	if (translateRegRegister(mcInst, &op0, insn, false))
+ 		return X86_SCAN_INVALID;
+-	translateRegister(mcInst, insn->vvvv, false);
+-	if (translateRM(mcInst, &op2, insn, false))
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 431:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32))
+ 		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_YMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 437:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 446:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD4))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_YMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 453:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 458:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 463:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 464:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD4) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 481:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R32 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 484:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_R64, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_R64 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 491:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 494:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 497:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD4))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 502:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 509:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 512:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 515:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 516:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD8) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 521:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD4) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 523:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 525:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op4 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op4, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 527:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 528:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_YMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 530:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 533:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_YMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 536:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 538:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_M };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 539:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 544:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 546:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 572:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVSIBOperand(insn, TYPE_MVSIBX, ENCODING_VSIB, hasVVVV, &needVVVV) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBX };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	return X86_SCAN_COMPLETE;
++}
++case 576:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVSIBOperand(insn, TYPE_MVSIBX, ENCODING_VSIB, hasVVVV, &needVVVV) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBX };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	return X86_SCAN_COMPLETE;
++}
++case 577:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVSIBOperand(insn, TYPE_MVSIBY, ENCODING_VSIB, hasVVVV, &needVVVV) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBY };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	return X86_SCAN_COMPLETE;
++}
++case 586:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVSIBOperand(insn, TYPE_MVSIBY, ENCODING_VSIB, hasVVVV, &needVVVV) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_RM, TYPE_MVSIBY };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op3, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	return X86_SCAN_COMPLETE;
++}
++case 595:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 604:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 613:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 614:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD8) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 628:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD4) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 631:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 633:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 646:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD32) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 652:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD64) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 658:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD64) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 661:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRegisterOperand(insn, TYPE_YMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_YMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 662:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRegisterOperand(insn, TYPE_XMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_M };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 663:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 666:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD4))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 682:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRegisterOperand(insn, TYPE_XMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 685:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    fixupRegisterOperand(insn, TYPE_XMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_REG, TYPE_XMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRegRegister(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 686:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM) ||
++	    fixupRegisterOperand(insn, TYPE_R32))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_R32 };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_R32 };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 687:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_R32) ||
++	    fixupRMOperand(insn, TYPE_R32, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_R32 };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_R32 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 804:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4) ||
++	    fixupRegisterOperand(insn, TYPE_XMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 807:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8) ||
++	    fixupRegisterOperand(insn, TYPE_YMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 812:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 815:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8) ||
++	    fixupRegisterOperand(insn, TYPE_XMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 820:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    fixupRegisterOperand(insn, TYPE_YMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 825:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 828:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD2) ||
++	    fixupRegisterOperand(insn, TYPE_XMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_XMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 831:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4) ||
++	    fixupRegisterOperand(insn, TYPE_YMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_YMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 834:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_REG, TYPE_ZMM };
++	if (translateRM(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRegRegister(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 839:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 842:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 845:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD2))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 848:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD4))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 851:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD8))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 860:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if (readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV) ||
++	    (!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 869:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if (readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    (!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_YMM, ENCODING_RM_CD32) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 878:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if (readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    (!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD64) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_IB, TYPE_UIMM8 };
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op2, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 890:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_M, ENCODING_RM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_M };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	return X86_SCAN_COMPLETE;
++}
++case 891:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_XMM) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM) ||
++	    readVVVVOperand(insn, TYPE_XMM, hasVVVV, &needVVVV))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_XMM };
++	static const OperandSpecifier op1 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	if (translateRM(mcInst, &op1, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	return X86_SCAN_COMPLETE;
++}
++case 904:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 908:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_YMM) ||
++	    readVVVVOperand(insn, TYPE_YMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_YMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 913:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_XMM, ENCODING_RM_CD16))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_XMM };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	return X86_SCAN_COMPLETE;
++}
++case 916:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD8) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
++	return X86_SCAN_COMPLETE;
++}
++case 918:
++{
++	int hasVVVV, needVVVV;
++
++	insn->operands = &x86OperandSets[insn->spec->operands][0];
++	hasVVVV = !readVVVV(insn);
++	needVVVV = hasVVVV && (insn->vvvv != 0);
++	if ((!insn->consumedModRM && readModRM(insn)) ||
++	    fixupRegisterOperand(insn, TYPE_ZMM) ||
++	    readVVVVOperand(insn, TYPE_ZMM, hasVVVV, &needVVVV) ||
++	    fixupRMOperand(insn, TYPE_ZMM, ENCODING_RM_CD4) ||
++	    readImmediate(insn, 1))
++		return X86_SCAN_INVALID;
++	if (needVVVV || finishDecodedInstruction(insn, true))
++		return X86_SCAN_INVALID;
++	*size = (uint16_t)insn->length;
++	if (beginTranslation(mcInst, insn))
++		return X86_SCAN_INVALID;
++	static const OperandSpecifier op0 = { ENCODING_REG, TYPE_ZMM };
++	static const OperandSpecifier op2 = { ENCODING_RM, TYPE_ZMM };
++	static const OperandSpecifier op3 = { ENCODING_IB, TYPE_UIMM8 };
++	if (translateRegRegister(mcInst, &op0, insn, false))
++		return X86_SCAN_INVALID;
++	translateRegister(mcInst, insn->vvvv, false);
++	if (translateRM(mcInst, &op2, insn, false))
++		return X86_SCAN_INVALID;
++	translateImmediate(
++		mcInst, insn->immediates[insn->numImmediatesTranslated++],
++		&op3, insn, false);
+ 	return X86_SCAN_COMPLETE;
+ }
+ case 926:
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..1f39c387 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -320,7 +320,7 @@ def emit_scan(suffix):
+     translations_by_index = dict(translation_specializations(suffix))
+     groups = defaultdict(list)
+     for index, operands in read_specializations(suffix):
+-        # Bound the fused code to scalar and three-operand VEX shapes.
++        # Keep memory and predicate-changing EVEX operands on their existing path.
+         scalar = all(
+             encoding in ENCODINGS and operand_type in TYPES
+             for encoding, operand_type in operands
+@@ -338,7 +338,14 @@ def emit_scan(suffix):
+                 for _, operand_type in operands
+             )
+         )
+-        if index in translations_by_index and (scalar or vex):
++        evex_registers = any(
++            encoding in RM_ENCODINGS - {"ENCODING_RM"} for encoding, _ in operands
++        ) and all(
++            encoding in RM_ENCODINGS | {"ENCODING_REG", "ENCODING_VVVV", "ENCODING_IB"}
++            and operand_type in {"TYPE_XMM", "TYPE_YMM", "TYPE_ZMM", "TYPE_UIMM8"}
++            for encoding, operand_type in operands
++        )
++        if index in translations_by_index and (scalar or vex or evex_registers):
+             # DUP is absent from the read sequence but remains significant to
+             # translation order and multiplicity. Both sequences identify a case.
+             groups[(operands, translations_by_index[index])].append(index)
+@@ -951,7 +958,11 @@ def emit_terminal(suffix):
+         f"readImmediateImpl(insn, {width}, false)": width
+         for width in IMMEDIATES.values()
+     }
+-    lines.append("static const uint8_t x86LegacyImmediateBytes[3][" + str(len(public_tails)) + "] = {")
++    lines.append(
++        "static const uint8_t x86LegacyImmediateBytes[3]["
++        + str(len(public_tails))
++        + "] = {"
++    )
+     for size, address_size in ((2, 2), (4, 4), (4, 8)):
+         extents = []
+         for tail in public_tails:
+@@ -962,7 +973,9 @@ def emit_terminal(suffix):
+                     immediate = 0
+                 else:
+                     width = immediate_readers[call]
+-                    immediate = immediate if width == "insn->immediateSize" else int(width)
++                    immediate = (
++                        immediate if width == "insn->immediateSize" else int(width)
++                    )
+                     tables.require(immediate > 0, "Invalid immediate extent")
+                     total += immediate
+             extents.append(str(total))

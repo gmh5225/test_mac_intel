@@ -1,5 +1,5 @@
 from pathlib import Path
-import json, os, shutil, subprocess, tempfile
+import hashlib, json, os, shutil, subprocess, tempfile
 root=Path(__file__).resolve().parent
 source=root.parent/'source'
 evidence=root.parent/'evidence'
@@ -23,7 +23,16 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
-    run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
+    assert not subprocess.check_output(['git','status','--porcelain'],cwd=source)
+    # Git apply --index must compare the same LF bytes on Windows and Unix.
+    run(['git','config','core.autocrlf','false'],'canonical-eol')
+    run(['git','checkout-index','-a','-f'],'canonical-checkout')
+    assert not subprocess.check_output(['git','status','--porcelain'],cwd=source)
+    patch=root_build/'candidate.patch'
+    canonical=subprocess.check_output(['git','show','HEAD:capstone-output-release/'+forms+'.patch'],cwd=root.parent)
+    assert hashlib.sha256(canonical).hexdigest()==json.loads((root/'candidate.json').read_text())['sha256']
+    patch.write_bytes(canonical)
+    run(['git','-c','core.autocrlf=false','apply','--index',patch],'apply')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
     assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
@@ -41,6 +50,8 @@ try:
         units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
     if profile not in ('diet','reduced','dedicated'):
         units+=sorted(q.stem for q in (source/'tests/unit').glob('mips*.c') if q.stem not in units)
+    if profile not in ('diet','reduced','alias-only'):
+        units += sorted(q.stem for q in (source/'tests/unit').glob('x86_*.c') if q.stem.startswith(('x86_apx_evex', 'x86_evex', 'x86_avx512')) and q.stem not in units)
     if profile=='adapter':units+=['x86_scan_adapter']
     if profile not in ('diet','reduced'):
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
