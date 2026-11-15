@@ -1,0 +1,162 @@
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -8,6 +8,13 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
++
++/* Keep this writer module's code growth separate from the decoder text. */
++#if defined(__ELF__) && defined(__GNUC__)
++#define X86_VECTOR_TEXT __attribute__((section("cs_x86_vector_text")))
++#else
++#define X86_VECTOR_TEXT
++#endif
+ struct PaddingOutput {
+ 	unsigned id;
+ 	uint8_t length;
+@@ -20,8 +27,8 @@
+ };
+ 
+ #include "X86GenVectorOutput.inc"
+-static char *writeVectorRegister(char *out, unsigned length_code,
+-				 unsigned number)
++static X86_VECTOR_TEXT char *
++writeVectorRegister(char *out, unsigned length_code, unsigned number)
+ {
+ 	*out++ = "xyz"[length_code];
+ 	*out++ = 'm';
+@@ -32,12 +39,11 @@
+ 	return out;
+ }
+ 
+-static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+-				 uint16_t *insn_size,
+-				 const struct VectorOutputRow *row,
+-				 unsigned prefix, unsigned ll, unsigned rex,
+-				 unsigned first_ll, const unsigned *regs,
+-				 unsigned reg_count)
++static X86_VECTOR_TEXT bool
++writeVectorRegisters(const uint8_t *code, cs_insn *insn, uint16_t *insn_size,
++		     const struct VectorOutputRow *row, unsigned prefix,
++		     unsigned ll, unsigned rex, unsigned first_ll,
++		     const unsigned *regs, unsigned reg_count)
+ {
+ 	const unsigned len = prefix + 2 + row->immediate;
+ 	*insn_size = insn->size = (uint16_t)len;
+@@ -101,18 +107,19 @@
+ 	return true;
+ }
+ 
+-static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+-			       uint16_t *insn_size,
+-			       const struct X86SimpleRegister *regs);
++static X86_VECTOR_TEXT bool
++writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
++		   uint16_t *insn_size, const struct X86SimpleRegister *regs);
+ 
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+-			    uint16_t *insn_size,
+-			    const struct X86SimpleRegister *address_regs)
++static X86_VECTOR_TEXT bool
++writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
++		uint16_t *insn_size,
++		const struct X86SimpleRegister *address_regs)
+ {
+ 	if (size >= 6 && code[5] < 0xc0)
+ 		return writeEvexBroadcast(code, size, insn, insn_size,
+@@ -153,9 +160,9 @@
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static bool writeVexIndexedOutput(const uint8_t *code, size_t size,
+-				  cs_insn *insn, uint16_t *insn_size,
+-				  const struct X86SimpleRegister *regs)
++static X86_VECTOR_TEXT bool
++writeVexIndexedOutput(const uint8_t *code, size_t size, cs_insn *insn,
++		      uint16_t *insn_size, const struct X86SimpleRegister *regs)
+ {
+ 	const bool fma = code[0] == 0xc4;
+ 	const unsigned prefix = fma ? 3 : 2;
+@@ -254,9 +261,9 @@
+ 	return true;
+ }
+ 
+-static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
+-				      cs_insn *insn, uint16_t *insn_size,
+-				      bool wide)
++static X86_VECTOR_TEXT bool
++writeLegacyRegisterOutput(const uint8_t *code, size_t size, cs_insn *insn,
++			  uint16_t *insn_size, bool wide)
+ {
+ 	if (size < 4)
+ 		return false;
+@@ -312,8 +319,8 @@
+ }
+ 
+ /* The caller has identified a two-byte VEX prefix and RIP-relative ModR/M. */
+-static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
+-			    uint16_t *insn_size)
++static X86_VECTOR_TEXT bool writeVexRipLoad(const uint8_t *code, size_t size,
++					    cs_insn *insn, uint16_t *insn_size)
+ {
+ 	const uint8_t flags = code[1], opcode = code[2];
+ 	if (size < 8 || (flags & 0x78) != 0x78 ||
+@@ -369,8 +376,9 @@
+ 	return true;
+ }
+ 
+-static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+-			       uint16_t *insn_size, bool wide)
++static X86_VECTOR_TEXT bool writePaddingOutput(const uint8_t *code, size_t size,
++					       cs_insn *insn,
++					       uint16_t *insn_size, bool wide)
+ {
+ 	const bool operand_prefix = code[0] == 0x66;
+ 	unsigned row = 0;
+@@ -463,9 +471,10 @@
+ 
+ /* The VEX register plan supplies the public fields for vvvv register operands.
+  * Memory forms and unsupported vector widths fall back before any output. */
+-static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+-				   cs_insn *insn, uint16_t *insn_size,
+-				   unsigned prefix)
++static X86_VECTOR_TEXT bool writeVexRegisterOutput(const uint8_t *code,
++						   size_t size, cs_insn *insn,
++						   uint16_t *insn_size,
++						   unsigned prefix)
+ {
+ 	const unsigned flags = code[prefix - 1];
+ 	const unsigned map = prefix == 2 ? 1 : code[1] & 31;
+@@ -501,9 +510,10 @@
+ 				    0x40 | (w << 3) | rxb, ll, regs, 3);
+ }
+ 
+-bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+-			   uint16_t *insn_size,
+-			   const struct X86SimpleRegister *regs, bool wide)
++X86_VECTOR_TEXT bool X86_writeVectorOutput(const uint8_t *code, size_t size,
++					   cs_insn *insn, uint16_t *insn_size,
++					   const struct X86SimpleRegister *regs,
++					   bool wide)
+ {
+ 	if (code[0] == 0x0f || code[0] == 0xf3 ||
+ 	    (code[0] == 0x66 && size >= 2 &&
+@@ -530,9 +540,9 @@
+ #elif defined(__GNUC__)
+ __attribute__((noinline))
+ #endif
+-static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+-			       uint16_t *insn_size,
+-			       const struct X86SimpleRegister *regs)
++static X86_VECTOR_TEXT bool
++writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
++		   uint16_t *insn_size, const struct X86SimpleRegister *regs)
+ {
+ 	if (size < 6 || (code[1] & 15) != 2 || (code[2] & 0x7f) != 0x7d ||
+ 	    (code[3] & 0x9f) != 8 || code[4] != 0x1a)

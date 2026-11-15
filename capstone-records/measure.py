@@ -30,14 +30,15 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   bins={};objects={};libs={};ownedlibs={}
   active=platform.system()=='Linux' and platform.machine()=='aarch64'
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan'):
-   variant=r/('baseline.patch' if key=='base' else key+'.patch')
+  for key in ('base','vex','section','scan'):
+   variant=r/({'base':'baseline.patch','vex':'vex32-runtime.patch','section':'section-only.patch','scan':'scan.patch'}[key])
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
     run(['git','add','-u'],'stage-tested-source',s)
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
-    write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
+    metadata={'vex':'vex32-runtime.json','section':'section-only.json','scan':'candidate.json'}[key]
+    assert tested==json.loads((r/metadata).read_text())['tree'],tested
+    write('tested-source-'+key,dict(tree=tested,patch_sha256=sha(variant)))
     run(['git','reset','-q'],'unstage-tested-source',s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
@@ -47,15 +48,39 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('scan',):
+  for key in ('vex','section','scan'):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'} if key=='indexed' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
+   expected={'arch/X86/X86VectorOutput.c.o'} | (set() if key=='section' else {'arch/X86/X86OutputIterator.c.o'})
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
+  layouts={}
+  for key in ('base','vex','section','scan'):
+   sections=(e/(key+'-sections.txt')).read_text()
+   match=re.search(r'^\s*\[\s*\d+\] \.text\s+\S+\s+([0-9a-f]+)\s+([0-9a-f]+)\s+([0-9a-f]+)',sections,re.M)
+   assert match,(key,sections)
+   addr,offset,length=(int(v,16)for v in match.groups())
+   blob=bins[key].read_bytes();rows={}
+   for line in (e/(key+'-symbols.txt')).read_text().splitlines():
+    parts=line.split()
+    if len(parts)!=4 or parts[2] not in ('t','T'):continue
+    start,size=int(parts[0],16),int(parts[1],16)
+    if not (addr<=start<addr+length):continue
+    rows[parts[3]]=dict(address=start,size=size,sha256=hashlib.sha256(blob[offset+start-addr:offset+start-addr+size]).hexdigest())
+   layouts[key]=rows
+  comparison={}
+  for left,right in [('base','vex'),('base','section'),('section','scan')]:
+   a,before=layouts[left],layouts[right]
+   common=a.keys()&before.keys()
+   comparison[left+'-to-'+right]=dict(functions=len(common),moved=[name for name in sorted(common)if a[name]['address']!=before[name]['address']],resized=[name for name in sorted(common)if a[name]['size']!=before[name]['size']],changed_bytes=[name for name in sorted(common)if a[name]['sha256']!=before[name]['sha256']])
+  write('normal-text-layout',dict(functions=layouts,comparison=comparison))
+  assert not comparison['section-to-scan']['moved'],comparison['section-to-scan']
+  assert not comparison['section-to-scan']['resized'],comparison['section-to-scan']
+  for name in ('ARM_getInstruction','AArch64_getInstruction','Mips_getInstruction'):
+   assert layouts['section'][name]==layouts['scan'][name],name
   active=True
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==4;write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -65,7 +90,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Integrated VEX32 register writer has complete-record and protected input/output qualification; retain original and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Exact combined source passed local complete-record and protected-page differentials. All four variants must preserve the unchanged consumer signature. Layout causal diagnostic only; not release qualification.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -79,9 +104,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for x in cases:
    for mode in (0,1,2):
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
-     for k in range(21):
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*100e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','aa','vex','section','scan']
+     for k in range(15):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
