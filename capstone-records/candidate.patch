@@ -1,0 +1,179 @@
+diff --git a/Mapping.c b/Mapping.c
+index b2be73de..f34ceca7 100644
+--- a/Mapping.c
++++ b/Mapping.c
+@@ -363,12 +363,8 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
+ 				       const map_insn_ops *insn_ops_map,
+ 				       size_t map_size)
+ {
+-	assert(MI);
+-	assert(MI->Opcode < map_size);
+-	assert(OpNum < sizeof(insn_ops_map[MI->Opcode].ops) /
+-			       sizeof(insn_ops_map[MI->Opcode].ops[0]));
+-
+-	cs_ac_type access = insn_ops_map[MI->Opcode].ops[OpNum].access;
++	cs_ac_type access =
++		mapping_get_op_access_raw(MI, OpNum, insn_ops_map, map_size);
+ 	if (MCInst_opIsTied(MI, OpNum) || MCInst_opIsTying(MI, OpNum))
+ 		access |= (access == CS_AC_READ) ? CS_AC_WRITE : CS_AC_READ;
+ 	return access;
+diff --git a/Mapping.h b/Mapping.h
+index 6f7281cd..74f39d79 100644
+--- a/Mapping.h
++++ b/Mapping.h
+@@ -59,6 +59,30 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
+ 				       const map_insn_ops *insn_ops_map,
+ 				       size_t map_size);
+ 
++/* The table lookup and its bounds have one owner for external and inline use. */
++static inline cs_ac_type
++mapping_get_op_access_raw(MCInst *MI, unsigned OpNum,
++			  const map_insn_ops *insn_ops_map, size_t map_size)
++{
++	assert(MI);
++	assert(MI->Opcode < map_size);
++	assert(OpNum < sizeof(insn_ops_map[MI->Opcode].ops) /
++			       sizeof(insn_ops_map[MI->Opcode].ops[0]));
++
++	return insn_ops_map[MI->Opcode].ops[OpNum].access;
++}
++
++/* No populated tie index exists when the initializer/writeback bound is zero. */
++static inline cs_ac_type
++mapping_get_op_access_inline(MCInst *MI, unsigned OpNum,
++			     const map_insn_ops *insn_ops_map, size_t map_size)
++{
++	assert(MI);
++	if (MI->tied_op_idx_size)
++		return mapping_get_op_access(MI, OpNum, insn_ops_map, map_size);
++	return mapping_get_op_access_raw(MI, OpNum, insn_ops_map, map_size);
++}
++
+ /// Macro for easier access of operand types from the map.
+ /// Assumes the istruction operands map is called "insn_operands"
+ /// Only usable by `auto-sync` archs!
+@@ -90,9 +114,9 @@ mapping_get_op_type_diet(MCInst *MI, unsigned OpNum,
+ /// Only usable by `auto-sync` archs!
+ #ifndef CAPSTONE_DIET
+ #define map_get_op_access(MI, OpNum) \
+-	mapping_get_op_access(MI, OpNum, (const map_insn_ops *)insn_operands, \
+-			      sizeof(insn_operands) / \
+-				      sizeof(insn_operands[0]))
++	mapping_get_op_access_inline( \
++		MI, OpNum, (const map_insn_ops *)insn_operands, \
++		sizeof(insn_operands) / sizeof(insn_operands[0]))
+ #else
+ #define map_get_op_access(MI, OpNum) CS_AC_INVALID
+ #endif
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index e374be5e..e3a34b82 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -231,6 +231,13 @@ preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
+ operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
+ Register and immediate predicates retain the checks of both existing operand tags.
+ 
++`MCInst_handleWriteback` maintains an upper bound on populated tied-operand
++indices. The mapping macros read the shared access table inline when that bound
++is zero. Nonempty sets use the external mapper and its existing tie queries.
++Both paths share one checked raw table lookup; external mapping/query symbols
++remain available. `MCInst_clear` retains both tie indices and their bound, and
++complete initialization resets both.
++
+ The private full x86 path uses `MCInst_InitX86` to initialize common and x86
+ metadata and the default first operand, leaving the other operand slots for
+ the decoder's append helpers. Those helpers set both operand tags and the
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 7f588c14..e5f9ffab 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -255,6 +255,79 @@ static bool test_full_group_map(void)
+ 	return true;
+ }
+ 
++static bool check_operand_access(MCInst *mi, unsigned tied)
++{
++	static const struct {
++		cs_ac_type base;
++		cs_ac_type tied;
++	} accesses[] = {
++		{ CS_AC_INVALID, CS_AC_READ },
++		{ CS_AC_READ, CS_AC_READ | CS_AC_WRITE },
++		{ CS_AC_WRITE, CS_AC_READ | CS_AC_WRITE },
++		{ CS_AC_READ | CS_AC_WRITE, CS_AC_READ | CS_AC_WRITE },
++	};
++	map_insn_ops table = { 0 };
++	for (unsigned a = 0; a < sizeof(accesses) / sizeof(accesses[0]); ++a) {
++		for (unsigned op = 0; op < MAX_NO_INSN_MAP_OPS; ++op) {
++			table.ops[op].access = accesses[a].base;
++			cs_ac_type expected = (tied & (1u << op)) ?
++						      accesses[a].tied :
++						      accesses[a].base;
++			cs_ac_type actual =
++				mapping_get_op_access(mi, op, &table, 1);
++			cs_ac_type inlined =
++				mapping_get_op_access_inline(mi, op, &table, 1);
++			if (actual != expected || inlined != expected) {
++				fprintf(stderr,
++					"Operand %u: access %u with ties %#x: expected %u, got %u\n",
++					op, (unsigned)accesses[a].base, tied,
++					(unsigned)expected, (unsigned)actual);
++				return false;
++			}
++		}
++	}
++	return true;
++}
++
++static bool test_operand_access(void)
++{
++	MCInst mi;
++	MCOperandInfo ops[MAX_MC_OPS] = { 0 };
++	MCInstrDesc desc = { 0 };
++	cs_insn insn = { 0 };
++	MCInst_Init(&mi, CS_ARCH_ARM);
++	mi.flat_insn = &insn;
++	desc.NumOperands = MAX_MC_OPS;
++	desc.OpInfo = ops;
++	MCInst_handleWriteback(&mi, &desc, 1);
++	if (!check_operand_access(&mi, 0))
++		return false;
++
++	// Include duplicate destinations, a self-tie and the final MC operand.
++	ops[3].Constraints = CONSTRAINT_MCOI_TIED_TO(0);
++	ops[5].Constraints = CONSTRAINT_MCOI_TIED_TO(0);
++	ops[7].Constraints = CONSTRAINT_MCOI_TIED_TO(7);
++	ops[MAX_MC_OPS - 1].Constraints = CONSTRAINT_MCOI_TIED_TO(15);
++	MCInst_handleWriteback(&mi, &desc, 1);
++	const unsigned tied = 1u | (1u << 3) | (1u << 5) | (1u << 7) |
++			      (1u << 15);
++	if (!check_operand_access(&mi, tied))
++		return false;
++
++	// Clearing operands and replacing a shorter descriptor retain old ties.
++	MCInst_clear(&mi);
++	if (!check_operand_access(&mi, tied))
++		return false;
++	desc.NumOperands = 4;
++	ops[3].Constraints = CONSTRAINT_MCOI_TIED_TO(1);
++	MCInst_handleWriteback(&mi, &desc, 1);
++	if (!check_operand_access(&mi, tied | (1u << 1)))
++		return false;
++
++	MCInst_Init(&mi, CS_ARCH_ARM);
++	return check_operand_access(&mi, 0);
++}
++
+ int main(void)
+ {
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+@@ -265,7 +338,8 @@ int main(void)
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
++	return test_operand_access() && test_full_group_map() &&
++			       test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
