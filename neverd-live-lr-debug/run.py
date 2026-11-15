@@ -18,7 +18,7 @@ def run(name,args):
 inc=Path(p["include"]).resolve();cc=["/usr/bin/clang++","-target",p["target"],"-std=c++20","-O2","-I",str(inc)]
 assert run("compile-writer",cc+[out/"writer.cpp","-o",out/"writer"])==0
 assert run("write-rules",[out/"writer",out/"rules"])==0
-assert run("compile-scope",["/usr/bin/clang","-target",p["target"],"-O0","-DNEVERD_LIVE_LR","-dynamiclib",out/"scope.S","-o",out/"scope.dylib"])==0
+assert run("compile-scope",["/usr/bin/clang++","-target",p["target"],"-O0","-DNEVERD_LIVE_LR","-dynamiclib",out/"scope.S","-o",out/"scope.dylib"])==0
 assert run("compile-driver",cc+["-DNEVERD_NONCALL_SCOPE",out/"driver.cpp","-o",out/"driver"])==0
 run("delivery",[out/"driver",out/"scope.dylib",out/"rules","0","0","1"])
 run("disassembly",["/usr/bin/otool","-tvV",out/"scope.dylib"])
