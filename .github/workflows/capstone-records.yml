@@ -1,7 +1,7 @@
-name: Validate affected backend guards on Windows with canonical patch bytes
+name: Validate cstest CRT inheritance and configuration switches
 on:
   push:
-    branches: [codex/capstone-mapping-presence-guard-windows]
+    branches: [codex/capstone-cstest-msvc-runtime]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,14 +11,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: windows-2022, cc: MD, profile: default, archs: combined }
-          - { host: windows-2022, cc: MT, profile: default, archs: combined }
+          - { host: windows-2022, cc: MSVC, runtime: MT }
+          - { host: windows-2022, cc: MSVC, runtime: MD }
+          - { host: windows-2022, cc: MSVC, runtime: MD-explicit }
+          - { host: ubuntu-24.04, cc: gcc, runtime: default }
+          - { host: macos-15, cc: clang, runtime: default }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 35
+    timeout-minutes: 40
     env:
-      PROFILE: ${{ matrix.profile }}
+      RUNTIME: ${{ matrix.runtime }}
       TOOLCHAIN: ${{ matrix.cc }}
-      ARCH_SET: ${{ matrix.archs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -30,7 +32,7 @@ jobs:
           ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
           path: source
           persist-credentials: false
-      - name: Compare baseline and candidate public units and mapping boundary states
+      - name: Build and test before and after Release Debug Release switches
         run: python capstone-records/measure.py
       - if: always()
         shell: bash
@@ -38,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mapping-presence-guard-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}-${{ matrix.archs }}
+          name: cstest-msvc-runtime-${{ matrix.host }}-${{ matrix.runtime }}
           path: evidence/
           retention-days: 14
