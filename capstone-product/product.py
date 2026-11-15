@@ -169,7 +169,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
 
-  write('slot-placement',arm_layout.compare(slot_products))
+  write('slot-placement',arm_layout.compare(slot_products,out/'slot-layout-snapshots.json'))
   products.update({'slot-'+key:value for key,value in slot_products.items()})
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities);assert len(set(identities.values()))==len(products)==4

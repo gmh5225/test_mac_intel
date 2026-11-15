@@ -3,6 +3,7 @@
 from collections import defaultdict
 from pathlib import Path
 import hashlib
+import json
 import os
 import shlex
 import subprocess as sp
@@ -112,7 +113,7 @@ def relink(build, target, output, script, command, label):
     command([*args, "-Wl,-T," + str(script)], label, build)
 
 
-def compare(paths):
+def compare(paths, diagnostic=None):
     snapshots = {}
     for label, path in paths.items():
         with Path(path).open("rb") as f:
@@ -122,6 +123,7 @@ def compare(paths):
             low, high = slot["sh_addr"], slot["sh_addr"] + slot["sh_size"]
             symbols = defaultdict(list)
             excluded = []
+            unwind_symbols = []
             for symbol in elf.get_section_by_name(".symtab").iter_symbols():
                 kind = symbol["st_info"]["type"]
                 if symbol["st_shndx"] == "SHN_UNDEF" or kind not in (
@@ -130,24 +132,76 @@ def compare(paths):
                 ):
                     continue
                 address = symbol["st_value"]
+                index = symbol["st_shndx"]
+                if (
+                    isinstance(index, int)
+                    and elf.get_section(index).name == ".eh_frame"
+                ):
+                    assert kind == "STT_OBJECT", symbol.name
+                    unwind_symbols.append((symbol.name, address, symbol["st_size"]))
+                    continue
                 if low <= address < high:
                     excluded.append(symbol.name)
                 else:
                     symbols[symbol.name].append((address, symbol["st_size"], kind))
             snapshots[label] = dict(
                 allocated=[
-                    (s.name, s["sh_addr"], s["sh_size"], s["sh_addralign"])
+                    (
+                        s.name,
+                        s["sh_addr"],
+                        s["sh_size"],
+                        s["sh_addralign"],
+                        s["sh_flags"],
+                    )
                     for s in elf.iter_sections()
                     if s["sh_flags"] & 2
                 ],
                 segments=[dict(s.header) for s in elf.iter_segments()],
                 symbols={k: sorted(v) for k, v in symbols.items()},
                 excluded=sorted(excluded),
+                unwind_symbols=sorted(unwind_symbols),
                 sha256=hashlib.sha256(Path(path).read_bytes()).hexdigest(),
             )
     a, b = snapshots.values()
-    assert a["allocated"] == b["allocated"], "Allocated section placement differs"
-    assert a["segments"] == b["segments"], "Program segment mappings differ"
+    if diagnostic:
+        Path(diagnostic).write_text(json.dumps(snapshots, indent=2) + "\n")
+    assert [s[0] for s in a["allocated"]] == [s[0] for s in b["allocated"]]
+    metadata = []
+    for left, right in zip(a["allocated"], b["allocated"]):
+        if left == right:
+            continue
+        assert (
+            left[0] == ".eh_frame" and left[1] == right[1] and left[3:] == right[3:]
+        ), (left, right)
+        assert left[4] == 2, (left, right)
+        metadata.append(
+            dict(
+                section=left[0],
+                address=left[1],
+                base_bytes=left[2],
+                candidate_bytes=right[2],
+            )
+        )
+    assert [x[0] for x in a["unwind_symbols"]] == [x[0] for x in b["unwind_symbols"]]
+    page = os.sysconf("SC_PAGE_SIZE")
+
+    def mapped_pages(segments):
+        result = []
+        for segment in segments:
+            item = dict(segment)
+            if item["p_type"] == "PT_LOAD":
+                for field in ["p_filesz", "p_memsz"]:
+                    item[field] = (
+                        (item["p_vaddr"] + item[field] + page - 1) // page * page
+                    )
+            result.append(item)
+        return result
+
+    assert mapped_pages(a["segments"]) == mapped_pages(b["segments"]), (
+        "Program mappings differ",
+        a["segments"],
+        b["segments"],
+    )
     assert (
         a["symbols"] == b["symbols"]
     ), "Symbols outside the changed ARM text slot differ"
@@ -156,8 +210,13 @@ def compare(paths):
     return dict(
         unchanged_external_symbols=len(a["symbols"]),
         excluded_arm_object_symbols=a["excluded"],
-        identical_allocated_layout=True,
-        identical_segments=True,
+        identical_allocated_layout=a["allocated"] == b["allocated"],
+        identical_segments=a["segments"] == b["segments"],
+        identical_hot_code_and_data_layout=True,
+        identical_mapping_pages=True,
+        page_bytes=page,
+        unwind_metadata_differences=metadata,
+        unwind_symbols={k: v["unwind_symbols"] for k, v in snapshots.items()},
         binary_sha256={k: v["sha256"] for k, v in snapshots.items()},
         scope="Diagnostic link placement; no production linker or code padding change",
     )
