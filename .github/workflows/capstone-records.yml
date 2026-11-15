@@ -1,7 +1,7 @@
-name: Qualify scalar SSE output with one writer call site mixed
+name: Qualify cached x86 output-option eligibility mixed
 on:
   push:
-    branches: [codex/capstone-scalar-shared-call-mixed]
+    branches: [codex/capstone-output-option-cache-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: fd61c821741da278075d406cd4c05131c28b1d7d
+          ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-shared-call-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: output-option-cache-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

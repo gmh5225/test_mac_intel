@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'} if key=='indexed' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
+   expected={'cs.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86Module.c.o'} if key=='indexed' else {'cs.c.o','arch/X86/X86OutputIterator.c.o','arch/X86/X86Module.c.o'}
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
