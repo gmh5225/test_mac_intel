@@ -51,9 +51,18 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'} if key=='indexed' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
+   expected={'arch/X86/X86Mapping.c.o'}
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
+  run(['clang++','-O2','-std=c++17','-I',s/'include','-I',s,r/'differential.cpp','-ldl','-o',t/'audit'],'compile-audit')
+  audits={}
+  for x in cases:
+   if x['selector'] not in (16,32,64):continue
+   raw=sp.check_output([t/'audit',libs['base'],libs['scan'],str(x['selector']),x['path']],text=True)
+   result=json.loads(raw)
+   assert result['other_bytes_cursor_errors_accesses_equal'] and result['records']>0,result
+   audits[x['name']]=result
+  write('semantic-audits',audits)
   active=True
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
@@ -65,7 +74,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Scalar SSE register writer passed 151781376 complete-record inputs and protected-page checks; preserve original and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Scalar implicit DS correction: full-record differential audit on each x86 corpus before measuring, including cursor, errors and register accesses. Only validated DS metadata may change.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -80,13 +89,19 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    for mode in (0,1,2):
     for launch in launches:
      warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
+     runs=[];reference={};keys=['base','aa','scan'];corrected_detail=mode==2 and audits.get(x['name'],{}).get('scalar_ds_corrections',0)>0
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
-       if reference is None:reference=(vout['first'],vout['result'])
-       assert reference==(vout['first'],vout['result'])
+       identity='scan' if corrected_detail and v=='scan' else 'base'
+       observed=(vout['first'],vout['result'])
+       if identity not in reference:reference[identity]=observed
+       assert reference[identity]==observed
+       if len(reference)==2:
+        for index in (0,1):
+         for field in ('instructions','rejected','boundaries'):
+          assert reference['base'][index][field]==reference['scan'][index][field]
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
