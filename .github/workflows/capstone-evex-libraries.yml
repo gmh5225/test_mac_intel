@@ -1,7 +1,7 @@
-name: Compare arithmetic prefix classes against nested selection and dependent lookup
+name: Measure exact paired hexadecimal immediate output
 on:
   push:
-    branches: [codex/capstone-prefix-arithmetic-cost]
+    branches: [codex/capstone-x86-immediate-pairs-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 729680277dd762704ea3270291b7a75318f51583
+          ref: defa77a3b8395499e6dfc991808ed8d1c8d83df1
           path: source
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: prefix-arithmetic-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: x86-immediate-pairs-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
