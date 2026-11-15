@@ -37,16 +37,3 @@ index 6712b300..2c917b26 100644
  	map_implicit_reads(MI, ppc_insns);
  	map_implicit_writes(MI, ppc_insns);
  	map_groups(MI, ppc_insns);
-diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
-index 711691be..7fa0e351 100644
---- a/arch/SystemZ/SystemZMapping.c
-+++ b/arch/SystemZ/SystemZMapping.c
-@@ -50,6 +50,8 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
- 		return;
- #else
- 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- #endif
- 	map_implicit_reads(MI, systemz_insns);
- 	map_implicit_writes(MI, systemz_insns);

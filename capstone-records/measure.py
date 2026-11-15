@@ -78,8 +78,8 @@ try:
         (evidence / (label+'-symbols.txt')).write_bytes(
             sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
     from native import measure
-    selected=[v for v in cases if v['selector']in (2,3,11,12)]
-    assert len(selected)==4
+    selected=cases
+    assert len(selected)==7
     measure(w,selected,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
