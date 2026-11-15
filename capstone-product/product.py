@@ -21,7 +21,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
   write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',swift_friend_applied=False))
-  command([sys.executable,r/'llvm_mixed_warnings.py',ll,out/'llvm-warning-compatibility.json'],'llvm-mixed-warning-flags')
+  assert cc == 'clang'
+  write('llvm-warning-compatibility', dict(applied=False, reason='Clang C and C++; unmodified latest fork LLVM source.'))
   cases=corpus.prepare(r,t,out,command)
   cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
   assert len(cases)==14
@@ -34,6 +35,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
+  shutil.copyfile(r/'prefix-probe.cpp',nd/'capstone-prefix-stream.cpp')
+  with cm.open('a') as f:f.write('\nadd_executable(capstone-prefix-stream capstone-prefix-stream.cpp)\ntarget_link_libraries(capstone-prefix-stream PRIVATE NeverDDecode)\n')
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   write('compiler',dict(c=sp.check_output([cc,'--version'],text=True).splitlines()[0],cxx=sp.check_output(['clang++','--version'],text=True).splitlines()[0],cpu=Path('/proc/cpuinfo').read_text(),host=platform.machine()))
@@ -68,13 +71,27 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    if label!='base':
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
-    command(['git','apply',change],'apply-'+label,cs)
-   targets=['capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests']
+    command(['git','apply',change],'apply-'+label,nd)
+    command(['git','add',*expected['neverd_patch_paths']],'stage-neverd-source',nd)
+    tested_neverd=sp.check_output(['git','write-tree'],cwd=nd,text=True).strip()
+    assert tested_neverd==variants[label]['neverd_tree'],tested_neverd
+    write(label+'-neverd-source-tree',dict(parent=rev(nd),tree=tested_neverd))
+   targets=['capstone-prefix-stream','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
+   decoder_objects,=list(build.rglob('CMakeFiles/NeverDDecode.dir'))
+   decoder_digests={str(q.relative_to(decoder_objects)):hashlib.sha256(q.read_bytes()).hexdigest() for q in decoder_objects.rglob('*.o')}
+   write(label+'-decoder-objects',decoder_digests)
+   if label=='base':decoder_baseline=decoder_digests
+   else:
+    assert decoder_digests.keys()==decoder_baseline.keys()
+    changed=[name for name in decoder_digests if decoder_digests[name]!=decoder_baseline[name]]
+    assert changed==['X86/X86Decoder.cpp.o'],changed
+    write(label+'-decoder-object-change',dict(changed=changed))
    llvm_current=llvm_identity();write(label+'-llvm-identity',llvm_current)
    assert llvm_current==llvm_reference,(label,'LLVM source changed during comparison',llvm_reference,llvm_current)
    command(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-L','^(NeverDX86DecodeDetailTests|NeverDX86MpxEncodingTests)$'],'tests-'+label)
+   command([next(build.rglob('capstone-prefix-stream'))],'invalid-prefix-stream-'+label)
    tool=next(build.rglob('capstone-route'))
    command([tool,'--xbegin'],'exhaustive-xbegin-'+label)
    command([tool,'--rendered-xbegin'],'rendered-xbegin-'+label)

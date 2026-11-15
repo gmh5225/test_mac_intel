@@ -1,22 +1,26 @@
 {
-  "neverd": "1aa3fd1d27f07e0f8a36c7655306375d29d5c16f",
-  "capstone": "dea9fee246c21a0045a2ea63a429f9147a6a1014",
+  "neverd": "f718d4a7a972d1023e3cdc55a28ed52322899efc",
+  "capstone": "a51c656195387e5f5264e53abcebe7c1a11e46a0",
   "variants": {
-    "vex32-registers": {
-      "source": "round1159-vex32-integrated-registers",
-      "patch": "vex32-registers.patch",
-      "patch_sha256": "964da44192a3bebdd3d3dbb488ee2cfbb8a2aa86d6f4c46685f959044746f0ab",
-      "tree": "b6715faf82fe72b207c6e0e9b9d6d83c8be11f76",
-      "changed": [
-        "X86OutputIterator.c.o",
-        "X86VectorOutput.c.o"
-      ],
+    "bounded-fallback": {
+      "source": "round1198-neverd-prefix-fallback",
+      "patch": "neverd.patch",
+      "patch_sha256": "5715d1e774ec1a2daf456a15088720389faa6a62c3f03ec90a28f8a69d5e18b0",
+      "neverd_tree": "4174c910edc52ccd6e2fd68b3213ec2e616afa84",
+      "tree": "b665f17abd0a28c47ed121ad7ebce080bf259107",
+      "changed": [],
       "added": []
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "compiler": "x86-64 Clang C/C++; AArch64 GCC C with Clang C++; latest fork LLVM compiled from source on both.",
+  "compiler": "Clang C/C++ on native x86-64 and AArch64 runners.",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Qualify exact integrated VEX32 register output through latest NeverD dev: 96 real PE32/PE64, scalar/SIMD and ARM/AArch64/MIPS observations per host, original and fixed-inode launches, A/A, complete public states, source-built latest fork LLVM and unchanged probes.",
-  "llvm_build_compatibility": "Three Clang-only diagnostic flags selected by C compiler ID for C sources; same patch for both variants, no LLVM algorithm changes, latest fork source and no prebuilt"
+  "scope": "Verify and measure the bounded NeverD x86 fence fallback independently. Capstone remains the released next revision in both variants; its separate repeated-prefix defect is still present in invalid-stream measurements.",
+  "llvm_build_compatibility": "Unmodified live main fork LLVM source; Clang C/C++; prebuilt disabled.",
+  "neverd_patch_paths": [
+    "docs/testing.md",
+    "lib/decode/X86/X86Decoder.cpp",
+    "unittests/lift/CMakeLists.txt",
+    "unittests/lift/x86_64/X86_64_PrefixLimitTests.cpp"
+  ]
 }
