@@ -137,7 +137,15 @@ def main(w):
                         assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                    return list(map(int,sp.check_output(command,executable=executable).split()))
+                    try:
+                        return list(map(int,sp.check_output(command,executable=executable).split()))
+                    except sp.CalledProcessError:
+                        diagnosis=['gdb','--batch','-ex','set pagination off','-ex','run','-ex','bt',
+                                   '-ex','x/12i $pc-16','-ex','info registers','-ex','info proc mappings',
+                                   '--args',*command]
+                        with (p/'evidence'/'failed-slot-gdb.log').open('wb') as out:
+                            sp.run(diagnosis,stdout=out,stderr=sp.STDOUT,timeout=90)
+                        raise
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
                 cycles={launch:[]for launch in launches};labels=['integer','aa','scan','slot-integer','slot-aa','slot-scan','iced']+(['fast'] if mode else [])
                 for i in range(15):

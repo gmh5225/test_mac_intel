@@ -72,6 +72,9 @@ def freeze(objects, directory, command):
         for item in schema:
             assert actual[item['slot']]['size'] == item['size']
             assert actual[item['slot']]['align'] == item['align'], (item,actual[item['slot']])
+            before = original[variant].get(item['original'])
+            expected = before['data'] if before else b''
+            assert actual[item['slot']]['data'] == expected+bytes(item['size']-len(expected)), (variant,item['original'],'section data changed')
         result[variant] = target
     script = directory / 'layout.ld'
     pieces = []
