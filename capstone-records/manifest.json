@@ -1,35 +1,85 @@
 {
-  "capstone_revision": "729680277dd762704ea3270291b7a75318f51583",
+  "capstone_revision": "3998ad42251df0547316a9d87df8b7aca5a4feac",
   "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
+  "source_lineage": {
+    "single.cpp": {
+      "experiment": "round363-arc-loongarch-detail/single.cpp",
+      "sha256": "bfe697a0b2388f0ff1a195986b3b2c48b907fbb4d7ae0292e33a8c0ec852f87f"
+    },
+    "iced.rs": {
+      "experiment": "round145-current-x86-check/iced-source/iced.rs",
+      "sha256": "ecafcad79546e3d0e8799e5eb9f4723d40578a61fd65d61e8dca9a650f9d0626"
+    },
+    "candidate.patch": {
+      "experiment": "round374-x86-public-register-text/runtime.patch",
+      "sha256": "f4374d09a507e0e65cbe5898e8d431d0162c159f1a0af657b17069b8cb6a5514"
+    },
+    "check-hint.c": {
+      "experiment": "round363-arc-loongarch-detail/check-hint.c",
+      "sha256": "f056d344b12fe597b82bd081ef14d164eeec933f9e2b380c7af1e2ff5f17d49d"
+    },
+    "check-callback.c": {
+      "experiment": "round348-ppc-hint-owner/check-callback.c",
+      "sha256": "7f6010c40e6be9926a8b2a5ee2570a8a67d64a2654a54142ebc0e0b4c673cb7d"
+    },
+    "scalar.c": {
+      "experiment": "inputs/scalar.c",
+      "sha256": "98e97b880dd6374552a6abfde363a018c3ad033117785e34e375a99c55f551cb"
+    },
+    "simd.c": {
+      "experiment": "inputs/simd.c",
+      "sha256": "c0c4708476c48bb25a34037461ce232e7c02e48fd270582f6054e06878f68d02"
+    },
+    "option-state.cpp": {
+      "experiment": "round212-stream-option-init/option-state.cpp",
+      "sha256": "3323f3a20eb76c0523b4c975ddf0f6dbeb7f9f7e9d6c684faf0d3b25869207b9"
+    },
+    "flags-state.c": {
+      "experiment": "round270-evex-mask-finalization/flags-state.c",
+      "sha256": "a203a3a976a8da81e629d0807461cde54bc2cea484563f395d2c320d5a57b730"
+    },
+    "check-register-text.c": {
+      "experiment": "round374-x86-public-register-text/check-register-text.c",
+      "sha256": "b1834f3eb17c34e951956445eb41f23b72e9b72afb79e82a34a93ce753223707"
+    }
+  },
   "compare_original_sha256": "6a02d07bb11e90ec23b279d2a9a7acb84107b1ba1ea6baa366a840d26939b665",
   "inputs": [
     {
-      "name": "arm-cp",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
+      "name": "ppc64el-cp",
+      "selector": 3,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_ppc64el.deb",
+      "package_sha256": "e957dbba78571202de4302b94b977157d461c772f1710be8502e2ef920d7c124",
       "kind": "deb",
       "command": "cp",
-      "text_sha256": "82569bcb320c864a08cf37798b610396d1e1066f68758826e3294e561987d393"
+      "text_sha256": "2d343f9f02856a0fdc78d59701931dc3f50dce1a474b10c3440a703aee601c61"
     },
     {
-      "name": "mips64el-ls",
-      "selector": 4,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
-      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
+      "name": "riscv64-ls",
+      "selector": 2,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_riscv64.deb",
+      "package_sha256": "47b00d78d09c7921296f1b849cd04e5cdda7fd948abf17d8659efb906ac386d7",
       "kind": "deb",
       "command": "ls",
-      "text_sha256": "3b48cf397f99bbee260ba1c12f976a9b790cc44b120f8ae0dfad89384ca6a2fa"
+      "text_sha256": "59520508376e30943d11d74866cd5b57c323aa8161f665b61862c19d32e1f487"
     },
     {
-      "name": "arm64-ls",
-      "selector": 0,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
-      "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
+      "name": "arc-ld-linux-arc",
+      "selector": 12,
+      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
+      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
+      "kind": "deb",
+      "member": "usr/arc-linux-gnu/lib/ld-linux-arc.so.2",
+      "text_sha256": "a863c07ded182d06db715a130cc348a858a1bc4b9a339aaee9f20c53b23bb46b"
+    },
+    {
+      "name": "loong64-ls",
+      "selector": 11,
+      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
+      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
       "kind": "deb",
       "command": "ls",
-      "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
+      "text_sha256": "79aee1454bea976cd0a7216849ce9852efabe3dbb7aaea15f2ddc8bb92eb3e7b"
     }
-  ],
-  "x86_record_entrypoint": "X86_disasmIter; test-only exported wrapper, no wrapper in timed executables"
+  ]
 }
