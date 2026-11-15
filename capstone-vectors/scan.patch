@@ -1,17 +1,62 @@
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..2d747235 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -35,9 +35,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	if (size <= lead)
- 		return false;
- 	const uint8_t opcode = code[lead];
--	const unsigned prefix_class = escaped ? 3 :
--				      has_rex ? ((rex & 8) ? 2 : 1) :
--						0;
-+	const unsigned prefix_class = (unsigned)has_rex +
-+				      ((unsigned)has_rex & (code[0] >> 3)) +
-+				      3u * escaped;
- 	const unsigned plan = x86_simple_plans[wide][prefix_class][opcode];
- 	if (!plan)
- 		return false;
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..ef86a2e7 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -32,6 +32,19 @@ static char *writeVectorRegister(char *out, unsigned length_code,
+ 	return out;
+ }
+ 
++/* Register rows have two operands (shifts and extracts) or three
++ * operands. Keep their fixed detail fields independent of loop induction. */
++static inline void writeVectorOperand(cs_x86_op *op, unsigned width,
++				      unsigned number, uint8_t access)
++{
++	static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
++					 X86_REG_ZMM0 };
++	op->type = X86_OP_REG;
++	op->reg = (x86_reg)(bases[width] + number);
++	op->access = (cs_ac_type)access;
++	op->size = (uint8_t)(16 << width);
++}
++
+ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 				 uint16_t *insn_size,
+ 				 const struct VectorOutputRow *row,
+@@ -47,9 +60,11 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
+ 	memset(insn->op_str, 0, sizeof(insn->op_str));
+ 	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
+-	for (unsigned n = 1; n != reg_count; ++n) {
++	memcpy(out, ", ", 2);
++	out = writeVectorRegister(out + 2, ll, regs[1]);
++	if (reg_count == 3) {
+ 		memcpy(out, ", ", 2);
+-		out = writeVectorRegister(out + 2, ll, regs[n]);
++		out = writeVectorRegister(out + 2, ll, regs[2]);
+ 	}
+ 	if (row->immediate) {
+ 		const unsigned value = code[prefix + 2];
+@@ -78,16 +93,13 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 		x->modrm = code[prefix + 1];
+ 		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
+ 		x->op_count = (uint8_t)(reg_count + row->immediate);
+-		static const x86_reg bases[] = { X86_REG_XMM0, X86_REG_YMM0,
+-						 X86_REG_ZMM0 };
+-		for (unsigned n = 0; n != reg_count; ++n) {
+-			cs_x86_op *op = &x->operands[n];
+-			op->type = X86_OP_REG;
+-			const unsigned width = n == 0 ? first_ll : ll;
+-			op->reg = (x86_reg)(bases[width] + regs[n]);
+-			op->access = (cs_ac_type)row->access[n];
+-			op->size = (uint8_t)(16 << width);
+-		}
++		writeVectorOperand(&x->operands[0], first_ll, regs[0],
++				   row->access[0]);
++		writeVectorOperand(&x->operands[1], ll, regs[1],
++				   row->access[1]);
++		if (reg_count == 3)
++			writeVectorOperand(&x->operands[2], ll, regs[2],
++					   row->access[2]);
+ 		if (row->immediate) {
+ 			x->operands[reg_count].type = X86_OP_IMM;
+ 			x->operands[reg_count].imm = code[prefix + 2];
