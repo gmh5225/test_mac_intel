@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import subprocess as sp
+from collections import defaultdict
 
 from elftools.elf.elffile import ELFFile
 
@@ -57,16 +58,20 @@ def freeze(objects, directory, command):
             else:
                 args += ['--add-section', slot + '=' + str(content)]
             flags = 'alloc,load,readonly,' + ('code' if item['flags'] & 4 else 'data')
-            args += ['--set-section-flags', slot + '=' + flags,
-                     '--set-section-alignment', slot + '=' + str(item['align'])]
+            args += ['--set-section-flags', slot + '=' + flags]
         target = directory / variant / 'X86OutputIterator.c.o'
         target.parent.mkdir()
-        command([*args, obj, target], 'slot-object-' + variant)
+        intermediate = target.with_suffix('.unplaced.o')
+        command([*args, obj, intermediate], 'slot-object-' + variant)
+        alignment = [os.environ.get('OBJCOPY', 'objcopy')]
+        for item in schema:
+            alignment += ['--set-section-alignment', item['slot']+'='+str(item['align'])]
+        command([*alignment, intermediate, target], 'slot-alignment-'+variant)
         actual = sections(target)
         assert {v['slot'] for v in schema} | notes == set(actual)
         for item in schema:
             assert actual[item['slot']]['size'] == item['size']
-            assert actual[item['slot']]['align'] == item['align']
+            assert actual[item['slot']]['align'] == item['align'], (item,actual[item['slot']])
         result[variant] = target
     script = directory / 'layout.ld'
     pieces = []
@@ -99,13 +104,17 @@ def validate_binaries(paths):
     assert base['allocated'] == candidate['allocated'], 'Allocated section placement differs'
     assert base['segments'] == candidate['segments'], 'Program mappings differ'
     shared = set(base['symbols']) & set(candidate['symbols'])
-    left = {name: (address, kind) for name, address, kind in base['symbols']}
-    right = {name: (address, kind) for name, address, kind in candidate['symbols']}
+    left, right = defaultdict(list), defaultdict(list)
+    for name,address,kind in base['symbols']:
+        left[name].append((address,kind))
+    for name,address,kind in candidate['symbols']:
+        right[name].append((address,kind))
     changed = {name: [left[name], right[name]] for name in left.keys() & right.keys()
                if left[name] != right[name]}
     assert not changed, changed
+    hashes = {k: hashlib.sha256(Path(v).read_bytes()).hexdigest() for k,v in paths.items()}
+    assert len(set(hashes.values())) == len(paths), 'The intended decoder variant was not linked'
     return dict(allocated=base['allocated'], segments=base['segments'],
                 shared_symbols=len(shared), changed_shared_symbols=changed,
                 added_symbols=sorted(right.keys()-left.keys()),
-                binary_sha256={k: hashlib.sha256(Path(v).read_bytes()).hexdigest()
-                               for k, v in paths.items()})
+                binary_sha256=hashes)
