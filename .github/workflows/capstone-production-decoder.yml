@@ -1,7 +1,7 @@
-name: Qualify ARM detail initialization through native GCC AArch64 NeverD
+name: Diagnose ARM detail placement through actual NeverD
 on:
   push:
-    branches: [codex/capstone-gnu-arm-product]
+    branches: [codex/capstone-arm-product-layout]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-gnu-arm
+          name: product-arm-layout
           path: product-evidence/
           retention-days: 14

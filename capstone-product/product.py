@@ -2,6 +2,7 @@ from pathlib import Path
 import hashlib,json,os,platform,random,shutil,statistics,subprocess as sp,sys,tempfile
 import corpus
 import avx_corpus
+import arm_layout
 r=Path(__file__).resolve().parent;root=r.parent;nd=root/'neverd';out=root/'product-evidence';out.mkdir(exist_ok=True)
 def write(n,v):(out/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def command(args,label,cwd=None):
@@ -18,6 +19,7 @@ write('sources',dict(neverd=rev(nd),capstone=rev(cs),llvm_fork=rev(ll),llvm_sour
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
+  write('native-layout-smoke',arm_layout.smoke(t/'layout-smoke',command))
   write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',swift_friend_applied=False))
   command([sys.executable,r/'llvm_mixed_warnings.py',ll,out/'llvm-warning-compatibility.json'],'llvm-mixed-warning-flags')
   cases=corpus.prepare(r,t,out,command)
@@ -43,7 +45,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    return dict(revision=rev(ll),tracked_diff_sha256=hashlib.sha256(modified).hexdigest(),untracked=extras)
   llvm_reference=llvm_identity()
   write('llvm-baseline-identity',llvm_reference)
-  products={}
+  products={};slot_products={};slot_size=None
   import struct,collections
   def compare(left,right,label):
    with left.open('rb') as a,right.open('rb')as b:
@@ -138,6 +140,27 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert {Path(k).name for k in changed}==set(variants[label]['changed']),changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
+   # Restore the archive after diagnostic relinking. Every production build
+   # and its tests above use the original compiler-produced archive.
+   arm_object,=[path for path in active.values() if path.name=='ARMMapping.c.o']
+   renamed,script,slot_info=arm_layout.reserve(arm_object,t/('layout-'+label),slot_size)
+   slot_size=slot_info['slot_size'];write('slot-object-'+label,slot_info)
+   archive=archives[0];original_archive=archive.read_bytes()
+   try:
+    command(['ar','r',archive,renamed],'slot-archive-'+label)
+    diagnostic=t/('slot-'+label)
+    arm_layout.relink(build,'capstone-product',diagnostic,script,command,'slot-product-'+label)
+    slot_products[label]=diagnostic
+    route=t/('slot-route-'+label)
+    arm_layout.relink(build,'capstone-route',route,script,command,'slot-route-'+label)
+    trace=t/('slot-'+label+'.trace')
+    write('slot-'+label+'-public-state',sp.check_output([route,trace],text=True).strip())
+    compare(t/'base.trace',trace,'slot-'+label);trace.unlink()
+    command([route,'--xbegin'],'slot-xbegin-'+label)
+    command([route,'--rendered-xbegin'],'slot-rendered-xbegin-'+label)
+   finally:
+    archive.write_bytes(original_archive)
+    assert archive.read_bytes()==original_archive
    command(['git','add','-A'],'stage-receipt-'+label,cs)
    source_tree=sp.check_output(['git','write-tree'],cwd=cs,text=True).strip()
    write(label+'-source-tree',dict(tree=source_tree,parent=ref))
@@ -146,11 +169,15 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
 
+  write('slot-placement',arm_layout.compare(slot_products))
+  products.update({'slot-'+key:value for key,value in slot_products.items()})
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==1+len(variants)
+  write('products',identities);assert len(set(identities.values()))==len(products)==4
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
+  products['slot-base-copy']=t/'slot-base-copy';shutil.copy2(products['slot-base'],products['slot-base-copy'])
   payloads={key:path.read_bytes() for key,path in products.items()}
   assert payloads['base']==payloads['base-copy']
+  assert payloads['slot-base']==payloads['slot-base-copy']
   image=t/'same-image';maximum=max(map(len,payloads.values()))
   padded={key:value+bytes(maximum-len(value)) for key,value in payloads.items()}
   image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
@@ -174,9 +201,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
    return ticks,signature
   results=[]
-  cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
-  batch_cases=('jpeg-avx2-i386','libssl3t64-i386','libzstd1-i386','libssl3t64-amd64','libjpeg62-turbo-i386','putty-32-0.85','putty-64-0.85','amd64-ls')
-  for name in batch_cases:cases_of_interest[name]=(*cases_of_interest[name],3)
+  cases_of_interest={'arm-cp':(1,2),'mips64el-ls':(1,2)}
   for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
    for mode in (0,1,2,3):
     if mode not in cases_of_interest.get(case['name'],()):continue
@@ -184,19 +209,23 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      # A long full text and a tiny compiler fixture have very different costs.
      start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(100000/start)))
      row=dict(case=case['name'],mode=mode,launch=launch,reps=reps,pairs={});oracle=None
-     for idx,label in enumerate(['base-copy',*variants]):
+     for idx,(label,left,right) in enumerate([
+      ('ordinary-aa','base','base-copy'),
+      ('ordinary-clear','base','gnu-arm-clear'),
+      ('slot-aa','slot-base','slot-base-copy'),
+      ('slot-clear','slot-base','slot-gnu-arm-clear')]):
       plans=[]
       for cycle in range(15):
-       order=('base',label,label,'base') if (cycle+idx)%2==0 else (label,'base','base',label)
-       times={'base':[],label:[]}
+       order=(left,right,right,left) if (cycle+idx)%2==0 else (right,left,left,right)
+       times={left:[],right:[]}
        for who in order:
         ticks,sig=measure(who,case,mode,reps,launch);times[who].append(ticks)
         if oracle is None:oracle=sig
         assert oracle==sig,(case['name'],mode,who,oracle,sig)
-       plans.append(dict(ticks=times,gain=sum(times['base'])/sum(times[label])))
-      row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
+       plans.append(dict(ticks=times,gain=sum(times[left])/sum(times[right])))
+      row['pairs'][label]=dict(reference=left,candidate=right,plans=plans,median=statistics.median(q['gain'] for q in plans))
      row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==48*len(launches);write('complete',dict(launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==4*len(launches);write('complete',dict(launches=launches,cases=len(results),variants=list(variants),diagnostic_only=True,scope='Separate actual NeverD ARM initialization work from changed external code placement; no production linker change'))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
