@@ -21,6 +21,7 @@ def run(name,args):
  (out/(name+".json")).write_text(json.dumps({"args":list(map(str,args)),"returncode":r.returncode,"stdout":r.stdout,"stderr":r.stderr},indent=2))
  print(name,r.returncode,r.stdout,r.stderr,flush=True);return r.returncode
 inc=Path(p["include"]).resolve();cc=["/usr/bin/clang++","-target",p["target"],"-std=c++20","-O2","-I",str(inc)]
+failures=[]
 for case in p["cases"]:
  name=case["name"]
  scope=out/(name+".S");scope.write_text(asm)
@@ -40,8 +41,11 @@ for case in p["cases"]:
   file=out/(variant+(".mm" if case["objc"] else ".cpp"));file.write_text(source)
   binary=out/variant
   assert run(variant+"-compile",cc+["-DNEVERD_NONCALL_SCOPE",file,"-o",binary]+flags+framework)==0
-  run(variant,[binary,out/(name+".dylib"),out/(name+"-rules"),"0","0","1"])
+  for alternate in ["0","1"]:
+   if run(variant+"-alt"+alternate,[binary,out/(name+".dylib"),out/(name+"-rules"),"0",alternate,"1"]):failures.append(variant+"-alt"+alternate)
   (out/(variant+".sha256")).write_text(hashlib.sha256(binary.read_bytes()).hexdigest());binary.unlink()
  run(name+"-disassembly",["/usr/bin/otool","-tvV",out/(name+".dylib")])
  for suffix in ["-writer",".dylib"]:
   f=out/(name+suffix);(out/(name+suffix+".sha256")).write_text(hashlib.sha256(f.read_bytes()).hexdigest());f.unlink()
+
+if failures:raise SystemExit(str(failures))
