@@ -1,7 +1,7 @@
-name: Qualify PowerPC alias string metadata on PPC RISCV LoongArch and ARC
+name: Diagnose PowerPC metadata text-layout sensitivity
 on:
   push:
-    branches: [codex/capstone-ppc-string-hint-other]
+    branches: [codex/capstone-ppc-text-layout]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,9 +13,7 @@ jobs:
         include:
           - { host: ubuntu-24.04, cc: gcc, archs: four }
           - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -39,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ppc-string-hint-other-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: ppc-text-layout-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

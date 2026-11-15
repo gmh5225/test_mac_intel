@@ -50,7 +50,19 @@ try:
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==meta['sha256']
     cases=corpus.prepare(r,w,evidence,run)
     assert len(cases)==7
-    costs=[];objects={};signatures={}
+    objects={}
+    plan=json.loads((r/'plan.json').read_text())
+    save('plan.json',plan)
+    consumer=w/'consumer.o'
+    run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',source,'-I',source/'include','-c',r/'single.cpp','-o',consumer],'consumer')
+    save('consumer-object.json',dict(sha256=hashlib.sha256(consumer.read_bytes()).hexdigest()))
+    for offset in plan['padding_bytes']:
+        if not offset:
+            continue
+        asm=w/f'padding-{offset}.s'
+        asm.write_text('.text\n.globl capstone_layout_padding\n.hidden capstone_layout_padding\n.type capstone_layout_padding,@object\ncapstone_layout_padding:\n.space '+str(offset)+',0\n.size capstone_layout_padding,.-capstone_layout_padding\n.section .note.GNU-stack,"",@progbits\n')
+        run(['clang','-c',asm,'-o',w/f'padding-{offset}.o'],'padding-'+str(offset))
+    linked={}
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
         if label=='scan':
@@ -69,22 +81,35 @@ try:
             assert {'arch/PowerPC/PPCInstPrinter.c.o','arch/PowerPC/PPCMapping.c.o'} <= changed <= {'Mapping.c.o','arch/PowerPC/PPCInstPrinter.c.o','arch/PowerPC/PPCMapping.c.o'}, changed
             save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
         (evidence / (label+'-object-sizes.txt')).write_bytes(sp.check_output(['size', build/'libcapstone.a']))
-        exe = w / label
-        run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
-             '-I', source / 'include', r / 'single.cpp', build / 'libcapstone.a',
-             '-lm', '-o', exe], 'link')
-        with gzip.open(evidence / (label+'-linked-assembly.gz'), 'wb') as out:
-            out.write(sp.check_output(['objdump', '-dr', exe]))
-        (evidence / (label+'-symbols.txt')).write_bytes(
-            sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
+        for offset in plan['padding_bytes']:
+            exe=w/f'{offset}-{label}'
+            padding=[] if not offset else [w/f'padding-{offset}.o']
+            run(['clang++',consumer,*padding,build/'libcapstone.a','-lm','-o',exe],f'link-{offset}-{label}')
+            header=sp.check_output(['readelf','-hW',exe],text=True)
+            assert 'DYN (Position-Independent Executable file)' in header,header
+            symbols=sp.check_output(['nm','-n','-S','--defined-only',exe],text=True)
+            (evidence/f'{offset}-{label}-symbols.txt').write_text(symbols)
+            (evidence/f'{offset}-{label}-elf.txt').write_text(header+sp.check_output(['readelf','-lWS',exe],text=True))
+            if not offset:
+                with gzip.open(evidence/f'{label}-linked-assembly.gz','wb') as out:
+                    out.write(sp.check_output(['objdump','-dr',exe]))
+            selected={}
+            for line in symbols.splitlines():
+                fields=line.split()
+                if len(fields)==4 and fields[-1] in ('capstone_layout_padding','trace_span','cs_disasm_iter','PPC_getInstruction','LoongArch_getInstruction','LoongArch_initMCInst','ARC_getInstruction'):
+                    selected[fields[-1]]=dict(address=int(fields[0],16),size=int(fields[1],16))
+            if offset:
+                assert selected['capstone_layout_padding']['size']==offset
+                assert selected['trace_span']==linked[f'0-{label}']['symbols']['trace_span']
+                assert selected['cs_disasm_iter']['address'] != linked[f'0-{label}']['symbols']['cs_disasm_iter']['address']
+            linked[f'{offset}-{label}']=dict(sha256=hashlib.sha256(exe.read_bytes()).hexdigest(),symbols=selected)
+    save('linked.json',linked)
     from native import measure
-    selected=[v for v in cases if v['selector']in (2,3,11,12)]
-    assert len(selected)==4
-    measure(w,selected,save)
+    measure(w,cases,plan,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
-    save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=False, restored=True, native_qualification=True, scope='four additional ISAs, separate product qualification required'))
+    save('complete.json', dict(success=True, layouts=len(plan['padding_bytes']),
+                               cases=len(plan['cases']), restored=True, native_qualification=False, scope='Predeclared text-layout sensitivity diagnostic, not product qualification'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)

@@ -1,0 +1,11 @@
+{
+  "padding_bytes": [0, 16, 64, 144, 272, 528, 1040, 2064, 4096],
+  "cases": [[3, 0], [3, 1], [11, 0], [11, 1], [12, 1]],
+  "cycles": 9,
+  "target_cpu_ns": 100000000,
+  "seed": "capstone-r1213-predeclared-text-layout",
+  "purpose": "Separate changed algorithm work from sensitivity to linked instruction addresses. Include the unpadded layout, positive PowerPC formatting path, passive PowerPC scan, and previously affected LoongArch and ARC paths.",
+  "scope": "An inert text object is placed between one compiled consumer and an unchanged archive for each source variant. No instruction in the padding is executed. All layouts and A/A observations are retained, regardless of sign. This does not reproduce Stabilizer randomization or establish a general normal distribution, and it does not by itself qualify a release.",
+  "reference": "https://people.cs.umass.edu/~emery/plasma/emery/stabilizer.html",
+  "prior_evidence": "R1200 heap shifts did not remove the passive slowdown. R1203 PIE versus ET_EXEC changed the effect, but also changed relative text layout. This experiment keeps PIE and changes a declared text displacement instead."
+}
