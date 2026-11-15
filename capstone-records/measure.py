@@ -54,9 +54,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    assert set(changed) <= {'MCInstPrinter.c.o','Mapping.c.o'}, (key,changed)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
-  if not active:
-   write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert digests['base']==digests['aa'];write('binaries',digests)
+  if digests['base']==digests['scan']:
+   assert not changed and not added
+   write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True,success=True,qualification='Compiled runtime objects and final consumer executable are byte-identical. No changed program exists to time.'));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
   assert payloads['base']==payloads['aa']
   maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}

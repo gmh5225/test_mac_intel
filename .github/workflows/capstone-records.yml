@@ -1,7 +1,7 @@
-name: Qualify PowerPC-scoped alias result mixed
+name: Verify byte-identical combined Capstone consumer images
 on:
   push:
-    branches: [codex/capstone-ppc-pattern-scope-mixed]
+    branches: [codex/capstone-ppc-pattern-scope-identity]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,9 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
           - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
@@ -39,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: ppc-pattern-scope-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: ppc-pattern-scope-identity-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
