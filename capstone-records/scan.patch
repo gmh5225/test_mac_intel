@@ -1,49 +1,90 @@
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..15270e1c 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3798,6 +3798,36 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
- 	cs_insn insn = { 0 };
- 	handle->errnum = CS_ERR_OK;
- 	while (batch.count < capacity && size) {
-+#if defined(__clang__)
-+		/* Separate lifetimes keep Clang's terminal fields out of the
-+         * fallback result. GCC generates less work with the shared result. */
-+		unsigned instructionID = 0;
-+		uint16_t length;
-+		insn.address = address;
-+		const int initial = tryInitialScanResult(
-+			handle, code, size, &instructionID, &length, false);
-+		if (initial == X86_SCAN_NOT_HANDLED) {
-+			X86ScanResult result;
-+			if (!getInstructionScanResultAfterInitial(
-+				    ud, code, size, &insn, &result, false))
-+				break;
-+			finish_x86_scan(handle, &insn, &result, code, false,
-+					false);
-+			length = result.length;
-+		} else {
-+			if (initial != X86_SCAN_COMPLETE)
-+				break;
-+			/* Keep terminal fields outside the escaped fallback result. */
-+			X86ScanResult result = { 0, instructionID, length, 0 };
-+			finish_x86_scan(handle, &insn, &result, code, false,
-+					false);
-+		}
-+		output[batch.count++] = (insn.id << 8) | length;
-+		batch.bytes += length;
-+		code += length;
-+		size -= length;
-+		address += length;
-+#else
- 		X86ScanResult result;
- 		insn.address = address;
- 		if (!getInstructionScanResult(ud, code, size, &insn, &result,
-@@ -3809,6 +3839,7 @@ CAPSTONE_INTERNAL X86ScanBatchResult X86_scanBatch(csh ud, const uint8_t *code,
- 		code += result.length;
- 		size -= result.length;
- 		address += result.length;
-+#endif
- 	}
- 	return batch;
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index d6775ef0..7fcfbac8 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -530,16 +530,18 @@ static cs_ac_type Mips_map_op_access(MCInst *MI, unsigned OpNum)
+ 
+ static void Mips_set_detail_op_mem_reg(MCInst *MI, unsigned OpNum, mips_reg Reg)
+ {
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
+-	Mips_get_detail_op(MI, 0)->mem.base = Reg;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_MEM;
++	op->mem.base = Reg;
++	op->access = Mips_map_op_access(MI, OpNum);
  }
+ 
+ static void Mips_set_detail_op_mem_disp(MCInst *MI, unsigned OpNum, int64_t Imm)
+ {
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
+-	Mips_get_detail_op(MI, 0)->mem.disp = Imm;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_MEM;
++	op->mem.disp = Imm;
++	op->access = Mips_map_op_access(MI, OpNum);
+ }
+ 
+ static void Mips_set_detail_op_imm(MCInst *MI, unsigned OpNum, int64_t Imm)
+@@ -552,9 +554,10 @@ static void Mips_set_detail_op_imm(MCInst *MI, unsigned OpNum, int64_t Imm)
+ 		return;
+ 	}
+ 
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_IMM;
+-	Mips_get_detail_op(MI, 0)->imm = Imm;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_IMM;
++	op->imm = Imm;
++	op->access = Mips_map_op_access(MI, OpNum);
+ 	Mips_inc_op_count(MI);
+ }
+ 
+@@ -568,10 +571,11 @@ static void Mips_set_detail_op_uimm(MCInst *MI, unsigned OpNum, uint64_t Imm)
+ 		return;
+ 	}
+ 
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_IMM;
+-	Mips_get_detail_op(MI, 0)->uimm = Imm;
+-	Mips_get_detail_op(MI, 0)->is_unsigned = true;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_IMM;
++	op->uimm = Imm;
++	op->is_unsigned = true;
++	op->access = Mips_map_op_access(MI, OpNum);
+ 	Mips_inc_op_count(MI);
+ }
+ 
+@@ -588,10 +592,11 @@ static void Mips_set_detail_op_reg(MCInst *MI, unsigned OpNum, mips_reg Reg,
+ 
+ 	CS_ASSERT(is_reglist ||
+ 		  (Mips_map_op_type(MI, OpNum) & ~CS_OP_MEM) == CS_OP_REG);
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_REG;
+-	Mips_get_detail_op(MI, 0)->reg = Reg;
+-	Mips_get_detail_op(MI, 0)->is_reglist = is_reglist;
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_REG;
++	op->reg = Reg;
++	op->is_reglist = is_reglist;
++	op->access = Mips_map_op_access(MI, OpNum);
+ 	Mips_inc_op_count(MI);
+ }
+ 
+@@ -677,10 +682,11 @@ static void Mips_set_detail_op_mem_nanomips(MCInst *MI, unsigned OpNum)
+ 	CS_ASSERT(doing_mem(MI));
+ 
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNum);
+-	Mips_get_detail_op(MI, 0)->type = MIPS_OP_MEM;
++	cs_mips_op *op = Mips_get_detail_op(MI, 0);
++	op->type = MIPS_OP_MEM;
+ 	// Base is a register, but nanoMips uses the Imm value as register.
+-	Mips_get_detail_op(MI, 0)->mem.base = MCOperand_getImm(Op);
+-	Mips_get_detail_op(MI, 0)->access = Mips_map_op_access(MI, OpNum);
++	op->mem.base = MCOperand_getImm(Op);
++	op->access = Mips_map_op_access(MI, OpNum);
+ }
+ 
+ static void Mips_set_detail_op_reglist(MCInst *MI, unsigned OpNum,

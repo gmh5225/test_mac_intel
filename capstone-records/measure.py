@@ -45,13 +45,17 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'arch/X86/X86DisassemblerDecoder.c.o'} if cc=='clang' else set()
-   assert set(changed)==expected,(key,changed,expected)
+   assert set(changed) == {'arch/Mips/MipsMapping.c.o'}, changed
+   assert objects['base']['Mapping.c.o'] == objects[key]['Mapping.c.o']
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  active=cc=='clang'
+  active=True
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,identical_binary=True));raise SystemExit(0)
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm.cpp','-ldl','-o',t/'verify-records'],'records-link')
+  run([t/'verify-records',libs['base'],libs['scan']],'records')
+  run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm-full.cpp','-ldl','-o',t/'verify-arm-full'],'arm-records-link')
+  run([t/'verify-arm-full',libs['base'],libs['scan']],'arm-records')
   payloads={key:path.read_bytes()for key,path in bins.items()}
   assert payloads['base']==payloads['aa']
   maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
@@ -59,9 +63,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='R1124 has local complete-record and guard-page qualification; retain original and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='One bounded operand lookup reused within each MIPS setter; complete ARM/AArch64/MIPS records checked on this runner.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  cases=[x for x in cases if x['name']in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','mips64el-ls')]
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
    if launch=='images':args=[str(bins[key]),*tail]
