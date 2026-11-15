@@ -1,13 +1,13 @@
-name: Validate current NeverD decoder on real AVX32 and cross-architecture workloads
+name: Qualify ARM detail initialization through native GCC AArch64 NeverD
 on:
   push:
-    branches: [codex/capstone-isolated-core-product]
+    branches: [codex/capstone-gnu-arm-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
 jobs:
   product:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 235
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -40,8 +40,8 @@ jobs:
         run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
       - name: Build production decoding from source and time real PE, ELF and targeted SIMD
         env:
-          CC: clang
-          CXX: clang++
+          CC: gcc
+          CXX: g++
         run: '"$RUNNER_TEMP/capstone-product-venv/bin/python" capstone-product/product.py'
       - name: Clean temporary source exports
         if: always()
@@ -49,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-isolated-core
+          name: product-gnu-arm
           path: product-evidence/
           retention-days: 14

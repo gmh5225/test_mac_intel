@@ -2,29 +2,19 @@
   "neverd": "2c7e2c3591293c994b67747b65c232a679b70fb1",
   "capstone": "729680277dd762704ea3270291b7a75318f51583",
   "variants": {
-    "vector-names": {
-      "source": "round1121-vector-name-suffix",
-      "patch": "vector-names.patch",
-      "patch_sha256": "07c60dd1f24f88ff3f2fababf03f482e0c4e2e01d726368543f89f9a96f62d66",
-      "tree": "a15ea3e429f3f2746945fa3ba633538ec9b73a66",
+    "gnu-arm-clear": {
+      "source": "round1132-gnu-arm-single-clear",
+      "patch": "gnu-arm-clear.patch",
+      "patch_sha256": "10a4f0486580eaebe60a171937a022e635cb88eceb86201b465189e598adb46b",
+      "tree": "d13dec57493f43a2245b91541b26d337d47a8d96",
       "changed": [
-        "X86VectorOutput.c.o"
-      ],
-      "added": []
-    },
-    "clang-batch": {
-      "source": "round1124-clang-batch-state",
-      "patch": "clang-batch.patch",
-      "patch_sha256": "702a8e6417434d2f11804730eeace43834d91c6a973a28b2ff07713e0f7476d6",
-      "tree": "8c0bb6717128a67b6962d45069f777ae7f304704",
-      "changed": [
-        "X86DisassemblerDecoder.c.o"
+        "ARMMapping.c.o"
       ],
       "added": []
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "compiler": "Clang; both candidate and baseline use the same source-built LLVM",
+  "compiler": "GCC on Linux AArch64; source-built latest fork LLVM",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. Two isolated changes on released next: vector register spelling and Clang batch terminal/fallback result lifetimes; no VEX32 admission extension; includes the actual 64-instruction classifyX86Prefix route and decodeOneLight fallback used by X86CallScan. All old probe cases and new batch signatures are checked before timing."
+  "scope": "Actual GCC on Linux AArch64 NeverD integration with the same 37 archived AVX32 functions as the standalone benchmark, fourteen prior workloads, source-built latest fork LLVM, full public state equality, and byte-identical A/A. One change on released next: ARM detail initialization for GNU Linux AArch64 four-backend builds; includes the actual 64-instruction classifyX86Prefix route and decodeOneLight fallback used by X86CallScan. All old probe cases and new batch signatures are checked before timing."
 }

@@ -18,7 +18,7 @@ write('sources',dict(neverd=rev(nd),capstone=rev(cs),llvm_fork=rev(ll),llvm_sour
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
-  write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',swift_friend_applied=False))
+  write('llvm_source_build',dict(revision=rev(ll),compiler='g++',swift_friend_applied=False))
   cases=corpus.prepare(r,t,out,command)
   cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
   assert len(cases)==14
@@ -31,9 +31,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   with cm.open('a') as f:f.write('\nadd_executable(capstone-product-legacy capstone-product-legacy.cpp)\ntarget_link_libraries(capstone-product-legacy PRIVATE NeverDDecode)\n')
   shutil.copyfile(r/'route.cpp',nd/'capstone-route.cpp')
   with cm.open('a') as f:f.write('\nadd_executable(capstone-route capstone-route.cpp)\ntarget_link_libraries(capstone-route PRIVATE NeverDDecode)\n')
-  command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
+  command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=gcc','-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers','-DCMAKE_CXX_COMPILER=g++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
-  write('compiler',dict(c=sp.check_output(['clang','--version'],text=True).splitlines()[0],cxx=sp.check_output(['clang++','--version'],text=True).splitlines()[0],cpu=next(x for x in Path('/proc/cpuinfo').read_text().splitlines()if x.startswith('model name'))))
+  write('compiler',dict(c=sp.check_output(['gcc','--version'],text=True).splitlines()[0],cxx=sp.check_output(['g++','--version'],text=True).splitlines()[0],cpu=Path('/proc/cpuinfo').read_text(),host=platform.machine()))
   command(['cmake','--build',build,'--target','LLVMSwiftDemangle','--parallel','4'],'swift-demangle-from-source')
   def llvm_identity():
    modified=sp.check_output(['git','-C',ll,'diff','--binary','HEAD'])
