@@ -11,6 +11,7 @@ import subprocess as sp
 from collections import defaultdict
 
 from elftools.elf.elffile import ELFFile
+from elftools.elf.relocation import RelocationSection
 
 
 def sections(path):
@@ -19,6 +20,25 @@ def sections(path):
         return {s.name: dict(size=s['sh_size'], align=s['sh_addralign'],
                             flags=s['sh_flags'], type=s['sh_type'], data=s.data())
                 for s in elf.iter_sections() if s['sh_flags'] & 2 and s['sh_size']}
+
+
+def relocations(path, renamed):
+    result=[]
+    with Path(path).open('rb') as stream:
+        elf=ELFFile(stream)
+        for section in elf.iter_sections():
+            if not isinstance(section,RelocationSection):
+                continue
+            target=elf.get_section(section['sh_info']).name
+            symbols=elf.get_section(section['sh_link'])
+            for reloc in section.iter_relocations():
+                symbol=symbols.get_symbol(reloc['r_info_sym'])
+                name=symbol.name
+                if symbol['st_info']['type']=='STT_SECTION':
+                    name=elf.get_section(symbol['st_shndx']).name
+                result.append((renamed.get(target,target),reloc['r_offset'],reloc['r_info_type'],
+                               renamed.get(name,name),reloc.entry.get('r_addend')))
+    return sorted(result)
 
 
 def freeze(objects, directory, command):
@@ -44,47 +64,31 @@ def freeze(objects, directory, command):
         schema.append(dict(original=name, slot=f'.cs_diag_{idx:04d}',
                            size=size, align=align, flags=values[0]['flags']))
     result = {}
+    renamed = {item['original']: item['slot'] for item in schema}
     for variant, obj in objects.items():
         args = [os.environ.get('OBJCOPY', 'objcopy')]
         for item in schema:
-            name, slot = item['original'], item['slot']
-            current = original[variant].get(name)
-            data = current['data'] if current else b''
-            content = directory / f'{variant}-{slot}.bin'
-            content.write_bytes(data + bytes(item['size'] - len(data)))
-            if current:
-                args += ['--update-section', name + '=' + str(content),
-                         '--rename-section', name + '=' + slot]
-            else:
-                args += ['--add-section', slot + '=' + str(content)]
-            flags = 'alloc,load,readonly,' + ('code' if item['flags'] & 4 else 'data')
-            args += ['--set-section-flags', slot + '=' + flags]
+            if item['original'] in original[variant]:
+                args += ['--rename-section', item['original']+'='+item['slot']]
         target = directory / variant / 'X86OutputIterator.c.o'
         target.parent.mkdir()
-        intermediate = target.with_suffix('.unplaced.o')
-        command([*args, obj, intermediate], 'slot-object-' + variant)
-        alignment = [os.environ.get('OBJCOPY', 'objcopy')]
-        for item in schema:
-            alignment += ['--set-section-alignment', item['slot']+'='+str(item['align'])]
-        command([*alignment, intermediate, target], 'slot-alignment-'+variant)
+        command([*args,obj,target], 'slot-object-'+variant)
         actual = sections(target)
-        assert {v['slot'] for v in schema} | notes == set(actual)
-        for item in schema:
-            assert actual[item['slot']]['size'] == item['size']
-            assert actual[item['slot']]['align'] == item['align'], (item,actual[item['slot']])
-            before = original[variant].get(item['original'])
-            expected = before['data'] if before else b''
-            assert actual[item['slot']]['data'] == expected+bytes(item['size']-len(expected)), (variant,item['original'],'section data changed')
+        for name,value in original[variant].items():
+            assert actual[renamed.get(name,name)] == value, (variant,name,'section changed')
+        assert relocations(obj,renamed) == relocations(target,{}), (variant,'relocations changed')
         result[variant] = target
     script = directory / 'layout.ld'
     pieces = []
     for executable, section, anchor in [(True, '.text.cs_diag', '.text'),
                                         (False, '.rodata.cs_diag', '.rodata')]:
         body = []
-        for item in schema:
+        alignment=max(item['align'] for item in schema if bool(item['flags'] & 4)==executable)
+        for idx,item in enumerate(schema):
             if bool(item['flags'] & 4) == executable:
-                body.append(f"  . = ALIGN({item['align']}); KEEP(*({item['slot']}))")
-        pieces.append('SECTIONS { ' + section + ' : {\n' + '\n'.join(body)
+                start = f'__cs_diag_slot_{idx}'
+                body.append(f"  . = ALIGN({item['align']}); {start} = .; KEEP(*({item['slot']})) . = {start}+{item['size']};")
+        pieces.append('SECTIONS { ' + section + f' ALIGN({alignment}) : ALIGN({alignment}) {{\n' + '\n'.join(body)
                       + '\n} } INSERT BEFORE ' + anchor + ';\n')
     script.write_text(''.join(pieces))
     return result, script, schema
@@ -104,7 +108,7 @@ def validate_binaries(paths):
             segments = [dict(p.header) for p in elf.iter_segments()]
         snapshots[variant] = dict(allocated=allocated, symbols=symbols, segments=segments)
     base, candidate = list(snapshots.values())
-    assert base['allocated'] == candidate['allocated'], 'Allocated section placement differs'
+    assert base['allocated'] == candidate['allocated'], ('Allocated section placement differs',base['allocated'],candidate['allocated'])
     assert base['segments'] == candidate['segments'], 'Program mappings differ'
     shared = set(base['symbols']) & set(candidate['symbols'])
     left, right = defaultdict(list), defaultdict(list)
