@@ -1,3 +1,75 @@
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..66dafe88 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -142,26 +142,6 @@ void MCInst_handleWriteback(MCInst *MI, const MCInstrDesc *InstDescTable,
+ 	}
+ }
+ 
+-/// Check if operand with OpNum is tied by another operand
+-/// (operand is tying destination).
+-bool MCInst_opIsTied(const MCInst *MI, unsigned OpNum)
+-{
+-	assert(OpNum < MAX_MC_OPS && "Maximum number of MC operands exceeded.");
+-	for (unsigned i = 0; i < MI->tied_op_idx_size; ++i) {
+-		if (MI->tied_op_idx[i] == OpNum)
+-			return true;
+-	}
+-	return false;
+-}
+-
+-/// Check if operand with OpNum is tying another operand
+-/// (operand is tying src).
+-bool MCInst_opIsTying(const MCInst *MI, unsigned OpNum)
+-{
+-	assert(OpNum < MAX_MC_OPS && "Maximum number of MC operands exceeded.");
+-	return MI->tied_op_idx[OpNum] != -1;
+-}
+-
+ /// Returns the value of the @MCInst operand at index @OpNum.
+ uint64_t MCInst_getOpVal(MCInst *MI, unsigned OpNum)
+ {
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..d2d6290c 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -291,6 +291,26 @@ CS_MCINST_INLINE unsigned MCInst_getOpcodePub(const MCInst *inst)
+ 	return inst->OpcodePub;
+ }
+ 
++/// Check if operand with OpNum is tied by another operand
++/// (operand is tying destination).
++CS_MCINST_INLINE bool MCInst_opIsTied(const MCInst *MI, unsigned OpNum)
++{
++	assert(OpNum < MAX_MC_OPS && "Maximum number of MC operands exceeded.");
++	for (unsigned i = 0; i < MI->tied_op_idx_size; ++i) {
++		if (MI->tied_op_idx[i] == OpNum)
++			return true;
++	}
++	return false;
++}
++
++/// Check if operand with OpNum is tying another operand
++/// (operand is tying src).
++CS_MCINST_INLINE bool MCInst_opIsTying(const MCInst *MI, unsigned OpNum)
++{
++	assert(OpNum < MAX_MC_OPS && "Maximum number of MC operands exceeded.");
++	return MI->tied_op_idx[OpNum] != -1;
++}
++
+ #undef CS_MCINST_INLINE
+ 
+ static inline MCOperand *MCInst_getOperand(MCInst *inst, unsigned i)
+@@ -312,9 +332,7 @@ bool MCInst_isPredicable(const MCInstrDesc *MIDesc);
+ void MCInst_handleWriteback(MCInst *MI, const MCInstrDesc *InstDescTable,
+ 			    unsigned tbl_size);
+ 
+-bool MCInst_opIsTied(const MCInst *MI, unsigned OpNum);
+ 
+-bool MCInst_opIsTying(const MCInst *MI, unsigned OpNum);
+ 
+ uint64_t MCInst_getOpVal(MCInst *MI, unsigned OpNum);
+ 
 diff --git a/Mapping.c b/Mapping.c
 index b2be73de..096839dc 100644
 --- a/Mapping.c
@@ -13,10 +85,10 @@ index b2be73de..096839dc 100644
  	return access;
  }
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index e374be5e..91356e6f 100644
+index e374be5e..0f4df644 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
-@@ -231,6 +231,12 @@ preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
+@@ -231,6 +231,14 @@ preserving their symbols. The shared assertion policy lives in `cs_assert.h`;
  operand capacity remains defined by `MAX_MC_OPS` in `MCInst.h`.
  Register and immediate predicates retain the checks of both existing operand tags.
  
@@ -25,6 +97,8 @@ index e374be5e..91356e6f 100644
 +is zero. `MCInst_clear` retains both the indices and their bound; a complete
 +initialization resets both. Nonempty tie sets still use the shared membership
 +queries, including ties from operands outside the public mapping table.
++Their bodies live in `MCInst.h` so mapping can inline them without a
++call frame; `MCInst.c` emits their existing external symbols.
 +
  The private full x86 path uses `MCInst_InitX86` to initialize common and x86
  metadata and the default first operand, leaving the other operand slots for
