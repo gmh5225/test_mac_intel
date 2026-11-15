@@ -42,7 +42,7 @@ index 63dcc538..010c1527 100644
  	const uint8_t opcode = code[offset];
  	if ((feature_prefix_flags[opcode] &
 diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 28ae2a67..1ca73411 100644
+index 28ae2a67..0fb97afa 100644
 --- a/arch/X86/X86FeatureExtension.h
 +++ b/arch/X86/X86FeatureExtension.h
 @@ -4,6 +4,9 @@
@@ -64,20 +64,22 @@ index 28ae2a67..1ca73411 100644
  static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
  						     size_t code_len,
  						     bool is_64_bit,
-@@ -274,8 +277,12 @@ static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
+@@ -266,11 +269,14 @@ static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
+ 	const uint8_t prefix_mask = FEATURE_LEGACY_PREFIX |
+ 				    (is_64_bit ? FEATURE_REX_PREFIX : 0);
+ 	size_t offset = 0;
++	const size_t prefix_limit = code_len < X86_MAX_INSTRUCTION_LENGTH ?
++					    code_len :
++					    X86_MAX_INSTRUCTION_LENGTH;
+ 
+ 	*opcode = 0;
+ 	if (opcodeOffset)
+ 		*opcodeOffset = SIZE_MAX;
+-	while (offset < code_len) {
++	while (offset < prefix_limit) {
  		uint8_t byte = code[offset];
  		uint8_t flags = feature_prefix_flags[byte];
  		++offset;
--		if (flags & prefix_mask)
-+		if (flags & prefix_mask) {
-+			/* A fifteenth prefix leaves no byte for an opcode. */
-+			if (offset == X86_MAX_INSTRUCTION_LENGTH)
-+				return false;
- 			continue;
-+		}
- 		*opcode = byte;
- 		if (opcodeOffset)
- 			*opcodeOffset = offset - 1;
 diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
 index f1c3ab76..32600e11 100644
 --- a/tests/unit/CMakeLists.txt
