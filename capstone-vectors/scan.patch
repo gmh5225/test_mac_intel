@@ -135,7 +135,7 @@ index 1d237cd1..e4098ba5 100644
 +	},
  };
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..bd26cbc8 100644
+index 6df1472d..8a168104 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -265,7 +265,8 @@ static bool writeLegacyRegisterOutput(const uint8_t *code, size_t size,
@@ -157,7 +157,7 @@ index 6df1472d..bd26cbc8 100644
  		x->opcode[0] = 0x0f;
  		x->opcode[1] = opcode;
  		x->rex = rex;
-@@ -505,7 +506,15 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -505,14 +506,21 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
  			   const struct X86SimpleRegister *regs, bool wide)
  {
@@ -167,21 +167,30 @@ index 6df1472d..bd26cbc8 100644
 +		    code[2] == 0x1e)
 +			return writePaddingOutput(code, size, insn, insn_size,
 +						  wide);
-+		return writeLegacyRegisterOutput(code, size, insn, insn_size,
-+						 wide);
++		goto legacy_registers;
 +	}
 +	if (code[0] == 0x0f ||
  	    (code[0] == 0x66 && size >= 2 &&
  	     (code[1] == 0x90 ||
  	      (size >= 3 && code[1] == 0x0f && code[2] == 0x1f))))
-@@ -513,6 +522,7 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		return writePaddingOutput(code, size, insn, insn_size, wide);
  	if (code[0] == 0x66)
- 		return writeLegacyRegisterOutput(code, size, insn, insn_size,
- 						 wide);
+-		return writeLegacyRegisterOutput(code, size, insn, insn_size,
+-						 wide);
++		goto legacy_registers;
 +
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
  	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+@@ -522,6 +530,8 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		return writeVexRegisterOutput(code, size, insn, insn_size,
+ 					      prefix);
+ 	return writeVexIndexedOutput(code, size, insn, insn_size, regs);
++legacy_registers:
++	return writeLegacyRegisterOutput(code, size, insn, insn_size, wide);
+ }
+ /* A regular base, an unmasked destination and a full 128-bit memory tuple.
+  * Indexed, absolute and RIP-relative addresses go through the ordinary reader. */
 diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
 index ccc4f0de..f06b37cb 100644
 --- a/suite/synctools/x86_simple_output.cpp

@@ -1,7 +1,7 @@
-name: Measure scalar prefix dispatch before padding selection
+name: Measure scalar dispatch with one writer call site
 on:
   push:
-    branches: [codex/capstone-scalar-prefix-dispatch-cost]
+    branches: [codex/capstone-scalar-shared-call-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: scalar-prefix-dispatch-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: scalar-shared-call-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
