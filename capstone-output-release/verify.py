@@ -23,6 +23,11 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
+    assert not subprocess.check_output(['git','status','--porcelain'],cwd=source)
+    # Git apply --index must compare the same LF bytes on Windows and Unix.
+    run(['git','config','core.autocrlf','false'],'canonical-eol')
+    run(['git','checkout-index','-a','-f'],'canonical-checkout')
+    assert not subprocess.check_output(['git','status','--porcelain'],cwd=source)
     patch=root_build/'candidate.patch'
     canonical=subprocess.check_output(['git','show','HEAD:capstone-output-release/'+forms+'.patch'],cwd=root.parent)
     assert hashlib.sha256(canonical).hexdigest()==json.loads((root/'candidate.json').read_text())['sha256']
