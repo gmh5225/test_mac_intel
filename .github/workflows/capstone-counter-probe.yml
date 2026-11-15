@@ -1,0 +1,30 @@
+name: Probe hardware performance counters on disposable runners
+on:
+  push:
+    branches: [codex/capstone-hardware-counter-probe]
+    paths: [capstone-counter-probe/**, .github/workflows/capstone-counter-probe.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [0, 1, 2]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-counter-probe
+          persist-credentials: false
+      - name: Install performance counter tooling
+        run: sudo apt-get update -qq && sudo apt-get install -y linux-tools-common linux-tools-generic
+      - name: Check hardware events and restore runner settings
+        run: python3 capstone-counter-probe/probe.py
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: hardware-counter-probe-${{ matrix.replica }}-${{ github.run_id }}
+          path: evidence/
+          retention-days: 14
