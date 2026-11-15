@@ -1,5 +1,6 @@
 from pathlib import Path
 import json, os, shutil, subprocess, tempfile
+from object_code import code_sections
 root=Path(__file__).resolve().parent
 source=root.parent/'source'
 evidence=root.parent/'evidence'
@@ -54,7 +55,15 @@ try:
         assert len(result)>5, result
         return result
     before=objects()
+    mapping_names=[name for name in before if Path(name).name in ('X86Mapping.c.o','X86Mapping.c.obj','X86Mapping.obj')]
+    assert len(mapping_names)==(0 if profile=='alias-only' else 1),mapping_names
+    before_code={name:code_sections((b/name).read_bytes())for name in mapping_names}
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
+    run(['python','suite/synctools/x86_mapping_counts.py','--check'],'candidate-counts-check')
+    table=source/'arch/X86/X86GenMappingCounts.inc'
+    generated=table.read_text()
+    run(['python','suite/synctools/x86_mapping_counts.py'],'candidate-counts-regenerate')
+    assert table.read_text()==generated
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
     assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
@@ -62,8 +71,11 @@ try:
     after=objects()
     assert before.keys()==after.keys()
     changed=[name for name in before if before[name]!=after[name]]
-    save('object-identity',dict(total=len(before),changed=changed,identical=not changed))
-    assert not changed, ('test-only patch changed production objects', changed)
+    after_code={name:code_sections((b/name).read_bytes())for name in mapping_names}
+    save('object-identity',dict(total=len(before),changed=changed,code_identical=before_code==after_code,before_code=before_code,after_code=after_code))
+    expected=set()if profile in ('diet','reduced','alias-only')else set(mapping_names)
+    assert set(changed)==expected,(changed,expected)
+    assert before_code==after_code,('table fix changed executable sections',before_code,after_code)
 
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     assert 'runtime error:' not in (evidence/'tests.log').read_text()
