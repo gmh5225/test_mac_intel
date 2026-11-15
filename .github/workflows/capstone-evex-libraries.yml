@@ -1,7 +1,7 @@
-name: Measure validated EVEX writemask admission
+name: Measure bounded X86 prefix scanning cost
 on:
   push:
-    branches: [codex/capstone-evex-mask-admission-cost]
+    branches: [codex/capstone-bounded-prefix-scan-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-admission-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: bounded-prefix-scan-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
