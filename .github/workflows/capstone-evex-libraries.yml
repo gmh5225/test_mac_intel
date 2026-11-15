@@ -1,7 +1,7 @@
-name: Replace vector register decimal spelling with fixed-width suffix copy libraries
+name: Qualify output prefix records libraries
 on:
   push:
-    branches: [codex/capstone-vector-name-suffix-libraries]
+    branches: [codex/capstone-output-prefix-records-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-name-suffix-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: output-prefix-records-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
