@@ -62,10 +62,10 @@ try:
     before_code={name:code_sections((b/name).read_bytes())for name in mapping_names}
     run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
     overlay=source/'suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch'
-    run(['git','apply','-R',overlay],'overlay-reverse')
+    run(['git','-c','core.autocrlf=false','apply','-R',overlay],'overlay-reverse')
     table='arch/X86/X86MappingInsnOp.inc'
     assert (source/table).read_bytes()==original_table
-    run(['git','apply',overlay],'overlay-replay')
+    run(['git','-c','core.autocrlf=false','apply',overlay],'overlay-replay')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
     assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
