@@ -54,6 +54,8 @@ try:
                     result[str(file.relative_to(b))]=hashlib.sha256(file.read_bytes()).hexdigest()
         assert len(result)>5, result
         return result
+    table='arch/X86/X86MappingInsnOp.inc'
+    original_table=(source/table).read_bytes()
     before=objects()
     mapping_names=[name for name in before if Path(name).name in ('X86Mapping.c.o','X86Mapping.c.obj','X86Mapping.obj')]
     assert len(mapping_names)==(0 if profile=='alias-only' else 1),mapping_names
@@ -62,7 +64,7 @@ try:
     overlay=source/'suite/auto-sync/inc_patches/X86/02_scalar_move_flags.patch'
     run(['git','apply','-R',overlay],'overlay-reverse')
     table='arch/X86/X86MappingInsnOp.inc'
-    assert (source/table).read_bytes()==subprocess.check_output(['git','show','HEAD:'+table],cwd=source)
+    assert (source/table).read_bytes()==original_table
     run(['git','apply',overlay],'overlay-replay')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()

@@ -1,7 +1,7 @@
 name: Correct scalar SSE move flags profiles
 on:
   push:
-    branches: [codex/capstone-scalar-move-flags-macos]
+    branches: [codex/capstone-scalar-move-flags-windows]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -11,7 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { cc: clang, profile: four, forms: combined, host: macos-15 }
+          - { cc: MD, profile: intel, forms: combined, host: windows-2022 }
+          - { cc: MT, profile: intel, forms: combined, host: windows-2022 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
