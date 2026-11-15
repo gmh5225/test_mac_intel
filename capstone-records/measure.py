@@ -43,7 +43,7 @@ try:
          '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
          *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in
            ['X86', 'ARM', 'AARCH64', 'MIPS', 'PPC', 'RISCV', 'LOONGARCH', 'ARC']],
-         '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
+         '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_CSTEST=OFF',
          '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'], 'configure')
     meta=inputs['candidate']
     patch=r/'candidate.patch'
@@ -51,6 +51,7 @@ try:
     cases=corpus.prepare(r,w,evidence,run)
     assert len(cases)==4
     costs=[];objects={};signatures={}
+    libraries={}
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
         if label=='scan':
@@ -60,15 +61,17 @@ try:
             assert tree==meta['tree'],tree
             save('candidate-tree.json',dict(tree=tree))
         run(['cmake', '--build', build, '--target', 'capstone_static',
-             '--parallel', '4'], 'build')
+             'capstone_shared', '--parallel', '4'], 'build')
         objroot=build/'CMakeFiles/capstone.dir'
         objects[label]={str(f.relative_to(objroot)):hashlib.sha256(f.read_bytes()).hexdigest()for f in objroot.rglob('*.o')}
         if label=='scan':
             changed={f for f in objects['integer']if objects['integer'][f]!=objects[label][f]}
             assert set(objects['integer'])==set(objects[label])
-            assert changed and all(f.startswith(('arch/ARM/', 'arch/AArch64/', 'arch/Mips/', 'arch/PowerPC/', 'arch/RISCV/', 'arch/LoongArch/', 'arch/ARC/')) for f in changed), changed
+            assert changed == {'arch/LoongArch/LoongArchMapping.c.o'}, changed
             assert objects['integer']['Mapping.c.o'] == objects[label]['Mapping.c.o']
             save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
+        libraries[label]=w/(label+'.so')
+        shutil.copy2(build/'libcapstone.so',libraries[label])
         (evidence / (label+'-object-sizes.txt')).write_bytes(sp.check_output(['size', build/'libcapstone.a']))
         exe = w / label
         run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
@@ -107,6 +110,10 @@ try:
                                   raw_sha256=hashlib.sha256(payload).hexdigest()))
                 save('instruction-costs.json', costs)
                 raw.unlink()
+    run(['clang++','-O2','-std=c++17','-I',source/'include',r/'verify.cpp','-ldl','-o',w/'verify-records'],'record-link')
+    run([w/'verify-records',libraries['integer'],libraries['scan']],'records')
+    from native import measure
+    measure(w, cases, save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),

@@ -1,7 +1,7 @@
-name: Measure shared operand readers on PPC RISCV LoongArch and ARC
+name: Measure LoongArch operand initialization and passive architectures
 on:
   push:
-    branches: [codex/capstone-inline-other-architectures-cost]
+    branches: [codex/capstone-loongarch-single-initialization]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: defa77a3b8395499e6dfc991808ed8d1c8d83df1
+          ref: dea9fee246c21a0045a2ea63a429f9147a6a1014
           path: source
           persist-credentials: false
       - name: Install instruction profiler
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: inline-other-architectures-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: loongarch-single-initialization-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
