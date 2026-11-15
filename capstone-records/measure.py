@@ -85,7 +85,7 @@ try:
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=False, restored=True, native_qualification=False, scope='Controlled argv0 length and ASLR diagnostic; unchanged candidate and timed function'))
+                               source_unchanged=False, restored=True, native_qualification=False, scope='Software CPU-clock sampling with unprofiled ASLR controls; unchanged candidate and timed function'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)

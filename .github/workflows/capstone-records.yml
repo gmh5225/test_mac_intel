@@ -1,7 +1,7 @@
-name: Diagnose compact mapping sensitivity to initial stack layout
+name: Sample unchanged compact mapping using software CPU clocks
 on:
   push:
-    branches: [codex/capstone-compact-stack-layout]
+    branches: [codex/capstone-compact-software-profile]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -30,6 +30,8 @@ jobs:
           ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
           path: source
           persist-credentials: false
+      - name: Install software profiling tools
+        run: sudo apt-get update -qq && sudo apt-get install -y linux-tools-common linux-tools-generic
       - name: Compare independent native images and fixed launches with A/A controls
         run: python3 capstone-records/measure.py
       - if: always()
@@ -37,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: compact-stack-layout-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: compact-software-profile-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
