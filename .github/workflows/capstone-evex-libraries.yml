@@ -1,7 +1,7 @@
-name: Qualify EVEX mask admission libraries
+name: Qualify EVEX fused register scan libraries
 on:
   push:
-    branches: [codex/capstone-evex-mask-admission-libraries]
+    branches: [codex/capstone-evex-byte-reader-inline-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
+          ref: 4c64c2a301ac0f15fc58500da3bccd8420e0e861
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-admission-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: evex-byte-reader-inline-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
