@@ -1,7 +1,7 @@
-name: Qualify bounded X86 prefix scanning libraries
+name: Qualify merged X86 prefix read libraries
 on:
   push:
-    branches: [codex/capstone-bounded-prefix-scan-libraries]
+    branches: [codex/capstone-merged-prefix-read-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: bounded-prefix-scan-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: merged-prefix-read-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
