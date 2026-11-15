@@ -1,68 +1,46 @@
 {
-  "description": "Digest-pinned real ELF sections for seven non-x86 ISAs. No downloaded binary is executed.",
+  "description": "Digest-pinned real SystemZ, SPARC and Xtensa code sections; never execute inputs.",
   "inputs": [
     {
-      "name": "arm-cp",
-      "selector": 1,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_armel.deb",
-      "package_sha256": "7cf6eb05e7f5e0ea8fe9ca1dbb43a58c9c6953c89dd1f02995fc9b4cb53f7ac1",
+      "name": "s390x-ls",
+      "selector": 5,
+      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_s390x.deb",
+      "package_sha256": "3226ac66d2bebad8e06b8a58732cf997dd5da532ab4cd844ea74b6d59b052de9",
+      "text_sha256": "46819752e9b45e34a3402b173ffa4099c4a2a249647062c92de2c8f99606db08",
       "kind": "deb",
-      "command": "cp",
-      "text_sha256": "82569bcb320c864a08cf37798b610396d1e1066f68758826e3294e561987d393"
+      "command": "ls"
     },
     {
-      "name": "mips64el-ls",
-      "selector": 4,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.1-1_mips64el.deb",
-      "package_sha256": "08c3a448d4853527e91c0b063a406af10e5c3d4c656b78f2c0ef765c9f9c4fc4",
+      "name": "sparc64-ls",
+      "selector": 10,
+      "url": "https://snapshot.debian.org/file/26177a7b9b82de5571fa818ccceb4ff707f3fe92",
+      "package_sha256": "652ad5f0c8d28ec115d685e865cb14bfdd74a6e7cffb03c381c86d47f5bdc535",
       "kind": "deb",
       "command": "ls",
-      "text_sha256": "3b48cf397f99bbee260ba1c12f976a9b790cc44b120f8ae0dfad89384ca6a2fa"
+      "text_sha256": "c3cab47f209f053de272d4c9b6fc28d5a457d8cb2c8569fcbd5e7e453010511a",
+      "binary_sha256": "224411c96d927cc358a6646bd0585f5f347c22cfc951153d21d160ebe019482d",
+      "original_url": "https://deb.debian.org/debian-ports/pool-sparc64/main/c/coreutils/coreutils_9.10-1_sparc64.deb",
+      "mirror_change_reason": "Official rolling mirror removed the pinned version; Debian snapshot binfiles API identifies this exact archived SPARC binary."
     },
     {
-      "name": "arm64-ls",
-      "selector": 0,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_arm64.deb",
-      "package_sha256": "99b2531e8d16e4f2d3f239ae3cb57913ec1f43764d2d6cd5c69154cbb1e57f3e",
-      "kind": "deb",
-      "command": "ls",
-      "text_sha256": "1c1aa3b8788108c32a6303fd28eb49cc665b635cfd1512aaddab1bb2c01e6e59"
+      "name": "esp32_generic-iram",
+      "selector": 6,
+      "url": "https://micropython.org/resources/firmware/ESP32_GENERIC-20260824-v1.29.0.meta.zip",
+      "package_sha256": "73723b0d6d89e887f20def187a72c8dcc76858a39c464a135103e8230f4818bc",
+      "kind": "zip-elf",
+      "section": ".iram0.text",
+      "binary_sha256": "38a782576e2ebca72df6895b20637dd35b2e2c3ce161dbb878f4f26570042d22",
+      "text_sha256": "06c57d5889cdccd685011fa07d49feecb0a90821dec337e4046367146f7c495e"
     },
     {
-      "name": "ppc64el-cp",
-      "selector": 3,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_ppc64el.deb",
-      "package_sha256": "e957dbba78571202de4302b94b977157d461c772f1710be8502e2ef920d7c124",
-      "kind": "deb",
-      "command": "cp",
-      "text_sha256": "2d343f9f02856a0fdc78d59701931dc3f50dce1a474b10c3440a703aee601c61"
-    },
-    {
-      "name": "riscv64-ls",
-      "selector": 2,
-      "url": "https://deb.debian.org/debian/pool/main/c/coreutils/coreutils_9.7-3_riscv64.deb",
-      "package_sha256": "47b00d78d09c7921296f1b849cd04e5cdda7fd948abf17d8659efb906ac386d7",
-      "kind": "deb",
-      "command": "ls",
-      "text_sha256": "59520508376e30943d11d74866cd5b57c323aa8161f665b61862c19d32e1f487"
-    },
-    {
-      "name": "arc-ld-linux-arc",
-      "selector": 12,
-      "url": "https://deb.debian.org/debian/pool/main/c/cross-toolchain-base-ports/libc6-arc-cross_2.36-8cross1_all.deb",
-      "package_sha256": "f85b43111f14a1fa6ccf5c0f6019d40079934bf72c9eee6e02641508349234cc",
-      "kind": "deb",
-      "member": "usr/arc-linux-gnu/lib/ld-linux-arc.so.2",
-      "text_sha256": "a863c07ded182d06db715a130cc348a858a1bc4b9a339aaee9f20c53b23bb46b"
-    },
-    {
-      "name": "loong64-ls",
-      "selector": 11,
-      "url": "https://snapshot.debian.org/file/c72f858624721e6f6b843d554cc4ae0aaf60908b",
-      "package_sha256": "5296231974c7f453b5b2fa936185b9a67e9d9ed6d2bffa6d49b84ef2613de24a",
-      "kind": "deb",
-      "command": "ls",
-      "text_sha256": "79aee1454bea976cd0a7216849ce9852efabe3dbb7aaea15f2ddc8bb92eb3e7b"
+      "name": "esp32_generic_s3-iram",
+      "selector": 8,
+      "url": "https://micropython.org/resources/firmware/ESP32_GENERIC_S3-20260824-v1.29.0.meta.zip",
+      "package_sha256": "71a47ff344ceff74d2f8c7bff4c91c56ca58a85b296478a8a0c745ffc8e40394",
+      "kind": "zip-elf",
+      "section": ".iram0.text",
+      "binary_sha256": "2b4e7ca7685957fba8ac3ba88473c85a69ad20886b961489494efbf8a17074ba",
+      "text_sha256": "099648048727e874d57d79a774ff33759652d946964ecd9ddc8e63782340a7f2"
     }
   ]
 }

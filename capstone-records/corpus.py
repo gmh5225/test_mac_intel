@@ -6,13 +6,14 @@ from pathlib import Path
 import struct
 import subprocess
 import tarfile
+import zipfile
 
 
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def elf_text(data):
+def elf_text(data, section_name='.text'):
     if data[:4] != b'\x7fELF' or data[4] not in (1, 2) or data[5] not in (1, 2):
         raise ValueError('unsupported ELF header')
     endian = '<' if data[5] == 1 else '>'
@@ -32,13 +33,13 @@ def elf_text(data):
     matches = []
     for section in sections:
         end = strings.find(b'\0', section[0])
-        if strings[section[0]:end] == b'.text':
+        if strings[section[0]:end] == section_name.encode():
             text = data[section[4]:section[4] + section[5]]
             if len(text) != section[5]:
                 raise ValueError('truncated ELF text')
             matches.append(text)
     if len(matches) != 1 or not matches[0]:
-        raise ValueError('expected exactly one nonempty .text section')
+        raise ValueError('expected exactly one nonempty ELF section: ' + section_name)
     return matches[0]
 
 
@@ -100,9 +101,18 @@ def prepare(source, scratch, evidence, command):
         if row['kind'] == 'deb':
             binary = deb_binary(package, row.get('command', ''),row.get('member'))
             text = elf_text(binary)
+        elif row['kind'] == 'zip-elf':
+            with zipfile.ZipFile(package) as archive:
+                names = [n for n in archive.namelist() if n.endswith('.elf')]
+                if len(names) != 1:
+                    raise ValueError('expected one ELF member')
+                binary = archive.read(names[0])
+            text = elf_text(binary, row['section'])
         else:
             binary = package.read_bytes()
             text = pe_text(binary)
+        if 'binary_sha256' in row and digest(binary) != row['binary_sha256']:
+            raise ValueError('binary digest mismatch: ' + row['name'])
         actual = digest(text)
         if 'text_sha256' in row and actual != row['text_sha256']:
             raise ValueError('text digest mismatch: ' + row['name'])
