@@ -17,7 +17,7 @@
 #include <memory>
 #include <capstone/capstone.h>
 #include <cstring>
-#include <valgrind/callgrind.h>
+
 #include "arch/X86/X86ScanAdapter.h"
 struct API {
   decltype(&::cs_open) cs_open;
@@ -185,10 +185,10 @@ int main(int argc, char **argv) {
     const Result expected = trace_span(session, bytes, repeats);
     auto wall = std::chrono::steady_clock::now();
     double cpu = process_cpu_ns();
-    CALLGRIND_ZERO_STATS;
-    CALLGRIND_TOGGLE_COLLECT;
+
+
     const Result measured = trace_span(session, bytes, repeats);
-    CALLGRIND_TOGGLE_COLLECT;
+
     cpu = process_cpu_ns() - cpu;
     double elapsed = std::chrono::duration<double, std::nano>(std::chrono::steady_clock::now() - wall).count();
     if (!equal(expected, measured)) throw std::runtime_error("sample mismatch");
