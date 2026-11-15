@@ -1,7 +1,7 @@
-name: Qualify empty-tie operand access mixed
+name: Qualify EVEX mask admission mixed
 on:
   push:
-    branches: [codex/capstone-empty-tie-dispatch-mixed]
+    branches: [codex/capstone-evex-mask-admission-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: empty-tie-dispatch-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-mask-admission-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

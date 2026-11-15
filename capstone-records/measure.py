@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added==set(),added
-   expected={'Mapping.c.o'} if key=='indexed' else {'Mapping.c.o'}
+   expected={'arch/X86/X86Disassembler.c.o'} if key=='indexed' else {'arch/X86/X86Disassembler.c.o'}
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   active=True
