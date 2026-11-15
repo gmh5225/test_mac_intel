@@ -19,6 +19,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
   write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',swift_friend_applied=False))
+  command([sys.executable,r/'llvm_mixed_warnings.py',ll,out/'llvm-warning-compatibility.json'],'llvm-mixed-warning-flags')
   cases=corpus.prepare(r,t,out,command)
   cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
   assert len(cases)==14
