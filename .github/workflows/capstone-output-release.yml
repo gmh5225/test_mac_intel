@@ -1,7 +1,7 @@
-name: Replace vector register decimal spelling with fixed-width suffix copy profiles
+name: Qualify output prefix records profiles
 on:
   push:
-    branches: [codex/capstone-vector-name-suffix-profiles]
+    branches: [codex/capstone-output-prefix-records-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -48,6 +48,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-name-suffix-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: output-prefix-records-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
