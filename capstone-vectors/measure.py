@@ -58,7 +58,7 @@ def main(w):
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
             assert added==set(),added
-            expected={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'} if label=='output' else {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'}
+            expected={'Mapping.c.o'} if label=='output' else {'Mapping.c.o'}
             assert changed==expected,(label,changed,expected)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
         for component in ('X86ImmediateOutput','X86VectorOutput','X86DisassemblerDecoder'):
