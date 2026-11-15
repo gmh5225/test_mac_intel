@@ -3,24 +3,39 @@
   "capstone": "a51c656195387e5f5264e53abcebe7c1a11e46a0",
   "variants": {
     "bounded-fallback": {
-      "source": "round1198-neverd-prefix-fallback",
+      "source": "round1205-neverd-prefix-product",
       "patch": "neverd.patch",
-      "patch_sha256": "5715d1e774ec1a2daf456a15088720389faa6a62c3f03ec90a28f8a69d5e18b0",
-      "neverd_tree": "4174c910edc52ccd6e2fd68b3213ec2e616afa84",
+      "patch_sha256": "f0feb35bfb0801cda41a9ba0b3f3c794cf76515d223badaad00be1a4ad26cc33",
+      "neverd_tree": "4d9ea281c70cec1269f1c6bb280ff4df5248f9ec",
       "tree": "b665f17abd0a28c47ed121ad7ebce080bf259107",
       "changed": [],
       "added": []
+    },
+    "bounded-engine": {
+      "source": "round1205-neverd-prefix-product",
+      "patch": "neverd.patch",
+      "patch_sha256": "f0feb35bfb0801cda41a9ba0b3f3c794cf76515d223badaad00be1a4ad26cc33",
+      "neverd_tree": "4d9ea281c70cec1269f1c6bb280ff4df5248f9ec",
+      "tree": "2ebdb936fb79ed2e1d61dadc448d9f08afed4fd9",
+      "changed": [
+        "X86Disassembler.c.o",
+        "X86DisassemblerDecoder.c.o"
+      ],
+      "added": [],
+      "capstone_patch": "capstone.patch",
+      "capstone_patch_sha256": "1cbd6180f01c4366bd09860ab58161cecd1a6d4e180b65bf9c0e3c3977cf8d24"
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Clang C/C++ on native x86-64 and AArch64 runners.",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Verify and measure the bounded NeverD x86 fence fallback independently. Capstone remains the released next revision in both variants; its separate repeated-prefix defect is still present in invalid-stream measurements.",
+  "scope": "Verify corrected TPAUSE/fence boundary expectations. Measure the bounded NeverD fallback independently and together with the inlined Capstone prefix budget. The combined variant must also pass its separate native/configuration matrix.",
   "llvm_build_compatibility": "Unmodified live main fork LLVM source; Clang C/C++; prebuilt disabled.",
   "neverd_patch_paths": [
     "docs/testing.md",
     "lib/decode/X86/X86Decoder.cpp",
     "unittests/lift/CMakeLists.txt",
     "unittests/lift/x86_64/X86_64_PrefixLimitTests.cpp"
-  ]
+  ],
+  "neverd_baseline_tree": "65097fe53bdceecc61371ab9324fe898e0187c0a"
 }

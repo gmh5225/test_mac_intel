@@ -1,7 +1,7 @@
-name: Verify bounded NeverD fence prefix fallback with source LLVM
+name: Verify prefix boundaries and both decoder fixes with source LLVM
 on:
   push:
-    branches: [codex/neverd-bounded-prefix-fallback-product]
+    branches: [codex/neverd-prefix-boundaries-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -57,6 +57,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-bounded-prefix-fallback-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-prefix-boundaries-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14

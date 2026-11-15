@@ -1,12 +1,12 @@
 diff --git a/docs/testing.md b/docs/testing.md
-index ce4dede..e40e3b9 100644
+index ce4dede..def67d9 100644
 --- a/docs/testing.md
 +++ b/docs/testing.md
 @@ -12917,6 +12917,7 @@ Opt-in audit-boundary tests cover dead RCL, LOCK memory XADD and REP MOVS, symbo
  Packed-flags tests cover all scalar entry-flag combinations, privilege masks, both-execution TF/AC guards, distinct undefined producers, correlated copies, native calls, sibling state, mandatory final system-state observation, malformed evidence and charged resource limits. Finite loops must exhaust every feasible input path; a safe sibling cannot hide an infinite or truncated path. RDSSPD/RDSSPQ checks cover all 16 general-purpose registers and both widths, unchanged high bits, retained `Missing` evidence and rejection of forged projections. Machine-state tests compare both C routes at O0/O2 with undefined-behavior traps against an independent user-mode flags oracle and check sticky profile failure. INCSSPD/INCSSPQ tests cover both widths and every general-purpose register, unreachable-boundary retention, feasible traps after a completed sibling, zero operands and forged trap evidence.
  
  `NeverDX86DecodeDetailTests` covers all three decode routes, both x64 address widths, signed displacement boundaries, mandatory prefixes, genuine i386 disp16, moffs, truncation and detail-free reuse. Exact relocation occurrences bind; wrong widths, offsets and values do not. Native independence and refinement tests additionally retain full frame writes, reject observed arbitrary flags and reject an altered shift candidate.
-+The decode detail suite also checks prefixed LFENCE/MFENCE/SFENCE at the 15-byte limit, rejects longer prefix runs, and verifies decoder reuse after rejection in both x86 modes with text and detail enabled or disabled.
++The decode detail suite also checks prefixed fence boundaries at the 15-byte limit, retains the mandatory 66 prefix that selects TPAUSE instead of MFENCE, rejects longer prefix runs, and verifies decoder reuse after rejection in both x86 modes with text and detail enabled or disabled.
  
  `NeverDLowUndefinedDigestTests` checks independent SHA-256 vectors, every stored field, signed sequence bits, order, padding exclusion and unchanged inputs. Cases retain the independent v1 inline-buffer and 199/200-operation boundary vectors. Extended eight-slot identities use independent v2 vectors across the 160/161-operation boundary and larger streaming spans. Default extension slots preserve v1; stored extension bits and additional operands select v2, including unused slots. `LowIRRefinement.StaleUnusedInputRefusesAcrossDigestStorageBoundaries` checks real stale-evidence rejection and rebinding across both paths. Keep `InputDigest.*` coverage in `NeverDDigestTests` and controlled loader cases in `NeverDNativeBufferTests`, and rebuild affected callers when changing the outlined owner. Report actual sanitizer, portable-path and host coverage; digest microbenchmarks alone do not certify native equivalence.
  
@@ -70,10 +70,10 @@ index 2ea17e5..c2b2223 100644
  
 diff --git a/unittests/lift/x86_64/X86_64_PrefixLimitTests.cpp b/unittests/lift/x86_64/X86_64_PrefixLimitTests.cpp
 new file mode 100644
-index 0000000..0ce81ad
+index 0000000..4a76902
 --- /dev/null
 +++ b/unittests/lift/x86_64/X86_64_PrefixLimitTests.cpp
-@@ -0,0 +1,85 @@
+@@ -0,0 +1,91 @@
 +//===- X86_64_PrefixLimitTests.cpp - Decoder prefix boundaries -----------===//
 +//
 +// NeverD Decompiler
@@ -102,7 +102,7 @@ index 0000000..0ce81ad
 +  return D.decodeOneLight(Bytes.data(), Bytes.size(), Entry, Out);
 +}
 +
-+TEST(X86DecodeDetail, PrefixedFenceLengthAndRecovery) {
++TEST(X86DecodeDetail, PrefixLengthOpcodeIdentityAndRecovery) {
 +  struct Fence {
 +    uint8_t ModRM;
 +    unsigned Id;
@@ -130,12 +130,16 @@ index 0000000..0ce81ad
 +                           << Prefixes);
 +              std::vector<uint8_t> Bytes(Prefixes, 0x66);
 +              Bytes.insert(Bytes.end(), {0x0f, 0xae, F.ModRM});
++              // 66 is mandatory for TPAUSE in the /6 encoding. It must not
++              // be stripped as an ignored MFENCE prefix (Intel SDM, TPAUSE).
++              const unsigned ExpectedId =
++                  Prefixes && F.Id == X86_INS_MFENCE ? X86_INS_TPAUSE : F.Id;
 +              DecodedInsn Insn{};
 +              const int Size = decode(D, Route, Bytes, Insn);
 +              if (Prefixes <= 12) {
 +                ASSERT_EQ(Size, Prefixes + 3);
 +                ASSERT_NE(Insn.Raw, nullptr);
-+                EXPECT_EQ(Insn.Id, F.Id);
++                EXPECT_EQ(Insn.Id, ExpectedId);
 +                EXPECT_EQ(Insn.Raw->address, Entry);
 +                EXPECT_EQ(Insn.Raw->size, Size);
 +                EXPECT_EQ(std::vector<uint8_t>(Insn.Raw->bytes,
@@ -143,7 +147,9 @@ index 0000000..0ce81ad
 +                          Bytes);
 +                if (Detail) {
 +                  ASSERT_NE(Insn.Raw->detail, nullptr);
-+                  EXPECT_EQ(Insn.Raw->detail->x86.op_count, 0);
++                  if (Text)
++                    EXPECT_EQ(Insn.Raw->detail->x86.op_count,
++                              ExpectedId == X86_INS_TPAUSE ? 1 : 0);
 +                }
 +              } else {
 +                EXPECT_EQ(Size, 0);

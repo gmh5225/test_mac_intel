@@ -76,6 +76,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     tested_neverd=sp.check_output(['git','write-tree'],cwd=nd,text=True).strip()
     assert tested_neverd==variants[label]['neverd_tree'],tested_neverd
     write(label+'-neverd-source-tree',dict(parent=rev(nd),tree=tested_neverd))
+    if 'capstone_patch' in variants[label]:
+     engine_change=r/variants[label]['capstone_patch']
+     assert hashlib.sha256(engine_change.read_bytes()).hexdigest()==variants[label]['capstone_patch_sha256']
+     command(['git','apply',engine_change],'apply-capstone-'+label,cs)
+     command(['git','add','-A'],'stage-capstone-'+label,cs)
+     engine_tree=sp.check_output(['git','write-tree'],cwd=cs,text=True).strip()
+     assert engine_tree==variants[label]['tree'],(label,engine_tree)
    targets=['capstone-prefix-stream','capstone-product','capstone-route','NeverDX86DecodeDetailTests','NeverDX86MpxEncodingTests']
    if label=='base':targets.append('capstone-product-legacy')
    command([sys.executable,nd/'scripts/build.py',build,'--target',*targets,'--parallel','4'],'product-'+label,nd)
@@ -164,6 +171,9 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     assert source_tree==variants[label]['tree'],(label,source_tree,variants[label]['tree'])
    command(['git','reset','--hard',ref],'restore-'+label,cs)
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
+   if label!='base':
+    command(['git','restore','--source=HEAD','--staged','--worktree','--',*expected['neverd_patch_paths']], 'restore-neverd-'+label,nd)
+    assert sp.check_output(['git','write-tree'],cwd=nd,text=True).strip()==expected['neverd_baseline_tree']
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
   write('products',identities);assert len(set(identities.values()))==1+len(variants)
