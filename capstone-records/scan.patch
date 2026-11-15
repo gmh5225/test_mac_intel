@@ -1,24 +1,42 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
- #endif
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 16e68cf4..2d9cae8e 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -4903,7 +4903,36 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+ 
+ 	/* Preserve handler precedence within each EVEX map. Other maps cannot
+      * match these source-owned encodings and use the generated decoder. */
+-	switch (code[offset + 1] & 7) {
++	const uint8_t map = code[offset + 1] & 7;
++	if (map >= 1 && map <= 3 && code_len - offset >= 6) {
++		/* Opcode membership for the ordered source-owned handlers below:
++		 * map 1: KMOV 90..93;
++		 * map 2: AMX 49..4B/6D, vector GPR 7A..7C,
++		 *        CMPccXADD E0..EF, BMI F2/F3/F5/F6/F7;
++		 * map 3: AMX 07/77, RORX F0.
++		 * Nonmembers cannot reach a state mutation in any handler.
++		 * Truncated encodings retain the original rejection precedence. */
++		static const uint64_t opcode_membership[3][4] = {
++			{ UINT64_C(0x0000000000000000),
++			  UINT64_C(0x0000000000000000),
++			  UINT64_C(0x00000000000f0000),
++			  UINT64_C(0x0000000000000000) },
++			{ UINT64_C(0x0000000000000000),
++			  UINT64_C(0x1c00200000000e00),
++			  UINT64_C(0x0000000000000000),
++			  UINT64_C(0x00ecffff00000000) },
++			{ UINT64_C(0x0000000000000080),
++			  UINT64_C(0x0080000000000000),
++			  UINT64_C(0x0000000000000000),
++			  UINT64_C(0x0001000000000000) },
++		};
++		const uint8_t feature_opcode = code[offset + 4];
++		if (!(opcode_membership[map - 1][feature_opcode >> 6] &
++		      (UINT64_C(1) << (feature_opcode & 63))))
++			return X86_FEATURE_NOT_HANDLED;
++	}
++
++	switch (map) {
+ 	default:
+ 		return X86_FEATURE_NOT_HANDLED;
+ 	case 1:
