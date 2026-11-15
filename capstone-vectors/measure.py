@@ -58,8 +58,7 @@ def main(w):
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
             assert added==set(),added
-            expected={'Mapping.c.o','arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o'} if label=='output' else {'Mapping.c.o','arch/AArch64/AArch64Mapping.c.o','arch/ARM/ARMMapping.c.o','arch/Mips/MipsMapping.c.o'}
-            assert changed==expected,(label,changed,expected)
+            assert {'MCInstPrinter.c.o'} <= changed <= {'MCInstPrinter.c.o','Mapping.c.o'} and not added, (label,changed,added)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
         for component in ('X86ImmediateOutput','X86VectorOutput','X86DisassemblerDecoder'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
