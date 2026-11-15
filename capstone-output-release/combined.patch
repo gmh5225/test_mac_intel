@@ -1,34 +1,8 @@
 diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 16e68cf4..ca1da225 100644
+index 16e68cf4..61760133 100644
 --- a/arch/X86/X86Mapping.c
 +++ b/arch/X86/X86Mapping.c
-@@ -10390,6 +10390,12 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 			switch (insn->id) {
- 			default:
- 				break;
-+			case X86_INS_MOVSD:
-+			case X86_INS_CMPSD:
-+				// The public IDs also name scalar SSE instructions.
-+				if (id != X86_MOVSL && id != X86_CMPSL)
-+					break;
-+				// fall through
- 			case X86_INS_LODSB:
- 			case X86_INS_LODSD:
- 			case X86_INS_LODSQ:
-@@ -10455,12 +10461,10 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
- 				break;
- 
- 			case X86_INS_CMPSB:
--			case X86_INS_CMPSD:
- 			case X86_INS_CMPSQ:
- 			case X86_INS_CMPSW:
- 			case X86_INS_MOVSB:
- 			case X86_INS_MOVSW:
--			case X86_INS_MOVSD:
- 			case X86_INS_MOVSQ:
- 				switch (mode) {
- 				default:
-@@ -10609,15 +10613,19 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
+@@ -10609,15 +10609,19 @@ void X86_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
  			switch (insn->id) {
  			default:
  				break;
@@ -51,10 +25,10 @@ index 16e68cf4..ca1da225 100644
  			case X86_INS_OUTSW:
  			case X86_INS_OUTSD:
 diff --git a/tests/unit/x86_reg_access.c b/tests/unit/x86_reg_access.c
-index 328cc88d..cd578e2e 100644
+index 328cc88d..abbe890e 100644
 --- a/tests/unit/x86_reg_access.c
 +++ b/tests/unit/x86_reg_access.c
-@@ -393,6 +393,136 @@ static bool check_scalar_move_flags(void)
+@@ -393,6 +393,171 @@ static bool check_scalar_move_flags(void)
  	return true;
  }
  
@@ -106,6 +80,41 @@ index 328cc88d..cd578e2e 100644
 +				     i < insn->detail->regs_read_count; ++i)
 +					ds |= insn->detail->regs_read[i] ==
 +					      X86_REG_DS;
++				if (n < 6) {
++					x86_reg source =
++						modes[mode] == CS_MODE_16 ?
++							X86_REG_SI :
++						modes[mode] == CS_MODE_32 ?
++							X86_REG_ESI :
++							X86_REG_RSI;
++					x86_reg destination =
++						modes[mode] == CS_MODE_16 ?
++							X86_REG_DI :
++						modes[mode] == CS_MODE_32 ?
++							X86_REG_EDI :
++							X86_REG_RDI;
++					bool has_source = false,
++					     has_destination = false;
++					for (unsigned i = 0;
++					     i < insn->detail->regs_read_count;
++					     ++i) {
++						has_source |=
++							insn->detail
++								->regs_read[i] ==
++							source;
++						has_destination |=
++							insn->detail
++								->regs_read[i] ==
++							destination;
++					}
++					if (!has_source || !has_destination) {
++						fprintf(stderr,
++							"string indices: mode=%u syntax=%u case=%u\n",
++							modes[mode], att, n);
++						ok = false;
++						break;
++					}
++				}
 +				if (ds != (modes[mode] != CS_MODE_64)) {
 +					fprintf(stderr,
 +						"string DS: mode=%u syntax=%u case=%u\n",
@@ -191,7 +200,7 @@ index 328cc88d..cd578e2e 100644
  int main(void)
  {
  	if (cs_support(CS_SUPPORT_DIET))
-@@ -405,7 +535,8 @@ int main(void)
+@@ -405,7 +570,8 @@ int main(void)
  		return 1;
  	}
  	bool success = check_implicit_copies(handle) && check_test_operands() &&

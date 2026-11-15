@@ -24,7 +24,6 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
-    run(['git','-c','core.autocrlf=false','apply','--index',root/'prerequisite.patch'],'apply-prerequisite')
     assert subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['baseline_tree']
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
@@ -56,8 +55,6 @@ try:
                     result[str(file.relative_to(b))]=hashlib.sha256(file.read_bytes()).hexdigest()
         assert len(result)>5, result
         return result
-    table='arch/X86/X86MappingInsnOp.inc'
-    original_table=(source/table).read_bytes()
     before=objects()
     mapping_names=[name for name in before if Path(name).name in ('X86Mapping.c.o','X86Mapping.c.obj','X86Mapping.obj')]
     assert len(mapping_names)==(0 if profile=='alias-only' else 1),mapping_names
