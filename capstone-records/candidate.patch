@@ -1,52 +1,127 @@
-diff --git a/arch/ARC/ARCMapping.c b/arch/ARC/ARCMapping.c
-index b791c161..daa850b8 100644
---- a/arch/ARC/ARCMapping.c
-+++ b/arch/ARC/ARCMapping.c
-@@ -136,6 +136,8 @@ const insn_map arc_insns[] = {
- void ARC_set_instr_map_data(MCInst *MI)
- {
- 	map_cs_id(MI, arc_insns, ARR_SIZE(arc_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- 	map_implicit_reads(MI, arc_insns);
- 	map_implicit_writes(MI, arc_insns);
- 	map_groups(MI, arc_insns);
-diff --git a/arch/LoongArch/LoongArchMapping.c b/arch/LoongArch/LoongArchMapping.c
-index 7c135b3f..fafa0459 100644
---- a/arch/LoongArch/LoongArchMapping.c
-+++ b/arch/LoongArch/LoongArchMapping.c
-@@ -390,6 +390,8 @@ void LoongArch_set_instr_map_data(MCInst *MI)
- #endif
- #else
- 	map_cs_id(MI, loongarch_insns, ARR_SIZE(loongarch_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- 	map_implicit_reads(MI, loongarch_insns);
- 	map_implicit_writes(MI, loongarch_insns);
- 	map_groups(MI, loongarch_insns);
-diff --git a/arch/PowerPC/PPCMapping.c b/arch/PowerPC/PPCMapping.c
-index 6712b300..2c917b26 100644
---- a/arch/PowerPC/PPCMapping.c
-+++ b/arch/PowerPC/PPCMapping.c
-@@ -297,6 +297,8 @@ static void PPC_add_branch_predicates(MCInst *MI, const uint8_t *Bytes,
- void PPC_set_instr_map_data(MCInst *MI, const uint8_t *Bytes, size_t BytesLen)
- {
- 	map_cs_id(MI, ppc_insns, ARR_SIZE(ppc_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- 	map_implicit_reads(MI, ppc_insns);
- 	map_implicit_writes(MI, ppc_insns);
- 	map_groups(MI, ppc_insns);
-diff --git a/arch/SystemZ/SystemZMapping.c b/arch/SystemZ/SystemZMapping.c
-index 711691be..7fa0e351 100644
---- a/arch/SystemZ/SystemZMapping.c
-+++ b/arch/SystemZ/SystemZMapping.c
-@@ -50,6 +50,8 @@ void SystemZ_set_instr_map_data(MCInst *MI, const uint8_t *Bytes,
- 		return;
- #else
- 	map_cs_id(MI, systemz_insns, ARR_SIZE(systemz_insns));
-+	if (!MI->flat_insn->detail)
-+		return;
- #endif
- 	map_implicit_reads(MI, systemz_insns);
- 	map_implicit_writes(MI, systemz_insns);
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 201d315b..4d74e329 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -819,6 +819,9 @@ endif()
+ 
+ if (CAPSTONE_TRICORE_SUPPORT)
+     add_definitions(-DCAPSTONE_HAS_TRICORE)
++    if(capstone_enabled_architectures STREQUAL "TRICORE")
++        set_property(SOURCE arch/TriCore/TriCoreDisassembler.c APPEND PROPERTY COMPILE_DEFINITIONS CAPSTONE_TRICORE_WIDTH_ADMISSION)
++    endif()
+     set(CSTOOL_SRC
+         ${CSTOOL_SRC}
+         cstool/cstool_tricore.c)
+diff --git a/Makefile b/Makefile
+index 44471169..b28a8a15 100644
+--- a/Makefile
++++ b/Makefile
+@@ -665,6 +665,11 @@ else
+ 	@echo "Skipping tests on whole corpus"
+ endif
+ 
++# Match the isolated TriCore decoder configuration.
++ifeq ($(sort $(CAPSTONE_ARCHS)),tricore)
++$(OBJDIR)/arch/TriCore/TriCoreDisassembler.o: CFLAGS += -DCAPSTONE_TRICORE_WIDTH_ADMISSION
++endif
++
+ # Match the Release x86 formatter tuning for the compiler's target.
+ ifneq (,$(filter -DCAPSTONE_X86_ONLY -DCAPSTONE_X86_MIPS_ONLY -DCAPSTONE_ARM_AARCH64_MIPS_X86,$(CFLAGS)))
+ ifneq (,$(filter -O2 -O3,$(CFLAGS)))
+diff --git a/arch/TriCore/TriCoreDisassembler.c b/arch/TriCore/TriCoreDisassembler.c
+index f2446eb4..91bb976f 100644
+--- a/arch/TriCore/TriCoreDisassembler.c
++++ b/arch/TriCore/TriCoreDisassembler.c
+@@ -1671,8 +1671,14 @@ static inline bool decodeInstruction2_or_4(const uint8_t *code, size_t code_len,
+ 			return false;
+ 		}
+ 		uint16_t insn2 = readBytes16(MI, code);
++		/* Both short tables reject odd primary opcodes before
++		 * touching MI. Keep the long-table fallback below. */
+ 		DecodeStatus Result =
+-			decodeInstruction_2(tbl2, MI, insn2, address, NULL);
++#ifdef CAPSTONE_TRICORE_WIDTH_ADMISSION
++			(insn2 & 1) ? MCDisassembler_Fail :
++#endif
++				      decodeInstruction_2(tbl2, MI, insn2,
++							  address, NULL);
+ 		if (Result == MCDisassembler_Success) {
+ 			*size = 2;
+ 			return true;
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 95583b5d..f551e7e0 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -53,6 +53,12 @@ ARC's 48- and 64-bit tables share the 64-bit `_8` helper. Its 16- and
+ remain unchanged. GCC 11 retains the ARC interpreter: direct lowering
+ regresses MIPS scan throughput in the combined library on that compiler.
+ Other qualified compiler profiles use the generated branches.
++TriCore-only builds check the instruction width bit before entering the short
++tables: both primary filter chains reject odd values without touching
++instruction state. Version-specific and long-table fallback order is
++unchanged. The decoder table regression checks this admission contract.
++Mixed-backend builds retain their existing code layout; the width check is
++qualified only for the isolated TriCore configuration.
+ 
+ ARM, AArch64 and RISC-V define their feature queries in the existing
+ disassembler extension headers. Constant feature numbers can then fold into
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 39d6b702..a9e9a7a8 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -30,7 +30,7 @@ if(CAPSTONE_MIPS_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+-   OR CAPSTONE_ARC_SUPPORT
++   OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_TRICORE_SUPPORT
+    OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_SPARC_SUPPORT
+    OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT
+    OR CAPSTONE_XTENSA_SUPPORT)
+diff --git a/tests/unit/test_fixed_len_decoder.py b/tests/unit/test_fixed_len_decoder.py
+index 26534aa4..d9fba9ca 100644
+--- a/tests/unit/test_fixed_len_decoder.py
++++ b/tests/unit/test_fixed_len_decoder.py
+@@ -1,11 +1,12 @@
+ #!/usr/bin/env python3
+ # SPDX-License-Identifier: BSD-3-Clause
+ 
+-"""Generated decoder checks must not depend on checkout newline conversion."""
++"""Check generated decoder contracts and checkout newline independence."""
+ 
+ import contextlib
+ import importlib.util
+ import io
++import re
+ from pathlib import Path
+ import sys
+ import tempfile
+@@ -92,5 +93,28 @@ class CheckoutNewlines(unittest.TestCase):
+                         self.check(root)
+ 
+ 
++class TriCoreShortTableAdmission(unittest.TestCase):
++    def test_odd_halfwords_fail_before_touching_instruction_state(self):
++        text = (ROOT / "arch/TriCore/TriCoreGenDisassemblerTables.inc").read_text()
++        tables = dict(re.findall(
++            r"static const uint8_t (DecoderTable\w*)\[\] = \{(.*?)\n\};",
++            text, re.S))
++        for name in ("DecoderTable16", "DecoderTablev11016"):
++            with self.subTest(table=name):
++                nodes = DECODER.parse(tables[name])
++                root = nodes[0]
++                self.assertEqual(root.op, "ExtractField")
++                self.assertEqual(root.args, (0, 6))
++                position = root.end
++                filters = 0
++                while nodes[position].op == "FilterValue":
++                    node = nodes[position]
++                    self.assertEqual(node.args[0] & 1, 0)
++                    position = node.target
++                    filters += 1
++                self.assertGreater(filters, 0)
++                self.assertEqual(nodes[position].op, "Fail")
++
++
+ if __name__ == "__main__":
+     unittest.main()
