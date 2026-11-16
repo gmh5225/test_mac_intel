@@ -1,24 +1,266 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
- #endif
+diff --git a/arch/X86/X86IntelInstPrinter.c b/arch/X86/X86IntelInstPrinter.c
+index 457485ab..3242d4fe 100644
+--- a/arch/X86/X86IntelInstPrinter.c
++++ b/arch/X86/X86IntelInstPrinter.c
+@@ -975,6 +975,129 @@ static void printPCRelImm(MCInst *MI, unsigned OpNo, SStream *O)
+ 	}
+ }
+ 
++/* Keep the immediate-specific rules outside the register printer. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static void printImmediateOperand(MCInst *MI, unsigned OpNo, SStream *O,
++				  MCOperand *Op)
++{
++	uint8_t encsize = 0;
++	int64_t imm = MCOperand_getImm(Op);
++	uint8_t opsize = X86_immediate_size(MCInst_getOpcode(MI), &encsize);
++
++	if (opsize == 1) // print 1 byte immediate in positive form
++		imm = imm & 0xff;
++
++	// printf(">>> id = %u\n", MI->flat_insn->id);
++	switch (MI->flat_insn->id) {
++	default:
++		printImm(MI, O, imm, MI->csh->imm_unsigned);
++		break;
++
++	case X86_INS_MOVABS:
++	case X86_INS_MOV:
++		// do not print number in negative form
++		printImm(MI, O, imm, true);
++		break;
++
++	case X86_INS_IN:
++	case X86_INS_OUT:
++	case X86_INS_INT:
++		// do not print number in negative form
++		imm = imm & 0xff;
++		printImm(MI, O, imm, true);
++		break;
++
++	case X86_INS_LCALL:
++	case X86_INS_LJMP:
++	case X86_INS_JMP:
++		// always print address in positive form
++		if (OpNo == 1) { // ptr16 part
++			imm = imm & 0xffff;
++			opsize = 2;
++		} else
++			opsize = 4;
++		printImm(MI, O, imm, true);
++		break;
++
++	case X86_INS_AND:
++	case X86_INS_OR:
++	case X86_INS_XOR:
++		// do not print number in negative form
++		if (imm >= 0 && imm <= HEX_THRESHOLD)
++			printImm(MI, O, imm, true);
++		else {
++			imm = arch_masks[opsize ? opsize : MI->imm_size] & imm;
++			printImm(MI, O, imm, true);
++		}
++		break;
++
++	case X86_INS_RET:
++	case X86_INS_RETF:
++		// RET imm16
++		if (imm >= 0 && imm <= HEX_THRESHOLD)
++			printImm(MI, O, imm, true);
++		else {
++			imm = 0xffff & imm;
++			printImm(MI, O, imm, true);
++		}
++		break;
++	}
++
++	if (MI->csh->detail_opt) {
++		if (MI->csh->doing_mem) {
++			MI->flat_insn->detail->x86
++				.operands[MI->flat_insn->detail->x86.op_count]
++				.mem.disp = imm;
++		} else {
++			MI->flat_insn->detail->x86
++				.operands[MI->flat_insn->detail->x86.op_count]
++				.type = X86_OP_IMM;
++			if (opsize > 0) {
++				MI->flat_insn->detail->x86
++					.operands[MI->flat_insn->detail->x86
++							  .op_count]
++					.size = opsize;
++				// Missing table entries retain the decoder's byte extent.
++				if (encsize != 0)
++					MI->flat_insn->detail->x86.encoding
++						.imm_size = encsize;
++			} else if (MI->flat_insn->detail->x86.op_count > 0) {
++				if (MI->flat_insn->id != X86_INS_LCALL &&
++				    MI->flat_insn->id != X86_INS_LJMP) {
++					MI->flat_insn->detail->x86
++						.operands[MI->flat_insn->detail
++								  ->x86.op_count]
++						.size =
++						MI->flat_insn->detail->x86
++							.operands[0]
++							.size;
++				} else
++					MI->flat_insn->detail->x86
++						.operands[MI->flat_insn->detail
++								  ->x86.op_count]
++						.size = MI->imm_size;
++			} else
++				MI->flat_insn->detail->x86
++					.operands[MI->flat_insn->detail->x86
++							  .op_count]
++					.size = MI->imm_size;
++			MI->flat_insn->detail->x86
++				.operands[MI->flat_insn->detail->x86.op_count]
++				.imm = imm;
++
++#ifndef CAPSTONE_DIET
++			set_early_operand_access(MI);
++#endif
++
++			MI->flat_insn->detail->x86.op_count++;
++		}
++	}
++}
++
+ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ {
+ 	MCOperand *Op = MCInst_getOperand(MI, OpNo);
+@@ -1017,130 +1140,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
+ 			MI->op1_size =
+ 				MI->csh->regsize_map[X86_register_map(reg)];
+ 	} else if (MCOperand_isImm(Op)) {
+-		uint8_t encsize = 0;
+-		int64_t imm = MCOperand_getImm(Op);
+-		uint8_t opsize =
+-			X86_immediate_size(MCInst_getOpcode(MI), &encsize);
+-
+-		if (opsize == 1) // print 1 byte immediate in positive form
+-			imm = imm & 0xff;
+-
+-		// printf(">>> id = %u\n", MI->flat_insn->id);
+-		switch (MI->flat_insn->id) {
+-		default:
+-			printImm(MI, O, imm, MI->csh->imm_unsigned);
+-			break;
+-
+-		case X86_INS_MOVABS:
+-		case X86_INS_MOV:
+-			// do not print number in negative form
+-			printImm(MI, O, imm, true);
+-			break;
+-
+-		case X86_INS_IN:
+-		case X86_INS_OUT:
+-		case X86_INS_INT:
+-			// do not print number in negative form
+-			imm = imm & 0xff;
+-			printImm(MI, O, imm, true);
+-			break;
+-
+-		case X86_INS_LCALL:
+-		case X86_INS_LJMP:
+-		case X86_INS_JMP:
+-			// always print address in positive form
+-			if (OpNo == 1) { // ptr16 part
+-				imm = imm & 0xffff;
+-				opsize = 2;
+-			} else
+-				opsize = 4;
+-			printImm(MI, O, imm, true);
+-			break;
+-
+-		case X86_INS_AND:
+-		case X86_INS_OR:
+-		case X86_INS_XOR:
+-			// do not print number in negative form
+-			if (imm >= 0 && imm <= HEX_THRESHOLD)
+-				printImm(MI, O, imm, true);
+-			else {
+-				imm = arch_masks[opsize ? opsize : MI->imm_size] &
+-				      imm;
+-				printImm(MI, O, imm, true);
+-			}
+-			break;
+-
+-		case X86_INS_RET:
+-		case X86_INS_RETF:
+-			// RET imm16
+-			if (imm >= 0 && imm <= HEX_THRESHOLD)
+-				printImm(MI, O, imm, true);
+-			else {
+-				imm = 0xffff & imm;
+-				printImm(MI, O, imm, true);
+-			}
+-			break;
+-		}
+-
+-		if (MI->csh->detail_opt) {
+-			if (MI->csh->doing_mem) {
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.mem.disp = imm;
+-			} else {
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.type = X86_OP_IMM;
+-				if (opsize > 0) {
+-					MI->flat_insn->detail->x86
+-						.operands[MI->flat_insn->detail
+-								  ->x86.op_count]
+-						.size = opsize;
+-					// Missing table entries retain the decoder's byte extent.
+-					if (encsize != 0)
+-						MI->flat_insn->detail->x86.encoding
+-							.imm_size = encsize;
+-				} else if (MI->flat_insn->detail->x86.op_count >
+-					   0) {
+-					if (MI->flat_insn->id !=
+-						    X86_INS_LCALL &&
+-					    MI->flat_insn->id != X86_INS_LJMP) {
+-						MI->flat_insn->detail->x86
+-							.operands[MI->flat_insn
+-									  ->detail
+-									  ->x86
+-									  .op_count]
+-							.size =
+-							MI->flat_insn->detail
+-								->x86
+-								.operands[0]
+-								.size;
+-					} else
+-						MI->flat_insn->detail->x86
+-							.operands[MI->flat_insn
+-									  ->detail
+-									  ->x86
+-									  .op_count]
+-							.size = MI->imm_size;
+-				} else
+-					MI->flat_insn->detail->x86
+-						.operands[MI->flat_insn->detail
+-								  ->x86.op_count]
+-						.size = MI->imm_size;
+-				MI->flat_insn->detail->x86
+-					.operands[MI->flat_insn->detail->x86
+-							  .op_count]
+-					.imm = imm;
+-
+-#ifndef CAPSTONE_DIET
+-				set_early_operand_access(MI);
+-#endif
+-
+-				MI->flat_insn->detail->x86.op_count++;
+-			}
+-		}
++		printImmediateOperand(MI, OpNo, O, Op);
+ 	}
+ }
+ 
