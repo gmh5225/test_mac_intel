@@ -1,36 +1,137 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..1ba999f5 100644
+index 63dcc538..dc30f7b6 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	uint16_t attrMask;
- 	uint16_t instructionID;
- 	bool rexWOverridesOpSize;
-+	const bool legacyVector = decoderMode != MODE_64BIT &&
-+				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
+@@ -988,45 +988,21 @@ legacyOpcode:
+ 	return 0;
+ }
  
- 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
- 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
-@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	}
+-/*
+- * getIDWithAttrMask - Determines the ID of an instruction, consuming
+- *   the ModR/M byte as appropriate for extended and escape opcodes,
+- *   and using a supplied attribute mask.
+- *
+- * @param instructionID - A pointer whose target is filled in with the ID of the
+- *                        instruction.
+- * @param insn          - The instruction whose ID is to be determined.
+- * @param attrMask      - The attribute mask to search.
+- * @return              - 0 if the ModR/M could be read when needed or was not
+- *                        needed; nonzero otherwise.
+- */
+-#if defined(_MSC_VER)
+-static __forceinline int
+-#else
+-#if defined(__GNUC__)
+-__attribute__((always_inline))
+-#endif
+-static inline int
+-#endif
+-getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
+-		  uint16_t attrMask)
++/* All opcode lookups share ModR/M consumption and packed-ID selection. */
++X86_DECODE_INLINE int getIDWithDecision(uint16_t *instructionID,
++					struct InternalInstruction *insn,
++					const struct ModRMDecision *decision,
++					bool hasModRMExtension)
+ {
+-	const struct ModRMDecision *decision = getModRMDecision(
+-		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);
+ 	uint32_t packed;
+-	bool hasModRMExtension;
  
- 	/* The following clauses compensate for limitations of the tables. */
--	if (decoderMode != MODE_64BIT &&
--	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
-+	if (legacyVector) {
- 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
- 			return -1;
- 		}
-@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 
+ 	if (!decision) {
+ 		*instructionID = 0;
  		return 0;
  	}
--	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
-+	/* Legacy-mode vectors already resolved this unmodified mask before
-+	 * W-bit disambiguation. The special addressing lookup above returns. */
-+	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
+ 	packed = decision->packed;
+-	hasModRMExtension =
++	hasModRMExtension |=
+ 		(packed & (X86_DECISION_INDEXED | X86_DECISION_SPLIT)) != 0;
+-#ifndef CAPSTONE_X86_REDUCE
+-	/* The trailing 3DNow opcode always follows a ModR/M byte. */
+-	hasModRMExtension |= insn->opcodeType == THREEDNOW_MAP;
+-#endif
+ 	if (hasModRMExtension && readModRM(insn))
  		return -1;
--	}
+ 	*instructionID = decode(packed, hasModRMExtension ? insn->modRM : 0);
+@@ -1034,6 +1010,25 @@ getIDWithAttrMask(uint16_t *instructionID, struct InternalInstruction *insn,
+ 	return 0;
+ }
  
- 	if ((decoderMode == MODE_16BIT ||
- 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
++/* Resolve attributes and opcode map for general instruction encodings. */
++X86_DECODE_INLINE int getIDWithAttrMask(uint16_t *instructionID,
++					struct InternalInstruction *insn,
++					uint16_t attrMask)
++{
++	const struct ModRMDecision *decision = getModRMDecision(
++		insn->opcodeType, contextForAttrs(attrMask), insn->opcode);
++	bool hasModRMExtension = false;
++#ifndef CAPSTONE_X86_REDUCE
++	/* The trailing 3DNow opcode always follows a ModR/M byte. */
++	hasModRMExtension |= insn->opcodeType == THREEDNOW_MAP;
++#endif
++	return getIDWithDecision(instructionID, insn, decision,
++				 hasModRMExtension);
++}
++
++X86_DECODE_INLINE const struct ModRMDecision *getVex2Decision(uint8_t payload,
++							      uint8_t opcode);
++
+ /*
+  * is16BitEquivalent - Determines whether two instruction names refer to
+  * equivalent instructions but one is 16-bit whereas the other is not.
+@@ -1630,6 +1625,21 @@ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+ 		return 0;
+ 	}
+ 
++	/* C5 fixes the opcode map and has no W bit. Keep address-dependent and
++	 * relative-branch size repairs in the general path. */
++	if (insn->mode != MODE_16BIT &&
++	    insn->vectorExtensionType == TYPE_VEX_2B && insn->opcode != 0xae &&
++	    (insn->opcode < 0x82 || insn->opcode > 0x8f)) {
++		const uint8_t payload = insn->vectorExtensionPrefix[1];
++		if (getIDWithDecision(&instructionID, insn,
++				      getVex2Decision(payload, insn->opcode),
++				      false))
++			return -1;
++		insn->instructionID = instructionID;
++		insn->spec = specifierForUID(instructionID);
++		return 0;
++	}
++
+ 	return getIDSlow(insn, mode);
+ }
+ 
+@@ -2954,6 +2964,15 @@ X86_DECODE_INLINE int finishDecodedInstruction(struct InternalInstruction *insn,
+ #include "X86GenLegacyTerminal.inc"
+ #include "X86GenVexScan.inc"
+ 
++/* The generator checks that C5 selects these rows in both 32- and 64-bit
++ * contexts. Operand readers still enforce the selected mode's register rules. */
++X86_DECODE_INLINE const struct ModRMDecision *getVex2Decision(uint8_t payload,
++							      uint8_t opcode)
++{
++	const struct ModRMDecision *row = x86VexScanRows[0][payload & 7];
++	return row ? &row[opcode] : NULL;
++}
++
+ int decodeInstruction(struct InternalInstruction *insn, const uint8_t *code,
+ 		      size_t codeSize, cs_mode mode)
+ {
+diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
+index 48c6fb41..86c54117 100644
+--- a/suite/synctools/x86_operand_specializations.py
++++ b/suite/synctools/x86_operand_specializations.py
+@@ -1203,6 +1203,12 @@ def emit_vex_scan_rows(suffix):
+                 attributes |= attrs["ATTR_VEXL"]
+             if key & 8:
+                 attributes |= attrs["ATTR_REXW"]
++            if name == names[1] and key < 8:
++                tables.require(
++                    context_values[attributes]
++                    == context_values[attributes & ~attrs["ATTR_64BIT"]],
++                    "C5 row reuse requires identical 32/64-bit contexts",
++                )
+             row = indices[contexts.index(context_values[attributes])]
+             lines.append(
+                 f"\t\t{name}[{row - 1}].modRMDecisions," if row else "\t\tNULL,"
