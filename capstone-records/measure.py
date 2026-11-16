@@ -1,6 +1,6 @@
 """Compare the exact held candidate with a matched downstream layout control."""
 from pathlib import Path
-from collections import defaultdict
+from collections import defaultdict, Counter
 import hashlib
 import json
 import os
@@ -62,168 +62,131 @@ assert int(re.search(r'clang version (\d+)', version)[1]) >= 17
 assert sha(r / 'scan.patch') == meta['sha256']
 save('environment', dict(compiler=version, cpu=Path('/proc/cpuinfo').read_text(),
                          diagnostic_only=True, source=meta))
-w = Path(tempfile.mkdtemp(prefix='capstone-vex-layout-factors-'))
+w = Path(tempfile.mkdtemp(prefix='capstone-vex32-shared-prefix-'))
 try:
     s, b = w / 'source', w / 'build'
+    prior = json.loads((r / 'prior.json').read_text())
+    assert prior['parent'] == meta['parent'] and sha(r/'prior.patch') == prior['sha256']
     run(['git', 'clone', '-q', '--shared', '--no-checkout', original, s], 'clone')
     run(['git', '-C', s, 'checkout', '-q', '--detach', meta['parent']], 'checkout')
-    cases = [x for x in corpus.prepare(r, w, e, run)
-             if x['name'] in ('arm-cp', 'mips64el-ls')]
+    cases = [x for x in corpus.prepare(r, w, e, run) if x['name'] in ('arm-cp', 'mips64el-ls')]
     assert len(cases) == 2
-    run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', s, '-I', s / 'include',
-         '-c', r / 'single.cpp', '-o', w / 'single.o'], 'consumer')
+    run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', s, '-I', s/'include',
+         '-c', r/'single.cpp', '-o', w/'single.o'], 'consumer')
     run(['cmake', '-S', s, '-B', b, '-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release',
          '-DCMAKE_C_COMPILER=clang', '-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers',
          '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
-         *['-DCAPSTONE_' + a + '_SUPPORT=ON' for a in ['X86', 'ARM', 'AARCH64', 'MIPS']],
-         '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_STATIC_LIBS=ON',
-         '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF', '-DCAPSTONE_BUILD_CSTOOL=OFF'], 'configure')
-    linker = w / 'placed.ld'
-    linker.write_text('''SECTIONS {
-  .cs_vector_diag_text : { *(.cs_vector_diag_text) }
-  .cs_vector_diag_rodata : { *(.cs_vector_diag_rodata*) }
-  .cs_vex32_diag_text : { *(.cs_vex32_diag_text) }
-  .cs_vex32_diag_rodata : { *(.cs_vex32_diag_rodata*) }
-  .cs_x86_vex32_text : { *(.cs_x86_vex32_text) }
-  .cs_x86_vex32_rodata : { *(.cs_x86_vex32_rodata) }
-} INSERT AFTER .bss;
-''')
-    shutil.copyfile(linker, e / 'diagnostic-layout.ld')
+         *['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ['X86','ARM','AARCH64','MIPS']],
+         '-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON',
+         '-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'], 'configure')
     binaries, layouts, symbol_tables, object_hashes = {}, {}, {}, {}
-    relocated_names = set()
-    for label in ('base', 'scan'):
+    vector_symbols = set()
+    for label in ('base','prior','scan'):
+        if label != 'base':
+            run(['git','-C',s,'apply','--index',r/(label+'.patch')],'apply-'+label)
+            expected = prior if label == 'prior' else meta
+            assert sp.check_output(['git','-C',s,'write-tree'],text=True).strip()==expected['tree']
+        run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
         if label == 'scan':
-            run(['git', '-C', s, 'apply', '--index', r / 'scan.patch'], 'apply-candidate')
-            assert sp.check_output(['git', '-C', s, 'write-tree'], text=True).strip() == meta['tree']
-        run(['cmake', '--build', b, '--target', 'capstone_static', '--parallel', '4'], 'build-' + label)
-        root = b / 'CMakeFiles/capstone.dir'
-        object_hashes[label] = {str(p.relative_to(root)): sha(p) for p in root.rglob('*.o')}
-        binaries[label] = w / label
-        run(['clang++', w / 'single.o', b / 'libcapstone.a', '-lm', '-o', binaries[label]], 'link-' + label)
-        symbol_tables[label] = symbols(binaries[label], label)
-        layouts[label] = sections(binaries[label])
-        for control in ('both', 'text', 'data'):
-            controlled = w / ('lib-' + control + '-' + label + '.a')
-            shutil.copyfile(b / 'libcapstone.a', controlled)
-            relocated_objects = []
-            for filename, prefix in [('X86VectorOutput.c.o', '.cs_vector_diag'), ('X86Vex32Output.c.o', '.cs_vex32_diag')]:
-                original_object = root / 'arch/X86' / filename
-                if not original_object.exists():
-                    assert label == 'base' and filename == 'X86Vex32Output.c.o'
-                    continue
-                new_object = w / ('object-' + control + '-' + label) / filename
-                new_object.parent.mkdir(exist_ok=True)
-                renames = []
-                with original_object.open('rb') as stream:
-                    elf = ELFFile(stream)
-                    for section in elf.iter_sections():
-                        if section.name == '.text' and (control != 'data' or filename == 'X86Vex32Output.c.o'):
-                            renames.append((section.name, prefix + '_text'))
-                        elif section.name.startswith('.rodata') and (control != 'text' or filename == 'X86Vex32Output.c.o'):
-                            renames.append((section.name, prefix + '_rodata' + section.name[len('.rodata'):]))
-                    symtab = elf.get_section_by_name('.symtab')
-                    relocated_sections = {old for old, new in renames}
-                    for symbol in symtab.iter_symbols():
-                        index = symbol['st_shndx']
-                        if isinstance(index, int) and elf.get_section(index).name in relocated_sections and symbol.name:
-                            relocated_names.add(symbol.name)
-                assert renames
-                run(['objcopy', *[arg for old, new in renames for arg in ('--rename-section', old + '=' + new)],
-                     original_object, new_object], 'relocate-object-' + control + '-' + label + '-' + filename)
-                with original_object.open('rb') as left, new_object.open('rb') as right:
-                    old, new = ELFFile(left), ELFFile(right)
-                    for before, after in renames:
-                        assert old.get_section_by_name(before).data() == new.get_section_by_name(after).data()
-                run(['ar', 'r', controlled, new_object], 'replace-object-' + control + '-' + label + '-' + filename)
-                relocated_objects.append(dict(object=filename, sections=renames, payload_bytes_identical=True,
-                     original_sha256=sha(original_object), relocated_sha256=sha(new_object)))
-            run(['ranlib', controlled], 'index-archive-' + control + '-' + label)
-            key = control + '-' + label
-            binaries[key] = w / key
-            run(['clang++', w / 'single.o', controlled, '-Wl,-T,' + str(linker), '-lm', '-o', binaries[key]], 'link-' + key)
-            symbol_tables[key] = symbols(binaries[key], key)
-            layouts[key] = sections(binaries[key])
-            save('object-relocation-' + control + '-' + label, relocated_objects)
-    save('object-digests', object_hashes)
-    changed = [key for key, value in object_hashes['base'].items() if object_hashes['scan'].get(key) != value]
-    assert set(changed) == {'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'}
-    assert set(object_hashes['scan']) - set(object_hashes['base']) == {'arch/X86/X86Vex32Output.c.o'}
-    ignored = relocated_names | {'X86_writeVex32RegisterOutput', 'writeVex32MemoryOutput'}
-    controls = {}
-    for control in ('both', 'text', 'data'):
-        left, right = symbol_tables[control + '-base'], symbol_tables[control + '-scan']
-        differences = {name: [left[name], right.get(name)] for name in sorted(left)
-                       if name not in ignored and left[name] != right.get(name)}
-        text_changes = {name: value for name, value in differences.items()
-                        if any(s[2] in 'tT' for s in value[0])}
-        data_changes = {name: value for name, value in differences.items()
-                        if any(s[2] in 'rRbBdDsSgGvV' for s in value[0])}
-        before, after = layouts[control + '-base'], layouts[control + '-scan']
-        text_positions_match = not text_changes and all(before['.text'][k] == after['.text'][k] for k in ('address', 'size'))
-        data_positions_match = not data_changes and all(before['.rodata'][k] == after['.rodata'][k] for k in ('address', 'size'))
-        controls[control] = dict(text_positions_match=text_positions_match,
-                                data_positions_match=data_positions_match,
-                                main_text_identical=before['.text'] == after['.text'],
-                                text_changes=text_changes, data_changes=data_changes,
-                                differences=differences)
-    save('layout-control', dict(controls=controls, sections=layouts,
-                               ignored_relocated_symbols=sorted(ignored), diagnostic_only=True))
-    assert controls['both']['main_text_identical'] and not controls['both']['differences']
-    assert controls['text']['text_positions_match'] and not controls['text']['data_positions_match']
-    assert controls['data']['data_positions_match'] and not controls['data']['text_positions_match']
-    binaries['aa'] = w / 'aa'
-    shutil.copy2(binaries['base'], binaries['aa'])
-    payloads = {name: path.read_bytes() for name, path in binaries.items()}
-    assert payloads['base'] == payloads['aa']
-    maximum = max(map(len, payloads.values()))
-    padded = {name: data + bytes(maximum - len(data)) for name, data in payloads.items()}
-    image = w / 'same-image'
-    image.write_bytes(padded['base'])
-    image.chmod(0o755)
-    inode = image.stat().st_ino
-    probe = sp.run(['setarch', platform.machine(), '-R', '/bin/true'], capture_output=True, text=True)
-    assert probe.returncode == 0, probe.stderr
-    save('launch-controls', dict(launches=['images', 'same-file-fixed'], aslr_disable_returncode=0,
-         inode=inode, fixed_size=maximum, original_sha256={k: hashlib.sha256(v).hexdigest() for k, v in payloads.items()}))
-    os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
-
-    def sample(key, case, repeats, launch):
-        args = list(map(str, [case['selector'], 0, case['path'], repeats]))
-        if launch == 'images':
-            args = [str(binaries[key]), *args]
-        else:
-            with image.open('r+b') as out:
-                assert out.write(padded[key]) == maximum
-            assert image.stat().st_ino == inode and image.stat().st_size == maximum
-            args = ['setarch', platform.machine(), '-R', str(image), *args]
-        return json.loads(sp.check_output(args, text=True))
-
-    measurements = []
-    keys = ['base', 'aa', 'scan', 'both-base', 'both-scan', 'text-base', 'text-scan', 'data-base', 'data-scan']
+            run(['cmake','--build',b,'--target','x86_simple_output','--parallel','4'],'build-active-unit')
+            run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_x86_simple_output$'],'active-unit')
+        objroot=b/'CMakeFiles/capstone.dir'
+        object_hashes[label]={str(p.relative_to(objroot)):sha(p) for p in objroot.rglob('*.o')}
+        vector=objroot/'arch/X86/X86VectorOutput.c.o'
+        vector_symbols.update(symbols(vector,label+'-vector'))
+        import gzip
+        with gzip.open(e/(label+'-vector.asm.gz'),'wb') as f:
+            f.write(sp.check_output(['objdump','-dr',vector]))
+        if label != 'base':
+            with gzip.open(e/(label+'-vex32.asm.gz'),'wb') as f:
+                f.write(sp.check_output(['objdump','-dr',objroot/'arch/X86/X86Vex32Output.c.o']))
+        binaries[label]=w/label
+        run(['clang++',w/'single.o',b/'libcapstone.a','-lm','-o',binaries[label]],'link-'+label)
+        symbol_tables[label]=symbols(binaries[label],label)
+        layouts[label]=sections(binaries[label])
+        run(['git','-C',s,'read-tree','--reset','-u',meta['parent']],'reset-'+label)
+        run(['git','-C',s,'clean','-fdx'],'clean-'+label)
+    save('object-digests',object_hashes)
+    for label in ('prior','scan'):
+        delta={n for n,v in object_hashes['base'].items() if object_hashes[label].get(n)!=v}
+        assert delta=={'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'},delta
+    delta={n for n,v in object_hashes['prior'].items() if object_hashes['scan'].get(n)!=v}
+    assert delta=={'arch/X86/X86VectorOutput.c.o','arch/X86/X86Vex32Output.c.o'},delta
+    comparisons={}
+    for label in ('prior','scan'):
+        old, new=symbol_tables['base'],symbol_tables[label]
+        differences={name:[v,new.get(name)] for name,v in old.items()
+                     if name != 'X86_writeVectorOutput' and
+                     Counter(tuple(x) for x in v if x[2] in 'tT') -
+                     Counter(tuple(x) for x in new.get(name,[]) if x[2] in 'tT')}
+        comparisons[label]=dict(other_original_text_positions_identical=not differences,
+                                differences=differences,
+                                vector_entry=symbol_tables[label]['X86_writeVectorOutput'])
+    save('layout-control',dict(comparisons=comparisons,sections=layouts,
+                              baseline_vector_entry=symbol_tables['base']['X86_writeVectorOutput'],
+                              changed_from_prior=sorted(delta)))
+    checks=[]
     for case in cases:
-        for launch in ('images', 'same-file-fixed'):
-            warm = sample('base', case, 2, launch)
-            repeats = max(2, min(4000, round(2 * 100e6 / warm['cpu_ns'])))
-            pairs, reference = [], None
-            for cycle in range(21):
-                order = keys[cycle % len(keys):] + keys[:cycle % len(keys)]
-                times = {key: [] for key in keys}
-                for key in order + order[::-1]:
-                    out = sample(key, case, repeats, launch)
-                    value = [out['first'], out['result']]
-                    if reference is None:
-                        reference = value
-                    assert value == reference
-                    times[key].append(out['cpu_ns'])
-                pair = {key: sum(times['base']) / sum(times[key]) for key in keys}
-                for control in ('both', 'text', 'data'):
-                    pair[control + '_gain'] = sum(times[control + '-base']) / sum(times[control + '-scan'])
-                pairs.append(pair)
-            measurements.append(dict(case=case['name'], mode=0, launch=launch, pairs=pairs,
-                 median={key: statistics.median(v[key] for v in pairs) for key in pairs[0]}, result=reference))
-            save('timings', measurements)
-    save('complete', dict(success=True, cases=len(measurements), diagnostic_only=True,
-                         candidate_qualified=False, matched_factors=['both', 'text', 'data']))
+        for mode in range(3):
+            outputs={k:json.loads(sp.check_output([p,str(case['selector']),str(mode),str(case['path']),'1'],text=True))
+                     for k,p in binaries.items()}
+            assert all([x['first'],x['result']]==[outputs['base']['first'],outputs['base']['result']] for x in outputs.values())
+            checks.append(dict(case=case['name'],mode=mode,equal=True))
+    save('semantic-cases',checks)
+    if not comparisons['scan']['other_original_text_positions_identical']:
+        save('complete',dict(success=True,layout_restored=False,native_timing_started=False,candidate_qualified=False))
+    else:
+        binaries['aa'] = w / 'aa'
+        shutil.copy2(binaries['base'], binaries['aa'])
+        payloads = {name: path.read_bytes() for name, path in binaries.items()}
+        assert payloads['base'] == payloads['aa']
+        maximum = max(map(len, payloads.values()))
+        padded = {name: data + bytes(maximum - len(data)) for name, data in payloads.items()}
+        image = w / 'same-image'
+        image.write_bytes(padded['base'])
+        image.chmod(0o755)
+        inode = image.stat().st_ino
+        probe = sp.run(['setarch', platform.machine(), '-R', '/bin/true'], capture_output=True, text=True)
+        assert probe.returncode == 0, probe.stderr
+        save('launch-controls', dict(launches=['images', 'same-file-fixed'], aslr_disable_returncode=0,
+             inode=inode, fixed_size=maximum, original_sha256={k: hashlib.sha256(v).hexdigest() for k, v in payloads.items()}))
+        os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
+
+        def sample(key, case, repeats, launch):
+            args = list(map(str, [case['selector'], 0, case['path'], repeats]))
+            if launch == 'images':
+                args = [str(binaries[key]), *args]
+            else:
+                with image.open('r+b') as out:
+                    assert out.write(padded[key]) == maximum
+                assert image.stat().st_ino == inode and image.stat().st_size == maximum
+                args = ['setarch', platform.machine(), '-R', str(image), *args]
+            return json.loads(sp.check_output(args, text=True))
+
+        measurements = []
+        keys = ['base', 'aa', 'prior', 'scan']
+        for case in cases:
+            for launch in ('images', 'same-file-fixed'):
+                warm = sample('base', case, 2, launch)
+                repeats = max(2, min(4000, round(2 * 100e6 / warm['cpu_ns'])))
+                pairs, reference = [], None
+                for cycle in range(21):
+                    order = keys[cycle % len(keys):] + keys[:cycle % len(keys)]
+                    times = {key: [] for key in keys}
+                    for key in order + order[::-1]:
+                        out = sample(key, case, repeats, launch)
+                        value = [out['first'], out['result']]
+                        if reference is None:
+                            reference = value
+                        assert value == reference
+                        times[key].append(out['cpu_ns'])
+                    pair = {key: sum(times['base']) / sum(times[key]) for key in keys}
+                    pairs.append(pair)
+                measurements.append(dict(case=case['name'], mode=0, launch=launch, pairs=pairs,
+                     median={key: statistics.median(v[key] for v in pairs) for key in pairs[0]}, result=reference))
+                save('timings', measurements)
+        save('complete', dict(success=True, cases=len(measurements), diagnostic_only=True,
+                             candidate_qualified=False, layout_restored=True, native_timing_started=True))
 finally:
     amount = sum(p.stat().st_size for p in w.rglob('*') if p.is_file())
     shutil.rmtree(w)
