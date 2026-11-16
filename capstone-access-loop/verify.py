@@ -58,7 +58,7 @@ try:
         options += ['-DENABLE_ASAN=ON', '-DCMAKE_C_FLAGS=-fsanitize=undefined', '-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined']
     units = ['api', 'utils', 'mapping', 'x86_reg_access', 'detail_option']
     if profile not in ('diet', 'reduced'):
-        units += ['x86_encoding_accuracy', 'x86_simple_output', 'arm_post_index', 'aarch64_memory_access', 'mips_scan']
+        units += ['x86_encoding_accuracy', 'x86_simple_output', 'arm_post_index', 'aarch64_postprocess', 'mips_scan']
     run('configure', ['cmake', '-S', s, '-B', b, *options])
     run('build', ['cmake', '--build', b, '--config', 'Release', '--target', 'capstone_static', *units, '--parallel', '4'])
     run('tests', ['ctest', '--test-dir', b, '-C', 'Release', '--no-tests=error', '--output-on-failure', '-R', '^unit_(' + '|'.join(units) + ')$'])
