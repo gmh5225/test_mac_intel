@@ -1,160 +1,128 @@
-"""Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
 from pathlib import Path
-import gzip, os, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
-r=Path(__file__).resolve().parent
-p=r.parent
-base=p/'source'
-lab=r; evidence=p/'evidence'; evidence.mkdir()
-pe=p/'round118-real-pe'
+import hashlib
+import json
+import os
+import platform
+import shutil
+import subprocess as sp
+import tempfile
 
-def save(name,data):
-    (evidence/name).write_text(json.dumps(data,indent=2)+'\n')
-def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
-def run(args,label,cwd=None):
-    with (evidence/(label+'.log')).open('w') as f:sp.run(args,cwd=cwd,stdout=f,stderr=sp.STDOUT,check=True)
-def module(path):
-    spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+r = Path(__file__).resolve().parent
+p = r.parent
+evidence = p / 'evidence'
+evidence.mkdir()
+base = p / 'source'
+meta = json.loads((r / 'candidate.json').read_text())
 
-def main(w):
-    reference=json.loads((r/'candidate.json').read_text())['parent']
-    assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
-    iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
-    checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
-    run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
-    ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
-    src=src.replace('InstructionInfoFactory, IntelFormatter,','InstructionInfoFactory, IntelFormatter, FastFormatter,').replace('    formatter: IntelFormatter,','    formatter: IntelFormatter,\n    fast: FastFormatter,\n    fast_enabled: bool,').replace('        mode,','        mode: mode & 3,\n        fast_enabled: mode & 8 != 0,\n        fast: FastFormatter::new(),')
-    old='state.formatter.format(&instruction, &mut state.text);';assert src.count(old)==1;src=src.replace(old,'if state.fast_enabled {state.fast.format(&instruction, &mut state.text);} else {state.formatter.format(&instruction, &mut state.text);}')
-    trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
-    (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
-    save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='32-bit VEX2 output selected by the existing vector branch with the original RIP memory helper kept out of line',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
-    save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
-    inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
-    inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
-    inc=inc.replace('if (mode>2 ||','if (mode>4 ||').replace('mode==2 ? CS_OPT_ON','mode>=2 ? CS_OPT_ON')
-    inc=inc.replace('if (mode == 2) {','if (mode == 2 || mode == 4) {\n        if (mode == 2) {').replace('        const auto &x = insn->detail->x86;', '        }\n        const auto &x = insn->detail->x86;')
-    old_engine='std::string engine=argv[1];';assert inc.count(old_engine)==1
-    inc=inc.replace(old_engine,old_engine+'\n  if(engine=="iced____") engine="iced"; else if(engine=="fast____") engine="fast";')
-    assert inc.count('iced_trace(bits,ptr,')==1
-    (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
-    profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF']
-    tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
-    active = platform.system()=='Linux' and platform.machine()=='x86_64' and os.environ['CC']=='clang'
-    save('scope.json',dict(active=active,policy='ELF x64 Clang',inactive_requirement='Identical original runtime objects and linked consumer'))
-    objects={}
-    for label in ('integer','aa','scan'):
-        if label=='aa':
-            exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/('dispatch.patch' if label=='output' else 'scan.patch')]
-        for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
-        if label=='scan':
-            run(['git','add','-A'],'stage-tested-source',tree)
-            tested=sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()
-            assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
-            save('tested-source.json',dict(tree=tested,patch_sha256=sha(r/'scan.patch')))
-            if active:
-                probe=w/'native-plan-policy.c';probe.write_text('#include "arch/X86/X86SimpleOutput.h"\n#ifndef CAPSTONE_X86_VEX32_OUTPUT\n#error missing native C5 output policy\n#endif\n_Static_assert(X86_PLAN_VEX32 == X86_PLAN_VECTOR, "native C5 plan must reach the vector branch");\n')
-                run([os.environ['CC'], '-fsyntax-only', '-I', tree, '-I', tree/'include', probe], 'native-plan-policy')
-                save('native-plan-policy.json',dict(active=True,selector='X86_PLAN_VECTOR',forced_feature_define=False))
-        run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
-        objroot=b/'CMakeFiles/capstone.dir'
-        objects[label]={str(path.relative_to(objroot)):sha(path) for path in objroot.rglob('*.o')}
-        assert len(objects[label])>30
-        if label in ('output','scan'):
-            changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
-            added=set(objects[label])-set(objects['integer'])
-            assert added=={'arch/X86/X86Vex32Output.c.o'},added
-            expected={'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'} if active else set()
-            assert changed==expected,(label,changed,expected)
-            save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
-        save('object-digests.json', objects)
-        for component in ('X86Mapping','X86ImmediateOutput','X86VectorOutput','X86DisassemblerDecoder','X86IntelInstPrinter','X86IntelInstPrinterPrechecked','X86OutputIterator'):
-            object_file=objroot/'arch/X86'/(component+'.c.o')
-            assembly=sp.check_output(['objdump','-dr',object_file])
-            with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
-                stream.write(assembly)
-        if label == 'scan':
-            with gzip.open(p/'evidence/scan-X86Vex32Output.asm.gz','wb') as stream:
-                stream.write(sp.check_output(['objdump','-dr',objroot/'arch/X86/X86Vex32Output.c.o']))
-        code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
-        target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
-        (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
-        (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
 
-        run(['git','reset','--hard',reference],'restore-'+label,tree)
-        run(['git','clean','-fdx'],'remove-generated-'+label,tree)
-        assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
-    save('binaries.json',{key:sha(path) for key,path in exe.items()})
-    if not active:
-        assert sha(exe['integer']) == sha(exe['scan']) == sha(exe['aa'])
-        save('complete.json',dict(cases=0,success=True,active=False,identical_binary=True,native_qualification=False))
-        return
-    exe['iced']=exe['fast']=exe['integer']
-    payloads={key:path.read_bytes()for key,path in exe.items()}
-    assert payloads['integer']==payloads['aa']
-    maximum=max(map(len,payloads.values()))
-    padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-    image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
-    image_inode=image.stat().st_ino
-    probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Qualify unified VEX descriptor pool against the published baseline with original-image and same-inode ASLR-disabled controls.'))
-    run(['git','apply',r/'scan.patch'],'apply-census',tree)
-    with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
-    run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
-    run(['clang++','-O2','-std=c++17','-I',tree/'include',r/'census.cpp',b/'libcapstone.a','-o',w/'census'],'census-link')
-    import deb
-    run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
-    for name,bits,f,spans,source in deb.prepare(w):
-        intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
-        common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
-        manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name!='jpeg-avx2-i386' else ['simd-functions']):
-            sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
-            if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
-            if not sel:continue
-            intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
-            rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
-            counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
-            save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [0,1,2]:
-                def measure(lib,n,launch):
-                    tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
-                    if launch=='images':
-                        command=[str(exe[lib]),*tail];executable=None
-                    elif launch=='same-argv':
-                        command=[str(image),*tail];executable=str(exe[lib])
-                    else:
-                        with image.open('r+b')as out:
-                            assert out.write(padded[lib])==maximum
-                        assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                        command=[str(image),*tail];executable=None
-                        if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                    return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
-                for i in range(21):
-                    launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
-                    for launch in launch_order:
-                        order=labels[i%len(labels):]+labels[:i%len(labels)]
-                        obs=[(k,measure(k,rep,launch))for k in order+order[::-1]]
-                        assert all(len(v)==6 for k,v in obs)
-                        assert len({tuple(v[2:5])for k,v in obs})==1,(name,mode,launch,obs)
-                        assert len({tuple(v[2:])for k,v in obs if k not in ('iced','fast')})==1,(name,mode,launch,obs)
-                        cycles[launch].append(dict(ns={k:statistics.mean(v[0]/v[2]for who,v in obs if who==k)for k in labels},raw=obs))
-                for launch,observations in cycles.items():
-                    md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
-                    row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=md('iced','scan')
-                    row['vs_fast']=md('fast','scan') if mode else None
-                    reported.append(row)
-                save('measurements.json',reported)
-            print(name,panel,len(sel),flush=True)
-    save('complete.json',dict(cases=len(reported),success=True,active=active,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
+def save(name, data):
+    (evidence / (name + '.json')).write_text(json.dumps(data, indent=2) + '\n')
+
+
+def sha(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def run(args, label, cwd=None):
+    with (evidence / (label + '.log')).open('wb') as out:
+        sp.run(list(map(str, args)), cwd=cwd, stdout=out, stderr=sp.STDOUT, check=True)
+
+
+w = Path(tempfile.mkdtemp(prefix='capstone-clang14-vectors-boundary-'))
 try:
-    if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
-    main(w)
+    assert os.environ['CC'] == 'clang'
+    assert sp.check_output(['git', '-C', base, 'rev-parse', 'HEAD'], text=True).strip() == meta['parent']
+    save('environment', dict(platform=platform.platform(), machine=platform.machine(),
+         cpu=Path('/proc/cpuinfo').read_text(), compiler=sp.check_output(['clang', '--version'], text=True),
+         cxx=sp.check_output(['clang++', '--version'], text=True),
+         cmake=sp.check_output(['cmake', '--version'], text=True),
+         linker=sp.check_output(['ld', '--version'], text=True),
+         debugger=sp.check_output(['gdb', '--version'], text=True),
+         original_failure_run=43936130678, original_revision='89768ab7e3d57e4bb59f910eafaebbd24ae7b732',
+         original_signal=11, rebuilt_reproducer=True))
+    import deb
+    case = next(x for x in deb.prepare(w) if x[0] == 'libjpeg62-turbo-amd64')
+    name, bits, data, spans, provenance = case
+    intervals = w / 'intervals.tsv'
+    intervals.write_text(''.join('%d %d %d\n' % item for item in spans))
+    save('input', dict(name=name, bits=bits, provenance=provenance,
+         text_sha256=sha(data), intervals_sha256=sha(intervals), intervals=len(spans)))
+    tree, build = w / 'source', w / 'build'
+    run(['git', 'clone', '-q', '--shared', '--no-checkout', base, tree], 'clone')
+    run(['git', 'checkout', '-q', '--detach', meta['parent']], 'checkout', tree)
+    options = ['-G', 'Ninja', '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_C_COMPILER=clang',
+               '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
+               *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in ['X86', 'ARM', 'AARCH64', 'MIPS']],
+               '-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer -Wno-error=incompatible-pointer-types-discards-qualifiers',
+               '-DCAPSTONE_BUILD_MACOS_THIN=ON', '-DCAPSTONE_BUILD_SHARED_LIBS=OFF',
+               '-DCAPSTONE_BUILD_STATIC_LIBS=ON', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
+               '-DCAPSTONE_BUILD_CSTOOL=OFF']
+    run(['cmake', '-S', tree, '-B', build, *options], 'configure')
+    observations = []
+    for label in ['baseline', 'cdecl']:
+        if label == 'cdecl':
+            header = tree / 'cs_priv.h'
+            code = header.read_text()
+            marker = '#if __has_attribute(preserve_most)'
+            assert code.count(marker) == 1
+            header.write_text(code.replace(marker, '#if 0 /* diagnostic: use the default private calling convention */'))
+            (evidence / 'cdecl.patch').write_bytes(sp.check_output(['git', 'diff'], cwd=tree))
+        run(['cmake', '--build', build, '--target', 'capstone_static', '--parallel', '4'], 'build-' + label)
+        executable = w / ('vectors-' + label)
+        command = ['clang++', '-O2', '-I', base / 'include', r / 'vectors.cpp', build / 'libcapstone.a', '-o', executable]
+        run(command, 'link-' + label)
+        guarded = w / 'guarded.cpp'
+        original = (r / 'vectors.cpp').read_text()
+        marker = '   if(!cs_disasm_iter(h,&cursor,&n,&address,insn)){++cursor;--n;++address;continue;}'
+        assert original.count(marker) == 1
+        guard = r"""   volatile size_t before_n=n;
+   volatile uintptr_t before_cursor=reinterpret_cast<uintptr_t>(cursor);
+   volatile uint64_t before_ip=address;
+   const bool ok=cs_disasm_iter(h,&cursor,&n,&address,insn);
+   const bool bad=ok ? (!insn->size || insn->size>before_n || n!=before_n-insn->size ||
+      reinterpret_cast<uintptr_t>(cursor)!=before_cursor+insn->size || address!=before_ip+insn->size) :
+      (n!=before_n || reinterpret_cast<uintptr_t>(cursor)!=before_cursor || address!=before_ip);
+   if(bad) {
+    std::fprintf(stderr,"violation ok=%d start=%zu span_length=%zu old_remaining=%zu new_remaining=%zu old_cursor=%llx new_cursor=%llx old_ip=%llx new_ip=%llx insn_size=%u id=%u\n",ok,start,size_t(before_n),size_t(before_n),n,(unsigned long long)before_cursor,(unsigned long long)reinterpret_cast<uintptr_t>(cursor),(unsigned long long)before_ip,(unsigned long long)address,unsigned(insn->size),insn->id);
+    const auto pos=before_cursor-reinterpret_cast<uintptr_t>(bytes.data());
+    if(pos<bytes.size()) {
+     std::fprintf(stderr,"input:");
+     for(size_t i=0;i<15 && i<before_n && i<bytes.size()-pos;++i)std::fprintf(stderr," %02x",unsigned(bytes[pos+i]));
+     std::fprintf(stderr,"\n");
+    }
+    return 77;
+   }
+   if(!ok){++cursor;--n;++address;continue;}"""
+        instrumented = original.replace(marker, guard)
+        instrumented = instrumented.replace(' cs_insn *insn=cs_malloc(h);', ' if(std::getenv("CAPSTONE_PROBE_NO_TEXT"))cs_option(h,CS_OPT_TEXT,CS_OPT_OFF);\n cs_insn *insn=cs_malloc(h);')
+        guarded.write_text(instrumented)
+        (evidence / 'guarded.cpp').write_text(instrumented)
+        guarded_exe=w/('guarded-'+label)
+        run(['clang++','-O2','-I',base/'include',guarded,build/'libcapstone.a','-o',guarded_exe], 'link-guarded-'+label)
+        (evidence / (label + '-symbols.txt')).write_bytes(sp.check_output(['nm', '-n', '-S', '--defined-only', executable]))
+        for surface, target, no_text in [('original',executable,False),('guarded',guarded_exe,False),('guarded-no-text',guarded_exe,True)]:
+            ident=label+'-'+surface
+            arguments=[target,str(bits),data,intervals]
+            env=dict(os.environ)
+            if no_text:env['CAPSTONE_PROBE_NO_TEXT']='1'
+            with (evidence / (ident + '-stdout.txt')).open('wb') as stdout, (evidence / (ident + '-stderr.txt')).open('wb') as stderr:
+                result = sp.run(list(map(str, arguments)), stdout=stdout, stderr=stderr, timeout=120,env=env)
+            observation = dict(label=label,surface=surface,no_text=no_text,returncode=result.returncode,binary_sha256=sha(target),
+                               archive_sha256=sha(build/'libcapstone.a'),stdout_sha256=sha(evidence/(ident+'-stdout.txt')),
+                               completed_lines=len((evidence/(ident+'-stdout.txt')).read_text().splitlines()))
+            observations.append(observation)
+            save('observations',observations)
+            if result.returncode<0 and surface=='original':
+                args=['gdb','-q','--batch','-ex','set pagination off','-ex','run','-ex','thread apply all bt full',
+                      '-ex','info registers','-ex','x/20i $pc-32','-ex','info frame','--args',*arguments]
+                with (evidence/('gdb-'+ident+'.log')).open('wb') as out:
+                    debugger=sp.run(list(map(str,args)),stdout=out,stderr=sp.STDOUT,timeout=180)
+                observation['debugger_returncode']=debugger.returncode
+                save('observations',observations)
+    save('complete', dict(success=True, diagnostic_only=True, cases=len(observations),
+                          no_native_performance_claim=True))
 finally:
-    files=[v for v in w.rglob('*') if v.is_file()];amount=sum(v.stat().st_size for v in files);shutil.rmtree(w);save('cleanup.json',dict(removed=not w.exists(),bytes=amount,files=len(files)))
+    files = [path for path in w.rglob('*') if path.is_file()]
+    amount = sum(path.stat().st_size for path in files)
+    shutil.rmtree(w)
+    save('cleanup', dict(bytes=amount, files=len(files), removed=not w.exists()))
