@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1237,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',scan='Resolve ordinary C5 opcodes directly before generic prefix and size repair'))
+    save('census-variant.json',dict(variant='integer',round=1238,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',scan='Separate immediate formatting from the register operand printer',iced='Frozen fork IntelFormatter',fast='Frozen fork FastFormatter'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical output entry cost diagnostic; actual NeverD tested separately'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -107,7 +107,7 @@ def main(w):
     costs=[]
     for name,bits,f,spans,source in deb.prepare(w):
         assert bits in (32,64)
-        if name not in ('libjpeg62-turbo-amd64','jpeg-avx2-i386','libssl3t64-i386','libssl3t64-amd64'):continue
+        if name not in ('jpeg-avx2-i386','libssl3t64-amd64'):continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
@@ -121,9 +121,9 @@ def main(w):
             save('baseline-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
             for profile_mode in (0,1,2):
              reference_record=None
-             engines=['capstone','scan']
+             engines=['capstone','scan','iced'] + (['fast'] if profile_mode else [])
              for key in engines:
-                 args=[str(exe[{'candidate':'output','scan':'scan'}.get(key,'integer')]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
+                 args=[str(exe[{'candidate':'output','scan':'scan'}.get(key,'integer')]),key if key in ('iced','fast') else 'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
                  observation=list(map(int,sp.check_output(args,text=True).split()))
                  assert len(observation)==6
                  if reference_record is None:reference_record=observation[2:5]
