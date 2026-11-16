@@ -66,4 +66,4 @@ def measure(w, cases, save):
                                  median={key: statistics.median(c[key] for c in cycles) for key in keys},
                                  result=reference))
                 save('timings.json', rows)
-    assert len(rows) == 6 * len(cases) == 60
+    assert len(rows) == 6 * len(cases) == 18

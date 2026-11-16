@@ -42,14 +42,14 @@ try:
           '-Wno-error=incompatible-pointer-types-discards-qualifiers'),
          '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
          *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in
-           ['X86', 'ARM', 'AARCH64', 'MIPS', 'PPC', 'RISCV', 'LOONGARCH', 'ARC', 'TRICORE']],
+           ['TRICORE']],
          '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
          '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'], 'configure')
     meta=inputs['candidate']
     patch=r/'candidate.patch'
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==meta['sha256']
     cases=corpus.prepare(r,w,evidence,run)
-    assert len(cases)==10
+    assert len(cases)==3
     costs=[];objects={};signatures={}
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
@@ -86,12 +86,12 @@ try:
                     assert observed['first']['rejected'] == 0
     from native import measure
     selected=cases
-    assert len(selected)==10
+    assert len(selected)==3
     measure(w,selected,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
-    save('complete.json', dict(success=True, cases=len(cases), observations=len(cases)*6,
-                               source_unchanged=False, restored=True, native_qualification=True, scope='TriCore instruction listings and seven real ELF controls; complete cross-architecture performance qualification remains subject to A/A review'))
+    save('complete.json', dict(success=True, cases=len(cases), observations=18,
+                               source_unchanged=False, restored=True, native_qualification=False, early_rejection_pilot=False, scope='Three real firmware instruction listings in an isolated TriCore build; combined library identity is verified separately'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)
