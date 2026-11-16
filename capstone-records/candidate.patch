@@ -1,0 +1,25 @@
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index e82eaaa5..32b970de 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -1183,10 +1183,16 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	write_count = insn->detail->regs_write_count;
+ 
+ 	// implicit registers
+-	memcpy(regs_read, insn->detail->regs_read,
+-	       read_count * sizeof(insn->detail->regs_read[0]));
+-	memcpy(regs_write, insn->detail->regs_write,
+-	       write_count * sizeof(insn->detail->regs_write[0]));
++	if (read_count == 1)
++		regs_read[0] = insn->detail->regs_read[0];
++	else if (read_count != 0)
++		memcpy(regs_read, insn->detail->regs_read,
++		       read_count * sizeof(insn->detail->regs_read[0]));
++	if (write_count == 1)
++		regs_write[0] = insn->detail->regs_write[0];
++	else if (write_count != 0)
++		memcpy(regs_write, insn->detail->regs_write,
++		       write_count * sizeof(insn->detail->regs_write[0]));
+ 
+ 	// explicit registers
+ 	for (i = 0; i < aarch64->op_count; i++) {
