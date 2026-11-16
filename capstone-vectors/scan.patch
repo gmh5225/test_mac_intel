@@ -1,36 +1,314 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 201d315b..11b3784d 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -468,6 +468,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86MemoryOutput.c
+         arch/X86/X86OutputIterator.c
+         arch/X86/X86VectorOutput.c
++        arch/X86/X86EvexScan.c
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+diff --git a/Makefile b/Makefile
+index 44471169..3d85fc15 100644
+--- a/Makefile
++++ b/Makefile
+@@ -272,6 +272,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+diff --git a/arch/X86/X86Disassembler.h b/arch/X86/X86Disassembler.h
+index ae1554b0..4bfb5ab4 100644
+--- a/arch/X86/X86Disassembler.h
++++ b/arch/X86/X86Disassembler.h
+@@ -56,6 +56,16 @@ bool X86_getInstructionAfterExtensions(csh ud, const uint8_t *code,
+ 				       size_t code_len, MCInst *instr,
+ 				       uint16_t *size,
+ 				       uint8_t extension_opcode);
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define X86_EVEX_REGISTER_SCAN
++bool X86_getEvexInstructionScan(csh ud, const uint8_t *code, size_t code_len,
++				MCInst *instr, uint16_t *size,
++				uint8_t extension_opcode);
++#endif
++
+ struct InternalInstruction;
+ bool X86_completeScan(MCInst *instr, struct InternalInstruction *insn,
+ 		      uint16_t *size);
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..1ba999f5 100644
+index 63dcc538..56dfccc6 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	uint16_t attrMask;
- 	uint16_t instructionID;
- 	bool rexWOverridesOpSize;
-+	const bool legacyVector = decoderMode != MODE_64BIT &&
-+				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
- 
- 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
- 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
-@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	}
- 
- 	/* The following clauses compensate for limitations of the tables. */
--	if (decoderMode != MODE_64BIT &&
--	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
-+	if (legacyVector) {
- 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
- 			return -1;
+@@ -3322,7 +3322,11 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 				return status == X86_SCAN_COMPLETE;
  		}
-@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 
- 		return 0;
+ 		bool decoded = opcode == 0x62 ?
++#ifdef X86_EVEX_REGISTER_SCAN
++				       X86_getEvexInstructionScan(
++#else
+ 				       X86_getInstructionAfterExtensions(
++#endif
+ 					       ud, code, code_len, &instr,
+ 					       &size, opcode) :
+ 				       decodeGenericScan(code, code_len,
+diff --git a/arch/X86/X86EvexAdmission.h b/arch/X86/X86EvexAdmission.h
+new file mode 100644
+index 00000000..7c161aba
+--- /dev/null
++++ b/arch/X86/X86EvexAdmission.h
+@@ -0,0 +1,16 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_EVEX_ADMISSION_H
++#define CS_X86_EVEX_ADMISSION_H
++
++/* Shared register-row admission. Arguments are local values, not expressions
++ * with side effects. Keep the extent check first for page-ended input. */
++#define X86_EVEX_REGISTER_PREFIX_REJECTS(code, size) \
++	((size) < 6 || ((code)[2] & 7) != 5 || ((code)[3] & 0x97) || \
++	 ((code)[3] & 0x60) == 0x60)
++#define X86_EVEX_REGISTER_EXTRACT(key) (((key) & ~0x22u) == 0x319)
++#define X86_EVEX_EXTRACT_SOURCE_REJECTS(code) \
++	(((code)[2] & 0x78) != 0x78 || !((code)[3] & 8))
++
++#endif
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+new file mode 100644
+index 00000000..0ef7fce7
+--- /dev/null
++++ b/arch/X86/X86EvexScan.c
+@@ -0,0 +1,48 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#include "X86Disassembler.h"
++#ifdef X86_EVEX_REGISTER_SCAN
++#include "X86EvexAdmission.h"
++/* Keep added code and row data out of existing ELF text/rodata ordering. */
++#if defined(__ELF__) && defined(__GNUC__)
++#define X86_EVEX_SCAN_TEXT __attribute__((section(".cs_x86_evex_text")))
++#define X86_EVEX_SCAN_DATA __attribute__((section(".cs_x86_evex_rodata")))
++#endif
++#define CAPSTONE_X86_EVEX_ROWS_ONLY
++#include "X86GenVectorOutput.inc"
++#undef CAPSTONE_X86_EVEX_ROWS_ONLY
++
++/* The existing generic EVEX branch enters here after source extensions and
++ * adapter dispatch. Keep this leaf outside the hot decoder and text writer. */
++X86_EVEX_SCAN_TEXT bool X86_getEvexInstructionScan(csh ud, const uint8_t *code, size_t code_len,
++				MCInst *instr, uint16_t *size,
++				uint8_t extension_opcode)
++{
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	if (handle->mode == CS_MODE_64 && code_len >= 6 && code[0] == 0x62
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++	    && !handle->x86_scan_adapter
++#endif
++	    && !X86_EVEX_REGISTER_PREFIX_REJECTS(code, code_len) &&
++	    code[5] >= 0xc0) {
++		const unsigned key = ((code[1] & 15) << 8) | code[4];
++		const struct VectorOutputRow *row =
++			evexOutputRow(key, code[2] >> 7, code[3] >> 5);
++		if (row && (!row->immediate || code_len >= 7) &&
++		    (!X86_EVEX_REGISTER_EXTRACT(key) ||
++		     !X86_EVEX_EXTRACT_SOURCE_REJECTS(code))) {
++			instr->Opcode = 0;
++			instr->OpcodePub = row->id;
++			instr->popcode_adjust = 0;
++			*size = (uint16_t)(6u + row->immediate);
++			return true;
++		}
++	}
++	return X86_getInstructionAfterExtensions(ud, code, code_len, instr,
++						 size, extension_opcode);
++}
++#endif
++#endif
+diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
+index 1d237cd1..dcf054d7 100644
+--- a/arch/X86/X86GenVectorOutput.inc
++++ b/arch/X86/X86GenVectorOutput.inc
+@@ -1,10 +1,16 @@
+ /* Generated by suite/synctools/x86_vector_output.cpp. */
++#ifndef X86_EVEX_SCAN_TEXT
++#define X86_EVEX_SCAN_TEXT
++#endif
++#ifndef X86_EVEX_SCAN_DATA
++#define X86_EVEX_SCAN_DATA
++#endif
+ struct VectorOutputRow {
+ 	uint16_t id;
+ 	char mnemonic[16];
+ 	uint8_t group_count, groups[4], access[4], immediate;
+ };
+-static const struct VectorOutputRow evex_output_rows[] = {
++static const struct VectorOutputRow evex_output_rows[] X86_EVEX_SCAN_DATA = {
+ 	{ X86_INS_VEXTRACTF32X4, "vextractf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ 	{ X86_INS_VEXTRACTF64X2, "vextractf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ 	{ X86_INS_VEXTRACTF32X8, "vextractf32x8", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+@@ -28,64 +34,65 @@ static const struct VectorOutputRow evex_output_rows[] = {
+ 	{ X86_INS_VPADDD, "vpaddd", 2, { 134, 166, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VPADDD, "vpaddd", 1, { 134, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ };
+-static const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
++static X86_EVEX_SCAN_TEXT const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)
+ {
+ 	switch (key) {
+ 	case 0x1ef: {
+-		static const uint8_t rows[2][3] = { { 8, 8, 10 }, { 9, 9, 11 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 8, 8, 10 }, { 9, 9, 11 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
  	}
--	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
-+	/* Legacy-mode vectors already resolved this unmodified mask before
-+	 * W-bit disambiguation. The special addressing lookup above returns. */
-+	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
- 		return -1;
--	}
+ 	case 0x1fe: {
+-		static const uint8_t rows[2][3] = { { 20, 20, 21 }, { 255, 255, 255 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 20, 20, 21 }, { 255, 255, 255 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x200: {
+-		static const uint8_t rows[2][3] = { { 19, 19, 19 }, { 19, 19, 19 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 19, 19, 19 }, { 19, 19, 19 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x2dc: {
+-		static const uint8_t rows[2][3] = { { 12, 12, 12 }, { 12, 12, 12 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 12, 12, 12 }, { 12, 12, 12 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x2dd: {
+-		static const uint8_t rows[2][3] = { { 13, 13, 13 }, { 13, 13, 13 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 13, 13, 13 }, { 13, 13, 13 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x2de: {
+-		static const uint8_t rows[2][3] = { { 14, 14, 14 }, { 14, 14, 14 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 14, 14, 14 }, { 14, 14, 14 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x2df: {
+-		static const uint8_t rows[2][3] = { { 15, 15, 15 }, { 15, 15, 15 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 15, 15, 15 }, { 15, 15, 15 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x319: {
+-		static const uint8_t rows[2][3] = { { 255, 0, 0 }, { 255, 1, 1 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 255, 0, 0 }, { 255, 1, 1 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x31b: {
+-		static const uint8_t rows[2][3] = { { 255, 255, 2 }, { 255, 255, 3 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 255, 255, 2 }, { 255, 255, 3 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x325: {
+-		static const uint8_t rows[2][3] = { { 17, 17, 17 }, { 18, 18, 18 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 17, 17, 17 }, { 18, 18, 18 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x339: {
+-		static const uint8_t rows[2][3] = { { 255, 4, 4 }, { 255, 5, 5 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 255, 4, 4 }, { 255, 5, 5 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x33b: {
+-		static const uint8_t rows[2][3] = { { 255, 255, 6 }, { 255, 255, 7 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 255, 255, 6 }, { 255, 255, 7 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	case 0x344: {
+-		static const uint8_t rows[2][3] = { { 16, 16, 16 }, { 16, 16, 16 } };
++		static const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { 16, 16, 16 }, { 16, 16, 16 } };
+ 		return rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];
+ 	}
+ 	default: return NULL;
+ 	}
+ }
++#ifndef CAPSTONE_X86_EVEX_ROWS_ONLY
+ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
+ 	{
+ 		{ X86_INS_VMOVAPS, "vmovaps", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
+@@ -808,3 +815,4 @@ static const uint8_t legacy_register_plans[256] = {
+ 	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
+ 	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
+ };
++#endif
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..8a606f4e 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -8,6 +8,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
++#include "X86EvexAdmission.h"
+ struct PaddingOutput {
+ 	unsigned id;
+ 	uint8_t length;
+@@ -117,8 +118,7 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (size >= 6 && code[5] < 0xc0)
+ 		return writeEvexBroadcast(code, size, insn, insn_size,
+ 					  address_regs);
+-	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
+-	    (code[3] & 0x60) == 0x60)
++	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, size))
+ 		return false;
+ 	const unsigned ll = code[3] >> 5;
+ 	const unsigned w = code[2] >> 7;
+@@ -134,8 +134,8 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 				  (code[5] & 7) | ((rxb & 3) << 3) };
+ 	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
+      * the full-width source, and reserve vvvv/V'. */
+-	if ((key & ~0x22u) == 0x319) {
+-		if ((code[2] & 0x78) != 0x78 || !(code[3] & 8))
++	if (X86_EVEX_REGISTER_EXTRACT(key)) {
++		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+ 			return false;
+ 		const unsigned pair[] = { regs[2], regs[0] };
+ 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 53824997..d11d3c11 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -947,20 +947,21 @@ void emit_output(Decoder &decoder)
+ 	    plans.at(0x33b)[1][2] == UINT8_MAX)
+ 		throw std::runtime_error("missing EVEX extract register forms");
+ 	std::puts(
+-		"struct VectorOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], immediate;\n};\nstatic const struct VectorOutputRow evex_output_rows[] = {");
++		"#ifndef X86_EVEX_SCAN_TEXT\n#define X86_EVEX_SCAN_TEXT\n#endif\n#ifndef X86_EVEX_SCAN_DATA\n#define X86_EVEX_SCAN_DATA\n#endif\nstruct VectorOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[4], immediate;\n};\nstatic const struct VectorOutputRow evex_output_rows[] X86_EVEX_SCAN_DATA = {");
+ 	for (const auto &row : records)
+ 		std::printf("\t%s,\n", row.c_str());
+ 	std::puts(
+-		"};\nstatic const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)\n{\n\tswitch (key) {");
++		"};\nstatic X86_EVEX_SCAN_TEXT const struct VectorOutputRow *evexOutputRow(unsigned key, unsigned w, unsigned ll)\n{\n\tswitch (key) {");
+ 	for (auto &[key, rows] : plans) {
+ 		std::printf(
+-			"\tcase 0x%x: {\n\t\tstatic const uint8_t rows[2][3] = { { %u, %u, %u }, { %u, %u, %u } };\n",
++			"\tcase 0x%x: {\n\t\tstatic const uint8_t rows[2][3] X86_EVEX_SCAN_DATA = { { %u, %u, %u }, { %u, %u, %u } };\n",
+ 			key, rows[0][0], rows[0][1], rows[0][2], rows[1][0],
+ 			rows[1][1], rows[1][2]);
+ 		std::puts(
+ 			"\t\treturn rows[w][ll] == UINT8_MAX ? NULL : &evex_output_rows[rows[w][ll]];\n\t}");
+ 	}
+ 	std::puts("\tdefault: return NULL;\n\t}\n}");
++	std::puts("#ifndef CAPSTONE_X86_EVEX_ROWS_ONLY");
+ 	emit_vex_indexed(decoder);
+ 	emit_vex_registers(decoder);
+ 	emit_vex_shifts(decoder);
+@@ -969,6 +970,7 @@ void emit_output(Decoder &decoder)
+ 	Decoder padding32(CS_MODE_32);
+ 	emit_padding_rows(padding32, decoder);
+ 	emit_legacy_registers(decoder);
++	std::puts("#endif");
+ }
+ }
  
- 	if ((decoderMode == MODE_16BIT ||
- 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
