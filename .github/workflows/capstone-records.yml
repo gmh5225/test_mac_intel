@@ -1,7 +1,7 @@
-name: Diagnose mixed-backend VEX candidate with matched original text and data
+name: Separate text and constant placement effects on unchanged decoders
 on:
   push:
-    branches: [codex/capstone-vex-mixed-layout-control]
+    branches: [codex/capstone-vex-layout-factor-control]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-mixed-layout-control-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex-layout-factor-control-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
