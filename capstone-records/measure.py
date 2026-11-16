@@ -24,7 +24,7 @@ def run(args, label):
                stderr=sp.STDOUT, check=True)
 
 
-w = Path(tempfile.mkdtemp(prefix='capstone-cross-architecture-cost-'))
+w = Path(tempfile.mkdtemp(prefix='capstone-arm-short-copy-cost-'))
 try:
     inputs = json.loads((r / 'inputs.json').read_text())
     assert sp.check_output(['git', '-C', source, 'rev-parse', 'HEAD'],
@@ -43,50 +43,80 @@ try:
          '-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',
          *['-DCAPSTONE_' + arch + '_SUPPORT=ON' for arch in
            ['X86', 'ARM', 'AARCH64', 'MIPS']],
-         '-DCAPSTONE_BUILD_SHARED_LIBS=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
+         '-DCAPSTONE_BUILD_SHARED_LIBS=ON', '-DCAPSTONE_BUILD_CSTEST=ON',
          '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'], 'configure')
-    run(['cmake', '--build', build, '--target', 'capstone_static',
-         '--parallel', '4'], 'build')
-    exe = w / 'probe'
-    run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
-         '-I', source / 'include', r / 'single.cpp', build / 'libcapstone.a',
-         '-lm', '-o', exe], 'link')
-    with gzip.open(evidence / 'integer-linked-assembly.gz', 'wb') as out:
-        out.write(sp.check_output(['objdump', '-dr', exe]))
-    (evidence / 'integer-symbols.txt').write_bytes(
-        sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
-    cases = corpus.prepare(r, w, evidence, run)
-    assert len(cases) == 3
-    costs = []
-    for case in cases:
-        for mode in range(3):
-            name = case['name'] + '-' + str(mode) + '-capstone'
-            args = [str(exe), str(case['selector']), str(mode), case['path'], '1']
-            native = json.loads(sp.check_output(args, text=True))
-            raw = w / (name + '.callgrind')
-            run(['valgrind', '--tool=callgrind', '--cache-sim=yes',
-                 '--branch-sim=yes', '--dump-instr=yes', '--collect-jumps=yes',
-                 '--collect-atstart=no', '--callgrind-out-file=' + str(raw),
-                 *args], 'profile-' + name)
-            log = (evidence / ('profile-' + name + '.log')).read_text()
-            observed = [json.loads(line) for line in log.splitlines()
-                        if line.startswith('{') and '"first"' in line]
-            assert len(observed) == 1
-            assert observed[0]['first'] == native['first']
-            assert observed[0]['result'] == native['result']
-            payload = raw.read_bytes()
-            with gzip.open(evidence / (name + '.callgrind.gz'), 'wb') as out:
-                out.write(payload)
-            costs.append(dict(case=case['name'], mode=mode, variant='capstone',
-                              instructions=native['first']['instructions'],
-                              rejected=native['first']['rejected'],
-                              signature=native['first'], captured_passes=1,
-                              raw_sha256=hashlib.sha256(payload).hexdigest()))
-            save('instruction-costs.json', costs)
-            raw.unlink()
+    meta=inputs['candidate']
+    patch=r/'candidate.patch'
+    assert hashlib.sha256(patch.read_bytes()).hexdigest()==meta['sha256']
+    cases=corpus.prepare(r,w,evidence,run)
+    assert len(cases)==4
+    costs=[];objects={};signatures={}
+    for label in ['integer','scan']:
+        engine='capstone' if label=='integer' else 'scan'
+        if label=='scan':
+            run(['git','apply',patch],'apply')
+            run(['git','add','-A'],'stage')
+            tree=sp.check_output(['git','-C',source,'write-tree'],text=True).strip()
+            assert tree==meta['tree'],tree
+            save('candidate-tree.json',dict(tree=tree))
+        run(['cmake', '--build', build, '--target', 'capstone_static',
+             '--parallel', '4'], 'build-'+label)
+        run(['cmake','--build',build,'--target','capstone_shared','arm_post_index','aarch64_postprocess','mips_scan','--parallel','4'],'build-units-'+label)
+        run(['ctest','--test-dir',build,'--no-tests=error','--output-on-failure','-R','^unit_(arm_post_index|aarch64_postprocess|mips_scan)$'],'units-'+label)
+        if label=='integer':
+            shutil.copy2(build/'libcapstone.so',w/'baseline.so')
+        else:
+            run(['clang','-std=gnu11','-O2','-I',source/'include',r/'verify.c','-ldl','-o',w/'verify'],'build-state-compare')
+            run([w/'verify',w/'baseline.so',build/'libcapstone.so'],'state-compare')
+        objroot=build/'CMakeFiles/capstone.dir'
+        objects[label]={str(f.relative_to(objroot)):hashlib.sha256(f.read_bytes()).hexdigest()for f in objroot.rglob('*.o')}
+        if label=='scan':
+            changed={f for f in objects['integer']if objects['integer'][f]!=objects[label][f]}
+            assert set(objects['integer'])==set(objects[label])
+            assert changed=={'arch/ARM/ARMMapping.c.o'}, changed
+            save('object-delta.json',dict(changed=sorted(changed),total=len(objects[label])))
+        (evidence / (label+'-object-sizes.txt')).write_bytes(sp.check_output(['size', build/'libcapstone.a']))
+        exe = w / label
+        run(['clang++', '-O3', '-DNDEBUG', '-std=c++17', '-I', source,
+             '-I', source / 'include', r / 'single.cpp', build / 'libcapstone.a',
+             '-lm', '-o', exe], 'link')
+        with gzip.open(evidence / (label+'-linked-assembly.gz'), 'wb') as out:
+            out.write(sp.check_output(['objdump', '-dr', exe]))
+        (evidence / (label+'-symbols.txt')).write_bytes(
+            sp.check_output(['nm', '-n', '-S', '--defined-only', exe]))
+        for case in cases:
+            for mode in range(3):
+                name = case['name'] + '-' + str(mode) + '-' + engine
+                args = [str(exe), str(case['selector']), str(mode), case['path'], '1']
+                native = json.loads(sp.check_output(args, text=True))
+                key = (case['name'], mode)
+                if label == 'integer': signatures[key] = [native['first'],native['result']]
+                else: assert signatures[key] == [native['first'],native['result']], (key, signatures[key], native['first'])
+                raw = w / (name + '.callgrind')
+                run(['valgrind', '--tool=callgrind', '--cache-sim=yes',
+                     '--branch-sim=yes', '--dump-instr=yes', '--collect-jumps=yes',
+                     '--collect-atstart=no', '--callgrind-out-file=' + str(raw),
+                     *args], 'profile-' + name)
+                log = (evidence / ('profile-' + name + '.log')).read_text()
+                observed = [json.loads(line) for line in log.splitlines()
+                            if line.startswith('{') and '"first"' in line]
+                assert len(observed) == 1
+                assert observed[0]['first'] == native['first']
+                assert observed[0]['result'] == native['result']
+                payload = raw.read_bytes()
+                with gzip.open(evidence / (name + '.callgrind.gz'), 'wb') as out:
+                    out.write(payload)
+                costs.append(dict(case=case['name'], mode=mode, variant=engine,
+                                  instructions=native['first']['instructions'],
+                                  rejected=native['first']['rejected'],
+                                  signature=native['first'], captured_passes=1,
+                                  raw_sha256=hashlib.sha256(payload).hexdigest()))
+                save('instruction-costs.json', costs)
+                raw.unlink()
+    run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
     save('complete.json', dict(success=True, traces=len(costs),
-                               source_unchanged=True, native_qualification=False))
+                               source_unchanged=False, restored=True, native_qualification=False))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)
