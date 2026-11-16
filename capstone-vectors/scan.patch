@@ -1,36 +1,26 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..1ba999f5 100644
+index 63dcc538..e08a8a3e 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	uint16_t attrMask;
- 	uint16_t instructionID;
- 	bool rexWOverridesOpSize;
-+	const bool legacyVector = decoderMode != MODE_64BIT &&
-+				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
- 
- 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
- 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
-@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	}
- 
+@@ -1431,10 +1431,6 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
  	/* The following clauses compensate for limitations of the tables. */
--	if (decoderMode != MODE_64BIT &&
--	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
-+	if (legacyVector) {
- 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
- 			return -1;
- 		}
-@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	if (decoderMode != MODE_64BIT &&
+ 	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
+-		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
+-			return -1;
+-		}
+-
+ 		/*
+ 		 * The tables can't distinguish between cases where the W-bit is used to
+ 		 * select register size and cases where it's a required part of the opcode.
+@@ -1447,6 +1443,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 		     wFromXOP3of3(insn->vectorExtensionPrefix[2]))) {
+ 			uint16_t instructionIDWithREXW;
  
- 		return 0;
- 	}
--	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
-+	/* Legacy-mode vectors already resolved this unmodified mask before
-+	 * W-bit disambiguation. The special addressing lookup above returns. */
-+	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
- 		return -1;
--	}
- 
- 	if ((decoderMode == MODE_16BIT ||
- 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
++			/* This preliminary ID is needed only for W-bit selection. */
++			if (getIDWithAttrMask(&instructionID, insn, attrMask))
++				return -1;
++
+ 			if (getIDWithAttrMask(&instructionIDWithREXW, insn,
+ 					      attrMask | ATTR_REXW)) {
+ 				insn->instructionID = instructionID;
