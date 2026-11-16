@@ -11,7 +11,9 @@ def command(args,label,cwd=None):
 def rev(d):return sp.check_output(['git','-C',d,'rev-parse','HEAD'],text=True).strip()
 cs=nd/'third_party/capstone';ll=nd/'third_party/llvm-project'
 cc=os.environ['CC']
-assert cc in ('gcc','clang')
+assert cc == 'clang'
+feature_active = platform.machine()=='x86_64' and cc=='clang'
+write('scope',dict(active=feature_active,policy='Portable C operand traversal, measured in the native x64 Clang product build'))
 expected=json.loads((r/'inputs.json').read_text())
 variants=expected['variants']
 write('inputs',expected)
@@ -20,8 +22,7 @@ write('sources',dict(neverd=rev(nd),capstone=rev(cs),llvm_fork=rev(ll),llvm_sour
 with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
  t=Path(temp);build=t/'build'
  try:
-  write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',swift_friend_applied=False))
-  command([sys.executable,r/'llvm_mixed_warnings.py',ll,out/'llvm-warning-compatibility.json'],'llvm-mixed-warning-flags')
+  write('llvm_source_build',dict(revision=rev(ll),compiler='clang++',prebuilt=False,unmodified_latest_fork=True))
   cases=corpus.prepare(r,t,out,command)
   cases=[v for v in cases if v['name'] in ('putty-32-0.85','putty-64-0.85','amd64-ls','arm64-ls','scalar32','scalar64','simd64','arm-cp','mips64el-ls','arm64-sort','libssl3t64-amd64','libjpeg62-turbo-i386','libssl3t64-i386','libzstd1-i386')]
   assert len(cases)==14
@@ -37,7 +38,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   command(['cmake','-S',nd,'-B',build,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCMAKE_CXX_COMPILER=clang++','-DNEVERD_LLVM_PREBUILT=OFF','-DBUILD_TESTING=ON','-DNEVERD_ENABLE_WEB_ANALYSIS=OFF','-DNEVERD_ENABLE_CPU_EMULATION=OFF','-DNEVERD_ENABLE_DRIVER_EMULATION=OFF','-DNEVERD_ENABLE_PYTHON_PLUGINS=OFF','-DNEVERD_BUILD_GUI=OFF'],'configure')
   assert 'NEVERD_LLVM_PREBUILT:BOOL=OFF' in (build/'CMakeCache.txt').read_text()
   write('compiler',dict(c=sp.check_output([cc,'--version'],text=True).splitlines()[0],cxx=sp.check_output(['clang++','--version'],text=True).splitlines()[0],cpu=Path('/proc/cpuinfo').read_text(),host=platform.machine()))
-  command(['cmake','--build',build,'--target','LLVMSwiftDemangle','--parallel','4'],'swift-demangle-from-source')
+  command([sys.executable,nd/'scripts/build.py',build,'--target','LLVMSwiftDemangle','--parallel','4'],'swift-demangle-from-source',nd)
   def llvm_identity():
    modified=sp.check_output(['git','-C',ll,'diff','--binary','HEAD'])
    untracked=sp.check_output(['git','-C',ll,'ls-files','--others','--exclude-standard','-z']).split(b'\0')
@@ -137,7 +138,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     changed=sorted(k for k in base_objects if objects.get(k)!=base_objects[k])
     write(label+'-capstone-objects',dict(added=new_files,changed=changed))
     assert {Path(k).name for k in new_files}==set(variants[label]['added']),new_files
-    assert {Path(k).name for k in changed}==set(variants[label]['changed']),changed
+    assert {Path(k).name for k in changed}==(set(variants[label]['changed']) if feature_active else set()),changed
    source_receipt=build/'neverd-dependency-inputs.json'
    if source_receipt.exists():shutil.copyfile(source_receipt,out/(label+'-dependencies.json'))
    command(['git','add','-A'],'stage-receipt-'+label,cs)
@@ -149,7 +150,11 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==1+len(variants)
+  write('products',identities);assert len(set(identities.values()))==(1+len(variants) if feature_active else 1)
+  if not feature_active:
+   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
+   write('complete',dict(cases=0,active=False,identical_product=True,variants=list(variants),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix']))
+   raise SystemExit(0)
   products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
   payloads={key:path.read_bytes() for key,path in products.items()}
   assert payloads['base']==payloads['base-copy']
@@ -199,6 +204,6 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       row['pairs'][label]=dict(plans=plans,median=statistics.median(q['gain'] for q in plans))
      row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==48*len(launches);write('complete',dict(launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
+  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==48*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))
