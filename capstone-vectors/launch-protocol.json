@@ -1,0 +1,44 @@
+{
+  "candidate": {
+    "parent": "502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff",
+    "baseline_tree": "c633ea4b4ea8560c831a574b7ac21487f5243b98",
+    "tree": "caad679a71dded8953f955e72502241c8d19c52c",
+    "sha256": "5358ed26614a2912bb5f4508de022e35cdbc2572234f3e02623d62425b5b0010",
+    "records": "equal private-entry records, cursor and errors for 152961024 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "layout_identical": true,
+    "generated_output_matches_producer": true,
+    "shared_vector_object_identical": true,
+    "decoder_object_identical": true
+  },
+  "diagnostic_only": true,
+  "original_pilot_run": 43828863420,
+  "original_gcc11_cpu": "AMD EPYC 7763 64-Core Processor",
+  "rows": 16,
+  "cycles": 42,
+  "target_sample_ms": 100,
+  "cases": [
+    "libjpeg62-turbo-amd64/all-functions",
+    "libssl3t64-amd64/simd-functions"
+  ],
+  "modes": [
+    "format",
+    "detail"
+  ],
+  "launches": [
+    "images",
+    "same-argv",
+    "same-file",
+    "same-file-fixed"
+  ],
+  "variants": [
+    "integer",
+    "aa",
+    "scan",
+    "bare"
+  ],
+  "intervention": "Keep exactly the candidate ELF layout and all bytes except one relative call operand; redirect X86_writeVectorModeOutput to X86_writeVectorOutput. Restrict this diagnostic control to 64-bit samples. Scan and bare executable basenames have equal length.",
+  "interpretation": "bare/scan isolates gateway execution on identical code and data layout. integer/bare isolates added image/layout effects on the original 64-bit writer. Same-file and same-argv conditions distinguish launch contributions. A different CPU model cannot establish the cause of the original EPYC 7763 loss.",
+  "publication_qualified": false
+}
