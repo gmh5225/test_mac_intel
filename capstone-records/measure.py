@@ -9,7 +9,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-register-pointer-mixed-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -28,8 +28,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={};ownedlibs={}
-  active=platform.system()=='Linux' and platform.machine()=='x86_64' and cc=='clang'
-  write('scope',dict(active=active,policy='ELF x64 Clang',inactive_requirement='Identical original runtime objects and linked consumer'))
+  write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
@@ -39,10 +38,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
     assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
     write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
-    if active:
-     probe=t/'native-plan-policy.c';probe.write_text('#include "arch/X86/X86SimpleOutput.h"\n#ifndef CAPSTONE_X86_VEX32_OUTPUT\n#error missing native C5 output policy\n#endif\n_Static_assert(X86_PLAN_VEX32 == X86_PLAN_VECTOR, "native C5 plan must reach the vector branch");\n')
-     run([cc, '-fsyntax-only', '-I', s, '-I', s/'include', probe], 'native-plan-policy')
-     write('native-plan-policy',dict(active=True,selector='X86_PLAN_VECTOR',forced_feature_define=False))
     run(['git','reset','-q'],'unstage-tested-source',s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
@@ -55,9 +50,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('scan',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
-   assert added=={'arch/X86/X86Vex32Output.c.o'},added
-   expected={'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'} if active else set()
-   assert set(changed)==expected,(key,changed,expected)
+   assert not added and objects[key].keys()==objects['base'].keys(),added
+   assert set(changed) <= {'arch/X86/X86Mapping.c.o'},changed
+   active=bool(changed)
+   write('scope',dict(active=active,source_applies=True,policy='Portable C pointer induction; identical lowering is retained as an object and binary identity control'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
@@ -69,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Canonical VEX32 register output; preserve complete records, original images and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Explicit operand pointer induction; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
