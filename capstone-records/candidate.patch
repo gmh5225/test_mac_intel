@@ -1,0 +1,93 @@
+diff --git a/arch/TriCore/TriCoreDisassembler.c b/arch/TriCore/TriCoreDisassembler.c
+index f2446eb4..c1e236e6 100644
+--- a/arch/TriCore/TriCoreDisassembler.c
++++ b/arch/TriCore/TriCoreDisassembler.c
+@@ -1671,8 +1671,12 @@ static inline bool decodeInstruction2_or_4(const uint8_t *code, size_t code_len,
+ 			return false;
+ 		}
+ 		uint16_t insn2 = readBytes16(MI, code);
++		/* Both short tables reject odd primary opcodes before
++		 * touching MI. Keep the long-table fallback below. */
+ 		DecodeStatus Result =
+-			decodeInstruction_2(tbl2, MI, insn2, address, NULL);
++			(insn2 & 1) ? MCDisassembler_Fail :
++				      decodeInstruction_2(tbl2, MI, insn2,
++							  address, NULL);
+ 		if (Result == MCDisassembler_Success) {
+ 			*size = 2;
+ 			return true;
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 95583b5d..5ef64706 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -53,6 +53,10 @@ ARC's 48- and 64-bit tables share the 64-bit `_8` helper. Its 16- and
+ remain unchanged. GCC 11 retains the ARC interpreter: direct lowering
+ regresses MIPS scan throughput in the combined library on that compiler.
+ Other qualified compiler profiles use the generated branches.
++TriCore checks the instruction width bit before entering its short
++tables: both primary filter chains reject odd values without touching
++instruction state. Version-specific and long-table fallback order is
++unchanged. The decoder table regression checks this admission contract.
+ 
+ ARM, AArch64 and RISC-V define their feature queries in the existing
+ disassembler extension headers. Constant feature numbers can then fold into
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 39d6b702..a9e9a7a8 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -30,7 +30,7 @@ if(CAPSTONE_MIPS_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES mips_scan.c mips_reglist_offset.c mips_msa_control.c mips16_word_order.c mips16_immediates.c mips16_memory_calls.c mips16_shifts_hilo.c mips16_frames.c mips16e2.c)
+ endif()
+ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_AARCH64_SUPPORT OR CAPSTONE_RISCV_SUPPORT
+-   OR CAPSTONE_ARC_SUPPORT
++   OR CAPSTONE_ARC_SUPPORT OR CAPSTONE_TRICORE_SUPPORT
+    OR CAPSTONE_LOONGARCH_SUPPORT OR CAPSTONE_SPARC_SUPPORT
+    OR CAPSTONE_PPC_SUPPORT OR CAPSTONE_MIPS_SUPPORT OR CAPSTONE_SYSTEMZ_SUPPORT
+    OR CAPSTONE_XTENSA_SUPPORT)
+diff --git a/tests/unit/test_fixed_len_decoder.py b/tests/unit/test_fixed_len_decoder.py
+index 26534aa4..d9fba9ca 100644
+--- a/tests/unit/test_fixed_len_decoder.py
++++ b/tests/unit/test_fixed_len_decoder.py
+@@ -1,11 +1,12 @@
+ #!/usr/bin/env python3
+ # SPDX-License-Identifier: BSD-3-Clause
+ 
+-"""Generated decoder checks must not depend on checkout newline conversion."""
++"""Check generated decoder contracts and checkout newline independence."""
+ 
+ import contextlib
+ import importlib.util
+ import io
++import re
+ from pathlib import Path
+ import sys
+ import tempfile
+@@ -92,5 +93,28 @@ class CheckoutNewlines(unittest.TestCase):
+                         self.check(root)
+ 
+ 
++class TriCoreShortTableAdmission(unittest.TestCase):
++    def test_odd_halfwords_fail_before_touching_instruction_state(self):
++        text = (ROOT / "arch/TriCore/TriCoreGenDisassemblerTables.inc").read_text()
++        tables = dict(re.findall(
++            r"static const uint8_t (DecoderTable\w*)\[\] = \{(.*?)\n\};",
++            text, re.S))
++        for name in ("DecoderTable16", "DecoderTablev11016"):
++            with self.subTest(table=name):
++                nodes = DECODER.parse(tables[name])
++                root = nodes[0]
++                self.assertEqual(root.op, "ExtractField")
++                self.assertEqual(root.args, (0, 6))
++                position = root.end
++                filters = 0
++                while nodes[position].op == "FilterValue":
++                    node = nodes[position]
++                    self.assertEqual(node.args[0] & 1, 0)
++                    position = node.target
++                    filters += 1
++                self.assertGreater(filters, 0)
++                self.assertEqual(nodes[position].op, "Fail")
++
++
+ if __name__ == "__main__":
+     unittest.main()
