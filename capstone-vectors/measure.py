@@ -54,7 +54,7 @@ def main(w):
         if label == 'scan':
             commands = sp.check_output(['ninja', '-C', b, '-t', 'commands'], text=True).splitlines()
             flagged = [line for line in commands if ' -c ' in line and '-fno-jump-tables' in line.split()]
-            assert len(flagged) == 1 and 'X86EvexScan.c' in flagged[0], flagged
+            assert len(flagged) == 1 and 'X86Vex32Output.c' in flagged[0], flagged
             save('scan-compile-review.json', dict(complete=True, flag='-fno-jump-tables', compilation_units=1))
         objroot=b/'CMakeFiles/capstone.dir'
         objects[label]={str(path.relative_to(objroot)):sha(path) for path in objroot.rglob('*.o')}
