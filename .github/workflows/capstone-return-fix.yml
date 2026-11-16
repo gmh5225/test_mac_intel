@@ -1,7 +1,7 @@
-name: Verify private return values across supported compiler profiles
+name: Complete unchanged macOS return validation with CTest summary parser fix
 on:
   push:
-    branches: [codex/capstone-preserve-most-return-fix]
+    branches: [codex/capstone-return-fix-macos-parser]
     paths: [capstone-return-fix/**, .github/workflows/capstone-return-fix.yml]
 permissions:
   contents: read
@@ -11,19 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang-14, profile: four }
-          - { host: ubuntu-22.04, cc: clang-14, profile: all }
-          - { host: ubuntu-22.04, cc: clang-14, profile: dedicated }
-          - { host: ubuntu-22.04, cc: clang-14, profile: diet }
-          - { host: ubuntu-22.04, cc: clang-14, profile: reduced }
-          - { host: ubuntu-22.04, cc: clang-14, profile: adapter }
-          - { host: ubuntu-24.04, cc: clang-16, profile: four }
-          - { host: ubuntu-24.04, cc: clang-17, profile: four }
-          - { host: ubuntu-24.04, cc: clang-18, profile: four }
-          - { host: ubuntu-24.04, cc: gcc, profile: four }
-          - { host: ubuntu-24.04-arm, cc: clang, profile: four }
           - { host: macos-15, cc: clang, profile: four }
-          - { host: windows-2022, cc: msvc, profile: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -61,6 +49,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: preserve-most-return-fix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}
+          name: preserve-most-return-fix-macos-repair-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}
           path: evidence/
           retention-days: 14

@@ -112,7 +112,7 @@ try:
     save('unit-inventory', dict(tests=[x['name'] for x in inventory['tests']]))
     run(['ctest', '--test-dir', b, '-C', 'Release', '--no-tests=error', '--output-on-failure', '--parallel', '2', '-R', regex], 'tests')
     log = (evidence / 'tests.log').read_text()
-    count = re.search(r'100% tests passed, 0 tests failed out of (\d+)', log)
+    count = re.search(r'100% tests passed(?:, 0 tests failed)? out of (\d+)', log)
     assert count and int(count[1]) == len(inventory['tests'])
     save('test-summary', dict(count=int(count[1]), skipped=[line.strip() for line in log.splitlines() if '***Skipped' in line]))
     if os.name != 'nt':
