@@ -1,7 +1,7 @@
-name: Validate TriCore direct decoder lowering other
+name: Pilot TriCore width admission
 on:
   push:
-    branches: [codex/capstone-tricore-direct-decoder-other]
+    branches: [codex/capstone-tricore-width-admission-pilot]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -32,13 +32,13 @@ jobs:
           ref: 2bee00c0d58ae9de33ab9aad657138ef3376fce4
           path: source
           persist-credentials: false
-      - name: Measure all ten native workloads with balanced A/A controls
+      - name: Measure 12 case-mode pairs with balanced native A/A controls
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: tricore-direct-decoder-other-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: tricore-width-admission-pilot-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

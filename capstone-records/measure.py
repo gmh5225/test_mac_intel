@@ -49,7 +49,7 @@ try:
     patch=r/'candidate.patch'
     assert hashlib.sha256(patch.read_bytes()).hexdigest()==meta['sha256']
     cases=corpus.prepare(r,w,evidence,run)
-    assert len(cases)==10
+    assert len(cases)==6
     costs=[];objects={};signatures={}
     for label in ['integer','scan']:
         engine='capstone' if label=='integer' else 'scan'
@@ -86,12 +86,12 @@ try:
                     assert observed['first']['rejected'] == 0
     from native import measure
     selected=cases
-    assert len(selected)==10
+    assert len(selected)==6
     measure(w,selected,save)
     run(['git','reset','--hard',inputs['capstone']],'restore')
     assert not sp.check_output(['git', '-C', source, 'status', '--porcelain'])
-    save('complete.json', dict(success=True, cases=len(cases), observations=len(cases)*6,
-                               source_unchanged=False, restored=True, native_qualification=True, scope='TriCore instruction listings and seven real ELF controls; complete cross-architecture performance qualification remains subject to A/A review'))
+    save('complete.json', dict(success=True, cases=len(cases), observations=24,
+                               source_unchanged=False, restored=True, native_qualification=False, early_rejection_pilot=True, scope='One TriCore instruction listing and five previously regressing real ELF/PE controls; full qualification remains required'))
 finally:
     files = [f for f in w.rglob('*') if f.is_file()]
     size = sum(f.stat().st_size for f in files)
