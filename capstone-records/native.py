@@ -29,7 +29,7 @@ def measure(w, cases, save):
         launches=launches, aslr_disable_returncode=probe.returncode,
         inode=inode, fixed_size=maximum,
         original_sha256={k: hashlib.sha256(v).hexdigest() for k, v in payloads.items()},
-        scope='Native TriCore direct-decoder qualification: three firmware instruction listings and seven unaffected ISA ELF controls; x86 and NeverD binary identity are separate.'))
+        scope='TriCore compact primary dispatch early pilot; prior regressions selected before measurements. Full qualification is separate.'))
 
     def sample(key, case, mode, reps, launch):
         tail = list(map(str, [case['selector'], mode, case['path'], reps]))
@@ -44,7 +44,12 @@ def measure(w, cases, save):
 
     rows = []
     for case in cases:
-        for mode in range(3):
+        selected_modes = {
+            'tricore-tc375-bluetooth': (0, 1, 2), 'mips64el-ls': (0, 1, 2),
+            'arm64-ls': (0, 1), 'arc-ld-linux-arc': (1, 2),
+            'putty-32-0.85': (0,), 'putty-64-0.85': (2,),
+        }
+        for mode in selected_modes[case['name']]:
             for launch in launches:
                 warm = sample('integer', case, mode, 2, launch)
                 reps = max(2, min(4000, round(2 * 160e6 / warm['cpu_ns'])))
@@ -66,4 +71,4 @@ def measure(w, cases, save):
                                  median={key: statistics.median(c[key] for c in cycles) for key in keys},
                                  result=reference))
                 save('timings.json', rows)
-    assert len(rows) == 6 * len(cases) == 60
+    assert len(rows) == 24 and len(cases) == 6
