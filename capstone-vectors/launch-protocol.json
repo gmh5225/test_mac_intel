@@ -1,0 +1,47 @@
+{
+  "candidate": {
+    "parent": "502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff",
+    "baseline_tree": "c633ea4b4ea8560c831a574b7ac21487f5243b98",
+    "tree": "8ecbc49a283a580604e0a26b15fbc291eeb2bfed",
+    "sha256": "60c5bd6097538cadfe9471a5f92c998226773c8e399184bb19eb8074a6e2c2c9",
+    "records": "equal private-entry records, cursor and errors for 152961024 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "layout_identical": true,
+    "generated_output_matches_producer": true,
+    "shared_vector_object_identical": true,
+    "decoder_object_identical": true
+  },
+  "diagnostic_only": true,
+  "original_pilot_run": 43839803569,
+  "original_clang_cpu": "AMD EPYC 9V45 96-Core Processor",
+  "rows": 12,
+  "cycles": 42,
+  "target_sample_ms": 100,
+  "cases": [
+    "libjpeg62-turbo-amd64/all-functions",
+    "libssl3t64-amd64/simd-functions"
+  ],
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "launches": [
+    "images",
+    "same-file-fixed"
+  ],
+  "variants": [
+    "integer",
+    "aa",
+    "scan",
+    "pad0"
+  ],
+  "intervention": "Append 32 unreachable bytes to the end of the original baseline output-iterator object text section; all existing bytes, symbols, relocations, tables and unwind sections must remain exact.",
+  "prediction": "Compare baseline against baseline with exactly 32 unreachable trailing text bytes; quantify whether displacement reproduces the GCC11 detail loss. Preserve results if the CPU differs from the original run.",
+  "interpretation": "Different CPU models cannot explain the original EPYC run. Padding is a diagnostic intervention, not a production optimization.",
+  "publication_qualified": false,
+  "compiler": "GCC11",
+  "replicas": 2,
+  "priority": "SSL64 detail regression under both original and fixed same-file launches"
+}

@@ -1,7 +1,7 @@
-name: Pilot VEX32 output with conditional plan dispatch
+name: Diagnose GCC11 VEX32 downstream text displacement
 on:
   push:
-    branches: [codex/capstone-vex32-conditional-plan-pilot]
+    branches: [codex/capstone-vex32-gcc-text-extent]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,9 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-22.04, cc: gcc }
-          - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -39,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-conditional-plan-pilot-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex32-gcc-text-extent-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
