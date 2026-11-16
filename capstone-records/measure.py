@@ -9,7 +9,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-c4-entry-mixed-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -30,6 +30,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   bins={};objects={};libs={};ownedlibs={}
   active=platform.system()=='Linux' and platform.machine()=='x86_64' and cc=='clang'
   write('scope',dict(active=active,policy='ELF x64 Clang',inactive_requirement='Identical original runtime objects and linked consumer'))
+  write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
   for key in ('base','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
@@ -55,7 +56,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   for key in ('scan',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
-   assert added=={'arch/X86/X86Vex32Output.c.o'},added
+   assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'},added
    expected={'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'} if active else set()
    assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
@@ -69,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Canonical VEX32 register output; preserve complete records, original images and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='C4/C5 output and single-entry placement; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
