@@ -1,0 +1,38 @@
+name: Restore allocator state after API error tests
+on:
+  push:
+    branches: [codex/capstone-api-test-allocator-reset]
+    paths: [capstone-api-reset/**, .github/workflows/capstone-api-reset.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        cc: [clang, gcc]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CC: ${{ matrix.cc }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-api-reset
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 37261a87936b29b727efb9c4a909f347b48c9221
+          path: source
+          persist-credentials: false
+      - name: Reproduce the published failure and verify both fixed source combinations
+        run: python3 capstone-api-reset/native.py
+      - if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: api-test-allocator-reset-${{ matrix.cc }}-${{ github.run_id }}
+          path: evidence/
+          retention-days: 14
