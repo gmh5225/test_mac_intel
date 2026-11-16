@@ -111,12 +111,24 @@ def main(w):
             (p/'evidence/pad0-symbols.txt').write_bytes(sp.check_output(['nm','-n','-S','--defined-only',exe['pad0']]))
             (p/'evidence/pad0-sections.txt').write_bytes(sp.check_output(['readelf','-WS',exe['pad0']]))
 
+            script = w/'diagnostic-layout.ld'
+            script.write_text('SECTIONS { .cs_x86_vex32_rodata : { *(.cs_x86_vex32_rodata) } } INSERT AFTER .bss;\n')
+            shutil.copyfile(script, p/'evidence/diagnostic-layout.ld')
+            exe['both'] = w/'run-both'
+            run(['clang++', w/'owned.o', archive, ad/'target/release/libiced_compare.a',
+                 '-Wl,-T,'+str(script), '-lpthread','-ldl','-lm','-o',exe['both']], 'link-data-control')
+            for kind, command in [('symbols', ['nm','-n','-S','--defined-only']),
+                                  ('sections', ['readelf','-WS']), ('segments', ['readelf','-Wl'])]:
+                (p/'evidence'/('both-'+kind+'.txt')).write_bytes(sp.check_output([*command, exe['both']]))
+            from link_layout import verify_positions
+            save('combined-placement-review.json', verify_positions(exe, p/'evidence'))
+
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
     exe['iced']=exe['fast']=exe['integer']
     assert os.environ['CC'] == 'clang'
-    assert len(exe['pad0'].name) == len(exe['scan'].name)
+    assert len(exe['pad0'].name) == len(exe['scan'].name) == len(exe['both'].name)
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
     maximum=max(map(len,payloads.values()))
@@ -126,7 +138,7 @@ def main(w):
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
     assert probe.returncode == 0, probe.stderr
     launches=['images', 'same-file-fixed']
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Diagnostic: R1268 candidate versus the exact same candidate with 16 unreachable text bytes appended to restore downstream baseline text addresses. Baseline and byte-identical A/A are included. No production padding change.'))
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Diagnostic: R1268 candidate versus the exact same candidate with 16 unreachable text bytes appended to restore downstream baseline text addresses. Baseline and byte-identical A/A are included. The combined control also places only the new readonly section after BSS and verifies old data addresses. No production padding or linker script change.'))
     run(['git','apply',r/'scan.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -161,7 +173,7 @@ def main(w):
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(100e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','pad0']
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','pad0','both']
                 for i in range(42):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:

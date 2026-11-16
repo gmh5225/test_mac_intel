@@ -36,10 +36,12 @@
     "integer",
     "aa",
     "scan",
-    "pad0"
+    "pad0",
+    "both"
   ],
   "replicas": 2,
-  "intervention": "Append 16 unreachable bytes to the unchanged candidate output-iterator object text. Existing candidate text, other input sections, symbols and relocations stay exact. Require original R1268 runtime object hashes.",
-  "prediction": "If downstream placement explains passive formatting losses, restoring those old text addresses should improve the candidate despite unchanged executed instructions. Within-object helper addresses are reported separately; no architectural mechanism claim.",
-  "publication_qualified": false
+  "intervention": "Use the exact R1268 candidate and R1271 text-only control. For the combined control, use the same padded input archive but place only the new C5 readonly section after BSS with a diagnostic linker script. Verify unchanged new section bytes, original runtime object hashes, restored old writable and readonly data addresses, and old text addresses outside the changed iterator object before any timing.",
+  "prediction": "The incremental pad0-to-both comparison isolates the contribution of the new readonly section placement while the candidate executed instruction structure stays unchanged. Any residual loss still needs analysis; no cache or predictor mechanism claim.",
+  "publication_qualified": false,
+  "prior_text_control_run": 43846628491
 }
