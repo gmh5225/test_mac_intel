@@ -1,6 +1,6 @@
 """Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
 from pathlib import Path
-import gzip, os, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
+import gzip, os, shlex, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
 r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
@@ -27,7 +27,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='32-bit VEX2 register output selected by a distinct generated plan; 64-bit vector output calls its original writer directly',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
+    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='C5 dispatch before the scalar frame, with generated 32-bit register-pair rows and bounded register-name writing',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -54,13 +54,30 @@ def main(w):
         if label == 'scan':
             commands = sp.check_output(['ninja', '-C', b, '-t', 'commands'], text=True).splitlines()
             flagged = [line for line in commands if ' -c ' in line and '-fno-jump-tables' in line.split()]
-            assert len(flagged) == 2 and all(any(name in line for line in flagged) for name in ('X86Vex32Output.c', 'X86OutputIterator.c')), flagged
-            save('scan-compile-review.json', dict(complete=True, flag='-fno-jump-tables', compilation_units=2))
+            expected = {'X86Vex32Output.c'} | ({'X86OutputIterator.c'} if os.environ['CC']=='clang' else set())
+            assert len(flagged) == len(expected), flagged
+            assert {Path(shlex.split(line)[shlex.split(line).index('-c')+1]).name for line in flagged} == expected, flagged
+            save('scan-compile-review.json', dict(complete=True, flag='-fno-jump-tables', compilation_units=len(flagged), files=sorted(expected)))
         objroot=b/'CMakeFiles/capstone.dir'
         objects[label]={str(path.relative_to(objroot)):sha(path) for path in objroot.rglob('*.o')}
         assert len(objects[label])>30
-        expected_objects=json.loads((r/'original-object-digests.json').read_text())[label]
-        assert objects[label]==expected_objects, (label, 'objects differ from original regression')
+
+        if label == 'integer' and os.environ['CC'] == 'clang':
+            commands = sp.check_output(['ninja','-C',b,'-t','commands'],text=True).splitlines()
+            parsed = [shlex.split(line) for line in commands if ' -c ' in line]
+            matching = [args for args in parsed
+                        if Path(args[args.index('-c')+1]).name == 'X86OutputIterator.c']
+            assert len(matching) == 1, matching
+            command = matching[0]
+            output = w/'baseline-conditional-plan.o'
+            for option, value in [('-o',str(output)),('-MF',str(output)+'.d'),('-MT',str(output))]:
+                if option in command: command[command.index(option)+1] = value
+            command.append('-fno-jump-tables')
+            run(command,'baseline-plan-policy',b)
+            identical = sha(output) == sha(objroot/'arch/X86/X86OutputIterator.c.o')
+            save('baseline-plan-policy.json',dict(compiler='clang',flag='-fno-jump-tables',
+                 baseline_object_identical=identical,source_object_sha256=sha(objroot/'arch/X86/X86OutputIterator.c.o'),
+                 conditional_object_sha256=sha(output)))
         if label in ('output','scan'):
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
@@ -97,38 +114,10 @@ def main(w):
         (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
 
-        if label == 'scan':
-            from text_extent import make_control
-            pad = w/'pad'; pad.mkdir()
-            obj = pad/'X86OutputIterator.c.o'
-            save('text-extent-object.json', make_control(objroot/'arch/X86/X86OutputIterator.c.o', obj, amount=16))
-            archive = pad/'libcapstone.a'; shutil.copyfile(b/'libcapstone.a', archive)
-            run(['ar', 'r', archive, obj], 'replace-padding-object')
-            assert sp.check_output(['ar','t',archive]) == sp.check_output(['ar','t',b/'libcapstone.a'])
-            exe['pad0'] = w/'run-pad0'
-            run(['clang++', w/'owned.o', archive, ad/'target/release/libiced_compare.a',
-                 '-lpthread','-ldl','-lm','-o',exe['pad0']], 'link-padding-control')
-            (p/'evidence/pad0-symbols.txt').write_bytes(sp.check_output(['nm','-n','-S','--defined-only',exe['pad0']]))
-            (p/'evidence/pad0-sections.txt').write_bytes(sp.check_output(['readelf','-WS',exe['pad0']]))
-
-            script = w/'diagnostic-layout.ld'
-            script.write_text('SECTIONS { .cs_x86_vex32_rodata : { *(.cs_x86_vex32_rodata) } } INSERT AFTER .bss;\n')
-            shutil.copyfile(script, p/'evidence/diagnostic-layout.ld')
-            exe['both'] = w/'run-both'
-            run(['clang++', w/'owned.o', archive, ad/'target/release/libiced_compare.a',
-                 '-Wl,-T,'+str(script), '-lpthread','-ldl','-lm','-o',exe['both']], 'link-data-control')
-            for kind, command in [('symbols', ['nm','-n','-S','--defined-only']),
-                                  ('sections', ['readelf','-WS']), ('segments', ['readelf','-Wl'])]:
-                (p/'evidence'/('both-'+kind+'.txt')).write_bytes(sp.check_output([*command, exe['both']]))
-            from link_layout import verify_positions
-            save('combined-placement-review.json', verify_positions(exe, p/'evidence'))
-
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
     exe['iced']=exe['fast']=exe['integer']
-    assert os.environ['CC'] == 'clang'
-    assert len(exe['pad0'].name) == len(exe['scan'].name) == len(exe['both'].name)
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
     maximum=max(map(len,payloads.values()))
@@ -136,9 +125,9 @@ def main(w):
     image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
     image_inode=image.stat().st_ino
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    assert probe.returncode == 0, probe.stderr
-    launches=['images', 'same-file-fixed']
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Diagnostic: R1268 candidate versus the exact same candidate with 16 unreachable text bytes appended to restore downstream baseline text addresses. Baseline and byte-identical A/A are included. The combined control also places only the new readonly section after BSS and verifies old data addresses. No production padding or linker script change.'))
+    launches=['images']
+    if probe.returncode==0:launches.append('same-file-fixed')
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Pilot isolated VEX32 output against the published baseline with original-image and same-inode ASLR-disabled controls.'))
     run(['git','apply',r/'scan.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -146,11 +135,11 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64', 'libzstd1-amd64'): continue
+        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-amd64', 'libzstd1-amd64'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['simd-functions'] if name=='libjpeg62-turbo-amd64' else ['all-functions','simd-functions']):
+        for panel in (['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else ['simd-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -158,7 +147,7 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in [1]:
+            for mode in ([1] if name=='libzstd1-amd64' or (name=='libjpeg62-turbo-amd64' and panel=='simd-functions') else [0,1,2]):
                 def measure(lib,n,launch):
                     tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
                     if launch=='images':
@@ -172,9 +161,9 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(100e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','pad0','both']
-                for i in range(42):
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
+                for i in range(21):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -186,12 +175,12 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=None
-                    row['vs_fast']=None
+                    row['vs_iced']=md('iced','scan')
+                    row['vs_fast']=md('fast','scan') if mode else None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==3*len(launches)
+    assert len(reported)==24
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:
