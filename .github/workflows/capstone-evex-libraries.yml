@@ -1,7 +1,7 @@
-name: Qualify legacy-mode vector opcode reuse libraries
+name: Pilot VEX32 output with preserved archive order
 on:
   push:
-    branches: [codex/capstone-vector-id-reuse-libraries]
+    branches: [codex/capstone-vex32-distinct-plan-pilot]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -14,8 +14,6 @@ jobs:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
-          - { host: ubuntu-24.04-arm, cc: gcc }
-          - { host: ubuntu-24.04-arm, cc: clang }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -28,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: d4699957199ddbd9b01daa592b69f81bc59e2e7a
+          ref: 502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-id-reuse-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex32-distinct-plan-pilot-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
