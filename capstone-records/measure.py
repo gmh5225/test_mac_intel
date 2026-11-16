@@ -82,6 +82,8 @@ try:
     linker.write_text('''SECTIONS {
   .cs_vector_diag_text : { *(.cs_vector_diag_text) }
   .cs_vector_diag_rodata : { *(.cs_vector_diag_rodata*) }
+  .cs_vex32_diag_text : { *(.cs_vex32_diag_text) }
+  .cs_vex32_diag_rodata : { *(.cs_vex32_diag_rodata*) }
   .cs_x86_vex32_text : { *(.cs_x86_vex32_text) }
   .cs_x86_vex32_rodata : { *(.cs_x86_vex32_rodata) }
 } INSERT AFTER .bss;
@@ -102,39 +104,45 @@ try:
         layouts[label] = sections(binaries[label])
         controlled = w / ('lib-' + label + '.a')
         shutil.copyfile(b / 'libcapstone.a', controlled)
-        original_object = root / 'arch/X86/X86VectorOutput.c.o'
-        new_object = w / ('object-' + label) / 'X86VectorOutput.c.o'
-        new_object.parent.mkdir()
-        renames = []
-        with original_object.open('rb') as stream:
-            elf = ELFFile(stream)
-            for section in elf.iter_sections():
-                if section.name == '.text':
-                    renames.append((section.name, '.cs_vector_diag_text'))
-                elif section.name.startswith('.rodata'):
-                    renames.append((section.name, '.cs_vector_diag_rodata' + section.name[len('.rodata'):]))
-            symtab = elf.get_section_by_name('.symtab')
-            relocated_sections = {old for old, new in renames}
-            for symbol in symtab.iter_symbols():
-                index = symbol['st_shndx']
-                if isinstance(index, int) and elf.get_section(index).name in relocated_sections and symbol.name:
-                    relocated_names.add(symbol.name)
-        assert any(old == '.text' for old, _ in renames) and any(old == '.rodata' for old, _ in renames)
-        run(['objcopy', *[arg for old, new in renames for arg in ('--rename-section', old + '=' + new)],
-             original_object, new_object], 'relocate-object-' + label)
-        with original_object.open('rb') as left, new_object.open('rb') as right:
-            old, new = ELFFile(left), ELFFile(right)
-            for before, after in renames:
-                assert old.get_section_by_name(before).data() == new.get_section_by_name(after).data()
-        run(['ar', 'r', controlled, new_object], 'replace-object-' + label)
+        relocated_objects = []
+        for filename, prefix in [('X86VectorOutput.c.o', '.cs_vector_diag'), ('X86Vex32Output.c.o', '.cs_vex32_diag')]:
+            original_object = root / 'arch/X86' / filename
+            if not original_object.exists():
+                assert label == 'base' and filename == 'X86Vex32Output.c.o'
+                continue
+            new_object = w / ('object-' + label) / filename
+            new_object.parent.mkdir(exist_ok=True)
+            renames = []
+            with original_object.open('rb') as stream:
+                elf = ELFFile(stream)
+                for section in elf.iter_sections():
+                    if section.name == '.text':
+                        renames.append((section.name, prefix + '_text'))
+                    elif section.name.startswith('.rodata'):
+                        renames.append((section.name, prefix + '_rodata' + section.name[len('.rodata'):]))
+                symtab = elf.get_section_by_name('.symtab')
+                relocated_sections = {old for old, new in renames}
+                for symbol in symtab.iter_symbols():
+                    index = symbol['st_shndx']
+                    if isinstance(index, int) and elf.get_section(index).name in relocated_sections and symbol.name:
+                        relocated_names.add(symbol.name)
+            assert renames
+            run(['objcopy', *[arg for old, new in renames for arg in ('--rename-section', old + '=' + new)],
+                 original_object, new_object], 'relocate-object-' + label + '-' + filename)
+            with original_object.open('rb') as left, new_object.open('rb') as right:
+                old, new = ELFFile(left), ELFFile(right)
+                for before, after in renames:
+                    assert old.get_section_by_name(before).data() == new.get_section_by_name(after).data()
+            run(['ar', 'r', controlled, new_object], 'replace-object-' + label + '-' + filename)
+            relocated_objects.append(dict(object=filename, sections=renames, payload_bytes_identical=True,
+                 original_sha256=sha(original_object), relocated_sha256=sha(new_object)))
         run(['ranlib', controlled], 'index-archive-' + label)
         key = 'placed-' + label
         binaries[key] = w / key
         run(['clang++', w / 'single.o', controlled, '-Wl,-T,' + str(linker), '-lm', '-o', binaries[key]], 'link-' + key)
         symbol_tables[key] = symbols(binaries[key], key)
         layouts[key] = sections(binaries[key])
-        save('object-relocation-' + label, dict(sections=renames, payload_bytes_identical=True,
-             original_sha256=sha(original_object), relocated_sha256=sha(new_object)))
+        save('object-relocation-' + label, relocated_objects)
     save('object-digests', object_hashes)
     changed = [key for key, value in object_hashes['base'].items() if object_hashes['scan'].get(key) != value]
     assert set(changed) == {'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'}
