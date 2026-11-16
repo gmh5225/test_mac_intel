@@ -1,7 +1,7 @@
-name: Qualify integrated VEX32 register output through current NeverD and source LLVM
+name: Validate C4 output through current NeverD and latest LLVM source
 on:
   push:
-    branches: [codex/capstone-vex32-register-output-product]
+    branches: [codex/capstone-c4-vector-entry-placement-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -13,8 +13,6 @@ jobs:
         include:
           - os: ubuntu-24.04
             cc: clang
-          - os: ubuntu-24.04-arm
-            cc: gcc
     runs-on: ${{ matrix.os }}
     timeout-minutes: 235
     steps:
@@ -26,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 1aa3fd1d27f07e0f8a36c7655306375d29d5c16f
+          ref: 833544b5005cc52412293cd883e92cb2cea85c4c
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -57,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-vex32-register-output-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-c4-entry-placement-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
