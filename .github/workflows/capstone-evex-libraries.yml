@@ -1,7 +1,7 @@
-name: Qualify unified VEX descriptor pool libraries
+name: Validate C4 output and vector entry placement libraries
 on:
   push:
-    branches: [codex/capstone-vex-unified-descriptor-pool-libraries]
+    branches: [codex/capstone-c4-vector-entry-placement-libraries]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -14,6 +14,7 @@ jobs:
           - { host: ubuntu-24.04, cc: gcc }
           - { host: ubuntu-22.04, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
+          - { host: ubuntu-22.04, cc: clang }
           - { host: ubuntu-24.04-arm, cc: gcc }
           - { host: ubuntu-24.04-arm, cc: clang }
     runs-on: ${{ matrix.host }}
@@ -28,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ce07fdfca945d55de72325eb6482aaf9dd9297b2
+          ref: 37261a87936b29b727efb9c4a909f347b48c9221
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -41,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-unified-descriptor-pool-libraries-${{ matrix.host }}-${{ matrix.cc }}
+          name: c4-vector-entry-placement-libraries-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
