@@ -1,24 +1,26 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
- #endif
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..e08a8a3e 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -1431,10 +1431,6 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	/* The following clauses compensate for limitations of the tables. */
+ 	if (decoderMode != MODE_64BIT &&
+ 	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
+-		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
+-			return -1;
+-		}
+-
+ 		/*
+ 		 * The tables can't distinguish between cases where the W-bit is used to
+ 		 * select register size and cases where it's a required part of the opcode.
+@@ -1447,6 +1443,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 		     wFromXOP3of3(insn->vectorExtensionPrefix[2]))) {
+ 			uint16_t instructionIDWithREXW;
+ 
++			/* This preliminary ID is needed only for W-bit selection. */
++			if (getIDWithAttrMask(&instructionID, insn, attrMask))
++				return -1;
++
+ 			if (getIDWithAttrMask(&instructionIDWithREXW, insn,
+ 					      attrMask | ATTR_REXW)) {
+ 				insn->instructionID = instructionID;
