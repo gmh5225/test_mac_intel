@@ -1,26 +1,30 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
+  "round": 1319,
+  "diagnostic_only": true,
+  "input": "R1314 exact source unchanged",
+  "reason": "AMD 9V45 longer confirmation showed detail losses and a raw-scan slowdown, but all 4664 original text addresses are unchanged; old function-size-only displacement theory is rejected.",
   "variants": [
     "published baseline",
-    "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+    "byte-identical A/A",
+    "source-built pointer candidate",
+    "baseline ELF with only the candidate function slot",
+    "second byte-identical baseline"
   ],
-  "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
-    "SSL64 SIMD",
-    "Zstd64 all and SIMD"
+  "cases": [
+    "JPEG64 all/detail",
+    "Zstd64 SIMD/raw",
+    "SSL32 all/detail"
   ],
-  "cycles": 21,
-  "launch_controls": [
+  "allocations": 3,
+  "cycles": 41,
+  "minimum_process_ms": 250,
+  "controls": [
     "original images",
-    "same inode and fixed addresses"
+    "same inode/size/argv ASLR off",
+    "two identical payload controls",
+    "paired rotating forward/reverse order",
+    "complete output signatures",
+    "exact PT_LOAD layout and function slot audit"
   ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "publication_authorized": false
 }
