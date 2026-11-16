@@ -1,0 +1,17 @@
+{
+  "candidate": {
+    "parent": "ce07fdfca945d55de72325eb6482aaf9dd9297b2",
+    "tree": "2cae820028414236de11680c97fa214bf9c8f431",
+    "sha256": "61ae35134885ec56533558f2dabf5c93fde2ff5652ba4f54d7a6e6f82946ad07",
+    "records": "equal ARM public records, cursor and errors for 10485760 inputs",
+    "poison_records": "equal ARM public records, cursor and errors for 10485760 inputs",
+    "custom_callback_zero_tail": true,
+    "negative_callback_control_failed": true,
+    "negative_allocator_control_failed": true
+  },
+  "basis": "R1291 reduced the ARM scan stack by 560 bytes, but GCC ARM still lost 0.6-1.1 percent in scan and x64 Clang had an A/A outlier. R1287 fixed ordinary code locations but did not fix readonly data.",
+  "hypothesis": "Separate the modified full decoder and newly outlined printer into diagnostic sections after all original code and data. Require original text and data symbol addresses and the full decoder entry address to match before timing.",
+  "protocol": "One native ARM GCC host; original and placed baseline/candidate, byte-identical A/A, 3 real ARM sections, images and same-inode fixed addresses, 21 balanced cycles, 100 ms target duration. Compare complete records against baseline for all variants.",
+  "interpretation": "Diagnostic only. ELF segment changes are not a production proposal. A matching control can separate surrounding placement effects from changes within the full decoder, without claiming a cache or predictor mechanism.",
+  "qualified": false
+}
