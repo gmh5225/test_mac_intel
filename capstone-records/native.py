@@ -29,7 +29,7 @@ def measure(w, cases, save):
         launches=launches, aslr_disable_returncode=probe.returncode,
         inode=inode, fixed_size=maximum,
         original_sha256={k: hashlib.sha256(v).hexdigest() for k, v in payloads.items()},
-        scope='Native shared operand-access qualification on PPC, RISCV, LoongArch and ARC; x86 and NeverD qualification are separate.'))
+        scope='PE32 and PE64 controls for the TriCore change in the combined nine-backend library; scan uses public iteration and formatted modes use the private x86 iterator. No iced speedup claim.'))
 
     def sample(key, case, mode, reps, launch):
         tail = list(map(str, [case['selector'], mode, case['path'], reps]))
@@ -66,4 +66,4 @@ def measure(w, cases, save):
                                  median={key: statistics.median(c[key] for c in cycles) for key in keys},
                                  result=reference))
                 save('timings.json', rows)
-    assert len(rows) == 24
+    assert len(rows) == 12
