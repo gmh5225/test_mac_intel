@@ -1,7 +1,7 @@
-name: Measure C4 output and single-entry placement
+name: Diagnose C4 entry placement and x64 detail costs
 on:
   push:
-    branches: [codex/capstone-c4-vector-entry-placement-pilot]
+    branches: [codex/capstone-detail-entry-factor-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: c4-vector-entry-placement-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: detail-entry-factor-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

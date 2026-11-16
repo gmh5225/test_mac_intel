@@ -1,26 +1,21 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
+  "trigger": "R1308 Ubuntu 24 Clang on AMD EPYC 9V45: fixed-image x64 detail regresses 3.8-8.7% while A/A remains stable",
+  "question": "Separate feature cost, initial entry placement, detail construction, consumer operand reads, and register-access query",
   "variants": [
-    "published baseline",
+    "published",
     "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+    "C4/C5 only",
+    "entry section only",
+    "C4/C5 plus entry section"
   ],
   "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
+    "JPEG64 SIMD",
+    "Zstd64 SIMD",
     "SSL64 SIMD",
-    "Zstd64 all and SIMD"
+    "JPEG32 AVX2"
   ],
-  "cycles": 21,
-  "launch_controls": [
-    "original images",
-    "same inode and fixed addresses"
-  ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "modes": "x64 format, full detail, detail construction without reads, detail reads without register-access query; JPEG32 format/full detail",
+  "controls": "Identical consumer object; both original images and same-inode ASLR-disabled launch; balanced 21 paired cycles; no sample removal",
+  "candidate_qualified": false,
+  "diagnostic_only": true
 }
