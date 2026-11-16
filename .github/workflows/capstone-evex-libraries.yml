@@ -1,7 +1,7 @@
-name: Measure canonical 32-bit C4 register output cost
+name: Measure explicit register operand traversal
 on:
   push:
-    branches: [codex/capstone-vex32-c4-output-cost]
+    branches: [codex/capstone-register-operand-pointer]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -24,11 +24,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 37261a87936b29b727efb9c4a909f347b48c9221
+          ref: 5aafe3fa6274988f9325b2894a598ffe37f2a21a
           path: source
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
-      - name: Profile the exact 32-bit function-boundary workload and final executable
+      - name: Profile matching 32-bit and 64-bit real function bodies
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-c4-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: register-operand-pointer-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
