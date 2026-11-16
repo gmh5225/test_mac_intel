@@ -1,36 +1,117 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..1ba999f5 100644
+index 63dcc538..3f3b3154 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	uint16_t attrMask;
- 	uint16_t instructionID;
- 	bool rexWOverridesOpSize;
-+	const bool legacyVector = decoderMode != MODE_64BIT &&
-+				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
+@@ -38,6 +38,14 @@
+ #include "X86ScanAdapter.h"
+ #include "X86InstPrinterCommon.h"
  
- 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
- 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
-@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	}
- 
- 	/* The following clauses compensate for limitations of the tables. */
--	if (decoderMode != MODE_64BIT &&
--	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
-+	if (legacyVector) {
- 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
- 			return -1;
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86SimpleOutput.h"
++#define X86_EVEX_OUTPUT_SCAN
++#endif
++
+ #if defined(_MSC_VER)
+ #define X86_DECODE_INLINE static __forceinline
+ #elif defined(__GNUC__)
+@@ -3367,6 +3375,18 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return true;
  		}
-@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 
- 		return 0;
  	}
--	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
-+	/* Legacy-mode vectors already resolved this unmodified mask before
-+	 * W-bit disambiguation. The special addressing lookup above returns. */
-+	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
- 		return -1;
--	}
++#endif
++#ifdef X86_EVEX_OUTPUT_SCAN
++	if (handle->mode == CS_MODE_64 && code_len && code[0] == 0x62) {
++		const uint32_t packed = X86_scanEvexRegisters(code, code_len);
++		if (packed) {
++			result->opcode = 0;
++			result->opcode_pub = packed >> 8;
++			result->length = (uint16_t)(packed & 0xff);
++			result->popcode_adjust = 0;
++			return true;
++		}
++	}
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..ea5148d3 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -68,6 +68,11 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
+ 		      bool wide);
  
- 	if ((decoderMode == MODE_16BIT ||
- 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
++/* Called for an unprefixed EVEX in 64-bit mode. Zero means not handled;
++ * success packs the public ID above an eight-bit instruction length. */
++CAPSTONE_INTERNAL uint32_t X86_scanEvexRegisters(const uint8_t *code,
++						 size_t size);
++
+ static inline char *X86_writeDisp8(char *out, int displacement)
+ {
+ 	if (displacement) {
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..0ec773d8 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -101,6 +101,31 @@ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 	return true;
+ }
+ 
++/* Scan and text output share the same complete register-row admission. */
++static inline const struct VectorOutputRow *
++selectEvexRegisterRow(const uint8_t *code, size_t size)
++{
++	if (size < 6 || code[5] < 0xc0 || (code[2] & 7) != 5 ||
++	    (code[3] & 0x97) || (code[3] & 0x60) == 0x60)
++		return NULL;
++	const unsigned key = ((code[1] & 15) << 8) | code[4];
++	const struct VectorOutputRow *row =
++		evexOutputRow(key, code[2] >> 7, code[3] >> 5);
++	if (!row || (row->immediate && size < 7))
++		return NULL;
++	/* Narrow extracts reserve vvvv/V'. */
++	if ((key & ~0x22u) == 0x319 &&
++	    ((code[2] & 0x78) != 0x78 || !(code[3] & 8)))
++		return NULL;
++	return row;
++}
++
++uint32_t X86_scanEvexRegisters(const uint8_t *code, size_t size)
++{
++	const struct VectorOutputRow *row = selectEvexRegisterRow(code, size);
++	return row ? (row->id << 8) | (6u + row->immediate) : 0;
++}
++
+ static bool writeEvexBroadcast(const uint8_t *code, size_t size, cs_insn *insn,
+ 			       uint16_t *insn_size,
+ 			       const struct X86SimpleRegister *regs);
+@@ -117,15 +142,12 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (size >= 6 && code[5] < 0xc0)
+ 		return writeEvexBroadcast(code, size, insn, insn_size,
+ 					  address_regs);
+-	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
+-	    (code[3] & 0x60) == 0x60)
++	const struct VectorOutputRow *row = selectEvexRegisterRow(code, size);
++	if (!row)
+ 		return false;
+ 	const unsigned ll = code[3] >> 5;
+ 	const unsigned w = code[2] >> 7;
+ 	const unsigned key = ((code[1] & 15) << 8) | code[4];
+-	const struct VectorOutputRow *row = evexOutputRow(key, w, ll);
+-	if (!row || (row->immediate && size < 7))
+-		return false;
+ 	const unsigned rxb = (~(unsigned)code[1] >> 5) & 7;
+ 	const unsigned regs[] = { ((code[5] >> 3) & 7) | ((rxb & 4) << 1) |
+ 					  (~(unsigned)code[1] & 16),
+@@ -135,8 +157,6 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
+      * the full-width source, and reserve vvvv/V'. */
+ 	if ((key & ~0x22u) == 0x319) {
+-		if ((code[2] & 0x78) != 0x78 || !(code[3] & 8))
+-			return false;
+ 		const unsigned pair[] = { regs[2], regs[0] };
+ 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+ 					    0x40 | (w << 3) | rxb,
