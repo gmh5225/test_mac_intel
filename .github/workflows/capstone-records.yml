@@ -1,26 +1,34 @@
-name: Qualify dedicated TriCore width admission
+name: Validate TriCore width admission
 on:
   push:
-    branches: [codex/capstone-tricore-dedicated-width-native]
+    branches: [codex/capstone-tricore-dedicated-width-profiles]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
 jobs:
-  cost:
+  verify:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
+          - { host: ubuntu-22.04, cc: gcc, profile: default, archs: TRICORE }
+          - { host: ubuntu-22.04, cc: gcc, profile: diet, archs: TRICORE }
+          - { host: ubuntu-24.04, cc: gcc, profile: default, archs: TRICORE }
+          - { host: ubuntu-24.04, cc: gcc, profile: diet, archs: TRICORE }
+          - { host: ubuntu-24.04, cc: clang, profile: default, archs: TRICORE }
+          - { host: ubuntu-24.04, cc: clang, profile: diet, archs: TRICORE }
+          - { host: ubuntu-24.04, cc: clang, profile: sanitize, archs: TRICORE }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: default, archs: TRICORE }
+          - { host: ubuntu-24.04-arm, cc: gcc, profile: diet, archs: TRICORE }
+          - { host: macos-15, cc: clang, profile: default, archs: TRICORE }
+          - { host: windows-2022, cc: MD, profile: default, archs: TRICORE }
+          - { host: windows-2022, cc: MT, profile: default, archs: TRICORE }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 65
+    timeout-minutes: 35
     env:
-      BUILD_ARCHS: ${{ matrix.archs }}
-      MEASURE_CC: ${{ matrix.cc }}
+      PROFILE: ${{ matrix.profile }}
+      TOOLCHAIN: ${{ matrix.cc }}
+      ARCH_SET: ${{ matrix.archs }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -32,13 +40,14 @@ jobs:
           ref: 2bee00c0d58ae9de33ab9aad657138ef3376fce4
           path: source
           persist-credentials: false
-      - name: Measure 9 case-mode pairs with balanced native A/A controls
-        run: python3 capstone-records/measure.py
+      - name: Compare baseline and candidate public units and complete decode records
+        run: python capstone-records/measure.py
       - if: always()
+        shell: bash
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: tricore-dedicated-width-native-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: tricore-dedicated-width-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}-${{ matrix.archs }}
           path: evidence/
           retention-days: 14
