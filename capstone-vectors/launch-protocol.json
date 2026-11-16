@@ -1,11 +1,11 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
+  "purpose": "Measure fixed two/three operand slots in only the new 32-bit VEX writers",
   "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
   "variants": [
     "published baseline",
     "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
+    "Exact R1308 C4/C5 input candidate",
+    "Fixed operand slots in R1309",
     "iced IntelFormatter",
     "iced FastFormatter"
   ],
@@ -21,6 +21,5 @@
     "same inode and fixed addresses"
   ],
   "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "source_only_change": "One common include specialized under X86_VEX_REGISTER_ONLY, all old runtime objects identical"
 }
