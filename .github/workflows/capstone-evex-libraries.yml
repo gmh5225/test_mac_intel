@@ -1,7 +1,7 @@
-name: Diagnose VEX32 code and data address restoration
+name: Measure C5 dispatch before the scalar frame
 on:
   push:
-    branches: [codex/capstone-vex32-data-placement-control]
+    branches: [codex/capstone-c5-output-before-scalar-frame-pilot]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-data-placement-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: c5-output-before-scalar-frame-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
