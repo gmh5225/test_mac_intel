@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
-    run(['git','add','-u'],'stage-tested-source',s)
+    run(['git','add','-A'],'stage-tested-source',s)
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
     assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
     write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
