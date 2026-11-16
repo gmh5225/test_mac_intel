@@ -1,22 +1,26 @@
 {
-  "neverd": "1aa3fd1d27f07e0f8a36c7655306375d29d5c16f",
-  "capstone": "dea9fee246c21a0045a2ea63a429f9147a6a1014",
+  "neverd": "ed4313dd83c272f0ca11b15c4569b7056b06129f",
+  "capstone": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
   "variants": {
-    "vex32-registers": {
-      "source": "round1159-vex32-integrated-registers",
-      "patch": "vex32-registers.patch",
-      "patch_sha256": "964da44192a3bebdd3d3dbb488ee2cfbb8a2aa86d6f4c46685f959044746f0ab",
-      "tree": "b6715faf82fe72b207c6e0e9b9d6d83c8be11f76",
+    "mips-short-copies": {
+      "source": "round1318-mips-short-register-copies",
+      "patch": "mips-short-copies.patch",
+      "patch_sha256": "b111436991533308a642b940f33a7b7c354aceede5bebcdcc21ddb3e02b86e1d",
+      "tree": "168d472e2de84099b9e0d4982e1a9304e1617218",
       "changed": [
-        "X86OutputIterator.c.o",
-        "X86VectorOutput.c.o"
+        "MipsMapping.c.o"
       ],
       "added": []
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "compiler": "x86-64 Clang C/C++; AArch64 GCC C with Clang C++; latest fork LLVM compiled from source on both.",
+  "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Qualify exact integrated VEX32 register output through latest NeverD dev: 96 real PE32/PE64, scalar/SIMD and ARM/AArch64/MIPS observations per host, original and fixed-inode launches, A/A, complete public states, source-built latest fork LLVM and unchanged probes.",
-  "llvm_build_compatibility": "Three Clang-only diagnostic flags selected by C compiler ID for C sources; same patch for both variants, no LLVM algorithm changes, latest fork source and no prebuilt"
+  "scope": "Actual NeverD decode, text, detail, and batch paths; 96 controlled observations across 15 real and targeted workloads. Use latest NeverSight LLVM main source, prebuilt disabled, no LLVM source edits. Preserve source identities between baseline and candidate builds.",
+  "qualification_pending": [
+    "native mixed-architecture throughput",
+    "configuration checks",
+    "this product check"
+  ],
+  "public_state_scope": "The existing seeded complete-state probe covers x86 as an unchanged control. MIPS has 2.25 million local and 4.5 million native full register-array comparisons, plus the actual NeverD MIPS decode and register-access workload here."
 }
