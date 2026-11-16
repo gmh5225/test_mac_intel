@@ -83,7 +83,7 @@ def main(w):
              ad / 'target/release/libiced_compare.a', '-lpthread', '-ldl', '-lm', '-o', target], 'matched-link-' + label)
         exe['matched_' + label] = target
     exe['matched_aa'] = w / 'matched-aa'
-    shutil.copyfile(exe['matched_integer'], exe['matched_aa'])
+    shutil.copy2(exe['matched_integer'], exe['matched_aa'])
     save('matched-layout.json', verify_layout(exe['matched_integer'], exe['matched_scan']))
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
