@@ -1,12 +1,12 @@
 {
-  "purpose": "Test C5 dispatch in the existing vector branch with native platform policy enabling the 32-bit plan",
-  "hosts": "Two separately assigned Ubuntu 24.04 Clang runners; record CPU models without selecting or discarding results",
-  "panels": "JPEG64 all + SIMD, JPEG AVX2 32, SSL64 SIMD, Zstd64 all + SIMD",
-  "cycles": 21,
+  "candidate": "round1286-c5-vector-plan-activation",
+  "candidate_tree": "72a169a22357f05a51a0e7c4e358f2ee358cddc3",
+  "evidence": "R1286 Intel 6975P-C SSL64 SIMD scan regresses 1.4%, although decoder code positions/sizes and all original .rodata symbols remain fixed. Relocation-bearing scan tables and data move +4096. LLVM also inlines the RIP memory output helper, growing the vector entry by 981 bytes while shrinking its total object text by 32.",
   "controls": [
-    "byte-identical A/A baseline",
-    "original images",
-    "same inode and fixed addresses"
+    "Link the unchanged R1286 archive with only the new C5 readonly section after BSS; verify original scan table addresses are restored and record segment changes.",
+    "Keep default linking and add noinline only to writeVexRipLoad; capture all object and linked text differences."
   ],
-  "native_qualification": false
+  "panels": "SSL64 SIMD scan and JPEG64 SIMD format; two independently assigned Clang x64 runners, 21 balanced cycles, original images and fixed inode/addresses, baseline plus A/A plus both independent controls.",
+  "interpretation": "Diagnose only when the original candidate regression reproduces on that allocation. Controls can distinguish placement from RIP inlining without claiming a cache or branch-predictor mechanism. No linker-script or noinline candidate is a release.",
+  "qualified": false
 }
