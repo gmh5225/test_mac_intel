@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1209,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',scan='R1209 generic slow-path window and shared raw-prefix bound'))
+    save('census-variant.json',dict(variant='integer',round=1290,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',scan='Shared canonical VEX descriptors for C5/32 register and ordinary base-memory output; prior is the exact R1292 memory candidate'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical output entry cost diagnostic; actual NeverD tested separately'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -45,31 +45,66 @@ def main(w):
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);baseline_tree=sp.check_output(['git','write-tree'],cwd=tree,text=True).strip();assert baseline_tree==json.loads((r/'candidate.json').read_text())['baseline_tree'];save('baseline-tree.json',dict(parent=reference,tree=baseline_tree,published_baseline=True));b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
     iterator_shapes={}
-    for label in ('integer','scan'):
+    for label in ('integer','prior','scan'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/({'aligned':'alignment.patch','output':'dispatch.patch','isolated':'isolated.patch','scan':'scan.patch'}[label])]
+        patches=[] if label=='integer' else [r/({'aligned':'alignment.patch','output':'dispatch.patch','isolated':'isolated.patch','prior':'prior.patch','scan':'scan.patch'}[label])]
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
-        if label=='scan':
-            run(['git','add','-A'],'stage-scan',tree)
-            assert sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()==json.loads((r/'candidate.json').read_text())['tree']
-            assert sha(r/'scan.patch')==json.loads((r/'candidate.json').read_text())['sha256']
+        if label!='integer':
+            metadata=json.loads((r/('prior.json' if label=='prior' else 'candidate.json')).read_text())
+            run(['git','add','-A'],'stage-'+label,tree)
+            assert sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()==metadata['tree']
+            assert sha(r/('prior.patch' if label=='prior' else 'scan.patch'))==metadata['sha256']
+            save('tested-'+label+'-source.json',dict(tree=metadata['tree'],patch_sha256=metadata['sha256']))
         run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'build-'+label)
+        if label != 'integer':
+            probe = w/'native-plan-policy.c'
+            probe.write_text('#include "arch/X86/X86SimpleOutput.h"\n#if !defined(CAPSTONE_X86_VEX32_OUTPUT) || X86_PLAN_VEX32 != X86_PLAN_VECTOR\n#error Expected active ELF Clang x64 C5/32 vector plan\n#endif\n')
+            run([os.environ['CC'], '-E', '-P', '-I', tree, '-I', tree/'include', probe], 'native-plan-policy')
+            save(label+'-native-plan-policy.json', dict(active=True, selector='X86_PLAN_VECTOR', policy='Native ELF Clang x64 target macros; no forced feature define'))
         objroot=b/'CMakeFiles/capstone.dir'
         objects[label]={str(path.relative_to(objroot)):sha(path) for path in objroot.rglob('*.o')}
         assert len(objects[label])>30
+
+        if label == 'integer' and os.environ['CC'] == 'clang':
+            import shlex
+            commands = sp.check_output(['ninja','-C',b,'-t','commands'],text=True).splitlines()
+            parsed = [shlex.split(line) for line in commands if ' -c ' in line]
+            matching = [args for args in parsed
+                        if Path(args[args.index('-c')+1]).name == 'X86OutputIterator.c']
+            assert len(matching) == 1, matching
+            command = matching[0]
+            output = w/'baseline-conditional-plan.o'
+            for option, value in [('-o',str(output)),('-MF',str(output)+'.d'),('-MT',str(output))]:
+                if option in command: command[command.index(option)+1] = value
+            command.append('-fno-jump-tables')
+            run(command,'baseline-plan-policy',b)
+            identical = sha(output) == sha(objroot/'arch/X86/X86OutputIterator.c.o')
+            save('baseline-plan-policy.json',dict(compiler='clang',flag='-fno-jump-tables',
+                 baseline_object_identical=identical,source_object_sha256=sha(objroot/'arch/X86/X86OutputIterator.c.o'),
+                 conditional_object_sha256=sha(output)))
         if label!='integer':
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
-            expected={'arch/X86/X86Disassembler.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
-            expected_added=set()
+            expected={'arch/X86/X86OutputIterator.c.o', 'arch/X86/X86VectorOutput.c.o'}
+            expected_added={'arch/X86/X86Vex32Output.c.o'}
             assert changed==expected and added==expected_added,(label,changed,added)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
+        if label == 'scan':
+            assert set(objects['prior']) == set(objects['scan'])
+            delta={name for name,value in objects['prior'].items() if value!=objects['scan'][name]}
+            assert delta=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86VectorOutput.c.o'},delta
+            save('prior-isolation.json',dict(changed=sorted(delta),all_other_runtime_objects_identical=True))
         for component in ('X86Disassembler','X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput','X86ImmediateOutput'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
                 stream.write(assembly)
+        if label != 'integer':
+            object_file = objroot / 'arch/X86/X86Vex32Output.c.o'
+            with gzip.open(p/('evidence/'+label+'-X86Vex32Output.asm.gz'), 'wb') as stream:
+                stream.write(sp.check_output(['objdump', '-dr', object_file]))
+            (p/('evidence/'+label+'-leaf-sections.txt')).write_bytes(sp.check_output(['readelf', '-WS', object_file]))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-o',target],'link-'+label);exe[label]=target
         import re
@@ -92,6 +127,13 @@ def main(w):
         (p/'evidence'/(label+'-symbols.txt')).write_text(symbols)
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
         with gzip.open(p/'evidence'/(label+'-linked-assembly.gz'),'wb')as out:out.write(sp.check_output(['objdump','-dr',target]))
+
+        if label == 'scan':
+            iterator_source = tree/'arch/X86/X86OutputIterator.c'
+            with iterator_source.open('a') as stream:
+                stream.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
+            run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'candidate-census-build')
+            run(['clang++','-O2','-std=c++17','-I',tree/'include',r/'census.cpp',b/'libcapstone.a','-o',w/'candidate-census'],'candidate-census-link')
         run(['git','read-tree','--reset','-u',baseline_tree],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'diff','--name-only',baseline_tree])
@@ -118,17 +160,22 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('baseline-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
+            candidate_rows=sp.check_output([w/'candidate-census',f,intervals,str(bits)],text=True).splitlines()
+            candidate_counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in candidate_rows],reverse=True)
+            assert sum(c for c,k in candidate_counts)==sum(c for c,k in counts)
+            save('candidate-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in candidate_counts),handled=sum(c for c,k in candidate_counts if k.startswith('hit ')),forms=candidate_counts))
+
             for profile_mode in (0,1,2):
              reference_record=None
-             engines=['capstone','scan']
+             engines=['capstone','prior','scan']
              for key in engines:
-                 args=[str(exe[{'candidate':'output','scan':'scan'}.get(key,'integer')]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
+                 args=[str(exe[{'candidate':'output','prior':'prior','scan':'scan'}.get(key,'integer')]),'capstone',str(profile_mode),'1',str(f),str(intervals),str(bits)]
                  observation=list(map(int,sp.check_output(args,text=True).split()))
                  assert len(observation)==6
                  if reference_record is None:reference_record=observation[2:5]
                  assert observation[2:5]==reference_record,(name,profile_mode,key,observation,reference_record)
                  if key=='capstone':baseline_record=observation[2:]
-                 if key in ('candidate','scan'):assert observation[2:]==baseline_record,(name,profile_mode,observation,baseline_record)
+                 if key in ('candidate','prior','scan'):assert observation[2:]==baseline_record,(name,profile_mode,observation,baseline_record)
                  ident=name+'-'+str(profile_mode)+'-'+key
                  counters.measure(ident, args, observation[0])
                  raw=w/(ident+'.callgrind')
