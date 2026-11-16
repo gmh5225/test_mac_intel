@@ -1,47 +1,26 @@
 {
-  "candidate": {
-    "parent": "502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff",
-    "baseline_tree": "c633ea4b4ea8560c831a574b7ac21487f5243b98",
-    "tree": "9ebbeb03d609f3c51468299b6e24d4d5ecd8149b",
-    "sha256": "0a5e4f4ae76ec2445cd12a7c218a0f8a2502e08bcd406c3746c54ebcf95e7978",
-    "records": "equal private-entry records, cursor and errors for 152961024 inputs",
-    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
-    "private_guard": "equal private-entry records for 3145734 protected-page extents",
-    "layout_identical": true,
-    "generated_output_matches_producer": true,
-    "shared_vector_object_identical": true,
-    "decoder_object_identical": true,
-    "inactive_runtime_objects_identical": true,
-    "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
-  },
-  "diagnostic_only": true,
-  "original_run": 43843162100,
-  "original_cpu": "Intel(R) Xeon(R) 6975P-C",
-  "rows": 6,
-  "cycles": 42,
-  "target_sample_ms": 100,
-  "cases": [
-    "libjpeg62-turbo-amd64/simd-functions",
-    "libzstd1-amd64/all-functions",
-    "libzstd1-amd64/simd-functions"
-  ],
-  "modes": [
-    "format"
-  ],
-  "launches": [
-    "images",
-    "same-file-fixed"
-  ],
+  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
+  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
   "variants": [
-    "integer",
-    "aa",
-    "scan",
-    "pad0",
-    "both"
+    "published baseline",
+    "byte-identical AA",
+    "plain C4/C5 candidate",
+    "C4/C5 plus single-entry placement",
+    "iced IntelFormatter",
+    "iced FastFormatter"
   ],
-  "replicas": 2,
-  "intervention": "Use the exact R1268 candidate and R1271 text-only control. For the combined control, use the same padded input archive but place only the new C5 readonly section after BSS with a diagnostic linker script. Verify unchanged new section bytes, original runtime object hashes, restored old writable and readonly data addresses, and old text addresses outside the changed iterator object before any timing.",
-  "prediction": "The incremental pad0-to-both comparison isolates the contribution of the new readonly section placement while the candidate executed instruction structure stays unchanged. Any residual loss still needs analysis; no cache or predictor mechanism claim.",
-  "publication_qualified": false,
-  "prior_text_control_run": 43846628491
+  "panels": [
+    "JPEG64 all and SIMD",
+    "JPEG AVX2 32 SIMD",
+    "SSL64 SIMD",
+    "Zstd64 all and SIMD"
+  ],
+  "cycles": 21,
+  "launch_controls": [
+    "original images",
+    "same inode and fixed addresses"
+  ],
+  "native_qualification": false,
+  "initial_transition_measured_directly": true,
+  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
 }
