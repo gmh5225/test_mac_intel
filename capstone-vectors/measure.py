@@ -101,9 +101,9 @@ def main(w):
     image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
     image_inode=image.stat().st_ino
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Pilot EVEX feature-boundary sections against the published baseline with original-image and same-inode ASLR-disabled controls.'))
+    assert probe.returncode == 0, probe.stderr
+    launches=['images','same-argv','same-file','same-file-fixed']
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Diagnose launch geometry with unchanged R1256 candidate and consumer; not a qualification replacement.'))
     run(['git','apply',r/'scan.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -111,11 +111,11 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-amd64'): continue
+        if name not in ('libjpeg62-turbo-amd64', 'libjpeg62-turbo-i386', 'jpeg-avx2-i386', 'libssl3t64-amd64'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions'] if name=='libjpeg62-turbo-amd64' else ['simd-functions']):
+        for panel in (['all-functions'] if name in ('libjpeg62-turbo-amd64', 'libjpeg62-turbo-i386') else ['simd-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -137,9 +137,9 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
-                for i in range(21):
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(160e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan']
+                for i in range(42):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -151,12 +151,12 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=md('iced','scan')
-                    row['vs_fast']=md('fast','scan') if mode else None
+                    row['vs_iced']=None
+                    row['vs_fast']=None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==3*3*len(launches)
+    assert len(reported)==4*3*len(launches)
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:

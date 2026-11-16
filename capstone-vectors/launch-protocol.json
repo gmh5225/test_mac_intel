@@ -1,0 +1,44 @@
+{
+  "candidate": {
+    "parent": "2bee00c0d58ae9de33ab9aad657138ef3376fce4",
+    "baseline_tree": "cd17c70718d51c766ac51acbbaf5c1945bdd7d9a",
+    "tree": "343ba3606c60564a7ef8f9f14dc0dd6aa7e466a5",
+    "sha256": "cb3030e018b8eb2217cb475090d33a69e81a8cdb80ad649a216edc4a3f93229e",
+    "records": "equal private-entry records, cursor and errors for 152961024 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "layout_identical": true,
+    "generated_output_matches_producer": true,
+    "output_rows_identical": true,
+    "output_object_identical": true
+  },
+  "scope": "Diagnostic only; original R1256 failures remain qualification evidence. No production edit.",
+  "hypothesis": "Ordinary-image timing depends on launch geometry. If argv and pathname differences contribute, same-argv or same-file with ASLR enabled will move affected passive modes toward unity; persistent fixed-launch losses refute a pure launch explanation.",
+  "cases": [
+    "libjpeg62-turbo-amd64/all-functions",
+    "libjpeg62-turbo-i386/all-functions",
+    "jpeg-avx2-i386/simd-functions",
+    "libssl3t64-amd64/simd-functions"
+  ],
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "launches": [
+    "images",
+    "same-argv",
+    "same-file",
+    "same-file-fixed"
+  ],
+  "cycles": 42,
+  "target_ms": 160,
+  "labels": [
+    "integer",
+    "aa",
+    "scan"
+  ],
+  "host": "ubuntu-22.04/gcc",
+  "controls": "One build per variant; exact byte-identical A/A copy; common result verification; same argv override, or same padded inode and pathname; ASLR only disabled in final launch. Rotating launch and variant order, mirrored pairs.",
+  "review": "Retain every paired cycle, compare standalone and original runs without pooling different binary hashes. Report all 48 rows, per-launch medians and deterministic bootstrap intervals; no outlier deletion or relaxed acceptance threshold."
+}
