@@ -1,26 +1,31 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
-  "variants": [
-    "published baseline",
-    "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+  "round": 1314,
+  "parent": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+  "patch": "4dd0834e8fa6fe365071090e5ca8e921296b4fbad19093d964cc2769897fd308",
+  "hosts": "Two independent ubuntu-24.04 Clang allocations; actual CPU identities retained",
+  "cases": [
+    "libjpeg62-turbo-amd64",
+    "libzstd1-amd64",
+    "libssl3t64-amd64",
+    "jpeg-avx2-i386",
+    "libssl3t64-i386"
   ],
-  "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
-    "SSL64 SIMD",
-    "Zstd64 all and SIMD"
+  "panels": 7,
+  "modes": [
+    "scan",
+    "format",
+    "detail"
   ],
   "cycles": 21,
-  "launch_controls": [
+  "controls": [
+    "byte-identical A/A",
     "original images",
-    "same inode and fixed addresses"
+    "same inode and file length with ASLR disabled when supported",
+    "equal-length engine arguments",
+    "rotating forward/reverse order",
+    "identical consumer object",
+    "complete Capstone output hash"
   ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "native_timing_claim": "Only native process CPU ns per decoded instruction; instruction cost is not timing proof.",
+  "gate": "No qualified promotion if a representative workload has a reproducible regression; inspect A/A and paired uncertainty without dropping rows."
 }
