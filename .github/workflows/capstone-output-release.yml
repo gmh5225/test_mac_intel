@@ -1,7 +1,7 @@
-name: Qualify unified VEX descriptor pool profiles
+name: Validate C4 output and vector entry placement profiles
 on:
   push:
-    branches: [codex/capstone-vex-unified-descriptor-pool-profiles]
+    branches: [codex/capstone-c4-vector-entry-placement-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -32,6 +32,10 @@ jobs:
           - { cc: clang, profile: all, forms: combined, host: ubuntu-24.04 }
           - { cc: gcc, profile: alias-only, forms: combined, host: ubuntu-24.04 }
           - { cc: clang, profile: alias-only, forms: combined, host: ubuntu-24.04 }
+          - { cc: clang, profile: four, forms: combined, host: ubuntu-22.04 }
+          - { cc: clang, profile: adapter, forms: combined, host: ubuntu-22.04 }
+          - { cc: clang, profile: diet, forms: combined, host: ubuntu-22.04 }
+          - { cc: clang, profile: reduced, forms: combined, host: ubuntu-22.04 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -46,13 +50,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ce07fdfca945d55de72325eb6482aaf9dd9297b2
+          ref: 37261a87936b29b727efb9c4a909f347b48c9221
           path: source
           persist-credentials: false
       - run: python capstone-output-release/verify.py
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-unified-descriptor-pool-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: c4-vector-entry-placement-${{ matrix.host }}-${{ matrix.forms }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
