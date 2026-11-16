@@ -1,6 +1,6 @@
 """Compare the exact held candidate with a matched downstream layout control."""
 from pathlib import Path
-from collections import defaultdict
+from collections import Counter, defaultdict
 import hashlib
 import json
 import os
@@ -105,8 +105,17 @@ try:
         assert delta=={'arch/X86/X86VectorOutput.c.o'},delta
     save('object-digests',object_hashes)
     old,new=symbol_tables['placed-base'],symbol_tables['placed-scan']
-    differences={n:[v,new.get(n)] for n,v in old.items() if n!='X86_writeVectorOutput'
-                 and any(s[2] in 'tT' for s in v) and new.get(n)!=v}
+    # Separate translation units can legally add identically named static helpers.
+    # Match every old (address, size, binding) tuple with multiplicity instead.
+    old_text={n:Counter(tuple(s) for s in v if s[2] in 'tT')
+              for n,v in old.items() if n!='X86_writeVectorOutput'}
+    new_text={n:Counter(tuple(s) for s in v if s[2] in 'tT')
+              for n,v in new.items() if n!='X86_writeVectorOutput'}
+    differences={n:[old[n],new.get(n)] for n,v in old_text.items()
+                 if v-new_text.get(n,Counter())}
+    additions={n:[list(s) for s in (v-old_text.get(n,Counter())).elements()]
+               for n,v in new_text.items() if v-old_text.get(n,Counter())}
+    save('additional-text-symbols', additions)
     save('layout-control',dict(other_text_symbols_identical=not differences,differences=differences,
           sections=layouts,entries={k:v['X86_writeVectorOutput'] for k,v in symbol_tables.items()},
           section='.cs_x86_vector_dispatch',no_linker_script=True,diagnostic_only=True))
