@@ -100,6 +100,7 @@ try:
             with gzip.open(e/(key+'-vector.asm.gz'),'wb') as out:
                 out.write(sp.check_output(['objdump','-dr',objroot/'arch/X86/X86VectorOutput.c.o']))
         source.write_text(content)
+        run(['git','-C',s,'update-index','--refresh'],'refresh-restored-'+label)
         delta={n for n,v in object_hashes[label].items() if object_hashes['placed-'+label].get(n)!=v}
         assert delta=={'arch/X86/X86VectorOutput.c.o'},delta
     save('object-digests',object_hashes)
