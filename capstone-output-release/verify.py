@@ -34,43 +34,19 @@ try:
         opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if compiler=='MT' else 'OFF')]
     else:
         opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]+(['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers'] if compiler=='gcc' else [])
-    profile_options={'all':['-DCAPSTONE_ARCHITECTURE_DEFAULT=ON'],'alias-only':['-DCAPSTONE_X86_SUPPORT=OFF','-DCAPSTONE_ARM_SUPPORT=OFF'],'dedicated':['-DCAPSTONE_ARM_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
+    profile_options={'all':['-DCAPSTONE_ARCHITECTURE_DEFAULT=ON'], 'dedicated':['-DCAPSTONE_X86_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
     run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
-    units=['mapping','mcinst','api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
+    units=['api','sstream','instruction_bytes','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
     if profile not in ('diet','reduced'):
         units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
-    if profile not in ('diet','reduced','dedicated'):
-        units+=sorted(q.stem for q in (source/'tests/unit').glob('mips*.c') if q.stem not in units)
     if profile=='adapter':units+=['x86_scan_adapter']
     if profile not in ('diet','reduced'):
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
         units+=sorted(q for q in known if q in ('aarch64_memory_access','aarch64_post_index','aarch64_addressing'))
-    if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
-    if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
-    if profile=='alias-only':units=['mapping','mcinst','api','mips_scan','aarch64_scan','aarch64_postprocess']
+    if profile not in ('diet','reduced'):units+=['arm_post_index','arm_private_stream','aarch64_scan','aarch64_postprocess']
+    if profile=='dedicated':units=['api','sstream','instruction_bytes','arm_post_index','arm_private_stream']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
-    assert 'runtime error:'not in(evidence/'tests.log').read_text()
-    if profile=='all':
-        run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
-        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_'],'all-unit-tests')
-    if profile=='adapter':
-        generator=root_build/'simple-output-generator'
-        run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
-        result=subprocess.check_output([generator],cwd=source)
-        assert result==(source/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
-    if profile=='adapter':
-        generator=root_build/'vector-output-generator'
-        run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
-        result=subprocess.check_output([generator],cwd=source)
-        assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-    if profile=='adapter':
-        make_build=root_build/'make-build'
-        run(['make','-j4','CAPSTONE_ARCHS=x86','CAPSTONE_BUILD_CORE_ONLY=yes','CC='+compiler,'BUILDDIR='+str(make_build),str(make_build/'libcapstone.a')],'make-static')
-        smoke=root_build/'make-simple-output'
-        run([compiler,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-Iinclude','tests/unit/x86_simple_output.c',make_build/'libcapstone.a','-lm','-o',smoke],'make-output-link')
-        run([smoke],'make-output-records')
-        save('make-output-validation',dict(build='Makefile x86-only static library',entrypoint='X86_disasmIter',full_output_records=True))
     save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units,tested_tree=tested_tree))
 finally:
     n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())

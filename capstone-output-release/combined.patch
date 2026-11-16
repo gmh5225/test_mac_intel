@@ -1,24 +1,155 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
+diff --git a/cs.c b/cs.c
+index b2db69da..22f6da05 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1107,14 +1107,18 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 				       false);
+ 	} else {
+ 		SStream ss;
+-#if defined(CAPSTONE_HAS_X86) && !defined(CAPSTONE_DIET) && \
+-	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++#if (defined(CAPSTONE_HAS_X86) || defined(CAPSTONE_HAS_ARM)) && \
++	!defined(CAPSTONE_DIET) && defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ 		/* Choose before printing: a custom formatter can restore vsnprintf
+ 		 * while returning a count inconsistent with its first NUL. */
+-		if (handle->arch == CS_ARCH_X86 && cs_vsnprintf == vsnprintf) {
+-			/* Only this private stream can leave the unused tail untouched. */
++		if ((handle->arch == CS_ARCH_X86 ||
++		     handle->arch == CS_ARCH_ARM) &&
++		    cs_vsnprintf == vsnprintf) {
++			/* ARM and x86 printers maintain a terminated prefix and do
++			 * not allocate while printing. Only this private stream can
++			 * leave the unused tail untouched. */
+ 			ss.buffer[0] = '\0';
+ 			ss.index = 0;
+ 			ss.is_closed = false;
+@@ -1125,8 +1129,13 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 			handle->printer(&mci, &ss, handle->printer_info);
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
+ 				  code,
++#ifdef CAPSTONE_HAS_X86
+ 				  !mci.assembly[0] && handle->post_printer ==
+-							      X86_postprinter);
++							      X86_postprinter
++#else
++				  false
++#endif
++			);
+ 		} else
  #endif
+ 		{
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index a9e9a7a8..81275c98 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -70,7 +70,7 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+     endif()
+ endif()
+ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
+-    list(APPEND UNIT_TEST_SOURCES arm_post_index.c)
++    list(APPEND UNIT_TEST_SOURCES arm_post_index.c arm_private_stream.c)
+ endif()
+ if(CAPSTONE_AARCH64_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c aarch64_scan.c)
+diff --git a/tests/unit/arm_private_stream.c b/tests/unit/arm_private_stream.c
+new file mode 100644
+index 00000000..7a806f96
+--- /dev/null
++++ b/tests/unit/arm_private_stream.c
+@@ -0,0 +1,94 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdarg.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++static unsigned calls;
++static bool zero_tail;
++
++static int inspect_tail(char *out, size_t size, const char *fmt, va_list ap)
++{
++	++calls;
++	/* Every append destination retains the full initialization on the
++	 * custom-formatter route, including bytes beyond the visible string. */
++	for (size_t i = 0; i < size; ++i)
++		zero_tail &= out[i] == '\0';
++	return vsnprintf(out, size, fmt, ap);
++}
++
++static bool check(cs_mode mode, unsigned syntax, bool detail, bool unsigned_imm)
++{
++	csh handle;
++	if (cs_open(CS_ARCH_ARM, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = cs_option(handle, CS_OPT_SYNTAX, syntax) == CS_ERR_OK &&
++		  cs_option(handle, CS_OPT_DETAIL,
++			    detail ? CS_OPT_ON : CS_OPT_OFF) == CS_ERR_OK &&
++		  cs_option(handle, CS_OPT_UNSIGNED,
++			    unsigned_imm ? CS_OPT_ON : CS_OPT_OFF) == CS_ERR_OK;
++	const uint8_t arm[] = { 0x04, 0x90, 0x9a, 0xe5 };
++	const uint8_t thumb[] = { 0x01, 0x30 };
++	const size_t length = mode & CS_MODE_THUMB ? sizeof(thumb) :
++						     sizeof(arm);
++	const uint8_t *original = mode & CS_MODE_THUMB ? thumb : arm;
++	uint8_t bytes[4];
++	for (size_t i = 0; i < length; ++i)
++		bytes[i] =
++			original[mode & CS_MODE_BIG_ENDIAN ? length - i - 1 : i];
++	cs_insn records[2];
++	cs_detail details[2];
++	cs_opt_mem memory = { malloc, calloc, realloc, free, vsnprintf };
++	calls = 0;
++	zero_tail = true;
++	for (unsigned side = 0; side < 2 && ok; ++side) {
++		memset(&records[side], 0x5a, sizeof(records[side]));
++		memset(&details[side], 0x5a, sizeof(details[side]));
++		records[side].illegal = records[side].is_alias =
++			records[side].usesAliasDetails = false;
++		records[side].detail = detail ? &details[side] : NULL;
++		memory.vsnprintf = side ? inspect_tail : vsnprintf;
++		ok = cs_option(0, CS_OPT_MEM, (size_t)&memory) == CS_ERR_OK;
++		const uint8_t *cursor = bytes;
++		size_t remaining = length;
++		uint64_t address = 0x1000;
++		ok = ok &&
++		     cs_disasm_iter(handle, &cursor, &remaining, &address,
++				    &records[side]) &&
++		     cursor == bytes + length && remaining == 0 &&
++		     address == 0x1000 + length;
++		records[side].detail = NULL;
++	}
++	memory.vsnprintf = vsnprintf;
++	ok &= cs_option(0, CS_OPT_MEM, (size_t)&memory) == CS_ERR_OK;
++	ok = ok && calls && zero_tail &&
++	     !memcmp(records, records + 1, sizeof(cs_insn)) &&
++	     (!detail || !memcmp(details, details + 1, sizeof(cs_detail)));
++	cs_close(&handle);
++	return ok;
++}
++
++int main(void)
++{
++	if (cs_support(CS_SUPPORT_DIET))
++		return 0;
++	const cs_mode modes[] = { CS_MODE_ARM, CS_MODE_THUMB,
++				  (cs_mode)(CS_MODE_ARM | CS_MODE_BIG_ENDIAN),
++				  (cs_mode)(CS_MODE_THUMB |
++					    CS_MODE_BIG_ENDIAN) };
++	for (size_t i = 0; i < sizeof(modes) / sizeof(modes[0]); ++i)
++		for (unsigned flags = 0; flags < 8; ++flags)
++			if (!check(modes[i],
++				   flags & 1 ? CS_OPT_SYNTAX_CS_REG_ALIAS :
++					       CS_OPT_SYNTAX_DEFAULT,
++				   (flags & 2) != 0, (flags & 4) != 0)) {
++				fprintf(stderr,
++					"ARM stream contract mismatch: mode=%u flags=%u\n",
++					(unsigned)modes[i], flags);
++				return 1;
++			}
++	return 0;
++}
