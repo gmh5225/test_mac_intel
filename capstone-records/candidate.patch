@@ -1,0 +1,69 @@
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index e82eaaa5..59ea4f43 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -1175,7 +1175,6 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 			uint8_t *regs_read_count, cs_regs regs_write,
+ 			uint8_t *regs_write_count)
+ {
+-	uint8_t i;
+ 	uint8_t read_count, write_count;
+ 	cs_aarch64 *aarch64 = &(insn->detail->aarch64);
+ 
+@@ -1189,8 +1188,8 @@ void AArch64_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	       write_count * sizeof(insn->detail->regs_write[0]));
+ 
+ 	// explicit registers
+-	for (i = 0; i < aarch64->op_count; i++) {
+-		cs_aarch64_op *op = &(aarch64->operands[i]);
++	for (cs_aarch64_op *op = aarch64->operands;
++	     op < aarch64->operands + aarch64->op_count; ++op) {
+ 		switch ((int)op->type) {
+ 		case AARCH64_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index c767e9e4..c2658711 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -931,7 +931,6 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		    uint8_t *regs_read_count, cs_regs regs_write,
+ 		    uint8_t *regs_write_count)
+ {
+-	uint8_t i;
+ 	uint8_t read_count, write_count;
+ 	cs_arm *arm = &(insn->detail->arm);
+ 
+@@ -945,8 +944,8 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	       write_count * sizeof(insn->detail->regs_write[0]));
+ 
+ 	// explicit registers
+-	for (i = 0; i < arm->op_count; i++) {
+-		cs_arm_op *op = &(arm->operands[i]);
++	for (cs_arm_op *op = arm->operands; op < arm->operands + arm->op_count;
++	     ++op) {
+ 		switch ((int)op->type) {
+ 		case ARM_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&
+diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
+index d6775ef0..0b2bd496 100644
+--- a/arch/Mips/MipsMapping.c
++++ b/arch/Mips/MipsMapping.c
+@@ -152,7 +152,6 @@ void Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		     uint8_t *regs_read_count, cs_regs regs_write,
+ 		     uint8_t *regs_write_count)
+ {
+-	uint8_t i;
+ 	uint8_t read_count, write_count;
+ 	cs_mips *mips = &(insn->detail->mips);
+ 
+@@ -166,8 +165,8 @@ void Mips_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 	       write_count * sizeof(insn->detail->regs_write[0]));
+ 
+ 	// explicit registers
+-	for (i = 0; i < mips->op_count; i++) {
+-		cs_mips_op *op = &(mips->operands[i]);
++	for (cs_mips_op *op = mips->operands;
++	     op < mips->operands + mips->op_count; ++op) {
+ 		switch ((int)op->type) {
+ 		case MIPS_OP_REG:
+ 			if ((op->access & CS_AC_READ) &&

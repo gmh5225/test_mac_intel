@@ -1,11 +1,27 @@
 {
-  "capstone": "729680277dd762704ea3270291b7a75318f51583",
-  "purpose": "Warmed released four-backend ARM/AArch64/MIPS scan, formatting, detail work attribution. No source mutation or speed claim.",
-  "text_consumer": "std::strlen, per R1118 consumer audit",
-  "reference_probe_commit": "881cf3a96a51657b3e5fdbfeeaca1792af733a27",
+  "capstone": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+  "candidate": {
+    "parent": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+    "baseline_tree": "18c18802f84a648501b8333d449d6491322e1773",
+    "tree": "8e3c7ebd9d35dc6b34a2c38bc2ed67fd0693510b",
+    "sha256": "704fc911336a0cbf4a9b66ed85f95133559c8146d6c1a8df24e90a49d78bf982",
+    "local_units": [
+      "api",
+      "utils",
+      "mapping",
+      "detail_option",
+      "arm_post_index",
+      "aarch64_postprocess",
+      "mips_scan"
+    ],
+    "differential_states": 2250000,
+    "native_qualified": false
+  },
+  "purpose": "Measure pointer induction in ARM/AArch64/MIPS register access with an unchanged x86 control; four-backend product profile.",
   "cases": [
     "arm-cp",
-    "arm64-ls",
-    "mips64el-ls"
+    "mips64el-ls",
+    "amd64-ls",
+    "arm64-ls"
   ]
 }
