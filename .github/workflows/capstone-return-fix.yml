@@ -1,0 +1,66 @@
+name: Verify private return values across supported compiler profiles
+on:
+  push:
+    branches: [codex/capstone-preserve-most-return-fix]
+    paths: [capstone-return-fix/**, .github/workflows/capstone-return-fix.yml]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: ubuntu-22.04, cc: clang-14, profile: four }
+          - { host: ubuntu-22.04, cc: clang-14, profile: all }
+          - { host: ubuntu-22.04, cc: clang-14, profile: dedicated }
+          - { host: ubuntu-22.04, cc: clang-14, profile: diet }
+          - { host: ubuntu-22.04, cc: clang-14, profile: reduced }
+          - { host: ubuntu-22.04, cc: clang-14, profile: adapter }
+          - { host: ubuntu-24.04, cc: clang-16, profile: four }
+          - { host: ubuntu-24.04, cc: clang-17, profile: four }
+          - { host: ubuntu-24.04, cc: clang-18, profile: four }
+          - { host: ubuntu-24.04, cc: gcc, profile: four }
+          - { host: ubuntu-24.04-arm, cc: clang, profile: four }
+          - { host: macos-15, cc: clang, profile: four }
+          - { host: windows-2022, cc: msvc, profile: four }
+    runs-on: ${{ matrix.host }}
+    timeout-minutes: 45
+    env:
+      CC: ${{ matrix.cc }}
+      PROFILE: ${{ matrix.profile }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          sparse-checkout: capstone-return-fix
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/capstone
+          ref: 56af4c403bfba96012697d0ef7af088b7aaa943d
+          path: source
+          persist-credentials: false
+      - if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          if ! command -v "$CC" >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --yes "$CC"
+          fi
+      - if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/capstone-return-venv"
+          "$RUNNER_TEMP/capstone-return-venv/bin/pip" install pyelftools==0.32
+          "$RUNNER_TEMP/capstone-return-venv/bin/python" capstone-return-fix/verify.py
+      - if: runner.os != 'Linux'
+        run: python3 capstone-return-fix/verify.py
+      - if: always()
+        shell: bash
+        run: rm -rf -- "$RUNNER_TEMP/capstone-return-venv" "$GITHUB_WORKSPACE/source"
+      - if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: preserve-most-return-fix-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}
+          path: evidence/
+          retention-days: 14
