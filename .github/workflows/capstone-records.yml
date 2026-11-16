@@ -1,7 +1,7 @@
-name: Qualify EVEX mask admission mixed
+name: Qualify unified VEX descriptor pool mixed
 on:
   push:
-    branches: [codex/capstone-evex-mask-admission-mixed]
+    branches: [codex/capstone-vex-unified-descriptor-pool-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
+          ref: ce07fdfca945d55de72325eb6482aaf9dd9297b2
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-mask-admission-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex-unified-descriptor-pool-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
