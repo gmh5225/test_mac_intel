@@ -1,5 +1,5 @@
 from pathlib import Path
-import json, os, shutil, subprocess, tempfile
+import hashlib, json, os, shutil, subprocess, tempfile
 root=Path(__file__).resolve().parent
 source=root.parent/'source'
 evidence=root.parent/'evidence'
@@ -23,13 +23,22 @@ root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
 b=root_build/'build'
 try:
     assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
-    run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
+    assert not subprocess.check_output(['git','status','--porcelain'],cwd=source)
+    # Git apply --index must compare the same LF bytes on Windows and Unix.
+    run(['git','config','core.autocrlf','false'],'canonical-eol')
+    run(['git','checkout-index','-a','-f'],'canonical-checkout')
+    assert not subprocess.check_output(['git','status','--porcelain'],cwd=source)
+    patch=root_build/'candidate.patch'
+    canonical=subprocess.check_output(['git','show','HEAD:capstone-output-release/'+forms+'.patch'],cwd=root.parent)
+    assert hashlib.sha256(canonical).hexdigest()==json.loads((root/'candidate.json').read_text())['sha256']
+    patch.write_bytes(canonical)
+    run(['git','-c','core.autocrlf=false','apply','--index',patch],'apply')
     run(['git','add','-A'],'stage-tested-source')
     tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
     assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
     run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
     if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
-    opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    opts=['-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if os.name=='nt':
         opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if compiler=='MT' else 'OFF')]
     else:
@@ -41,6 +50,8 @@ try:
         units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
     if profile not in ('diet','reduced','dedicated'):
         units+=sorted(q.stem for q in (source/'tests/unit').glob('mips*.c') if q.stem not in units)
+    if profile not in ('diet','reduced','alias-only'):
+        units += sorted(q.stem for q in (source/'tests/unit').glob('x86_*.c') if q.stem.startswith(('x86_apx', 'x86_amx', 'x86_evex', 'x86_avx512')) and q.stem not in units)
     if profile=='adapter':units+=['x86_scan_adapter']
     if profile not in ('diet','reduced'):
         known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
@@ -49,11 +60,26 @@ try:
     if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
     if profile=='alias-only':units=['mapping','mcinst','api','mips_scan','aarch64_scan','aarch64_postprocess']
     run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
+    if os.name != 'nt':
+        if os.uname().sysname=='Linux' and os.uname().machine=='x86_64' and compiler=='clang' and profile not in ('alias-only','diet','reduced'):
+            probe=root_build/'native-plan-policy.c';probe.write_text('#include "arch/X86/X86SimpleOutput.h"\n#ifndef CAPSTONE_X86_VEX32_OUTPUT\n#error missing native C5 output policy\n#endif\n_Static_assert(X86_PLAN_VEX32 == X86_PLAN_VECTOR, "native C5 plan must reach the vector branch");\n')
+            run([compiler, '-fsyntax-only', '-I', source, '-I', source/'include', probe], 'native-plan-policy')
+            save('native-plan-policy',dict(active=True,selector='X86_PLAN_VECTOR',forced_feature_define=False))
+        commands=json.loads((b/'compile_commands.json').read_text())
+        flagged=[x['file'] for x in commands if '-fno-jump-tables' in x.get('command','').split()]
+        expected=set()
+        if os.uname().sysname=='Linux' and profile!='alias-only':
+            expected.add('X86Vex32Output.c')
+            if compiler=='clang' and os.uname().machine=='x86_64':expected.add('X86OutputIterator.c')
+        assert {Path(x).name for x in flagged}==expected,(profile,flagged)
+        save('compile-scope',dict(flag='-fno-jump-tables',expected=len(expected),files=sorted(expected),compilation_units=len(flagged)))
     run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
     assert 'runtime error:'not in(evidence/'tests.log').read_text()
     if profile=='all':
         run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
         run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_'],'all-unit-tests')
+        inventory=json.loads(subprocess.check_output(['ctest','--test-dir',b,'-C','Release','--show-only=json-v1','-R','^unit_'],text=True))
+        save('all-unit-inventory',dict(tests=[x['name'] for x in inventory['tests']]))
     if profile=='adapter':
         generator=root_build/'simple-output-generator'
         run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
