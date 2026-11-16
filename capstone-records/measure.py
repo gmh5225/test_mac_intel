@@ -158,7 +158,7 @@ try:
     # A mismatched control is evidence, but must not be timed as a causal test.
     assert text_equal and not mismatches, (text_equal, mismatches)
     binaries['aa'] = w / 'aa'
-    shutil.copyfile(binaries['base'], binaries['aa'])
+    shutil.copy2(binaries['base'], binaries['aa'])
     payloads = {name: path.read_bytes() for name, path in binaries.items()}
     assert payloads['base'] == payloads['aa']
     maximum = max(map(len, payloads.values()))
