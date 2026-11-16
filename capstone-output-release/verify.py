@@ -37,7 +37,14 @@ try:
     header=source/'MCInst.h';core=source/'cs.c'
     for phase in ('base','candidate','observer'):
         if phase=='candidate':
-            run(['git','apply','--index',patch],'apply')
+            raw=(source/'cs.c').read_bytes()
+            head=sp.check_output(['git','show','HEAD:cs.c'],cwd=source)
+            index=sp.check_output(['git','show',':cs.c'],cwd=source)
+            status=sp.check_output(['git','status','--porcelain'],cwd=source,text=True)
+            save('pre-apply-source',dict(worktree_sha256=hashlib.sha256(raw).hexdigest(),head_sha256=hashlib.sha256(head).hexdigest(),index_sha256=hashlib.sha256(index).hexdigest(),status=status))
+            assert raw==head==index and not status
+            run(['git','apply',patch],'apply')
+            run(['git','add','-A'],'stage-tested-source')
             tree=sp.check_output(['git','write-tree'],cwd=source,text=True).strip()
             assert tree==meta['tree']
         if phase=='observer':
