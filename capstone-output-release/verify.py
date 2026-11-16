@@ -17,7 +17,13 @@ w=Path(tempfile.mkdtemp(prefix='capstone-arm-constructed-profile-'));b=w/'build'
 try:
     assert sp.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==meta['parent']
     run(['git','config','core.autocrlf','false'],'canonical-config')
-    run(['git','checkout-index','-a','-f'],'canonical-checkout')
+    archive=w/'canonical-source.tar'
+    run(['git','archive','--format=tar','-o',archive,'HEAD'],'canonical-archive')
+    save('canonical-archive',dict(bytes=archive.stat().st_size,sha256=hashlib.sha256(archive.read_bytes()).hexdigest()))
+    run(['tar','-xf',archive,'-C',source],'canonical-extract')
+    archive.unlink()
+    assert not sp.check_output(['git','status','--porcelain'],cwd=source)
+
     patch=w/'candidate.patch'
     canonical=sp.check_output(['git','show','HEAD:capstone-output-release/'+forms+'.patch'],cwd=r.parent)
     assert hashlib.sha256(canonical).hexdigest()==meta['sha256']
