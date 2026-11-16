@@ -25,7 +25,10 @@ with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
   choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls'} if mixed else set())
   cases=[x for x in all_inputs if x['name'] in choices];assert mixed or len(cases)==len(choices)
 
-  run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
+  run(['clang++','-O3','-DNDEBUG','-std=c++17',*(['-DCAPSTONE_PERF_ARM_ONLY'] if not mixed else []),'-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
+  consumer_symbols=sp.check_output(['nm','-u',t/'single.o'],text=True)
+  if not mixed:assert 'X86_disasmIter' not in consumer_symbols
+  write('consumer-scope',dict(arm_only=not mixed,source_sha256=sha(r/'single.cpp'),x86_iterator_reference='X86_disasmIter' in consumer_symbols))
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in (['X86','MIPS','AARCH64','PPC','RISCV','LOONGARCH','ARC','TRICORE'] if os.environ['BUILD_ARCHS']=='extra' else ['X86','MIPS','AARCH64'])] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={};ownedlibs={}
   active=not mixed
