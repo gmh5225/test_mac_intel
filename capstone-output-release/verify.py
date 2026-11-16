@@ -16,13 +16,16 @@ def clean_error(fn,path,exc):
 w=Path(tempfile.mkdtemp(prefix='capstone-arm-constructed-profile-'));b=w/'build'
 try:
     assert sp.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==meta['parent']
-    run(['git','config','core.autocrlf','false'],'canonical-config')
-    archive=w/'canonical-source.tar'
-    run(['git','archive','--format=tar','-o',archive,'HEAD'],'canonical-archive')
-    save('canonical-archive',dict(bytes=archive.stat().st_size,sha256=hashlib.sha256(archive.read_bytes()).hexdigest()))
-    run(['tar','-xf',archive,'-C',source],'canonical-extract')
-    archive.unlink()
-    assert not sp.check_output(['git','status','--porcelain'],cwd=source)
+    original_source=source
+    original_raw=(source/'cs.c').read_bytes()
+    original_head=sp.check_output(['git','show','HEAD:cs.c'],cwd=source)
+    save('original-checkout',dict(raw_sha256=hashlib.sha256(original_raw).hexdigest(),head_sha256=hashlib.sha256(original_head).hexdigest(),crlf=original_raw.count(b'\r\n')))
+    run(['git','clone','--shared','--no-checkout','--config','core.autocrlf=false',original_source,w/'source'],'fresh-clone')
+    source=w/'source'
+    run(['git','checkout','-q','--detach',meta['parent']],'first-checkout')
+    status=sp.check_output(['git','status','--porcelain'],cwd=source,text=True)
+    save('fresh-checkout',dict(status=status,raw_sha256=hashlib.sha256((source/'cs.c').read_bytes()).hexdigest(),head_sha256=hashlib.sha256(original_head).hexdigest()))
+    assert not status and (source/'cs.c').read_bytes()==original_head
 
     patch=w/'candidate.patch'
     canonical=sp.check_output(['git','show','HEAD:capstone-output-release/'+forms+'.patch'],cwd=r.parent)
