@@ -4,6 +4,7 @@ import io
 import json
 from pathlib import Path
 import struct
+import re
 import subprocess
 import tarfile
 
@@ -88,6 +89,25 @@ def prepare(source, scratch, evidence, command):
     packages = {}
     cases = []
     for row in manifest['inputs']:
+        if row['kind'] == 'capstone-yaml':
+            fixture = source.parent / 'source' / row['fixture']
+            raw = fixture.read_bytes()
+            if digest(raw) != row['fixture_sha256']:
+                raise ValueError('fixture digest mismatch: ' + row['name'])
+            text = raw.decode('utf8')
+            blocks = re.findall(r'(?m)^\s+bytes:\s*\[([^\]]+)\]\s*$', text)
+            modes = re.findall(r'options:\s*\[\s*"([^"]+)"\s*\]', text)
+            assert len(blocks) == text.count('bytes:') == row['expected_instructions']
+            assert len(modes) == len(blocks) and set(modes) == {'CS_MODE_TRICORE_162'}
+            segments = [bytes(int(token.strip(), 16) for token in block.split(',')) for block in blocks]
+            assert all(len(segment) in (2, 4) for segment in segments)
+            payload = b''.join(segments)
+            assert digest(payload) == row['text_sha256']
+            target = corpus / (row['name'] + '.text')
+            target.write_bytes(payload)
+            cases.append(dict(row, path=str(target), bytes=len(payload), executable_was_run=False,
+                              scope='Ordered repository instruction listing from a named firmware example, not a complete image.'))
+            continue
         sha = row['package_sha256']
         if sha not in packages:
             package = corpus / sha
