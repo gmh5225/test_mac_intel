@@ -1,11 +1,27 @@
 {
-  "capstone": "729680277dd762704ea3270291b7a75318f51583",
-  "purpose": "Warmed released four-backend ARM/AArch64/MIPS scan, formatting, detail work attribution. No source mutation or speed claim.",
-  "text_consumer": "std::strlen, per R1118 consumer audit",
-  "reference_probe_commit": "881cf3a96a51657b3e5fdbfeeaca1792af733a27",
+  "capstone": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+  "candidate": {
+    "parent": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+    "baseline_tree": "18c18802f84a648501b8333d449d6491322e1773",
+    "tree": "168d472e2de84099b9e0d4982e1a9304e1617218",
+    "sha256": "b111436991533308a642b940f33a7b7c354aceede5bebcdcc21ddb3e02b86e1d",
+    "local_units": [
+      "api",
+      "utils",
+      "mapping",
+      "detail_option",
+      "arm_post_index",
+      "aarch64_postprocess",
+      "mips_scan"
+    ],
+    "differential_states": 2250000,
+    "native_qualified": false
+  },
+  "purpose": "Isolate MIPS zero- and one-register implicit copies using the existing X86 copy shape; unchanged ARM/AArch64/x86 controls.",
   "cases": [
     "arm-cp",
-    "arm64-ls",
-    "mips64el-ls"
+    "mips64el-ls",
+    "amd64-ls",
+    "arm64-ls"
   ]
 }
