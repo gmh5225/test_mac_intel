@@ -27,8 +27,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('census-variant.json',dict(variant='integer',round=1209,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
-    save('variants.json',dict(integer='Released Capstone next',scan='R1209 generic slow-path window and shared raw-prefix bound'))
+    save('census-variant.json',dict(variant='integer',round=1237,capstone_revision=reference,iced_revision=iced,purpose='Warm steady-state instruction-address comparison; not native qualification'))
+    save('variants.json',dict(integer='Released Capstone next',scan='Resolve ordinary C5 opcodes directly before generic prefix and size repair'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical output entry cost diagnostic; actual NeverD tested separately'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -61,12 +61,13 @@ def main(w):
         if label!='integer':
             changed={n for n in objects['integer']if objects[label].get(n)!=objects['integer'][n]}
             added=set(objects[label])-set(objects['integer'])
-            expected={'arch/X86/X86Disassembler.c.o','arch/X86/X86DisassemblerDecoder.c.o'}
+            expected={'arch/X86/X86IntelInstPrinter.c.o', 'arch/X86/X86IntelInstPrinterPrechecked.c.o'}
             expected_added=set()
             assert changed==expected and added==expected_added,(label,changed,added)
             save('objects-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),total=len(objects[label])))
-        for component in ('X86Disassembler','X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput','X86ImmediateOutput'):
+        for component in ('X86IntelInstPrinter','X86IntelInstPrinterPrechecked','X86Disassembler','X86Mapping','X86OutputIterator','X86DisassemblerDecoder','X86VectorOutput','X86ImmediateOutput'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
+            (p/'evidence'/(label+'-'+component+'.symbols.txt')).write_bytes(sp.check_output(['nm','-S','--defined-only',object_file]))
             assembly=sp.check_output(['objdump','-dr',object_file])
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
                 stream.write(assembly)
