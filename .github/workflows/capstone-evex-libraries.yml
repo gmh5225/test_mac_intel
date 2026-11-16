@@ -1,7 +1,7 @@
-name: Isolate first iterator extent violation on Clang 14
+name: Isolate Clang 14 private decoder return and register preservation
 on:
   push:
-    branches: [codex/capstone-clang14-vectors-boundary]
+    branches: [codex/capstone-clang14-vectors-abi]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: clang14-vectors-boundary-${{ matrix.host }}-${{ matrix.cc }}
+          name: clang14-vectors-abi-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
