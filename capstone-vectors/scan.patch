@@ -1,36 +1,30 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..1ba999f5 100644
+index 63dcc538..4e948755 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	uint16_t attrMask;
- 	uint16_t instructionID;
- 	bool rexWOverridesOpSize;
-+	const bool legacyVector = decoderMode != MODE_64BIT &&
-+				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
- 
- 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
- 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
-@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	}
- 
- 	/* The following clauses compensate for limitations of the tables. */
--	if (decoderMode != MODE_64BIT &&
--	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
-+	if (legacyVector) {
- 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
- 			return -1;
- 		}
-@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 
+@@ -1630,6 +1630,25 @@ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
  		return 0;
  	}
--	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
-+	/* Legacy-mode vectors already resolved this unmodified mask before
-+	 * W-bit disambiguation. The special addressing lookup above returns. */
-+	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
- 		return -1;
--	}
  
- 	if ((decoderMode == MODE_16BIT ||
- 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
++	/* C5 fixes the opcode map and has no W bit. Keep address-dependent and
++	 * relative-branch size repairs in the general path. */
++	if (insn->mode != MODE_16BIT &&
++	    insn->vectorExtensionType == TYPE_VEX_2B && insn->opcode != 0xae &&
++	    (insn->opcode < 0x82 || insn->opcode > 0x8f)) {
++		const uint8_t payload = insn->vectorExtensionPrefix[1];
++		attrMask = ATTR_VEX |
++			   mandatoryPrefixAttributes(ppFromVEX2of2(payload));
++		if (insn->mode == MODE_64BIT)
++			attrMask |= ATTR_64BIT;
++		if (lFromVEX2of2(payload))
++			attrMask |= ATTR_VEXL;
++		if (getIDWithAttrMask(&instructionID, insn, attrMask))
++			return -1;
++		insn->instructionID = instructionID;
++		insn->spec = specifierForUID(instructionID);
++		return 0;
++	}
++
+ 	return getIDSlow(insn, mode);
+ }
+ 
