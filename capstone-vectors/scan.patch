@@ -1,36 +1,68 @@
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..1ba999f5 100644
+index 63dcc538..807f6b95 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -1266,6 +1266,8 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+@@ -1253,16 +1253,21 @@ X86_DECODE_INLINE uint16_t mandatoryPrefixAttributes(uint8_t pp)
+  * @return      - 0 if the ModR/M could be read when needed or was not needed;
+  *                nonzero otherwise.
+  */
++/* Keep one copy of prefix and operand-size repairs outside the common
++ * legacy lookup. The mode selection retains the previous default case. */
+ #if defined(_MSC_VER)
+-static __forceinline int
++static __declspec(noinline) int
+ #elif defined(__GNUC__)
+-static inline __attribute__((always_inline)) int
++static __attribute__((noinline)) int
+ #else
+-static inline int
++static int
+ #endif
+-getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+-	     DisassemblerMode decoderMode)
++getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+ {
++	const DisassemblerMode decoderMode =
++		insn->mode == MODE_16BIT ? MODE_16BIT :
++		insn->mode == MODE_32BIT ? MODE_32BIT :
++					   MODE_64BIT;
  	uint16_t attrMask;
  	uint16_t instructionID;
  	bool rexWOverridesOpSize;
-+	const bool legacyVector = decoderMode != MODE_64BIT &&
-+				  insn->vectorExtensionType != TYPE_NO_VEX_XOP;
+@@ -1598,18 +1603,6 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
+ 	return 0;
+ }
  
- 	/* REX.W overrides the operand-sized prefix for near RET in 64-bit mode */
- 	rexWOverridesOpSize = decoderMode == MODE_64BIT && insn->hasOpSize &&
-@@ -1429,8 +1431,7 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 	}
- 
- 	/* The following clauses compensate for limitations of the tables. */
--	if (decoderMode != MODE_64BIT &&
--	    insn->vectorExtensionType != TYPE_NO_VEX_XOP) {
-+	if (legacyVector) {
- 		if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
- 			return -1;
- 		}
-@@ -1501,9 +1502,10 @@ getIDForMode(struct InternalInstruction *insn, cs_mode mode,
- 
- 		return 0;
- 	}
--	if (getIDWithAttrMask(&instructionID, insn, attrMask)) {
-+	/* Legacy-mode vectors already resolved this unmodified mask before
-+	 * W-bit disambiguation. The special addressing lookup above returns. */
-+	if (!legacyVector && getIDWithAttrMask(&instructionID, insn, attrMask))
- 		return -1;
+-X86_DECODE_INLINE int getIDSlow(struct InternalInstruction *insn, cs_mode mode)
+-{
+-	switch (insn->mode) {
+-	case MODE_16BIT:
+-		return getIDForMode(insn, mode, MODE_16BIT);
+-	case MODE_32BIT:
+-		return getIDForMode(insn, mode, MODE_32BIT);
+-	default:
+-		return getIDForMode(insn, mode, MODE_64BIT);
 -	}
- 
- 	if ((decoderMode == MODE_16BIT ||
- 	     (insn->hasOpSize && !rexWOverridesOpSize)) &&
+-}
+-
+ X86_DECODE_INLINE int getID(struct InternalInstruction *insn, cs_mode mode)
+ {
+ 	uint16_t attrMask;
+@@ -2979,7 +2972,7 @@ legacyTerminalDecision(const struct InternalInstruction *insn,
+ {
+ 	if (insn->opcodeType != ONEBYTE && insn->opcodeType != TWOBYTE)
+ 		return 0;
+-	/* Opcode 90 with REX.B is repaired to XCHG by getIDForMode. */
++	/* Opcode 90 with REX.B is repaired to XCHG by getIDSlow. */
+ 	if (insn->opcodeType == ONEBYTE && insn->opcode == 0x90 &&
+ 	    bFromREX(insn->rexPrefix))
+ 		return 0;
+@@ -3042,7 +3035,7 @@ decodeInstructionImpl(struct InternalInstruction *insn, const uint8_t *code,
+ 		readInstructionHeader(insn, code, codeSize, mode);
+ 	if (prefixResult == PREFIX_READ_INVALID)
+ 		return X86_SCAN_INVALID;
+-	/* getIDForMode restores incoming size flags for absolute moves even
++	/* getIDSlow restores incoming size flags for absolute moves even
+ 	 * when this header contains no size prefix. Preserve that raw contract. */
+ 	const bool inheritedMoffsSize = insn->opcodeType == ONEBYTE &&
+ 					(insn->opcode & 0xfc) == 0xa0 &&
