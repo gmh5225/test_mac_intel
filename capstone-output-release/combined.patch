@@ -1,24 +1,42 @@
-diff --git a/arch/X86/X86Disassembler.c b/arch/X86/X86Disassembler.c
-index b88dfbc7..087971ee 100644
---- a/arch/X86/X86Disassembler.c
-+++ b/arch/X86/X86Disassembler.c
-@@ -706,11 +706,14 @@ getInstructionAfterExtensions(csh ud, const uint8_t *code, size_t code_len,
- 			if (x86HasWritemaskOperand(insn.instructionID))
- 				Flags |= X86_IP_HAS_EVEX_OPMASK;
- #else
--			for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
--				if (insn.operands[i].encoding ==
--				    ENCODING_WRITEMASK) {
--					Flags |= X86_IP_HAS_EVEX_OPMASK;
--					break;
-+			/* Successful writemask reads require an EVEX prefix. */
-+			if (insn.vectorExtensionType == TYPE_EVEX) {
-+				for (int i = 0; i < X86_MAX_OPERANDS; ++i) {
-+					if (insn.operands[i].encoding ==
-+					    ENCODING_WRITEMASK) {
-+						Flags |= X86_IP_HAS_EVEX_OPMASK;
-+						break;
-+					}
- 				}
- 			}
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 57a2660d..2f231b20 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -163,7 +163,7 @@ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "ARM")
+-    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS)
++    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_PRIVATE_STREAM)
+ endif()
+ 
+ if(capstone_enabled_architectures STREQUAL "MIPS")
+diff --git a/cs.c b/cs.c
+index b2db69da..2767de9b 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1130,7 +1130,23 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		} else
  #endif
+ 		{
+-			SStream_Init(&ss);
++#if defined(CAPSTONE_ARM_PRIVATE_STREAM) && !defined(CAPSTONE_DIET) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++			/* ARM alias allocation hooks can install a formatter while
++			 * printing, so both allocators must retain their defaults. */
++			if (cs_mem_malloc == malloc && cs_mem_free == free &&
++			    cs_vsnprintf == vsnprintf) {
++				ss.buffer[0] = '\0';
++				ss.index = 0;
++				ss.is_closed = false;
++				ss.markup_stream = false;
++				ss.prefixed_by_markup = false;
++				ss.unsigned_num = false;
++			} else
++#endif
++				SStream_Init(&ss);
+ 			SStream_opt_unum(&ss, handle->imm_unsigned);
+ 			handle->printer(&mci, &ss, handle->printer_info);
+ 			fill_insn(handle, insn, &ss, &mci, handle->post_printer,
