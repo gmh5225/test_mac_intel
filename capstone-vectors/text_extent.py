@@ -1,7 +1,6 @@
 """Diagnostic only: increase a baseline ELF object's trailing text extent."""
 import hashlib
 import struct
-import subprocess as sp
 
 
 def sections(path):
@@ -29,9 +28,26 @@ def sections(path):
 def make_control(source, output, amount=32):
     before = sections(source)
     text = before['.text']['body']
-    payload = output.with_suffix('.text')
-    payload.write_bytes(text + b'\x90' * amount)
-    sp.run(['objcopy', '--update-section', '.text=' + str(payload), source, output], check=True)
+    original = source.read_bytes()
+    data = bytearray(original)
+    shoff = struct.unpack_from('<Q', data, 40)[0]
+    shsize, shnum, shnames = struct.unpack_from('<HHH', data, 58)
+    names_header = struct.unpack_from('<IIQQQQIIQQ', data, shoff + shsize * shnames)
+    names = data[names_header[4]:names_header[4] + names_header[5]]
+    header_offset = None
+    for i in range(shnum):
+        offset = shoff + i * shsize
+        name_offset = struct.unpack_from('<I', data, offset)[0]
+        if names[name_offset:names.index(0, name_offset)] == b'.text':
+            assert header_offset is None
+            header_offset = offset
+    assert header_offset is not None
+    alignment = before['.text']['alignment']
+    tail = (len(data) + alignment - 1) // alignment * alignment
+    data.extend(bytes(tail - len(data)))
+    data.extend(text + b'\x90' * amount)
+    struct.pack_into('<QQ', data, header_offset + 24, tail, len(text) + amount)
+    output.write_bytes(data)
     after = sections(output)
     assert before.keys() == after.keys()
     for name in before:
@@ -44,10 +60,12 @@ def make_control(source, output, amount=32):
         else:
             assert a == b, name
     # In particular, symbols, relocation entries, tables and unwind data are exact.
-    payload.unlink()
+    changed = [i for i, (a, b) in enumerate(zip(original, data)) if a != b]
+    assert all(header_offset + 24 <= i < header_offset + 40 for i in changed)
     return dict(complete=True, source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                 control_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
                 added_unreachable_text_bytes=amount, original_text_bytes=len(text),
+                original_file_header_fields_changed=changed,
                 existing_text_unchanged=True, other_sections_unchanged=True,
                 symbols_and_relocations_unchanged=True,
                 scope='Diagnostic object only. Added bytes follow the entire original text section and are never executed.')
