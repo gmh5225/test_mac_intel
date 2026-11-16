@@ -1,0 +1,48 @@
+{
+  "round": 1318,
+  "source": {
+    "parent": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+    "baseline_tree": "18c18802f84a648501b8333d449d6491322e1773",
+    "tree": "168d472e2de84099b9e0d4982e1a9304e1617218",
+    "sha256": "b111436991533308a642b940f33a7b7c354aceede5bebcdcc21ddb3e02b86e1d",
+    "local_units": [
+      "api",
+      "utils",
+      "mapping",
+      "detail_option",
+      "arm_post_index",
+      "aarch64_postprocess",
+      "mips_scan"
+    ],
+    "differential_states": 2250000,
+    "native_qualified": false
+  },
+  "hosts": [
+    "ubuntu-22.04 GCC/Clang",
+    "ubuntu-24.04 GCC/Clang",
+    "ubuntu-24.04-arm GCC/Clang"
+  ],
+  "cases": [
+    "PuTTY PE32",
+    "PuTTY PE64",
+    "AMD64 ls",
+    "ARM ls/sort/cp",
+    "AArch64 ls",
+    "MIPS64EL ls"
+  ],
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "cycles": 21,
+  "minimum_process_ms": 160,
+  "controls": [
+    "byte-identical A/A",
+    "original images",
+    "same inode and size with ASLR disabled if supported",
+    "identical consumer object",
+    "complete Capstone output hash"
+  ],
+  "gate": "Retain all rows and inspect paired uncertainty and A/A before promotion; all non-Mapping runtime objects must remain byte-identical."
+}
