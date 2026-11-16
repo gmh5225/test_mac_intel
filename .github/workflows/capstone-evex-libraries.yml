@@ -1,7 +1,7 @@
-name: Diagnose VEX32 code and data address restoration
+name: Measure C5 dispatch while preserving the RIP output boundary
 on:
   push:
-    branches: [codex/capstone-vex32-data-placement-control]
+    branches: [codex/capstone-c5-preserve-rip-boundary-pilot]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff
+          ref: ce07fdfca945d55de72325eb6482aaf9dd9297b2
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-data-placement-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: c5-preserve-rip-boundary-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
