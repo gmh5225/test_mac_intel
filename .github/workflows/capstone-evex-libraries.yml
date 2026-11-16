@@ -1,7 +1,7 @@
-name: Measure X86 slow-path prefix window cost
+name: Measure isolated VEX32 output cost
 on:
   push:
-    branches: [codex/capstone-prefix-slow-window-cost]
+    branches: [codex/capstone-vex32-isolated-output-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: a51c656195387e5f5264e53abcebe7c1a11e46a0
+          ref: a25e9cb7cf22250544d1fb5c19d6fc271447e6ef
           path: source
           persist-credentials: false
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq valgrind linux-tools-common linux-tools-generic
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: prefix-slow-window-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-isolated-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
