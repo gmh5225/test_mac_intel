@@ -1,0 +1,10 @@
+{
+  "candidate": "round1284-arm-dedicated-stream",
+  "candidate_tree": "b492c4a3c1d5f7dceab2a104debb80754ee450eb",
+  "evidence": "R1284 ARM GCC loses 2.1-2.4% scan throughput for all three real sections with fixed image controls and clean A/A. cs_decode_full_insn grows 1260 to 1952 bytes; later code shifts +688. ARM scan still calls this full function.",
+  "control": "Compile original and candidate with cs_decode_full_insn in a separate executable section, alongside untouched original-layout baseline and candidate. Verify all other text symbol addresses and sizes match within the separated pair and capture full assembly. Measure original baseline, A/A, original candidate, separated baseline and separated candidate on the same runner.",
+  "panels": "Three ARM sections, scan only, original images plus fixed inode/addresses, 21 balanced forward/reverse cycles, target 100ms per measured process CPU pass.",
+  "interpretation": "Compare candidate/base within each layout. Recovery with matching surrounding text supports a placement contribution; persistent loss warrants instruction-path/frame analysis. Neither outcome alone identifies PMU-level mechanisms.",
+  "product_change": false,
+  "qualified": false
+}
