@@ -1,0 +1,44 @@
+{
+  "candidate": {
+    "parent": "502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff",
+    "baseline_tree": "c633ea4b4ea8560c831a574b7ac21487f5243b98",
+    "tree": "d6e064d6035cb09e386bdc873612022067340cc0",
+    "sha256": "cc1a295732585cfb5e5a5c64b926f8532d4b305fe05f0846459584f97e4f0f04",
+    "records": "equal private-entry records, cursor and errors for 152961024 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "layout_identical": true,
+    "generated_output_matches_producer": true,
+    "shared_vector_object_identical": true,
+    "decoder_object_identical": true
+  },
+  "diagnostic_only": true,
+  "original_pilot_run": 43834070905,
+  "original_clang_cpu": "AMD EPYC 7763 64-Core Processor",
+  "rows": 12,
+  "cycles": 42,
+  "target_sample_ms": 100,
+  "cases": [
+    "libjpeg62-turbo-amd64/all-functions",
+    "libssl3t64-amd64/simd-functions"
+  ],
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "launches": [
+    "images",
+    "same-file-fixed"
+  ],
+  "variants": [
+    "integer",
+    "aa",
+    "scan",
+    "pad0"
+  ],
+  "intervention": "Append 32 unreachable bytes to the end of the original baseline output-iterator object text section; all existing bytes, symbols, relocations, tables and unwind sections must remain exact.",
+  "prediction": "The old text-symbol addresses in the padded baseline match R1265 for Clang. If SSL64 scan slows in the padded baseline on the same host, this establishes a contribution from text displacement without executing new logic.",
+  "interpretation": "Different CPU models cannot explain the original EPYC run. Padding is a diagnostic intervention, not a production optimization.",
+  "publication_qualified": false
+}

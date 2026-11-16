@@ -1,7 +1,7 @@
-name: Pilot VEX32 output with preserved archive order
+name: Diagnose VEX32 downstream text displacement
 on:
   push:
-    branches: [codex/capstone-vex32-distinct-plan-pilot]
+    branches: [codex/capstone-vex32-text-extent]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,8 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc }
-          - { host: ubuntu-22.04, cc: gcc }
           - { host: ubuntu-24.04, cc: clang }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
@@ -39,6 +37,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-distinct-plan-pilot-${{ matrix.host }}-${{ matrix.cc }}
+          name: vex32-text-extent-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
