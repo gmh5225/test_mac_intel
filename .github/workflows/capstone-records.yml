@@ -1,7 +1,7 @@
-name: Attribute warmed ARM AArch64 and MIPS formatting and detail costs
+name: Measure TriCore direct decoder lowering
 on:
   push:
-    branches: [codex/capstone-cross-architecture-output-cost]
+    branches: [codex/capstone-tricore-direct-decoder-cost]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 729680277dd762704ea3270291b7a75318f51583
+          ref: 2bee00c0d58ae9de33ab9aad657138ef3376fce4
           path: source
           persist-credentials: false
       - name: Install instruction profiler
@@ -39,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: cross-architecture-output-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: tricore-direct-decoder-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
