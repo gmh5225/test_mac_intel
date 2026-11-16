@@ -1,78 +1,61 @@
 from pathlib import Path
-import json, os, shutil, subprocess, tempfile
-root=Path(__file__).resolve().parent
-source=root.parent/'source'
-evidence=root.parent/'evidence'
-evidence.mkdir()
-def run(args, label):
-    print(label, flush=True)
-    path=evidence/(label+'.log')
-    with path.open('wb') as log:
-        proc=subprocess.run(list(map(str,args)),cwd=source,stdout=log,stderr=subprocess.STDOUT)
-    if proc.returncode:
-        raise RuntimeError((label,path.read_text(errors='replace')[-4500:]))
-def save(label,data):
-    (evidence/(label+'.json')).write_text(json.dumps(data,indent=2)+'\n')
+import hashlib, json, os, shutil, subprocess as sp, tempfile
+r=Path(__file__).resolve().parent
+source=r.parent/'source'
+evidence=r.parent/'evidence';evidence.mkdir()
+meta=json.loads((r/'candidate.json').read_text())
+profile=os.environ['PROFILE'];compiler=os.environ['TOOLCHAIN'];forms=os.environ['FORMS']
+def save(name,value):(evidence/(name+'.json')).write_text(json.dumps(value,indent=2)+'\n')
+def run(args,name):
+    print(name,flush=True)
+    with (evidence/(name+'.log')).open('wb') as log:
+        result=sp.run(list(map(str,args)),cwd=source,stdout=log,stderr=sp.STDOUT)
+    if result.returncode:raise RuntimeError((name,(evidence/(name+'.log')).read_text(errors='replace')[-3500:]))
 def clean_error(fn,path,exc):
-    os.chmod(path,0o700)
-    fn(path)
-profile=os.environ['PROFILE']
-compiler=os.environ['TOOLCHAIN']
-forms=os.environ['FORMS']
-root_build=Path(tempfile.mkdtemp(prefix='capstone-verified-config-'))
-b=root_build/'build'
+    os.chmod(path,0o700);fn(path)
+w=Path(tempfile.mkdtemp(prefix='capstone-arm-constructed-profile-'));b=w/'build'
 try:
-    assert subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==json.loads((root/'candidate.json').read_text())['parent']
-    run(['git','-c','core.autocrlf=false','apply',root/(forms+'.patch')],'apply')
-    run(['git','add','-A'],'stage-tested-source')
-    tested_tree=subprocess.check_output(['git','write-tree'],cwd=source,text=True).strip()
-    assert tested_tree==json.loads((root/'candidate.json').read_text())['tree'],tested_tree
-    run(['python','suite/synctools/x86_mapping_counts.py','--check'],'mapping-counts')
-    if profile=='adapter': run(['python3','suite/synctools/x86_operand_specializations.py','--check'],'regenerate')
-    opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
+    assert sp.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()==meta['parent']
+    run(['git','config','core.autocrlf','false'],'canonical-config')
+    run(['git','checkout-index','-a','-f'],'canonical-checkout')
+    patch=w/'candidate.patch'
+    canonical=sp.check_output(['git','show','HEAD:capstone-output-release/'+forms+'.patch'],cwd=r.parent)
+    assert hashlib.sha256(canonical).hexdigest()==meta['sha256']
+    patch.write_bytes(canonical)
+    opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON','-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if os.name=='nt':
         opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if compiler=='MT' else 'OFF')]
     else:
-        opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]+(['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers'] if compiler=='gcc' else [])
-    profile_options={'all':['-DCAPSTONE_ARCHITECTURE_DEFAULT=ON'],'alias-only':['-DCAPSTONE_X86_SUPPORT=OFF','-DCAPSTONE_ARM_SUPPORT=OFF'],'dedicated':['-DCAPSTONE_ARM_SUPPORT=OFF','-DCAPSTONE_AARCH64_SUPPORT=OFF','-DCAPSTONE_MIPS_SUPPORT=OFF'],'four':['-DCAPSTONE_ARM_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON'],'diet':['-DCAPSTONE_BUILD_DIET=ON'],'reduced':['-DCAPSTONE_X86_REDUCE=ON'],'adapter':['-DCAPSTONE_X86_SCAN_ADAPTER=ON'],'intel':['-DCAPSTONE_X86_ATT_DISABLE=ON'],'sanitize':['-DENABLE_ASAN=ON']}
-    run(['cmake','-S',source,'-B',b,*opts,*profile_options[profile],*(['-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined'] if profile=='sanitize' else [])],'configure')
-    units=['mapping','mcinst','api','x86_scan_batch','x86_relative_jump','x86_reg_access','detail_option']
-    if profile not in ('diet','reduced'):
-        units+=['x86_packed_move_access','x86_buffer_bounds','x86_simple_output','x86_encoding_accuracy','x86_evex_reserved_fields','x86_memory_scale','mips_scan']
-    if profile not in ('diet','reduced','dedicated'):
-        units+=sorted(q.stem for q in (source/'tests/unit').glob('mips*.c') if q.stem not in units)
-    if profile=='adapter':units+=['x86_scan_adapter']
-    if profile not in ('diet','reduced'):
-        known={q.stem for q in (source/'tests/unit').glob('aarch64_*.c')}
-        units+=sorted(q for q in known if q in ('aarch64_memory_access','aarch64_post_index','aarch64_addressing'))
-    if profile not in ('diet','reduced'):units+=['arm_post_index','aarch64_scan','aarch64_postprocess']
-    if profile=='dedicated':units=[name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
-    if profile=='alias-only':units=['mapping','mcinst','api','mips_scan','aarch64_scan','aarch64_postprocess']
-    run(['cmake','--build',b,'--config','Release','--target','capstone_static',*units,'--parallel','4'],'build')
-    run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units+['arm_register_names_generator','aarch64_register_names_generator','fixed_len_decoder'])+')$'],'tests')
-    assert 'runtime error:'not in(evidence/'tests.log').read_text()
-    if profile=='all':
-        run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
-        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_'],'all-unit-tests')
-    if profile=='adapter':
-        generator=root_build/'simple-output-generator'
-        run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_simple_output.cpp',b/'libcapstone.a','-o',generator],'compile-output-generator')
-        result=subprocess.check_output([generator],cwd=source)
-        assert result==(source/'arch/X86/X86GenSimpleOutput.inc').read_bytes()
-    if profile=='adapter':
-        generator=root_build/'vector-output-generator'
-        run(['clang++','-std=c++17','-O2','-Iinclude','suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',generator],'compile-vector-generator')
-        result=subprocess.check_output([generator],cwd=source)
-        assert result==(source/'arch/X86/X86GenVectorOutput.inc').read_bytes()
-    if profile=='adapter':
-        make_build=root_build/'make-build'
-        run(['make','-j4','CAPSTONE_ARCHS=x86','CAPSTONE_BUILD_CORE_ONLY=yes','CC='+compiler,'BUILDDIR='+str(make_build),str(make_build/'libcapstone.a')],'make-static')
-        smoke=root_build/'make-simple-output'
-        run([compiler,'-O2','-DCAPSTONE_HAS_X86','-DCAPSTONE_USE_SYS_DYN_MEM','-Iinclude','tests/unit/x86_simple_output.c',make_build/'libcapstone.a','-lm','-o',smoke],'make-output-link')
-        run([smoke],'make-output-records')
-        save('make-output-validation',dict(build='Makefile x86-only static library',entrypoint='X86_disasmIter',full_output_records=True))
-    save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units,tested_tree=tested_tree))
+        opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+compiler]
+        if compiler=='gcc':opts+=['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers']
+    if profile=='diet':opts+=['-DCAPSTONE_BUILD_DIET=ON']
+    if profile=='sanitize':opts+=['-DENABLE_ASAN=ON','-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined']
+    run(['cmake','-S',source,'-B',b,*opts],'configure')
+    units=['api','sstream','instruction_bytes']
+    if profile!='diet':units+=['arm_post_index','arm_private_stream']
+    targets=['capstone_static',*units,*(['cstest'] if profile!='diet' else [])]
+    header=source/'MCInst.h';core=source/'cs.c'
+    for phase in ('base','candidate','observer'):
+        if phase=='candidate':
+            run(['git','apply','--index',patch],'apply')
+            tree=sp.check_output(['git','write-tree'],cwd=source,text=True).strip()
+            assert tree==meta['tree']
+        if phase=='observer':
+            text=header.read_text();needle='assert(i < MAX_MC_OPS);';assert text.count(needle)==1
+            text=text.replace(needle,'if (i >= inst->size) { fprintf(stderr, "ARM operand read before construction: opcode=%u size=%u index=%u\\n", inst->Opcode, inst->size, i); abort(); }')
+            text=text.replace('#include <assert.h>','#include <assert.h>\n#include <stdio.h>\n#include <stdlib.h>');header.write_text(text)
+            text=core.read_text();assert text.count('MCInst mci;')==1
+            core.write_text(text.replace('MCInst mci;','MCInst mci;\nmemset(&mci, 0xa5, sizeof(mci));'))
+        run(['cmake','--build',b,'--config','Release','--target',*targets,'--parallel','4'],phase+'-build')
+        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],phase+'-tests')
+        if profile!='diet':
+            binary=b/'suite/cstest'/('Release/cstest.exe' if os.name=='nt' else 'cstest')
+            run([binary,source/'tests/MC/ARM'],phase+'-arm-fixtures')
+        names=[phase+'-tests',*([phase+'-arm-fixtures'] if profile!='diet' else [])]
+        for name in names:
+            text=(evidence/(name+'.log')).read_text(errors='replace')
+            assert 'runtime error:' not in text and 'ERROR: AddressSanitizer' not in text
+    save('complete',dict(forms=forms,profile=profile,compiler=compiler,units=units,tested_tree=tree,operand_observer_passed=True))
 finally:
-    n=sum(f.stat().st_size for f in root_build.rglob('*') if f.is_file())
-    shutil.rmtree(root_build,onerror=clean_error)
-    save('cleanup',dict(bytes=n,removed=not root_build.exists()))
+    amount=sum(f.stat().st_size for f in w.rglob('*') if f.is_file())
+    shutil.rmtree(w,onerror=clean_error);save('cleanup',dict(bytes=amount,removed=not w.exists()))
