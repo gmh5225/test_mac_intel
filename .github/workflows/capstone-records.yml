@@ -29,9 +29,12 @@ jobs:
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
-        run: python3 capstone-records/measure.py
+        run: |
+          python3 -m venv "$RUNNER_TEMP/capstone-layout-venv"
+          "$RUNNER_TEMP/capstone-layout-venv/bin/pip" install pyelftools==0.32
+          "$RUNNER_TEMP/capstone-layout-venv/bin/python" capstone-records/measure.py
       - if: always()
-        run: rm -rf -- "$GITHUB_WORKSPACE/source"
+        run: rm -rf -- "$GITHUB_WORKSPACE/source" "$RUNNER_TEMP/capstone-layout-venv"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
