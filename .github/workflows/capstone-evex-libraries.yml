@@ -1,7 +1,7 @@
-name: Measure canonical 32-bit C4 register output cost
+name: Measure fixed operand slots in the 32-bit VEX writers
 on:
   push:
-    branches: [codex/capstone-vex32-c4-output-cost]
+    branches: [codex/capstone-vex32-fixed-operands-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-c4-output-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-fixed-operands-cost-libraries-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

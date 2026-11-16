@@ -898,7 +898,7 @@ index 7675273f..d75c8ae4 100644
  {
  	if (displacement) {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..419bdfe2 100644
+index 6df1472d..a32816c6 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -19,87 +19,12 @@ struct PaddingOutput {
@@ -1005,7 +1005,7 @@ index 6df1472d..419bdfe2 100644
  static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
  			    uint16_t *insn_size)
  {
-@@ -463,43 +392,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -463,44 +392,12 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
  
  /* The VEX register plan supplies the public fields for vvvv register operands.
   * Memory forms and unsupported vector widths fall back before any output. */
@@ -1048,9 +1048,14 @@ index 6df1472d..419bdfe2 100644
 -}
 +#include "X86VexRegisterOutput.inc"
  
++/* Keep vector dispatch growth separate from following decoder code. */
++#if defined(CAPSTONE_X86_VEX32_OUTPUT) && defined(__ELF__)
++__attribute__((section(".cs_x86_vector_dispatch")))
++#endif
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
-@@ -515,6 +408,14 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 			   const struct X86SimpleRegister *regs, bool wide)
+@@ -515,6 +412,14 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  						 wide);
  	if (code[0] == 0x62)
  		return writeEvexOutput(code, size, insn, insn_size, regs);
@@ -1067,10 +1072,10 @@ index 6df1472d..419bdfe2 100644
  	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
 diff --git a/arch/X86/X86VectorRegisterOutput.inc b/arch/X86/X86VectorRegisterOutput.inc
 new file mode 100644
-index 00000000..037641f2
+index 00000000..5f95fb69
 --- /dev/null
 +++ b/arch/X86/X86VectorRegisterOutput.inc
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,132 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1090,6 +1095,23 @@ index 00000000..037641f2
 +#endif
 +	return out;
 +}
++
++#ifdef X86_VEX_REGISTER_ONLY
++/* The 32-bit entries admit two or three explicit register operands. */
++static inline X86_VECTOR_REGISTER_TEXT void writeVectorOperand(cs_x86_op *op,
++							       unsigned width,
++							       unsigned number,
++							       uint8_t access)
++{
++	static const x86_reg bases[] X86_VECTOR_REGISTER_DATA = {
++		X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0
++	};
++	op->type = X86_OP_REG;
++	op->reg = (x86_reg)(bases[width] + number);
++	op->access = (cs_ac_type)access;
++	op->size = (uint8_t)(16 << width);
++}
++#endif
 +
 +static X86_VECTOR_REGISTER_TEXT bool
 +writeVectorRegisters(const uint8_t *code, cs_insn *insn, uint16_t *insn_size,
@@ -1112,10 +1134,19 @@ index 00000000..037641f2
 +	memcpy(insn->mnemonic, row->mnemonic, sizeof(row->mnemonic));
 +	memset(insn->op_str, 0, sizeof(insn->op_str));
 +	char *out = writeVectorRegister(insn->op_str, first_ll, regs[0]);
++#ifdef X86_VEX_REGISTER_ONLY
++	memcpy(out, ", ", 2);
++	out = writeVectorRegister(out + 2, ll, regs[1]);
++	if (reg_count == 3) {
++		memcpy(out, ", ", 2);
++		out = writeVectorRegister(out + 2, ll, regs[2]);
++	}
++#else
 +	for (unsigned n = 1; n != reg_count; ++n) {
 +		memcpy(out, ", ", 2);
 +		out = writeVectorRegister(out + 2, ll, regs[n]);
 +	}
++#endif
 +	if (row->immediate) {
 +		const unsigned value = code[prefix + 2];
 +		memcpy(out, ", ", 2);
@@ -1144,6 +1175,15 @@ index 00000000..037641f2
 +		x->modrm = code[prefix + 1];
 +		x->encoding.modrm_offset = (uint8_t)(prefix + 1);
 +		x->op_count = (uint8_t)(reg_count + row->immediate);
++#ifdef X86_VEX_REGISTER_ONLY
++		writeVectorOperand(&x->operands[0], first_ll, regs[0],
++				   row->access[0]);
++		writeVectorOperand(&x->operands[1], ll, regs[1],
++				   row->access[1]);
++		if (reg_count == 3)
++			writeVectorOperand(&x->operands[2], ll, regs[2],
++					   row->access[2]);
++#else
 +		static const x86_reg bases[] X86_VECTOR_REGISTER_DATA = {
 +			X86_REG_XMM0, X86_REG_YMM0, X86_REG_ZMM0
 +		};
@@ -1155,6 +1195,7 @@ index 00000000..037641f2
 +			op->access = (cs_ac_type)row->access[n];
 +			op->size = (uint8_t)(16 << width);
 +		}
++#endif
 +		if (row->immediate) {
 +			x->operands[reg_count].type = X86_OP_IMM;
 +			x->operands[reg_count].imm = code[prefix + 2];
