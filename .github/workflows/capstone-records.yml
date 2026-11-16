@@ -1,7 +1,7 @@
 name: Validate TriCore direct decoder lowering
 on:
   push:
-    branches: [codex/capstone-tricore-direct-decoder-profiles]
+    branches: [codex/capstone-tricore-qualified-lowering-profiles]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -50,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: tricore-direct-decoder-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}-${{ matrix.archs }}
+          name: tricore-qualified-lowering-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.profile }}-${{ matrix.archs }}
           path: evidence/
           retention-days: 14
