@@ -119,6 +119,40 @@ def main(w):
         (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
 
+        if label == 'scan':
+            script = w / 'diagnostic-data.ld'
+            script.write_text('SECTIONS { .cs_x86_vex32_rodata : { *(.cs_x86_vex32_rodata) } } INSERT AFTER .bss;\n')
+            shutil.copyfile(script, p / 'evidence/diagnostic-data.ld')
+            exe['data'] = w / 'run-data'
+            run(['clang++', obj, b / 'libcapstone.a', ad / 'target/release/libiced_compare.a',
+                 '-Wl,-T,' + str(script), '-lpthread', '-ldl', '-lm', '-o', exe['data']], 'link-data-control')
+            for control in ('integer', 'scan', 'data'):
+                for kind, command in [('symbols', ['nm', '-n', '-S', '--defined-only']),
+                                      ('sections', ['readelf', '-WS']), ('segments', ['readelf', '-Wl'])]:
+                    (p / 'evidence' / (control + '-' + kind + '.txt')).write_bytes(sp.check_output([*command, exe[control]]))
+                with gzip.open(p / 'evidence' / (control + '-linked-assembly.gz'), 'wb') as stream:
+                    stream.write(sp.check_output(['objdump', '-dr', exe[control]]))
+            import re
+            symbols = {}
+            for control in ('integer', 'scan', 'data'):
+                symbols[control] = {}
+                for line in (p / 'evidence' / (control + '-symbols.txt')).read_text().splitlines():
+                    match = re.fullmatch(r'([0-9a-f]+) ([0-9a-f]+) (\S) (.+)', line)
+                    if match:
+                        symbols[control].setdefault(match[4], []).append([int(match[1], 16), int(match[2], 16), match[3]])
+            selected = ('arch_configs', 'x86LegacyFullHandlers', 'x86LegacyHandlers', 'x86VexScanRows')
+            assert all(symbols['integer'][key] == symbols['data'][key] for key in selected)
+            for key in ('cs_disasm_iter', 'decodeInstructionScan', 'decodeInstructionFull'):
+                assert all(symbols[label][key] == symbols['integer'][key] for label in ('scan', 'data'))
+            hot = ('X86_completeScan','X86_getInstructionAfterExtensions','decodeEVEXInstruction','translateOperand','validateRMMemory')
+            assert all(symbols['scan'][key]==symbols['data'][key] for key in hot)
+            save('placement-control.json', dict(
+                 restored_scan_tables={key: {label: values[key] for label, values in symbols.items()} for key in selected},
+                 vector_functions={key: {label: values.get(key) for label, values in symbols.items()}
+                                   for key in ('X86_writeVectorOutput', 'writeVexRipLoad')},
+                 scanner_positions_identical=True,
+                 scope='Relink the exact R1292 archive with only the added C5 constant section moved after original code/data. ELF segments also change; no PMU-level mechanism attribution.'))
+
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
@@ -132,7 +166,7 @@ def main(w):
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Pilot isolated VEX32 output against the published baseline with original-image and same-inode ASLR-disabled controls.'))
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='R1292 JPEG64 full-detail and SSL64 SIMD-scan regressions; restore original scan table addresses by relinking the same archive.'))
     run(['git','apply',r/'scan.patch'],'apply-census',tree)
     with (tree/'arch/X86/X86OutputIterator.c').open('a')as f:f.write('\nbool census_output(csh h,const uint8_t*p,size_t n,cs_insn*i){uint16_t len;return X86_trySimpleOutput((cs_struct*)(uintptr_t)h,p,n,i,&len);}\n')
     run(['cmake','--build',b,'--target','capstone_static','--parallel','4'],'census-build')
@@ -140,11 +174,11 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-amd64', 'libzstd1-amd64'): continue
+        if name not in ('libjpeg62-turbo-amd64', 'libssl3t64-amd64'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else ['simd-functions']):
+        for panel in (['all-functions'] if name=='libjpeg62-turbo-amd64' else ['simd-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -152,7 +186,7 @@ def main(w):
             rows=sp.check_output([w/'census',f,intervals,str(bits)],text=True).splitlines()
             counts=sorted([(int(x.split(' ',1)[0]),x.split(' ',1)[1]) for x in rows],reverse=True)
             save('output-coverage-'+name+'-'+panel+'.json',dict(total=sum(c for c,k in counts),handled=sum(c for c,k in counts if k.startswith('hit ')),forms=counts))
-            for mode in ([1] if name=='libzstd1-amd64' or (name=='libjpeg62-turbo-amd64' and panel=='simd-functions') else [0,1,2]):
+            for mode in ([0] if name=='libssl3t64-amd64' else [2]):
                 def measure(lib,n,launch):
                     tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
                     if launch=='images':
@@ -166,8 +200,8 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(100e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','data']
                 for i in range(21):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
@@ -180,12 +214,12 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=md('iced','scan')
-                    row['vs_fast']=md('fast','scan') if mode else None
+                    row['vs_iced']=None
+                    row['vs_fast']=None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==24
+    assert len(reported)==4
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-iced-formatters-'))
 try:

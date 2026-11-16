@@ -1,7 +1,7 @@
-name: Measure isolated C5 memory output
+name: Diagnose memory-output regressions with original scan table addresses
 on:
   push:
-    branches: [codex/capstone-c5-isolated-memory-output-pilot]
+    branches: [codex/capstone-c5-memory-data-control]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: c5-isolated-memory-output-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: c5-memory-data-control-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

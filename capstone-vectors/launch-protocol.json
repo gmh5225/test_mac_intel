@@ -1,13 +1,21 @@
 {
-  "purpose": "Test isolated C5/32 ordinary base-memory output with the same existing vector dispatch and preserved RIP function boundary",
-  "hosts": "Two separately assigned Ubuntu 24.04 Clang runners; record CPU models without selecting or discarding results",
-  "panels": "JPEG64 all + SIMD, JPEG AVX2 32, SSL64 SIMD, Zstd64 all + SIMD",
-  "cycles": 21,
-  "controls": [
-    "byte-identical A/A baseline",
-    "original images",
-    "same inode and fixed addresses"
-  ],
-  "native_qualification": false,
-  "independent_cost_control": "Same job compares released baseline, exact R1290 register-only candidate, and this candidate; only the isolated leaf runtime object may differ between the two candidates."
+  "candidate": {
+    "parent": "ce07fdfca945d55de72325eb6482aaf9dd9297b2",
+    "baseline_tree": "16cef0462e138667e43d750c66a00e7eab41073a",
+    "tree": "3338f4b0f212113c336f81644e00c577c7a7a503",
+    "sha256": "b4c157f6234efc1244409e65ad9b51299cb7f1c941e0fde2a59c7bd988eb3238",
+    "records": "equal private-entry records, cursor and errors for 152961024 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "layout_identical": true,
+    "generated_output_matches_producer": true,
+    "shared_vector_object_identical": false,
+    "decoder_object_identical": true,
+    "inactive_runtime_objects_identical": true,
+    "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+  },
+  "basis": "R1292 ordinary C5 memory output cuts AVX32 formatting/detail instruction cost by another 25.5/22.9 percent, but AMD EPYC7763 shows JPEG64 full-detail and SSL64 SIMD-scan regressions. Its only changed runtime object relative to R1290 is the isolated C5 leaf; original scan data moves from +4096 to +12288 bytes.",
+  "hypothesis": "Hold runtime objects and hot code positions fixed while relinking only added C5 constant data after original sections, restoring original scan tables. This tests placement sensitivity without an arbitrary production padding change.",
+  "protocol": "Two independently assigned Ubuntu24.04 Clang hosts; preserve CPU models and all observations. JPEG64 all-functions detail and SSL64 SIMD scan, images and fixed-address same-inode controls, byte-identical A/A, 21 balanced 100ms cycles.",
+  "qualified": false
 }
