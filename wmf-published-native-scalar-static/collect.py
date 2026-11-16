@@ -1,0 +1,73 @@
+"""Retain authored Published native scalar compiler outputs without linking."""
+from pathlib import Path
+import datetime
+import hashlib
+import json
+import subprocess
+import sys
+PROFILES = (('arm64-ios', 'iphoneos', 'arm64-apple-ios18.0'), ('arm64e-ios', 'iphoneos', 'arm64e-apple-ios18.0'), ('arm64-ios-simulator', 'iphonesimulator', 'arm64-apple-ios18.0-simulator'), ('x86_64-ios-simulator', 'iphonesimulator', 'x86_64-apple-ios18.0-simulator'), ('x86_64-macabi', 'macosx', 'x86_64-apple-ios18.0-macabi'))
+MODES = (('ir', '.ll'), ('sil', '.sil'), ('assembly', '.s'), ('object', '.o'))
+OPTIMIZATIONS = ('-O', '-Onone', '-Osize')
+CLIENT = 'import Foundation\nimport Combine\n\npublic enum PublishedLoadState {\n  case idle, loading, failed\n}\npublic enum PublishedImageAvailability {\n  case unknown, missing, available, refreshing\n}\n\npublic final class FirstPublishedOwner: NSObject {\n  @Published public var first: Bool = false\n  @Published public var second: Bool = false\n}\npublic final class SecondPublishedOwner: NSObject {\n  @Published public var enabled: Bool = false\n}\npublic final class ThirdPublishedOwner: NSObject {\n  @Published public var visible: Bool = false\n}\npublic final class DifferentPublishedOwner: NSObject {\n  @Published public var count: Int = 0\n  @Published public var text: String = ""\n  @Published public var object: NSObject? = nil\n  @Published public var state: PublishedLoadState = .idle\n  @Published public var availability: PublishedImageAvailability = .unknown\n  @Published public var storageByte: UInt8 = 0\n}\n\n@inline(never) public func setFirst(_ owner: FirstPublishedOwner, _ value: Bool) {\n  owner.first = value\n}\n@inline(never) public func setSecond(_ owner: FirstPublishedOwner, _ value: Bool) {\n  owner.second = value\n}\n@inline(never) public func setEnabled(_ owner: SecondPublishedOwner, _ value: Bool) {\n  owner.enabled = value\n}\n@inline(never) public func setVisible(_ owner: ThirdPublishedOwner, _ value: Bool) {\n  owner.visible = value\n}\n@inline(never) public func setCount(_ owner: DifferentPublishedOwner, _ value: Int) {\n  owner.count = value\n}\n@inline(never) public func setText(_ owner: DifferentPublishedOwner, _ value: String) {\n  owner.text = value\n}\n@inline(never) public func setObject(_ owner: DifferentPublishedOwner,\n                                    _ value: NSObject?) {\n  owner.object = value\n}\n@inline(never) public func readFirst(_ owner: FirstPublishedOwner) -> Bool {\n  owner.first\n}\n\n@inline(never) public func setState(_ owner: DifferentPublishedOwner,\n                                  _ value: PublishedLoadState) {\n  owner.state = value\n}\n@inline(never) public func setAvailability(_ owner: DifferentPublishedOwner,\n                                         _ value: PublishedImageAvailability) {\n  owner.availability = value\n}\n@inline(never) public func setStorageByte(_ owner: DifferentPublishedOwner,\n                                       _ value: UInt8) {\n  owner.storageByte = value\n}\n\npublic final class NativePublishedOwner {\n  public enum LoadState { case idle, loading, failed }\n  public enum ImageAvailability { case unknown, missing, available, refreshing }\n  @Published public var first: Bool = false\n  @Published public var second: Bool = false\n  @Published public var state: LoadState = .idle\n  @Published public var availability: ImageAvailability = .unknown\n  @Published public var storageByte: UInt8 = 0\n}\n@inline(never) public func setNativeFirst(_ owner: NativePublishedOwner, _ value: Bool) {\n  owner.first = value\n}\n@inline(never) public func setNativeSecond(_ owner: NativePublishedOwner, _ value: Bool) {\n  owner.second = value\n}\n@inline(never) public func setNativeState(_ owner: NativePublishedOwner,\n                                        _ value: NativePublishedOwner.LoadState) {\n  owner.state = value\n}\n@inline(never) public func setNativeAvailability(_ owner: NativePublishedOwner,\n                                               _ value: NativePublishedOwner.ImageAvailability) {\n  owner.availability = value\n}\n@inline(never) public func setNativeStorageByte(_ owner: NativePublishedOwner,\n                                              _ value: UInt8) {\n  owner.storageByte = value\n}\n'
+
+def sha(path):
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+def compiler_command(profile, sdk, source, output, optimization, mode):
+    if profile not in PROFILES or optimization not in OPTIMIZATIONS or mode not in dict(MODES):
+        raise ValueError('unsupported authored static compiler profile')
+    label, kind, target = profile
+    command = ['xcrun', 'swiftc', '-sdk', str(sdk), '-target', target, '-parse-as-library', optimization, '-module-name', 'NDPublishedNativeScalarABI', '-emit-' + mode, str(source), '-o', str(output)]
+    if kind == 'macosx':
+        command += ['-F', str(Path(sdk) / 'System/iOSSupport/System/Library/Frameworks'), '-I', str(Path(sdk) / 'System/iOSSupport/usr/lib/swift')]
+    return command
+
+def output_path(output, profile, optimization, suffix):
+    return output / (profile[0] + '-' + optimization.removeprefix('-') + suffix)
+
+def permitted(command, roots, source, output):
+    if command == ['xcrun', 'swiftc', '--version']:
+        return True
+    if len(command) == 4 and command[:2] == ['xcrun', '--sdk'] and (command[2] in {'iphoneos', 'iphonesimulator', 'macosx'}) and (command[3] == '--show-sdk-path'):
+        return True
+    return any((command == compiler_command(p, roots[p[1]], source, output_path(output, p, opt, suffix), opt, mode) for p in PROFILES for opt in OPTIMIZATIONS for mode, suffix in MODES))
+
+def collect(output, runner=subprocess.run):
+    output = Path(output).resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    source = output / 'authored.swift'
+    source.write_text(CLIENT)
+    roots, commands, files = ({}, [], [])
+    result = dict(passed=False, static_only=True, authored_source_sha256=sha(source), commands=commands, files=files, no_link_or_execution=True, no_simulator_or_original_or_provider_execution=True, no_ABI_or_ownership_or_lifetime_or_nil_bit_conclusion=True)
+
+    def run(command, label):
+        if not permitted(command, roots, source, output):
+            raise ValueError('command outside authored static compiler allowlist')
+        p = runner(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=False)
+        (output / (label + '.stdout.txt')).write_text(p.stdout)
+        (output / (label + '.stderr.txt')).write_text(p.stderr)
+        commands.append(dict(argv=command, returncode=p.returncode))
+        if p.returncode:
+            raise RuntimeError('static command failed: ' + label)
+        return p.stdout
+    try:
+        result['compiler_version'] = run(['xcrun', 'swiftc', '--version'], 'compiler-version')
+        for kind in ('iphoneos', 'iphonesimulator', 'macosx'):
+            roots[kind] = Path(run(['xcrun', '--sdk', kind, '--show-sdk-path'], kind + '-sdk-path').strip()).resolve()
+        for p in PROFILES:
+            for opt in OPTIMIZATIONS:
+                for mode, suffix in MODES:
+                    path = output_path(output, p, opt, suffix)
+                    run(compiler_command(p, roots[p[1]], source, path, opt, mode), p[0] + '-' + opt[1:] + '-' + mode)
+                    files.append(dict(profile=p[0], target=p[2], SDK=p[1], optimization=opt, mode=mode, path=path.name, bytes=path.stat().st_size, sha256=sha(path)))
+        result['passed'] = True
+        return result
+    except BaseException as error:
+        result['error'] = str(error)
+        raise
+    finally:
+        result['at'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        (output / 'raw-compiler-outputs.json').write_text(json.dumps(files, indent=2) + '\n')
+        (output / 'result.json').write_text(json.dumps(result, indent=2) + '\n')
+if __name__ == '__main__':
+    collect(Path(sys.argv[1]) if len(sys.argv) == 2 else Path('wmf-published-native-scalar-static-records'))
