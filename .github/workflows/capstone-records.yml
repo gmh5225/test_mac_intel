@@ -1,7 +1,7 @@
-name: Separate ASLR and executable-image effects in flagged EVEX transfer comparisons
+name: Replicate the original directory context on the flagged CPU model
 on:
   push:
-    branches: [codex/capstone-evex-transfer-geometry-mixed]
+    branches: [codex/capstone-evex-original-context]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,14 +11,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 2 }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 3 }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 90
     env:
-      GEOMETRY_PROFILE: ${{ matrix.host }}-${{ matrix.cc }}
+      REPLICA: ${{ matrix.replica }}
       BUILD_ARCHS: ${{ matrix.archs }}
       MEASURE_CC: ${{ matrix.cc }}
     steps:
@@ -32,10 +32,10 @@ jobs:
           ref: 8acfcd402e9f5fb7a458faa37552e53d7da3aa9a
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Compare unchanged AArch64 consumer under ten predeclared launch controls
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y valgrind
+          sudo apt-get install -y valgrind gdb
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
           pip install pyelftools==0.32
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-transfer-geometry-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-original-context-${{ matrix.replica }}-${{ matrix.host }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
