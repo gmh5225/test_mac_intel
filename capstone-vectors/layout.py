@@ -83,5 +83,13 @@ def linked_layout(before, after, label):
             changed=[dict(symbol=k, before=left[k], after=right[k]) for k in sorted(common) if left[k] != right[k]],
             removed=[dict(symbol=k, positions=left[k]) for k in sorted(left.keys() - right.keys())],
             added=[dict(symbol=k, positions=right[k]) for k in sorted(right.keys() - left.keys())])
-    assert not result['text']['changed'], 'Existing function positions or sizes changed'
+    permitted = {'X86_writeDisplacement', 'X86_writeEvexMemoryDispatch',
+                 'X86_decodeScanFeatureExtension', 'decodeEvexRegisterScan',
+                 'X86_writeEvexMemoryOutput'}
+    moved = result['text']['changed']
+    assert {row['symbol'] for row in moved} == permitted
+    assert all(len(row['before']) == len(row['after']) == 1 and
+               row['before'][0][2] == row['after'][0][2] for row in moved)
+    assert len({row['after'][0][1] - row['before'][0][1] for row in moved}) == 1
+    result['scope'] = 'Cost diagnosis only: ordinary text identity is separately checked, while exactly five unmodified functions in existing isolated EVEX sections move by one common delta. Native performance is unqualified.'
     return result

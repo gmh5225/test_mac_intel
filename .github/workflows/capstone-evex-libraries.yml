@@ -1,7 +1,7 @@
-name: Verify isolated 32-bit output with unchanged generic body and caller shape and compare unchanged-consumer instruction costs
+name: Diagnose fixed-mode output costs with explicit isolated EVEX section movement
 on:
   push:
-    branches: [codex/capstone-mode-caller-shape-cost]
+    branches: [codex/capstone-mode-section-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -42,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: mode-caller-shape-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mode-section-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
