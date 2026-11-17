@@ -1,0 +1,14 @@
+{
+  "source_parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "evidence": "../round1401-residual-output-hotspots/dispatch-pcs.json",
+  "observed": "Clang18 SSL32 calls the shared output entry 1491396 times in two traversals. Every invocation executes dynamic REX/prefix-class selection and mode-index formation before loading the plan; mode is fixed for the handle.",
+  "change": "Instantiate one canonical output body with constant 32-bit and 64-bit policy. Move the mode validity check to the owning entry and place the noinline 32-bit instantiation in its own ELF section. Keep all option, callback, legality, byte-extent and complete-record behavior.",
+  "expectations": "Fewer PE32 executed instructions and stack traffic; no scalar or SIMD gains assumed until measured. No added ISA admission, no cached options, no table projection, no public ABI change.",
+  "prior_negative_evidence": [
+    "R1386",
+    "R1391",
+    "R1393",
+    "R1395"
+  ],
+  "publication_qualified": false
+}
