@@ -1,7 +1,7 @@
-name: Validate canonical EVEX transfer plans through current NeverD and latest LLVM source
+name: Validate frozen transfer plans against updated NeverD dev
 on:
   push:
-    branches: [codex/capstone-evex-transfer-plan-product]
+    branches: [codex/capstone-transfer-current-dev-integration]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 3a55853a144c46823d01bd2693862f3702519a0a
+          ref: b63022bd057effd15766bdebe9028a103a3b7f3b
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
