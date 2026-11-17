@@ -1,7 +1,7 @@
-name: Time prechecked memory dispatch with frozen consumers and complete launch controls
+name: Verify isolated alias lookup and compare unchanged mixed consumers
 on:
   push:
-    branches: [codex/capstone-evex-prechecked-dispatch-mixed]
+    branches: [codex/capstone-isolated-alias-trie-cost]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -28,21 +28,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 8acfcd402e9f5fb7a458faa37552e53d7da3aa9a
+          ref: 7e54e86ca81124be00b978dd00164803a6b1f4b7
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Install instruction profiler
+        run: sudo apt-get update -qq && sudo apt-get install -y valgrind
+      - name: Verify records and collect mixed architecture instruction costs
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
           pip install pyelftools==0.32
-          python3 capstone-records/prepare_baseline.py
           python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-prechecked-dispatch-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: isolated-alias-trie-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

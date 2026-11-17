@@ -1,0 +1,11 @@
+{
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "cause": "R1388 identifies linear alias-name scans as 17.82% of AArch64 and 10.62% of MIPS format instruction counts in retained Clang14 four-backend traces. Existing dedicated configurations already use generated double-array tries. Previous grouped-index changes improved work but changed shared code/data layout and regressed x86.",
+  "change": "Reuse the canonical trie parser and unchanged generated rows, with AArch64/MIPS entry points and data in a separate translation unit and ELF sections. Keep the ordinary shared parser and every unrelated runtime object identical; measure final linked placement separately.",
+  "constraints": [
+    "Preserve existing 15-byte limit, whitespace and architecture-specific mnemonic delimiters",
+    "Keep DIET/no-text/real-detail semantics and all previous negative evidence",
+    "No production padding, corpus or consumer changes; native and configuration qualification remain required"
+  ],
+  "publication_qualified": false
+}
