@@ -1,0 +1,22 @@
+diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
+index e82eaaa5..3a2d108e 100644
+--- a/arch/AArch64/AArch64Mapping.c
++++ b/arch/AArch64/AArch64Mapping.c
+@@ -342,12 +342,12 @@ void AArch64_init_cs_detail(MCInst *MI)
+ 	       sizeof(empty_aarch64_detail));
+ #else
+ 	if (detail_is_set(MI)) {
+-		memset(get_detail(MI), 0,
++		cs_detail *detail = get_detail(MI);
++		memset(detail, 0,
+ 		       offsetof(cs_detail, aarch64) + sizeof(cs_aarch64));
+-		for (int i = 0; i < ARR_SIZE(AArch64_get_detail(MI)->operands);
+-		     i++)
+-			AArch64_setup_op(&AArch64_get_detail(MI)->operands[i]);
+-		AArch64_get_detail(MI)->cc = AArch64CC_Invalid;
++		for (int i = 0; i < ARR_SIZE(detail->aarch64.operands); i++)
++			AArch64_setup_op(&detail->aarch64.operands[i]);
++		detail->aarch64.cc = AArch64CC_Invalid;
+ 	}
+ #endif
+ }
