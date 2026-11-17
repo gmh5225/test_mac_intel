@@ -2,6 +2,7 @@ from pathlib import Path
 import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
 from geometry import Geometry
+from section_identity import capture as capture_reader, compare as compare_reader
 from jpeg_fixture import prepare_jpeg
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
@@ -35,13 +36,14 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
   geometry=Geometry(e)
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan'):
+  reader_views={}
+  for key in ('base','packed','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
     run(['git','add','-A'],'stage-tested-source-'+key,s)
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/('candidate.json' if key=='scan' else key+'.json')).read_text())['tree'],tested
+    assert tested==json.loads((r/('candidate.json' if key=='scan' else 'input.json')).read_text())['tree'],tested
     write('tested-source-'+key,dict(tree=tested,patch_sha256=sha(variant)))
     run(['git','reset','-q'],'unstage-tested-source-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+key)
@@ -53,19 +55,22 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    geometry.capture(key,b,f)
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
+   if key!='base':reader_views[key]=capture_reader(objdir/'arch/X86/X86VexScan.c.o','.text' if key=='packed' else '.cs_x86_vex_scan')
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('scan',):
+  for key in ('packed','scan'):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added=={'arch/X86/X86VexScan.c.o'},added
    assert set(objects['base']) <= set(objects[key])
    assert set(changed) == {'arch/X86/X86DisassemblerDecoder.c.o'},changed
    active=bool(changed)
-   write('scope-'+key,dict(active=active,source_applies=True,policy='Early packed C5 scan; original output writers and non-x86 runtime objects unchanged'))
+   write('scope-'+key,dict(active=active,source_applies=True,policy='Shared packed C5 reader with or without private ELF code/data sections; old runtime objects identical between candidates'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
   assert active
+  assert all(objects['packed'][name]==objects['scan'][name] for name in objects['base'])
+  write('reader-section-identity',dict(compare_reader(reader_views['packed'],reader_views['scan']),old_runtime_objects_identical=len(objects['base'])))
   geometry.finish()
   write('all-binaries',{key:sha(path) for key,path in bins.items()})
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -90,7 +95,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    for mode in ((0,2) if x['name']=='arm64-ls' else (0,1,2) if x['name']=='jpeg-avx2-i386' else (2,)):
     for launch in launches:
      warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
+     runs=[];reference=None;keys=['base','aa','packed','scan']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:

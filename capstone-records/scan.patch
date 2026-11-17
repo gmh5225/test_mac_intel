@@ -81,7 +81,7 @@ index 74790c01..6d09e938 100644
  $(LIBOBJ_TMS320C64X): $(DEP_TMS320C64X)
  $(LIBOBJ_M680X): $(DEP_M680X)
 diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..7417457c 100644
+index 63dcc538..27f3c45b 100644
 --- a/arch/X86/X86DisassemblerDecoder.c
 +++ b/arch/X86/X86DisassemblerDecoder.c
 @@ -36,6 +36,7 @@
@@ -92,21 +92,19 @@ index 63dcc538..7417457c 100644
  #include "X86InstPrinterCommon.h"
  
  #if defined(_MSC_VER)
-@@ -3675,10 +3676,34 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
+@@ -3675,10 +3676,35 @@ getInstructionScanResultAfterInitial(csh ud, const uint8_t *code,
  	if (extension || opcode == 0x62)
  		return decodeScanResultFallback(ud, code, code_len, insn,
  						result, opcode, extension);
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
 +	if (opcode == 0xc5 && opcodeOffset == 0) {
-+		if (readerFlags && !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
-+			return decodeVexTerminalResultInline(
-+				ud, code, code_len, insn, result, 0xc5);
-+		/* In 32-bit mode, C5 is LDS unless the next two bits are set.
-+		 * Mixed mode flags retain their original decoder precedence. */
-+		if (handle->mode == CS_MODE_32 && code_len >= 2 &&
-+		    (code[1] & 0xc0) == 0xc0) {
++		/* Bare VEX2 public plans share their ID and extent in 32/64-bit
++		 * mode. In 32-bit mode, retain C5's legacy LDS interpretation. */
++		if (handle->mode == CS_MODE_64 ||
++		    (handle->mode == CS_MODE_32 && code_len >= 2 &&
++		     (code[1] & 0xc0) == 0xc0)) {
 +			const uint32_t packed =
-+				X86_readVex32PublicPlan(code, code_len);
++				X86_readVex2PublicPlan(code, code_len);
 +			if (packed) {
 +				if (packed == UINT32_MAX)
 +					return false;
@@ -117,6 +115,9 @@ index 63dcc538..7417457c 100644
 +				return true;
 +			}
 +		}
++		if (readerFlags && !(handle->mode & (CS_MODE_16 | CS_MODE_32)))
++			return decodeVexTerminalResultInline(
++				ud, code, code_len, insn, result, 0xc5);
 +	}
 +#else
  	if (readerFlags && opcode == 0xc5 && opcodeOffset == 0 &&
@@ -129,7 +130,7 @@ index 63dcc538..7417457c 100644
  	/* Constant bitness folds the terminal readers' mode and size tests.
 diff --git a/arch/X86/X86GenVexPublicPlans.inc b/arch/X86/X86GenVexPublicPlans.inc
 new file mode 100644
-index 00000000..7817a761
+index 00000000..a1991728
 --- /dev/null
 +++ b/arch/X86/X86GenVexPublicPlans.inc
 @@ -0,0 +1,135 @@
@@ -146,7 +147,7 @@ index 00000000..7817a761
 +#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS
 +enum { X86_VEX2_PUBLIC_LENGTH = 16384, X86_VEX2_PUBLIC_GROUP = 32768 };
 +/* Public plan, tagged L pair or ModR/M group by pp/opcode. */
-+static const uint16_t x86Vex2PublicPlans[4][256] = {
++static const uint16_t x86Vex2PublicPlans[4][256] X86_VEX_SCAN_DATA = {
 +	{
 +		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +		8414, 8414, 16384, 16385, 11788, 11772, 16386, 16387, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -223,7 +224,7 @@ index 00000000..7817a761
 +
 +#define X86_HAS_VEX2_PUBLIC_GROUPS 1
 +#define X86_HAS_VEX2_LENGTH_PLANS 1
-+static const uint16_t x86Vex2LengthPlans[14][2] = {
++static const uint16_t x86Vex2LengthPlans[14][2] X86_VEX_SCAN_DATA = {
 +	{ 32768, 0 },
 +	{ 32769, 0 },
 +	{ 32770, 0 },
@@ -241,7 +242,7 @@ index 00000000..7817a761
 +};
 +
 +/* Register form and ModR/M.reg select an exact public plan. */
-+static const uint16_t x86Vex2PublicGroups[22][16] = {
++static const uint16_t x86Vex2PublicGroups[22][16] X86_VEX_SCAN_DATA = {
 +	{ 8316, 8316, 8316, 8316, 8316, 8316, 8316, 8316, 8276, 8276, 8276, 8276, 8276, 8276, 8276, 8276 },
 +	{ 8318, 8318, 8318, 8318, 8318, 8318, 8318, 8318, 0, 0, 0, 0, 0, 0, 0, 0 },
 +	{ 8292, 8292, 8292, 8292, 8292, 8292, 8292, 8292, 8300, 8300, 8300, 8300, 8300, 8300, 8300, 8300 },
@@ -270,13 +271,21 @@ index 00000000..7817a761
 +#endif
 diff --git a/arch/X86/X86VexScan.c b/arch/X86/X86VexScan.c
 new file mode 100644
-index 00000000..c0bf2665
+index 00000000..d7445931
 --- /dev/null
 +++ b/arch/X86/X86VexScan.c
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,83 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +#ifdef CAPSTONE_HAS_X86
++/* Keep the added scan projection out of the existing ELF code/data sections. */
++#if defined(__ELF__) && defined(__GNUC__)
++#define X86_VEX_SCAN_CODE __attribute__((section(".cs_x86_vex_scan")))
++#define X86_VEX_SCAN_DATA __attribute__((section(".cs_x86_vex_scan_rodata")))
++#else
++#define X86_VEX_SCAN_CODE
++#define X86_VEX_SCAN_DATA
++#endif
 +#define X86_DEFINE_VEX2_PUBLIC_PLANS
 +#include "X86VexScan.h"
 +#include "X86DisassemblerDecoder.h"
@@ -289,8 +298,8 @@ index 00000000..c0bf2665
 +#elif defined(__GNUC__)
 +__attribute__((noinline))
 +#endif
-+CAPSTONE_INTERNAL CS_PRESERVE_MOST uint32_t
-+X86_readVex32PublicPlan(const uint8_t *code, size_t size)
++CAPSTONE_INTERNAL CS_PRESERVE_MOST X86_VEX_SCAN_CODE uint32_t
++X86_readVex2PublicPlan(const uint8_t *code, size_t size)
 +{
 +	if (size < 3)
 +		return UINT32_MAX;
@@ -327,7 +336,7 @@ index 00000000..c0bf2665
 +		end = 4;
 +		if (modrm < 0xc0) {
 +			const unsigned mod = modrm >> 6, rm = modrm & 7;
-+			static const uint8_t extra[3][8] = {
++			static const uint8_t extra[3][8] X86_VEX_SCAN_DATA = {
 +				{ 0, 0, 0, 0, 1, 4, 0, 0 },
 +				{ 1, 1, 1, 1, 2, 1, 1, 1 },
 +				{ 4, 4, 4, 4, 5, 4, 4, 4 }
@@ -351,7 +360,7 @@ index 00000000..c0bf2665
 +#endif
 diff --git a/arch/X86/X86VexScan.h b/arch/X86/X86VexScan.h
 new file mode 100644
-index 00000000..eb3ae30e
+index 00000000..5784e456
 --- /dev/null
 +++ b/arch/X86/X86VexScan.h
 @@ -0,0 +1,22 @@
@@ -364,7 +373,7 @@ index 00000000..eb3ae30e
 +#include "X86GenVexPublicPlans.inc"
 +
 +#if X86_HAS_VEX2_PUBLIC_PLANS && !defined(CAPSTONE_X86_SCAN_ADAPTER)
-+/* The caller admits a bare 32-bit VEX2 prefix. Return (public_id << 8) |
++/* The caller admits a bare 32/64-bit VEX2 prefix. Return (public_id << 8) |
 + * length for a complete instruction, zero for canonical fallback, or
 + * UINT32_MAX for an invalid encoding. The reader only reads input and
 + * immutable generated tables; it has no state or output-pointer effects. */
@@ -372,13 +381,13 @@ index 00000000..eb3ae30e
 +__attribute__((pure))
 +#endif
 +CAPSTONE_INTERNAL CS_PRESERVE_MOST uint32_t
-+X86_readVex32PublicPlan(const uint8_t *code, size_t size);
++X86_readVex2PublicPlan(const uint8_t *code, size_t size);
 +
 +#endif
 +
 +#endif
 diff --git a/suite/synctools/x86_operand_specializations.py b/suite/synctools/x86_operand_specializations.py
-index 48c6fb41..33fbbfa2 100644
+index 48c6fb41..8c84062f 100644
 --- a/suite/synctools/x86_operand_specializations.py
 +++ b/suite/synctools/x86_operand_specializations.py
 @@ -1158,7 +1158,130 @@ def vex_scan_form(operands, register_form):
@@ -486,7 +495,7 @@ index 48c6fb41..33fbbfa2 100644
 +             "#ifdef X86_DEFINE_VEX2_PUBLIC_PLANS",
 +             "enum { X86_VEX2_PUBLIC_LENGTH = 16384, X86_VEX2_PUBLIC_GROUP = 32768 };",
 +        "/* Public plan, tagged L pair or ModR/M group by pp/opcode. */",
-+             "static const uint16_t x86Vex2PublicPlans[4][256] = {"]
++             "static const uint16_t x86Vex2PublicPlans[4][256] X86_VEX_SCAN_DATA = {"]
 +    for row in out:
 +        lines.append("\t{")
 +        for i in range(0, len(row), 16):
@@ -495,14 +504,14 @@ index 48c6fb41..33fbbfa2 100644
 +    lines += ["};", "", f"#define X86_HAS_VEX2_PUBLIC_GROUPS {int(bool(groups))}"]
 +    lines += [f"#define X86_HAS_VEX2_LENGTH_PLANS {int(bool(length_pairs))}"]
 +    if length_pairs:
-+        lines += [f"static const uint16_t x86Vex2LengthPlans[{len(length_pairs)}][2] = {{"]
++        lines += [f"static const uint16_t x86Vex2LengthPlans[{len(length_pairs)}][2] X86_VEX_SCAN_DATA = {{"]
 +        for pair in length_pairs:
 +            lines.append("\t{ " + ", ".join(map(str, pair)) + " },")
 +        lines += ["};", ""]
 +    if groups:
 +        lines += [
 +                  "/* Register form and ModR/M.reg select an exact public plan. */",
-+                  f"static const uint16_t x86Vex2PublicGroups[{len(groups)}][16] = {{"]
++                  f"static const uint16_t x86Vex2PublicGroups[{len(groups)}][16] X86_VEX_SCAN_DATA = {{"]
 +        for group in groups:
 +            lines.append("\t{ " + ", ".join(map(str, group)) + " },")
 +        lines += ["};"]
