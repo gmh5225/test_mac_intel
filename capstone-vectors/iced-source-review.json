@@ -1,0 +1,26 @@
+{
+  "local_head": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
+  "benchmark_iced": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
+  "path": "src/rust/iced-x86/src/decoder.rs",
+  "fragments": [
+    {
+      "function": "vex2",
+      "local_line": 1584,
+      "sha256": "c3b3bf47534177034de1de279ea999f5e844d6404d728bc6d404ac043f1a4ca2",
+      "matches_benchmark_fork": true
+    },
+    {
+      "function": "vex3",
+      "local_line": 1632,
+      "sha256": "fa49c637efcf78eb7ce4be3f15e808827a0edd6e71221bfdfb17563869ec1cbf",
+      "matches_benchmark_fork": true
+    }
+  ],
+  "findings": [
+    "VEX2 and VEX3 normalize prefix-derived state, then select the same handlers_vex tables; these paths are not excluded wholesale in 32-bit mode.",
+    "VEX3 uses preconfigured reg15_mask and mask_e0 to normalize extension fields. Capstone already owns canonical mode handling; the new prototype reuses its verified output rows only after a narrower prefix gate.",
+    "The prototype explicitly projects Capstone's canonical 32-bit rex and addr_size detail fields and retains unsupported cases in the ordinary decoder."
+  ],
+  "copied_external_code": false,
+  "scope": "Structural comparison of exact local fragments against the frozen fork used by measurements; no throughput inference from source shape."
+}
