@@ -1,0 +1,339 @@
+{
+  "status": "compiler-audit-complete-static-pointer-table-removed",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "cd1908c48bf0d9f42c858344c297f72c3f23fb0f",
+      "sha256": "9e05be7b031200a7ef18659229736f62b59f8c1d7acefc2de1bab0f45f49ec86",
+      "input_tree": "03eb80645d70a3dc57332d4b976e8fbfc45a9b46",
+      "input_patch_sha256": "8aa989302589f1dee79b07f41a66454ad9189280d39a6d37affeb06c08f23644",
+      "delta_files": [
+        "arch/X86/X86OutputIterator.c"
+      ],
+      "local_complete_records_pending": true,
+      "compiler_audit_only": true
+    },
+    "run": {
+      "id": 44021396832,
+      "head_sha": "95988075da01325cf5edd54d746780c8d3eb3ad4",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44021396832",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "host": "vex32-conditional-writer-audit-ubuntu-22.04",
+        "compiler": {
+          "version": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "shapes": {
+          "base": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2578,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 328,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8106,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17760,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 768,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2594,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 328,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8106,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17760,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 768,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "entrypoints": {
+          "base": {
+            "X86_disasmIter": {
+              "address": 1231712,
+              "size": 274
+            },
+            "X86_trySimpleOutput": {
+              "address": 1232000,
+              "size": 2019
+            },
+            "X86_writeVectorOutput": {
+              "address": 1234304,
+              "size": 1852
+            }
+          },
+          "scan": {
+            "X86_disasmIter": {
+              "address": 1231712,
+              "size": 274
+            },
+            "X86_trySimpleOutput": {
+              "address": 1232000,
+              "size": 2034
+            },
+            "X86_writeVectorOutput": {
+              "address": 1234320,
+              "size": 1852
+            },
+            "X86_writeVectorOutput32": {
+              "address": 2941696,
+              "size": 22
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 813,
+            "deltas": {
+              "16": 807,
+              "0": 6
+            }
+          },
+          "r": {
+            "symbols": 1114,
+            "deltas": {
+              "4096": 1114
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 78702327,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-conditional-writer-audit-ubuntu-24.04",
+        "compiler": {
+          "version": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "shapes": {
+          "base": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2632,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 312,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8037,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17728,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 760,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2648,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 312,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8037,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17728,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 760,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "entrypoints": {
+          "base": {
+            "X86_disasmIter": {
+              "address": 1110800,
+              "size": 250
+            },
+            "X86_trySimpleOutput": {
+              "address": 1111056,
+              "size": 2053
+            },
+            "X86_writeVectorOutput": {
+              "address": 1113440,
+              "size": 1849
+            }
+          },
+          "scan": {
+            "X86_disasmIter": {
+              "address": 1110800,
+              "size": 250
+            },
+            "X86_trySimpleOutput": {
+              "address": 1111056,
+              "size": 2069
+            },
+            "X86_writeVectorOutput": {
+              "address": 1113456,
+              "size": 1849
+            },
+            "X86_writeVectorOutput32": {
+              "address": 2329040,
+              "size": 23
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 805,
+            "deltas": {
+              "16": 799,
+              "0": 6
+            }
+          },
+          "r": {
+            "symbols": 1112,
+            "deltas": {
+              "4096": 1112
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 74901329,
+          "removed": true
+        }
+      }
+    ],
+    "native_timing": false,
+    "publication_qualified": false,
+    "scope": "Compiler and linked-address audit only. Native performance remains required; no instruction-count or byte-size result is treated as a throughput measurement."
+  },
+  "publication_qualified": false
+}
