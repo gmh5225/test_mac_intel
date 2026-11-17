@@ -1,26 +1,76 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
-  "variants": [
-    "published baseline",
-    "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+  "round": 1335,
+  "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "patch": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+  "hosts": "Two independent ubuntu-24.04 Clang allocations; actual CPU identities retained",
+  "cases": [
+    "libjpeg62-turbo-amd64",
+    "libzstd1-amd64",
+    "libssl3t64-amd64",
+    "jpeg-avx2-i386",
+    "libssl3t64-i386"
   ],
-  "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
-    "SSL64 SIMD",
-    "Zstd64 all and SIMD"
+  "panels": 7,
+  "modes": [
+    "scan",
+    "format",
+    "detail"
   ],
   "cycles": 21,
-  "launch_controls": [
+  "controls": [
+    "byte-identical A/A",
     "original images",
-    "same inode and fixed addresses"
+    "same inode and file length with ASLR disabled when supported",
+    "equal-length engine arguments",
+    "rotating forward/reverse order",
+    "identical consumer object",
+    "Capstone boundary hash and selected-output aggregate checksum"
   ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "native_timing_claim": "Only native process CPU ns per decoded instruction; instruction cost is not timing proof.",
+  "gate": "No qualified promotion if a representative workload has a reproducible regression; inspect A/A and paired uncertainty without dropping rows.",
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+    "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+    "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 4718598 protected-page extents",
+    "layout_identical": true,
+    "generated_output_matches_producer": true,
+    "input_source": {
+      "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+      "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+      "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+      "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+      "semantic_input": {
+        "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+        "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+        "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+        "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+        "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+        "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+        "private_guard": "equal private-entry records for 4718598 protected-page extents",
+        "unit_checks": 75,
+        "additional_c4_regression": true,
+        "cosmetic_runtime_object_equality": true,
+        "generated_output_matches_producer": true,
+        "layout_identical": true,
+        "inactive_runtime_objects_identical": true,
+        "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+      },
+      "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+      "inactive_runtime_objects_identical": true,
+      "local_inactive_unit_passed": true,
+      "active_semantic_validation_pending": true,
+      "native_qualified": false
+    },
+    "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+    "shared_vector_object_identical": false,
+    "decoder_object_identical": true,
+    "inactive_runtime_objects_identical": true,
+    "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+  },
+  "reason": "The shared C4/C5 prefix gate was previously stopped on text extent alone. The exact current rebase now passes 162398208 complete private output records, inaccessible-tail probes, 78 owner units, and generator reproduction. Measure actual native timing without inferring loss from function size.",
+  "semantic_validation": "Native timing checks instruction boundaries, rejections and selected consumed output values. Eight native owner units run on each binary. The separate local active-path probe compares complete cs_insn/cs_detail records, untouched bytes, cursors and errors for 162398208 inputs and guarded-page extents. These are distinct validation surfaces."
 }

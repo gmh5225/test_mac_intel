@@ -898,7 +898,7 @@ index 7675273f..d75c8ae4 100644
  {
  	if (displacement) {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..a32816c6 100644
+index 6df1472d..818a1bae 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -19,87 +19,12 @@ struct PaddingOutput {
@@ -1005,7 +1005,7 @@ index 6df1472d..a32816c6 100644
  static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
  			    uint16_t *insn_size)
  {
-@@ -463,44 +392,12 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -463,48 +392,17 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
  
  /* The VEX register plan supplies the public fields for vvvv register operands.
   * Memory forms and unsupported vector widths fall back before any output. */
@@ -1048,28 +1048,18 @@ index 6df1472d..a32816c6 100644
 -}
 +#include "X86VexRegisterOutput.inc"
  
-+/* Keep vector dispatch growth separate from following decoder code. */
-+#if defined(CAPSTONE_X86_VEX32_OUTPUT) && defined(__ELF__)
-+__attribute__((section(".cs_x86_vector_dispatch")))
-+#endif
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
  			   const struct X86SimpleRegister *regs, bool wide)
-@@ -515,6 +412,14 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 						 wide);
- 	if (code[0] == 0x62)
- 		return writeEvexOutput(code, size, insn, insn_size, regs);
+ {
 +#ifdef CAPSTONE_X86_VEX32_OUTPUT
-+	/* Legacy and EVEX forms keep their existing writers above. */
-+	if (!wide && code[0] == 0xc4)
-+		return X86_writeVex32C4Output(code, size, insn, insn_size);
-+	if (code[0] == 0xc5 && !wide)
++	if (!wide && (code[0] & 0xfe) == 0xc4)
 +		return X86_writeVex32RegisterOutput(code, size, insn,
 +						    insn_size);
 +#endif
- 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
- 		return writeVexRipLoad(code, size, insn, insn_size);
- 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
+ 	if (code[0] == 0x0f || code[0] == 0xf3 ||
+ 	    (code[0] == 0x66 && size >= 2 &&
+ 	     (code[1] == 0x90 ||
 diff --git a/arch/X86/X86VectorRegisterOutput.inc b/arch/X86/X86VectorRegisterOutput.inc
 new file mode 100644
 index 00000000..037641f2
@@ -1250,10 +1240,10 @@ index 00000000..3c36662c
 +#endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 new file mode 100644
-index 00000000..b8f9dd42
+index 00000000..a7af8807
 --- /dev/null
 +++ b/arch/X86/X86Vex32Output.c
-@@ -0,0 +1,170 @@
+@@ -0,0 +1,172 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1414,6 +1404,8 @@ index 00000000..b8f9dd42
 +X86_writeVex32RegisterOutput(const uint8_t *code, size_t size, cs_insn *insn,
 +			     uint16_t *insn_size)
 +{
++	if (size >= 4 && code[0] == 0xc4)
++		return X86_writeVex32C4Output(code, size, insn, insn_size);
 +	if (size < 4 || (code[1] & 0xc0) != 0xc0)
 +		return false;
 +	if (code[3] < 0xc0)

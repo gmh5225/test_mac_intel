@@ -1,7 +1,7 @@
-name: Measure C4 output and single-entry placement
+name: Measure shared 32-bit VEX prefix dispatch
 on:
   push:
-    branches: [codex/capstone-c4-vector-entry-placement-pilot]
+    branches: [codex/capstone-vex32-shared-gate-pilot]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 37261a87936b29b727efb9c4a909f347b48c9221
+          ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -38,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: c4-vector-entry-placement-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: vex32-shared-gate-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
