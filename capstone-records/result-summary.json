@@ -1,0 +1,3636 @@
+{
+  "publication_qualified": false,
+  "native_timing": false,
+  "source": {
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "tree": "0ac30373d58c5c6c5ec8192a731e4252fe6c9c62",
+    "sha256": "d84d84d7190095d1ee97e35fc8197bb81fa5908f374fc7c8f9ad1a96422807b0",
+    "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+    "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+    "complete": true,
+    "publication_qualified": false,
+    "mapping_object_unchanged": true
+  },
+  "reason": "The canonical generated trie reduces AArch64 and MIPS instruction counts in all four compilers. All ARM and PE32/64 control instruction counts remain exact. Shared Mapping and all unrelated runtime objects are byte identical, but Clang outlines the trie helper into ordinary text and linked positions still move. Native comparison is required; all prior alias and placement failures remain held.",
+  "profile_review": {
+    "complete": true,
+    "run": {
+      "id": 44177041207,
+      "head_sha": "bb58b58692f7df42bf834dce93233e8fa1d5c540",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44177041207",
+      "run_attempt": 1
+    },
+    "source": {
+      "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+      "tree": "0ac30373d58c5c6c5ec8192a731e4252fe6c9c62",
+      "sha256": "d84d84d7190095d1ee97e35fc8197bb81fa5908f374fc7c8f9ad1a96422807b0",
+      "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+      "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+      "complete": true,
+      "publication_qualified": false,
+      "mapping_object_unchanged": true
+    },
+    "profiles": [
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "cleanup": {
+          "bytes": 390261075,
+          "files": 147,
+          "removed": true
+        },
+        "object_isolation": {
+          "changed": [
+            "arch/AArch64/AArch64Mapping.c.o",
+            "arch/Mips/MipsMapping.c.o"
+          ],
+          "added": [
+            "AliasMapping.c.o"
+          ],
+          "unchanged": 36,
+          "mapping_object_identical": true
+        },
+        "layout": {
+          "text": {
+            "changed": 926,
+            "added": 3,
+            "removed": 0
+          },
+          "readonly": {
+            "changed": 1448,
+            "added": 2,
+            "removed": 0
+          },
+          "writable": {
+            "changed": 80,
+            "added": 0,
+            "removed": 0
+          }
+        }
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "cleanup": {
+          "bytes": 384438283,
+          "files": 147,
+          "removed": true
+        },
+        "object_isolation": {
+          "changed": [
+            "arch/AArch64/AArch64Mapping.c.o",
+            "arch/Mips/MipsMapping.c.o"
+          ],
+          "added": [
+            "AliasMapping.c.o"
+          ],
+          "unchanged": 36,
+          "mapping_object_identical": true
+        },
+        "layout": {
+          "text": {
+            "changed": 752,
+            "added": 2,
+            "removed": 0
+          },
+          "readonly": {
+            "changed": 0,
+            "added": 2,
+            "removed": 0
+          },
+          "writable": {
+            "changed": 84,
+            "added": 0,
+            "removed": 0
+          }
+        }
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "cleanup": {
+          "bytes": 375353634,
+          "files": 147,
+          "removed": true
+        },
+        "object_isolation": {
+          "changed": [
+            "arch/Mips/MipsMapping.c.o",
+            "arch/AArch64/AArch64Mapping.c.o"
+          ],
+          "added": [
+            "AliasMapping.c.o"
+          ],
+          "unchanged": 36,
+          "mapping_object_identical": true
+        },
+        "layout": {
+          "text": {
+            "changed": 882,
+            "added": 3,
+            "removed": 0
+          },
+          "readonly": {
+            "changed": 1440,
+            "added": 2,
+            "removed": 0
+          },
+          "writable": {
+            "changed": 79,
+            "added": 0,
+            "removed": 0
+          }
+        }
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "cleanup": {
+          "bytes": 383795060,
+          "files": 147,
+          "removed": true
+        },
+        "object_isolation": {
+          "changed": [
+            "arch/Mips/MipsMapping.c.o",
+            "arch/AArch64/AArch64Mapping.c.o"
+          ],
+          "added": [
+            "AliasMapping.c.o"
+          ],
+          "unchanged": 36,
+          "mapping_object_identical": true
+        },
+        "layout": {
+          "text": {
+            "changed": 770,
+            "added": 2,
+            "removed": 0
+          },
+          "readonly": {
+            "changed": 0,
+            "added": 2,
+            "removed": 0
+          },
+          "writable": {
+            "changed": 84,
+            "added": 0,
+            "removed": 0
+          }
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "arm-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 45423083,
+            "Dr": 9124179,
+            "Dw": 10775075,
+            "I1mr": 4027,
+            "D1mr": 5957,
+            "D1mw": 51,
+            "ILmr": 716,
+            "DLmr": 273,
+            "DLmw": 1,
+            "Bc": 4723329,
+            "Bcm": 90128,
+            "Bi": 536080,
+            "Bim": 143856
+          },
+          "trie": {
+            "Ir": 45423083,
+            "Dr": 9124179,
+            "Dw": 10775075,
+            "I1mr": 4375,
+            "D1mr": 5957,
+            "D1mw": 51,
+            "ILmr": 718,
+            "DLmr": 273,
+            "DLmw": 1,
+            "Bc": 4723329,
+            "Bcm": 90091,
+            "Bi": 536080,
+            "Bim": 143860
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "arm-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 216590490,
+            "Dr": 44964067,
+            "Dw": 40383447,
+            "I1mr": 580617,
+            "D1mr": 7367,
+            "D1mw": 135,
+            "ILmr": 1169,
+            "DLmr": 474,
+            "DLmw": 3,
+            "Bc": 28153142,
+            "Bcm": 1116707,
+            "Bi": 2198182,
+            "Bim": 563507
+          },
+          "trie": {
+            "Ir": 216590490,
+            "Dr": 44964067,
+            "Dw": 40383447,
+            "I1mr": 225973,
+            "D1mr": 7367,
+            "D1mw": 135,
+            "ILmr": 1174,
+            "DLmr": 474,
+            "DLmw": 3,
+            "Bc": 28153142,
+            "Bcm": 1063636,
+            "Bi": 2198182,
+            "Bim": 508128
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "arm-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 501344625,
+            "Dr": 72761380,
+            "Dw": 238907349,
+            "I1mr": 1426671,
+            "D1mr": 20825,
+            "D1mw": 505,
+            "ILmr": 1327,
+            "DLmr": 1160,
+            "DLmw": 37,
+            "Bc": 214492094,
+            "Bcm": 2091045,
+            "Bi": 3104071,
+            "Bim": 807373
+          },
+          "trie": {
+            "Ir": 501344625,
+            "Dr": 72761380,
+            "Dw": 238907349,
+            "I1mr": 1705550,
+            "D1mr": 20825,
+            "D1mw": 505,
+            "ILmr": 1332,
+            "DLmr": 1160,
+            "DLmw": 37,
+            "Bc": 214492094,
+            "Bcm": 2075424,
+            "Bi": 3104071,
+            "Bim": 778525
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "arm64-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 43530746,
+            "Dr": 8694492,
+            "Dw": 10345724,
+            "I1mr": 1953,
+            "D1mr": 6504,
+            "D1mw": 58,
+            "ILmr": 530,
+            "DLmr": 545,
+            "DLmw": 1,
+            "Bc": 4185216,
+            "Bcm": 16770,
+            "Bi": 590923,
+            "Bim": 180421
+          },
+          "trie": {
+            "Ir": 43530746,
+            "Dr": 8694492,
+            "Dw": 10345724,
+            "I1mr": 1499,
+            "D1mr": 6504,
+            "D1mw": 58,
+            "ILmr": 534,
+            "DLmr": 545,
+            "DLmw": 1,
+            "Bc": 4185216,
+            "Bcm": 19431,
+            "Bi": 590923,
+            "Bim": 180423
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "arm64-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 235761136,
+            "Dr": 50162213,
+            "Dw": 35224778,
+            "I1mr": 1114965,
+            "D1mr": 52469,
+            "D1mw": 142,
+            "ILmr": 1203,
+            "DLmr": 1274,
+            "DLmw": 3,
+            "Bc": 36642929,
+            "Bcm": 1497259,
+            "Bi": 2094931,
+            "Bim": 503979
+          },
+          "trie": {
+            "Ir": 195998425,
+            "Dr": 42650309,
+            "Dw": 35152859,
+            "I1mr": 944020,
+            "D1mr": 30886,
+            "D1mw": 123,
+            "ILmr": 1207,
+            "DLmr": 1249,
+            "DLmw": 3,
+            "Bc": 26527370,
+            "Bcm": 1224462,
+            "Bi": 2094931,
+            "Bim": 499191
+          }
+        },
+        "ir_change": -39762711,
+        "instruction_reduction": 0.1686567670763175,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              42110544,
+              8208486,
+              174636
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -42110544,
+              -8208486,
+              -174636
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              2275914,
+              696582,
+              102717
+            ],
+            "delta": [
+              2275914,
+              696582,
+              102717
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              215757,
+              0,
+              0
+            ],
+            "delta": [
+              215757,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              4709127,
+              1438380,
+              1008012
+            ],
+            "after": [
+              4565289,
+              1438380,
+              1008012
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "arm64-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 308070864,
+            "Dr": 66541654,
+            "Dw": 49073733,
+            "I1mr": 2040312,
+            "D1mr": 109460,
+            "D1mw": 257,
+            "ILmr": 1380,
+            "DLmr": 1858,
+            "DLmw": 24,
+            "Bc": 46324923,
+            "Bcm": 2194272,
+            "Bi": 2549123,
+            "Bim": 529602
+          },
+          "trie": {
+            "Ir": 268308153,
+            "Dr": 59029750,
+            "Dw": 49001814,
+            "I1mr": 2198547,
+            "D1mr": 72889,
+            "D1mw": 217,
+            "ILmr": 1378,
+            "DLmr": 1833,
+            "DLmw": 24,
+            "Bc": 36209364,
+            "Bcm": 1882266,
+            "Bi": 2549123,
+            "Bim": 525187
+          }
+        },
+        "ir_change": -39762711,
+        "instruction_reduction": 0.1290700148781353,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              42110544,
+              8208486,
+              174636
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -42110544,
+              -8208486,
+              -174636
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              2275914,
+              696582,
+              102717
+            ],
+            "delta": [
+              2275914,
+              696582,
+              102717
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              215757,
+              0,
+              0
+            ],
+            "delta": [
+              215757,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              10324461,
+              3299187,
+              1104243
+            ],
+            "after": [
+              10180623,
+              3299187,
+              1104243
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 58321617,
+            "Dr": 12999228,
+            "Dw": 12354327,
+            "I1mr": 1270,
+            "D1mr": 7030,
+            "D1mw": 22,
+            "ILmr": 485,
+            "DLmr": 470,
+            "DLmw": 1,
+            "Bc": 6154722,
+            "Bcm": 23609,
+            "Bi": 532668,
+            "Bim": 185399
+          },
+          "trie": {
+            "Ir": 58321617,
+            "Dr": 12999228,
+            "Dw": 12354327,
+            "I1mr": 767,
+            "D1mr": 7030,
+            "D1mw": 22,
+            "ILmr": 492,
+            "DLmr": 470,
+            "DLmw": 1,
+            "Bc": 6154722,
+            "Bcm": 23607,
+            "Bi": 532668,
+            "Bim": 184455
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 235926454,
+            "Dr": 51925865,
+            "Dw": 35602544,
+            "I1mr": 177505,
+            "D1mr": 10943,
+            "D1mw": 63,
+            "ILmr": 761,
+            "DLmr": 856,
+            "DLmw": 3,
+            "Bc": 36447852,
+            "Bcm": 1997564,
+            "Bi": 1938180,
+            "Bim": 433257
+          },
+          "trie": {
+            "Ir": 212937172,
+            "Dr": 47551823,
+            "Dw": 35515865,
+            "I1mr": 325452,
+            "D1mr": 10223,
+            "D1mw": 63,
+            "ILmr": 774,
+            "DLmr": 843,
+            "DLmw": 3,
+            "Bc": 30523080,
+            "Bcm": 1546774,
+            "Bi": 1938180,
+            "Bim": 398537
+          }
+        },
+        "ir_change": -22989282,
+        "instruction_reduction": 0.09744257844014392,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              25048875,
+              5014788,
+              198423
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -25048875,
+              -5014788,
+              -198423
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              1972914,
+              640746,
+              111744
+            ],
+            "delta": [
+              1972914,
+              640746,
+              111744
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              260037,
+              0,
+              0
+            ],
+            "delta": [
+              260037,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              2773728,
+              780111,
+              606753
+            ],
+            "after": [
+              2600370,
+              780111,
+              606753
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 282953959,
+            "Dr": 62043791,
+            "Dw": 41219750,
+            "I1mr": 715674,
+            "D1mr": 21459,
+            "D1mw": 75,
+            "ILmr": 832,
+            "DLmr": 1269,
+            "DLmw": 14,
+            "Bc": 42373923,
+            "Bcm": 2314778,
+            "Bi": 2195586,
+            "Bim": 430662
+          },
+          "trie": {
+            "Ir": 259964677,
+            "Dr": 57669749,
+            "Dw": 41133071,
+            "I1mr": 937929,
+            "D1mr": 20075,
+            "D1mw": 75,
+            "ILmr": 845,
+            "DLmr": 1256,
+            "DLmw": 14,
+            "Bc": 36449151,
+            "Bcm": 1810303,
+            "Bi": 2195586,
+            "Bim": 390441
+          }
+        },
+        "ir_change": -22989282,
+        "instruction_reduction": 0.08124743008101898,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              25048875,
+              5014788,
+              198423
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -25048875,
+              -5014788,
+              -198423
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              1972914,
+              640746,
+              111744
+            ],
+            "delta": [
+              1972914,
+              640746,
+              111744
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              260037,
+              0,
+              0
+            ],
+            "delta": [
+              260037,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              2773728,
+              780111,
+              606753
+            ],
+            "after": [
+              2600370,
+              780111,
+              606753
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 149161836,
+            "Dr": 30278469,
+            "Dw": 24325707,
+            "I1mr": 1181,
+            "D1mr": 41156,
+            "D1mw": 155,
+            "ILmr": 477,
+            "DLmr": 289,
+            "DLmw": 2,
+            "Bc": 24700293,
+            "Bcm": 851058,
+            "Bi": 1651758,
+            "Bim": 408010
+          },
+          "trie": {
+            "Ir": 149161836,
+            "Dr": 30278469,
+            "Dw": 24325707,
+            "I1mr": 1136,
+            "D1mr": 41156,
+            "D1mw": 155,
+            "ILmr": 480,
+            "DLmr": 289,
+            "DLmw": 2,
+            "Bc": 24700293,
+            "Bcm": 851433,
+            "Bi": 1651758,
+            "Bim": 408010
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 480933549,
+            "Dr": 109874511,
+            "Dw": 81806712,
+            "I1mr": 611736,
+            "D1mr": 55812,
+            "D1mw": 508,
+            "ILmr": 1802,
+            "DLmr": 979,
+            "DLmw": 3,
+            "Bc": 66445803,
+            "Bcm": 3904792,
+            "Bi": 2216700,
+            "Bim": 210844
+          },
+          "trie": {
+            "Ir": 480933549,
+            "Dr": 109874511,
+            "Dw": 81806712,
+            "I1mr": 453142,
+            "D1mr": 55812,
+            "D1mw": 508,
+            "ILmr": 1799,
+            "DLmr": 979,
+            "DLmw": 3,
+            "Bc": 66445803,
+            "Bcm": 3930405,
+            "Bi": 2216700,
+            "Bim": 211258
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 806675088,
+            "Dr": 188934483,
+            "Dw": 145333742,
+            "I1mr": 2437560,
+            "D1mr": 92397,
+            "D1mw": 785,
+            "ILmr": 1974,
+            "DLmr": 1478,
+            "DLmw": 13,
+            "Bc": 113334128,
+            "Bcm": 7669074,
+            "Bi": 5232695,
+            "Bim": 210854
+          },
+          "trie": {
+            "Ir": 806675088,
+            "Dr": 188934483,
+            "Dw": 145333742,
+            "I1mr": 1917408,
+            "D1mr": 92397,
+            "D1mw": 785,
+            "ILmr": 1969,
+            "DLmr": 1478,
+            "DLmw": 13,
+            "Bc": 113334128,
+            "Bcm": 7701974,
+            "Bi": 5232695,
+            "Bim": 212246
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 164614089,
+            "Dr": 30043815,
+            "Dw": 23071737,
+            "I1mr": 1825,
+            "D1mr": 49292,
+            "D1mw": 153,
+            "ILmr": 584,
+            "DLmr": 393,
+            "DLmw": 2,
+            "Bc": 26349648,
+            "Bcm": 1127152,
+            "Bi": 1584453,
+            "Bim": 361516
+          },
+          "trie": {
+            "Ir": 164614089,
+            "Dr": 30043815,
+            "Dw": 23071737,
+            "I1mr": 6562,
+            "D1mr": 49292,
+            "D1mw": 153,
+            "ILmr": 589,
+            "DLmr": 393,
+            "DLmw": 2,
+            "Bc": 26349648,
+            "Bcm": 1126586,
+            "Bi": 1584453,
+            "Bim": 361516
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 489457873,
+            "Dr": 112000924,
+            "Dw": 82731125,
+            "I1mr": 732640,
+            "D1mr": 80758,
+            "D1mw": 476,
+            "ILmr": 2113,
+            "DLmr": 1246,
+            "DLmw": 3,
+            "Bc": 67120618,
+            "Bcm": 3687918,
+            "Bi": 2241875,
+            "Bim": 262587
+          },
+          "trie": {
+            "Ir": 489457873,
+            "Dr": 112000924,
+            "Dw": 82731125,
+            "I1mr": 541574,
+            "D1mr": 80758,
+            "D1mw": 476,
+            "ILmr": 2101,
+            "DLmr": 1246,
+            "DLmw": 3,
+            "Bc": 67120618,
+            "Bcm": 3753312,
+            "Bi": 2241875,
+            "Bim": 262904
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-clang-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 808860730,
+            "Dr": 189218530,
+            "Dw": 142805395,
+            "I1mr": 2722108,
+            "D1mr": 165226,
+            "D1mw": 812,
+            "ILmr": 2321,
+            "DLmr": 1870,
+            "DLmw": 13,
+            "Bc": 113803419,
+            "Bcm": 6817653,
+            "Bi": 5082031,
+            "Bim": 262597
+          },
+          "trie": {
+            "Ir": 808860730,
+            "Dr": 189218530,
+            "Dw": 142805395,
+            "I1mr": 2138282,
+            "D1mr": 165226,
+            "D1mw": 812,
+            "ILmr": 2306,
+            "DLmr": 1870,
+            "DLmw": 13,
+            "Bc": 113803419,
+            "Bcm": 6715156,
+            "Bi": 5082031,
+            "Bim": 262983
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "arm-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 48154257,
+            "Dr": 8843427,
+            "Dw": 16920381,
+            "I1mr": 9179,
+            "D1mr": 6440,
+            "D1mw": 40,
+            "ILmr": 798,
+            "DLmr": 245,
+            "DLmw": 1,
+            "Bc": 14017854,
+            "Bcm": 217494,
+            "Bi": 402702,
+            "Bim": 63545
+          },
+          "trie": {
+            "Ir": 48154257,
+            "Dr": 8843427,
+            "Dw": 16920381,
+            "I1mr": 8156,
+            "D1mr": 6440,
+            "D1mw": 40,
+            "ILmr": 792,
+            "DLmr": 245,
+            "DLmw": 1,
+            "Bc": 14017854,
+            "Bcm": 217741,
+            "Bi": 402702,
+            "Bim": 63545
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "arm-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 215919300,
+            "Dr": 41715907,
+            "Dw": 47805337,
+            "I1mr": 365322,
+            "D1mr": 12930,
+            "D1mw": 411,
+            "ILmr": 1360,
+            "DLmr": 438,
+            "DLmw": 3,
+            "Bc": 43694223,
+            "Bcm": 1311824,
+            "Bi": 1831944,
+            "Bim": 400127
+          },
+          "trie": {
+            "Ir": 215919300,
+            "Dr": 41715907,
+            "Dw": 47805337,
+            "I1mr": 440453,
+            "D1mr": 12930,
+            "D1mw": 411,
+            "ILmr": 1353,
+            "DLmr": 438,
+            "DLmw": 3,
+            "Bc": 43694223,
+            "Bcm": 1354610,
+            "Bi": 1831944,
+            "Bim": 400198
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "arm-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 332018256,
+            "Dr": 83196793,
+            "Dw": 78444883,
+            "I1mr": 2368473,
+            "D1mr": 76076,
+            "D1mw": 1742,
+            "ILmr": 1555,
+            "DLmr": 1134,
+            "DLmw": 37,
+            "Bc": 79194561,
+            "Bcm": 2437106,
+            "Bi": 2238567,
+            "Bim": 581258
+          },
+          "trie": {
+            "Ir": 332018256,
+            "Dr": 83196793,
+            "Dw": 78444883,
+            "I1mr": 2411364,
+            "D1mr": 76076,
+            "D1mw": 1742,
+            "ILmr": 1546,
+            "DLmr": 1134,
+            "DLmw": 37,
+            "Bc": 79194561,
+            "Bcm": 2403186,
+            "Bi": 2238567,
+            "Bim": 581365
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "arm64-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 82880265,
+            "Dr": 11745675,
+            "Dw": 27224475,
+            "I1mr": 3491,
+            "D1mr": 8655,
+            "D1mw": 49,
+            "ILmr": 595,
+            "DLmr": 494,
+            "DLmw": 1,
+            "Bc": 13173387,
+            "Bcm": 133548,
+            "Bi": 396867,
+            "Bim": 115124
+          },
+          "trie": {
+            "Ir": 82880265,
+            "Dr": 11745675,
+            "Dw": 27224475,
+            "I1mr": 2151,
+            "D1mr": 8655,
+            "D1mw": 49,
+            "ILmr": 587,
+            "DLmr": 494,
+            "DLmw": 1,
+            "Bc": 13173387,
+            "Bcm": 132578,
+            "Bi": 396867,
+            "Bim": 101678
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "arm64-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 277279657,
+            "Dr": 49858139,
+            "Dw": 57842472,
+            "I1mr": 1148999,
+            "D1mr": 282026,
+            "D1mw": 3178,
+            "ILmr": 1268,
+            "DLmr": 1192,
+            "DLmw": 3,
+            "Bc": 51000384,
+            "Bcm": 1749072,
+            "Bi": 1514541,
+            "Bim": 480925
+          },
+          "trie": {
+            "Ir": 247187563,
+            "Dr": 42418154,
+            "Dw": 57811674,
+            "I1mr": 1073304,
+            "D1mr": 117301,
+            "D1mw": 213,
+            "ILmr": 1258,
+            "DLmr": 1147,
+            "DLmw": 3,
+            "Bc": 40905300,
+            "Bcm": 1605171,
+            "Bi": 1514541,
+            "Bim": 417908
+          }
+        },
+        "ir_change": -30092094,
+        "instruction_reduction": 0.10852615127116949,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              34158501,
+              8198163,
+              164313
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -34158501,
+              -8198163,
+              -164313
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              4210245,
+              758178,
+              133515
+            ],
+            "delta": [
+              4210245,
+              758178,
+              133515
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              4456602,
+              1222623,
+              864174
+            ],
+            "after": [
+              4312764,
+              1222623,
+              864174
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "arm64-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 357419365,
+            "Dr": 75777096,
+            "Dw": 75528989,
+            "I1mr": 3055353,
+            "D1mr": 488740,
+            "D1mw": 4811,
+            "ILmr": 1463,
+            "DLmr": 1795,
+            "DLmw": 24,
+            "Bc": 72567364,
+            "Bcm": 2616205,
+            "Bi": 1741535,
+            "Bim": 556803
+          },
+          "trie": {
+            "Ir": 327327271,
+            "Dr": 68337111,
+            "Dw": 75498191,
+            "I1mr": 2841731,
+            "D1mr": 248365,
+            "D1mw": 540,
+            "ILmr": 1452,
+            "DLmr": 1750,
+            "DLmw": 24,
+            "Bc": 62472280,
+            "Bcm": 2422426,
+            "Bi": 1741535,
+            "Bim": 467570
+          }
+        },
+        "ir_change": -30092094,
+        "instruction_reduction": 0.08419267937538866,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              34158501,
+              8198163,
+              164313
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -34158501,
+              -8198163,
+              -164313
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              4210245,
+              758178,
+              133515
+            ],
+            "delta": [
+              4210245,
+              758178,
+              133515
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              10215381,
+              2767620,
+              941757
+            ],
+            "after": [
+              10071543,
+              2767620,
+              941757
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 49843722,
+            "Dr": 11524839,
+            "Dw": 10850145,
+            "I1mr": 2309,
+            "D1mr": 6440,
+            "D1mw": 24,
+            "ILmr": 605,
+            "DLmr": 233,
+            "DLmw": 1,
+            "Bc": 7605030,
+            "Bcm": 232732,
+            "Bi": 684786,
+            "Bim": 310431
+          },
+          "trie": {
+            "Ir": 49843722,
+            "Dr": 11524839,
+            "Dw": 10850145,
+            "I1mr": 1914,
+            "D1mr": 6440,
+            "D1mw": 24,
+            "ILmr": 604,
+            "DLmr": 233,
+            "DLmw": 1,
+            "Bc": 7605030,
+            "Bcm": 239098,
+            "Bi": 684786,
+            "Bim": 310430
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 240835265,
+            "Dr": 50409974,
+            "Dw": 38076837,
+            "I1mr": 144093,
+            "D1mr": 19342,
+            "D1mw": 65,
+            "ILmr": 874,
+            "DLmr": 588,
+            "DLmw": 3,
+            "Bc": 48142922,
+            "Bcm": 2625017,
+            "Bi": 2078894,
+            "Bim": 739229
+          },
+          "trie": {
+            "Ir": 223167701,
+            "Dr": 46122611,
+            "Dw": 38051772,
+            "I1mr": 150428,
+            "D1mr": 15166,
+            "D1mw": 68,
+            "ILmr": 876,
+            "DLmr": 576,
+            "DLmw": 3,
+            "Bc": 42157877,
+            "Bcm": 2342372,
+            "Bi": 2078894,
+            "Bim": 739228
+          }
+        },
+        "ir_change": -17667564,
+        "instruction_reduction": 0.07335953893629321,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              21071436,
+              4978239,
+              161874
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -21071436,
+              -4978239,
+              -161874
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              3577230,
+              690876,
+              136809
+            ],
+            "delta": [
+              3577230,
+              690876,
+              136809
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              3069867,
+              866790,
+              693432
+            ],
+            "after": [
+              2896509,
+              866790,
+              693432
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 303328784,
+            "Dr": 63644765,
+            "Dw": 52212000,
+            "I1mr": 622811,
+            "D1mr": 57382,
+            "D1mw": 248,
+            "ILmr": 969,
+            "DLmr": 1064,
+            "DLmw": 14,
+            "Bc": 62392406,
+            "Bcm": 3183667,
+            "Bi": 2075114,
+            "Bim": 710761
+          },
+          "trie": {
+            "Ir": 285661220,
+            "Dr": 59357402,
+            "Dw": 52186935,
+            "I1mr": 614034,
+            "D1mr": 36452,
+            "D1mw": 254,
+            "ILmr": 970,
+            "DLmr": 1052,
+            "DLmw": 14,
+            "Bc": 56407361,
+            "Bcm": 2863877,
+            "Bi": 2075114,
+            "Bim": 713919
+          }
+        },
+        "ir_change": -17667564,
+        "instruction_reduction": 0.05824559003935481,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              21071436,
+              4978239,
+              161874
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -21071436,
+              -4978239,
+              -161874
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              3577230,
+              690876,
+              136809
+            ],
+            "delta": [
+              3577230,
+              690876,
+              136809
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              3069867,
+              866790,
+              693432
+            ],
+            "after": [
+              2896509,
+              866790,
+              693432
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 148471722,
+            "Dr": 32070714,
+            "Dw": 24214251,
+            "I1mr": 1152,
+            "D1mr": 42000,
+            "D1mw": 663,
+            "ILmr": 486,
+            "DLmr": 276,
+            "DLmw": 2,
+            "Bc": 23533386,
+            "Bcm": 1050926,
+            "Bi": 883902,
+            "Bim": 12547
+          },
+          "trie": {
+            "Ir": 148471722,
+            "Dr": 32070714,
+            "Dw": 24214251,
+            "I1mr": 989,
+            "D1mr": 42000,
+            "D1mw": 663,
+            "ILmr": 477,
+            "DLmr": 276,
+            "DLmw": 2,
+            "Bc": 23533386,
+            "Bcm": 1052078,
+            "Bi": 883902,
+            "Bim": 12547
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 482087034,
+            "Dr": 107084394,
+            "Dw": 82673880,
+            "I1mr": 403144,
+            "D1mr": 73250,
+            "D1mw": 1008,
+            "ILmr": 1430,
+            "DLmr": 920,
+            "DLmw": 3,
+            "Bc": 77678745,
+            "Bcm": 4261482,
+            "Bi": 3276369,
+            "Bim": 148378
+          },
+          "trie": {
+            "Ir": 482087034,
+            "Dr": 107084394,
+            "Dw": 82673880,
+            "I1mr": 406630,
+            "D1mr": 73250,
+            "D1mw": 1008,
+            "ILmr": 1416,
+            "DLmr": 920,
+            "DLmw": 3,
+            "Bc": 77678745,
+            "Bcm": 4285586,
+            "Bi": 3276369,
+            "Bim": 148384
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 800283448,
+            "Dr": 177982158,
+            "Dw": 145317350,
+            "I1mr": 1603486,
+            "D1mr": 148333,
+            "D1mw": 1566,
+            "ILmr": 1618,
+            "DLmr": 1392,
+            "DLmw": 13,
+            "Bc": 129904644,
+            "Bcm": 8435063,
+            "Bi": 5889641,
+            "Bim": 161091
+          },
+          "trie": {
+            "Ir": 800283448,
+            "Dr": 177982158,
+            "Dw": 145317350,
+            "I1mr": 1634603,
+            "D1mr": 148333,
+            "D1mw": 1566,
+            "ILmr": 1600,
+            "DLmr": 1392,
+            "DLmw": 13,
+            "Bc": 129904644,
+            "Bcm": 8366663,
+            "Bi": 5889641,
+            "Bim": 161097
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 155648067,
+            "Dr": 31338426,
+            "Dw": 24391335,
+            "I1mr": 1355,
+            "D1mr": 50553,
+            "D1mw": 726,
+            "ILmr": 599,
+            "DLmr": 374,
+            "DLmw": 2,
+            "Bc": 25006830,
+            "Bcm": 1138785,
+            "Bi": 829686,
+            "Bim": 9852
+          },
+          "trie": {
+            "Ir": 155648067,
+            "Dr": 31338426,
+            "Dw": 24391335,
+            "I1mr": 1293,
+            "D1mr": 50553,
+            "D1mw": 726,
+            "ILmr": 593,
+            "DLmr": 374,
+            "DLmw": 2,
+            "Bc": 25006830,
+            "Bcm": 1141259,
+            "Bi": 829686,
+            "Bim": 9852
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 498210515,
+            "Dr": 109951330,
+            "Dw": 85710410,
+            "I1mr": 683419,
+            "D1mr": 140231,
+            "D1mw": 529,
+            "ILmr": 1713,
+            "DLmr": 1166,
+            "DLmw": 3,
+            "Bc": 81204400,
+            "Bcm": 4536341,
+            "Bi": 3181558,
+            "Bim": 186136
+          },
+          "trie": {
+            "Ir": 498210515,
+            "Dr": 109951330,
+            "Dw": 85710410,
+            "I1mr": 718141,
+            "D1mr": 140231,
+            "D1mw": 529,
+            "ILmr": 1721,
+            "DLmr": 1166,
+            "DLmw": 3,
+            "Bc": 81204400,
+            "Bcm": 4506491,
+            "Bi": 3181558,
+            "Bim": 186136
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-22.04-gcc-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 813555570,
+            "Dr": 179235931,
+            "Dw": 147510688,
+            "I1mr": 2553058,
+            "D1mr": 316585,
+            "D1mw": 1125,
+            "ILmr": 1936,
+            "DLmr": 1756,
+            "DLmw": 13,
+            "Bc": 135825634,
+            "Bcm": 7996695,
+            "Bi": 5587854,
+            "Bim": 191616
+          },
+          "trie": {
+            "Ir": 813555570,
+            "Dr": 179235931,
+            "Dw": 147510688,
+            "I1mr": 2513361,
+            "D1mr": 316585,
+            "D1mw": 1125,
+            "ILmr": 1941,
+            "DLmr": 1756,
+            "DLmw": 13,
+            "Bc": 135825634,
+            "Bcm": 7845579,
+            "Bi": 5587854,
+            "Bim": 191616
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "arm-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 45595093,
+            "Dr": 9276911,
+            "Dw": 11477787,
+            "I1mr": 735,
+            "D1mr": 5970,
+            "D1mw": 51,
+            "ILmr": 728,
+            "DLmr": 271,
+            "DLmw": 1,
+            "Bc": 4801291,
+            "Bcm": 88208,
+            "Bi": 536079,
+            "Bim": 143935
+          },
+          "trie": {
+            "Ir": 45595093,
+            "Dr": 9276911,
+            "Dw": 11477787,
+            "I1mr": 758,
+            "D1mr": 5970,
+            "D1mw": 51,
+            "ILmr": 753,
+            "DLmr": 271,
+            "DLmw": 1,
+            "Bc": 4801291,
+            "Bcm": 85494,
+            "Bi": 536079,
+            "Bim": 143869
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "arm-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 189223870,
+            "Dr": 41541019,
+            "Dw": 36421492,
+            "I1mr": 3900,
+            "D1mr": 7148,
+            "D1mw": 106,
+            "ILmr": 1154,
+            "DLmr": 471,
+            "DLmw": 3,
+            "Bc": 25687104,
+            "Bcm": 955659,
+            "Bi": 1931125,
+            "Bim": 418509
+          },
+          "trie": {
+            "Ir": 189223870,
+            "Dr": 41541019,
+            "Dw": 36421492,
+            "I1mr": 3648,
+            "D1mr": 7148,
+            "D1mw": 106,
+            "ILmr": 1188,
+            "DLmr": 471,
+            "DLmw": 3,
+            "Bc": 25687104,
+            "Bcm": 909885,
+            "Bi": 1931125,
+            "Bim": 418007
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "arm-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 473399074,
+            "Dr": 69227119,
+            "Dw": 234773776,
+            "I1mr": 12470,
+            "D1mr": 18542,
+            "D1mw": 300,
+            "ILmr": 1312,
+            "DLmr": 1162,
+            "DLmw": 37,
+            "Bc": 212024364,
+            "Bcm": 1804893,
+            "Bi": 2837014,
+            "Bim": 702628
+          },
+          "trie": {
+            "Ir": 473399074,
+            "Dr": 69227119,
+            "Dw": 234773776,
+            "I1mr": 11820,
+            "D1mr": 18542,
+            "D1mw": 300,
+            "ILmr": 1348,
+            "DLmr": 1162,
+            "DLmw": 37,
+            "Bc": 212024364,
+            "Bcm": 1826078,
+            "Bi": 2837014,
+            "Bim": 714902
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "arm64-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 43683223,
+            "Dr": 8598857,
+            "Dw": 10531467,
+            "I1mr": 597,
+            "D1mr": 6519,
+            "D1mw": 64,
+            "ILmr": 586,
+            "DLmr": 547,
+            "DLmw": 1,
+            "Bc": 4256056,
+            "Bcm": 21015,
+            "Bi": 590922,
+            "Bim": 212883
+          },
+          "trie": {
+            "Ir": 43683223,
+            "Dr": 8598857,
+            "Dw": 10531467,
+            "I1mr": 591,
+            "D1mr": 6519,
+            "D1mw": 64,
+            "ILmr": 588,
+            "DLmr": 547,
+            "DLmw": 1,
+            "Bc": 4256056,
+            "Bcm": 20986,
+            "Bi": 590922,
+            "Bim": 212883
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "arm64-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 218009003,
+            "Dr": 47660186,
+            "Dw": 32641377,
+            "I1mr": 5749,
+            "D1mr": 52538,
+            "D1mw": 209,
+            "ILmr": 1241,
+            "DLmr": 1272,
+            "DLmw": 3,
+            "Bc": 35386233,
+            "Bcm": 1358006,
+            "Bi": 1950229,
+            "Bim": 463797
+          },
+          "trie": {
+            "Ir": 180727727,
+            "Dr": 40179080,
+            "Dw": 32569458,
+            "I1mr": 3964,
+            "D1mr": 29533,
+            "D1mw": 185,
+            "ILmr": 1238,
+            "DLmr": 1249,
+            "DLmw": 3,
+            "Bc": 25270674,
+            "Bcm": 1147627,
+            "Bi": 1950229,
+            "Bim": 463805
+          }
+        },
+        "ir_change": -37281276,
+        "instruction_reduction": 0.17100796520774875,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              39570009,
+              8177688,
+              174636
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -39570009,
+              -8177688,
+              -174636
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              2216814,
+              696582,
+              102717
+            ],
+            "delta": [
+              2216814,
+              696582,
+              102717
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              215757,
+              0,
+              0
+            ],
+            "delta": [
+              215757,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              4596333,
+              1438380,
+              1008012
+            ],
+            "after": [
+              4452495,
+              1438380,
+              1008012
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "arm64-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 290041290,
+            "Dr": 64335187,
+            "Dw": 46629439,
+            "I1mr": 22721,
+            "D1mr": 106203,
+            "D1mw": 324,
+            "ILmr": 1409,
+            "DLmr": 1862,
+            "DLmw": 24,
+            "Bc": 45074257,
+            "Bcm": 2113426,
+            "Bi": 2404418,
+            "Bim": 485708
+          },
+          "trie": {
+            "Ir": 252760014,
+            "Dr": 56854081,
+            "Dw": 46557520,
+            "I1mr": 10147,
+            "D1mr": 63571,
+            "D1mw": 236,
+            "ILmr": 1403,
+            "DLmr": 1839,
+            "DLmw": 24,
+            "Bc": 34958698,
+            "Bcm": 1958809,
+            "Bi": 2404418,
+            "Bim": 515729
+          }
+        },
+        "ir_change": -37281276,
+        "instruction_reduction": 0.12853782301133743,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              39570009,
+              8177688,
+              174636
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -39570009,
+              -8177688,
+              -174636
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              2216814,
+              696582,
+              102717
+            ],
+            "delta": [
+              2216814,
+              696582,
+              102717
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              215757,
+              0,
+              0
+            ],
+            "delta": [
+              215757,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              10215312,
+              3299187,
+              1086159
+            ],
+            "after": [
+              10071474,
+              3299187,
+              1086159
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 57738183,
+            "Dr": 12702906,
+            "Dw": 12080169,
+            "I1mr": 458,
+            "D1mr": 6967,
+            "D1mw": 22,
+            "ILmr": 458,
+            "DLmr": 460,
+            "DLmw": 1,
+            "Bc": 6251052,
+            "Bcm": 21897,
+            "Bi": 532197,
+            "Bim": 217307
+          },
+          "trie": {
+            "Ir": 57738183,
+            "Dr": 12702906,
+            "Dw": 12080169,
+            "I1mr": 455,
+            "D1mr": 6967,
+            "D1mw": 22,
+            "ILmr": 455,
+            "DLmr": 460,
+            "DLmw": 1,
+            "Bc": 6251052,
+            "Bcm": 32818,
+            "Bi": 532197,
+            "Bim": 217307
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 225353719,
+            "Dr": 50535050,
+            "Dw": 33610438,
+            "I1mr": 764,
+            "D1mr": 10427,
+            "D1mw": 60,
+            "ILmr": 710,
+            "DLmr": 839,
+            "DLmw": 3,
+            "Bc": 36023366,
+            "Bcm": 1975943,
+            "Bi": 1881323,
+            "Bim": 356272
+          },
+          "trie": {
+            "Ir": 203776759,
+            "Dr": 46186073,
+            "Dw": 33523759,
+            "I1mr": 777,
+            "D1mr": 9928,
+            "D1mw": 60,
+            "ILmr": 713,
+            "DLmr": 825,
+            "DLmw": 3,
+            "Bc": 30098594,
+            "Bcm": 1504855,
+            "Bi": 1881323,
+            "Bim": 356271
+          }
+        },
+        "ir_change": -21576960,
+        "instruction_reduction": 0.09574707750884737,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              23602290,
+              4989723,
+              198423
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -23602290,
+              -4989723,
+              -198423
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              1938651,
+              640746,
+              111744
+            ],
+            "delta": [
+              1938651,
+              640746,
+              111744
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              260037,
+              0,
+              0
+            ],
+            "delta": [
+              260037,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              2773728,
+              780111,
+              606753
+            ],
+            "after": [
+              2600370,
+              780111,
+              606753
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 270179407,
+            "Dr": 60830840,
+            "Dw": 39016963,
+            "I1mr": 911,
+            "D1mr": 19998,
+            "D1mw": 81,
+            "ILmr": 776,
+            "DLmr": 1235,
+            "DLmw": 14,
+            "Bc": 41949428,
+            "Bcm": 2176078,
+            "Bi": 2138729,
+            "Bim": 361097
+          },
+          "trie": {
+            "Ir": 248602447,
+            "Dr": 56481863,
+            "Dw": 38930284,
+            "I1mr": 908,
+            "D1mr": 17571,
+            "D1mw": 77,
+            "ILmr": 780,
+            "DLmr": 1221,
+            "DLmw": 14,
+            "Bc": 36024656,
+            "Bcm": 1732089,
+            "Bi": 2138729,
+            "Bim": 361096
+          }
+        },
+        "ir_change": -21576960,
+        "instruction_reduction": 0.07986160099907247,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              23602290,
+              4989723,
+              198423
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -23602290,
+              -4989723,
+              -198423
+            ]
+          },
+          {
+            "function": "map_set_alias_id_trie_impl",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              1938651,
+              640746,
+              111744
+            ],
+            "delta": [
+              1938651,
+              640746,
+              111744
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              260037,
+              0,
+              0
+            ],
+            "delta": [
+              260037,
+              0,
+              0
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              2773728,
+              780111,
+              606753
+            ],
+            "after": [
+              2600370,
+              780111,
+              606753
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 145242648,
+            "Dr": 28773927,
+            "Dw": 22767846,
+            "I1mr": 453,
+            "D1mr": 41163,
+            "D1mw": 223,
+            "ILmr": 453,
+            "DLmr": 289,
+            "DLmw": 2,
+            "Bc": 24278166,
+            "Bcm": 997965,
+            "Bi": 1217751,
+            "Bim": 177351
+          },
+          "trie": {
+            "Ir": 145242648,
+            "Dr": 28773927,
+            "Dw": 22767846,
+            "I1mr": 453,
+            "D1mr": 41163,
+            "D1mw": 223,
+            "ILmr": 453,
+            "DLmr": 289,
+            "DLmw": 2,
+            "Bc": 24278166,
+            "Bcm": 997459,
+            "Bi": 1217751,
+            "Bim": 177351
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 468736074,
+            "Dr": 110997924,
+            "Dw": 80293737,
+            "I1mr": 9224,
+            "D1mr": 56064,
+            "D1mw": 245,
+            "ILmr": 1412,
+            "DLmr": 944,
+            "DLmw": 3,
+            "Bc": 66920205,
+            "Bcm": 4026684,
+            "Bi": 2232105,
+            "Bim": 193575
+          },
+          "trie": {
+            "Ir": 468736074,
+            "Dr": 110997924,
+            "Dw": 80293737,
+            "I1mr": 9440,
+            "D1mr": 56064,
+            "D1mw": 245,
+            "ILmr": 1424,
+            "DLmr": 944,
+            "DLmw": 3,
+            "Bc": 66920205,
+            "Bcm": 3932141,
+            "Bi": 2232105,
+            "Bim": 193601
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 784931758,
+            "Dr": 188668216,
+            "Dw": 142371897,
+            "I1mr": 23811,
+            "D1mr": 91142,
+            "D1mw": 451,
+            "ILmr": 1588,
+            "DLmr": 1363,
+            "DLmw": 13,
+            "Bc": 113688467,
+            "Bcm": 7835038,
+            "Bi": 5248103,
+            "Bim": 227843
+          },
+          "trie": {
+            "Ir": 784931758,
+            "Dr": 188668216,
+            "Dw": 142371897,
+            "I1mr": 23279,
+            "D1mr": 91142,
+            "D1mw": 451,
+            "ILmr": 1601,
+            "DLmr": 1363,
+            "DLmw": 13,
+            "Bc": 113688467,
+            "Bcm": 8000662,
+            "Bi": 5248103,
+            "Bim": 227869
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 163270509,
+            "Dr": 28978086,
+            "Dw": 21860319,
+            "I1mr": 565,
+            "D1mr": 49351,
+            "D1mw": 212,
+            "ILmr": 562,
+            "DLmr": 390,
+            "DLmw": 2,
+            "Bc": 27009489,
+            "Bcm": 1178744,
+            "Bi": 1081782,
+            "Bim": 107857
+          },
+          "trie": {
+            "Ir": 163270509,
+            "Dr": 28978086,
+            "Dw": 21860319,
+            "I1mr": 564,
+            "D1mr": 49351,
+            "D1mw": 212,
+            "ILmr": 561,
+            "DLmr": 390,
+            "DLmw": 2,
+            "Bc": 27009489,
+            "Bcm": 1177954,
+            "Bi": 1081782,
+            "Bim": 107857
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 477970573,
+            "Dr": 113595652,
+            "Dw": 81861120,
+            "I1mr": 15020,
+            "D1mr": 75993,
+            "D1mw": 184,
+            "ILmr": 1666,
+            "DLmr": 1187,
+            "DLmw": 3,
+            "Bc": 67649396,
+            "Bcm": 3872018,
+            "Bi": 2261623,
+            "Bim": 250714
+          },
+          "trie": {
+            "Ir": 477970573,
+            "Dr": 113595652,
+            "Dw": 81861120,
+            "I1mr": 15162,
+            "D1mr": 75993,
+            "D1mw": 184,
+            "ILmr": 1674,
+            "DLmr": 1187,
+            "DLmw": 3,
+            "Bc": 67649396,
+            "Bcm": 3818610,
+            "Bi": 2261623,
+            "Bim": 250717
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-clang-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 788303282,
+            "Dr": 189595538,
+            "Dw": 140602677,
+            "I1mr": 32238,
+            "D1mr": 151159,
+            "D1mw": 377,
+            "ILmr": 1879,
+            "DLmr": 1710,
+            "DLmw": 13,
+            "Bc": 114179113,
+            "Bcm": 7233766,
+            "Bi": 5101782,
+            "Bim": 268675
+          },
+          "trie": {
+            "Ir": 788303282,
+            "Dr": 189595538,
+            "Dw": 140602677,
+            "I1mr": 32811,
+            "D1mr": 151159,
+            "D1mw": 377,
+            "ILmr": 1888,
+            "DLmr": 1710,
+            "DLmw": 13,
+            "Bc": 114179113,
+            "Bcm": 7349374,
+            "Bi": 5101782,
+            "Bim": 268678
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "arm-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 48020361,
+            "Dr": 8842779,
+            "Dw": 16995768,
+            "I1mr": 5069,
+            "D1mr": 6220,
+            "D1mw": 46,
+            "ILmr": 778,
+            "DLmr": 243,
+            "DLmw": 1,
+            "Bc": 13967052,
+            "Bcm": 204211,
+            "Bi": 402702,
+            "Bim": 63545
+          },
+          "trie": {
+            "Ir": 48020361,
+            "Dr": 8842779,
+            "Dw": 16995768,
+            "I1mr": 5008,
+            "D1mr": 6220,
+            "D1mw": 46,
+            "ILmr": 794,
+            "DLmr": 243,
+            "DLmw": 1,
+            "Bc": 13967052,
+            "Bcm": 203945,
+            "Bi": 402702,
+            "Bim": 63545
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "arm-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 196811106,
+            "Dr": 40137411,
+            "Dw": 45354343,
+            "I1mr": 307183,
+            "D1mr": 12484,
+            "D1mw": 180,
+            "ILmr": 1348,
+            "DLmr": 437,
+            "DLmw": 3,
+            "Bc": 41554017,
+            "Bcm": 1322577,
+            "Bi": 1625299,
+            "Bim": 570798
+          },
+          "trie": {
+            "Ir": 196811106,
+            "Dr": 40137411,
+            "Dw": 45354343,
+            "I1mr": 305370,
+            "D1mr": 12484,
+            "D1mw": 180,
+            "ILmr": 1368,
+            "DLmr": 437,
+            "DLmw": 3,
+            "Bc": 41554017,
+            "Bcm": 1288974,
+            "Bi": 1625299,
+            "Bim": 516298
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "arm-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 311439789,
+            "Dr": 81326313,
+            "Dw": 75510388,
+            "I1mr": 1982315,
+            "D1mr": 81741,
+            "D1mw": 2101,
+            "ILmr": 1539,
+            "DLmr": 1137,
+            "DLmw": 37,
+            "Bc": 76974987,
+            "Bcm": 2307036,
+            "Bi": 2031922,
+            "Bim": 749436
+          },
+          "trie": {
+            "Ir": 311439789,
+            "Dr": 81326313,
+            "Dw": 75510388,
+            "I1mr": 2245001,
+            "D1mr": 81741,
+            "D1mw": 2101,
+            "ILmr": 1559,
+            "DLmr": 1137,
+            "DLmw": 37,
+            "Bc": 76974987,
+            "Bcm": 2462343,
+            "Bi": 2031922,
+            "Bim": 713572
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "arm64-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 46948128,
+            "Dr": 9017796,
+            "Dw": 15743265,
+            "I1mr": 1870,
+            "D1mr": 8255,
+            "D1mw": 38,
+            "ILmr": 547,
+            "DLmr": 500,
+            "DLmw": 1,
+            "Bc": 13224033,
+            "Bcm": 132043,
+            "Bi": 396867,
+            "Bim": 101320
+          },
+          "trie": {
+            "Ir": 46948128,
+            "Dr": 9017796,
+            "Dw": 15743265,
+            "I1mr": 1760,
+            "D1mr": 8255,
+            "D1mw": 38,
+            "ILmr": 547,
+            "DLmr": 500,
+            "DLmw": 1,
+            "Bc": 13224033,
+            "Bcm": 134248,
+            "Bi": 396867,
+            "Bim": 101321
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "arm64-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 215081529,
+            "Dr": 45608931,
+            "Dw": 40186692,
+            "I1mr": 831074,
+            "D1mr": 249373,
+            "D1mw": 2983,
+            "ILmr": 1199,
+            "DLmr": 1216,
+            "DLmw": 3,
+            "Bc": 48740756,
+            "Bcm": 1754156,
+            "Bi": 1378318,
+            "Bim": 432588
+          },
+          "trie": {
+            "Ir": 182829336,
+            "Dr": 38199744,
+            "Dw": 40186692,
+            "I1mr": 819135,
+            "D1mr": 95106,
+            "D1mw": 506,
+            "ILmr": 1192,
+            "DLmr": 1166,
+            "DLmw": 3,
+            "Bc": 38723021,
+            "Bcm": 1545074,
+            "Bi": 1378318,
+            "Bim": 489814
+          }
+        },
+        "ir_change": -32252193,
+        "instruction_reduction": 0.1499533369971533,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              35311950,
+              8136567,
+              102717
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -35311950,
+              -8136567,
+              -102717
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              3203595,
+              727380,
+              102717
+            ],
+            "delta": [
+              3203595,
+              727380,
+              102717
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              4456602,
+              1222623,
+              864174
+            ],
+            "after": [
+              4312764,
+              1222623,
+              864174
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "arm64-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 294156920,
+            "Dr": 71212885,
+            "Dw": 57419728,
+            "I1mr": 1544392,
+            "D1mr": 523214,
+            "D1mw": 18671,
+            "ILmr": 1387,
+            "DLmr": 1823,
+            "DLmw": 24,
+            "Bc": 70349086,
+            "Bcm": 2716772,
+            "Bi": 1605292,
+            "Bim": 477735
+          },
+          "trie": {
+            "Ir": 261904727,
+            "Dr": 63803698,
+            "Dw": 57419728,
+            "I1mr": 1605886,
+            "D1mr": 235967,
+            "D1mw": 1463,
+            "ILmr": 1378,
+            "DLmr": 1773,
+            "DLmw": 24,
+            "Bc": 60331351,
+            "Bcm": 2487868,
+            "Bi": 1605292,
+            "Bim": 515016
+          }
+        },
+        "ir_change": -32252193,
+        "instruction_reduction": 0.10964281581408997,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              35311950,
+              8136567,
+              102717
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -35311950,
+              -8136567,
+              -102717
+            ]
+          },
+          {
+            "function": "map_set_aarch64_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              3203595,
+              727380,
+              102717
+            ],
+            "delta": [
+              3203595,
+              727380,
+              102717
+            ]
+          },
+          {
+            "function": "AArch64_printer",
+            "before": [
+              10226001,
+              2763480,
+              941769
+            ],
+            "after": [
+              10082163,
+              2763480,
+              941769
+            ],
+            "delta": [
+              -143838,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 51190290,
+            "Dr": 11781291,
+            "Dw": 11149521,
+            "I1mr": 1415,
+            "D1mr": 6507,
+            "D1mw": 23,
+            "ILmr": 581,
+            "DLmr": 234,
+            "DLmw": 1,
+            "Bc": 7646616,
+            "Bcm": 231400,
+            "Bi": 684786,
+            "Bim": 310433
+          },
+          "trie": {
+            "Ir": 51190290,
+            "Dr": 11781291,
+            "Dw": 11149521,
+            "I1mr": 1392,
+            "D1mr": 6507,
+            "D1mw": 23,
+            "ILmr": 582,
+            "DLmr": 234,
+            "DLmw": 1,
+            "Bc": 7646616,
+            "Bcm": 231054,
+            "Bi": 684786,
+            "Bim": 310432
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 236864144,
+            "Dr": 50420302,
+            "Dw": 37576273,
+            "I1mr": 200373,
+            "D1mr": 17009,
+            "D1mw": 176,
+            "ILmr": 849,
+            "DLmr": 604,
+            "DLmw": 3,
+            "Bc": 46978290,
+            "Bcm": 2429797,
+            "Bi": 2060645,
+            "Bim": 906031
+          },
+          "trie": {
+            "Ir": 218034392,
+            "Dr": 46158004,
+            "Dw": 37576273,
+            "I1mr": 166702,
+            "D1mr": 11029,
+            "D1mw": 59,
+            "ILmr": 845,
+            "DLmr": 591,
+            "DLmw": 3,
+            "Bc": 41075661,
+            "Bcm": 2113416,
+            "Bi": 2060645,
+            "Bim": 736483
+          }
+        },
+        "ir_change": -18829752,
+        "instruction_reduction": 0.07949600003620638,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              21397011,
+              4928109,
+              111744
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -21397011,
+              -4928109,
+              -111744
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              2740617,
+              665811,
+              111744
+            ],
+            "delta": [
+              2740617,
+              665811,
+              111744
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              2791779,
+              780111,
+              606753
+            ],
+            "after": [
+              2618421,
+              780111,
+              606753
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 297248987,
+            "Dr": 63480295,
+            "Dw": 51338623,
+            "I1mr": 524518,
+            "D1mr": 64624,
+            "D1mw": 232,
+            "ILmr": 940,
+            "DLmr": 1079,
+            "DLmw": 14,
+            "Bc": 61227765,
+            "Bcm": 2711657,
+            "Bi": 2056865,
+            "Bim": 827545
+          },
+          "trie": {
+            "Ir": 278419235,
+            "Dr": 59217997,
+            "Dw": 51338623,
+            "I1mr": 460680,
+            "D1mr": 30712,
+            "D1mw": 127,
+            "ILmr": 935,
+            "DLmr": 1066,
+            "DLmw": 14,
+            "Bc": 55325136,
+            "Bcm": 2445348,
+            "Bi": 2056865,
+            "Bim": 708024
+          }
+        },
+        "ir_change": -18829752,
+        "instruction_reduction": 0.06334673228003296,
+        "changed_function_costs": [
+          {
+            "function": "map_set_alias_id",
+            "before": [
+              21397011,
+              4928109,
+              111744
+            ],
+            "after": [
+              0,
+              0,
+              0
+            ],
+            "delta": [
+              -21397011,
+              -4928109,
+              -111744
+            ]
+          },
+          {
+            "function": "map_set_mips_alias_id",
+            "before": [
+              0,
+              0,
+              0
+            ],
+            "after": [
+              2740617,
+              665811,
+              111744
+            ],
+            "delta": [
+              2740617,
+              665811,
+              111744
+            ]
+          },
+          {
+            "function": "Mips_printer",
+            "before": [
+              2791779,
+              780111,
+              606753
+            ],
+            "after": [
+              2618421,
+              780111,
+              606753
+            ],
+            "delta": [
+              -173358,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 152846100,
+            "Dr": 32329128,
+            "Dw": 25930812,
+            "I1mr": 942,
+            "D1mr": 41994,
+            "D1mw": 525,
+            "ILmr": 478,
+            "DLmr": 276,
+            "DLmw": 2,
+            "Bc": 23464602,
+            "Bcm": 1042835,
+            "Bi": 885771,
+            "Bim": 13036
+          },
+          "trie": {
+            "Ir": 152846100,
+            "Dr": 32329128,
+            "Dw": 25930812,
+            "I1mr": 910,
+            "D1mr": 41994,
+            "D1mw": 525,
+            "ILmr": 473,
+            "DLmr": 276,
+            "DLmw": 2,
+            "Bc": 23464602,
+            "Bcm": 1042060,
+            "Bi": 885771,
+            "Bim": 13036
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 463326585,
+            "Dr": 107291406,
+            "Dw": 83100408,
+            "I1mr": 318875,
+            "D1mr": 72771,
+            "D1mw": 573,
+            "ILmr": 1412,
+            "DLmr": 918,
+            "DLmw": 3,
+            "Bc": 74890905,
+            "Bcm": 4171053,
+            "Bi": 2521707,
+            "Bim": 148049
+          },
+          "trie": {
+            "Ir": 463326585,
+            "Dr": 107291406,
+            "Dw": 83100408,
+            "I1mr": 345776,
+            "D1mr": 72771,
+            "D1mw": 573,
+            "ILmr": 1420,
+            "DLmr": 918,
+            "DLmw": 3,
+            "Bc": 74890905,
+            "Bcm": 4319756,
+            "Bi": 2521707,
+            "Bim": 148049
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 770389971,
+            "Dr": 177140647,
+            "Dw": 141487200,
+            "I1mr": 1427241,
+            "D1mr": 158511,
+            "D1mw": 818,
+            "ILmr": 1593,
+            "DLmr": 1330,
+            "DLmw": 13,
+            "Bc": 127155687,
+            "Bcm": 8215869,
+            "Bi": 5134982,
+            "Bim": 157700
+          },
+          "trie": {
+            "Ir": 770389971,
+            "Dr": 177140647,
+            "Dw": 141487200,
+            "I1mr": 1509702,
+            "D1mr": 158511,
+            "D1mw": 818,
+            "ILmr": 1605,
+            "DLmr": 1330,
+            "DLmw": 13,
+            "Bc": 127155687,
+            "Bcm": 8208021,
+            "Bi": 5134982,
+            "Bim": 157700
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "totals": {
+          "base": {
+            "Ir": 159277641,
+            "Dr": 31465392,
+            "Dw": 26034492,
+            "I1mr": 2015,
+            "D1mr": 50645,
+            "D1mw": 615,
+            "ILmr": 597,
+            "DLmr": 374,
+            "DLmw": 2,
+            "Bc": 24821964,
+            "Bcm": 1132328,
+            "Bi": 832176,
+            "Bim": 11307
+          },
+          "trie": {
+            "Ir": 159277641,
+            "Dr": 31465392,
+            "Dw": 26034492,
+            "I1mr": 1921,
+            "D1mr": 50645,
+            "D1mw": 615,
+            "ILmr": 592,
+            "DLmr": 374,
+            "DLmw": 2,
+            "Bc": 24821964,
+            "Bcm": 1130965,
+            "Bi": 832176,
+            "Bim": 11307
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "totals": {
+          "base": {
+            "Ir": 478933174,
+            "Dr": 110026248,
+            "Dw": 85558176,
+            "I1mr": 548125,
+            "D1mr": 143848,
+            "D1mw": 508,
+            "ILmr": 1699,
+            "DLmr": 1165,
+            "DLmw": 3,
+            "Bc": 78526585,
+            "Bcm": 4331802,
+            "Bi": 2511354,
+            "Bim": 186048
+          },
+          "trie": {
+            "Ir": 478933174,
+            "Dr": 110026248,
+            "Dw": 85558176,
+            "I1mr": 570958,
+            "D1mr": 143848,
+            "D1mw": 508,
+            "ILmr": 1718,
+            "DLmr": 1165,
+            "DLmw": 3,
+            "Bc": 78526585,
+            "Bcm": 4371635,
+            "Bi": 2511354,
+            "Bim": 186048
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      },
+      {
+        "host": "isolated-alias-trie-cost-four-ubuntu-24.04-gcc-44177041207",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "totals": {
+          "base": {
+            "Ir": 783816901,
+            "Dr": 178462648,
+            "Dw": 143396880,
+            "I1mr": 1994580,
+            "D1mr": 316152,
+            "D1mw": 1765,
+            "ILmr": 1910,
+            "DLmr": 1673,
+            "DLmw": 13,
+            "Bc": 133224988,
+            "Bcm": 7928015,
+            "Bi": 4917653,
+            "Bim": 190619
+          },
+          "trie": {
+            "Ir": 783816901,
+            "Dr": 178462648,
+            "Dw": 143396880,
+            "I1mr": 2005236,
+            "D1mr": 316152,
+            "D1mw": 1765,
+            "ILmr": 1930,
+            "DLmr": 1673,
+            "DLmw": 13,
+            "Bc": 133224988,
+            "Bcm": 7900461,
+            "Bi": 4917653,
+            "Bim": 190619
+          }
+        },
+        "ir_change": 0,
+        "instruction_reduction": 0.0,
+        "changed_function_costs": []
+      }
+    ],
+    "instruction_increases": [],
+    "publication_qualified": false,
+    "scope": "Five frozen mixed consumer panels, three traversals per ROI, including scalar PE32/64 and ARM controls. Simulated costs do not establish native throughput."
+  },
+  "followup": "round1397-isolated-alias-native",
+  "native_run": {
+    "id": 44179116332,
+    "head_sha": "1b8b016e3e9146444e62e31a37e2f94b68b27bd9",
+    "status": "in_progress",
+    "conclusion": null,
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44179116332",
+    "run_attempt": 1
+  },
+  "mixed_run": {
+    "id": 44179435632,
+    "head_sha": "672ee8a1560894523c2a799315e87f9bcc8011bb",
+    "status": "in_progress",
+    "conclusion": null,
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44179435632",
+    "run_attempt": 1
+  },
+  "cancelled_attempt": {
+    "id": 44176550059,
+    "head_sha": "533d13b0ebea61fb79c0325b98b321bfd7652bc9",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44176550059"
+  },
+  "all_instruction_increases_preserved": true
+}
