@@ -95,11 +95,11 @@ def main(w):
     import deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-amd64', 'libzstd1-amd64', 'libssl3t64-i386'): continue
+        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-i386'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
+        for panel in (['simd-functions'] if name=='jpeg-avx2-i386' else ['all-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -137,9 +137,9 @@ def main(w):
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
+    assert len(reported)==9*len(launches)
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-vex32-gate-pilot-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-vex32-gate-crosscpu-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)

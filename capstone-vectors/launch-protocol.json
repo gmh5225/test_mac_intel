@@ -2,15 +2,13 @@
   "round": 1335,
   "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
   "patch": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
-  "hosts": "Two independent ubuntu-24.04 Clang allocations; actual CPU identities retained",
+  "hosts": "Six independent Ubuntu 24.04 x64 Clang allocations. Record actual CPU models; allocation does not guarantee a particular vendor.",
   "cases": [
     "libjpeg62-turbo-amd64",
-    "libzstd1-amd64",
-    "libssl3t64-amd64",
     "jpeg-avx2-i386",
     "libssl3t64-i386"
   ],
-  "panels": 7,
+  "panels": "JPEG64 and SSL32 all-functions; JPEG AVX2 i386 simd-functions; every panel in scan, format, detail and both launch controls.",
   "modes": [
     "scan",
     "format",
@@ -71,6 +69,6 @@
     "inactive_runtime_objects_identical": true,
     "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
   },
-  "reason": "The shared C4/C5 prefix gate was previously stopped on text extent alone. The exact current rebase now passes 162398208 complete private output records, inaccessible-tail probes, 78 owner units, and generator reproduction. Measure actual native timing without inferring loss from function size.",
+  "reason": "Both initial pilot allocations were Intel Xeon 6975P-C. Replicate target and regression-sensitive panels across more CPU allocations before promotion.",
   "semantic_validation": "Native timing checks instruction boundaries, rejections and selected consumed output values. Eight native owner units run on each binary. The separate local active-path probe compares complete cs_insn/cs_detail records, untouched bytes, cursors and errors for 162398208 inputs and guarded-page extents. These are distinct validation surfaces."
 }
