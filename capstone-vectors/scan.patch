@@ -42,10 +42,10 @@ index 74790c01..36e4f298 100644
  
 diff --git a/arch/X86/X86EvexMemoryOutput.c b/arch/X86/X86EvexMemoryOutput.c
 new file mode 100644
-index 00000000..a31cc34f
+index 00000000..2ec3604c
 --- /dev/null
 +++ b/arch/X86/X86EvexMemoryOutput.c
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,125 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -56,10 +56,20 @@ index 00000000..a31cc34f
 +	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
 +	!defined(_WIN32_WCE)
 +#include "X86SimpleOutput.h"
++/* Keep the optional output writer and its records together without adding
++ * them to the existing ELF decoder code and constant sections. */
++#if defined(__ELF__) && defined(__GNUC__)
++#define X86_EVEX_MEMORY_CODE __attribute__((section(".cs_x86_evex_output")))
++#define X86_EVEX_MEMORY_DATA __attribute__((section(".cs_x86_evex_output_rodata")))
++#else
++#define X86_EVEX_MEMORY_CODE
++#define X86_EVEX_MEMORY_DATA
++#endif
 +#include "X86GenEvexMemoryOutput.inc"
 +
 +/* Ordinary unmasked packed moves. Indexed and absolute SIB addresses keep
 + * the general printer; disp8 is a full-vector tuple, disp32 is unscaled. */
++X86_EVEX_MEMORY_CODE
 +bool X86_writeEvexMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
 +			       uint16_t *insn_size,
 +			       const struct X86SimpleRegister *regs)
@@ -136,7 +146,7 @@ index 00000000..a31cc34f
 +			x->encoding.disp_size = (uint8_t)disp_size;
 +		}
 +		x->op_count = 2;
-+		static const x86_reg vector_bases[] = { X86_REG_XMM0,
++		static const x86_reg vector_bases[] X86_EVEX_MEMORY_DATA = { X86_REG_XMM0,
 +							X86_REG_YMM0,
 +							X86_REG_ZMM0 };
 +		cs_x86_op *reg = &x->operands[store];
@@ -163,7 +173,7 @@ index 00000000..a31cc34f
 +#endif
 diff --git a/arch/X86/X86GenEvexMemoryOutput.inc b/arch/X86/X86GenEvexMemoryOutput.inc
 new file mode 100644
-index 00000000..e07091a8
+index 00000000..ab92c291
 --- /dev/null
 +++ b/arch/X86/X86GenEvexMemoryOutput.inc
 @@ -0,0 +1,32 @@
@@ -173,7 +183,7 @@ index 00000000..e07091a8
 +	char mnemonic[16];
 +	uint8_t group_count, groups[4], access[2];
 +};
-+static const struct EvexMemoryOutputRow evex_memory_rows[2][2][3] = {
++static const struct EvexMemoryOutputRow evex_memory_rows[2][2][3] X86_EVEX_MEMORY_DATA = {
 +	{
 +		{
 +			{ X86_INS_VMOVDQA64, "vmovdqa64", 2, { 134, 166, 0, 0 }, { 2, 1 } },
@@ -321,7 +331,7 @@ index 6df1472d..fda40b5b 100644
  	out += 15;
  	memcpy(out, base->name, sizeof(base->name));
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 53824997..fae0c092 100644
+index 53824997..a9506639 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -917,6 +917,97 @@ void emit_vex_registers(Decoder &decoder)
@@ -333,7 +343,7 @@ index 53824997..fae0c092 100644
 +void emit_evex_memory(Decoder &decoder)
 +{
 +	std::puts(
-+		"struct EvexMemoryOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[2];\n};\nstatic const struct EvexMemoryOutputRow evex_memory_rows[2][2][3] = {");
++		"struct EvexMemoryOutputRow {\n\tuint16_t id;\n\tchar mnemonic[16];\n\tuint8_t group_count, groups[4], access[2];\n};\nstatic const struct EvexMemoryOutputRow evex_memory_rows[2][2][3] X86_EVEX_MEMORY_DATA = {");
 +	for (unsigned pp = 1; pp <= 2; ++pp) {
 +		std::puts("\t{");
 +		for (unsigned store = 0; store < 2; ++store) {
@@ -513,3 +523,71 @@ index a72237dc..a1a212e6 100644
  		    !check_padding(handles) ||
  		    !check_alu_memory(handles, mode) ||
  		    !check_alu_immediates(handles, mode) ||
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index 82c9453e..cb7b38c5 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -113,6 +113,7 @@
+ 		EE9D7FCC807402A74CD63761 /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
++		A5AC6A7BD960B761CD1F5161 /* X86EvexMemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FBECF7C522A711B06BBB771 /* X86EvexMemoryOutput.c */; };
+ 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -161,6 +162,7 @@
+ 		9DDE0C4764522FB3D109267B /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
++		B65350BCEE4DB47F604B7FDF /* X86EvexMemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FBECF7C522A711B06BBB771 /* X86EvexMemoryOutput.c */; };
+ 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -228,6 +230,7 @@
+ 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
++		5FAE45006730FEA36B199117 /* X86EvexMemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 7FBECF7C522A711B06BBB771 /* X86EvexMemoryOutput.c */; };
+ 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -513,6 +516,7 @@
+ 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
+ 		CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86InstPrinterCommon.c; sourceTree = "<group>"; };
+ 		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
++		7FBECF7C522A711B06BBB771 /* X86EvexMemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86EvexMemoryOutput.c; sourceTree = "<group>"; };
+ 		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
+ 		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
+ 		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
+@@ -988,6 +992,7 @@
+ 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
+ 				CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */,
+ 				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
++				7FBECF7C522A711B06BBB771 /* X86EvexMemoryOutput.c */,
+ 				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
+ 				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
+ 				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
+@@ -1644,6 +1649,7 @@
+ 				9DDE0C4764522FB3D109267B /* X86MemoryOutput.c in Sources */,
+ 				6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */,
+ 				C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */,
++				B65350BCEE4DB47F604B7FDF /* X86EvexMemoryOutput.c in Sources */,
+ 				DC474FC519DE6FDA00BCA449 /* ARMModule.c in Sources */,
+ 				DC474FC719DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
+ 				DC474F9319DE6FCD00BCA449 /* cs.c in Sources */,
+@@ -1745,6 +1751,7 @@
+ 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
+ 				9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */,
+ 				417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */,
++				5FAE45006730FEA36B199117 /* X86EvexMemoryOutput.c in Sources */,
+ 				DCFE249719DDCDD000EF8EA9 /* XCoreMapping.c in Sources */,
+ 				DCA357831BC2C0290094BB3F /* M68KDisassembler.c in Sources */,
+ 				DCFE247719DDCDAD00EF8EA9 /* SparcDisassembler.c in Sources */,
+@@ -1792,6 +1799,7 @@
+ 				EE9D7FCC807402A74CD63761 /* X86MemoryOutput.c in Sources */,
+ 				1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */,
+ 				622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */,
++				A5AC6A7BD960B761CD1F5161 /* X86EvexMemoryOutput.c in Sources */,
+ 				DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */,
+ 				DC474FA319DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
+ 				DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */,

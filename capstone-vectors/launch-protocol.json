@@ -2,8 +2,23 @@
   "source": {
     "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
     "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-    "tree": "aaf9dd3209a701bd28e86016c7309a14573cec50",
-    "sha256": "8f676e588220a9a4a438e678e324485d4551b603200d335f575bc1c997c61dbe",
+    "tree": "5fbea8c802c25105c8e28459814e79d80784261e",
+    "sha256": "500fe5d17cbd8b6d241e8d36582962bb7f80b7156ceb7374ed0ea9111dd5e14a",
+    "input_tree": "5de0348683acf04cd04b4fd91e9c2197bad0c62a",
+    "input_sha256": "c8f70671a75069f68e125a426b7dd5b3d05f8d9c2eeddc28c1b1c7e5d0e64e6f",
+    "delta_files": [
+      "arch/X86/X86EvexMemoryOutput.c",
+      "arch/X86/X86GenEvexMemoryOutput.inc",
+      "suite/synctools/x86_vector_output.cpp"
+    ],
+    "local_complete_records_pending": true,
+    "compiler_audit_only": true
+  },
+  "input_source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "5de0348683acf04cd04b4fd91e9c2197bad0c62a",
+    "sha256": "c8f70671a75069f68e125a426b7dd5b3d05f8d9c2eeddc28c1b1c7e5d0e64e6f",
     "files": [
       "CMakeLists.txt",
       "Makefile",
@@ -25,8 +40,24 @@
       "arch/X86/X86EvexMemoryOutput.c.o"
     ],
     "validation_scope": "Apple Clang private-entry records and protected extents; native performance and configuration qualification pending.",
-    "publication_qualified": false
+    "publication_qualified": false,
+    "runtime_input_tree": "aaf9dd3209a701bd28e86016c7309a14573cec50",
+    "runtime_input_sha256": "8f676e588220a9a4a438e678e324485d4551b603200d335f575bc1c997c61dbe",
+    "runtime_files_identical": true,
+    "only_additional_file": "xcode/Capstone.xcodeproj/project.pbxproj",
+    "xcode_source_targets": 3,
+    "plist_lint": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1351-evex-move-memory-output/build-registration/.capstone-perf/current/source/xcode/Capstone.xcodeproj/project.pbxproj: OK",
+    "native_xcode_build": "unavailable: this host has Command Line Tools and no full Xcode.app",
+    "runtime_semantic_evidence": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1351-evex-move-memory-output/semantic-review.json"
   },
+  "variants": [
+    "integer",
+    "aa",
+    "plain",
+    "scan",
+    "iced",
+    "fast"
+  ],
   "profiles": [
     {
       "host": "ubuntu-22.04",
@@ -45,27 +76,8 @@
       "compiler": "gcc"
     }
   ],
-  "variants": [
-    "integer",
-    "aa",
-    "scan",
-    "iced",
-    "fast"
-  ],
-  "modes": [
-    "scan",
-    "format",
-    "detail"
-  ],
   "cycles": 21,
   "calibration_process_cpu_ms": 60,
-  "launches": [
-    "images",
-    "same-file-fixed"
-  ],
-  "native_owner_units_per_source": 8,
-  "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
-  "purpose": "First native real-library screen for EVEX packed move memory output; all panels retained, not conditioned on a prior timing result.",
-  "limits": "Selected common-boundary functions; broad architecture/configuration and actual NeverD qualification remain separate requirements.",
-  "publishable": false
+  "scope": "Same frozen seven library panels as R1351. Isolate new output text/data placement; instruction and immutable table payloads must match the plain writer, and all 37 original runtime objects must remain identical between writers.",
+  "native_qualified": false
 }
