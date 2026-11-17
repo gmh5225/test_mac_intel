@@ -10,10 +10,13 @@
     "clang",
     "gcc"
   ],
-  "replicas": 2,
+  "replicas": 4,
   "blocks": 8,
   "samples_per_retained_process": 8,
   "fresh_processes_per_block": 8,
   "calibration_cpu_ms": 80,
-  "constraints": "Baseline only, diagnostic instrumentation, no candidate performance qualification. Check undefined-value errors before attributing unexplained variation to hardware or the runner."
+  "constraints": "Baseline only, diagnostic instrumentation, no candidate performance qualification. Check undefined-value errors before attributing unexplained variation to hardware or the runner.",
+  "target_cpu": "AMD EPYC 9V74",
+  "runner_attempts": 4,
+  "selection": "Fixed CPU-model predicate chosen before results. Other models emit explicit skipped receipts and do not run the timing workload. No automatic retry if unavailable; preserve all selected results."
 }

@@ -1,7 +1,7 @@
-name: Diagnose baseline process lifetime and undefined values on matched compilers
+name: Diagnose the AMD 9V74 baseline anomaly with matched compilers
 on:
   push:
-    branches: [codex/capstone-baseline-runtime-state]
+    branches: [codex/capstone-baseline-runtime-state-9v74]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
         include:
           - { host: ubuntu-22.04, cc: both, archs: four, replica: 1 }
           - { host: ubuntu-22.04, cc: both, archs: four, replica: 2 }
+          - { host: ubuntu-22.04, cc: both, archs: four, replica: 3 }
+          - { host: ubuntu-22.04, cc: both, archs: four, replica: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -42,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: baseline-runtime-state-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}-${{ github.run_id }}
+          name: baseline-runtime-state-9v74-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

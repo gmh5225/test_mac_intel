@@ -36,6 +36,11 @@ paths = ['/sys/kernel/mm/transparent_hugepage/enabled', '/sys/kernel/mm/transpar
 write('host', dict(cpu=Path('/proc/cpuinfo').read_text(), affinity=cpu,
                    settings={name: Path(name).read_text() for name in paths if Path(name).exists()},
                    baseline=baseline, compilers={cc: sp.check_output([cc, '--version'], text=True) for cc in ('clang', 'gcc')}))
+model = next(line.split(':',1)[1].strip() for line in Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name'))
+if not model.startswith('AMD EPYC 9V74 '):
+    write('complete',dict(success=True,hardware_skipped=True,model=model,target='AMD EPYC 9V74',candidate_measured=False))
+    write('cleanup',dict(bytes=0,removed=True))
+    raise SystemExit(0)
 with tempfile.TemporaryDirectory(prefix='capstone-baseline-runtime-state-') as tmp:
     t = Path(tmp)
     try:
