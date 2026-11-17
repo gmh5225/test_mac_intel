@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
+import gzip,hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
 from entry_identity import object_proof, linked_proof
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
@@ -23,8 +23,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
    write('cpu',{'model':next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith(('model name','CPU part')))})
   mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
   all_inputs=corpus.prepare(r,t,e,run)
-  target_modes=json.loads((r/'replication-cases.json').read_text())[cc]
-  choices=set(target_modes)
+  choices={'amd64-ls','mips64el-ls'}
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
@@ -66,37 +65,35 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
-  assert payloads['base']==payloads['aa']
   maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-  image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
-  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Isolated EVEX entry with original section bytes and linked symbol positions verified; preserve complete records, original images and controlled-image timing panels.'))
+  image=t/'cost-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
+  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True);assert probe.returncode==0
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps,launch):
-   tail=list(map(str,[x['selector'],mode,x['path'],reps]))
-   if launch=='images':args=[str(bins[key]),*tail]
-   else:
-    with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
+  costs=[]
+  targets=[('amd64-ls',0),('mips64el-ls',1)]
+  for name,mode in targets:
+   x=next(v for v in cases if v['name']==name);reference=None
+   for label in ('base','previous','scan'):
+    with image.open('r+b')as stream:assert stream.write(padded[label])==maximum
     assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
-   return json.loads(sp.check_output(args,text=True))
-  data=[]
-  for x in cases:
-   for mode in target_modes[x['name']]:
-    for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*150e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','previous','scan']
-     for k in range(41):
-      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-      for v in seq+seq[::-1]:
-       vout=sample(v,x,mode,n,launch)
-       if reference is None:reference=(vout['first'],vout['result'])
-       assert reference==(vout['first'],vout['result'])
-       ticks[v].append(vout['cpu_ns'])
-      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-     data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(focused_replication=True,cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
+    raw=t/(name+'-'+label+'.callgrind');logname='cost-'+name+'-'+label
+    run(['setarch',platform.machine(),'-R','valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no',
+         '--toggle-collect=_ZL3runR7SessionRKSt6vectorIhSaIhEEj','--cache-sim=yes','--branch-sim=yes',
+         '--dump-instr=yes','--collect-jumps=yes','--callgrind-out-file='+str(raw),image,
+         str(x['selector']),str(mode),x['path'],'1'],logname)
+    value=json.loads(next(line for line in (e/(logname+'.log')).read_text().splitlines() if line.startswith('{')))
+    result={k:value[k]for k in ('first','result')}
+    if reference is None:reference=result
+    else:assert result==reference,(name,label)
+    content=raw.read_text();events=next(line[8:].split()for line in content.splitlines()if line.startswith('events: '))
+    counts=list(map(int,next(line[8:].split()for line in content.splitlines()if line.startswith('totals: '))))
+    assert len(events)==len(counts) and counts[0]>0
+    costs.append(dict(case=name,mode=mode,variant=label,events=dict(zip(events,counts)),result=result,collected_traversals=2))
+    with gzip.open(e/(name+'-'+label+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
+    raw.unlink();write('instruction-costs',costs)
+  assert len(costs)==6
+  write('cost-protocol',dict(consumer_unchanged=True,symbol='_ZL3runR7SessionRKSt6vectorIhSaIhEEj',traversals=2,same_inode=True,padded_size=maximum,aslr_disabled=True,scope='Original warmed mixed consumer, one warm and one measured traversal. Counts and simulated cache events are separate from native timing.'))
+  write('complete',dict(success=True,cases=len(costs),cc=cc,host=platform.platform(),active=True,native_qualification=False,cost_only=True))
+
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
