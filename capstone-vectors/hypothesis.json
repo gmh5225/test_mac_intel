@@ -1,0 +1,23 @@
+{
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "prior_source": {
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "tree": "98703cebc053d0567b34b6c69f59141972bfd4b8",
+    "sha256": "f3b34c7fc8aeb11cc0850b2d9cd353c2b1bd06d7e00117588c91a457a99b7dcf",
+    "files": [
+      "arch/X86/X86GenSimpleOutput.inc",
+      "arch/X86/X86VectorOutput.c",
+      "suite/synctools/x86_simple_output.cpp"
+    ]
+  },
+  "cause": "R1386 already shows AVX32 format/detail gains but stable fixed-image x64 detail losses in the first Clang14 profile. The original R1385 change inserts a mode branch inside the existing vector core and changes its layout and GCC inlining. R1384 independently shows that a placement-only intervention can reproduce unaffected-architecture losses.",
+  "change": "Put the mode decision at the existing vector call boundary in a new translation unit. Keep the original vector core byte-for-byte except its private entry name. For admitted 32-bit register-only VEX forms, reuse that core in wide mode and normalize rex/address-size metadata as the verified prototype does.",
+  "constraints": [
+    "Do not assume relocation or speed equality from source structure",
+    "Keep LDS/LES, memory forms, register extensions and W1 on the canonical fallback",
+    "Preserve all old losses and measure the extra wrapper cost on legacy32 and 64-bit paths",
+    "No production padding or benchmark changes"
+  ],
+  "publication_qualified": false
+}
