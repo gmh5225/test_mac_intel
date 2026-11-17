@@ -1,7 +1,7 @@
-name: Measure VEX32 raw-mode writer index on native Clang hosts
+name: Measure early packed VEX32 scan with unchanged architecture controls
 on:
   push:
-    branches: [codex/capstone-vex32-mode-index-native]
+    branches: [codex/capstone-vex32-early-scan-native]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -12,11 +12,9 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, archs: four, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 2 }
-          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 3 }
+          - { host: ubuntu-22.04, cc: gcc, archs: four, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, archs: four, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, archs: four, replica: 2 }
-          - { host: ubuntu-24.04, cc: clang, archs: four, replica: 3 }
+          - { host: ubuntu-24.04, cc: gcc, archs: four, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -33,13 +31,13 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Measure the mode-derived writer index after complete semantic validation
+      - name: Measure earlier C5 scan admission after complete semantic validation
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-mode-index-${{ matrix.host }}-${{ matrix.replica }}
+          name: vex32-early-scan-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
