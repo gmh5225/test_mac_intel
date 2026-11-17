@@ -44,7 +44,13 @@ try:
                '-DCAPSTONE_BUILD_MACOS_THIN=ON', '-DCAPSTONE_BUILD_CSTEST=ON',
                '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
     if os.name == 'nt':
-        options += ['-G', 'Visual Studio 17 2022', '-A', 'x64', '-DCMAKE_C_FLAGS=/MP4',
+        vswhere = Path(os.environ['ProgramFiles(x86)']) / 'Microsoft Visual Studio/Installer/vswhere.exe'
+        installed = json.loads(sp.check_output([vswhere, '-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-format', 'json'], text=True))
+        major = installed[0]['installationVersion'].split('.')[0]
+        generators = json.loads(sp.check_output(['cmake', '-E', 'capabilities'], text=True))['generators']
+        generator, = [g['name'] for g in generators if g['name'].startswith('Visual Studio ' + major + ' ')]
+        save('toolchain-selection', dict(generator=generator, installed_version=installed[0]['installationVersion']))
+        options += ['-G', generator, '-A', 'x64', '-DCMAKE_C_FLAGS=/MP4',
                     '-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME=' + ('ON' if compiler == 'MT' else 'OFF')]
     else:
         options += ['-G', 'Ninja', '-DCMAKE_C_COMPILER=' + compiler]
