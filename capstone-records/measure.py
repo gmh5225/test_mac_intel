@@ -34,7 +34,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
   geometry=Geometry(e)
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','shared','mode','scan'):
+  for key in ('base','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
@@ -52,16 +52,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('shared','mode','scan'):
+  for key in ('scan',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'},added
    assert set(objects['base']) <= set(objects[key])
-   assert set(changed) <= {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'},changed
+   assert set(changed) <= {'arch/X86/X86OutputIterator.c.o'},changed
    active=bool(changed)
-   write('scope-'+key,dict(active=active,source_applies=True,policy='ELF x86-64 Clang admission; unchanged baseline, shared-prefix gate, admitted-mode gate, private-record-pool candidate'))
+   write('scope-'+key,dict(active=active,source_applies=True,policy='ELF x86-64 Clang admission; unchanged baseline and mode-derived index with unchanged old vector object'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==4;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   assert active
   geometry.finish()
   write('all-binaries',{key:sha(path) for key,path in bins.items()})
@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Timing checks selected output values and boundaries. Complete-record source equality is established separately for each candidate. Old vector constants must be byte-identical in the private-pool candidate. Source variants isolate gate simplification and pool storage changes; linked placement is recorded without assuming a timing result.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Timing checks selected output values and boundaries. Complete-record source equality is established separately for each candidate. Old vector constants must be byte-identical in the private-pool candidate. The mode-derived-index candidate preserves the old vector object; linked placement is recorded without assuming a timing result.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    for mode in ((0,2) if x['name']=='arm64-ls' else (1,2) if x['name']=='jpeg-avx2-i386' else (2,)):
     for launch in launches:
      warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','shared','mode','scan']
+     runs=[];reference=None;keys=['base','aa','scan']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:

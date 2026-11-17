@@ -1,7 +1,7 @@
-name: Measure VEX32 gate and record storage fixes on native Clang hosts
+name: Measure VEX32 raw-mode writer index on native Clang hosts
 on:
   push:
-    branches: [codex/capstone-vex32-private-record-pool]
+    branches: [codex/capstone-vex32-mode-index-native]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -33,13 +33,13 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Measure admitted mode and private descriptor pool changes against the unchanged baseline
+      - name: Measure the mode-derived writer index after complete semantic validation
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-private-pool-${{ matrix.host }}-${{ matrix.replica }}
+          name: vex32-mode-index-${{ matrix.host }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
