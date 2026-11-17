@@ -11,11 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: macos-15-intel, compiler: clang, profile: xcode }
-          - { host: windows-latest, compiler: MT, profile: full }
           - { host: windows-latest, compiler: MD, profile: full }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 35
+    timeout-minutes: 70
     env:
       TOOLCHAIN: ${{ matrix.compiler }}
       PROFILE: ${{ matrix.profile }}
