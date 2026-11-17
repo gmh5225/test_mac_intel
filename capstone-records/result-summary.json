@@ -1,0 +1,425 @@
+{
+  "status": "compiler-audit-complete-clang18-index-spill-observed",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "5b0decc256c74ffdf26eaf7e8ac1e5ac08ca2bb0",
+      "sha256": "6f7477b818a810168f0f331c086a3e503aaf9a297b9b14be62a06bd40029702a",
+      "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+      "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+      "private_guard": "equal private-entry records for 4718598 protected-page extents",
+      "layout_identical": true,
+      "generated_output_matches_producer": true,
+      "input_source": {
+        "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+        "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+        "tree": "1295957b21ea7de6138f4a18ec3470725d4b4aef",
+        "sha256": "95b9bb9a11cbfb0bf7f1357f858cf4f983e5b2cad83da2a0804e180bef3fa9a3",
+        "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+        "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+        "private_guard": "equal private-entry records for 4718598 protected-page extents",
+        "layout_identical": true,
+        "generated_output_matches_producer": true,
+        "input_source": {
+          "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+          "tree": "1015439bb2b51790ffb170cfd324c19646265c93",
+          "sha256": "9a52276ab72528a9531386b10692166a6d0230aca0a194c178529b0f801136f0",
+          "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+          "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+          "private_guard": "equal private-entry records for 4718598 protected-page extents",
+          "layout_identical": true,
+          "generated_output_matches_producer": true,
+          "input_source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "qualification_reason": "Move 32-bit VEX dispatch after the existing padding, legacy-register and EVEX cases. The generated plan domain then makes a second C4/C5 prefix test redundant. Complete-state equality and native code/data geometry are checked before timing.",
+          "shared_vector_object_identical": false,
+          "decoder_object_identical": true,
+          "inactive_runtime_objects_identical": true,
+          "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+        },
+        "qualification_reason": "Keep original 64-bit descriptor storage exact and place the complete 32-bit descriptor pool in the new 32-bit object. Combine with the admitted-mode gate already validated in round1338; independently verify canonical records and native code/data geometry before timing.",
+        "shared_vector_object_identical": false,
+        "decoder_object_identical": true,
+        "inactive_runtime_objects_identical": true,
+        "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+      },
+      "qualification_reason": "Select a mode writer only at the existing vector call. Keep the existing vector writer object exact and pass its original constant register-array address. Unlike R1114 this has no mode-dependent register-row index or scanner change. Native code shape and timing remain separate requirements.",
+      "shared_vector_object_identical": true,
+      "decoder_object_identical": true,
+      "inactive_runtime_objects_identical": true,
+      "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+    },
+    "run": {
+      "id": 44018251979,
+      "head_sha": "198879c1b8f1397639b01767a8edaa84675c5bf9",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44018251979",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "host": "vex32-constant-register-audit-ubuntu-22.04",
+        "compiler": {
+          "version": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "shapes": {
+          "base": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2578,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 328,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8106,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17760,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 768,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2530,
+                "alignment": 16
+              },
+              ".data.rel.ro": {
+                "size": 16,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 328,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8106,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17760,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 768,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "entrypoints": {
+          "base": {
+            "X86_disasmIter": {
+              "address": 1231712,
+              "size": 274
+            },
+            "X86_trySimpleOutput": {
+              "address": 1232000,
+              "size": 2019
+            },
+            "X86_writeVectorOutput": {
+              "address": 1234304,
+              "size": 1852
+            }
+          },
+          "scan": {
+            "X86_disasmIter": {
+              "address": 1231712,
+              "size": 274
+            },
+            "X86_trySimpleOutput": {
+              "address": 1232000,
+              "size": 1969
+            },
+            "X86_writeVectorOutput": {
+              "address": 1234256,
+              "size": 1852
+            },
+            "X86_writeVectorOutput32": {
+              "address": 2941632,
+              "size": 22
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 813,
+            "deltas": {
+              "-48": 807,
+              "0": 6
+            }
+          },
+          "r": {
+            "symbols": 1114,
+            "deltas": {
+              "4096": 1114
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 78702807,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-constant-register-audit-ubuntu-24.04",
+        "compiler": {
+          "version": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "shapes": {
+          "base": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2632,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 312,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8037,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17728,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 760,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86OutputIterator": {
+              ".text": {
+                "size": 2664,
+                "alignment": 16
+              },
+              ".data.rel.ro": {
+                "size": 16,
+                "alignment": 16
+              },
+              ".rodata.cst8": {
+                "size": 8,
+                "alignment": 2
+              },
+              ".rodata": {
+                "size": 34448,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 17,
+                "alignment": 1
+              },
+              ".eh_frame": {
+                "size": 312,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8037,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17728,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 760,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "entrypoints": {
+          "base": {
+            "X86_disasmIter": {
+              "address": 1110800,
+              "size": 250
+            },
+            "X86_trySimpleOutput": {
+              "address": 1111056,
+              "size": 2053
+            },
+            "X86_writeVectorOutput": {
+              "address": 1113440,
+              "size": 1849
+            }
+          },
+          "scan": {
+            "X86_disasmIter": {
+              "address": 1110800,
+              "size": 250
+            },
+            "X86_trySimpleOutput": {
+              "address": 1111056,
+              "size": 2083
+            },
+            "X86_writeVectorOutput": {
+              "address": 1113472,
+              "size": 1849
+            },
+            "X86_writeVectorOutput32": {
+              "address": 2329056,
+              "size": 23
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 805,
+            "deltas": {
+              "32": 799,
+              "0": 6
+            }
+          },
+          "r": {
+            "symbols": 1112,
+            "deltas": {
+              "4096": 1112
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 74901991,
+          "removed": true
+        }
+      }
+    ],
+    "native_timing": false,
+    "publication_qualified": false,
+    "scope": "Compiler and linked-address audit only. Native performance remains required; no instruction-count or byte-size result is treated as a throughput measurement."
+  },
+  "publication_qualified": false
+}
