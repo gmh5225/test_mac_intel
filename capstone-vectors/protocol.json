@@ -1,5 +1,5 @@
 {
-  "inputs": {
+  "source": {
     "baseline_commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
     "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
     "variants": {
@@ -73,45 +73,259 @@
     "baseline_patch_sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452",
     "baseline_publication_pending": true
   },
-  "created_before_any_native_timing": true,
-  "question": "Does either semantic-equivalent EVEX transfer implementation improve real scanning without regressing PE32, formatted/detail output or other architectures, including the observed linker relocation?",
-  "methodology_change": "R1365 and R1366 retain their failed exact-address gates and are not published. Data address equality was a conservative proxy, not a measured performance requirement. This fresh predeclared comparison retains every layout difference and evaluates both implementations, without any timing results having been observed or discarded.",
-  "native": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
-    ],
-    "panels": 7,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 60,
-    "rows_per_variant": 168
+  "focus": {
+    "native": {
+      "ubuntu-22.04-gcc": [
+        [
+          "jpeg-avx2-i386",
+          "simd-functions",
+          0
+        ],
+        [
+          "jpeg-avx2-i386",
+          "simd-functions",
+          2
+        ],
+        [
+          "libssl3t64-amd64",
+          "simd-functions",
+          0
+        ],
+        [
+          "libssl3t64-i386",
+          "all-functions",
+          1
+        ],
+        [
+          "libzstd1-amd64",
+          "all-functions",
+          0
+        ],
+        [
+          "libzstd1-amd64",
+          "all-functions",
+          2
+        ],
+        [
+          "libzstd1-amd64",
+          "simd-functions",
+          0
+        ],
+        [
+          "libzstd1-amd64",
+          "simd-functions",
+          1
+        ]
+      ],
+      "ubuntu-22.04-clang": [
+        [
+          "libjpeg62-turbo-amd64",
+          "simd-functions",
+          0
+        ],
+        [
+          "libssl3t64-amd64",
+          "simd-functions",
+          0
+        ],
+        [
+          "libzstd1-amd64",
+          "simd-functions",
+          0
+        ]
+      ],
+      "ubuntu-24.04-gcc": [
+        [
+          "libjpeg62-turbo-amd64",
+          "all-functions",
+          1
+        ],
+        [
+          "libssl3t64-amd64",
+          "simd-functions",
+          0
+        ],
+        [
+          "libssl3t64-i386",
+          "all-functions",
+          0
+        ],
+        [
+          "libzstd1-amd64",
+          "simd-functions",
+          1
+        ]
+      ],
+      "ubuntu-24.04-clang": [
+        [
+          "libssl3t64-amd64",
+          "simd-functions",
+          0
+        ]
+      ]
+    },
+    "mixed": {
+      "ubuntu-22.04-clang": [
+        [
+          "amd64-ls",
+          2
+        ],
+        [
+          "arm-cp",
+          1
+        ],
+        [
+          "arm-cp",
+          2
+        ],
+        [
+          "arm-ls",
+          1
+        ],
+        [
+          "arm-ls",
+          2
+        ],
+        [
+          "arm-sort",
+          1
+        ],
+        [
+          "arm-sort",
+          2
+        ],
+        [
+          "arm64-ls",
+          0
+        ],
+        [
+          "arm64-ls",
+          1
+        ],
+        [
+          "arm64-ls",
+          2
+        ],
+        [
+          "mips64el-ls",
+          1
+        ],
+        [
+          "mips64el-ls",
+          2
+        ],
+        [
+          "putty-32-0.85",
+          1
+        ],
+        [
+          "putty-32-0.85",
+          2
+        ],
+        [
+          "putty-64-0.85",
+          1
+        ],
+        [
+          "putty-64-0.85",
+          2
+        ]
+      ],
+      "ubuntu-22.04-gcc": [
+        [
+          "arm-cp",
+          1
+        ],
+        [
+          "arm-ls",
+          1
+        ],
+        [
+          "arm-sort",
+          1
+        ],
+        [
+          "mips64el-ls",
+          1
+        ],
+        [
+          "mips64el-ls",
+          2
+        ]
+      ],
+      "ubuntu-24.04-clang": [
+        [
+          "arm-cp",
+          2
+        ],
+        [
+          "arm-ls",
+          2
+        ],
+        [
+          "arm-sort",
+          0
+        ]
+      ],
+      "ubuntu-24.04-gcc": [
+        [
+          "arm-cp",
+          0
+        ],
+        [
+          "arm-cp",
+          1
+        ],
+        [
+          "arm-cp",
+          2
+        ],
+        [
+          "arm-ls",
+          0
+        ],
+        [
+          "arm-ls",
+          1
+        ],
+        [
+          "arm-ls",
+          2
+        ],
+        [
+          "arm-sort",
+          0
+        ],
+        [
+          "arm-sort",
+          1
+        ],
+        [
+          "arm-sort",
+          2
+        ],
+        [
+          "arm64-ls",
+          2
+        ]
+      ]
+    }
   },
-  "mixed": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
-    ],
-    "cases": 8,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 80,
-    "rows_per_variant": 192
+  "cycles": 21,
+  "target_ms": {
+    "native": 80,
+    "mixed": 60
   },
-  "controls": [
-    "byte-identical A/A",
-    "original images",
-    "same-file-fixed with ASLR disabled"
+  "launches": [
+    "images",
+    "images-fixed",
+    "same-file",
+    "same-file-fixed"
   ],
-  "gate": "Preserve every result. Investigate each median candidate loss beyond 1% and every A/A deviation beyond 1%; exclude unstable observations from gain claims. No candidate is qualified by instruction-count reductions or symbol movement alone.",
-  "layout": "Require all unmodified runtime object hashes and text symbol positions unchanged. Record all read-only and writable address moves. The edited EVEX helpers and their own tables are explicit exceptions.",
-  "consumer": "Frozen original consumers, original mode semantics, common instruction-boundary filtering and frozen real PE/ELF corpora; forked iced 8b8d90b benchmark unchanged.",
-  "production_unchanged": true,
-  "publication_qualified": false,
-  "cleanup": "Remove owned builds and source exports in finally; preserve diagnostics and original observations.",
-  "baseline_assembly": "Reconstruct the exact locally prepared baseline commit from its published parent, frozen patch and verified commit object. Git tree and commit hashes must match before compilation. Baseline product qualification is independent and remains required before production publication."
+  "question": "Which part of the combined original-image versus fixed-image control explains the original-only timing flags: ASLR, or the pathname/inode/padded-image bundle?",
+  "selection": "Every originally flagged native or mixed workload from either candidate or A/A; additionally the SSL64 raw beneficiary in every native compiler profile. No old result removed.",
+  "semantics": "Frozen consumers, source variants, object checks and real corpora remain unchanged. Record state equality for every sample.",
+  "mixed_costs": "Collect the unchanged run(Session&, vector<uint8_t> const&, unsigned) function for three single-pass calls; compare all self counts and original executable PCs outside native timing.",
+  "interpretation": "A factorial launch comparison isolates factors, not a hardware microarchitectural mechanism. A/A or other unstable observations are not gain evidence. No publication is authorized by this experiment alone.",
+  "publication_qualified": false
 }
