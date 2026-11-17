@@ -1,7 +1,7 @@
-name: Measure canonical EVEX register scan plans with original layout and A/A controls
+name: Compare EVEX transfer dispatch with complete layout records and A/A controls
 on:
   push:
-    branches: [codex/capstone-evex-canonical-scan-mixed]
+    branches: [codex/capstone-evex-transfer-comparison-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -36,12 +36,13 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
           pip install pyelftools==0.32
+          python3 capstone-records/prepare_baseline.py
           python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-canonical-scan-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-transfer-comparison-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
