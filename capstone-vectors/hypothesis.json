@@ -1,0 +1,48 @@
+{
+  "source": {
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "tree": "98703cebc053d0567b34b6c69f59141972bfd4b8",
+    "sha256": "f3b34c7fc8aeb11cc0850b2d9cd353c2b1bd06d7e00117588c91a457a99b7dcf",
+    "files": [
+      "arch/X86/X86GenSimpleOutput.inc",
+      "arch/X86/X86VectorOutput.c",
+      "suite/synctools/x86_simple_output.cpp"
+    ]
+  },
+  "root_cause": "The generated simple-output entry table routes unprefixed C4/C5 into the verified VEX register writer only in 64-bit mode. The 32-bit AVX2 panel therefore pays full decode/translation/printing even for the same ordinary register plans.",
+  "canonical_boundary": "Admit only register ModR/M, VEX2 with disambiguating high bits, and VEX3 W=0 with no register extensions and vvvv in 0..7. Reuse existing validated register rows, then project the canonical 32-bit rex=0 and addr_size=4 fields. LDS/LES, memory and all other encodings retain fallback.",
+  "census_run": 44161029211,
+  "census_panel_instructions": 7764,
+  "census_uncovered_vex_register_instructions": 3081,
+  "coverage_limit": "3081 is the observed upper bound for all remaining VEX register forms, not a claim that every form is admitted by this prototype.",
+  "local_validation": {
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "tree": "98703cebc053d0567b34b6c69f59141972bfd4b8",
+    "sha256": "f3b34c7fc8aeb11cc0850b2d9cd353c2b1bd06d7e00117588c91a457a99b7dcf",
+    "files": [
+      "arch/X86/X86GenSimpleOutput.inc",
+      "arch/X86/X86VectorOutput.c",
+      "suite/synctools/x86_simple_output.cpp"
+    ],
+    "complete": true,
+    "records": "equal private-entry records, cursor and errors for 56885248 inputs",
+    "guards": "equal private-entry records for 3145734 protected-page extents",
+    "changed_runtime_objects": [
+      "arch/X86/X86VectorOutput.c.o",
+      "arch/X86/X86OutputIterator.c.o"
+    ],
+    "unchanged_runtime_objects": 36,
+    "generated_table_reproducible": true,
+    "publication_qualified": false,
+    "native_timing": false
+  },
+  "hypotheses_to_test": [
+    "Actual 32-bit formatting and detail cost reduction",
+    "Added 64-bit VEX entry branch cost",
+    "Linked layout and unchanged ARM/AArch64/MIPS paths"
+  ],
+  "native_timing": false,
+  "publication_qualified": false
+}
