@@ -94,7 +94,7 @@ try:
         print(name, {k:{x:v[x] for x in ('decoded','invalid_bytes','vectors','functions')} for k,v in result.items()}, flush=True)
     save('complete',dict(source=revision,cases=len(results),success=True,
         selection='All nonoverlapping symbol/FDE extents; SIMD subset requires at least 8 vector instructions and at least 15% vector instructions. No iced common-boundary filter in this diagnostic; do not relabel these as timed benchmark panels.',
-        assertions='Every raw decode agrees with canonical full decode on status, public ID, length and cursor. Every admitted historical EVEX row agrees on ID and length.',
+        assertions='Every raw decode agrees with canonical detail-enabled/no-text decode on status, public ID, length and cursor. Printed detail agrees on status, length and cursor; existing predicate ID adjustments are counted separately. Every admitted historical EVEX row agrees with both canonical IDs and lengths.',
         limits='One linear traversal, not application runtime frequencies or native timing; no source optimization or publication.'))
 finally:
     amount = sum(path.stat().st_size for path in w.rglob('*') if path.is_file())

@@ -35,13 +35,16 @@ int main(int argc, char **argv) {
   try {
     if (argc != 4) return 1;
     unsigned bits = std::stoul(argv[1]);
-    csh full = 0, raw = 0;
+    csh full = 0, raw = 0, canonical = 0;
     cs_mode mode = bits == 64 ? CS_MODE_64 : CS_MODE_32;
     if (cs_open(CS_ARCH_X86, mode, &full) || cs_open(CS_ARCH_X86, mode, &raw) ||
+        cs_open(CS_ARCH_X86, mode, &canonical) ||
+        cs_option(canonical, CS_OPT_DETAIL, CS_OPT_ON) ||
+        cs_option(canonical, CS_OPT_TEXT, CS_OPT_OFF) ||
         cs_option(full, CS_OPT_DETAIL, CS_OPT_ON) ||
         cs_option(raw, CS_OPT_TEXT, CS_OPT_OFF)) return 2;
-    cs_insn *insn = cs_malloc(full), *scan = cs_malloc(raw);
-    if (!insn || !scan) return 2;
+    cs_insn *insn = cs_malloc(full), *scan = cs_malloc(raw), *reference = cs_malloc(canonical);
+    if (!insn || !scan || !reference) return 2;
     std::ifstream input(argv[2], std::ios::binary), spans(argv[3]);
     if (!input || !spans) return 3;
     std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(input), {}};
@@ -52,20 +55,23 @@ int main(int argc, char **argv) {
       const uint8_t *cursor = bytes.data() + start;
       Stats local; local.functions = 1;
       while (left) {
-        const uint8_t *begin = cursor, *raw_cursor = cursor;
-        size_t before = left, raw_left = left; uint64_t raw_ip = address;
+        const uint8_t *begin = cursor, *raw_cursor = cursor, *reference_cursor = cursor;
+        size_t before = left, raw_left = left, reference_left = left; uint64_t raw_ip = address, reference_ip = address;
         bool ok = cs_disasm_iter(full, &cursor, &left, &address, insn);
         bool raw_ok = cs_disasm_iter(raw, &raw_cursor, &raw_left, &raw_ip, scan);
+        bool reference_ok = cs_disasm_iter(canonical, &reference_cursor, &reference_left, &reference_ip, reference);
         if (ok != raw_ok || cursor != raw_cursor || left != raw_left || address != raw_ip ||
-            (ok && (insn->id != scan->id || insn->size != scan->size))) {
+            reference_ok != raw_ok || reference_cursor != raw_cursor || reference_left != raw_left || reference_ip != raw_ip ||
+            (ok && (reference->id != scan->id || reference->size != scan->size || insn->size != scan->size))) {
           std::fprintf(stderr,"mismatch bits=%u offset=%zu ip=%llx full_ok=%u raw_ok=%u full_id=%u raw_id=%u full_size=%u raw_size=%u full_left=%zu raw_left=%zu bytes=",
             bits,size_t(begin-bytes.data()),(unsigned long long)(address-(before-left)),ok,raw_ok,insn->id,scan->id,insn->size,scan->size,left,raw_left);
           for(size_t i=0;i<before && i<15;++i)std::fprintf(stderr,"%02x",begin[i]);
-          std::fprintf(stderr," full_text=%s %s\n",insn->mnemonic,insn->op_str);
+          std::fprintf(stderr," canonical_id=%u canonical_size=%u full_text=%s %s\n",reference->id,reference->size,insn->mnemonic,insn->op_str);
           throw std::runtime_error("raw/full decode mismatch");
         }
         if (!ok) { ++local.invalid; ++cursor; --left; ++address; continue; }
         ++local.valid;
+        if(insn->id!=scan->id)++local.counts["printed-predicate-id-adjustments"];
         const cs_x86 &detail = insn->detail->x86;
         for (unsigned i = 0; i < detail.op_count; ++i) {
           if (detail.operands[i].type != X86_OP_REG) continue;
@@ -99,7 +105,7 @@ int main(int argc, char **argv) {
           ((begin[2] & 0x78) != 0x78 || !(begin[3] & 8));
         bool admitted = bits == 64 && !memory && row && !extract_source &&
           (!row->immediate || before >= 7);
-        if (admitted && (row->id != insn->id || insn->size != 6 + row->immediate))
+        if (admitted && (row->id != insn->id || row->id != reference->id || insn->size != 6 + row->immediate))
           throw std::runtime_error("existing EVEX row disagrees with canonical decoder");
         ++local.counts[admitted ? "evex/admitted" : "evex/missed"];
         std::string flags = std::string(memory ? "mem" : "reg") +
@@ -115,7 +121,7 @@ int main(int argc, char **argv) {
     }
     std::printf("{\"all-functions\":"); all.print();
     std::printf(",\"simd-functions\":"); simd.print(); std::puts("}");
-    cs_free(insn, 1); cs_free(scan, 1); cs_close(&full); cs_close(&raw);
+    cs_free(insn, 1); cs_free(scan, 1); cs_free(reference, 1); cs_close(&full); cs_close(&raw); cs_close(&canonical);
   } catch (const std::exception &e) {
     std::fprintf(stderr,"%s\n",e.what()); return 4;
   }
