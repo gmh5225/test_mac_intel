@@ -1,0 +1,1564 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "runtime_published": false,
+  "conclusion": "The matched placement control reproduces AArch64 raw-decode loss in both fixed-file Clang panels, although it retains the baseline vector implementation. The code/data placement intervention is sufficient for this observed loss; the experiment does not isolate a particular cache or hardware resource.",
+  "limitations": "MIPS losses from R1379 were not reproduced in this allocation. Both original regressions and the two image-launch A/A flags remain. This experiment does not qualify the formatter source or explain every prior regression.",
+  "fixed_aarch64_rows": [
+    {
+      "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "median": 0.9991678403924198,
+          "ci95": [
+            0.9979693615952989,
+            1.0003710047198848
+          ]
+        },
+        "geometry": {
+          "median": 0.9816732478449169,
+          "ci95": [
+            0.9789582793393415,
+            0.9834250400124165
+          ]
+        },
+        "output": {
+          "median": 0.9803637609337041,
+          "ci95": [
+            0.9788076427992102,
+            0.9821864510320006
+          ]
+        },
+        "output_vs_geometry": {
+          "median": 0.9987666600134184,
+          "ci95": [
+            0.9968858320341947,
+            1.0011313825742352
+          ]
+        }
+      }
+    },
+    {
+      "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "comparisons": {
+        "aa": {
+          "median": 1.0000913628948032,
+          "ci95": [
+            0.9990956704265141,
+            1.0009750188268227
+          ]
+        },
+        "geometry": {
+          "median": 0.9871711793698269,
+          "ci95": [
+            0.986421032806118,
+            0.9889461558650007
+          ]
+        },
+        "output": {
+          "median": 0.9867807407721629,
+          "ci95": [
+            0.985726505177655,
+            0.9889023424286357
+          ]
+        },
+        "output_vs_geometry": {
+          "median": 0.9999626182900097,
+          "ci95": [
+            0.9990141740179416,
+            1.0011592729436853
+          ]
+        }
+      }
+    }
+  ],
+  "review": {
+    "complete": true,
+    "run": {
+      "id": 44167492826,
+      "head_sha": "8573a54b834042856c6d90fd77a7ba802dfbf3c3",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44167492826",
+      "run_attempt": 1
+    },
+    "protocol": {
+      "source": {
+        "baseline_commit": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "source_parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+        "baseline_patch_sha256": "1a6654521a094cedac21c882be4239037e3ca3d8b7a9cf7b41c00bdc04909ad0",
+        "variants": {
+          "output": {
+            "tree": "8c76907e65c9e8e340ef703c753deed2f4033841",
+            "sha256": "f2befb14d519e77e572a6f80e8ef42ab766605e539f84382f11d3ec6a4fdba69",
+            "experiment": "round1375-evex-output-existing-miss",
+            "semantic_run": {
+              "id": 44151921166,
+              "head_sha": "949654306c3865a195e757fea1ac81f364ef3ec9",
+              "status": "completed",
+              "conclusion": "success",
+              "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44151921166",
+              "run_attempt": 1
+            }
+          }
+        }
+      },
+      "preceding_run": {
+        "id": 44154404917,
+        "head_sha": "afcd50fc078d3e261d0a602accc124a8588b0a58",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44154404917",
+        "run_attempt": 1
+      },
+      "original_losses": {
+        "output": [
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.0003469502414175,
+            "aa_ci95": [
+              0.9991601056599902,
+              1.0025434166108065
+            ],
+            "variant": "output",
+            "gain": 0.9821959913910121,
+            "ci95": [
+              0.9805067025192161,
+              0.9845393583639472
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "same-file-fixed",
+            "aa": 1.0009489875532593,
+            "aa_ci95": [
+              0.9998116950480578,
+              1.0034804660460483
+            ],
+            "variant": "output",
+            "gain": 0.97976310018335,
+            "ci95": [
+              0.9769428771035857,
+              0.9810471212718683
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 0.9995631183218434,
+            "aa_ci95": [
+              0.9982212405115278,
+              1.0008872260087898
+            ],
+            "variant": "output",
+            "gain": 0.9899479106986656,
+            "ci95": [
+              0.9875369666244191,
+              0.9921748246738947
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "same-file-fixed",
+            "aa": 1.0005951390766863,
+            "aa_ci95": [
+              0.9983465371671104,
+              1.0051734017153175
+            ],
+            "variant": "output",
+            "gain": 0.989521645818408,
+            "ci95": [
+              0.9857739750527283,
+              0.9921372466639549
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 1.000066915585644,
+            "aa_ci95": [
+              0.9895196721641923,
+              1.009784480143956
+            ],
+            "variant": "output",
+            "gain": 0.9836871942281937,
+            "ci95": [
+              0.9748473115092231,
+              0.9896954008310195
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "same-file-fixed",
+            "aa": 1.00048599122103,
+            "aa_ci95": [
+              0.9966589942552554,
+              1.0068347922910177
+            ],
+            "variant": "output",
+            "gain": 0.9821849883997532,
+            "ci95": [
+              0.9801284417879998,
+              0.9860202970529903
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-24.04-clang-44154404917",
+            "case": "arm-sort",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9940023338551643,
+            "aa_ci95": [
+              0.9828776932624678,
+              1.0007515404502823
+            ],
+            "variant": "output",
+            "gain": 0.9885094467780942,
+            "ci95": [
+              0.9818277271059722,
+              0.9950140034914535
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-24.04-clang-44154404917",
+            "case": "arm-cp",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9973464471324285,
+            "aa_ci95": [
+              0.9857562683429142,
+              1.0007090934209937
+            ],
+            "variant": "output",
+            "gain": 0.9878152936309827,
+            "ci95": [
+              0.9815536536541379,
+              1.001821549482361
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-24.04-clang-44154404917",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "same-file-fixed",
+            "aa": 0.9999148677168074,
+            "aa_ci95": [
+              0.9982727971860462,
+              1.0026330106042878
+            ],
+            "variant": "output",
+            "gain": 0.9884870049198586,
+            "ci95": [
+              0.9864531050533089,
+              0.9901341259335115
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          }
+        ]
+      },
+      "original_aa_flags": [
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "arm-ls",
+          "panel": null,
+          "mode": 1,
+          "launch": "images",
+          "aa": 1.012794566688362,
+          "aa_ci95": [
+            1.0015859998476948,
+            1.0186812051056793
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "mips64el-ls",
+          "panel": null,
+          "mode": 1,
+          "launch": "images",
+          "aa": 0.9692935404360028,
+          "aa_ci95": [
+            0.955507900411222,
+            0.9828747194919072
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "mips64el-ls",
+          "panel": null,
+          "mode": 2,
+          "launch": "images",
+          "aa": 0.975081571654502,
+          "aa_ci95": [
+            0.9675837670023716,
+            0.9894016216071255
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "arm64-ls",
+          "panel": null,
+          "mode": 2,
+          "launch": "images",
+          "aa": 0.9705733960386874,
+          "aa_ci95": [
+            0.9621995279743092,
+            0.9779318089878821
+          ]
+        }
+      ],
+      "hypothesis": "Reproduce candidate placement with baseline runtime text plus unreachable new writer data/code. If unaffected-path losses follow this matched placement control, the added formatter is not executed work causing those losses.",
+      "boundary": "Before timing, require identical linked addresses and bytes of every non-vector function and identical named read-only/writable data symbols between geometry control and candidate. Failure is inconclusive and stops timing.",
+      "panels": [
+        "arm64-ls raw",
+        "mips64el-ls format",
+        "mips64el-ls detail",
+        "arm-sort raw",
+        "arm-cp raw"
+      ],
+      "profiles": [
+        "ubuntu-22.04-clang",
+        "ubuntu-24.04-clang"
+      ],
+      "launches": [
+        "images",
+        "same-file-fixed"
+      ],
+      "cycles": 40,
+      "calibration_cpu_ms": 80,
+      "source_changes": false,
+      "interpretation": "The matched baseline control is diagnostic only; it can identify placement effects in these binaries, not a unique hardware-cache mechanism or a universal no-regression guarantee.",
+      "publication_qualified": false
+    },
+    "profiles": [
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "proof": {
+          "padding_bytes": 32,
+          "original_text_prefix_preserved": true,
+          "original_relocation_semantics_preserved": true,
+          "synthetic_control_only": true,
+          "production_source_modified": false,
+          "method": "Keep every baseline text byte and relocation; append exactly the observed text growth, then link the same otherwise-unreachable memory-writer object in the candidate archive order. This is a diagnostic binary, never a production patch.",
+          "layout": {
+            "captured": true,
+            "criterion": "Record every symbol relocation and size change. Object isolation is mandatory; actual native timing and A/A controls determine performance acceptance.",
+            "text": {
+              "original_symbols": 1485,
+              "unchanged": 1481,
+              "changed": [
+                {
+                  "symbol": "X86_writeDisp8",
+                  "before": [
+                    [
+                      "t",
+                      1242288,
+                      122
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      1242320,
+                      122
+                    ]
+                  ]
+                },
+                {
+                  "symbol": "X86_writeEvexMemoryOutput",
+                  "before": [
+                    [
+                      "T",
+                      2940400,
+                      1372
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      2940400,
+                      1372
+                    ]
+                  ]
+                },
+                {
+                  "symbol": "writeEvexBroadcast",
+                  "before": [
+                    [
+                      "t",
+                      1240272,
+                      1133
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      1240272,
+                      1156
+                    ]
+                  ]
+                },
+                {
+                  "symbol": "writeVectorRegisters",
+                  "before": [
+                    [
+                      "t",
+                      1241408,
+                      871
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      1241440,
+                      871
+                    ]
+                  ]
+                }
+              ],
+              "removed": [],
+              "added": []
+            },
+            "readonly": {
+              "original_symbols": 1451,
+              "unchanged": 1451,
+              "changed": [],
+              "removed": [],
+              "added": []
+            },
+            "writable": {
+              "original_symbols": 80,
+              "unchanged": 80,
+              "changed": [],
+              "removed": [],
+              "added": []
+            }
+          },
+          "excluded_vector_functions": [
+            "X86_writeDisp8",
+            "X86_writeVectorOutput",
+            "writeEvexBroadcast",
+            "writeEvexOutput",
+            "writeVectorRegisters",
+            "writeVexIndexedOutput",
+            "writeVexRegisterOutput",
+            "writeVexRipLoad"
+          ],
+          "compared_other_functions": 1477,
+          "other_function_byte_mismatches": [],
+          "binding_only_differences": [
+            "X86_writeEvexMemoryOutput"
+          ],
+          "binding_differences_absent_from_dynamic_symbols": true,
+          "data_symbols_match": true,
+          "matched": true
+        },
+        "complete": {
+          "cases": 10,
+          "cc": "clang",
+          "host": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false,
+          "geometry_matched": true,
+          "native_timing": true
+        },
+        "cleanup": {
+          "bytes": 283654688,
+          "removed": true
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "proof": {
+          "padding_bytes": 16,
+          "original_text_prefix_preserved": true,
+          "original_relocation_semantics_preserved": true,
+          "synthetic_control_only": true,
+          "production_source_modified": false,
+          "method": "Keep every baseline text byte and relocation; append exactly the observed text growth, then link the same otherwise-unreachable memory-writer object in the candidate archive order. This is a diagnostic binary, never a production patch.",
+          "layout": {
+            "captured": true,
+            "criterion": "Record every symbol relocation and size change. Object isolation is mandatory; actual native timing and A/A controls determine performance acceptance.",
+            "text": {
+              "original_symbols": 1486,
+              "unchanged": 1482,
+              "changed": [
+                {
+                  "symbol": "X86_writeDisp8",
+                  "before": [
+                    [
+                      "t",
+                      1121360,
+                      117
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      1121376,
+                      117
+                    ]
+                  ]
+                },
+                {
+                  "symbol": "X86_writeEvexMemoryOutput",
+                  "before": [
+                    [
+                      "T",
+                      2327808,
+                      1378
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      2327808,
+                      1378
+                    ]
+                  ]
+                },
+                {
+                  "symbol": "writeEvexBroadcast",
+                  "before": [
+                    [
+                      "t",
+                      1119344,
+                      1112
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      1119344,
+                      1131
+                    ]
+                  ]
+                },
+                {
+                  "symbol": "writeVectorRegisters",
+                  "before": [
+                    [
+                      "t",
+                      1120464,
+                      896
+                    ]
+                  ],
+                  "after": [
+                    [
+                      "t",
+                      1120480,
+                      896
+                    ]
+                  ]
+                }
+              ],
+              "removed": [],
+              "added": []
+            },
+            "readonly": {
+              "original_symbols": 1443,
+              "unchanged": 1443,
+              "changed": [],
+              "removed": [],
+              "added": []
+            },
+            "writable": {
+              "original_symbols": 79,
+              "unchanged": 79,
+              "changed": [],
+              "removed": [],
+              "added": []
+            }
+          },
+          "excluded_vector_functions": [
+            "X86_writeDisp8",
+            "X86_writeVectorOutput",
+            "writeEvexBroadcast",
+            "writeEvexOutput",
+            "writeVectorRegisters",
+            "writeVexIndexedOutput",
+            "writeVexRegisterOutput",
+            "writeVexRipLoad"
+          ],
+          "compared_other_functions": 1478,
+          "other_function_byte_mismatches": [],
+          "binding_only_differences": [
+            "X86_writeEvexMemoryOutput"
+          ],
+          "binding_differences_absent_from_dynamic_symbols": true,
+          "data_symbols_match": true,
+          "matched": true
+        },
+        "complete": {
+          "cases": 10,
+          "cc": "clang",
+          "host": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false,
+          "geometry_matched": true,
+          "native_timing": true
+        },
+        "cleanup": {
+          "bytes": 271878142,
+          "removed": true
+        }
+      }
+    ],
+    "rows": [
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9961041002954161,
+            "ci95": [
+              0.9889907859141803,
+              1.007069447831949
+            ]
+          },
+          "geometry": {
+            "median": 1.0038689678806585,
+            "ci95": [
+              0.9982398922456999,
+              1.0121163910391135
+            ]
+          },
+          "output": {
+            "median": 1.008895202217798,
+            "ci95": [
+              1.002086222298206,
+              1.0117188954527214
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0008847925643956,
+            "ci95": [
+              0.995582543345272,
+              1.0048770220730538
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 0.9987359105405738,
+            "ci95": [
+              0.9972530727534714,
+              1.0001894517699526
+            ]
+          },
+          "geometry": {
+            "median": 1.003754186775692,
+            "ci95": [
+              1.0025610003683174,
+              1.0048062673290616
+            ]
+          },
+          "output": {
+            "median": 1.0038295570625386,
+            "ci95": [
+              1.0022485327371122,
+              1.005302111479239
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9995683853741171,
+            "ci95": [
+              0.9988440477100211,
+              1.0008659551390058
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9978765480098027,
+            "ci95": [
+              0.9873540788871513,
+              1.0042081201132556
+            ]
+          },
+          "geometry": {
+            "median": 1.007965606225262,
+            "ci95": [
+              1.0010352671972682,
+              1.0121530178426497
+            ]
+          },
+          "output": {
+            "median": 1.0067382537031035,
+            "ci95": [
+              0.9974752543957845,
+              1.01354948450931
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9986175997348776,
+            "ci95": [
+              0.9949512758775247,
+              1.0055764755105776
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 1.0001924535077054,
+            "ci95": [
+              0.9988635466484834,
+              1.0028288484155523
+            ]
+          },
+          "geometry": {
+            "median": 1.0078313373136583,
+            "ci95": [
+              1.0065301236353112,
+              1.0103400446687145
+            ]
+          },
+          "output": {
+            "median": 1.0072142176961214,
+            "ci95": [
+              1.0053187100541392,
+              1.0088047183167486
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.99936490600504,
+            "ci95": [
+              0.9972352851959212,
+              1.0010309190725493
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9819748567510251,
+            "ci95": [
+              0.9780051997741939,
+              0.9855207573104309
+            ]
+          },
+          "geometry": {
+            "median": 1.001415243771545,
+            "ci95": [
+              0.9997629208155524,
+              1.0024984059494262
+            ]
+          },
+          "output": {
+            "median": 1.0014031932504426,
+            "ci95": [
+              0.999559125201703,
+              1.002798351749394
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0007426513531779,
+            "ci95": [
+              0.9992900889172689,
+              1.0042586699038683
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 0.9995959542765853,
+            "ci95": [
+              0.9973373435527129,
+              1.0006587073496038
+            ]
+          },
+          "geometry": {
+            "median": 1.011277173309237,
+            "ci95": [
+              1.0088146408104366,
+              1.012557561082894
+            ]
+          },
+          "output": {
+            "median": 1.0116884232359036,
+            "ci95": [
+              1.0104198523127292,
+              1.0126209567792568
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0006808685510644,
+            "ci95": [
+              0.9992152808325329,
+              1.0015761065907696
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9886710822922838,
+            "ci95": [
+              0.9829118511002871,
+              0.9931474878576938
+            ]
+          },
+          "geometry": {
+            "median": 1.0075701738201248,
+            "ci95": [
+              1.0034124840039813,
+              1.0143220946732097
+            ]
+          },
+          "output": {
+            "median": 1.0087916434485673,
+            "ci95": [
+              1.0036251760373065,
+              1.0114229788013858
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9984106550835135,
+            "ci95": [
+              0.993447197402135,
+              1.0026684783959692
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 0.9986379707086479,
+            "ci95": [
+              0.9966345048000678,
+              0.9998821152098691
+            ]
+          },
+          "geometry": {
+            "median": 1.0135974045968652,
+            "ci95": [
+              1.0120653935336565,
+              1.01643180629264
+            ]
+          },
+          "output": {
+            "median": 1.0137721650832545,
+            "ci95": [
+              1.011797337214425,
+              1.015901338793391
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9999290434305763,
+            "ci95": [
+              0.9981440058681987,
+              1.0012168648913076
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9986839129346542,
+            "ci95": [
+              0.9947036068471062,
+              1.0033194946635127
+            ]
+          },
+          "geometry": {
+            "median": 0.9780752268022523,
+            "ci95": [
+              0.9739498992112261,
+              0.982760029187765
+            ]
+          },
+          "output": {
+            "median": 0.9763918238575189,
+            "ci95": [
+              0.9685077196878868,
+              0.9834357531219043
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9924135696107197,
+            "ci95": [
+              0.9884791534442723,
+              0.9996019409270305
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 0.9991678403924198,
+            "ci95": [
+              0.9979693615952989,
+              1.0003710047198848
+            ]
+          },
+          "geometry": {
+            "median": 0.9816732478449169,
+            "ci95": [
+              0.9789582793393415,
+              0.9834250400124165
+            ]
+          },
+          "output": {
+            "median": 0.9803637609337041,
+            "ci95": [
+              0.9788076427992102,
+              0.9821864510320006
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9987666600134184,
+            "ci95": [
+              0.9968858320341947,
+              1.0011313825742352
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 1.0013503001481094,
+            "ci95": [
+              0.9896682400851353,
+              1.0134472699044825
+            ]
+          },
+          "geometry": {
+            "median": 0.9972906101814567,
+            "ci95": [
+              0.9835945904197908,
+              1.004195913375531
+            ]
+          },
+          "output": {
+            "median": 0.9943538132353633,
+            "ci95": [
+              0.9845205368285119,
+              1.0050808011874874
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9969734362369941,
+            "ci95": [
+              0.9869419109964164,
+              1.0114545025238244
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 1.0009502176160106,
+            "ci95": [
+              0.9979981073292592,
+              1.002802738472231
+            ]
+          },
+          "geometry": {
+            "median": 1.0032288078904816,
+            "ci95": [
+              1.000870222510179,
+              1.0051456329420365
+            ]
+          },
+          "output": {
+            "median": 1.0026603638540863,
+            "ci95": [
+              1.000833518721402,
+              1.004041222752872
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.001001537694644,
+            "ci95": [
+              0.9985890866157046,
+              1.0026544232979622
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 1.0060679842117755,
+            "ci95": [
+              0.9938169964605004,
+              1.0148801069213624
+            ]
+          },
+          "geometry": {
+            "median": 0.9970248533098873,
+            "ci95": [
+              0.9917995737089007,
+              1.008496229911072
+            ]
+          },
+          "output": {
+            "median": 0.996060626797032,
+            "ci95": [
+              0.9932285563675279,
+              1.0048856354880518
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0009984868819661,
+            "ci95": [
+              0.9948251608046237,
+              1.0080876773731213
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 1.0009925621326254,
+            "ci95": [
+              0.9991010974801944,
+              1.0021728969010952
+            ]
+          },
+          "geometry": {
+            "median": 0.9977066301017573,
+            "ci95": [
+              0.996291665551752,
+              0.9991890020436655
+            ]
+          },
+          "output": {
+            "median": 0.9983748414788729,
+            "ci95": [
+              0.9965374381128554,
+              0.9994953324355161
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.999411211217412,
+            "ci95": [
+              0.998519441014259,
+              1.0011556986767456
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9955961396621086,
+            "ci95": [
+              0.9921796745135556,
+              0.9967500710031307
+            ]
+          },
+          "geometry": {
+            "median": 1.0097768246265555,
+            "ci95": [
+              1.0085077505984958,
+              1.0115695670678684
+            ]
+          },
+          "output": {
+            "median": 1.0090100714570744,
+            "ci95": [
+              1.0079652300885495,
+              1.0114609458834964
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9993020018973411,
+            "ci95": [
+              0.9968669912463737,
+              1.0016032439294693
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 0.999990762618156,
+            "ci95": [
+              0.9988471796405693,
+              1.0012996001949221
+            ]
+          },
+          "geometry": {
+            "median": 1.0115035069970664,
+            "ci95": [
+              1.009509872357349,
+              1.0126083033060511
+            ]
+          },
+          "output": {
+            "median": 1.012317058914669,
+            "ci95": [
+              1.0109463310949298,
+              1.0138526460295552
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0008963499897248,
+            "ci95": [
+              0.9984720563798024,
+              1.0031464548892761
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9968848553595432,
+            "ci95": [
+              0.9939238004176804,
+              1.0012870332949917
+            ]
+          },
+          "geometry": {
+            "median": 1.0231381800371984,
+            "ci95": [
+              1.0196802273782772,
+              1.026260117188045
+            ]
+          },
+          "output": {
+            "median": 1.0214621875996106,
+            "ci95": [
+              1.0185838139724637,
+              1.026039147821686
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9987914520899974,
+            "ci95": [
+              0.99653810233802,
+              1.0032711118725381
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 0.997519553592383,
+            "ci95": [
+              0.9951391704193919,
+              1.0003541805087526
+            ]
+          },
+          "geometry": {
+            "median": 1.0259420816788243,
+            "ci95": [
+              1.0239921363546864,
+              1.0285049813483944
+            ]
+          },
+          "output": {
+            "median": 1.024995908872219,
+            "ci95": [
+              1.022800896576495,
+              1.0261907516150988
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9991849473162313,
+            "ci95": [
+              0.9973272841065608,
+              1.0015777369720626
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9993162263339728,
+            "ci95": [
+              0.9932223436569356,
+              1.0041633298351487
+            ]
+          },
+          "geometry": {
+            "median": 0.9936644194271798,
+            "ci95": [
+              0.9870088358090686,
+              1.003677258192551
+            ]
+          },
+          "output": {
+            "median": 0.9947296984205425,
+            "ci95": [
+              0.9838540791395737,
+              1.0007747497400612
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0021058721296623,
+            "ci95": [
+              0.9918255913242149,
+              1.0106690570872208
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44167492826",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "median": 1.0000913628948032,
+            "ci95": [
+              0.9990956704265141,
+              1.0009750188268227
+            ]
+          },
+          "geometry": {
+            "median": 0.9871711793698269,
+            "ci95": [
+              0.986421032806118,
+              0.9889461558650007
+            ]
+          },
+          "output": {
+            "median": 0.9867807407721629,
+            "ci95": [
+              0.985726505177655,
+              0.9889023424286357
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9999626182900097,
+            "ci95": [
+              0.9990141740179416,
+              1.0011592729436853
+            ]
+          }
+        }
+      }
+    ],
+    "matched_profiles": 2,
+    "aa_outside_one_percent": [
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9819748567510251,
+            "ci95": [
+              0.9780051997741939,
+              0.9855207573104309
+            ]
+          },
+          "geometry": {
+            "median": 1.001415243771545,
+            "ci95": [
+              0.9997629208155524,
+              1.0024984059494262
+            ]
+          },
+          "output": {
+            "median": 1.0014031932504426,
+            "ci95": [
+              0.999559125201703,
+              1.002798351749394
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 1.0007426513531779,
+            "ci95": [
+              0.9992900889172689,
+              1.0042586699038683
+            ]
+          }
+        }
+      },
+      {
+        "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44167492826",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "median": 0.9886710822922838,
+            "ci95": [
+              0.9829118511002871,
+              0.9931474878576938
+            ]
+          },
+          "geometry": {
+            "median": 1.0075701738201248,
+            "ci95": [
+              1.0034124840039813,
+              1.0143220946732097
+            ]
+          },
+          "output": {
+            "median": 1.0087916434485673,
+            "ci95": [
+              1.0036251760373065,
+              1.0114229788013858
+            ]
+          },
+          "output_vs_geometry": {
+            "median": 0.9984106550835135,
+            "ci95": [
+              0.993447197402135,
+              1.0026684783959692
+            ]
+          }
+        }
+      }
+    ],
+    "publication_qualified": false,
+    "production_modified": false,
+    "scope": "Synthetic placement controls retain baseline text. Matching is checked before timing; unmatched controls yield no speed inference. This does not repair or qualify the original formatter candidate."
+  },
+  "prior_attempts": [
+    {
+      "run": {
+        "id": 44162365841,
+        "head_sha": "92ade467525a4c04c5dd0936b495be5067244205",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44162365841",
+        "run_attempt": 1
+      },
+      "native_timing_started": false,
+      "production_modified": false,
+      "reason": "Raw .rela.text bytes differ after objcopy updates the object. The next diagnostic compares resolved relocation offset, type, target and addend, and still requires complete linked-byte identity before timing.",
+      "cleanup": [
+        {
+          "bytes": 208315804,
+          "removed": true
+        },
+        {
+          "bytes": 199839178,
+          "removed": true
+        }
+      ]
+    },
+    {
+      "run": {
+        "id": 44164037524,
+        "head_sha": "6c94db9f3d5bade683c928960cfe49385b0c8d5f",
+        "status": "completed",
+        "conclusion": "failure",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44164037524",
+        "run_attempt": 1
+      },
+      "native_timing_started": false,
+      "production_modified": false,
+      "profiles": [
+        {
+          "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44164037524",
+          "before_relocations": 69,
+          "after_relocations": 0,
+          "cleanup": {
+            "bytes": 208315804,
+            "removed": true
+          }
+        },
+        {
+          "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44164037524",
+          "before_relocations": 67,
+          "after_relocations": 0,
+          "cleanup": {
+            "bytes": 199839186,
+            "removed": true
+          }
+        }
+      ],
+      "reason": "On both tested toolchains, objcopy --update-section discarded every .text relocation. The invariant caught this before linking or timing. Replace section rewriting with an owned ELF extent update that preserves all other section bytes, then require raw and resolved relocation equality and full linked-byte identity."
+    },
+    {
+      "run": {
+        "id": 44165436683,
+        "head_sha": "0f9f1cdf854bee49fb5e5e8715cb96a526d97ab5",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44165436683",
+        "run_attempt": 1
+      },
+      "native_timing_started": false,
+      "matched_controls": 0,
+      "profiles": [
+        {
+          "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44165436683",
+          "padding_bytes": 32,
+          "reported_mismatches": [
+            "X86_writeEvexMemoryOutput"
+          ],
+          "cleanup": {
+            "bytes": 247039112,
+            "removed": true
+          }
+        },
+        {
+          "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44165436683",
+          "padding_bytes": 16,
+          "reported_mismatches": [
+            "X86_writeEvexMemoryOutput"
+          ],
+          "cleanup": {
+            "bytes": 236648242,
+            "removed": true
+          }
+        }
+      ],
+      "diagnosis": "The function comparison included nm symbol binding (T versus t) in its byte-identity tuple. The one reported mismatch is the writer forced into the control with -u. This report does not establish whether its bytes differ. The next run will separately compare addresses, sizes and bytes, retain binding differences, and require that each binding-only difference is absent from the dynamic symbol table in both binaries."
+    }
+  ],
+  "followup": "round1389-evex-output-isolated-dispatch",
+  "overall_goal_complete": false
+}
