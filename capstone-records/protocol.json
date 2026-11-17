@@ -1,5 +1,5 @@
 {
-  "inputs": {
+  "source": {
     "baseline_commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
     "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
     "variants": {
@@ -73,45 +73,72 @@
     "baseline_patch_sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452",
     "baseline_publication_pending": true
   },
-  "created_before_any_native_timing": true,
-  "question": "Does either semantic-equivalent EVEX transfer implementation improve real scanning without regressing PE32, formatted/detail output or other architectures, including the observed linker relocation?",
-  "methodology_change": "R1365 and R1366 retain their failed exact-address gates and are not published. Data address equality was a conservative proxy, not a measured performance requirement. This fresh predeclared comparison retains every layout difference and evaluates both implementations, without any timing results having been observed or discarded.",
-  "native": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
+  "original_flag": {
+    "host": "evex-transfer-geometry-images-four-ubuntu-22.04-clang-44140786801",
+    "case": "arm64-ls",
+    "panel": null,
+    "mode": 0,
+    "launch": "images",
+    "aa": 0.9969989353765163,
+    "aa_ci95": [
+      0.9750937220816739,
+      1.0132473900664347
     ],
-    "panels": 7,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 60,
-    "rows_per_variant": 168
-  },
-  "mixed": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
+    "variant": "merge",
+    "gain": 0.9861939437872747,
+    "ci95": [
+      0.9752821716088839,
+      0.9964306304473157
     ],
-    "cases": 8,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 80,
-    "rows_per_variant": 192
+    "vs_iced": null,
+    "vs_fast": null
   },
-  "controls": [
-    "byte-identical A/A",
-    "original images",
-    "same-file-fixed with ASLR disabled"
+  "source_review_run": {
+    "id": 44140786801,
+    "head_sha": "6c5a6be37eedef3c6bc4f8b811f5deba20911014",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44140786801",
+    "run_attempt": 1
+  },
+  "requested_cpu": "AMD EPYC 9V74 80-Core Processor",
+  "allocations": 4,
+  "focus": [
+    [
+      "arm64-ls",
+      0
+    ]
   ],
-  "gate": "Preserve every result. Investigate each median candidate loss beyond 1% and every A/A deviation beyond 1%; exclude unstable observations from gain claims. No candidate is qualified by instruction-count reductions or symbol movement alone.",
-  "layout": "Require all unmodified runtime object hashes and text symbol positions unchanged. Record all read-only and writable address moves. The edited EVEX helpers and their own tables are explicit exceptions.",
-  "consumer": "Frozen original consumers, original mode semantics, common instruction-boundary filtering and frozen real PE/ELF corpora; forked iced 8b8d90b benchmark unchanged.",
-  "production_unchanged": true,
+  "variants": [
+    "base",
+    "aa",
+    "merge"
+  ],
+  "cycles": 36,
+  "target_ms": 80,
+  "image_controls": [
+    "images",
+    "equal-names",
+    "equal-padded",
+    "shared-variable",
+    "shared-padded"
+  ],
+  "aslr_controls": [
+    "aslr",
+    "fixed"
+  ],
+  "interpretation": "Original images retain their original distinct inodes and unequal names. Equal names use hard-link aliases of those same inodes, with five-character basenames for every variant. Equal padded uses those aliases and inodes with equal final file sizes. Shared variable and padded use one five-character pathname and inode, replacing bytes for each invocation. The latter tests inode/replacement jointly; it is not proof of a particular hardware cache mechanism.",
+  "selection": "Four predeclared allocations. Run timing only on the CPU model that produced the new AArch64 flag. Other allocations are unavailable evidence, not passes. Keep all observations without outlier removal.",
+  "diagnostics": "After native timing, record original consumer Callgrind work and exact executed bytes, and observe entry stack/argument pointers under GDB with ASLR disabled. GDB is never used for reported native timing.",
   "publication_qualified": false,
-  "cleanup": "Remove owned builds and source exports in finally; preserve diagnostics and original observations.",
-  "baseline_assembly": "Reconstruct the exact locally prepared baseline commit from its published parent, frozen patch and verified commit object. Git tree and commit hashes must match before compilation. Baseline product qualification is independent and remains required before production publication."
+  "followup_of": {
+    "id": 44148767684,
+    "head_sha": "db6acc2633312579b9c8ab0276cec2a17c1b34fe",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44148767684",
+    "run_attempt": 1
+  },
+  "temporary_prefix": "capstone-evex-transfer-geometry-mixed-",
+  "directory_control": "Restore the exact R1370 temporary directory prefix and suffix length; frozen consumer, corpus names, binary names and source patches are unchanged. Retain every original and follow-up result. This is a replication and launch-factor diagnosis, not proof of a particular hardware mechanism."
 }
