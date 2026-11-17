@@ -36,8 +36,9 @@
     "original images",
     "same inode and size with ASLR disabled if supported",
     "identical consumer object",
-    "complete Capstone output hash"
+    "Capstone boundary hash and selected-output aggregate checksum"
   ],
   "gate": "Keep exact unchanged-object/binary controls for inactive profiles. Check all native rows and A/A uncertainty before promotion; no product qualification yet.",
-  "reason": "Measure PE32/PE64 and unchanged ARM/AArch64/MIPS controls for Intel printOperand pointer reuse. SIMD function-body timing and iced comparisons are handled by the separate native pilot on this same source tree."
+  "reason": "Measure PE32/PE64 and unchanged ARM/AArch64/MIPS controls for Intel printOperand pointer reuse. SIMD function-body timing and iced comparisons are handled by the separate native pilot on this same source tree.",
+  "semantic_validation": "Native timing checks selected consumed values, instruction boundaries and rejection counts. It is not a byte-for-byte record comparison. Complete cs_insn/cs_detail records, unused bytes, cursors and errors are checked separately by the dedicated differential probes recorded for this source tree."
 }
