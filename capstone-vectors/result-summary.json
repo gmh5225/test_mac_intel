@@ -1,0 +1,4715 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44048028928,
+    "head_sha": "6248e0c4165fbd09e9dcf8c593b60bf2f4a90dab",
+    "conclusion": "success",
+    "status": "completed",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44048028928",
+    "run_attempt": 1
+  },
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "aaf9dd3209a701bd28e86016c7309a14573cec50",
+    "sha256": "8f676e588220a9a4a438e678e324485d4551b603200d335f575bc1c997c61dbe",
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86EvexMemoryOutput.c",
+      "arch/X86/X86GenEvexMemoryOutput.inc",
+      "arch/X86/X86SimpleOutput.h",
+      "arch/X86/X86VectorOutput.c",
+      "suite/synctools/x86_vector_output.cpp",
+      "tests/unit/x86_simple_output.c"
+    ]
+  },
+  "rows": [
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "mode": 0,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          322196550,
+          62602986,
+          48772250
+        ],
+        "scan": [
+          322196550,
+          62602986,
+          48772250
+        ]
+      },
+      "instruction_reduction": 0.0,
+      "changed_function_costs": {},
+      "raw_code": {
+        "executed_instruction_addresses": 8287,
+        "relative_instruction_counts_identical": true,
+        "moved_functions": {
+          "X86_completeScan": {
+            "old_address": "0x18d130",
+            "new_address": "0x18d7d0",
+            "address_delta": 1696,
+            "executed_positions": 418,
+            "dynamic_instructions": 1019764
+          },
+          "X86_getInstructionAfterExtensions": {
+            "old_address": "0x2071a0",
+            "new_address": "0x207840",
+            "address_delta": 1696,
+            "executed_positions": 1014,
+            "dynamic_instructions": 16061712
+          },
+          "decodeEVEXInstruction": {
+            "old_address": "0x217600",
+            "new_address": "0x217ca0",
+            "address_delta": 1696,
+            "executed_positions": 173,
+            "dynamic_instructions": 26053324
+          }
+        },
+        "changed_executed_instructions": [
+          {
+            "function": "decode_apx_evex_vector_gpr",
+            "offset": "0x1e",
+            "old_address": "0x15cd0e",
+            "new_address": "0x15cd0e",
+            "count": 58226,
+            "old": "lea    0x4bc26b(%rip),%r14        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bd26b(%rip),%r14        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_evex_vector_gpr",
+            "offset": "0x2b",
+            "old_address": "0x15cd1b",
+            "new_address": "0x15cd1b",
+            "count": 58226,
+            "old": "lea    0x34bcbe(%rip),%r12        # 4a89e0 <getModRMDecision.emptyDecision+0x1430>",
+            "new": "lea    0x34ccbe(%rip),%r12        # 4a99e0 <getModRMDecision.emptyDecision+0x1430>"
+          },
+          {
+            "function": "X86_completeScan",
+            "offset": "0xf7",
+            "old_address": "0x18d227",
+            "new_address": "0x18d8c7",
+            "count": 1686,
+            "old": "lea    0xf99926(%rip),%r15        # 1126b54 <insn_operands+0x1a6204>",
+            "new": "lea    0xf9a386(%rip),%r15        # 1127c54 <insn_operands+0x1a61b4>"
+          },
+          {
+            "function": "X86_completeScan",
+            "offset": "0x104",
+            "old_address": "0x18d234",
+            "new_address": "0x18d8d4",
+            "count": 1686,
+            "old": "lea    0xf99e05(%rip),%r14        # 1127040 <insn_operands+0x1a66f0>",
+            "new": "lea    0xf9a865(%rip),%r14        # 1128140 <insn_operands+0x1a66a0>"
+          },
+          {
+            "function": "X86_completeScan",
+            "offset": "0xab1",
+            "old_address": "0x18dbe1",
+            "new_address": "0x18e281",
+            "count": 13104,
+            "old": "lea    0xf95798(%rip),%rcx        # 1123380 <insn_operands+0x1a2a30>",
+            "new": "lea    0xf961f8(%rip),%rcx        # 1124480 <insn_operands+0x1a29e0>"
+          },
+          {
+            "function": "X86_completeScan",
+            "offset": "0x6efc",
+            "old_address": "0x19402c",
+            "new_address": "0x1946cc",
+            "count": 2298,
+            "old": "lea    0xf925c5(%rip),%rcx        # 11265f8 <insn_operands+0x1a5ca8>",
+            "new": "lea    0xf93025(%rip),%rcx        # 11276f8 <insn_operands+0x1a5c58>"
+          },
+          {
+            "function": "decode_apx_pdep_pext",
+            "offset": "0x1f",
+            "old_address": "0x15d38f",
+            "new_address": "0x15d38f",
+            "count": 58226,
+            "old": "lea    0x4bbbea(%rip),%r9        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bcbea(%rip),%r9        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_pdep_pext",
+            "offset": "0x2c",
+            "old_address": "0x15d39c",
+            "new_address": "0x15d39c",
+            "count": 58226,
+            "old": "lea    0x34b9fd(%rip),%r11        # 4a8da0 <getModRMDecision.emptyDecision+0x17f0>",
+            "new": "lea    0x34c9fd(%rip),%r11        # 4a9da0 <getModRMDecision.emptyDecision+0x17f0>"
+          },
+          {
+            "function": "decode_apx_bextr",
+            "offset": "0x1f",
+            "old_address": "0x15e0af",
+            "new_address": "0x15e0af",
+            "count": 58226,
+            "old": "lea    0x4baeca(%rip),%r9        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bbeca(%rip),%r9        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_bextr",
+            "offset": "0x2c",
+            "old_address": "0x15e0bc",
+            "new_address": "0x15e0bc",
+            "count": 58226,
+            "old": "lea    0x34b27d(%rip),%r11        # 4a9340 <getModRMDecision.emptyDecision+0x1d90>",
+            "new": "lea    0x34c27d(%rip),%r11        # 4aa340 <getModRMDecision.emptyDecision+0x1d90>"
+          },
+          {
+            "function": "decode_apx_cmpccxadd",
+            "offset": "0x1f",
+            "old_address": "0x15d05f",
+            "new_address": "0x15d05f",
+            "count": 58226,
+            "old": "lea    0x4bbf1a(%rip),%r8        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bcf1a(%rip),%r8        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_cmpccxadd",
+            "offset": "0x2c",
+            "old_address": "0x15d06c",
+            "new_address": "0x15d06c",
+            "count": 58226,
+            "old": "lea    0x34bb4d(%rip),%r11        # 4a8bc0 <getModRMDecision.emptyDecision+0x1610>",
+            "new": "lea    0x34cb4d(%rip),%r11        # 4a9bc0 <getModRMDecision.emptyDecision+0x1610>"
+          },
+          {
+            "function": "decodeScanResultGeneric",
+            "offset": "0x270",
+            "old_address": "0x158a90",
+            "new_address": "0x158a90",
+            "count": 193058,
+            "old": "call   2071a0 <X86_getInstructionAfterExtensions>",
+            "new": "call   207840 <X86_getInstructionAfterExtensions>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x1f",
+            "old_address": "0x128bdf",
+            "new_address": "0x128bdf",
+            "count": 206162,
+            "old": "lea    0x2f8c4a(%rip),%rcx        # 421830 <x86OperandSets>",
+            "new": "lea    0x2f9c4a(%rip),%rcx        # 422830 <x86OperandSets>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0xa1",
+            "old_address": "0x128c61",
+            "new_address": "0x128c61",
+            "count": 196556,
+            "old": "lea    0x2d354c(%rip),%rdx        # 3fc1b4 <_IO_stdin_used+0x51b4>",
+            "new": "lea    0x2d454c(%rip),%rdx        # 3fd1b4 <_IO_stdin_used+0x51b4>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x139",
+            "old_address": "0x128cf9",
+            "new_address": "0x128cf9",
+            "count": 3666,
+            "old": "lea    0x2d43a0(%rip),%r15        # 3fd0a0 <_IO_stdin_used+0x60a0>",
+            "new": "lea    0x2d53a0(%rip),%r15        # 3fe0a0 <_IO_stdin_used+0x60a0>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x1ae",
+            "old_address": "0x128d6e",
+            "new_address": "0x128d6e",
+            "count": 3340,
+            "old": "lea    0x2d445f(%rip),%rdi        # 3fd1d4 <_IO_stdin_used+0x61d4>",
+            "new": "lea    0x2d545f(%rip),%rdi        # 3fe1d4 <_IO_stdin_used+0x61d4>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x2e1",
+            "old_address": "0x128ea1",
+            "new_address": "0x128ea1",
+            "count": 3616,
+            "old": "lea    0x2d4398(%rip),%rdi        # 3fd240 <_IO_stdin_used+0x6240>",
+            "new": "lea    0x2d5398(%rip),%rdi        # 3fe240 <_IO_stdin_used+0x6240>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x334",
+            "old_address": "0x128ef4",
+            "new_address": "0x128ef4",
+            "count": 388,
+            "old": "lea    0x2d422d(%rip),%rdi        # 3fd128 <_IO_stdin_used+0x6128>",
+            "new": "lea    0x2d522d(%rip),%rdi        # 3fe128 <_IO_stdin_used+0x6128>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0xa3d",
+            "old_address": "0x1295fd",
+            "new_address": "0x1295fd",
+            "count": 206162,
+            "old": "lea    0x2d2bc0(%rip),%rdx        # 3fc1c4 <_IO_stdin_used+0x51c4>",
+            "new": "lea    0x2d3bc0(%rip),%rdx        # 3fd1c4 <_IO_stdin_used+0x51c4>"
+          },
+          {
+            "function": "decode_apx_bls",
+            "offset": "0x1f",
+            "old_address": "0x15dc3f",
+            "new_address": "0x15dc3f",
+            "count": 58226,
+            "old": "lea    0x4bb33a(%rip),%r9        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bc33a(%rip),%r9        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_bls",
+            "offset": "0x2c",
+            "old_address": "0x15dc4c",
+            "new_address": "0x15dc4c",
+            "count": 58226,
+            "old": "lea    0x34b50d(%rip),%r11        # 4a9160 <getModRMDecision.emptyDecision+0x1bb0>",
+            "new": "lea    0x34c50d(%rip),%r11        # 4aa160 <getModRMDecision.emptyDecision+0x1bb0>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x2a6",
+            "old_address": "0x158296",
+            "new_address": "0x158296",
+            "count": 13240,
+            "old": "lea    0x1142893(%rip),%rax        # 129ab30 <x86VexScanRows>",
+            "new": "lea    0x1143893(%rip),%rax        # 129bb30 <x86VexScanRows>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x314",
+            "old_address": "0x158304",
+            "new_address": "0x158304",
+            "count": 13240,
+            "old": "lea    0x33fef5(%rip),%rax        # 498200 <x86VexScanMetadata>",
+            "new": "lea    0x340ef5(%rip),%rax        # 499200 <x86VexScanMetadata>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x35f",
+            "old_address": "0x15834f",
+            "new_address": "0x15834f",
+            "count": 12004,
+            "old": "lea    0x2a7486(%rip),%rax        # 3ff7dc <_IO_stdin_used+0x87dc>",
+            "new": "lea    0x2a8486(%rip),%rax        # 4007dc <_IO_stdin_used+0x87dc>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x419",
+            "old_address": "0x158409",
+            "new_address": "0x158409",
+            "count": 12004,
+            "old": "lea    0x2a73bc(%rip),%rdi        # 3ff7cc <_IO_stdin_used+0x87cc>",
+            "new": "lea    0x2a83bc(%rip),%rdi        # 4007cc <_IO_stdin_used+0x87cc>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x4b1",
+            "old_address": "0x1584a1",
+            "new_address": "0x1584a1",
+            "count": 5392,
+            "old": "lea    0x32d088(%rip),%rax        # 485530 <modRMTable>",
+            "new": "lea    0x32e088(%rip),%rax        # 486530 <modRMTable>"
+          },
+          {
+            "function": "decode_apx_rorx",
+            "offset": "0x2d",
+            "old_address": "0x15e90d",
+            "new_address": "0x15e90d",
+            "count": 63198,
+            "old": "lea    0x34adec(%rip),%rcx        # 4a9700 <getModRMDecision.emptyDecision+0x2150>",
+            "new": "lea    0x34bdec(%rip),%rcx        # 4aa700 <getModRMDecision.emptyDecision+0x2150>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0x6a7",
+            "old_address": "0x155927",
+            "new_address": "0x155927",
+            "count": 30246,
+            "old": "lea    0x2a9f52(%rip),%rax        # 3ff880 <feature_prefix_flags>",
+            "new": "lea    0x2aaf52(%rip),%rax        # 400880 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0xe17",
+            "old_address": "0x156097",
+            "new_address": "0x156097",
+            "count": 29852,
+            "old": "lea    0x2a98e2(%rip),%rbp        # 3ff980 <x86LegacyPublicDecisions>",
+            "new": "lea    0x2aa8e2(%rip),%rbp        # 400980 <x86LegacyPublicDecisions>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0xe86",
+            "old_address": "0x156106",
+            "new_address": "0x156106",
+            "count": 29052,
+            "old": "lea    0x2a9647(%rip),%rdi        # 3ff754 <_IO_stdin_used+0x8754>",
+            "new": "lea    0x2aa647(%rip),%rdi        # 400754 <_IO_stdin_used+0x8754>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0xf56",
+            "old_address": "0x1561d6",
+            "new_address": "0x1561d6",
+            "count": 28926,
+            "old": "lea    0x2a9567(%rip),%rdi        # 3ff744 <_IO_stdin_used+0x8744>",
+            "new": "lea    0x2aa567(%rip),%rdi        # 400744 <_IO_stdin_used+0x8744>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0x1ed0",
+            "old_address": "0x157150",
+            "new_address": "0x157150",
+            "count": 3220,
+            "old": "lea    0x2c4829(%rip),%rax        # 41b980 <x86LegacyPublicTerminals>",
+            "new": "lea    0x2c5829(%rip),%rax        # 41c980 <x86LegacyPublicTerminals>"
+          },
+          {
+            "function": "decode_legacy_enqueue",
+            "offset": "0xc1",
+            "old_address": "0x15a3a1",
+            "new_address": "0x15a3a1",
+            "count": 3674,
+            "old": "lea    0x34d9bc(%rip),%r10        # 4a7d64 <getModRMDecision.emptyDecision+0x7b4>",
+            "new": "lea    0x34e9bc(%rip),%r10        # 4a8d64 <getModRMDecision.emptyDecision+0x7b4>"
+          },
+          {
+            "function": "decode_apx_bmi_ternary",
+            "offset": "0x1f",
+            "old_address": "0x15d7cf",
+            "new_address": "0x15d7cf",
+            "count": 58226,
+            "old": "lea    0x4bb7aa(%rip),%r9        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bc7aa(%rip),%r9        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_bmi_ternary",
+            "offset": "0x2c",
+            "old_address": "0x15d7dc",
+            "new_address": "0x15d7dc",
+            "count": 58226,
+            "old": "lea    0x34b79d(%rip),%r11        # 4a8f80 <getModRMDecision.emptyDecision+0x19d0>",
+            "new": "lea    0x34c79d(%rip),%r11        # 4a9f80 <getModRMDecision.emptyDecision+0x19d0>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x1a8",
+            "old_address": "0x207348",
+            "new_address": "0x2079e8",
+            "count": 288,
+            "old": "lea    0xf2fb59(%rip),%r15        # 1136ea8 <insn_operands+0x1b6558>",
+            "new": "lea    0xf305b9(%rip),%r15        # 1137fa8 <insn_operands+0x1b6508>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x1b4",
+            "old_address": "0x207354",
+            "new_address": "0x2079f4",
+            "count": 288,
+            "old": "lea    0xf30039(%rip),%r12        # 1137394 <insn_operands+0x1b6a44>",
+            "new": "lea    0xf30a99(%rip),%r12        # 1138494 <insn_operands+0x1b69f4>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0xae3",
+            "old_address": "0x207c83",
+            "new_address": "0x208323",
+            "count": 193058,
+            "old": "lea    0xf2ba4a(%rip),%rcx        # 11336d4 <insn_operands+0x1b2d84>",
+            "new": "lea    0xf2c4aa(%rip),%rcx        # 11347d4 <insn_operands+0x1b2d34>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x67a5",
+            "old_address": "0x20d945",
+            "new_address": "0x20dfe5",
+            "count": 1330,
+            "old": "lea    0xf27da0(%rip),%rcx        # 11356ec <insn_operands+0x1b4d9c>",
+            "new": "lea    0xf28800(%rip),%rcx        # 11367ec <insn_operands+0x1b4d4c>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x67d4",
+            "old_address": "0x20d974",
+            "new_address": "0x20e014",
+            "count": 19394,
+            "old": "lea    0xf27b25(%rip),%rcx        # 11354a0 <insn_operands+0x1b4b50>",
+            "new": "lea    0xf28585(%rip),%rcx        # 11365a0 <insn_operands+0x1b4b00>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x6a93",
+            "old_address": "0x20dc33",
+            "new_address": "0x20e2d3",
+            "count": 2784,
+            "old": "lea    0xf28d12(%rip),%rcx        # 113694c <insn_operands+0x1b5ffc>",
+            "new": "lea    0xf29772(%rip),%rcx        # 1137a4c <insn_operands+0x1b5fac>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x7044",
+            "old_address": "0x20e1e4",
+            "new_address": "0x20e884",
+            "count": 284,
+            "old": "lea    0xf27a5d(%rip),%rcx        # 1135c48 <insn_operands+0x1b52f8>",
+            "new": "lea    0xf284bd(%rip),%rcx        # 1136d48 <insn_operands+0x1b52a8>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x75d8",
+            "old_address": "0x20e778",
+            "new_address": "0x20ee18",
+            "count": 86,
+            "old": "lea    0xf27405(%rip),%rcx        # 1135b84 <insn_operands+0x1b5234>",
+            "new": "lea    0xf27e65(%rip),%rcx        # 1136c84 <insn_operands+0x1b51e4>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x7607",
+            "old_address": "0x20e7a7",
+            "new_address": "0x20ee47",
+            "count": 1540,
+            "old": "lea    0xf270c6(%rip),%rcx        # 1135874 <insn_operands+0x1b4f24>",
+            "new": "lea    0xf27b26(%rip),%rcx        # 1136974 <insn_operands+0x1b4ed4>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x7636",
+            "old_address": "0x20e7d6",
+            "new_address": "0x20ee76",
+            "count": 1232,
+            "old": "lea    0xf268ef(%rip),%rcx        # 11350cc <insn_operands+0x1b477c>",
+            "new": "lea    0xf2734f(%rip),%rcx        # 11361cc <insn_operands+0x1b472c>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x89f8",
+            "old_address": "0x20fb98",
+            "new_address": "0x210238",
+            "count": 32,
+            "old": "lea    0xf259c5(%rip),%rcx        # 1135564 <insn_operands+0x1b4c14>",
+            "new": "lea    0xf26425(%rip),%rcx        # 1136664 <insn_operands+0x1b4bc4>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x8a27",
+            "old_address": "0x20fbc7",
+            "new_address": "0x210267",
+            "count": 20,
+            "old": "lea    0xf2580e(%rip),%rcx        # 11353dc <insn_operands+0x1b4a8c>",
+            "new": "lea    0xf2626e(%rip),%rcx        # 11364dc <insn_operands+0x1b4a3c>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x8a56",
+            "old_address": "0x20fbf6",
+            "new_address": "0x210296",
+            "count": 32,
+            "old": "lea    0xf2571b(%rip),%rcx        # 1135318 <insn_operands+0x1b49c8>",
+            "new": "lea    0xf2617b(%rip),%rcx        # 1136418 <insn_operands+0x1b4978>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x94f5",
+            "old_address": "0x210695",
+            "new_address": "0x210d35",
+            "count": 2,
+            "old": "lea    0xf24bb8(%rip),%rcx        # 1135254 <insn_operands+0x1b4904>",
+            "new": "lea    0xf25618(%rip),%rcx        # 1136354 <insn_operands+0x1b48b4>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x9524",
+            "old_address": "0x2106c4",
+            "new_address": "0x210d64",
+            "count": 28,
+            "old": "lea    0xf24ac5(%rip),%rcx        # 1135190 <insn_operands+0x1b4840>",
+            "new": "lea    0xf25525(%rip),%rcx        # 1136290 <insn_operands+0x1b47f0>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0xa2f7",
+            "old_address": "0x211497",
+            "new_address": "0x211b37",
+            "count": 138,
+            "old": "lea    0xf2455e(%rip),%rcx        # 11359fc <insn_operands+0x1b50ac>",
+            "new": "lea    0xf24fbe(%rip),%rcx        # 1136afc <insn_operands+0x1b505c>"
+          },
+          {
+            "function": "readModRM",
+            "offset": "0x16f",
+            "old_address": "0x13984f",
+            "new_address": "0x13984f",
+            "count": 206704,
+            "old": "lea    0x2c3a56(%rip),%r15        # 3fd2ac <_IO_stdin_used+0x62ac>",
+            "new": "lea    0x2c4a56(%rip),%r15        # 3fe2ac <_IO_stdin_used+0x62ac>"
+          },
+          {
+            "function": "readModRM",
+            "offset": "0x565",
+            "old_address": "0x139c45",
+            "new_address": "0x139c45",
+            "count": 4136,
+            "old": "lea    0x2c3670(%rip),%rdx        # 3fd2bc <_IO_stdin_used+0x62bc>",
+            "new": "lea    0x2c4670(%rip),%rdx        # 3fe2bc <_IO_stdin_used+0x62bc>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x61",
+            "old_address": "0x105db1",
+            "new_address": "0x105db1",
+            "count": 13984,
+            "old": "lea    0x2f54c0(%rip),%rcx        # 3fb278 <_IO_stdin_used+0x4278>",
+            "new": "lea    0x2f64c0(%rip),%rcx        # 3fc278 <_IO_stdin_used+0x4278>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x71",
+            "old_address": "0x105dc1",
+            "new_address": "0x105dc1",
+            "count": 668,
+            "old": "lea    0x31ba68(%rip),%rax        # 421830 <x86OperandSets>",
+            "new": "lea    0x31ca68(%rip),%rax        # 422830 <x86OperandSets>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x2d7",
+            "old_address": "0x106027",
+            "new_address": "0x106027",
+            "count": 12,
+            "old": "lea    0x31b83e(%rip),%rax        # 42186c <x86OperandSets+0x3c>",
+            "new": "lea    0x31c83e(%rip),%rax        # 42286c <x86OperandSets+0x3c>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x46e",
+            "old_address": "0x1061be",
+            "new_address": "0x1061be",
+            "count": 16,
+            "old": "lea    0x31b72b(%rip),%rax        # 4218f0 <x86OperandSets+0xc0>",
+            "new": "lea    0x31c72b(%rip),%rax        # 4228f0 <x86OperandSets+0xc0>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x4b8",
+            "old_address": "0x106208",
+            "new_address": "0x106208",
+            "count": 158,
+            "old": "lea    0x31b6f9(%rip),%rax        # 421908 <x86OperandSets+0xd8>",
+            "new": "lea    0x31c6f9(%rip),%rax        # 422908 <x86OperandSets+0xd8>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0xcef",
+            "old_address": "0x106a3f",
+            "new_address": "0x106a3f",
+            "count": 24,
+            "old": "lea    0x31b0d2(%rip),%rax        # 421b18 <x86OperandSets+0x2e8>",
+            "new": "lea    0x31c0d2(%rip),%rax        # 422b18 <x86OperandSets+0x2e8>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x168c",
+            "old_address": "0x1073dc",
+            "new_address": "0x1073dc",
+            "count": 2,
+            "old": "lea    0x31ade9(%rip),%rax        # 4221cc <x86OperandSets+0x99c>",
+            "new": "lea    0x31bde9(%rip),%rax        # 4231cc <x86OperandSets+0x99c>"
+          },
+          {
+            "function": "X86_decodeFeatureExtension",
+            "offset": "0x20d",
+            "old_address": "0x15902d",
+            "new_address": "0x15902d",
+            "count": 193058,
+            "old": "lea    0x4bff4c(%rip),%r10        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4c0f4c(%rip),%r10        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "X86_decodeFeatureExtension",
+            "offset": "0x214",
+            "old_address": "0x159034",
+            "new_address": "0x159034",
+            "count": 193058,
+            "old": "lea    0x34e7d5(%rip),%rbp        # 4a7810 <getModRMDecision.emptyDecision+0x260>",
+            "new": "lea    0x34f7d5(%rip),%rbp        # 4a8810 <getModRMDecision.emptyDecision+0x260>"
+          },
+          {
+            "function": "X86_decodeFeatureExtension",
+            "offset": "0x408",
+            "old_address": "0x159228",
+            "new_address": "0x159228",
+            "count": 193058,
+            "old": "lea    0x34e6e9(%rip),%rcx        # 4a7918 <getModRMDecision.emptyDecision+0x368>",
+            "new": "lea    0x34f6e9(%rip),%rcx        # 4a8918 <getModRMDecision.emptyDecision+0x368>"
+          },
+          {
+            "function": "X86_decodeFeatureExtension",
+            "offset": "0x463",
+            "old_address": "0x159283",
+            "new_address": "0x159283",
+            "count": 3674,
+            "old": "lea    0x34e6ba(%rip),%rdi        # 4a7944 <getModRMDecision.emptyDecision+0x394>",
+            "new": "lea    0x34f6ba(%rip),%rdi        # 4a8944 <getModRMDecision.emptyDecision+0x394>"
+          },
+          {
+            "function": "decode_system_legacy_vex",
+            "offset": "0x29",
+            "old_address": "0x15a869",
+            "new_address": "0x15a869",
+            "count": 3674,
+            "old": "lea    0x4be710(%rip),%r8        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bf710(%rip),%r8        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_system_legacy_vex",
+            "offset": "0x30",
+            "old_address": "0x15a870",
+            "new_address": "0x15a870",
+            "count": 3674,
+            "old": "lea    0x34d6fd(%rip),%r10        # 4a7f74 <getModRMDecision.emptyDecision+0x9c4>",
+            "new": "lea    0x34e6fd(%rip),%r10        # 4a8f74 <getModRMDecision.emptyDecision+0x9c4>"
+          },
+          {
+            "function": "decode_amx",
+            "offset": "0x26",
+            "old_address": "0x15b9b6",
+            "new_address": "0x15b9b6",
+            "count": 121424,
+            "old": "lea    0x4bd5c3(%rip),%r8        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4be5c3(%rip),%r8        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_amx",
+            "offset": "0x33",
+            "old_address": "0x15b9c3",
+            "new_address": "0x15b9c3",
+            "count": 121424,
+            "old": "lea    0x34c96e(%rip),%rcx        # 4a8338 <getModRMDecision.emptyDecision+0xd88>",
+            "new": "lea    0x34d96e(%rip),%rcx        # 4a9338 <getModRMDecision.emptyDecision+0xd88>"
+          },
+          {
+            "function": "decode_amx",
+            "offset": "0x1ce",
+            "old_address": "0x15bb5e",
+            "new_address": "0x15bb5e",
+            "count": 121424,
+            "old": "lea    0x4bd41b(%rip),%r8        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4be41b(%rip),%r8        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_amx",
+            "offset": "0x1db",
+            "old_address": "0x15bb6b",
+            "new_address": "0x15bb6b",
+            "count": 121424,
+            "old": "lea    0x34c9a6(%rip),%rax        # 4a8518 <getModRMDecision.emptyDecision+0xf68>",
+            "new": "lea    0x34d9a6(%rip),%rax        # 4a9518 <getModRMDecision.emptyDecision+0xf68>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0xdf",
+            "old_address": "0xf5c4f",
+            "new_address": "0xf5c4f",
+            "count": 1274,
+            "old": "lea    0x309c2a(%rip),%rax        # 3ff880 <feature_prefix_flags>",
+            "new": "lea    0x30ac2a(%rip),%rax        # 400880 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12c",
+            "old_address": "0xf5c9c",
+            "new_address": "0xf5c9c",
+            "count": 12710,
+            "old": "lea    0x309bdd(%rip),%rbp        # 3ff880 <feature_prefix_flags>",
+            "new": "lea    0x30abdd(%rip),%rbp        # 400880 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x152",
+            "old_address": "0xf5cc2",
+            "new_address": "0xf5cc2",
+            "count": 7892,
+            "old": "lea    0x303beb(%rip),%r14        # 3f98b4 <_IO_stdin_used+0x28b4>",
+            "new": "lea    0x304beb(%rip),%r14        # 3fa8b4 <_IO_stdin_used+0x28b4>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x159",
+            "old_address": "0xf5cc9",
+            "new_address": "0xf5cc9",
+            "count": 7892,
+            "old": "lea    0x303cec(%rip),%r8        # 3f99bc <_IO_stdin_used+0x29bc>",
+            "new": "lea    0x304cec(%rip),%r8        # 3fa9bc <_IO_stdin_used+0x29bc>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0xa13",
+            "old_address": "0xf6583",
+            "new_address": "0xf6583",
+            "count": 3500,
+            "old": "lea    0x30359e(%rip),%rax        # 3f9b28 <_IO_stdin_used+0x2b28>",
+            "new": "lea    0x30459e(%rip),%rax        # 3fab28 <_IO_stdin_used+0x2b28>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0xce3",
+            "old_address": "0xf6853",
+            "new_address": "0xf6853",
+            "count": 1536,
+            "old": "lea    0x317126(%rip),%rbx        # 40d980 <x86LegacyDecisions>",
+            "new": "lea    0x318126(%rip),%rbx        # 40e980 <x86LegacyDecisions>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x13c2",
+            "old_address": "0xf6f32",
+            "new_address": "0xf6f32",
+            "count": 2596,
+            "old": "lea    0x38a5f7(%rip),%rax        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x38b5f7(%rip),%rax        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x13d0",
+            "old_address": "0xf6f40",
+            "new_address": "0xf6f40",
+            "count": 2596,
+            "old": "lea    0x11a3d69(%rip),%rsi        # 129acb0 <x86VexScanRows+0x180>",
+            "new": "lea    0x11a4d69(%rip),%rsi        # 129bcb0 <x86VexScanRows+0x180>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x13d7",
+            "old_address": "0xf6f47",
+            "new_address": "0xf6f47",
+            "count": 2596,
+            "old": "lea    0x11a3da2(%rip),%rdi        # 129acf0 <x86VexScanRows+0x1c0>",
+            "new": "lea    0x11a4da2(%rip),%rdi        # 129bcf0 <x86VexScanRows+0x1c0>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x13fa",
+            "old_address": "0xf6f6a",
+            "new_address": "0xf6f6a",
+            "count": 2596,
+            "old": "lea    0x3b063f(%rip),%rcx        # 4a75b0 <getModRMDecision.emptyDecision>",
+            "new": "lea    0x3b163f(%rip),%rcx        # 4a85b0 <getModRMDecision.emptyDecision>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2368",
+            "old_address": "0xf7ed8",
+            "new_address": "0xf7ed8",
+            "count": 5994,
+            "old": "lea    0x389651(%rip),%rcx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x38a651(%rip),%rcx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2372",
+            "old_address": "0xf7ee2",
+            "new_address": "0xf7ee2",
+            "count": 5994,
+            "old": "lea    0x337847(%rip),%rsi        # 42f730 <index_x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x338847(%rip),%rsi        # 430730 <index_x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2379",
+            "old_address": "0xf7ee9",
+            "new_address": "0xf7ee9",
+            "count": 5994,
+            "old": "lea    0x337b40(%rip),%rcx        # 42fa30 <x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x338b40(%rip),%rcx        # 430a30 <x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x238b",
+            "old_address": "0xf7efb",
+            "new_address": "0xf7efb",
+            "count": 2282,
+            "old": "lea    0x38962e(%rip),%rcx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x38a62e(%rip),%rcx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23a1",
+            "old_address": "0xf7f11",
+            "new_address": "0xf7f11",
+            "count": 2282,
+            "old": "lea    0x337998(%rip),%rsi        # 42f8b0 <index_x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x338998(%rip),%rsi        # 4308b0 <index_x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23a8",
+            "old_address": "0xf7f18",
+            "new_address": "0xf7f18",
+            "count": 2282,
+            "old": "lea    0x37b311(%rip),%rcx        # 473230 <x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x37c311(%rip),%rcx        # 474230 <x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23af",
+            "old_address": "0xf7f1f",
+            "new_address": "0xf7f1f",
+            "count": 2282,
+            "old": "lea    0x301e32(%rip),%rdi        # 3f9d58 <_IO_stdin_used+0x2d58>",
+            "new": "lea    0x302e32(%rip),%rdi        # 3fad58 <_IO_stdin_used+0x2d58>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23bf",
+            "old_address": "0xf7f2f",
+            "new_address": "0xf7f2f",
+            "count": 176,
+            "old": "lea    0x387afa(%rip),%rsi        # 47fa30 <index_x86DisassemblerXOP8Opcodes>",
+            "new": "lea    0x388afa(%rip),%rsi        # 480a30 <index_x86DisassemblerXOP8Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23c6",
+            "old_address": "0xf7f36",
+            "new_address": "0xf7f36",
+            "count": 176,
+            "old": "lea    0x386af3(%rip),%rcx        # 47ea30 <x86DisassemblerXOP8Opcodes>",
+            "new": "lea    0x387af3(%rip),%rcx        # 47fa30 <x86DisassemblerXOP8Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23d5",
+            "old_address": "0xf7f45",
+            "new_address": "0xf7f45",
+            "count": 338,
+            "old": "lea    0x3895e4(%rip),%rcx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x38a5e4(%rip),%rcx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23df",
+            "old_address": "0xf7f4f",
+            "new_address": "0xf7f4f",
+            "count": 338,
+            "old": "lea    0x337a1a(%rip),%rsi        # 42f970 <index_x86DisassemblerOneByteOpcodes>",
+            "new": "lea    0x338a1a(%rip),%rsi        # 430970 <index_x86DisassemblerOneByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23e6",
+            "old_address": "0xf7f56",
+            "new_address": "0xf7f56",
+            "count": 338,
+            "old": "lea    0x333bd3(%rip),%rcx        # 42bb30 <x86DisassemblerOneByteOpcodes>",
+            "new": "lea    0x334bd3(%rip),%rcx        # 42cb30 <x86DisassemblerOneByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23f5",
+            "old_address": "0xf7f65",
+            "new_address": "0xf7f65",
+            "count": 2774,
+            "old": "lea    0x3895c4(%rip),%rcx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x38a5c4(%rip),%rcx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x23ff",
+            "old_address": "0xf7f6f",
+            "new_address": "0xf7f6f",
+            "count": 2774,
+            "old": "lea    0x33787a(%rip),%rsi        # 42f7f0 <index_x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x33887a(%rip),%rsi        # 4307f0 <index_x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2406",
+            "old_address": "0xf7f76",
+            "new_address": "0xf7f76",
+            "count": 2774,
+            "old": "lea    0x3642b3(%rip),%rcx        # 45c230 <x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x3652b3(%rip),%rcx        # 45d230 <x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2464",
+            "old_address": "0xf7fd4",
+            "new_address": "0xf7fd4",
+            "count": 11388,
+            "old": "lea    0x3af5d5(%rip),%rdx        # 4a75b0 <getModRMDecision.emptyDecision>",
+            "new": "lea    0x3b05d5(%rip),%rdx        # 4a85b0 <getModRMDecision.emptyDecision>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x28a8",
+            "old_address": "0xf8418",
+            "new_address": "0xf8418",
+            "count": 13984,
+            "old": "lea    0x32bf91(%rip),%rcx        # 4243b0 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x32cf91(%rip),%rcx        # 4253b0 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x311b",
+            "old_address": "0xf8c8b",
+            "new_address": "0xf8c8b",
+            "count": 380,
+            "old": "lea    0x38c89e(%rip),%rax        # 485530 <modRMTable>",
+            "new": "lea    0x38d89e(%rip),%rax        # 486530 <modRMTable>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x4317",
+            "old_address": "0xf9e87",
+            "new_address": "0xf9e87",
+            "count": 13104,
+            "old": "call   18d130 <X86_completeScan>",
+            "new": "call   18d7d0 <X86_completeScan>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0xd1",
+            "old_address": "0xeb761",
+            "new_address": "0xeb761",
+            "count": 193058,
+            "old": "lea    0x314118(%rip),%rbp        # 3ff880 <feature_prefix_flags>",
+            "new": "lea    0x315118(%rip),%rbp        # 400880 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x9b1",
+            "old_address": "0xec041",
+            "new_address": "0xec041",
+            "count": 193058,
+            "old": "lea    0x30b9ac(%rip),%rcx        # 3f79f4 <_IO_stdin_used+0x9f4>",
+            "new": "lea    0x30c9ac(%rip),%rcx        # 3f89f4 <_IO_stdin_used+0x9f4>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22a3",
+            "old_address": "0xed933",
+            "new_address": "0xed933",
+            "count": 71634,
+            "old": "lea    0x393bf6(%rip),%rdx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x394bf6(%rip),%rdx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22ae",
+            "old_address": "0xed93e",
+            "new_address": "0xed93e",
+            "count": 71634,
+            "old": "lea    0x341deb(%rip),%rsi        # 42f730 <index_x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x342deb(%rip),%rsi        # 430730 <index_x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22b5",
+            "old_address": "0xed945",
+            "new_address": "0xed945",
+            "count": 71634,
+            "old": "lea    0x3420e4(%rip),%rdx        # 42fa30 <x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x3430e4(%rip),%rdx        # 430a30 <x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22c6",
+            "old_address": "0xed956",
+            "new_address": "0xed956",
+            "count": 63198,
+            "old": "lea    0x393bd3(%rip),%rdx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x394bd3(%rip),%rdx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22e4",
+            "old_address": "0xed974",
+            "new_address": "0xed974",
+            "count": 63198,
+            "old": "lea    0x341f35(%rip),%rsi        # 42f8b0 <index_x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x342f35(%rip),%rsi        # 4308b0 <index_x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22eb",
+            "old_address": "0xed97b",
+            "new_address": "0xed97b",
+            "count": 63198,
+            "old": "lea    0x3858ae(%rip),%rdx        # 473230 <x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x3868ae(%rip),%rdx        # 474230 <x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x22f2",
+            "old_address": "0xed982",
+            "new_address": "0xed982",
+            "count": 63198,
+            "old": "lea    0x30a33b(%rip),%rdi        # 3f7cc4 <_IO_stdin_used+0xcc4>",
+            "new": "lea    0x30b33b(%rip),%rdi        # 3f8cc4 <_IO_stdin_used+0xcc4>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x2342",
+            "old_address": "0xed9d2",
+            "new_address": "0xed9d2",
+            "count": 58226,
+            "old": "lea    0x393b57(%rip),%rdx        # 481530 <x86DisassemblerContexts>",
+            "new": "lea    0x394b57(%rip),%rdx        # 482530 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x234d",
+            "old_address": "0xed9dd",
+            "new_address": "0xed9dd",
+            "count": 58226,
+            "old": "lea    0x341e0c(%rip),%rsi        # 42f7f0 <index_x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x342e0c(%rip),%rsi        # 4307f0 <index_x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x2354",
+            "old_address": "0xed9e4",
+            "new_address": "0xed9e4",
+            "count": 58226,
+            "old": "lea    0x36e845(%rip),%rdx        # 45c230 <x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x36f845(%rip),%rdx        # 45d230 <x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x23b4",
+            "old_address": "0xeda44",
+            "new_address": "0xeda44",
+            "count": 193058,
+            "old": "lea    0x3b9b65(%rip),%rdx        # 4a75b0 <getModRMDecision.emptyDecision>",
+            "new": "lea    0x3bab65(%rip),%rdx        # 4a85b0 <getModRMDecision.emptyDecision>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x30df",
+            "old_address": "0xee76f",
+            "new_address": "0xee76f",
+            "count": 6018,
+            "old": "lea    0x396dba(%rip),%rax        # 485530 <modRMTable>",
+            "new": "lea    0x397dba(%rip),%rax        # 486530 <modRMTable>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x38fe",
+            "old_address": "0xeef8e",
+            "new_address": "0xeef8e",
+            "count": 193058,
+            "old": "lea    0x33541b(%rip),%rcx        # 4243b0 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x33641b(%rip),%rcx        # 4253b0 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "readVVVV",
+            "offset": "0xb",
+            "old_address": "0x154d1b",
+            "new_address": "0x154d1b",
+            "count": 2,
+            "old": "lea    0x2a98b2(%rip),%rcx        # 3fe5d4 <_IO_stdin_used+0x75d4>",
+            "new": "lea    0x2aa8b2(%rip),%rcx        # 3ff5d4 <_IO_stdin_used+0x75d4>"
+          },
+          {
+            "function": "decode_apx_kmov",
+            "offset": "0x1f",
+            "old_address": "0x15c7df",
+            "new_address": "0x15c7df",
+            "count": 71634,
+            "old": "lea    0x4bc79a(%rip),%r9        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bd79a(%rip),%r9        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_kmov",
+            "offset": "0x2c",
+            "old_address": "0x15c7ec",
+            "new_address": "0x15c7ec",
+            "count": 71634,
+            "old": "lea    0x34c00d(%rip),%r11        # 4a8800 <getModRMDecision.emptyDecision+0x1250>",
+            "new": "lea    0x34d00d(%rip),%r11        # 4a9800 <getModRMDecision.emptyDecision+0x1250>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x661",
+            "old_address": "0xff261",
+            "new_address": "0xff261",
+            "count": 373360,
+            "old": "lea    0x300618(%rip),%rsi        # 3ff880 <feature_prefix_flags>",
+            "new": "lea    0x301618(%rip),%rsi        # 400880 <feature_prefix_flags>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x6fd",
+            "old_address": "0xff2fd",
+            "new_address": "0xff2fd",
+            "count": 93098,
+            "old": "lea    0x30067c(%rip),%rbx        # 3ff980 <x86LegacyPublicDecisions>",
+            "new": "lea    0x30167c(%rip),%rbx        # 400980 <x86LegacyPublicDecisions>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x7b4",
+            "old_address": "0xff3b4",
+            "new_address": "0xff3b4",
+            "count": 57302,
+            "old": "lea    0x2fb945(%rip),%rcx        # 3fad00 <_IO_stdin_used+0x3d00>",
+            "new": "lea    0x2fc945(%rip),%rcx        # 3fbd00 <_IO_stdin_used+0x3d00>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x93a",
+            "old_address": "0xff53a",
+            "new_address": "0xff53a",
+            "count": 282698,
+            "old": "lea    0x30033f(%rip),%rsi        # 3ff880 <feature_prefix_flags>",
+            "new": "lea    0x30133f(%rip),%rsi        # 400880 <feature_prefix_flags>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0xaf0",
+            "old_address": "0xff6f0",
+            "new_address": "0xff6f0",
+            "count": 21530,
+            "old": "lea    0x119b439(%rip),%rdx        # 129ab30 <x86VexScanRows>",
+            "new": "lea    0x119c439(%rip),%rdx        # 129bb30 <x86VexScanRows>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0xb58",
+            "old_address": "0xff758",
+            "new_address": "0xff758",
+            "count": 21530,
+            "old": "lea    0x398aa1(%rip),%rax        # 498200 <x86VexScanMetadata>",
+            "new": "lea    0x399aa1(%rip),%rax        # 499200 <x86VexScanMetadata>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0xbaf",
+            "old_address": "0xff7af",
+            "new_address": "0xff7af",
+            "count": 21242,
+            "old": "lea    0x2fb66a(%rip),%rax        # 3fae20 <_IO_stdin_used+0x3e20>",
+            "new": "lea    0x2fc66a(%rip),%rax        # 3fbe20 <_IO_stdin_used+0x3e20>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1254",
+            "old_address": "0xffe54",
+            "new_address": "0xffe54",
+            "count": 1536,
+            "old": "lea    0x2ffb25(%rip),%rbp        # 3ff980 <x86LegacyPublicDecisions>",
+            "new": "lea    0x300b25(%rip),%rbp        # 400980 <x86LegacyPublicDecisions>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x153f",
+            "old_address": "0x10013f",
+            "new_address": "0x10013f",
+            "count": 13356,
+            "old": "lea    0x31b83a(%rip),%rax        # 41b980 <x86LegacyPublicTerminals>",
+            "new": "lea    0x31c83a(%rip),%rax        # 41c980 <x86LegacyPublicTerminals>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x156b",
+            "old_address": "0x10016b",
+            "new_address": "0x10016b",
+            "count": 13356,
+            "old": "lea    0x2fab8e(%rip),%rsi        # 3fad00 <_IO_stdin_used+0x3d00>",
+            "new": "lea    0x2fbb8e(%rip),%rsi        # 3fbd00 <_IO_stdin_used+0x3d00>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x17f2",
+            "old_address": "0x1003f2",
+            "new_address": "0x1003f2",
+            "count": 21082,
+            "old": "lea    0x2faa17(%rip),%rax        # 3fae10 <_IO_stdin_used+0x3e10>",
+            "new": "lea    0x2fba17(%rip),%rax        # 3fbe10 <_IO_stdin_used+0x3e10>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1cd4",
+            "old_address": "0x1008d4",
+            "new_address": "0x1008d4",
+            "count": 1468,
+            "old": "lea    0x31b0a5(%rip),%rax        # 41b980 <x86LegacyPublicTerminals>",
+            "new": "lea    0x31c0a5(%rip),%rax        # 41c980 <x86LegacyPublicTerminals>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1d00",
+            "old_address": "0x100900",
+            "new_address": "0x100900",
+            "count": 1468,
+            "old": "lea    0x2fa3f9(%rip),%rsi        # 3fad00 <_IO_stdin_used+0x3d00>",
+            "new": "lea    0x2fb3f9(%rip),%rsi        # 3fbd00 <_IO_stdin_used+0x3d00>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1fdc",
+            "old_address": "0x100bdc",
+            "new_address": "0x100bdc",
+            "count": 6326,
+            "old": "lea    0x38494d(%rip),%rax        # 485530 <modRMTable>",
+            "new": "lea    0x38594d(%rip),%rax        # 486530 <modRMTable>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x23fb",
+            "old_address": "0x100ffb",
+            "new_address": "0x100ffb",
+            "count": 30090,
+            "old": "lea    0x2f9d1e(%rip),%rsi        # 3fad20 <_IO_stdin_used+0x3d20>",
+            "new": "lea    0x2fad1e(%rip),%rsi        # 3fbd20 <_IO_stdin_used+0x3d20>"
+          },
+          {
+            "function": "decode_apx_mulx",
+            "offset": "0x1f",
+            "old_address": "0x15e51f",
+            "new_address": "0x15e51f",
+            "count": 58226,
+            "old": "lea    0x4baa5a(%rip),%r9        # 618f80 <feature_prefix_flags>",
+            "new": "lea    0x4bba5a(%rip),%r9        # 619f80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decode_apx_mulx",
+            "offset": "0x2c",
+            "old_address": "0x15e52c",
+            "new_address": "0x15e52c",
+            "count": 58226,
+            "old": "lea    0x34afed(%rip),%r11        # 4a9520 <getModRMDecision.emptyDecision+0x1f70>",
+            "new": "lea    0x34bfed(%rip),%r11        # 4aa520 <getModRMDecision.emptyDecision+0x1f70>"
+          },
+          {
+            "function": "_ZZ4mainENK3$_0clEj",
+            "offset": "0x17",
+            "old_address": "0xe29f7",
+            "new_address": "0xe29f7",
+            "count": 2,
+            "old": "movdqa 0x314621(%rip),%xmm0        # 3f7020 <_IO_stdin_used+0x20>",
+            "new": "movdqa 0x315621(%rip),%xmm0        # 3f8020 <_IO_stdin_used+0x20>"
+          },
+          {
+            "function": "_ZZ4mainENK3$_0clEj",
+            "offset": "0x1a3",
+            "old_address": "0xe2b83",
+            "new_address": "0xe2b83",
+            "count": 640,
+            "old": "movdqa 0x314495(%rip),%xmm0        # 3f7020 <_IO_stdin_used+0x20>",
+            "new": "movdqa 0x315495(%rip),%xmm0        # 3f8020 <_IO_stdin_used+0x20>"
+          },
+          {
+            "function": "_ZZ4mainENK3$_0clEj",
+            "offset": "0x1b8",
+            "old_address": "0xe2b98",
+            "new_address": "0xe2b98",
+            "count": 640,
+            "old": "lea    0x3144cd(%rip),%rsi        # 3f706c <_IO_stdin_used+0x6c>",
+            "new": "lea    0x3154cd(%rip),%rsi        # 3f806c <_IO_stdin_used+0x6c>"
+          },
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x12b",
+            "old_address": "0x154e9b",
+            "new_address": "0x154e9b",
+            "count": 15154,
+            "old": "lea    0x1145c8e(%rip),%rbp        # 129ab30 <x86VexScanRows>",
+            "new": "lea    0x1146c8e(%rip),%rbp        # 129bb30 <x86VexScanRows>"
+          },
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x19a",
+            "old_address": "0x154f0a",
+            "new_address": "0x154f0a",
+            "count": 15154,
+            "old": "lea    0x3432ef(%rip),%rcx        # 498200 <x86VexScanMetadata>",
+            "new": "lea    0x3442ef(%rip),%rcx        # 499200 <x86VexScanMetadata>"
+          },
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x1ee",
+            "old_address": "0x154f5e",
+            "new_address": "0x154f5e",
+            "count": 13358,
+            "old": "lea    0x2a968f(%rip),%rax        # 3fe5f4 <_IO_stdin_used+0x75f4>",
+            "new": "lea    0x2aa68f(%rip),%rax        # 3ff5f4 <_IO_stdin_used+0x75f4>"
+          },
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x29f",
+            "old_address": "0x15500f",
+            "new_address": "0x15500f",
+            "count": 13358,
+            "old": "lea    0x2a95ce(%rip),%rbx        # 3fe5e4 <_IO_stdin_used+0x75e4>",
+            "new": "lea    0x2aa5ce(%rip),%rbx        # 3ff5e4 <_IO_stdin_used+0x75e4>"
+          },
+          {
+            "function": "decode_legacy_atomic",
+            "offset": "0x106",
+            "old_address": "0x159c96",
+            "new_address": "0x159c96",
+            "count": 3674,
+            "old": "lea    0x34deb7(%rip),%r10        # 4a7b54 <getModRMDecision.emptyDecision+0x5a4>",
+            "new": "lea    0x34eeb7(%rip),%r10        # 4a8b54 <getModRMDecision.emptyDecision+0x5a4>"
+          },
+          {
+            "function": "decodeEVEXInstruction",
+            "offset": "0xe9",
+            "old_address": "0x2176e9",
+            "new_address": "0x217d89",
+            "count": 193058,
+            "old": "lea    0xf1fd7c(%rip),%rax        # 113746c <insn_operands+0x1b6b1c>",
+            "new": "lea    0xf207dc(%rip),%rax        # 113856c <insn_operands+0x1b6acc>"
+          },
+          {
+            "function": "decodeEVEXInstruction",
+            "offset": "0x1cb",
+            "old_address": "0x2177cb",
+            "new_address": "0x217e6b",
+            "count": 193058,
+            "old": "call   eb680 <decodeInstruction>",
+            "new": "call   eb680 <decodeInstruction>"
+          }
+        ],
+        "scope": "Function-relative execution counts are identical. Absolute addresses and resolved instruction bytes may change with linking; differences are reported, not masked. Shared-library self Ir/Dr/Dw counts match but library bytes are not captured."
+      }
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "mode": 1,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          355383231,
+          76904423,
+          55275153
+        ],
+        "scan": [
+          332745891,
+          71714993,
+          51330973
+        ]
+      },
+      "instruction_reduction": 0.06369839099132957,
+      "changed_function_costs": {
+        "X86_Intel_printInstructionPrechecked": [
+          -455492,
+          -100160,
+          -56368
+        ],
+        "decodeInstruction": [
+          -44550,
+          0,
+          0
+        ],
+        "writeEvexOutput": [
+          172544,
+          43136,
+          0
+        ],
+        "writeEvexBroadcast": [
+          -593170,
+          -206320,
+          -154740
+        ],
+        "X86_writeDisplacement": [
+          1004934,
+          124552,
+          139246
+        ],
+        "_printOperand": [
+          -493220,
+          -126828,
+          -84552
+        ],
+        "X86_decodeFeatureExtension": [
+          -1247400,
+          -178200,
+          -89100
+        ],
+        "SStream_trimls": [
+          -311850,
+          -89100,
+          -74250
+        ],
+        "X86Recipe40": [
+          -267180,
+          -53436,
+          -106872
+        ],
+        "X86_getInstruction": [
+          -3957980,
+          -960096,
+          -926104
+        ],
+        "X86Recipe17": [
+          -83520,
+          -16704,
+          -33408
+        ],
+        "decode_apx_kmov": [
+          -787050,
+          -163350,
+          -103950
+        ],
+        "printMemReference": [
+          -1398480,
+          -407906,
+          -298230
+        ],
+        "printi512mem": [
+          -21224,
+          -5306,
+          -6064
+        ],
+        "X86_Intel_printInstructionGeneral": [
+          -758,
+          0,
+          0
+        ],
+        "printOperand": [
+          -816726,
+          -273088,
+          -157814
+        ],
+        "X86_printFeatureExtension": [
+          -311850,
+          -118800,
+          -89100
+        ],
+        "readOperands": [
+          -1221328,
+          -371250,
+          -171882
+        ],
+        "__memcpy_avx_unaligned_erms": [
+          379032,
+          72402,
+          48268
+        ],
+        "SStream_opt_unum": [
+          -29700,
+          -14850,
+          -14850
+        ],
+        "printImm": [
+          -205716,
+          -29388,
+          0
+        ],
+        "decodeInstructionScan": [
+          -5152950,
+          -801900,
+          -653400
+        ],
+        "X86_Intel_printHexPrechecked": [
+          -771450,
+          -76410,
+          -90370
+        ],
+        "decodeEVEXInstruction": [
+          -2033320,
+          -392960,
+          -282150
+        ],
+        "readModRM": [
+          -1890888,
+          -352198,
+          -357658
+        ],
+        "printRegName": [
+          -59124,
+          -13644,
+          -9096
+        ],
+        "X86_register_map": [
+          -128400,
+          -25680,
+          0
+        ],
+        "X86Recipe60": [
+          -34500,
+          -6900,
+          -13800
+        ],
+        "X86_printPrefixes": [
+          -178200,
+          -103950,
+          0
+        ],
+        "cs_decode_full_insn": [
+          -4032424,
+          -824968,
+          -917384
+        ],
+        "0x00000000001e22d0": [
+          24134,
+          24134,
+          0
+        ],
+        "X86_disasmIter": [
+          -133650,
+          -14850,
+          -14850
+        ],
+        "X86_Intel_printInst": [
+          -579150,
+          -193050,
+          -74250
+        ],
+        "X86_postprinter": [
+          -430650,
+          -133650,
+          -148500
+        ],
+        "SStream_concat_hex64": [
+          -52880,
+          -9464,
+          -7262
+        ],
+        "X86Recipe27": [
+          -30120,
+          -6024,
+          -12048
+        ],
+        "X86Recipe76": [
+          -7440,
+          -1488,
+          -2976
+        ],
+        "X86_writeEvexMemoryOutput": [
+          3633800,
+          635698,
+          831462
+        ],
+        "printInstruction": [
+          -89444,
+          -17434,
+          -12128
+        ]
+      },
+      "raw_code": null
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "mode": 2,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          532008068,
+          118485202,
+          82308495
+        ],
+        "scan": [
+          502323666,
+          111074234,
+          77746019
+        ]
+      },
+      "instruction_reduction": 0.05579690193720899,
+      "changed_function_costs": {
+        "X86_get_op_access": [
+          -490050,
+          -89100,
+          -14850
+        ],
+        "X86_Intel_printInstructionPrechecked": [
+          -455492,
+          -100160,
+          -56368
+        ],
+        "decodeInstruction": [
+          -44550,
+          0,
+          0
+        ],
+        "writeEvexOutput": [
+          172544,
+          43136,
+          0
+        ],
+        "X86_insn_reg_intel2": [
+          -133650,
+          -44550,
+          -29700
+        ],
+        "writeEvexBroadcast": [
+          -593170,
+          -206320,
+          -154740
+        ],
+        "X86_writeDisplacement": [
+          1004934,
+          124552,
+          139246
+        ],
+        "_printOperand": [
+          -493220,
+          -126828,
+          -84552
+        ],
+        "X86_decodeFeatureExtension": [
+          -1247400,
+          -178200,
+          -89100
+        ],
+        "X86_get_insn_id": [
+          -1291950,
+          -386100,
+          -222750
+        ],
+        "SStream_trimls": [
+          -311850,
+          -89100,
+          -74250
+        ],
+        "X86Recipe40": [
+          -267180,
+          -53436,
+          -106872
+        ],
+        "X86_getInstruction": [
+          -4988460,
+          -1510284,
+          -1159350
+        ],
+        "X86Recipe17": [
+          -83520,
+          -16704,
+          -33408
+        ],
+        "decode_apx_kmov": [
+          -787050,
+          -163350,
+          -103950
+        ],
+        "printMemReference": [
+          -2423130,
+          -883106,
+          -461580
+        ],
+        "__strchr_avx2": [
+          -445500,
+          -59400,
+          0
+        ],
+        "printi512mem": [
+          -21224,
+          -5306,
+          -6064
+        ],
+        "x86_map_sib_index": [
+          -21616,
+          -10808,
+          0
+        ],
+        "X86_Intel_printInstructionGeneral": [
+          -758,
+          0,
+          0
+        ],
+        "printOperand": [
+          -1379016,
+          -525538,
+          -246914
+        ],
+        "X86_printFeatureExtension": [
+          -311850,
+          -118800,
+          -89100
+        ],
+        "readOperands": [
+          -1221328,
+          -371250,
+          -171882
+        ],
+        "__memcpy_avx_unaligned_erms": [
+          379032,
+          72402,
+          48268
+        ],
+        "SStream_opt_unum": [
+          -29700,
+          -14850,
+          -14850
+        ],
+        "printImm": [
+          -205716,
+          -29388,
+          0
+        ],
+        "X86_Intel_printHexPrechecked": [
+          -771450,
+          -76410,
+          -90370
+        ],
+        "decodeInstructionScan": [
+          -5152950,
+          -801900,
+          -653400
+        ],
+        "decodeEVEXInstruction": [
+          -2033320,
+          -392960,
+          -282150
+        ],
+        "readModRM": [
+          -1890888,
+          -352198,
+          -357658
+        ],
+        "printRegName": [
+          -59124,
+          -13644,
+          -9096
+        ],
+        "X86_register_map": [
+          -722400,
+          -144480,
+          0
+        ],
+        "X86_insn_reg_intel_h": [
+          -193050,
+          -59400,
+          0
+        ],
+        "X86Recipe60": [
+          -34500,
+          -6900,
+          -13800
+        ],
+        "X86_printPrefixes": [
+          -237600,
+          -148500,
+          -14850
+        ],
+        "cs_decode_full_insn": [
+          -3958174,
+          -810118,
+          -917384
+        ],
+        "0x00000000001e22d0": [
+          24134,
+          24134,
+          0
+        ],
+        "x86_map_sib_base": [
+          -21616,
+          -10808,
+          0
+        ],
+        "X86_disasmIter": [
+          -133650,
+          -14850,
+          -14850
+        ],
+        "X86_Intel_printInst": [
+          -1574100,
+          -504900,
+          -237600
+        ],
+        "X86_postprinter": [
+          -1650360,
+          -267300,
+          -178200
+        ],
+        "SStream_concat_hex64": [
+          -52880,
+          -9464,
+          -7262
+        ],
+        "X86Recipe27": [
+          -30120,
+          -6024,
+          -12048
+        ],
+        "X86Recipe76": [
+          -7440,
+          -1488,
+          -2976
+        ],
+        "X86_writeEvexMemoryOutput": [
+          4595400,
+          946164,
+          1174062
+        ],
+        "printInstruction": [
+          -89444,
+          -17434,
+          -12128
+        ]
+      },
+      "raw_code": null
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "mode": 0,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          330392418,
+          67221150,
+          50963652
+        ],
+        "scan": [
+          330392418,
+          67221150,
+          50963652
+        ]
+      },
+      "instruction_reduction": 0.0,
+      "changed_function_costs": {},
+      "raw_code": {
+        "executed_instruction_addresses": 7657,
+        "relative_instruction_counts_identical": true,
+        "moved_functions": {
+          "X86_completeScan": {
+            "old_address": "0x16e170",
+            "new_address": "0x16e820",
+            "address_delta": 1712,
+            "executed_positions": 213,
+            "dynamic_instructions": 637060
+          },
+          "decodeEVEXInstruction": {
+            "old_address": "0x18ae20",
+            "new_address": "0x18b4d0",
+            "address_delta": 1712,
+            "executed_positions": 165,
+            "dynamic_instructions": 24711798
+          },
+          "X86_getInstructionAfterExtensions": {
+            "old_address": "0x184ef0",
+            "new_address": "0x1855a0",
+            "address_delta": 1712,
+            "executed_positions": 238,
+            "dynamic_instructions": 13420726
+          },
+          "validateRMMemory#2": {
+            "old_address": "0x18ac80",
+            "new_address": "0x18b330",
+            "address_delta": 1712,
+            "executed_positions": 55,
+            "dynamic_instructions": 1391678
+          },
+          "translateOperand": {
+            "old_address": "0x188c00",
+            "new_address": "0x1892b0",
+            "address_delta": 1712,
+            "executed_positions": 113,
+            "dynamic_instructions": 252490
+          }
+        },
+        "changed_executed_instructions": [
+          {
+            "function": "X86_completeScan",
+            "offset": "0x20a",
+            "old_address": "0x16e37a",
+            "new_address": "0x16ea2a",
+            "count": 13104,
+            "old": "lea    0xf27aff(%rip),%rcx        # 1095e80 <insn_operands+0x1a0400>",
+            "new": "lea    0xf275cf(%rip),%rcx        # 1096000 <insn_operands+0x1a0430>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x3948",
+            "old_address": "0xf8ce8",
+            "new_address": "0xf8ce8",
+            "count": 13104,
+            "old": "call   16e170 <X86_completeScan>",
+            "new": "call   16e820 <X86_completeScan>"
+          },
+          {
+            "function": "decodeEVEXInstruction",
+            "offset": "0xda",
+            "old_address": "0x18aefa",
+            "new_address": "0x18b5aa",
+            "count": 193058,
+            "old": "lea    0xf0f0f7(%rip),%rax        # 1099ff8 <insn_operands+0x1a4578>",
+            "new": "lea    0xf0ebc7(%rip),%rax        # 109a178 <insn_operands+0x1a45a8>"
+          },
+          {
+            "function": "decodeEVEXInstruction",
+            "offset": "0x1b2",
+            "old_address": "0x18afd2",
+            "new_address": "0x18b682",
+            "count": 193058,
+            "old": "call   eb480 <decodeInstruction>",
+            "new": "call   eb480 <decodeInstruction>"
+          },
+          {
+            "function": "decodeScanResultGeneric",
+            "offset": "0x27f",
+            "old_address": "0x13a6ff",
+            "new_address": "0x13a6ff",
+            "count": 193058,
+            "old": "call   184ef0 <X86_getInstructionAfterExtensions>",
+            "new": "call   1855a0 <X86_getInstructionAfterExtensions>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x2b7",
+            "old_address": "0x1851a7",
+            "new_address": "0x185857",
+            "count": 193058,
+            "old": "lea    0xf13846(%rip),%rcx        # 10989f4 <insn_operands+0x1a2f74>",
+            "new": "lea    0xf13316(%rip),%rcx        # 1098b74 <insn_operands+0x1a2fa4>"
+          },
+          {
+            "function": "translateOperand",
+            "offset": "0x3",
+            "old_address": "0x188c03",
+            "new_address": "0x1892b3",
+            "count": 7754,
+            "old": "lea    0xf10c66(%rip),%rax        # 1099870 <insn_operands+0x1a3df0>",
+            "new": "lea    0xf10736(%rip),%rax        # 10999f0 <insn_operands+0x1a3e20>"
+          },
+          {
+            "function": "translateOperand",
+            "offset": "0xe2",
+            "old_address": "0x188ce2",
+            "new_address": "0x189392",
+            "count": 1920,
+            "old": "lea    0xf10c9b(%rip),%r10        # 1099984 <insn_operands+0x1a3f04>",
+            "new": "lea    0xf1076b(%rip),%r10        # 1099b04 <insn_operands+0x1a3f34>"
+          }
+        ],
+        "scope": "Function-relative execution counts are identical. Absolute addresses and resolved instruction bytes may change with linking; differences are reported, not masked. Shared-library self Ir/Dr/Dw counts match but library bytes are not captured."
+      }
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "mode": 1,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          348372340,
+          76985357,
+          54669470
+        ],
+        "scan": [
+          325323436,
+          71554535,
+          50715186
+        ]
+      },
+      "instruction_reduction": 0.06616169354891954,
+      "changed_function_costs": {
+        "X86_Intel_printInstructionPrechecked": [
+          -454734,
+          -100160,
+          -56368
+        ],
+        "decodeInstruction": [
+          -44550,
+          0,
+          0
+        ],
+        "writeEvexOutput": [
+          172544,
+          43136,
+          0
+        ],
+        "writeEvexBroadcast": [
+          -567380,
+          -206320,
+          -154740
+        ],
+        "X86_writeDisplacement": [
+          970374,
+          124552,
+          139246
+        ],
+        "_printOperand": [
+          -521404,
+          -126828,
+          -84552
+        ],
+        "translateRMMemoryFull": [
+          -1412192,
+          -264396,
+          -376654
+        ],
+        "X86_decodeFeatureExtension": [
+          -1158300,
+          -178200,
+          -89100
+        ],
+        "SStream_trimls": [
+          -311850,
+          -89100,
+          -74250
+        ],
+        "X86Recipe40": [
+          -267180,
+          -53436,
+          -106872
+        ],
+        "X86_getInstruction": [
+          -2620262,
+          -619392,
+          -549450
+        ],
+        "X86Recipe17": [
+          -83520,
+          -16704,
+          -33408
+        ],
+        "decode_apx_kmov": [
+          -757350,
+          -163350,
+          -89100
+        ],
+        "printMemReference": [
+          -1391992,
+          -409422,
+          -300504
+        ],
+        "printi512mem": [
+          -12128,
+          -3032,
+          -3790
+        ],
+        "0x00000000001e22a0": [
+          24134,
+          24134,
+          0
+        ],
+        "X86_Intel_printInstructionGeneral": [
+          -758,
+          0,
+          0
+        ],
+        "printOperand": [
+          -845668,
+          -273088,
+          -157814
+        ],
+        "X86_printFeatureExtension": [
+          -311850,
+          -118800,
+          -89100
+        ],
+        "readOperands": [
+          -1236206,
+          -371250,
+          -171882
+        ],
+        "__memcpy_avx_unaligned_erms": [
+          379032,
+          72402,
+          48268
+        ],
+        "SStream_opt_unum": [
+          -29700,
+          -14850,
+          -14850
+        ],
+        "printImm": [
+          -205716,
+          -29388,
+          0
+        ],
+        "decodeInstructionScan": [
+          -5375700,
+          -950400,
+          -653400
+        ],
+        "X86_Intel_printHexPrechecked": [
+          -785410,
+          -76410,
+          -90370
+        ],
+        "decodeEVEXInstruction": [
+          -1885950,
+          -333560,
+          -222750
+        ],
+        "readModRM": [
+          -1901990,
+          -385534,
+          -342808
+        ],
+        "printRegName": [
+          -57608,
+          -13644,
+          -9096
+        ],
+        "X86_register_map": [
+          -115560,
+          -25680,
+          0
+        ],
+        "X86Recipe60": [
+          -34500,
+          -6900,
+          -13800
+        ],
+        "X86_printPrefixes": [
+          -178200,
+          -103950,
+          0
+        ],
+        "cs_decode_full_insn": [
+          -4273296,
+          -928918,
+          -1021334
+        ],
+        "X86_disasmIter": [
+          -133650,
+          -14850,
+          -14850
+        ],
+        "X86_Intel_printInst": [
+          -608850,
+          -207900,
+          -89100
+        ],
+        "X86_postprinter": [
+          -430650,
+          -133650,
+          -133650
+        ],
+        "SStream_concat_hex64": [
+          -52146,
+          -8730,
+          -6528
+        ],
+        "X86Recipe27": [
+          -30120,
+          -6024,
+          -12048
+        ],
+        "X86Recipe76": [
+          -7440,
+          -1488,
+          -2976
+        ],
+        "X86_writeEvexMemoryOutput": [
+          3592202,
+          556984,
+          833958
+        ],
+        "printInstruction": [
+          -83380,
+          -16676,
+          -10612
+        ]
+      },
+      "raw_code": null
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "mode": 2,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          521003506,
+          117861988,
+          81722974
+        ],
+        "scan": [
+          491043576,
+          110205776,
+          77150394
+        ]
+      },
+      "instruction_reduction": 0.057504277140123516,
+      "changed_function_costs": {
+        "X86_get_op_access": [
+          -475200,
+          -89100,
+          -14850
+        ],
+        "X86_Intel_printInstructionPrechecked": [
+          -454734,
+          -100160,
+          -56368
+        ],
+        "decodeInstruction": [
+          -44550,
+          0,
+          0
+        ],
+        "writeEvexOutput": [
+          172544,
+          43136,
+          0
+        ],
+        "X86_insn_reg_intel2": [
+          -74250,
+          -14850,
+          0
+        ],
+        "writeEvexBroadcast": [
+          -567380,
+          -206320,
+          -154740
+        ],
+        "X86_writeDisplacement": [
+          970374,
+          124552,
+          139246
+        ],
+        "_printOperand": [
+          -521404,
+          -126828,
+          -84552
+        ],
+        "translateRMMemoryFull": [
+          -1412192,
+          -264396,
+          -376654
+        ],
+        "X86_decodeFeatureExtension": [
+          -1158300,
+          -178200,
+          -89100
+        ],
+        "X86_get_insn_id": [
+          -1232550,
+          -386100,
+          -193050
+        ],
+        "SStream_trimls": [
+          -311850,
+          -89100,
+          -74250
+        ],
+        "X86Recipe40": [
+          -267180,
+          -53436,
+          -106872
+        ],
+        "X86_getInstruction": [
+          -3650742,
+          -1169580,
+          -782696
+        ],
+        "X86Recipe17": [
+          -83520,
+          -16704,
+          -33408
+        ],
+        "decode_apx_kmov": [
+          -757350,
+          -163350,
+          -89100
+        ],
+        "printMemReference": [
+          -2358758,
+          -871288,
+          -463854
+        ],
+        "__strchr_avx2": [
+          -461852,
+          -61736,
+          0
+        ],
+        "printi512mem": [
+          -12128,
+          -3032,
+          -3790
+        ],
+        "0x00000000001e22a0": [
+          24134,
+          24134,
+          0
+        ],
+        "x86_map_sib_index": [
+          -21616,
+          -10808,
+          0
+        ],
+        "X86_Intel_printInstructionGeneral": [
+          -758,
+          0,
+          0
+        ],
+        "printOperand": [
+          -1407958,
+          -525538,
+          -246914
+        ],
+        "X86_printFeatureExtension": [
+          -311850,
+          -118800,
+          -89100
+        ],
+        "readOperands": [
+          -1236206,
+          -371250,
+          -171882
+        ],
+        "__memcpy_avx_unaligned_erms": [
+          379032,
+          72402,
+          48268
+        ],
+        "printImm": [
+          -205716,
+          -29388,
+          0
+        ],
+        "SStream_opt_unum": [
+          -29700,
+          -14850,
+          -14850
+        ],
+        "X86_Intel_printHexPrechecked": [
+          -785410,
+          -76410,
+          -90370
+        ],
+        "decodeInstructionScan": [
+          -5375700,
+          -950400,
+          -653400
+        ],
+        "repair_vector_narrow_access": [
+          -89100,
+          -14850,
+          0
+        ],
+        "decodeEVEXInstruction": [
+          -1885950,
+          -333560,
+          -222750
+        ],
+        "readModRM": [
+          -1901990,
+          -385534,
+          -342808
+        ],
+        "printRegName": [
+          -57608,
+          -13644,
+          -9096
+        ],
+        "X86_register_map": [
+          -650160,
+          -144480,
+          0
+        ],
+        "X86Recipe60": [
+          -34500,
+          -6900,
+          -13800
+        ],
+        "X86_insn_reg_intel_h": [
+          -193050,
+          -59400,
+          0
+        ],
+        "X86_printPrefixes": [
+          -237600,
+          -148500,
+          -14850
+        ],
+        "cs_decode_full_insn": [
+          -4228746,
+          -914068,
+          -1021334
+        ],
+        "x86_map_sib_base": [
+          -21616,
+          -10808,
+          0
+        ],
+        "X86_disasmIter": [
+          -133650,
+          -14850,
+          -14850
+        ],
+        "X86_Intel_printInst": [
+          -1603800,
+          -519750,
+          -252450
+        ],
+        "X86_postprinter": [
+          -1635510,
+          -297000,
+          -222750
+        ],
+        "SStream_concat_hex64": [
+          -52146,
+          -8730,
+          -6528
+        ],
+        "X86Recipe27": [
+          -30120,
+          -6024,
+          -12048
+        ],
+        "X86Recipe76": [
+          -7440,
+          -1488,
+          -2976
+        ],
+        "X86_writeEvexMemoryOutput": [
+          4559206,
+          867450,
+          1176558
+        ],
+        "printInstruction": [
+          -83380,
+          -16676,
+          -10612
+        ]
+      },
+      "raw_code": null
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "mode": 0,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          324995624,
+          66532084,
+          55572206
+        ],
+        "scan": [
+          324995624,
+          66532084,
+          55572206
+        ]
+      },
+      "instruction_reduction": 0.0,
+      "changed_function_costs": {},
+      "raw_code": {
+        "executed_instruction_addresses": 8161,
+        "relative_instruction_counts_identical": true,
+        "moved_functions": {
+          "validateRMMemory.isra.0#2": {
+            "old_address": "0x188e10",
+            "new_address": "0x189600",
+            "address_delta": 2032,
+            "executed_positions": 59,
+            "dynamic_instructions": 1368850
+          },
+          "X86_completeScan": {
+            "old_address": "0x189d90",
+            "new_address": "0x18a580",
+            "address_delta": 2032,
+            "executed_positions": 215,
+            "dynamic_instructions": 618490
+          },
+          "prepareTranslation": {
+            "old_address": "0x188050",
+            "new_address": "0x188840",
+            "address_delta": 2032,
+            "executed_positions": 7,
+            "dynamic_instructions": 700166
+          },
+          "X86_getInstructionAfterExtensions": {
+            "old_address": "0x1a9970",
+            "new_address": "0x1aa160",
+            "address_delta": 2032,
+            "executed_positions": 453,
+            "dynamic_instructions": 17508528
+          },
+          "decodeEVEXInstruction.constprop.0": {
+            "old_address": "0x1880e0",
+            "new_address": "0x1888d0",
+            "address_delta": 2032,
+            "executed_positions": 142,
+            "dynamic_instructions": 21033152
+          },
+          "translateOperand": {
+            "old_address": "0x189010",
+            "new_address": "0x189800",
+            "address_delta": 2032,
+            "executed_positions": 130,
+            "dynamic_instructions": 316802
+          }
+        },
+        "changed_executed_instructions": [
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x1bc",
+            "old_address": "0x131b4c",
+            "new_address": "0x131b4c",
+            "count": 15154,
+            "old": "lea    0x112c8ed(%rip),%rdi        # 125e440 <x86VexScanRows>",
+            "new": "lea    0x112d8ed(%rip),%rdi        # 125f440 <x86VexScanRows>"
+          },
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x211",
+            "old_address": "0x131ba1",
+            "new_address": "0x131ba1",
+            "count": 15154,
+            "old": "lea    0x2a17d8(%rip),%r13        # 3d3380 <x86VexScanMetadata>",
+            "new": "lea    0x2a27d8(%rip),%r13        # 3d4380 <x86VexScanMetadata>"
+          },
+          {
+            "function": "decodeScanResultFallback",
+            "offset": "0x281",
+            "old_address": "0x131c11",
+            "new_address": "0x131c11",
+            "count": 13358,
+            "old": "lea    0x2a07c8(%rip),%r14        # 3d23e0 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3d10>",
+            "new": "lea    0x2a17c8(%rip),%r14        # 3d33e0 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3d10>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x36",
+            "old_address": "0x114596",
+            "new_address": "0x114596",
+            "count": 13980,
+            "old": "lea    0x2bcae7(%rip),%rdx        # 3d1084 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x29b4>",
+            "new": "lea    0x2bdae7(%rip),%rdx        # 3d2084 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x29b4>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x2302",
+            "old_address": "0x116862",
+            "new_address": "0x116862",
+            "count": 24,
+            "old": "lea    0x361a1f(%rip),%r13        # 478288 <x86OperandSets+0x2e8>",
+            "new": "lea    0x362a1f(%rip),%r13        # 479288 <x86OperandSets+0x2e8>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x361c",
+            "old_address": "0x117b7c",
+            "new_address": "0x117b7c",
+            "count": 12,
+            "old": "lea    0x360459(%rip),%r13        # 477fdc <x86OperandSets+0x3c>",
+            "new": "lea    0x361459(%rip),%r13        # 478fdc <x86OperandSets+0x3c>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x3c3d",
+            "old_address": "0x11819d",
+            "new_address": "0x11819d",
+            "count": 668,
+            "old": "lea    0x35fdfc(%rip),%rdx        # 477fa0 <x86OperandSets>",
+            "new": "lea    0x360dfc(%rip),%rdx        # 478fa0 <x86OperandSets>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x6b89",
+            "old_address": "0x11b0e9",
+            "new_address": "0x11b0e9",
+            "count": 158,
+            "old": "lea    0x35cf88(%rip),%r13        # 478078 <x86OperandSets+0xd8>",
+            "new": "lea    0x35df88(%rip),%r13        # 479078 <x86OperandSets+0xd8>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x6cc8",
+            "old_address": "0x11b228",
+            "new_address": "0x11b228",
+            "count": 16,
+            "old": "lea    0x35ce31(%rip),%r13        # 478060 <x86OperandSets+0xc0>",
+            "new": "lea    0x35de31(%rip),%r13        # 479060 <x86OperandSets+0xc0>"
+          },
+          {
+            "function": "readOperandsScan",
+            "offset": "0x6d57",
+            "old_address": "0x11b2b7",
+            "new_address": "0x11b2b7",
+            "count": 2,
+            "old": "lea    0x35d67e(%rip),%r13        # 47893c <x86OperandSets+0x99c>",
+            "new": "lea    0x35e67e(%rip),%r13        # 47993c <x86OperandSets+0x99c>"
+          },
+          {
+            "function": "X86_completeScan",
+            "offset": "0x78",
+            "old_address": "0x189e08",
+            "new_address": "0x18a5f8",
+            "count": 13100,
+            "old": "lea    0xf5e4b5(%rip),%rdx        # 10e82c4 <MipsRegDiffLists+0x984>",
+            "new": "lea    0xf5ee45(%rip),%rdx        # 10e9444 <MipsRegDiffLists+0x984>"
+          },
+          {
+            "function": "X86_completeScan",
+            "offset": "0x452a",
+            "old_address": "0x18e2ba",
+            "new_address": "0x18eaaa",
+            "count": 4,
+            "old": "lea    0xf5acfb(%rip),%rdx        # 10e8fbc <MipsRegDiffLists+0x167c>",
+            "new": "lea    0xf5b68b(%rip),%rdx        # 10ea13c <MipsRegDiffLists+0x167c>"
+          },
+          {
+            "function": "X86_decodeFeatureExtension",
+            "offset": "0x291",
+            "old_address": "0x15afa1",
+            "new_address": "0x15afa1",
+            "count": 193058,
+            "old": "lea    0x490958(%rip),%r13        # 5eb900 <feature_prefix_flags>",
+            "new": "lea    0x491958(%rip),%r13        # 5ec900 <feature_prefix_flags>"
+          },
+          {
+            "function": "X86_decodeFeatureExtension",
+            "offset": "0x358",
+            "old_address": "0x15b068",
+            "new_address": "0x15b068",
+            "count": 193058,
+            "old": "lea    0x320049(%rip),%rdx        # 47b0b8 <feature_prefix_flags+0x538>",
+            "new": "lea    0x321049(%rip),%rdx        # 47c0b8 <feature_prefix_flags+0x538>"
+          },
+          {
+            "function": "decode_system_legacy_vex",
+            "offset": "0xe9",
+            "old_address": "0x158379",
+            "new_address": "0x158379",
+            "count": 852,
+            "old": "lea    0x493580(%rip),%r15        # 5eb900 <feature_prefix_flags>",
+            "new": "lea    0x494580(%rip),%r15        # 5ec900 <feature_prefix_flags>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x166",
+            "old_address": "0x145766",
+            "new_address": "0x145766",
+            "count": 359010,
+            "old": "lea    0x335413(%rip),%r9        # 47ab80 <feature_prefix_flags>",
+            "new": "lea    0x336413(%rip),%r9        # 47bb80 <feature_prefix_flags>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x19b",
+            "old_address": "0x14579b",
+            "new_address": "0x14579b",
+            "count": 93098,
+            "old": "lea    0x29cb5e(%rip),%rcx        # 3e2300 <x86LegacyPublicDecisions>",
+            "new": "lea    0x29db5e(%rip),%rcx        # 3e3300 <x86LegacyPublicDecisions>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x211",
+            "old_address": "0x145811",
+            "new_address": "0x145811",
+            "count": 27194,
+            "old": "lea    0x28d968(%rip),%rdi        # 3d3180 <extra.0>",
+            "new": "lea    0x28e968(%rip),%rdi        # 3d4180 <extra.0>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x226",
+            "old_address": "0x145826",
+            "new_address": "0x145826",
+            "count": 91562,
+            "old": "lea    0x29ca43(%rip),%rax        # 3e2270 <x86LegacyImmediateBytes>",
+            "new": "lea    0x29da43(%rip),%rax        # 3e3270 <x86LegacyImmediateBytes>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x2a1",
+            "old_address": "0x1458a1",
+            "new_address": "0x1458a1",
+            "count": 336480,
+            "old": "lea    0x3352d8(%rip),%rcx        # 47ab80 <feature_prefix_flags>",
+            "new": "lea    0x3362d8(%rip),%rcx        # 47bb80 <feature_prefix_flags>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x8dd",
+            "old_address": "0x145edd",
+            "new_address": "0x145edd",
+            "count": 1536,
+            "old": "lea    0x29c41c(%rip),%rdx        # 3e2300 <x86LegacyPublicDecisions>",
+            "new": "lea    0x29d41c(%rip),%rdx        # 3e3300 <x86LegacyPublicDecisions>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x173e",
+            "old_address": "0x146d3e",
+            "new_address": "0x146d3e",
+            "count": 14824,
+            "old": "lea    0x2a95bb(%rip),%rdx        # 3f0300 <x86LegacyPublicTerminals>",
+            "new": "lea    0x2aa5bb(%rip),%rdx        # 3f1300 <x86LegacyPublicTerminals>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1c79",
+            "old_address": "0x147279",
+            "new_address": "0x147279",
+            "count": 21530,
+            "old": "lea    0x11171c0(%rip),%rdx        # 125e440 <x86VexScanRows>",
+            "new": "lea    0x11181c0(%rip),%rdx        # 125f440 <x86VexScanRows>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1ccc",
+            "old_address": "0x1472cc",
+            "new_address": "0x1472cc",
+            "count": 21530,
+            "old": "lea    0x28c0ad(%rip),%rdx        # 3d3380 <x86VexScanMetadata>",
+            "new": "lea    0x28d0ad(%rip),%rdx        # 3d4380 <x86VexScanMetadata>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x1d83",
+            "old_address": "0x147383",
+            "new_address": "0x147383",
+            "count": 21242,
+            "old": "lea    0x28bb22(%rip),%rdx        # 3d2eac <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x47dc>",
+            "new": "lea    0x28cb22(%rip),%rdx        # 3d3eac <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x47dc>"
+          },
+          {
+            "function": "cs_disasm_iter",
+            "offset": "0x2f1c",
+            "old_address": "0x14851c",
+            "new_address": "0x14851c",
+            "count": 6326,
+            "old": "lea    0x31a6dd(%rip),%rdx        # 462c00 <modRMTable>",
+            "new": "lea    0x31b6dd(%rip),%rdx        # 463c00 <modRMTable>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0xdc",
+            "old_address": "0x1a9a4c",
+            "new_address": "0x1aa23c",
+            "count": 180938,
+            "old": "lea    0xf40dc5(%rip),%rdx        # 10ea818 <MipsRegDiffLists+0x2ed8>",
+            "new": "lea    0xf41755(%rip),%rdx        # 10eb998 <MipsRegDiffLists+0x2ed8>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x20e",
+            "old_address": "0x1a9b7e",
+            "new_address": "0x1aa36e",
+            "count": 6076,
+            "old": "lea    0xf415c7(%rip),%rdx        # 10eb14c <MipsRegDiffLists+0x380c>",
+            "new": "lea    0xf41f57(%rip),%rdx        # 10ec2cc <MipsRegDiffLists+0x380c>"
+          },
+          {
+            "function": "X86_getInstructionAfterExtensions",
+            "offset": "0x4a42",
+            "old_address": "0x1ae3b2",
+            "new_address": "0x1aeba2",
+            "count": 6000,
+            "old": "lea    0xf3d157(%rip),%rdx        # 10eb510 <MipsRegDiffLists+0x3bd0>",
+            "new": "lea    0xf3dae7(%rip),%rdx        # 10ec690 <MipsRegDiffLists+0x3bd0>"
+          },
+          {
+            "function": "decodeScanResultGeneric",
+            "offset": "0x122",
+            "old_address": "0x131312",
+            "new_address": "0x131312",
+            "count": 193058,
+            "old": "call   1a9970 <X86_getInstructionAfterExtensions>",
+            "new": "call   1aa160 <X86_getInstructionAfterExtensions>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0xce8",
+            "old_address": "0x133588",
+            "new_address": "0x133588",
+            "count": 30246,
+            "old": "lea    0x3475f1(%rip),%r12        # 47ab80 <feature_prefix_flags>",
+            "new": "lea    0x3485f1(%rip),%r12        # 47bb80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0xe00",
+            "old_address": "0x1336a0",
+            "new_address": "0x1336a0",
+            "count": 29852,
+            "old": "lea    0x2aec59(%rip),%rcx        # 3e2300 <x86LegacyPublicDecisions>",
+            "new": "lea    0x2afc59(%rip),%rcx        # 3e3300 <x86LegacyPublicDecisions>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0xef7",
+            "old_address": "0x133797",
+            "new_address": "0x133797",
+            "count": 29052,
+            "old": "lea    0x29ed0a(%rip),%rsi        # 3d24a8 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3dd8>",
+            "new": "lea    0x29fd0a(%rip),%rsi        # 3d34a8 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3dd8>"
+          },
+          {
+            "function": "decodeLegacyPrefixedResult",
+            "offset": "0x149c",
+            "old_address": "0x133d3c",
+            "new_address": "0x133d3c",
+            "count": 3220,
+            "old": "lea    0x2bc5bd(%rip),%rcx        # 3f0300 <x86LegacyPublicTerminals>",
+            "new": "lea    0x2bd5bd(%rip),%rcx        # 3f1300 <x86LegacyPublicTerminals>"
+          },
+          {
+            "function": "readModRM",
+            "offset": "0x8b",
+            "old_address": "0xed4eb",
+            "new_address": "0xed4eb",
+            "count": 3186,
+            "old": "mov    0x2cdbee(%rip),%rdx        # 3bb0e0 <_IO_stdin_used+0xe0>",
+            "new": "mov    0x2cebee(%rip),%rdx        # 3bc0e0 <_IO_stdin_used+0xe0>"
+          },
+          {
+            "function": "readModRM",
+            "offset": "0x180",
+            "old_address": "0xed5e0",
+            "new_address": "0xed5e0",
+            "count": 113304,
+            "old": "mov    0x2cdb01(%rip),%rdx        # 3bb0e8 <_IO_stdin_used+0xe8>",
+            "new": "mov    0x2ceb01(%rip),%rdx        # 3bc0e8 <_IO_stdin_used+0xe8>"
+          },
+          {
+            "function": "readModRM",
+            "offset": "0x240",
+            "old_address": "0xed6a0",
+            "new_address": "0xed6a0",
+            "count": 90214,
+            "old": "mov    0x2cda49(%rip),%rdx        # 3bb0f0 <_IO_stdin_used+0xf0>",
+            "new": "mov    0x2cea49(%rip),%rdx        # 3bc0f0 <_IO_stdin_used+0xf0>"
+          },
+          {
+            "function": "readModRM",
+            "offset": "0x628",
+            "old_address": "0xeda88",
+            "new_address": "0xeda88",
+            "count": 5630,
+            "old": "mov    0x2cd671(%rip),%rdx        # 3bb100 <_IO_stdin_used+0x100>",
+            "new": "mov    0x2ce671(%rip),%rdx        # 3bc100 <_IO_stdin_used+0x100>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x29",
+            "old_address": "0x1018a9",
+            "new_address": "0x1018a9",
+            "count": 206162,
+            "old": "lea    0x3766f0(%rip),%rax        # 477fa0 <x86OperandSets>",
+            "new": "lea    0x3776f0(%rip),%rax        # 478fa0 <x86OperandSets>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0xf1",
+            "old_address": "0x101971",
+            "new_address": "0x101971",
+            "count": 196556,
+            "old": "lea    0x2cd6d0(%rip),%rcx        # 3cf048 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x978>",
+            "new": "lea    0x2ce6d0(%rip),%rcx        # 3d0048 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x978>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x112",
+            "old_address": "0x101992",
+            "new_address": "0x101992",
+            "count": 2084,
+            "old": "lea    0x2ce52b(%rip),%r13        # 3cfec4 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x17f4>",
+            "new": "lea    0x2cf52b(%rip),%r13        # 3d0ec4 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x17f4>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x26b",
+            "old_address": "0x101aeb",
+            "new_address": "0x101aeb",
+            "count": 1808,
+            "old": "lea    0x2ce45a(%rip),%rdi        # 3cff4c <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x187c>",
+            "new": "lea    0x2cf45a(%rip),%rdi        # 3d0f4c <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x187c>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x42f",
+            "old_address": "0x101caf",
+            "new_address": "0x101caf",
+            "count": 2084,
+            "old": "lea    0x2ce30a(%rip),%rcx        # 3cffc0 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x18f0>",
+            "new": "lea    0x2cf30a(%rip),%rcx        # 3d0fc0 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x18f0>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x51f",
+            "old_address": "0x101d9f",
+            "new_address": "0x101d9f",
+            "count": 388,
+            "old": "lea    0x2ce28e(%rip),%rcx        # 3d0034 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x1964>",
+            "new": "lea    0x2cf28e(%rip),%rcx        # 3d1034 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x1964>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0x69c",
+            "old_address": "0x101f1c",
+            "new_address": "0x101f1c",
+            "count": 9606,
+            "old": "lea    0x2ce185(%rip),%rdx        # 3d00a8 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x19d8>",
+            "new": "lea    0x2cf185(%rip),%rdx        # 3d10a8 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x19d8>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0xd60c",
+            "old_address": "0x10ee8c",
+            "new_address": "0x10ee8c",
+            "count": 1582,
+            "old": "lea    0x2c2091(%rip),%r15        # 3d0f24 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x2854>",
+            "new": "lea    0x2c3091(%rip),%r15        # 3d1f24 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x2854>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0xd70f",
+            "old_address": "0x10ef8f",
+            "new_address": "0x10ef8f",
+            "count": 1532,
+            "old": "lea    0x2c2016(%rip),%rdi        # 3d0fac <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x28dc>",
+            "new": "lea    0x2c3016(%rip),%rdi        # 3d1fac <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x28dc>"
+          },
+          {
+            "function": "readOperands",
+            "offset": "0xd8b1",
+            "old_address": "0x10f131",
+            "new_address": "0x10f131",
+            "count": 1532,
+            "old": "lea    0x2c1ee0(%rip),%rsi        # 3d1018 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x2948>",
+            "new": "lea    0x2c2ee0(%rip),%rsi        # 3d2018 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x2948>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0xfc",
+            "old_address": "0x1321dc",
+            "new_address": "0x1321dc",
+            "count": 13240,
+            "old": "lea    0x112c25d(%rip),%r12        # 125e440 <x86VexScanRows>",
+            "new": "lea    0x112d25d(%rip),%r12        # 125f440 <x86VexScanRows>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x141",
+            "old_address": "0x132221",
+            "new_address": "0x132221",
+            "count": 13240,
+            "old": "lea    0x2a1158(%rip),%r14        # 3d3380 <x86VexScanMetadata>",
+            "new": "lea    0x2a2158(%rip),%r14        # 3d4380 <x86VexScanMetadata>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x1fa",
+            "old_address": "0x1322da",
+            "new_address": "0x1322da",
+            "count": 12004,
+            "old": "lea    0x2a0127(%rip),%rsi        # 3d2408 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3d38>",
+            "new": "lea    0x2a1127(%rip),%rsi        # 3d3408 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3d38>"
+          },
+          {
+            "function": "decodeVexTerminalResult",
+            "offset": "0x775",
+            "old_address": "0x132855",
+            "new_address": "0x132855",
+            "count": 5392,
+            "old": "lea    0x3303a4(%rip),%r13        # 462c00 <modRMTable>",
+            "new": "lea    0x3313a4(%rip),%r13        # 463c00 <modRMTable>"
+          },
+          {
+            "function": "decodeEVEXInstruction.constprop.0",
+            "offset": "0x17b",
+            "old_address": "0x18825b",
+            "new_address": "0x188a4b",
+            "count": 193058,
+            "old": "call   13b040 <decodeInstruction>",
+            "new": "call   13b040 <decodeInstruction>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x9d",
+            "old_address": "0x12a43d",
+            "new_address": "0x12a43d",
+            "count": 1274,
+            "old": "lea    0x35073c(%rip),%rsi        # 47ab80 <feature_prefix_flags>",
+            "new": "lea    0x35173c(%rip),%rsi        # 47bb80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0xa7b",
+            "old_address": "0x12ae1b",
+            "new_address": "0x12ae1b",
+            "count": 12710,
+            "old": "lea    0x34fd5e(%rip),%rdx        # 47ab80 <feature_prefix_flags>",
+            "new": "lea    0x350d5e(%rip),%rdx        # 47bb80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x10f2",
+            "old_address": "0x12b492",
+            "new_address": "0x12b492",
+            "count": 13104,
+            "old": "call   189d90 <X86_completeScan>",
+            "new": "call   18a580 <X86_completeScan>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x1204",
+            "old_address": "0x12b5a4",
+            "new_address": "0x12b5a4",
+            "count": 2596,
+            "old": "lea    0x341275(%rip),%rdx        # 46c820 <x86DisassemblerContexts>",
+            "new": "lea    0x342275(%rip),%rdx        # 46d820 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x121c",
+            "old_address": "0x12b5bc",
+            "new_address": "0x12b5bc",
+            "count": 2596,
+            "old": "lea    0x2a6945(%rip),%rcx        # 3d1f08 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3838>",
+            "new": "lea    0x2a7945(%rip),%rcx        # 3d2f08 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3838>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x1272",
+            "old_address": "0x12b612",
+            "new_address": "0x12b612",
+            "count": 2560,
+            "old": "lea    0x345207(%rip),%rax        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x346207(%rip),%rax        # 471820 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12ad",
+            "old_address": "0x12b64d",
+            "new_address": "0x12b64d",
+            "count": 160,
+            "old": "lea    0x2efeac(%rip),%rcx        # 41b500 <index_x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x2f0eac(%rip),%rcx        # 41c500 <index_x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12b4",
+            "old_address": "0x12b654",
+            "new_address": "0x12b654",
+            "count": 160,
+            "old": "lea    0x2e46a5(%rip),%rdx        # 40fd00 <x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x2e56a5(%rip),%rdx        # 410d00 <x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12c0",
+            "old_address": "0x12b660",
+            "new_address": "0x12b660",
+            "count": 900,
+            "old": "lea    0x306f59(%rip),%rcx        # 4325c0 <index_x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x307f59(%rip),%rcx        # 4335c0 <index_x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12c7",
+            "old_address": "0x12b667",
+            "new_address": "0x12b667",
+            "count": 900,
+            "old": "lea    0x2eff52(%rip),%rdx        # 41b5c0 <x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x2f0f52(%rip),%rdx        # 41c5c0 <x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12d3",
+            "old_address": "0x12b673",
+            "new_address": "0x12b673",
+            "count": 1532,
+            "old": "lea    0x333806(%rip),%rcx        # 45ee80 <index_x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x334806(%rip),%rcx        # 45fe80 <index_x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x12da",
+            "old_address": "0x12b67a",
+            "new_address": "0x12b67a",
+            "count": 1532,
+            "old": "lea    0x306fff(%rip),%rdx        # 432680 <x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x307fff(%rip),%rdx        # 433680 <x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x1305",
+            "old_address": "0x12b6a5",
+            "new_address": "0x12b6a5",
+            "count": 4,
+            "old": "lea    0x337494(%rip),%rdx        # 462b40 <index_x86DisassemblerOneByteOpcodes>",
+            "new": "lea    0x338494(%rip),%rdx        # 463b40 <index_x86DisassemblerOneByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x1318",
+            "old_address": "0x12b6b8",
+            "new_address": "0x12b6b8",
+            "count": 4,
+            "old": "lea    0x333881(%rip),%rdx        # 45ef40 <x86DisassemblerOneByteOpcodes>",
+            "new": "lea    0x334881(%rip),%rdx        # 45ff40 <x86DisassemblerOneByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x1d5c",
+            "old_address": "0x12c0fc",
+            "new_address": "0x12c0fc",
+            "count": 1536,
+            "old": "lea    0x2c757d(%rip),%rdi        # 3f3680 <x86LegacyDecisions>",
+            "new": "lea    0x2c857d(%rip),%rdi        # 3f4680 <x86LegacyDecisions>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2208",
+            "old_address": "0x12c5a8",
+            "new_address": "0x12c5a8",
+            "count": 11388,
+            "old": "lea    0x340271(%rip),%r12        # 46c820 <x86DisassemblerContexts>",
+            "new": "lea    0x341271(%rip),%r12        # 46d820 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2225",
+            "old_address": "0x12c5c5",
+            "new_address": "0x12c5c5",
+            "count": 11388,
+            "old": "lea    0x2a5b24(%rip),%rdi        # 3d20f0 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3a20>",
+            "new": "lea    0x2a6b24(%rip),%rdi        # 3d30f0 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3a20>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2285",
+            "old_address": "0x12c625",
+            "new_address": "0x12c625",
+            "count": 338,
+            "old": "lea    0x3441f4(%rip),%r14        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x3451f4(%rip),%r14        # 471820 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x22f7",
+            "old_address": "0x12c697",
+            "new_address": "0x12c697",
+            "count": 2774,
+            "old": "lea    0x305f22(%rip),%rdi        # 4325c0 <index_x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x306f22(%rip),%rdi        # 4335c0 <index_x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x22fe",
+            "old_address": "0x12c69e",
+            "new_address": "0x12c69e",
+            "count": 2774,
+            "old": "lea    0x2eef1b(%rip),%rax        # 41b5c0 <x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x2eff1b(%rip),%rax        # 41c5c0 <x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x230a",
+            "old_address": "0x12c6aa",
+            "new_address": "0x12c6aa",
+            "count": 176,
+            "old": "lea    0x2e358f(%rip),%rdi        # 40fc40 <index_x86DisassemblerXOP8Opcodes>",
+            "new": "lea    0x2e458f(%rip),%rdi        # 410c40 <index_x86DisassemblerXOP8Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2311",
+            "old_address": "0x12c6b1",
+            "new_address": "0x12c6b1",
+            "count": 176,
+            "old": "lea    0x2e2588(%rip),%rax        # 40ec40 <x86DisassemblerXOP8Opcodes>",
+            "new": "lea    0x2e3588(%rip),%rax        # 40fc40 <x86DisassemblerXOP8Opcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x231d",
+            "old_address": "0x12c6bd",
+            "new_address": "0x12c6bd",
+            "count": 2106,
+            "old": "lea    0x2eee3c(%rip),%rdi        # 41b500 <index_x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x2efe3c(%rip),%rdi        # 41c500 <index_x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2324",
+            "old_address": "0x12c6c4",
+            "new_address": "0x12c6c4",
+            "count": 2106,
+            "old": "lea    0x2e3635(%rip),%rax        # 40fd00 <x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x2e4635(%rip),%rax        # 410d00 <x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2348",
+            "old_address": "0x12c6e8",
+            "new_address": "0x12c6e8",
+            "count": 338,
+            "old": "lea    0x336451(%rip),%rdi        # 462b40 <index_x86DisassemblerOneByteOpcodes>",
+            "new": "lea    0x337451(%rip),%rdi        # 463b40 <index_x86DisassemblerOneByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2353",
+            "old_address": "0x12c6f3",
+            "new_address": "0x12c6f3",
+            "count": 338,
+            "old": "lea    0x332846(%rip),%rax        # 45ef40 <x86DisassemblerOneByteOpcodes>",
+            "new": "lea    0x333846(%rip),%rax        # 45ff40 <x86DisassemblerOneByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x238b",
+            "old_address": "0x12c72b",
+            "new_address": "0x12c72b",
+            "count": 5994,
+            "old": "lea    0x33274e(%rip),%rdi        # 45ee80 <index_x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x33374e(%rip),%rdi        # 45fe80 <index_x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x2392",
+            "old_address": "0x12c732",
+            "new_address": "0x12c732",
+            "count": 5994,
+            "old": "lea    0x305f47(%rip),%rax        # 432680 <x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x306f47(%rip),%rax        # 433680 <x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x281f",
+            "old_address": "0x12cbbf",
+            "new_address": "0x12cbbf",
+            "count": 2260,
+            "old": "lea    0x2a64b2(%rip),%rsi        # 3d3078 <CSWTCH.1500>",
+            "new": "lea    0x2a74b2(%rip),%rsi        # 3d4078 <CSWTCH.1500>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x3d35",
+            "old_address": "0x12e0d5",
+            "new_address": "0x12e0d5",
+            "count": 380,
+            "old": "lea    0x334b24(%rip),%rdi        # 462c00 <modRMTable>",
+            "new": "lea    0x335b24(%rip),%rdi        # 463c00 <modRMTable>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x3d3c",
+            "old_address": "0x12e0dc",
+            "new_address": "0x12e0dc",
+            "count": 380,
+            "old": "lea    0x34273d(%rip),%r14        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x34373d(%rip),%r14        # 471820 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x3ebb",
+            "old_address": "0x12e25b",
+            "new_address": "0x12e25b",
+            "count": 36,
+            "old": "lea    0x3425be(%rip),%rax        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x3435be(%rip),%rax        # 471820 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "decodeGenericScan",
+            "offset": "0x410c",
+            "old_address": "0x12e4ac",
+            "new_address": "0x12e4ac",
+            "count": 10670,
+            "old": "lea    0x34236d(%rip),%r14        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x34336d(%rip),%r14        # 471820 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "translateOperand",
+            "offset": "0x1a",
+            "old_address": "0x18902a",
+            "new_address": "0x18981a",
+            "count": 9294,
+            "old": "lea    0xf5ec17(%rip),%rsi        # 10e7c48 <MipsRegDiffLists+0x308>",
+            "new": "lea    0xf5f5a7(%rip),%rsi        # 10e8dc8 <MipsRegDiffLists+0x308>"
+          },
+          {
+            "function": "translateOperand",
+            "offset": "0x8f",
+            "old_address": "0x18909f",
+            "new_address": "0x18988f",
+            "count": 288,
+            "old": "lea    0xf5ec2a(%rip),%rdx        # 10e7cd0 <MipsRegDiffLists+0x390>",
+            "new": "lea    0xf5f5ba(%rip),%rdx        # 10e8e50 <MipsRegDiffLists+0x390>"
+          },
+          {
+            "function": "translateOperand",
+            "offset": "0x1c6",
+            "old_address": "0x1891d6",
+            "new_address": "0x1899c6",
+            "count": 1928,
+            "old": "lea    0xf62843(%rip),%rax        # 10eba20 <llvmRegnums.0>",
+            "new": "lea    0xf631d3(%rip),%rax        # 10ecba0 <llvmRegnums.0>"
+          },
+          {
+            "function": "translateOperand",
+            "offset": "0x23e",
+            "old_address": "0x18924e",
+            "new_address": "0x189a3e",
+            "count": 3572,
+            "old": "lea    0xf627cb(%rip),%rax        # 10eba20 <llvmRegnums.0>",
+            "new": "lea    0xf6315b(%rip),%rax        # 10ecba0 <llvmRegnums.0>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x97b",
+            "old_address": "0x1361fb",
+            "new_address": "0x1361fb",
+            "count": 193058,
+            "old": "lea    0x34497e(%rip),%rcx        # 47ab80 <feature_prefix_flags>",
+            "new": "lea    0x34597e(%rip),%rcx        # 47bb80 <feature_prefix_flags>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1c8d",
+            "old_address": "0x13750d",
+            "new_address": "0x13750d",
+            "count": 193058,
+            "old": "lea    0x33530c(%rip),%r8        # 46c820 <x86DisassemblerContexts>",
+            "new": "lea    0x33630c(%rip),%r8        # 46d820 <x86DisassemblerContexts>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1c94",
+            "old_address": "0x137514",
+            "new_address": "0x137514",
+            "count": 193058,
+            "old": "lea    0x29b0c9(%rip),%rdi        # 3d25e4 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3f14>",
+            "new": "lea    0x29c0c9(%rip),%rdi        # 3d35e4 <_RNvNtCsf9kfGoqHfH0_8iced_x867decoder11MEM_REGS_16+0x3f14>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1d20",
+            "old_address": "0x1375a0",
+            "new_address": "0x1375a0",
+            "count": 63198,
+            "old": "lea    0x2e3f59(%rip),%rdi        # 41b500 <index_x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x2e4f59(%rip),%rdi        # 41c500 <index_x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1d27",
+            "old_address": "0x1375a7",
+            "new_address": "0x1375a7",
+            "count": 63198,
+            "old": "lea    0x2d8752(%rip),%rax        # 40fd00 <x86DisassemblerThreeByte3AOpcodes>",
+            "new": "lea    0x2d9752(%rip),%rax        # 410d00 <x86DisassemblerThreeByte3AOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1d30",
+            "old_address": "0x1375b0",
+            "new_address": "0x1375b0",
+            "count": 58226,
+            "old": "lea    0x2fb009(%rip),%rdi        # 4325c0 <index_x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x2fc009(%rip),%rdi        # 4335c0 <index_x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1d37",
+            "old_address": "0x1375b7",
+            "new_address": "0x1375b7",
+            "count": 58226,
+            "old": "lea    0x2e4002(%rip),%rax        # 41b5c0 <x86DisassemblerThreeByte38Opcodes>",
+            "new": "lea    0x2e5002(%rip),%rax        # 41c5c0 <x86DisassemblerThreeByte38Opcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1d43",
+            "old_address": "0x1375c3",
+            "new_address": "0x1375c3",
+            "count": 71634,
+            "old": "lea    0x3278b6(%rip),%rdi        # 45ee80 <index_x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x3288b6(%rip),%rdi        # 45fe80 <index_x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x1d4a",
+            "old_address": "0x1375ca",
+            "new_address": "0x1375ca",
+            "count": 71634,
+            "old": "lea    0x2fb0af(%rip),%rax        # 432680 <x86DisassemblerTwoByteOpcodes>",
+            "new": "lea    0x2fc0af(%rip),%rax        # 433680 <x86DisassemblerTwoByteOpcodes>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x27ca",
+            "old_address": "0x13804a",
+            "new_address": "0x13804a",
+            "count": 193058,
+            "old": "lea    0x29b027(%rip),%rdx        # 3d3078 <CSWTCH.1500>",
+            "new": "lea    0x29c027(%rip),%rdx        # 3d4078 <CSWTCH.1500>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x38d4",
+            "old_address": "0x139154",
+            "new_address": "0x139154",
+            "count": 6018,
+            "old": "lea    0x329aa5(%rip),%rdi        # 462c00 <modRMTable>",
+            "new": "lea    0x32aaa5(%rip),%rdi        # 463c00 <modRMTable>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x38db",
+            "old_address": "0x13915b",
+            "new_address": "0x13915b",
+            "count": 6018,
+            "old": "lea    0x3376be(%rip),%r9        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x3386be(%rip),%r9        # 471820 <x86DisassemblerInstrSpecifiers>"
+          },
+          {
+            "function": "decodeInstructionScan",
+            "offset": "0x3d63",
+            "old_address": "0x1395e3",
+            "new_address": "0x1395e3",
+            "count": 187040,
+            "old": "lea    0x337236(%rip),%r9        # 470820 <x86DisassemblerInstrSpecifiers>",
+            "new": "lea    0x338236(%rip),%r9        # 471820 <x86DisassemblerInstrSpecifiers>"
+          }
+        ],
+        "scope": "Function-relative execution counts are identical. Absolute addresses and resolved instruction bytes may change with linking; differences are reported, not masked. Shared-library self Ir/Dr/Dw counts match but library bytes are not captured."
+      }
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "mode": 1,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          353797732,
+          76840790,
+          56937402
+        ],
+        "scan": [
+          329760906,
+          71404246,
+          52626996
+        ]
+      },
+      "instruction_reduction": 0.06793945756554487,
+      "changed_function_costs": {
+        "X86_Intel_printInstructionPrechecked": [
+          -528226,
+          -100160,
+          -56368
+        ],
+        "decodeInstruction": [
+          -59400,
+          0,
+          0
+        ],
+        "writeEvexOutput": [
+          460338,
+          43136,
+          0
+        ],
+        "prepareTranslation": [
+          -78678,
+          -38232,
+          0
+        ],
+        "printOperand.constprop.0": [
+          -513600,
+          -205440,
+          -102720
+        ],
+        "writeEvexBroadcast": [
+          -722120,
+          -206320,
+          -154740
+        ],
+        "printf512mem": [
+          -22740,
+          -5306,
+          -6064
+        ],
+        "_printOperand": [
+          -571880,
+          -135166,
+          -74250
+        ],
+        "translateRMMemoryFull": [
+          -1448174,
+          -229292,
+          -346954
+        ],
+        "X86_decodeFeatureExtension": [
+          -1098900,
+          -207900,
+          -103950
+        ],
+        "X86Recipe40": [
+          -267180,
+          -44530,
+          -89060
+        ],
+        "SStream_trimls": [
+          -267300,
+          -89100,
+          -59400
+        ],
+        "X86_getInstruction": [
+          -2869290,
+          -638550,
+          -727650
+        ],
+        "X86Recipe17": [
+          -83520,
+          -13920,
+          -27840
+        ],
+        "0x00000000001e22d8": [
+          28184,
+          28184,
+          0
+        ],
+        "decode_apx_kmov": [
+          -861300,
+          -193050,
+          -103950
+        ],
+        "printMemReference": [
+          -1608186,
+          -481110,
+          -313080
+        ],
+        "MCOperand_CreateReg0": [
+          -178200,
+          -29700,
+          -59400
+        ],
+        "X86_Intel_printInstructionGeneral": [
+          -1516,
+          0,
+          0
+        ],
+        "printOperand": [
+          -97110,
+          -32688,
+          -15586
+        ],
+        "X86_printFeatureExtension": [
+          -430650,
+          -163350,
+          -103950
+        ],
+        "readOperands": [
+          -1018332,
+          -341550,
+          -142182
+        ],
+        "__memcpy_avx_unaligned_erms": [
+          429834,
+          84552,
+          56368
+        ],
+        "SStream_opt_unum": [
+          -44550,
+          -14850,
+          -14850
+        ],
+        "X86_featureExtensionMCRegisterMap": [
+          -77040,
+          -12840,
+          0
+        ],
+        "decodeInstructionScan": [
+          -5251714,
+          -891000,
+          -668250
+        ],
+        "X86_Intel_printHexPrechecked": [
+          -674470,
+          -76410,
+          -90370
+        ],
+        "readModRM": [
+          -1915928,
+          -344224,
+          -327882
+        ],
+        "printRegName": [
+          -422760,
+          -98644,
+          -70460
+        ],
+        "X86_register_map": [
+          -231120,
+          -51360,
+          -38520
+        ],
+        "X86Recipe60": [
+          -34500,
+          -5750,
+          -11500
+        ],
+        "X86_printPrefixes": [
+          -148500,
+          -74250,
+          0
+        ],
+        "cs_decode_full_insn": [
+          -4809958,
+          -856398,
+          -1079148
+        ],
+        "printImm.isra.0": [
+          -205716,
+          -14694,
+          0
+        ],
+        "X86_disasmIter": [
+          -148500,
+          0,
+          -14850
+        ],
+        "X86_Intel_printInst": [
+          -772200,
+          -267300,
+          -118800
+        ],
+        "X86_postprinter": [
+          -549450,
+          -178200,
+          -163350
+        ],
+        "SStream_concat_hex64": [
+          -56628,
+          -10932,
+          -6528
+        ],
+        "X86Recipe27": [
+          -34136,
+          -6024,
+          -11044
+        ],
+        "X86Recipe76": [
+          -8432,
+          -1488,
+          -2728
+        ],
+        "decodeEVEXInstruction.constprop.0": [
+          -1559250,
+          -318710,
+          -222750
+        ],
+        "X86_writeEvexMemoryOutput": [
+          4804658,
+          804972,
+          971254
+        ],
+        "printInstruction": [
+          -88686,
+          -18950,
+          -9854
+        ]
+      },
+      "raw_code": null
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "mode": 2,
+      "collected_traversals": 2,
+      "decoded_per_traversal": 187130,
+      "totals": {
+        "integer": [
+          530188540,
+          114710195,
+          87995936
+        ],
+        "scan": [
+          498148644,
+          107432093,
+          82042428
+        ]
+      },
+      "instruction_reduction": 0.060431136440633026,
+      "changed_function_costs": {
+        "X86_get_op_access": [
+          -579150,
+          -118800,
+          -29700
+        ],
+        "X86_Intel_printInstructionPrechecked": [
+          -528226,
+          -100160,
+          -56368
+        ],
+        "decodeInstruction": [
+          -59400,
+          0,
+          0
+        ],
+        "__memset_avx2_unaligned_erms": [
+          742500,
+          29700,
+          297000
+        ],
+        "writeEvexOutput": [
+          460338,
+          43136,
+          0
+        ],
+        "prepareTranslation": [
+          -78678,
+          -38232,
+          0
+        ],
+        "X86_insn_reg_intel2": [
+          -89100,
+          -14850,
+          0
+        ],
+        "printOperand.constprop.0": [
+          -988680,
+          -398040,
+          -179760
+        ],
+        "writeEvexBroadcast": [
+          -722120,
+          -206320,
+          -154740
+        ],
+        "printf512mem": [
+          -22740,
+          -5306,
+          -6064
+        ],
+        "_printOperand": [
+          -571880,
+          -135166,
+          -74250
+        ],
+        "translateRMMemoryFull": [
+          -1448174,
+          -229292,
+          -346954
+        ],
+        "X86_decodeFeatureExtension": [
+          -1098900,
+          -207900,
+          -103950
+        ],
+        "X86_get_insn_id": [
+          -1410750,
+          -386100,
+          -207900
+        ],
+        "SStream_trimls": [
+          -267300,
+          -89100,
+          -59400
+        ],
+        "X86Recipe40": [
+          -267180,
+          -44530,
+          -89060
+        ],
+        "X86_getInstruction": [
+          -4920846,
+          -1010850,
+          -2089652
+        ],
+        "X86Recipe17": [
+          -83520,
+          -13920,
+          -27840
+        ],
+        "0x00000000001e22d8": [
+          28184,
+          28184,
+          0
+        ],
+        "decode_apx_kmov": [
+          -861300,
+          -193050,
+          -103950
+        ],
+        "printMemReference": [
+          -2471002,
+          -807810,
+          -491280
+        ],
+        "__strchr_avx2": [
+          -461852,
+          -61736,
+          0
+        ],
+        "x86_map_sib_index": [
+          -27020,
+          -10808,
+          0
+        ],
+        "MCOperand_CreateReg0": [
+          -178200,
+          -29700,
+          -59400
+        ],
+        "X86_Intel_printInstructionGeneral": [
+          -1516,
+          0,
+          0
+        ],
+        "printOperand": [
+          -171480,
+          -62838,
+          -27646
+        ],
+        "X86_printFeatureExtension": [
+          -430650,
+          -163350,
+          -103950
+        ],
+        "readOperands": [
+          -1018332,
+          -341550,
+          -142182
+        ],
+        "__memcpy_avx_unaligned_erms": [
+          429834,
+          84552,
+          56368
+        ],
+        "SStream_opt_unum": [
+          -44550,
+          -14850,
+          -14850
+        ],
+        "X86_Intel_printHexPrechecked": [
+          -674470,
+          -76410,
+          -90370
+        ],
+        "decodeInstructionScan": [
+          -5251714,
+          -891000,
+          -668250
+        ],
+        "X86_featureExtensionMCRegisterMap": [
+          -433440,
+          -72240,
+          0
+        ],
+        "readModRM": [
+          -1915928,
+          -344224,
+          -327882
+        ],
+        "printRegName": [
+          -422760,
+          -98644,
+          -70460
+        ],
+        "X86_register_map": [
+          -1300320,
+          -288960,
+          -216720
+        ],
+        "X86_insn_reg_intel_h": [
+          -252450,
+          -59400,
+          0
+        ],
+        "X86Recipe60": [
+          -34500,
+          -5750,
+          -11500
+        ],
+        "X86_printPrefixes": [
+          -207900,
+          -118800,
+          -14850
+        ],
+        "cs_decode_full_insn": [
+          -4795108,
+          -856398,
+          -1079148
+        ],
+        "0x00000000001e22d0": [
+          14850,
+          14850,
+          0
+        ],
+        "x86_map_sib_base": [
+          -27020,
+          -10808,
+          0
+        ],
+        "printImm.isra.0": [
+          -205716,
+          -14694,
+          0
+        ],
+        "X86_disasmIter": [
+          -148500,
+          0,
+          -14850
+        ],
+        "X86_Intel_printInst": [
+          -1826550,
+          -475200,
+          -311850
+        ],
+        "X86_postprinter": [
+          -1599000,
+          -267300,
+          -193050
+        ],
+        "SStream_concat_hex64": [
+          -56628,
+          -10932,
+          -6528
+        ],
+        "X86Recipe27": [
+          -34136,
+          -6024,
+          -11044
+        ],
+        "X86Recipe76": [
+          -8432,
+          -1488,
+          -2728
+        ],
+        "decodeEVEXInstruction.constprop.0": [
+          -1559250,
+          -318710,
+          -222750
+        ],
+        "X86_writeEvexMemoryOutput": [
+          5929452,
+          1141666,
+          1313854
+        ],
+        "printInstruction": [
+          -88686,
+          -18950,
+          -9854
+        ]
+      },
+      "raw_code": null
+    }
+  ],
+  "native": [
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 0.9812386813561821,
+      "aa": 0.9977775834101967,
+      "ci95": [
+        0.9738310720606043,
+        0.983502474435971
+      ],
+      "aa_ci95": [
+        0.9956556253727277,
+        1.002281576664541
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9846012331329427,
+      "aa": 0.9974571861103226,
+      "ci95": [
+        0.9822505922304039,
+        0.9858977098346963
+      ],
+      "aa_ci95": [
+        0.9940126831918185,
+        0.9999960463994559
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.1086092076477576,
+      "aa": 0.9968851768282359,
+      "ci95": [
+        1.1059145131401988,
+        1.1133041128684462
+      ],
+      "aa_ci95": [
+        0.9918997689570903,
+        0.9993023090810188
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.115316013617366,
+      "aa": 0.9999208422385815,
+      "ci95": [
+        1.1112486067595202,
+        1.1157431279996826
+      ],
+      "aa_ci95": [
+        0.9961626259445846,
+        1.001468104251188
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.1059074656082313,
+      "aa": 0.995330473904432,
+      "ci95": [
+        1.099825691846687,
+        1.1086359204656246
+      ],
+      "aa_ci95": [
+        0.9914333030892961,
+        0.9988336459871658
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.1056643862229065,
+      "aa": 1.0015516216010767,
+      "ci95": [
+        1.1034885432510673,
+        1.1099406594166736
+      ],
+      "aa_ci95": [
+        0.9966346925312461,
+        1.0040539030549533
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.0116581685721928,
+      "aa": 1.0042959768303088,
+      "ci95": [
+        1.0072619585743072,
+        1.0180140317138857
+      ],
+      "aa_ci95": [
+        0.9989111150350208,
+        1.0083183566521658
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 1.0059478005042237,
+      "aa": 0.9974546571360055,
+      "ci95": [
+        1.004286890603645,
+        1.0075369322396728
+      ],
+      "aa_ci95": [
+        0.9958631001129772,
+        1.0012275839376334
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "images",
+      "gain": 0.9881567106148376,
+      "aa": 0.9968581828627341,
+      "ci95": [
+        0.9794456569376994,
+        0.992415547904378
+      ],
+      "aa_ci95": [
+        0.9937829454584574,
+        1.0105594963725553
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 0.9852668956801878,
+      "aa": 1.001575327668155,
+      "ci95": [
+        0.9831616341030195,
+        0.9877860022441115
+      ],
+      "aa_ci95": [
+        0.9992553681189243,
+        1.00303213795098
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0116806653491437,
+      "aa": 1.0024817674464546,
+      "ci95": [
+        1.0041225142742578,
+        1.0201111515958672
+      ],
+      "aa_ci95": [
+        0.9985351820066789,
+        1.0100499123162012
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0097708296322614,
+      "aa": 0.9992348026794451,
+      "ci95": [
+        1.0073340513718865,
+        1.01153562434818
+      ],
+      "aa_ci95": [
+        0.9968330499233331,
+        0.9999623181852437
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.0072875214338866,
+      "aa": 1.0018758554061669,
+      "ci95": [
+        1.0055916891037078,
+        1.0081361456479525
+      ],
+      "aa_ci95": [
+        1.0003387178722067,
+        1.00380445734091
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 1.0067607720549328,
+      "aa": 0.998591918662121,
+      "ci95": [
+        1.0056123504150463,
+        1.008499965447295
+      ],
+      "aa_ci95": [
+        0.9974026393708166,
+        1.0007373472422003
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.07203316421235,
+      "aa": 1.0005080335224563,
+      "ci95": [
+        1.0686464787213747,
+        1.0745726141078837
+      ],
+      "aa_ci95": [
+        0.9977792530991455,
+        1.002318245290578
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0715201813758752,
+      "aa": 0.9995490785264196,
+      "ci95": [
+        1.0701544390272384,
+        1.0727631677592941
+      ],
+      "aa_ci95": [
+        0.9986075772620082,
+        1.0015553490397664
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0776281276708615,
+      "aa": 0.9992269172646079,
+      "ci95": [
+        1.0747570981889911,
+        1.0818745564529757
+      ],
+      "aa_ci95": [
+        0.9962031176449992,
+        1.0030172632796714
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.078789955496895,
+      "aa": 1.0011924888890633,
+      "ci95": [
+        1.0767443716733114,
+        1.081630926701349
+      ],
+      "aa_ci95": [
+        0.9984178764298833,
+        1.0030886578057203
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 0.9962059782515921,
+      "aa": 1.0004027368971267,
+      "ci95": [
+        0.9940850860583732,
+        0.9982261186965382
+      ],
+      "aa_ci95": [
+        0.9982672173827262,
+        1.002559134438148
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9985024830622728,
+      "aa": 0.9991800233180871,
+      "ci95": [
+        0.996100368676935,
+        1.0005168311841413
+      ],
+      "aa_ci95": [
+        0.9982034050558892,
+        1.0004179657012227
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "images",
+      "gain": 0.9996223759419145,
+      "aa": 0.9953521066757554,
+      "ci95": [
+        0.996182327927805,
+        1.0024116859487109
+      ],
+      "aa_ci95": [
+        0.9926437560913598,
+        0.9993566446676068
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 0.9993059869337048,
+      "aa": 0.9979557766345268,
+      "ci95": [
+        0.9973980771363494,
+        1.0013660908751145
+      ],
+      "aa_ci95": [
+        0.9967824225409889,
+        1.0003171052575197
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 0.996598146458747,
+      "aa": 0.9969827421349438,
+      "ci95": [
+        0.991537034515624,
+        0.9977004886461628
+      ],
+      "aa_ci95": [
+        0.9915925078396474,
+        0.9992760227243692
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 0.9952781917852427,
+      "aa": 1.0001405966410184,
+      "ci95": [
+        0.9938199700952631,
+        0.9970446110861055
+      ],
+      "aa_ci95": [
+        0.9982414955823979,
+        1.0032915099535091
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.0086439380557026,
+      "aa": 1.0001320178146393,
+      "ci95": [
+        1.0078915084695113,
+        1.010367470541164
+      ],
+      "aa_ci95": [
+        0.999085246498936,
+        1.0006442048726722
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 1.0097488550397888,
+      "aa": 0.9998722623499083,
+      "ci95": [
+        1.0089958829089944,
+        1.0102234388930564
+      ],
+      "aa_ci95": [
+        0.9989129173275562,
+        1.0005204247287187
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0859696851923824,
+      "aa": 0.9995921212073213,
+      "ci95": [
+        1.0850401877861744,
+        1.0867113803548247
+      ],
+      "aa_ci95": [
+        0.9987019719736753,
+        1.0014713211985884
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.083922405298649,
+      "aa": 0.9991098536027087,
+      "ci95": [
+        1.0832751562163327,
+        1.0854381215921365
+      ],
+      "aa_ci95": [
+        0.9978010288327194,
+        0.9997220722294572
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.087112082450242,
+      "aa": 1.0010570867502306,
+      "ci95": [
+        1.0862660376526607,
+        1.0880429262260694
+      ],
+      "aa_ci95": [
+        0.9996795066837055,
+        1.0020364611913906
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0856300168663846,
+      "aa": 0.9991657027241619,
+      "ci95": [
+        1.0850065521578145,
+        1.0862965907083555
+      ],
+      "aa_ci95": [
+        0.9982097986124924,
+        1.0006165328141479
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.0071638154395235,
+      "aa": 0.9990655198046088,
+      "ci95": [
+        1.0061321884300913,
+        1.008502628396978
+      ],
+      "aa_ci95": [
+        0.9980284413238699,
+        1.000949651439595
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 1.0074731053857748,
+      "aa": 0.9998598732064833,
+      "ci95": [
+        1.0071463110913317,
+        1.0076629171225384
+      ],
+      "aa_ci95": [
+        0.9995075669135908,
+        1.0003183550805226
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0085297512855493,
+      "aa": 1.000083258054176,
+      "ci95": [
+        1.0079055536409256,
+        1.0097023709433326
+      ],
+      "aa_ci95": [
+        0.9987339460204395,
+        1.000770823698037
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0073518015055483,
+      "aa": 0.9996458407116515,
+      "ci95": [
+        1.0064492653609203,
+        1.0081839258439542
+      ],
+      "aa_ci95": [
+        0.9985622064504837,
+        1.0006320507969244
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0030833791788745,
+      "aa": 1.000380049534546,
+      "ci95": [
+        1.0016005203830978,
+        1.0045210813026177
+      ],
+      "aa_ci95": [
+        0.9986967132471007,
+        1.0011269114970487
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.00214134592781,
+      "aa": 1.0000724795245342,
+      "ci95": [
+        1.0015490181017486,
+        1.0028565677503352
+      ],
+      "aa_ci95": [
+        0.9991286966326687,
+        1.0005926848195934
+      ]
+    }
+  ],
+  "receipts": [
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "cleanup": {
+        "removed": true,
+        "bytes": 592027593,
+        "files": 4701
+      }
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-clang-1",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "cleanup": {
+        "removed": true,
+        "bytes": 579276374,
+        "files": 4701
+      }
+    },
+    {
+      "host": "evex-output-cost-ubuntu-24.04-gcc-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "cleanup": {
+        "removed": true,
+        "bytes": 586344430,
+        "files": 4701
+      }
+    }
+  ],
+  "losses": [
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 0.9812386813561821,
+      "aa": 0.9977775834101967,
+      "ci95": [
+        0.9738310720606043,
+        0.983502474435971
+      ],
+      "aa_ci95": [
+        0.9956556253727277,
+        1.002281576664541
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9846012331329427,
+      "aa": 0.9974571861103226,
+      "ci95": [
+        0.9822505922304039,
+        0.9858977098346963
+      ],
+      "aa_ci95": [
+        0.9940126831918185,
+        0.9999960463994559
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "images",
+      "gain": 0.9881567106148376,
+      "aa": 0.9968581828627341,
+      "ci95": [
+        0.9794456569376994,
+        0.992415547904378
+      ],
+      "aa_ci95": [
+        0.9937829454584574,
+        1.0105594963725553
+      ]
+    },
+    {
+      "host": "evex-output-cost-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 0.9852668956801878,
+      "aa": 1.001575327668155,
+      "ci95": [
+        0.9831616341030195,
+        0.9877860022441115
+      ],
+      "aa_ci95": [
+        0.9992553681189243,
+        1.00303213795098
+      ]
+    }
+  ],
+  "aa_outside_one_percent": [],
+  "native_qualified": false,
+  "limits": "Callgrind confirms executed instruction/read/write work. Native hardware-cache, predictor or timing causality is not established by simulated counters. Native timing and counts are kept distinct."
+}
