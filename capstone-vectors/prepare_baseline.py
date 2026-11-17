@@ -7,6 +7,12 @@ r=Path(__file__).resolve().parent
 s=r.parent/'source'
 inputs=json.loads((r/'experiment.json').read_text())
 git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
+if git('rev-parse', 'HEAD') == inputs['baseline_commit']:
+    assert not git('status', '--porcelain')
+    assert git('rev-parse', 'HEAD^{tree}') == inputs['baseline_tree']
+    assert sp.check_output(['git', '-C', s, 'cat-file', 'commit', 'HEAD']) == (r / 'baseline.commit').read_bytes()
+    print('Verified the exact published baseline commit and tree fetched directly.')
+    raise SystemExit(0)
 assert git('rev-parse','HEAD')==inputs['source_parent']
 assert not git('status','--porcelain')
 patch=r/'baseline.patch'
