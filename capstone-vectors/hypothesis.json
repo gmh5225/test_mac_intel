@@ -1,0 +1,11 @@
+{
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "cause": "R1391 preserved every vector-core machine instruction but routed every existing vector output through a wrapper. Across all four compilers the new wrapper adds 0.3271\u20130.9627 percent of total SSL64 formatting instructions and 0.2174\u20130.6392 percent of detail instructions.",
+  "change": "Give 32-bit C4/C5 their own reserved simple-output plan. Retain the original vector plan and direct call, with the entire original vector object unchanged. The dedicated 32-bit handler admits only low-register W0 forms, reuses the original core and normalizes address size/rex metadata.",
+  "constraints": [
+    "Keep LDS/LES, memory forms, extensions, W1 and unsupported rows on canonical fallback",
+    "Measure the extra plan comparison on immediate instructions; do not infer throughput from static layout",
+    "Do not add padding or change consumers/corpora; preserve all old negative results"
+  ],
+  "publication_qualified": false
+}
