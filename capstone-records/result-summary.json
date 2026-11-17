@@ -1,0 +1,3626 @@
+{
+  "status": "baseline-address-diagnosis-complete-no-candidate-measured",
+  "review": {
+    "complete": true,
+    "run": {
+      "id": 44092467384,
+      "head_sha": "bb6ba24558ee28ae0154e10b48e55c199c377877",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44092467384",
+      "run_attempt": 1
+    },
+    "protocol": {
+      "candidate_measured": false,
+      "hypothesis": "Uncontrolled process addresses and/or separate executable identities contribute to the remaining identical-binary timing variation. An A/A deviation alone cannot be attributed to a source change.",
+      "intervention": "Use one identical production baseline executable in a 2x2 design: separate versus same pathname/inode, ASLR enabled versus disabled. Interleave all four cells within each balanced cycle and record process addresses, faults, context switches, CPU time and wall time.",
+      "cases": {
+        "amd64-ls": 0,
+        "mips64el-ls": 1
+      },
+      "compilers": [
+        "clang",
+        "gcc"
+      ],
+      "replicas_per_compiler": 2,
+      "cycles": 40,
+      "calibration_cpu_ms": 80,
+      "constraints": "This instrumented consumer is diagnostic only. It cannot replace the original consumer performance results, erase initial flags, or prove a candidate gain. Do not infer physical cache conflicts without counters."
+    },
+    "profiles": [
+      {
+        "name": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "host": {
+          "cpu": "AMD EPYC 9V74 80-Core Processor",
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+          "original_consumer_sha256": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
+          "baseline": "106380545da022533aa28bb9af6ba4df9f6e9970"
+        },
+        "cleanup": {
+          "bytes": 113519271,
+          "removed": true
+        },
+        "instrumentation": {
+          "diagnostic_consumer_sha256": "4a9fff7ecdfe2fe45322b4844448e7c458461aa393db1b64f4f64fdad498917a",
+          "scope": "Record image, stack and allocation addresses, timed-region faults and context switches outside the measured decoder loop. Both controls use the same resulting executable."
+        }
+      },
+      {
+        "name": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "host": {
+          "cpu": "AMD EPYC 9V74 80-Core Processor",
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+          "original_consumer_sha256": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
+          "baseline": "106380545da022533aa28bb9af6ba4df9f6e9970"
+        },
+        "cleanup": {
+          "bytes": 113519271,
+          "removed": true
+        },
+        "instrumentation": {
+          "diagnostic_consumer_sha256": "4a9fff7ecdfe2fe45322b4844448e7c458461aa393db1b64f4f64fdad498917a",
+          "scope": "Record image, stack and allocation addresses, timed-region faults and context switches outside the measured decoder loop. Both controls use the same resulting executable."
+        }
+      },
+      {
+        "name": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "host": {
+          "cpu": "AMD EPYC 7763 64-Core Processor",
+          "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+          "original_consumer_sha256": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
+          "baseline": "106380545da022533aa28bb9af6ba4df9f6e9970"
+        },
+        "cleanup": {
+          "bytes": 110806830,
+          "removed": true
+        },
+        "instrumentation": {
+          "diagnostic_consumer_sha256": "4a9fff7ecdfe2fe45322b4844448e7c458461aa393db1b64f4f64fdad498917a",
+          "scope": "Record image, stack and allocation addresses, timed-region faults and context switches outside the measured decoder loop. Both controls use the same resulting executable."
+        }
+      },
+      {
+        "name": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "host": {
+          "cpu": "AMD EPYC 9V74 80-Core Processor",
+          "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+          "original_consumer_sha256": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
+          "baseline": "106380545da022533aa28bb9af6ba4df9f6e9970"
+        },
+        "cleanup": {
+          "bytes": 110806830,
+          "removed": true
+        },
+        "instrumentation": {
+          "diagnostic_consumer_sha256": "4a9fff7ecdfe2fe45322b4844448e7c458461aa393db1b64f4f64fdad498917a",
+          "scope": "Record image, stack and allocation addresses, timed-region faults and context switches outside the measured decoder loop. Both controls use the same resulting executable."
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": false,
+        "median": 1.0220034569830994,
+        "ci95": [
+          0.987368047410334,
+          1.037338204709581
+        ],
+        "quartiles": [
+          0.947283676283597,
+          1.0220034569830994,
+          1.0510692309713865
+        ],
+        "median_absolute_deviation": 0.04540566996355616,
+        "outside_one_percent": 36,
+        "min": 0.906466479441204,
+        "max": 1.2324249306081252,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 33,
+            "affected_samples": 31
+          }
+        },
+        "wall_to_cpu": 1.0001223008657978
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": true,
+        "median": 1.0046492718469273,
+        "ci95": [
+          0.9593115982110854,
+          1.0301881300364617
+        ],
+        "quartiles": [
+          0.9417563472086514,
+          1.0046492718469273,
+          1.0655473128252342
+        ],
+        "median_absolute_deviation": 0.061821781329881365,
+        "outside_one_percent": 36,
+        "min": 0.8389568613128433,
+        "max": 1.1980709234171734,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 34,
+            "affected_samples": 34
+          }
+        },
+        "wall_to_cpu": 1.000124133526369
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": false,
+        "median": 1.0301784666337812,
+        "ci95": [
+          0.9752209542848582,
+          1.046306286544195
+        ],
+        "quartiles": [
+          0.9543115254564124,
+          1.0301784666337812,
+          1.0683609080229828
+        ],
+        "median_absolute_deviation": 0.05960251436317382,
+        "outside_one_percent": 37,
+        "min": 0.8585927865763257,
+        "max": 1.1646176356817304,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 39,
+            "affected_samples": 38
+          }
+        },
+        "wall_to_cpu": 1.0001236314367223
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": true,
+        "median": 1.0184578087582374,
+        "ci95": [
+          0.98773944187094,
+          1.0742310656775214
+        ],
+        "quartiles": [
+          0.9631788149825503,
+          1.0184578087582374,
+          1.0954550186827572
+        ],
+        "median_absolute_deviation": 0.06423782980958137,
+        "outside_one_percent": 35,
+        "min": 0.8679048203082356,
+        "max": 1.2109736732135394,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 272,
+            "affected_samples": 37
+          }
+        },
+        "wall_to_cpu": 1.0001208466536526
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": false,
+        "median": 1.0002017104795935,
+        "ci95": [
+          0.9990335876299217,
+          1.0013624231145681
+        ],
+        "quartiles": [
+          0.9978172244263691,
+          1.0002017104795935,
+          1.0020100697236343
+        ],
+        "median_absolute_deviation": 0.0022491720462538556,
+        "outside_one_percent": 4,
+        "min": 0.9261460051675919,
+        "max": 1.0230308169676412,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 38,
+            "affected_samples": 34
+          }
+        },
+        "wall_to_cpu": 1.0001129210159416
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": true,
+        "median": 0.9989410249460642,
+        "ci95": [
+          0.9978689210963292,
+          1.0029186179559013
+        ],
+        "quartiles": [
+          0.9958395745404831,
+          0.9989410249460642,
+          1.0054156896616178
+        ],
+        "median_absolute_deviation": 0.005058758108057282,
+        "outside_one_percent": 9,
+        "min": 0.9720375659461954,
+        "max": 1.0249351672938065,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 32,
+            "affected_samples": 31
+          }
+        },
+        "wall_to_cpu": 1.0001116815382167
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": false,
+        "median": 1.000459516359386,
+        "ci95": [
+          0.9983949285046114,
+          1.0016422695952318
+        ],
+        "quartiles": [
+          0.9972938001164052,
+          1.000459516359386,
+          1.0026129813682654
+        ],
+        "median_absolute_deviation": 0.0029006937051075377,
+        "outside_one_percent": 0,
+        "min": 0.9930620771604347,
+        "max": 1.0076015895398025,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 170,
+            "affected_samples": 26
+          }
+        },
+        "wall_to_cpu": 1.0001119155167042
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-1-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": true,
+        "median": 1.001358086842445,
+        "ci95": [
+          0.99874116601771,
+          1.0055069930306533
+        ],
+        "quartiles": [
+          0.9971182527532647,
+          1.001358086842445,
+          1.0102535068179062
+        ],
+        "median_absolute_deviation": 0.005404323757254859,
+        "outside_one_percent": 13,
+        "min": 0.9796968056307526,
+        "max": 1.06752534591596,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 138,
+            "affected_samples": 36
+          }
+        },
+        "wall_to_cpu": 1.000110639417827
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": false,
+        "median": 1.0082329143981923,
+        "ci95": [
+          0.9947880713675392,
+          1.02120877207567
+        ],
+        "quartiles": [
+          0.9832807741572761,
+          1.0082329143981923,
+          1.035077992419901
+        ],
+        "median_absolute_deviation": 0.024761946925055844,
+        "outside_one_percent": 32,
+        "min": 0.8666206189384337,
+        "max": 1.1161368919050216,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 65,
+            "affected_samples": 53
+          }
+        },
+        "wall_to_cpu": 1.0001403826108093
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": true,
+        "median": 1.000269773163906,
+        "ci95": [
+          0.9850186607243977,
+          1.0320867632731527
+        ],
+        "quartiles": [
+          0.9710419289833839,
+          1.000269773163906,
+          1.0574568415642114
+        ],
+        "median_absolute_deviation": 0.045518327310242634,
+        "outside_one_percent": 35,
+        "min": 0.8808842706064681,
+        "max": 1.1262661585006484,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 146,
+            "affected_samples": 50
+          }
+        },
+        "wall_to_cpu": 1.000146202142763
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": false,
+        "median": 0.9902307808210853,
+        "ci95": [
+          0.9764494367327445,
+          1.0019334326306142
+        ],
+        "quartiles": [
+          0.9618857000656355,
+          0.9902307808210853,
+          1.0175425290869744
+        ],
+        "median_absolute_deviation": 0.02793349793355787,
+        "outside_one_percent": 30,
+        "min": 0.904735671151605,
+        "max": 1.0768647978510917,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 179,
+            "affected_samples": 52
+          }
+        },
+        "wall_to_cpu": 1.0001401338548246
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": true,
+        "median": 0.99280647012382,
+        "ci95": [
+          0.9588323890880482,
+          1.0244419855988953
+        ],
+        "quartiles": [
+          0.9456707491784291,
+          0.99280647012382,
+          1.0425738161069902
+        ],
+        "median_absolute_deviation": 0.048825168317279344,
+        "outside_one_percent": 36,
+        "min": 0.837529436668166,
+        "max": 1.156686671780756,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 58,
+            "affected_samples": 48
+          }
+        },
+        "wall_to_cpu": 1.0001460585709054
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": false,
+        "median": 1.0000867314452861,
+        "ci95": [
+          0.9990066929570733,
+          1.0019894728147216
+        ],
+        "quartiles": [
+          0.9981627732055546,
+          1.0000867314452861,
+          1.0036831778004554
+        ],
+        "median_absolute_deviation": 0.002121370423197211,
+        "outside_one_percent": 7,
+        "min": 0.98531734499185,
+        "max": 1.0904812519209097,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 47,
+            "affected_samples": 44
+          }
+        },
+        "wall_to_cpu": 1.0001312109660343
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": true,
+        "median": 1.0001569814770195,
+        "ci95": [
+          0.9975763915020632,
+          1.0047299292900873
+        ],
+        "quartiles": [
+          0.995743915187595,
+          1.0001569814770195,
+          1.0062604298415787
+        ],
+        "median_absolute_deviation": 0.00538760183086584,
+        "outside_one_percent": 12,
+        "min": 0.9313996532496134,
+        "max": 1.0431530605075403,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 54,
+            "affected_samples": 46
+          }
+        },
+        "wall_to_cpu": 1.0001294027062237
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": false,
+        "median": 1.0001794970884132,
+        "ci95": [
+          0.9980043558857972,
+          1.000631818519468
+        ],
+        "quartiles": [
+          0.9963732852010546,
+          1.0001794970884132,
+          1.0012958940964476
+        ],
+        "median_absolute_deviation": 0.002719000021976503,
+        "outside_one_percent": 0,
+        "min": 0.9913397860417728,
+        "max": 1.0099145713574795,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 169,
+            "affected_samples": 36
+          }
+        },
+        "wall_to_cpu": 1.0001290978361541
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-clang-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": true,
+        "median": 0.9983403152569434,
+        "ci95": [
+          0.9961480174203028,
+          1.0000225512973744
+        ],
+        "quartiles": [
+          0.9915425386417869,
+          0.9983403152569434,
+          1.0047535122011018
+        ],
+        "median_absolute_deviation": 0.00638832294833902,
+        "outside_one_percent": 12,
+        "min": 0.896501814907887,
+        "max": 1.0712970507284965,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 44,
+            "affected_samples": 41
+          }
+        },
+        "wall_to_cpu": 1.0001255937713702
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": false,
+        "median": 1.0007919540676764,
+        "ci95": [
+          0.9994525473272027,
+          1.0019378863106698
+        ],
+        "quartiles": [
+          0.9987370434522338,
+          1.0007919540676764,
+          1.0031089587242599
+        ],
+        "median_absolute_deviation": 0.0021811703400714255,
+        "outside_one_percent": 1,
+        "min": 0.9872596945366126,
+        "max": 1.009635659608184,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 105,
+            "affected_samples": 75
+          }
+        },
+        "wall_to_cpu": 1.0000808431776895
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": true,
+        "median": 1.0006805764032016,
+        "ci95": [
+          0.9986172288919051,
+          1.0032746942891073
+        ],
+        "quartiles": [
+          0.9950864696072012,
+          1.0006805764032016,
+          1.004804118660553
+        ],
+        "median_absolute_deviation": 0.004060000437222766,
+        "outside_one_percent": 9,
+        "min": 0.8839953751570334,
+        "max": 1.0307471953358656,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 150,
+            "affected_samples": 54
+          }
+        },
+        "wall_to_cpu": 1.0000727988024787
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": false,
+        "median": 0.9997406682209218,
+        "ci95": [
+          0.9990847927097883,
+          1.0003607161164163
+        ],
+        "quartiles": [
+          0.9981626417571194,
+          0.9997406682209218,
+          1.0025050946938927
+        ],
+        "median_absolute_deviation": 0.001726941176954877,
+        "outside_one_percent": 1,
+        "min": 0.9898351820517641,
+        "max": 1.009800938252821,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 275,
+            "affected_samples": 49
+          }
+        },
+        "wall_to_cpu": 1.0000714113664344
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": true,
+        "median": 1.0007864876652974,
+        "ci95": [
+          0.9993001358276425,
+          1.0025930338849136
+        ],
+        "quartiles": [
+          0.9972126702485651,
+          1.0007864876652974,
+          1.0041252698183563
+        ],
+        "median_absolute_deviation": 0.0034782790563167576,
+        "outside_one_percent": 2,
+        "min": 0.9925143605259367,
+        "max": 1.0112125580650329,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 76,
+            "affected_samples": 59
+          }
+        },
+        "wall_to_cpu": 1.000071254518128
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": false,
+        "median": 1.0007120142794608,
+        "ci95": [
+          0.9987875996242829,
+          1.0032362213544601
+        ],
+        "quartiles": [
+          0.9976153543134166,
+          1.0007120142794608,
+          1.0050863191574797
+        ],
+        "median_absolute_deviation": 0.0034874428995448903,
+        "outside_one_percent": 6,
+        "min": 0.9728499798008603,
+        "max": 1.0121981671535945,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 64,
+            "affected_samples": 42
+          }
+        },
+        "wall_to_cpu": 1.0000676546950906
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": true,
+        "median": 0.9953143980997535,
+        "ci95": [
+          0.9910958904109589,
+          1.0012784350057296
+        ],
+        "quartiles": [
+          0.986172499371806,
+          0.9953143980997535,
+          1.0060838463397672
+        ],
+        "median_absolute_deviation": 0.009317326496604883,
+        "outside_one_percent": 19,
+        "min": 0.9701838581991387,
+        "max": 1.0864361061605896,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 60,
+            "affected_samples": 45
+          }
+        },
+        "wall_to_cpu": 1.000068073881882
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": false,
+        "median": 0.9995770815793139,
+        "ci95": [
+          0.99774085230359,
+          1.00061980600674
+        ],
+        "quartiles": [
+          0.9969141276258833,
+          0.9995770815793139,
+          1.0020167060580194
+        ],
+        "median_absolute_deviation": 0.002545444577558287,
+        "outside_one_percent": 3,
+        "min": 0.9817273134310297,
+        "max": 1.0118064923332055,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 87,
+            "affected_samples": 51
+          }
+        },
+        "wall_to_cpu": 1.0000708126567734
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-1-44092467384",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": true,
+        "median": 1.0047362859566484,
+        "ci95": [
+          0.9994875240321444,
+          1.00776254127801
+        ],
+        "quartiles": [
+          0.996072831910864,
+          1.0047362859566484,
+          1.011394465569368
+        ],
+        "median_absolute_deviation": 0.007704004471034143,
+        "outside_one_percent": 15,
+        "min": 0.9679635101683639,
+        "max": 1.0435509264866174,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 70,
+            "affected_samples": 51
+          }
+        },
+        "wall_to_cpu": 1.0000705334259647
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": false,
+        "median": 0.9991028210909267,
+        "ci95": [
+          0.9982650661929047,
+          1.0006582131782586
+        ],
+        "quartiles": [
+          0.9976204130446781,
+          0.9991028210909267,
+          1.001413602489828
+        ],
+        "median_absolute_deviation": 0.0017053450712184448,
+        "outside_one_percent": 2,
+        "min": 0.9323357668715423,
+        "max": 1.0088905940954283,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 51,
+            "affected_samples": 48
+          }
+        },
+        "wall_to_cpu": 1.0001269278227993
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "same",
+        "aslr": true,
+        "median": 0.9992660489239827,
+        "ci95": [
+          0.9974566210337774,
+          1.00165503514016
+        ],
+        "quartiles": [
+          0.9959752248830801,
+          0.9992660489239827,
+          1.0080142772658398
+        ],
+        "median_absolute_deviation": 0.0040326182247661935,
+        "outside_one_percent": 10,
+        "min": 0.9511728725723468,
+        "max": 1.0237862131954347,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 292,
+            "affected_samples": 53
+          }
+        },
+        "wall_to_cpu": 1.0001242675722448
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": false,
+        "median": 0.9982791864464795,
+        "ci95": [
+          0.9970835103812918,
+          0.9995307633370544
+        ],
+        "quartiles": [
+          0.996153183866398,
+          0.9982791864464795,
+          1.0009247226414875
+        ],
+        "median_absolute_deviation": 0.0022237973704902214,
+        "outside_one_percent": 1,
+        "min": 0.978376847782018,
+        "max": 1.0088300949714029,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 68,
+            "affected_samples": 65
+          }
+        },
+        "wall_to_cpu": 1.000130229874781
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "files": "separate",
+        "aslr": true,
+        "median": 0.9986763725850434,
+        "ci95": [
+          0.9966037521741666,
+          1.003491471212997
+        ],
+        "quartiles": [
+          0.995650786835933,
+          0.9986763725850434,
+          1.0049906050880386
+        ],
+        "median_absolute_deviation": 0.004815098627953596,
+        "outside_one_percent": 4,
+        "min": 0.9776939069246762,
+        "max": 1.016401057204166,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 63,
+            "affected_samples": 56
+          }
+        },
+        "wall_to_cpu": 1.000127315327981
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": false,
+        "median": 0.9998463916084116,
+        "ci95": [
+          0.9983845586486979,
+          1.000784768279853
+        ],
+        "quartiles": [
+          0.9963906133318459,
+          0.9998463916084116,
+          1.0027220765150484
+        ],
+        "median_absolute_deviation": 0.0030925383696001063,
+        "outside_one_percent": 3,
+        "min": 0.9631450344463339,
+        "max": 1.0441856688300362,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 53,
+            "affected_samples": 50
+          }
+        },
+        "wall_to_cpu": 1.0001175425328555
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "same",
+        "aslr": true,
+        "median": 0.9989255919645621,
+        "ci95": [
+          0.9950576079710689,
+          1.0010873689841877
+        ],
+        "quartiles": [
+          0.9927232997648457,
+          0.9989255919645621,
+          1.010380241096736
+        ],
+        "median_absolute_deviation": 0.006343319079492149,
+        "outside_one_percent": 19,
+        "min": 0.9728006575278129,
+        "max": 1.0728944363742878,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 56,
+            "affected_samples": 52
+          }
+        },
+        "wall_to_cpu": 1.0001187300575103
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": false,
+        "median": 1.00489110578368,
+        "ci95": [
+          1.0040293718335316,
+          1.0072762577990955
+        ],
+        "quartiles": [
+          1.0033438257555254,
+          1.00489110578368,
+          1.0097772335945951
+        ],
+        "median_absolute_deviation": 0.003917275068317183,
+        "outside_one_percent": 10,
+        "min": 0.9599231783788786,
+        "max": 1.2033112823495202,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                24
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 1,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 1,
+              "residues64": [
+                40
+              ]
+            },
+            "handle": {
+              "distinct": 1,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 1,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 117,
+            "affected_samples": 47
+          }
+        },
+        "wall_to_cpu": 1.0001181755467825
+      },
+      {
+        "host": "identical-image-address-control-four-ubuntu-22.04-gcc-2-44092467384",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "files": "separate",
+        "aslr": true,
+        "median": 1.0019748121119032,
+        "ci95": [
+          0.9993001821866003,
+          1.0045227579017517
+        ],
+        "quartiles": [
+          0.9967160262646358,
+          1.0019748121119032,
+          1.0087605944816165
+        ],
+        "median_absolute_deviation": 0.005641186021848488,
+        "outside_one_percent": 15,
+        "min": 0.9375453720508167,
+        "max": 1.0469400449782287,
+        "addresses": {
+          "base": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          },
+          "aa": {
+            "image": {
+              "distinct": 80,
+              "residues64": [
+                0
+              ]
+            },
+            "stack": {
+              "distinct": 80,
+              "residues64": [
+                8,
+                24,
+                40,
+                56
+              ]
+            },
+            "handle": {
+              "distinct": 80,
+              "residues64": [
+                48
+              ]
+            },
+            "insn": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            },
+            "input": {
+              "distinct": 80,
+              "residues64": [
+                16
+              ]
+            }
+          }
+        },
+        "events": {
+          "minor_faults": {
+            "total": 480,
+            "affected_samples": 160
+          },
+          "major_faults": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "voluntary_switches": {
+            "total": 0,
+            "affected_samples": 0
+          },
+          "involuntary_switches": {
+            "total": 47,
+            "affected_samples": 45
+          }
+        },
+        "wall_to_cpu": 1.0001188968124117
+      }
+    ],
+    "candidate_measured": false,
+    "scope": "Identical production baseline only, with diagnostic instrumentation. Differences cannot be a candidate code effect. This diagnostic does not qualify performance or overwrite original-consumer observations."
+  },
+  "publication_qualified": false
+}
