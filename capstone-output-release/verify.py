@@ -84,7 +84,7 @@ try:
     assert 'runtime error:'not in(evidence/'tests.log').read_text()
     if profile=='all':
         run(['cmake','--build',b,'--config','Release','--parallel','4'],'build-all-units')
-        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','-R','^unit_'],'all-unit-tests')
+        run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','--output-junit',evidence/'all-tests.xml','-R','^unit_'],'all-unit-tests')
         inventory=json.loads(subprocess.check_output(['ctest','--test-dir',b,'-C','Release','--show-only=json-v1','-R','^unit_'],text=True))
         save('all-unit-inventory',dict(tests=[x['name'] for x in inventory['tests']]))
     if profile=='adapter':
