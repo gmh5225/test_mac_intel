@@ -1,0 +1,2559 @@
+{
+  "status": "positive-libraries-pending-product",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+      "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+      "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+      "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+      "private_guard": "equal private-entry records for 4718598 protected-page extents",
+      "layout_identical": true,
+      "generated_output_matches_producer": true,
+      "input_source": {
+        "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+        "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+        "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+        "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+        "semantic_input": {
+          "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+          "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+          "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+          "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+          "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+          "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+          "private_guard": "equal private-entry records for 4718598 protected-page extents",
+          "unit_checks": 75,
+          "additional_c4_regression": true,
+          "cosmetic_runtime_object_equality": true,
+          "generated_output_matches_producer": true,
+          "layout_identical": true,
+          "inactive_runtime_objects_identical": true,
+          "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+        },
+        "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+        "inactive_runtime_objects_identical": true,
+        "local_inactive_unit_passed": true,
+        "active_semantic_validation_pending": true,
+        "native_qualified": false
+      },
+      "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+      "shared_vector_object_identical": false,
+      "decoder_object_identical": true,
+      "inactive_runtime_objects_identical": true,
+      "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+    },
+    "run": {
+      "id": 44005995450,
+      "head_sha": "986d32fb67992a9357ef0c62d175af9e5a0c0227",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44005995450",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "complete": {
+          "cases": 60,
+          "success": true,
+          "active": true,
+          "native_qualification": false,
+          "controlled_replication": true,
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ]
+        },
+        "scope": {
+          "active": true,
+          "policy": "ELF x64 Clang",
+          "inactive_requirement": "Identical original runtime objects and linked consumer"
+        },
+        "cleanup": {
+          "removed": true,
+          "bytes": 427829289,
+          "files": 4673
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86OutputIterator.c.o",
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "total": 39
+        },
+        "cpu": {
+          "cpu": "processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 207\nmodel name\t: INTEL(R) XEON(R) PLATINUM 8573C\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3100.341\ncache size\t: 266240 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch tpr_shadow ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves vnmi avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid fsrm arch_capabilities\nvmx flags\t: vnmi invvpid tsc_offset vtpr ept vpid unrestricted_guest ept_mode_based_exec tsc_scaling\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs taa mmio_unknown retbleed bhi its\nbogomips\t: 4600.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 57 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 207\nmodel name\t: INTEL(R) XEON(R) PLATINUM 8573C\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3167.234\ncache size\t: 266240 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch tpr_shadow ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves vnmi avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid fsrm arch_capabilities\nvmx flags\t: vnmi invvpid tsc_offset vtpr ept vpid unrestricted_guest ept_mode_based_exec tsc_scaling\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs taa mmio_unknown retbleed bhi its\nbogomips\t: 4600.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 57 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 207\nmodel name\t: INTEL(R) XEON(R) PLATINUM 8573C\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3094.844\ncache size\t: 266240 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch tpr_shadow ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves vnmi avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid fsrm arch_capabilities\nvmx flags\t: vnmi invvpid tsc_offset vtpr ept vpid unrestricted_guest ept_mode_based_exec tsc_scaling\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs taa mmio_unknown retbleed bhi its\nbogomips\t: 4600.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 57 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 207\nmodel name\t: INTEL(R) XEON(R) PLATINUM 8573C\nstepping\t: 2\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 3065.329\ncache size\t: 266240 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch tpr_shadow ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves vnmi avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid fsrm arch_capabilities\nvmx flags\t: vnmi invvpid tsc_offset vtpr ept vpid unrestricted_guest ept_mode_based_exec tsc_scaling\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs taa mmio_unknown retbleed bhi its\nbogomips\t: 4600.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 57 bits virtual\npower management:\n\n",
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-gcc",
+        "complete": {
+          "cases": 0,
+          "success": true,
+          "active": false,
+          "identical_binary": true,
+          "native_qualification": false
+        },
+        "scope": {
+          "active": false,
+          "policy": "ELF x64 Clang",
+          "inactive_requirement": "Identical original runtime objects and linked consumer"
+        },
+        "cleanup": {
+          "removed": true,
+          "bytes": 354839382,
+          "files": 4649
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "total": 39
+        },
+        "cpu": {
+          "cpu": "processor\t: 0\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4167.687\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru amd_ibpb_ret arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4196.240\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru amd_ibpb_ret arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 2596.121\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru amd_ibpb_ret arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: AuthenticAMD\ncpu family\t: 26\nmodel\t\t: 2\nmodel name\t: AMD EPYC 9V45 96-Core Processor\nstepping\t: 1\nmicrocode\t: 0xffffffff\ncpu MHz\t\t: 4162.557\ncache size\t: 1024 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 28\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru amd_ibpb_ret arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect\nbugs\t\t: sysret_ss_attrs null_seg spectre_v1 spectre_v2 spec_store_bypass\nbogomips\t: 5192.24\nTLB size\t: 192 4K pages\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+          "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-arm-clang",
+        "complete": {
+          "cases": 0,
+          "success": true,
+          "active": false,
+          "identical_binary": true,
+          "native_qualification": false
+        },
+        "scope": {
+          "active": false,
+          "policy": "ELF x64 Clang",
+          "inactive_requirement": "Identical original runtime objects and linked consumer"
+        },
+        "cleanup": {
+          "removed": true,
+          "bytes": 354219573,
+          "files": 4649
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "total": 39
+        },
+        "cpu": {
+          "cpu": "processor\t: 0\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\nprocessor\t: 1\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\nprocessor\t: 2\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\nprocessor\t: 3\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\n",
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: aarch64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-arm-gcc",
+        "complete": {
+          "cases": 0,
+          "success": true,
+          "active": false,
+          "identical_binary": true,
+          "native_qualification": false
+        },
+        "scope": {
+          "active": false,
+          "policy": "ELF x64 Clang",
+          "inactive_requirement": "Identical original runtime objects and linked consumer"
+        },
+        "cleanup": {
+          "removed": true,
+          "bytes": 357336095,
+          "files": 4649
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "total": 39
+        },
+        "cpu": {
+          "cpu": "processor\t: 0\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\nprocessor\t: 1\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\nprocessor\t: 2\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\nprocessor\t: 3\nBogoMIPS\t: 2000.00\nFeatures\t: fp asimd evtstrm aes pmull sha1 sha2 crc32 atomics fphp asimdhp cpuid asimdrdm jscvt fcma lrcpc dcpop sha3 sm3 sm4 asimddp sha512 sve asimdfhm uscat ilrcpc flagm sb paca pacg dcpodp sve2 sveaes svebitperm svesha3 svesm4 flagm2 frint svei8mm svebf16 i8mm bf16\nCPU implementer\t: 0x41\nCPU architecture: 8\nCPU variant\t: 0x0\nCPU part\t: 0xd49\nCPU revision\t: 0\n\n",
+          "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "complete": {
+          "cases": 60,
+          "success": true,
+          "active": true,
+          "native_qualification": false,
+          "controlled_replication": true,
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ]
+        },
+        "scope": {
+          "active": true,
+          "policy": "ELF x64 Clang",
+          "inactive_requirement": "Identical original runtime objects and linked consumer"
+        },
+        "cleanup": {
+          "removed": true,
+          "bytes": 421413421,
+          "files": 4673
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86OutputIterator.c.o",
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "total": 39
+        },
+        "cpu": {
+          "cpu": "processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 3930.652\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 2700.000\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 3171.233\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 2700.000\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-gcc",
+        "complete": {
+          "cases": 0,
+          "success": true,
+          "active": false,
+          "identical_binary": true,
+          "native_qualification": false
+        },
+        "scope": {
+          "active": false,
+          "policy": "ELF x64 Clang",
+          "inactive_requirement": "Identical original runtime objects and linked consumer"
+        },
+        "cleanup": {
+          "removed": true,
+          "bytes": 354628984,
+          "files": 4649
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "total": 39
+        },
+        "cpu": {
+          "cpu": "processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 3881.131\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 0\ninitial apicid\t: 0\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 1\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 2700.000\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 2\ninitial apicid\t: 2\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 2\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 2700.000\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 0\ncpu cores\t: 2\napicid\t\t: 1\ninitial apicid\t: 1\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\nprocessor\t: 3\nvendor_id\t: GenuineIntel\ncpu family\t: 6\nmodel\t\t: 173\nmodel name\t: Intel(R) Xeon(R) 6975P-C\nstepping\t: 1\nmicrocode\t: 0x1000434\ncpu MHz\t\t: 3598.334\ncache size\t: 491520 KB\nphysical id\t: 0\nsiblings\t: 4\ncore id\t\t: 1\ncpu cores\t: 2\napicid\t\t: 3\ninitial apicid\t: 3\nfpu\t\t: yes\nfpu_exception\t: yes\ncpuid level\t: 36\nwp\t\t: yes\nflags\t\t: fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq monitor vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch cpuid_fault ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves avx_vnni avx512_bf16 wbnoinvd ida arat vnmi avx512vbmi umip pku ospke waitpkg avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq rdpid bus_lock_detect cldemote movdiri movdir64b md_clear serialize amx_bf16 avx512_fp16 amx_tile amx_int8 flush_l1d arch_capabilities\nvmx flags\t: vnmi preemption_timer posted_intr invvpid ept_x_only ept_ad ept_1gb ept_5level flexpriority apicv tsc_offset vtpr mtf vapic ept vpid unrestricted_guest vapic_reg vid shadow_vmcs pml tsc_scaling usr_wait_pause\nbugs\t\t: spectre_v1 spectre_v2 spec_store_bypass swapgs bhi spectre_v2_user\nbogomips\t: 5400.00\nclflush size\t: 64\ncache_alignment\t: 64\naddress sizes\t: 48 bits physical, 48 bits virtual\npower management:\n\n",
+          "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.9983470384438784,
+        "aa": 1.000585690738556,
+        "ci95": [
+          0.9974054793606301,
+          1.0024990659637179
+        ],
+        "aa_ci95": [
+          0.9988251860122148,
+          1.0025853970787506
+        ],
+        "vs_iced": 0.8694112439132359,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0007189373103382,
+        "aa": 0.9990409313807251,
+        "ci95": [
+          0.9990050084030803,
+          1.0015066670014816
+        ],
+        "aa_ci95": [
+          0.9981944328345732,
+          1.0003593424868171
+        ],
+        "vs_iced": 0.8697886587152124,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0071586250394198,
+        "aa": 1.0007114655408313,
+        "ci95": [
+          1.0047240002834399,
+          1.0097495563005325
+        ],
+        "aa_ci95": [
+          0.9989588552104207,
+          1.0032390681450105
+        ],
+        "vs_iced": 1.2797552967853179,
+        "vs_fast": 0.6046144744626306
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0082976761778681,
+        "aa": 1.0009479118520317,
+        "ci95": [
+          1.0078461029446517,
+          1.010645255336417
+        ],
+        "aa_ci95": [
+          0.9977850914819608,
+          1.00212095692586
+        ],
+        "vs_iced": 1.282955341058378,
+        "vs_fast": 0.6044650312741252
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0087516764850686,
+        "aa": 1.0016254137225342,
+        "ci95": [
+          1.0048887802493278,
+          1.010924589169748
+        ],
+        "aa_ci95": [
+          0.9998414949528656,
+          1.0048251918728301
+        ],
+        "vs_iced": 1.1153752138841357,
+        "vs_fast": 0.6446051073904955
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0069100004239266,
+        "aa": 0.9985431772132822,
+        "ci95": [
+          1.0059936507936509,
+          1.0103339442068826
+        ],
+        "aa_ci95": [
+          0.9959002965564171,
+          1.0011622462289709
+        ],
+        "vs_iced": 1.1137073236951063,
+        "vs_fast": 0.6448429352664378
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0050379216103786,
+        "aa": 0.9994829426066295,
+        "ci95": [
+          0.9963493647017552,
+          1.0075727513227515
+        ],
+        "aa_ci95": [
+          0.9966376734905359,
+          1.006747178602433
+        ],
+        "vs_iced": 0.7823525532522917,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9994384496806872,
+        "aa": 0.9995268850330631,
+        "ci95": [
+          0.9971002394499241,
+          1.003201508656134
+        ],
+        "aa_ci95": [
+          0.9978985586973264,
+          1.0019449480797757
+        ],
+        "vs_iced": 0.7823028915476989,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0039307541124842,
+        "aa": 0.9981742634097203,
+        "ci95": [
+          1.0003425058811866,
+          1.0048342541436464
+        ],
+        "aa_ci95": [
+          0.9960021609940574,
+          1.0025898993923699
+        ],
+        "vs_iced": 1.0236231199593113,
+        "vs_fast": 0.4891287711685109
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0069155791116842,
+        "aa": 0.9999547977652017,
+        "ci95": [
+          1.0040478832754198,
+          1.0082743278804158
+        ],
+        "aa_ci95": [
+          0.9984870998243954,
+          1.005543930211702
+        ],
+        "vs_iced": 1.0298313760368831,
+        "vs_fast": 0.49339932492061905
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0039136775646587,
+        "aa": 1.0016619335043968,
+        "ci95": [
+          1.0011840619750887,
+          1.0078283293424202
+        ],
+        "aa_ci95": [
+          0.9961332784862197,
+          1.0039450627081479
+        ],
+        "vs_iced": 0.9026984711733284,
+        "vs_fast": 0.5435287849419892
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0038480658405906,
+        "aa": 0.9972035385290248,
+        "ci95": [
+          1.0022963588933387,
+          1.0060776838499363
+        ],
+        "aa_ci95": [
+          0.9951655568731187,
+          1.0009280188176488
+        ],
+        "vs_iced": 0.9049405533640451,
+        "vs_fast": 0.5421776462152272
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0013788232920247,
+        "aa": 0.9991236791991777,
+        "ci95": [
+          0.9985342278731228,
+          1.0036557835506588
+        ],
+        "aa_ci95": [
+          0.9967716985573529,
+          1.0020560873668598
+        ],
+        "vs_iced": 0.8839819918374215,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0010539451274008,
+        "aa": 1.0008236747661352,
+        "ci95": [
+          0.9987154305793821,
+          1.0041404550284183
+        ],
+        "aa_ci95": [
+          0.9972681040642205,
+          1.002830760935499
+        ],
+        "vs_iced": 0.8843145362033904,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0028379042710085,
+        "aa": 0.9986263634271116,
+        "ci95": [
+          1.0007428096030426,
+          1.0040170800291612
+        ],
+        "aa_ci95": [
+          0.996398222038148,
+          1.0012394240759983
+        ],
+        "vs_iced": 1.4391761138255985,
+        "vs_fast": 0.668204207247554
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0037390512435123,
+        "aa": 0.9987668719403939,
+        "ci95": [
+          1.0017566355611227,
+          1.0060864771440492
+        ],
+        "aa_ci95": [
+          0.9969388959372142,
+          1.0002898227622337
+        ],
+        "vs_iced": 1.4384579414973762,
+        "vs_fast": 0.6673659153462769
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0048076571804334,
+        "aa": 1.0003208914949169,
+        "ci95": [
+          1.003854536943579,
+          1.0054826249166247
+        ],
+        "aa_ci95": [
+          0.9983934049637245,
+          1.002781175374221
+        ],
+        "vs_iced": 1.2699381604923936,
+        "vs_fast": 0.7169975822404571
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0022697747741172,
+        "aa": 1.0003713790542212,
+        "ci95": [
+          1.0002111486486487,
+          1.006232307050846
+        ],
+        "aa_ci95": [
+          0.9968295153896053,
+          1.0017267507941596
+        ],
+        "vs_iced": 1.2680610588802947,
+        "vs_fast": 0.7176589348021682
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0014741387315442,
+        "aa": 0.9997302116079388,
+        "ci95": [
+          0.9986233026616148,
+          1.0078004950088562
+        ],
+        "aa_ci95": [
+          0.9954446702642092,
+          1.0021022555692352
+        ],
+        "vs_iced": 0.9077900500772219,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0047562147091211,
+        "aa": 0.9987210045927561,
+        "ci95": [
+          1.0024183090528873,
+          1.0081827680531585
+        ],
+        "aa_ci95": [
+          0.9964641706502902,
+          1.002255331580485
+        ],
+        "vs_iced": 0.9028371777793359,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0014181962711377,
+        "aa": 0.9974143271414847,
+        "ci95": [
+          0.9979351770742086,
+          1.0055876998503936
+        ],
+        "aa_ci95": [
+          0.9947406488021358,
+          1.000062572069616
+        ],
+        "vs_iced": 1.1802591668611015,
+        "vs_fast": 0.5200079168016122
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 0.999657333513684,
+        "aa": 0.9980984519792169,
+        "ci95": [
+          0.9953481714735559,
+          1.0038062939144394
+        ],
+        "aa_ci95": [
+          0.996837399320892,
+          1.0005209315693513
+        ],
+        "vs_iced": 1.1802739967402316,
+        "vs_fast": 0.5192140481718194
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0024846807494716,
+        "aa": 0.9995160963935984,
+        "ci95": [
+          0.9985168705969597,
+          1.003873614522533
+        ],
+        "aa_ci95": [
+          0.9956120681316553,
+          1.0020498321258173
+        ],
+        "vs_iced": 1.0247911257131752,
+        "vs_fast": 0.5617954733889604
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0059861150467555,
+        "aa": 1.0004757290106598,
+        "ci95": [
+          1.004253512906449,
+          1.0101180288909188
+        ],
+        "aa_ci95": [
+          0.9956734271196258,
+          1.0029142711240635
+        ],
+        "vs_iced": 1.026494757721734,
+        "vs_fast": 0.5639320812693702
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.996186561097636,
+        "aa": 0.9992045077891945,
+        "ci95": [
+          0.9939808499649049,
+          0.9980531820175148
+        ],
+        "aa_ci95": [
+          0.996680976230225,
+          1.0006052101276262
+        ],
+        "vs_iced": 0.6069355361835355,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9967777011616188,
+        "aa": 0.9993937213516683,
+        "ci95": [
+          0.9944357226605195,
+          0.9990300872257173
+        ],
+        "aa_ci95": [
+          0.9977468795278418,
+          1.0013059849911166
+        ],
+        "vs_iced": 0.6064919181568771,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0016818219223174,
+        "aa": 0.9979987273958826,
+        "ci95": [
+          1.000569178229702,
+          1.0045484447916453
+        ],
+        "aa_ci95": [
+          0.9964849625983649,
+          1.0005183208457356
+        ],
+        "vs_iced": 1.4266760602492043,
+        "vs_fast": 0.6813274669500137
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.002532036436622,
+        "aa": 0.9995347386611722,
+        "ci95": [
+          0.999712577309005,
+          1.0036218482214412
+        ],
+        "aa_ci95": [
+          0.9982740960770254,
+          1.0008050084859175
+        ],
+        "vs_iced": 1.427151654605314,
+        "vs_fast": 0.6815547746748043
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0021217354055394,
+        "aa": 0.9986791450949156,
+        "ci95": [
+          0.9994006752392306,
+          1.0041359803607641
+        ],
+        "aa_ci95": [
+          0.9967787784596583,
+          1.0023012204449468
+        ],
+        "vs_iced": 1.2531710604453163,
+        "vs_fast": 0.7466567607726599
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0036743092298648,
+        "aa": 0.9992599753325111,
+        "ci95": [
+          1.0017301152747302,
+          1.0063397153134155
+        ],
+        "aa_ci95": [
+          0.997993888667464,
+          1.0024675385302806
+        ],
+        "vs_iced": 1.255101155972972,
+        "vs_fast": 0.7456372748566891
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.994244549763033,
+        "aa": 1.000573341895239,
+        "ci95": [
+          0.9890704156887764,
+          0.9962966624335567
+        ],
+        "aa_ci95": [
+          0.9977222523713798,
+          1.003725651030687
+        ],
+        "vs_iced": 0.3069845126024901,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9930346816399397,
+        "aa": 0.9992716957988347,
+        "ci95": [
+          0.9915580658912369,
+          0.9967765912262605
+        ],
+        "aa_ci95": [
+          0.9971330318950201,
+          1.003931727430888
+        ],
+        "vs_iced": 0.3071325484238512,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.000877400195728,
+        "aa": 0.9985331773244476,
+        "ci95": [
+          0.997799410376368,
+          1.0036405425582782
+        ],
+        "aa_ci95": [
+          0.9955452060342209,
+          1.0014687030418283
+        ],
+        "vs_iced": 1.107294766395992,
+        "vs_fast": 0.5240930966999554
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0015213496061397,
+        "aa": 1.0000339112373364,
+        "ci95": [
+          0.9960944749051035,
+          1.0037572449117131
+        ],
+        "aa_ci95": [
+          0.9981573052702759,
+          1.0010189082648493
+        ],
+        "vs_iced": 1.1042503487336348,
+        "vs_fast": 0.5218782544428394
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.002996653372511,
+        "aa": 1.0007824556065117,
+        "ci95": [
+          0.9999343717185859,
+          1.0066059460895753
+        ],
+        "aa_ci95": [
+          0.9983659653934813,
+          1.0040508287776715
+        ],
+        "vs_iced": 0.9648002204064469,
+        "vs_fast": 0.5861177246254716
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0030618672995502,
+        "aa": 0.9952934136979904,
+        "ci95": [
+          0.9970834482058127,
+          1.0044178392348302
+        ],
+        "aa_ci95": [
+          0.993636987201004,
+          0.9978435914005038
+        ],
+        "vs_iced": 0.9635941412847241,
+        "vs_fast": 0.5865746641468524
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0047080744308303,
+        "aa": 1.000874555434321,
+        "ci95": [
+          0.9934139952600723,
+          1.0064216582742522
+        ],
+        "aa_ci95": [
+          0.9985024210859113,
+          1.0060386473429952
+        ],
+        "vs_iced": 0.33265633619176577,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0018313027335748,
+        "aa": 0.9978034778267743,
+        "ci95": [
+          0.999038879416976,
+          1.0044535226359497
+        ],
+        "aa_ci95": [
+          0.9943931919707849,
+          1.0016728842196831
+        ],
+        "vs_iced": 0.3334278565471226,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 2.3178317020906936,
+        "aa": 1.0016606443967855,
+        "ci95": [
+          2.3077906233660603,
+          2.3219716021201684
+        ],
+        "aa_ci95": [
+          0.9996148210173749,
+          1.0048003216969514
+        ],
+        "vs_iced": 1.902554490647704,
+        "vs_fast": 0.832516244504105
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 2.3107269246388586,
+        "aa": 1.0022121862243407,
+        "ci95": [
+          2.306329843434828,
+          2.3227994480399587
+        ],
+        "aa_ci95": [
+          0.9976569899798934,
+          1.0042095887878737
+        ],
+        "vs_iced": 1.9018910461975007,
+        "vs_fast": 0.8350607334508612
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 2.301093083485679,
+        "aa": 0.9976687857018854,
+        "ci95": [
+          2.287094679754039,
+          2.306029579067122
+        ],
+        "aa_ci95": [
+          0.9944183217151126,
+          1.0020758804030325
+        ],
+        "vs_iced": 1.5908893381449918,
+        "vs_fast": 0.9428440085810603
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 2.292030183801866,
+        "aa": 0.9972460903580082,
+        "ci95": [
+          2.2847906870923707,
+          2.30343355003527
+        ],
+        "aa_ci95": [
+          0.9941636492898831,
+          0.9993897511174151
+        ],
+        "vs_iced": 1.5937629780647111,
+        "vs_fast": 0.9472453074187476
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.9999591179284236,
+        "aa": 0.9986317435496482,
+        "ci95": [
+          0.9968582307049091,
+          1.0026605077815773
+        ],
+        "aa_ci95": [
+          0.9971195819742629,
+          1.001925650314958
+        ],
+        "vs_iced": 0.9183246586647276,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0015951169888098,
+        "aa": 0.9995305582310139,
+        "ci95": [
+          0.9980696233332252,
+          1.0055734436036152
+        ],
+        "aa_ci95": [
+          0.9970917716634577,
+          1.0022566217236366
+        ],
+        "vs_iced": 0.9184456412419297,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0082089000894772,
+        "aa": 0.9982840399527301,
+        "ci95": [
+          1.0051154872399288,
+          1.0097316014474322
+        ],
+        "aa_ci95": [
+          0.9952494638449401,
+          1.001708100931765
+        ],
+        "vs_iced": 1.3705630680377285,
+        "vs_fast": 0.62336355305361
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.006922244726974,
+        "aa": 0.9978316419065432,
+        "ci95": [
+          1.0045641931684335,
+          1.0088151519119957
+        ],
+        "aa_ci95": [
+          0.9947209653092006,
+          1.0017461547876463
+        ],
+        "vs_iced": 1.3722425342919542,
+        "vs_fast": 0.6232623213515864
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.003020698830066,
+        "aa": 0.9994612699974234,
+        "ci95": [
+          1.001108316302468,
+          1.0065918797514823
+        ],
+        "aa_ci95": [
+          0.9964265563287569,
+          1.0034403132947436
+        ],
+        "vs_iced": 1.1770167308145472,
+        "vs_fast": 0.669499646532087
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0022688910696762,
+        "aa": 1.0005655264501432,
+        "ci95": [
+          0.9973225511043506,
+          1.0050369111142594
+        ],
+        "aa_ci95": [
+          0.998069543333672,
+          1.0034168653973963
+        ],
+        "vs_iced": 1.1748209838107098,
+        "vs_fast": 0.6695709828393137
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0026576671588272,
+        "aa": 1.0004022627278442,
+        "ci95": [
+          1.000418753454716,
+          1.003425089834973
+        ],
+        "aa_ci95": [
+          0.9950908527339595,
+          1.004156674660272
+        ],
+        "vs_iced": 0.9658614947265725,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0006621961441742,
+        "aa": 0.9995386602694223,
+        "ci95": [
+          0.9988860971524289,
+          1.0039271418480273
+        ],
+        "aa_ci95": [
+          0.9950027530742662,
+          1.0021234972494857
+        ],
+        "vs_iced": 0.9674092131809011,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0046239107935766,
+        "aa": 1.0004620373326165,
+        "ci95": [
+          1.0001848087229717,
+          1.0062083919163858
+        ],
+        "aa_ci95": [
+          0.9978162087704416,
+          1.0038949449119676
+        ],
+        "vs_iced": 1.5363095087710432,
+        "vs_fast": 0.69125139174736
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0059577905685146,
+        "aa": 1.0032304077865415,
+        "ci95": [
+          1.0027923535068923,
+          1.009858919776275
+        ],
+        "aa_ci95": [
+          0.9990138891210242,
+          1.0062807232043411
+        ],
+        "vs_iced": 1.5390015861090238,
+        "vs_fast": 0.6908839359530278
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.002877050409741,
+        "aa": 1.0001282916948009,
+        "ci95": [
+          0.9998435767867951,
+          1.006135177276117
+        ],
+        "aa_ci95": [
+          0.996367283866945,
+          1.0013785274083684
+        ],
+        "vs_iced": 1.3252666707614191,
+        "vs_fast": 0.7484235408863393
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0031122309997276,
+        "aa": 0.9997001683146052,
+        "ci95": [
+          0.999722101724325,
+          1.0055478877432276
+        ],
+        "aa_ci95": [
+          0.9973083103375799,
+          1.0020548315578868
+        ],
+        "vs_iced": 1.3262891761675333,
+        "vs_fast": 0.747198296455043
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.9987271412647246,
+        "aa": 1.0020936357974202,
+        "ci95": [
+          0.9968325046426646,
+          1.0007030087277788
+        ],
+        "aa_ci95": [
+          0.9999925264935805,
+          1.0041257174750908
+        ],
+        "vs_iced": 0.9341882898377327,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9993594510421806,
+        "aa": 0.9999028400597906,
+        "ci95": [
+          0.9964502624858647,
+          1.0032087978306719
+        ],
+        "aa_ci95": [
+          0.9972634081783723,
+          1.0046300465255893
+        ],
+        "vs_iced": 0.9342036985508119,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0029841261069588,
+        "aa": 1.0017875732836559,
+        "ci95": [
+          1.0015120105635489,
+          1.0066323740160479
+        ],
+        "aa_ci95": [
+          0.9982118511109133,
+          1.0045130755545175
+        ],
+        "vs_iced": 1.639231587527458,
+        "vs_fast": 0.7651819344137669
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.002862464732791,
+        "aa": 0.9990746410832142,
+        "ci95": [
+          1.0010939263010155,
+          1.0068740131964506
+        ],
+        "aa_ci95": [
+          0.9967651543248032,
+          1.0038080312341044
+        ],
+        "vs_iced": 1.639293282329306,
+        "vs_fast": 0.7662212757187512
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.000217054263566,
+        "aa": 0.9979598566623432,
+        "ci95": [
+          0.9983725709850134,
+          1.0007122223549343
+        ],
+        "aa_ci95": [
+          0.9954579996749439,
+          1.0007692477729393
+        ],
+        "vs_iced": 1.4351489671199096,
+        "vs_fast": 0.8468373353679904
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-22.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0032971020906725,
+        "aa": 1.0006570215317863,
+        "ci95": [
+          1.0000973003573577,
+          1.0048727259875776
+        ],
+        "aa_ci95": [
+          0.9982224513284954,
+          1.0024660642403165
+        ],
+        "vs_iced": 1.4407577070694566,
+        "vs_fast": 0.84542905465551
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0010300903632117,
+        "aa": 1.0001928074440436,
+        "ci95": [
+          0.9997149444560889,
+          1.0021394518286417
+        ],
+        "aa_ci95": [
+          0.9985713211519666,
+          1.000838905061114
+        ],
+        "vs_iced": 0.87774474213953,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0016644110254622,
+        "aa": 1.000108836703085,
+        "ci95": [
+          1.0009985650871438,
+          1.0019990464799216
+        ],
+        "aa_ci95": [
+          0.9995889537614927,
+          1.000938047019607
+        ],
+        "vs_iced": 0.8791687615217028,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0034695707028785,
+        "aa": 0.9991545022753835,
+        "ci95": [
+          1.0008552402145574,
+          1.00647822917357
+        ],
+        "aa_ci95": [
+          0.9982857943447696,
+          0.9995303113953048
+        ],
+        "vs_iced": 1.3261766102626906,
+        "vs_fast": 0.637212253792781
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0064583696980276,
+        "aa": 0.9993304235690904,
+        "ci95": [
+          1.0033567564001056,
+          1.0072557614398618
+        ],
+        "aa_ci95": [
+          0.9987943947613975,
+          1.0014380165289256
+        ],
+        "vs_iced": 1.3220013947001394,
+        "vs_fast": 0.6339717514596191
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0076667230396301,
+        "aa": 0.9989998319717711,
+        "ci95": [
+          1.0057368433721405,
+          1.0090087910315348
+        ],
+        "aa_ci95": [
+          0.997599451303155,
+          1.001423829140503
+        ],
+        "vs_iced": 1.181737852145204,
+        "vs_fast": 0.691381897250327
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0057070642024601,
+        "aa": 0.999808035321501,
+        "ci95": [
+          1.0038875502008033,
+          1.0063008032321676
+        ],
+        "aa_ci95": [
+          0.9986891011550298,
+          1.0009911515742522
+        ],
+        "vs_iced": 1.178636214708679,
+        "vs_fast": 0.6875989106771314
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0047212833306507,
+        "aa": 1.001792711072943,
+        "ci95": [
+          1.0037023920672226,
+          1.0078221758685875
+        ],
+        "aa_ci95": [
+          1.0008320532514081,
+          1.0033334405179157
+        ],
+        "vs_iced": 0.7408862131504673,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.009451159964409,
+        "aa": 0.9998168498168499,
+        "ci95": [
+          1.005951609418881,
+          1.0124026284868792
+        ],
+        "aa_ci95": [
+          0.9980390485122347,
+          1.0027757754419186
+        ],
+        "vs_iced": 0.7458255230215672,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0073386554699226,
+        "aa": 0.9996101399869441,
+        "ci95": [
+          1.0050287290278097,
+          1.0085951797794752
+        ],
+        "aa_ci95": [
+          0.9966534140647796,
+          1.001142240985434
+        ],
+        "vs_iced": 1.0568454690709883,
+        "vs_fast": 0.522720366840695
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0070910275109852,
+        "aa": 0.9996743613864968,
+        "ci95": [
+          1.003840154700769,
+          1.0085612236551518
+        ],
+        "aa_ci95": [
+          0.9970333947218015,
+          1.0015123523871623
+        ],
+        "vs_iced": 1.0528137816384877,
+        "vs_fast": 0.5197982918408142
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.01238349103234,
+        "aa": 1.0016225892644557,
+        "ci95": [
+          1.0092050432263855,
+          1.0136122118955806
+        ],
+        "aa_ci95": [
+          1.000546188135384,
+          1.0037236389305568
+        ],
+        "vs_iced": 0.9522388586764601,
+        "vs_fast": 0.5888442094563869
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0099671617616959,
+        "aa": 0.998460374436937,
+        "ci95": [
+          1.008781636465037,
+          1.0113095343445249
+        ],
+        "aa_ci95": [
+          0.9953560911007721,
+          1.0002534034707538
+        ],
+        "vs_iced": 0.9495440837011027,
+        "vs_fast": 0.588186003845679
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0004702791674438,
+        "aa": 1.000258029141166,
+        "ci95": [
+          0.9990791004265219,
+          1.0033662659593452
+        ],
+        "aa_ci95": [
+          0.9980856120768676,
+          1.0013498549108044
+        ],
+        "vs_iced": 0.8773402973081559,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9989058460241687,
+        "aa": 0.9985890510360397,
+        "ci95": [
+          0.9977530459611609,
+          1.000478981636331
+        ],
+        "aa_ci95": [
+          0.9975727566203063,
+          0.9994117410048753
+        ],
+        "vs_iced": 0.8763487008350915,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0028217751936257,
+        "aa": 1.0003481481481482,
+        "ci95": [
+          1.001949332242104,
+          1.0073345433089096
+        ],
+        "aa_ci95": [
+          0.9991027133651216,
+          1.002036886982508
+        ],
+        "vs_iced": 1.4820698062267692,
+        "vs_fast": 0.7013213029286766
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0018295460485538,
+        "aa": 0.9989567109567707,
+        "ci95": [
+          1.0002836096039167,
+          1.0038126930595557
+        ],
+        "aa_ci95": [
+          0.9980597048085255,
+          0.9997698128058335
+        ],
+        "vs_iced": 1.4746555081533452,
+        "vs_fast": 0.6978178509635463
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.003363093077835,
+        "aa": 0.998835846299597,
+        "ci95": [
+          1.0019231235404866,
+          1.0060299161125157
+        ],
+        "aa_ci95": [
+          0.9947852098313191,
+          1.0011116442738321
+        ],
+        "vs_iced": 1.3382786203779187,
+        "vs_fast": 0.7697844043344552
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0038029844986172,
+        "aa": 0.9998638856639578,
+        "ci95": [
+          1.0018525201491641,
+          1.009390163300179
+        ],
+        "aa_ci95": [
+          0.9975989051007258,
+          1.003091351442497
+        ],
+        "vs_iced": 1.331526191508843,
+        "vs_fast": 0.7669126444349873
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0040827498118285,
+        "aa": 0.9998636301650076,
+        "ci95": [
+          0.9987682780753497,
+          1.005825508875334
+        ],
+        "aa_ci95": [
+          0.9953004439724804,
+          1.0039535570652793
+        ],
+        "vs_iced": 0.7943699824277297,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9981234219684734,
+        "aa": 0.9983623406105646,
+        "ci95": [
+          0.9971492498324758,
+          1.0003523087588504
+        ],
+        "aa_ci95": [
+          0.9959246974653883,
+          1.0039115356188526
+        ],
+        "vs_iced": 0.7917021590741309,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0070671378091873,
+        "aa": 0.9989354611767319,
+        "ci95": [
+          1.0055411207033031,
+          1.0107112814281707
+        ],
+        "aa_ci95": [
+          0.9974390016762898,
+          1.0017454275369044
+        ],
+        "vs_iced": 1.2230956671116877,
+        "vs_fast": 0.5514020432300543
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0045401683955901,
+        "aa": 0.9992050874403816,
+        "ci95": [
+          1.0020477116821953,
+          1.0065270752752156
+        ],
+        "aa_ci95": [
+          0.997883588103732,
+          1.0002411292267173
+        ],
+        "vs_iced": 1.2166781864713903,
+        "vs_fast": 0.5473537343621244
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0062329366919074,
+        "aa": 0.9987002770462085,
+        "ci95": [
+          1.0044771400985997,
+          1.0101372116175389
+        ],
+        "aa_ci95": [
+          0.9967409758303261,
+          1.000137042620255
+        ],
+        "vs_iced": 1.085956750236926,
+        "vs_fast": 0.6042489270386266
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.01017500667143,
+        "aa": 0.9998295217231944,
+        "ci95": [
+          1.0080615166376903,
+          1.0132151781344187
+        ],
+        "aa_ci95": [
+          0.9971592842076615,
+          1.0043776933907922
+        ],
+        "vs_iced": 1.0837922424408266,
+        "vs_fast": 0.605548625747344
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0007637377324627,
+        "aa": 0.9999555902374653,
+        "ci95": [
+          0.9980315835592778,
+          1.0016971800214045
+        ],
+        "aa_ci95": [
+          0.9995315536592622,
+          1.0002862650050572
+        ],
+        "vs_iced": 0.6023053476715229,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9994354189001452,
+        "aa": 0.9995676885323026,
+        "ci95": [
+          0.9984550508440233,
+          1.0010299054012815
+        ],
+        "aa_ci95": [
+          0.9979265215020356,
+          1.0007000504540868
+        ],
+        "vs_iced": 0.6017281113304934,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0019589449288158,
+        "aa": 0.9992349259739184,
+        "ci95": [
+          0.9995119134368168,
+          1.0033120351075722
+        ],
+        "aa_ci95": [
+          0.9982472901731403,
+          1.0026157233268689
+        ],
+        "vs_iced": 1.4653959735256892,
+        "vs_fast": 0.7161561179391768
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 0.9998217847571131,
+        "aa": 1.0003773973307715,
+        "ci95": [
+          0.9986376396763362,
+          1.0006611342584621
+        ],
+        "aa_ci95": [
+          0.9982742261520057,
+          1.0014486385543824
+        ],
+        "vs_iced": 1.4594466403162056,
+        "vs_fast": 0.7122498359580053
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0016318703354554,
+        "aa": 1.0003360756492476,
+        "ci95": [
+          0.9987815009692604,
+          1.0065839054950643
+        ],
+        "aa_ci95": [
+          0.9985450485898867,
+          1.0023264902641438
+        ],
+        "vs_iced": 1.3295046296296298,
+        "vs_fast": 0.7985259578725988
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.001574049357033,
+        "aa": 0.9980176211453746,
+        "ci95": [
+          1.0001707681798884,
+          1.0027617813720384
+        ],
+        "aa_ci95": [
+          0.9972310508667914,
+          1.0004413387274735
+        ],
+        "vs_iced": 1.3237248819462983,
+        "vs_fast": 0.7983840435846529
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.9989223011283668,
+        "aa": 0.9999040337801094,
+        "ci95": [
+          0.9983573222758264,
+          1.0002170435453661
+        ],
+        "aa_ci95": [
+          0.9987600842506854,
+          1.0007345133449899
+        ],
+        "vs_iced": 0.29375215463677834,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.999935627670446,
+        "aa": 0.9994810420675284,
+        "ci95": [
+          0.9972275487376158,
+          1.00130376010814
+        ],
+        "aa_ci95": [
+          0.9974257504896669,
+          1.0013808185939597
+        ],
+        "vs_iced": 0.29223557364285085,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 0.9986737804878049,
+        "aa": 0.9991088430192702,
+        "ci95": [
+          0.9975377855221789,
+          0.9995504145330407
+        ],
+        "aa_ci95": [
+          0.9973131170126124,
+          1.0020242914979756
+        ],
+        "vs_iced": 1.131315580135611,
+        "vs_fast": 0.5584984756097561
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 0.9975069691544093,
+        "aa": 0.9986664545117028,
+        "ci95": [
+          0.9953076676975579,
+          1.0006503425641646
+        ],
+        "aa_ci95": [
+          0.9969427775965528,
+          1.0002964359280346
+        ],
+        "vs_iced": 1.1253410731427105,
+        "vs_fast": 0.553253401179177
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0002571724643932,
+        "aa": 0.9996046499251118,
+        "ci95": [
+          0.9986127760311825,
+          1.0019507179095561
+        ],
+        "aa_ci95": [
+          0.9968854214936304,
+          1.0006228258062555
+        ],
+        "vs_iced": 1.017275053369468,
+        "vs_fast": 0.6312975591974361
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0025154201278796,
+        "aa": 0.9976942726032867,
+        "ci95": [
+          1.0005962039168335,
+          1.003530658776699
+        ],
+        "aa_ci95": [
+          0.9963200228308787,
+          0.9986870401810979
+        ],
+        "vs_iced": 1.0145580457364636,
+        "vs_fast": 0.627531036564658
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0058491871908708,
+        "aa": 1.0003690408293353,
+        "ci95": [
+          1.0042470880114376,
+          1.0078516071655443
+        ],
+        "aa_ci95": [
+          0.997914730045474,
+          1.0016810819443394
+        ],
+        "vs_iced": 0.3280106732899241,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0035591945860138,
+        "aa": 0.9990550946148681,
+        "ci95": [
+          1.0023062268123935,
+          1.0057829704967638
+        ],
+        "aa_ci95": [
+          0.9975968934234706,
+          1.000942931766787
+        ],
+        "vs_iced": 0.3252056453647787,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 2.3042973949420045,
+        "aa": 1.0007711250963909,
+        "ci95": [
+          2.2968325447946945,
+          2.3078933811604436
+        ],
+        "aa_ci95": [
+          0.9974863287915234,
+          1.003376495929077
+        ],
+        "vs_iced": 1.9436432385186873,
+        "vs_fast": 0.8871508808250427
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 2.313557388891001,
+        "aa": 0.9997618245879155,
+        "ci95": [
+          2.307572268635697,
+          2.3175970573100306
+        ],
+        "aa_ci95": [
+          0.9975553756958093,
+          1.0026490724107386
+        ],
+        "vs_iced": 1.943472871173834,
+        "vs_fast": 0.8820497271073378
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 2.2743426140757927,
+        "aa": 0.9982342405973311,
+        "ci95": [
+          2.2692255995698845,
+          2.282282282282283
+        ],
+        "aa_ci95": [
+          0.9957559053786714,
+          1.0008024123047814
+        ],
+        "vs_iced": 1.672034941891788,
+        "vs_fast": 1.0098090027833766
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 2.27856181503557,
+        "aa": 0.9987740158538224,
+        "ci95": [
+          2.27574410514109,
+          2.2840503183724183
+        ],
+        "aa_ci95": [
+          0.9970325162244865,
+          1.0026151730654045
+        ],
+        "vs_iced": 1.6633552377270968,
+        "vs_fast": 1.005146719926256
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0024099801531048,
+        "aa": 0.9983307181250626,
+        "ci95": [
+          1.0008774055535594,
+          1.003503298939835
+        ],
+        "aa_ci95": [
+          0.9966910642230601,
+          1.0006410256410256
+        ],
+        "vs_iced": 0.9232069126265318,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.0008852365920062,
+        "aa": 0.9987977256977784,
+        "ci95": [
+          1.000124918802778,
+          1.0034532972748076
+        ],
+        "aa_ci95": [
+          0.9977061733132032,
+          1.0010461038906695
+        ],
+        "vs_iced": 0.9270474534327661,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0053637580805468,
+        "aa": 1.000604960677556,
+        "ci95": [
+          1.003833839586241,
+          1.006501683030607
+        ],
+        "aa_ci95": [
+          0.9974793206402037,
+          1.0023705399109002
+        ],
+        "vs_iced": 1.423383953990171,
+        "vs_fast": 0.6563783641681181
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0043441623784084,
+        "aa": 0.9990064175652342,
+        "ci95": [
+          1.0030922015984556,
+          1.0079623716375399
+        ],
+        "aa_ci95": [
+          0.9979271494647168,
+          0.9999512032466106
+        ],
+        "vs_iced": 1.4206252770890462,
+        "vs_fast": 0.6545953225594534
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0090900751390615,
+        "aa": 1.0019867604263701,
+        "ci95": [
+          1.007369251858929,
+          1.0112408092053338
+        ],
+        "aa_ci95": [
+          1.000470316432196,
+          1.0049554095865254
+        ],
+        "vs_iced": 1.255547864666294,
+        "vs_fast": 0.7255752278811433
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libjpeg62-turbo-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.003604663689021,
+        "aa": 0.9972554562187745,
+        "ci95": [
+          1.0013801881022826,
+          1.0068456732686428
+        ],
+        "aa_ci95": [
+          0.9959774275278868,
+          0.9989347822496738
+        ],
+        "vs_iced": 1.2483520310440042,
+        "vs_fast": 0.7211839814277423
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0014136787890313,
+        "aa": 1.0012683412086547,
+        "ci95": [
+          0.9994318088242561,
+          1.003082750534972
+        ],
+        "aa_ci95": [
+          0.9992905344090812,
+          1.0052297378542427
+        ],
+        "vs_iced": 0.9658187271843299,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9986582042986853,
+        "aa": 1.0008774180731568,
+        "ci95": [
+          0.9954004574769404,
+          1.0017492615145964
+        ],
+        "aa_ci95": [
+          0.9975678296166043,
+          1.0019606221045665
+        ],
+        "vs_iced": 0.969775731471855,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 1.0021022394466779,
+        "aa": 1.0003207492702955,
+        "ci95": [
+          0.9996394028511214,
+          1.0041648399824639
+        ],
+        "aa_ci95": [
+          0.9992607888668377,
+          1.0013241717870667
+        ],
+        "vs_iced": 1.5946047870078393,
+        "vs_fast": 0.7270226982252349
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0006802231131813,
+        "aa": 0.9975503930578459,
+        "ci95": [
+          0.9999116841826372,
+          1.0023314318677095
+        ],
+        "aa_ci95": [
+          0.9970729217345531,
+          0.9987249500805929
+        ],
+        "vs_iced": 1.5885483883896723,
+        "vs_fast": 0.7232477357143431
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0059784985147993,
+        "aa": 1.0011925298132454,
+        "ci95": [
+          1.003630759978952,
+          1.0076293459487873
+        ],
+        "aa_ci95": [
+          0.9976347166883051,
+          1.0042659561729135
+        ],
+        "vs_iced": 1.4127506195088984,
+        "vs_fast": 0.8089509107379484
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libzstd1-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0015373424224017,
+        "aa": 0.9986674452379883,
+        "ci95": [
+          0.9972883331092286,
+          1.003083733493397
+        ],
+        "aa_ci95": [
+          0.9966266029221216,
+          1.0021205107145525
+        ],
+        "vs_iced": 1.410158506304995,
+        "vs_fast": 0.8069489358501918
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.00102754134438,
+        "aa": 1.0011316085123012,
+        "ci95": [
+          0.999431222627589,
+          1.0034749348958334
+        ],
+        "aa_ci95": [
+          0.9981450731035598,
+          1.0039587575342133
+        ],
+        "vs_iced": 0.9420955285871894,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9996004826821473,
+        "aa": 1.0003334092313698,
+        "ci95": [
+          0.9975176006185653,
+          1.0011310560320277
+        ],
+        "aa_ci95": [
+          0.99874986808673,
+          1.0006749888179565
+        ],
+        "vs_iced": 0.943537603548366,
+        "vs_fast": null
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "gain": 0.998910038117876,
+        "aa": 0.999797210102624,
+        "ci95": [
+          0.9974892943756529,
+          1.000240518038853
+        ],
+        "aa_ci95": [
+          0.9979017890009569,
+          1.000693174986811
+        ],
+        "vs_iced": 1.694926069083993,
+        "vs_fast": 0.8031253256824772
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "same-file-fixed",
+        "gain": 1.0006446226195007,
+        "aa": 0.9996924647718397,
+        "ci95": [
+          0.9986918275902119,
+          1.0023410592373787
+        ],
+        "aa_ci95": [
+          0.9981860601470695,
+          1.0001408019589837
+        ],
+        "vs_iced": 1.6910659786485593,
+        "vs_fast": 0.8005781057810578
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 0.9995314744376154,
+        "aa": 0.9983966022655643,
+        "ci95": [
+          0.9981913281517328,
+          1.0020107279693486
+        ],
+        "aa_ci95": [
+          0.9978029687615391,
+          1.0013937537823911
+        ],
+        "vs_iced": 1.5375711574952562,
+        "vs_fast": 0.9115836153291715
+      },
+      {
+        "host": "vex32-shared-gate-libraries-ubuntu-24.04-clang",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "detail",
+        "launch": "same-file-fixed",
+        "gain": 1.0025690075905285,
+        "aa": 1.0006738957299517,
+        "ci95": [
+          0.9999386672391057,
+          1.005808749657503
+        ],
+        "aa_ci95": [
+          0.9997250800322572,
+          1.0043883641491316
+        ],
+        "vs_iced": 1.5330407023144454,
+        "vs_fast": 0.9081593324238181
+      }
+    ],
+    "losses": [],
+    "aa_outside_one_percent": [],
+    "native_qualified": false,
+    "checksum_scope": "Native timing checks instruction boundaries, rejections and selected consumed output values. This full-library driver does not run unit tests. Eight native owner units per binary were checked in the separate pilot, and the eleven-configuration job runs its own registered unit checks. The separate local active-path probe compares complete cs_insn/cs_detail records, untouched bytes, cursors and errors for 162398208 inputs and guarded-page extents. These are distinct validation surfaces.",
+    "protocol_correction": {
+      "original_sha256": "0f41a0bd6e6294e648f163bf27fb38c5d7c1ae30580c8da10c8934da5ede5598",
+      "corrected_sha256": "749053ec4b3f3c4fb8a936ebecdef75ff7df329ca9bc8f1bc8641bb65dd6fc26",
+      "reason": "Correct a copied pilot-only unit-test claim. No timing code, data, source patch or run changed.",
+      "original_retained": "libraries-protocol.as-launched.json"
+    },
+    "scope": "Full library corpus: two active Clang versions, ten common-boundary panels, three modes, two launch controls, 21 paired cycles; four other compiler/host profiles retain identical runtime objects and binaries. Actual NeverD product qualification remains separate."
+  },
+  "publication_qualified": false
+}
