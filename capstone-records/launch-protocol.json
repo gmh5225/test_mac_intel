@@ -1,8 +1,15 @@
 {
-  "parent": "round1342-vex32-mode-derived-index",
-  "observation": "R1342 retains the original vector runtime object and removes the Clang18 boolean-index spill. Its 16-byte static writer array grows data.rel.ro by 16 bytes and moves 17 original x86 relocation-backed tables by 20464 bytes, shifting their within-page offsets by -16; 57 later data symbols move by page-multiple 20480.",
-  "change": "Select the target function address with a local conditional expression in the existing vector arm. Remove the stored two-entry function-pointer table while keeping unchanged targets, argument types, constant register row and no common 64-bit gateway.",
-  "prediction": "Remove the new data.rel.ro entries and indexed target load. The compiler may instead duplicate direct-call tails or change register liveness; inspect actual lowering before any semantic or timing qualification.",
-  "scope": "Compiler audit only. R1342 native timing is still running and no runtime loss is inferred from layout alone.",
-  "qualification": false
+  "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "prior_reader": {
+    "parent": "729680277dd762704ea3270291b7a75318f51583",
+    "tree": "3fe3bd89946167cace93b266de74c51f491cdcbf",
+    "sha256": "0667b6caa89478cdbeeff90464aa38fa6f0ff52d572cb9aa5bb6d63a45d52dfc",
+    "records": "equal public records, cursor and errors for 69140480 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch"
+  },
+  "observation": "Current 32-bit bare C5 falls through the legacy terminal probe and outlined fallback before generic operand decoding. The prior packed reader ran inside that fallback; it was held for multi-profile regressions.",
+  "hypothesis": "Use the same scalar-return generated reader inside the existing bare-C5 branch after feature routing, before a repeated legacy rejection and fallback prologue. Preserve 64-bit priority and mixed-mode behavior; adapter builds retain their old path.",
+  "scope": "Only raw iterator and private batch C5 decoding, no output-writer candidate. Generate plans from current canonical tables. Fresh full-record, guarded-input, native and multi-configuration validation required.",
+  "public_abi_change": false,
+  "published": false
 }

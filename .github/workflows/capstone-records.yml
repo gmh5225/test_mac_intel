@@ -1,7 +1,7 @@
-name: Audit VEX32 conditional writer selection without a pointer table
+name: Audit early packed VEX32 scan on GCC and Clang
 on:
   push:
-    branches: [codex/capstone-vex32-conditional-writer-audit]
+    branches: [codex/capstone-vex32-early-scan-audit]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -12,7 +12,9 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, archs: four, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, archs: four, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, archs: four, replica: 1 }
+          - { host: ubuntu-24.04, cc: gcc, archs: four, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -29,13 +31,13 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Audit unchanged vector objects and mode-selected caller code generation
+      - name: Audit earlier packed VEX32 scan caller and unchanged backend placement
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-conditional-writer-audit-${{ matrix.host }}
+          name: vex32-early-scan-audit-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
