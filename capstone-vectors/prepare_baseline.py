@@ -5,7 +5,7 @@ import subprocess as sp
 
 r=Path(__file__).resolve().parent
 s=r.parent/'source'
-inputs=json.loads((r/'inputs.json').read_text())
+inputs=json.loads((r/'experiment.json').read_text())
 git=lambda *a:sp.check_output(['git','-C',s,*a],text=True).strip()
 assert git('rev-parse','HEAD')==inputs['source_parent']
 assert not git('status','--porcelain')
