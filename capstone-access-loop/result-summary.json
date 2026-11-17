@@ -1,0 +1,129 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44040300538,
+    "head_sha": "0a167874ebdedbf9bbfe746db1e278b5fe76d5e8",
+    "conclusion": "success",
+    "status": "completed",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44040300538",
+    "run_attempt": 1
+  },
+  "source": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "cleanup": {
+    "bytes": 15300938,
+    "removed": true
+  },
+  "assertions": "Every raw decode agrees with canonical detail-enabled/no-text decode on status, public ID, length and cursor. Printed detail agrees on status, length and cursor; existing predicate ID adjustments are counted separately. Every admitted historical EVEX row agrees with both canonical IDs and lengths.",
+  "selection": "All nonoverlapping symbol/FDE extents; SIMD subset requires at least 8 vector instructions and at least 15% vector instructions. No iced common-boundary filter in this diagnostic; do not relabel these as timed benchmark panels.",
+  "limits": "One linear traversal, not application runtime frequencies or native timing; no source optimization or publication.",
+  "source_rows": {
+    "owner": "arch/X86/X86GenVectorOutput.inc",
+    "full_sha256": "a6fb1648bf5e3d7ebf74e348c12f609884cf09cc1f9f508b88a58a1f303999eb",
+    "evex_prefix_sha256": "e66302835ab9163556262ce600114d93edd1e8f8146a35b13c6b784842733642",
+    "method": "Verbatim EVEX prefix from the frozen generated owner, excluding unrelated VEX and padding rows."
+  },
+  "scope": {
+    "instructions": 191632,
+    "invalid_bytes": 699,
+    "functions": 326
+  },
+  "evex": {
+    "total": 96529,
+    "existing_register_rule_admissions": 69546,
+    "missed": 26983,
+    "memory_missed": 21568,
+    "memory_share_of_misses": 0.7993180891672534
+  },
+  "addressing": {
+    "evex/address/vbroadcastf64x2/base/disp0": 528,
+    "evex/address/vbroadcastf64x2/base/disp1": 6336,
+    "evex/address/vmovdqa64/base/disp0": 6,
+    "evex/address/vmovdqa64/base/disp1": 1882,
+    "evex/address/vmovdqa64/rip/disp4": 1547,
+    "evex/address/vmovdqu64/base/disp0": 75,
+    "evex/address/vmovdqu64/base/disp1": 2389,
+    "evex/address/vmovdqu64/base/disp4": 1429,
+    "evex/address/vmovdqu64/indexed/disp0": 313,
+    "evex/address/vmovdqu64/indexed/disp1": 939,
+    "evex/address/vmovdqu64/rip/disp4": 111,
+    "evex/broadcast/current-output-admitted": 6864
+  },
+  "top_missing_forms": [
+    [
+      "evex/missed/mem/vbroadcastf64x2",
+      6864
+    ],
+    [
+      "evex/missed/mem+pp/vmovdqu64",
+      5243
+    ],
+    [
+      "evex/missed/mem/vmovdqa64",
+      3430
+    ],
+    [
+      "evex/missed/mem+pp/vmovdqu8",
+      2011
+    ],
+    [
+      "evex/missed/reg/vpslldq",
+      1419
+    ],
+    [
+      "evex/missed/reg/vpsrldq",
+      1335
+    ],
+    [
+      "evex/missed/mem+pp+mask/vmovdqu8",
+      1027
+    ],
+    [
+      "evex/missed/mem/vbroadcasti32x4",
+      678
+    ],
+    [
+      "evex/missed/mem/vpaddd",
+      664
+    ],
+    [
+      "evex/missed/reg/vshufi64x2",
+      555
+    ],
+    [
+      "evex/missed/reg+pp+mask/vmovdqu8",
+      480
+    ],
+    [
+      "evex/missed/mem/vpmadd52huq",
+      308
+    ],
+    [
+      "evex/missed/mem/vpmadd52luq",
+      308
+    ],
+    [
+      "evex/missed/mem/vinserti64x2",
+      248
+    ],
+    [
+      "evex/missed/reg/vpaddq",
+      241
+    ]
+  ],
+  "findings": [
+    "Earlier incomplete or empty-SIMD diagnostics were unqualified: operand population and predicate ID contracts must be respected; no production bug was established.",
+    "All 6864 VBROADCASTF64X2 instructions in this cohort already satisfy the existing fast output admission. Extending broadcast RIP formatting would not improve this cohort.",
+    "VMOVDQU64 and VMOVDQA64 memory are concrete output coverage gaps. Base plus displacement and RIP-relative forms dominate their canonical addressing counts.",
+    "The proposed raw register projection remains unmerged. Its 69546 admissions are a coverage estimate, not proof that production raw decoding currently uses that path.",
+    "This census retains all symbol/FDE extents and is deliberately not the iced common-boundary timing panel. Counts are static traversal frequencies, not native CPU costs or application execution frequencies."
+  ],
+  "proposed_next": "Derive packed EVEX move memory metadata from the canonical generator, preserving mask/reserved-field admission, compressed disp8 and uncompressed disp32, source/destination accesses and complete public detail. Implement and benchmark independently of the held public-dispatch prototypes.",
+  "publication_qualified": false,
+  "diagnostic_corrections": {
+    "initial": "Consumer included unrelated generated padding rows without their type; corrected by verbatim EVEX-only prefix include and syntax check.",
+    "operand_selection": "No-text mode intentionally omits printer-built operand detail, as tests/unit/text_option.c asserts. SIMD selection now consumes text-enabled full detail.",
+    "predicate_id": "62 f3 e5 28 1e 0d c8 af 34 00 06 yields printed VPCMPNLEUQ and no-text VPCMPUQ with the same 11-byte boundary. Compare raw IDs to a detail-enabled no-text canonical handle, and compare printed status/length/cursor separately.",
+    "production_bug_found": false,
+    "prior_census_outputs_qualified": false
+  }
+}
