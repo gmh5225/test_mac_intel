@@ -1,22 +1,285 @@
 {
-  "neverd": "1aa3fd1d27f07e0f8a36c7655306375d29d5c16f",
-  "capstone": "dea9fee246c21a0045a2ea63a429f9147a6a1014",
+  "neverd": "c129d2b84713ccbfa52f3b9d72d95e4b676283ed",
+  "capstone": "106380545da022533aa28bb9af6ba4df9f6e9970",
   "variants": {
-    "vex32-registers": {
-      "source": "round1159-vex32-integrated-registers",
-      "patch": "vex32-registers.patch",
-      "patch_sha256": "964da44192a3bebdd3d3dbb488ee2cfbb8a2aa86d6f4c46685f959044746f0ab",
-      "tree": "b6715faf82fe72b207c6e0e9b9d6d83c8be11f76",
+    "evex-isolated-entry": {
+      "source": "round1362-evex-extension-isolated-entry",
+      "patch": "evex-isolated-entry.patch",
+      "patch_sha256": "55e32b2f07614957889a88504300a16cad288582493b3084416402bfd5db062f",
+      "tree": "a1ec79c3557f54ebde318d616f5ffda6b1ae27d6",
       "changed": [
-        "X86OutputIterator.c.o",
-        "X86VectorOutput.c.o"
+        "X86Mapping.c.o"
       ],
       "added": []
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-  "compiler": "x86-64 Clang C/C++; AArch64 GCC C with Clang C++; latest fork LLVM compiled from source on both.",
+  "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Qualify exact integrated VEX32 register output through latest NeverD dev: 96 real PE32/PE64, scalar/SIMD and ARM/AArch64/MIPS observations per host, original and fixed-inode launches, A/A, complete public states, source-built latest fork LLVM and unchanged probes.",
-  "llvm_build_compatibility": "Three Clang-only diagnostic flags selected by C compiler ID for C sources; same patch for both variants, no LLVM algorithm changes, latest fork source and no prebuilt"
+  "scope": "Actual NeverD decode, text, detail, and batch paths; 96 controlled observations across 15 real and targeted workloads. Use latest NeverSight LLVM main source, prebuilt disabled, no LLVM source edits. Preserve source identities between baseline and candidate builds.",
+  "qualification_pending": [
+    "this product check",
+    "Clang14 / AMD EPYC 9V74 baseline-control precision"
+  ],
+  "validation_entry": {
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "a1ec79c3557f54ebde318d616f5ffda6b1ae27d6",
+      "sha256": "55e32b2f07614957889a88504300a16cad288582493b3084416402bfd5db062f",
+      "files": [
+        "arch/X86/X86FeatureExtension.h",
+        "arch/X86/X86Mapping.c"
+      ]
+    },
+    "native_run": 44085036040,
+    "native_replication_run": 44088717691,
+    "mixed_run": 44085081426,
+    "mixed_replication_run": 44089973271,
+    "original_mixed_flags": [
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9883092305787609,
+        "aa": 0.9982767180037319,
+        "ci95": [
+          0.985915981344599,
+          0.9988454513079141
+        ],
+        "aa_ci95": [
+          0.9918615033754002,
+          1.01710825045234
+        ],
+        "vs_previous": 1.015221857263896,
+        "previous_ci95": [
+          1.0080416031032196,
+          1.0174704393619693
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44085081426",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9964728415117478,
+        "aa": 0.9863266286634377,
+        "ci95": [
+          0.9845345054725498,
+          1.0063575974240004
+        ],
+        "aa_ci95": [
+          0.9739269740877716,
+          0.9989420536828568
+        ],
+        "vs_previous": 0.9952999792922985,
+        "previous_ci95": [
+          0.9898825206906171,
+          1.013666748882185
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44085081426",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9991238403769696,
+        "aa": 0.945176673533542,
+        "ci95": [
+          0.9532765743762982,
+          1.0331213741409786
+        ],
+        "aa_ci95": [
+          0.9296212965494038,
+          0.9966820713354663
+        ],
+        "vs_previous": 1.0070610234297597,
+        "previous_ci95": [
+          0.9862244146664703,
+          1.055512772558252
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0062843623556612,
+        "aa": 0.9773743271599307,
+        "ci95": [
+          1.0014158844957324,
+          1.009261302466783
+        ],
+        "aa_ci95": [
+          0.970172842615622,
+          0.9873787359137678
+        ],
+        "vs_previous": 1.0095581040874873,
+        "previous_ci95": [
+          1.0081777329359523,
+          1.016534258176392
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.001074006543947,
+        "aa": 0.9840034802063266,
+        "ci95": [
+          0.9842120017416304,
+          1.0212808273667462
+        ],
+        "aa_ci95": [
+          0.9799810507656102,
+          1.0047314964691652
+        ],
+        "vs_previous": 1.2074389087373778,
+        "previous_ci95": [
+          1.1928199673743525,
+          1.2334965157229565
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9950831788344942,
+        "aa": 0.9889071359960339,
+        "ci95": [
+          0.9804079895342359,
+          1.0027259887876752
+        ],
+        "aa_ci95": [
+          0.984814914557117,
+          0.9995868110073548
+        ],
+        "vs_previous": 0.9977760391318543,
+        "previous_ci95": [
+          0.9920190422850742,
+          1.0108176116144392
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0282453637660485,
+        "aa": 1.020515763901866,
+        "ci95": [
+          1.0093609906060945,
+          1.0464352815893536
+        ],
+        "aa_ci95": [
+          1.0128660670172518,
+          1.0304299330087296
+        ],
+        "vs_previous": 1.0010911925175372,
+        "previous_ci95": [
+          0.9822344568282529,
+          1.0145311328338749
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0166088844635852,
+        "aa": 1.0206965965730679,
+        "ci95": [
+          1.0126586062976117,
+          1.028588989048648
+        ],
+        "aa_ci95": [
+          1.0092170554152429,
+          1.0260009341652994
+        ],
+        "vs_previous": 0.9885911096760305,
+        "previous_ci95": [
+          0.9846327331181995,
+          0.9990605522266719
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0239310662470253,
+        "aa": 1.0227437123525307,
+        "ci95": [
+          1.017984594252471,
+          1.0281197452745456
+        ],
+        "aa_ci95": [
+          1.0129995779357812,
+          1.0258649976480427
+        ],
+        "vs_previous": 0.9868625094822205,
+        "previous_ci95": [
+          0.9858342418107252,
+          0.9960756355835204
+        ]
+      },
+      {
+        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0145069442655055,
+        "aa": 1.014238979043177,
+        "ci95": [
+          1.0062530628246593,
+          1.0251358473540009
+        ],
+        "aa_ci95": [
+          1.0030612510746946,
+          1.0289382818421513
+        ],
+        "vs_previous": 1.1408855288756576,
+        "previous_ci95": [
+          1.1336932400690398,
+          1.152146254575349
+        ]
+      }
+    ],
+    "unresolved_controls": [
+      {
+        "host": "evex-extension-isolated-entry-mixed-replication-four-ubuntu-22.04-clang-2-44089973271",
+        "cc": "clang",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9986901227959187,
+        "aa": 0.9763919700895143,
+        "ci95": [
+          0.9574684669927223,
+          1.0317857907210857
+        ],
+        "aa_ci95": [
+          0.9562523659305994,
+          1.012945715161983
+        ],
+        "vs_previous": 1.0120372110129887
+      }
+    ],
+    "address_diagnosis_run": 44092467384,
+    "runtime_state_run": 44094485795,
+    "publication_qualified": false,
+    "rationale": "Candidate loss screens passed in independent replications; the remaining identical-binary control has broad confidence intervals covering equality. Product validation is additional evidence, not a replacement for that control or a publication gate override."
+  },
+  "timing_protocol": {
+    "cycles": 32,
+    "calibration_cpu_ms": 100,
+    "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+    "consumer_unchanged": true,
+    "publication_qualified": false
+  },
+  "public_state_scope": "The seeded complete-state probe covers x86. Separate dedicated probes compare 4390912 complete public and 4390912 private records, including cursors, errors and unused output bytes, plus 3145728 protected-page extents."
 }
