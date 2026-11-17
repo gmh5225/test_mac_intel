@@ -1,278 +1,244 @@
 {
-  "neverd": "c129d2b84713ccbfa52f3b9d72d95e4b676283ed",
-  "capstone": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "neverd": "02ace371079999d9bd16695229643604b7399c7f",
+  "capstone": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
   "variants": {
-    "evex-isolated-entry": {
-      "source": "round1362-evex-extension-isolated-entry",
-      "patch": "evex-isolated-entry.patch",
-      "patch_sha256": "55e32b2f07614957889a88504300a16cad288582493b3084416402bfd5db062f",
-      "tree": "a1ec79c3557f54ebde318d616f5ffda6b1ae27d6",
+    "evex-canonical-scan": {
+      "source": "round1364-evex-canonical-scan-plan",
+      "patch": "evex-canonical-scan.patch",
+      "patch_sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+      "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
       "changed": [
-        "X86Mapping.c.o"
+        "X86DisassemblerDecoder.c.o"
       ],
-      "added": []
+      "added": [
+        "X86EvexScan.c.o"
+      ]
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual NeverD decode, text, detail, and batch paths; 96 controlled observations across 15 real and targeted workloads. Use latest NeverSight LLVM main source, prebuilt disabled, no LLVM source edits. Preserve source identities between baseline and candidate builds.",
+  "scope": "Actual NeverD raw, text, detail and batch paths: 96 paired observations across 15 real and targeted workloads. Use unmodified latest NeverSight LLVM main built from source, prebuilt disabled; preserve dependencies between variants.",
   "qualification_pending": [
-    "this product check",
-    "Clang14 / AMD EPYC 9V74 baseline-control precision"
+    "product validation",
+    "focused native outliers",
+    "portable builds"
   ],
   "validation_entry": {
     "source": {
-      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
-      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-      "tree": "a1ec79c3557f54ebde318d616f5ffda6b1ae27d6",
-      "sha256": "55e32b2f07614957889a88504300a16cad288582493b3084416402bfd5db062f",
+      "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+      "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+      "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+      "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
       "files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86DisassemblerDecoder.c",
+        "arch/X86/X86EvexAdmission.h",
+        "arch/X86/X86EvexScan.c",
         "arch/X86/X86FeatureExtension.h",
-        "arch/X86/X86Mapping.c"
-      ]
+        "arch/X86/X86GenEvexScan.inc",
+        "arch/X86/X86VectorOutput.c",
+        "suite/synctools/x86_vector_output.cpp",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ],
+      "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
     },
-    "native_run": 44085036040,
-    "native_replication_run": 44088717691,
-    "mixed_run": 44085081426,
-    "mixed_replication_run": 44089973271,
+    "native_run": {
+      "id": 44117159626,
+      "head_sha": "d2754b1147bb62d4b6856c8136b5d95d99fde1fe",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44117159626",
+      "run_attempt": 1
+    },
+    "mixed_run": {
+      "id": 44117219216,
+      "head_sha": "0a2de8ffe2d723ce720a3c95796131b420fb7063",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44117219216",
+      "run_attempt": 1
+    },
+    "profiles_run": {
+      "id": 44119046576,
+      "head_sha": "0fc7c0d0d8b1699afecc759467f731536a69ac2f",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44119046576",
+      "run_attempt": 1
+    },
+    "original_native_flags": [
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "case": "libjpeg62-turbo-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 0.9809091671402883,
+        "aa": 0.999465261438544,
+        "ci95": [
+          0.9488437603564459,
+          0.9884082010530986
+        ],
+        "aa_ci95": [
+          0.9682976164953067,
+          1.016651732377539
+        ],
+        "vs_iced": 0.5101972997094624,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 0.9774894123046751,
+        "aa": 0.9970840309114899,
+        "ci95": [
+          0.9699206495663406,
+          1.0030774546750316
+        ],
+        "aa_ci95": [
+          0.9852333655620991,
+          1.006001446131598
+        ],
+        "vs_iced": 0.8250308769040758,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.0086243323184936,
+        "aa": 1.0124412319698084,
+        "ci95": [
+          0.9882069821634689,
+          1.019659211698895
+        ],
+        "aa_ci95": [
+          1.0073497051315903,
+          1.0292871197215077
+        ],
+        "vs_iced": 0.8464520008160021,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "gain": 1.0006191356517493,
+        "aa": 1.012289205380156,
+        "ci95": [
+          0.9798456467561701,
+          1.0183712401675973
+        ],
+        "aa_ci95": [
+          0.9972414274739856,
+          1.0352359275146634
+        ],
+        "vs_iced": 0.6277734811377503,
+        "vs_fast": 0.37841096906938304
+      }
+    ],
     "original_mixed_flags": [
       {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "mips64el-ls",
+        "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+        "case": "arm-ls",
         "mode": 1,
-        "launch": "same-file-fixed",
-        "gain": 0.9883092305787609,
-        "aa": 0.9982767180037319,
+        "launch": "images",
+        "gain": 1.007105065203512,
+        "aa": 1.0186669749993575,
         "ci95": [
-          0.985915981344599,
-          0.9988454513079141
+          1.0041140958890984,
+          1.0163542648977535
         ],
         "aa_ci95": [
-          0.9918615033754002,
-          1.01710825045234
-        ],
-        "vs_previous": 1.015221857263896,
-        "previous_ci95": [
-          1.0080416031032196,
-          1.0174704393619693
+          1.0134254599881294,
+          1.020902351033904
         ]
       },
       {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44085081426",
+        "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
         "case": "arm-sort",
-        "mode": 0,
-        "launch": "images",
-        "gain": 0.9964728415117478,
-        "aa": 0.9863266286634377,
-        "ci95": [
-          0.9845345054725498,
-          1.0063575974240004
-        ],
-        "aa_ci95": [
-          0.9739269740877716,
-          0.9989420536828568
-        ],
-        "vs_previous": 0.9952999792922985,
-        "previous_ci95": [
-          0.9898825206906171,
-          1.013666748882185
-        ]
-      },
-      {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44085081426",
-        "case": "amd64-ls",
-        "mode": 0,
-        "launch": "images",
-        "gain": 0.9991238403769696,
-        "aa": 0.945176673533542,
-        "ci95": [
-          0.9532765743762982,
-          1.0331213741409786
-        ],
-        "aa_ci95": [
-          0.9296212965494038,
-          0.9966820713354663
-        ],
-        "vs_previous": 1.0070610234297597,
-        "previous_ci95": [
-          0.9862244146664703,
-          1.055512772558252
-        ]
-      },
-      {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "mips64el-ls",
-        "mode": 0,
-        "launch": "images",
-        "gain": 1.0062843623556612,
-        "aa": 0.9773743271599307,
-        "ci95": [
-          1.0014158844957324,
-          1.009261302466783
-        ],
-        "aa_ci95": [
-          0.970172842615622,
-          0.9873787359137678
-        ],
-        "vs_previous": 1.0095581040874873,
-        "previous_ci95": [
-          1.0081777329359523,
-          1.016534258176392
-        ]
-      },
-      {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "mips64el-ls",
         "mode": 1,
         "launch": "images",
-        "gain": 1.001074006543947,
-        "aa": 0.9840034802063266,
+        "gain": 1.0090907446814923,
+        "aa": 1.0155991779635694,
         "ci95": [
-          0.9842120017416304,
-          1.0212808273667462
+          1.0028248756994715,
+          1.0159796875568106
         ],
         "aa_ci95": [
-          0.9799810507656102,
-          1.0047314964691652
-        ],
-        "vs_previous": 1.2074389087373778,
-        "previous_ci95": [
-          1.1928199673743525,
-          1.2334965157229565
+          1.0138249692880323,
+          1.0196871990540393
         ]
       },
       {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "mips64el-ls",
-        "mode": 2,
-        "launch": "same-file-fixed",
-        "gain": 0.9950831788344942,
-        "aa": 0.9889071359960339,
-        "ci95": [
-          0.9804079895342359,
-          1.0027259887876752
-        ],
-        "aa_ci95": [
-          0.984814914557117,
-          0.9995868110073548
-        ],
-        "vs_previous": 0.9977760391318543,
-        "previous_ci95": [
-          0.9920190422850742,
-          1.0108176116144392
-        ]
-      },
-      {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "putty-32-0.85",
-        "mode": 2,
+        "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+        "case": "arm-cp",
+        "mode": 1,
         "launch": "images",
-        "gain": 1.0282453637660485,
-        "aa": 1.020515763901866,
+        "gain": 1.0122010448662413,
+        "aa": 1.0170176362200578,
         "ci95": [
-          1.0093609906060945,
-          1.0464352815893536
+          1.005999723696935,
+          1.0148998486426986
         ],
         "aa_ci95": [
-          1.0128660670172518,
-          1.0304299330087296
-        ],
-        "vs_previous": 1.0010911925175372,
-        "previous_ci95": [
-          0.9822344568282529,
-          1.0145311328338749
+          1.0141265117874887,
+          1.0246125918417375
         ]
       },
       {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "putty-64-0.85",
-        "mode": 2,
+        "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+        "case": "amd64-ls",
+        "mode": 1,
         "launch": "images",
-        "gain": 1.0166088844635852,
-        "aa": 1.0206965965730679,
+        "gain": 1.0126273291925465,
+        "aa": 1.0108920773549595,
         "ci95": [
-          1.0126586062976117,
-          1.028588989048648
+          1.0070878216636745,
+          1.0138379501558412
         ],
         "aa_ci95": [
-          1.0092170554152429,
-          1.0260009341652994
-        ],
-        "vs_previous": 0.9885911096760305,
-        "previous_ci95": [
-          0.9846327331181995,
-          0.9990605522266719
+          1.0098350451291627,
+          1.0147578440063427
         ]
       },
       {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+        "host": "evex-canonical-scan-images-four-ubuntu-24.04-gcc-44117219216",
         "case": "amd64-ls",
         "mode": 2,
         "launch": "images",
-        "gain": 1.0239310662470253,
-        "aa": 1.0227437123525307,
+        "gain": 0.9967146908391148,
+        "aa": 0.9864389131297104,
         "ci95": [
-          1.017984594252471,
-          1.0281197452745456
+          0.9898296921119907,
+          1.0028852211162909
         ],
         "aa_ci95": [
-          1.0129995779357812,
-          1.0258649976480427
-        ],
-        "vs_previous": 0.9868625094822205,
-        "previous_ci95": [
-          0.9858342418107252,
-          0.9960756355835204
-        ]
-      },
-      {
-        "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
-        "case": "arm64-ls",
-        "mode": 2,
-        "launch": "images",
-        "gain": 1.0145069442655055,
-        "aa": 1.014238979043177,
-        "ci95": [
-          1.0062530628246593,
-          1.0251358473540009
-        ],
-        "aa_ci95": [
-          1.0030612510746946,
-          1.0289382818421513
-        ],
-        "vs_previous": 1.1408855288756576,
-        "previous_ci95": [
-          1.1336932400690398,
-          1.152146254575349
+          0.9829753489495889,
+          0.9893288332444069
         ]
       }
     ],
-    "unresolved_controls": [
-      {
-        "host": "evex-extension-isolated-entry-mixed-replication-four-ubuntu-22.04-clang-2-44089973271",
-        "cc": "clang",
-        "cpu": "AMD EPYC 9V74 80-Core Processor",
-        "case": "amd64-ls",
-        "mode": 0,
-        "launch": "images",
-        "gain": 0.9986901227959187,
-        "aa": 0.9763919700895143,
-        "ci95": [
-          0.9574684669927223,
-          1.0317857907210857
-        ],
-        "aa_ci95": [
-          0.9562523659305994,
-          1.012945715161983
-        ],
-        "vs_previous": 1.0120372110129887
-      }
+    "unresolved": [
+      "focused native timing and executed-PC investigation",
+      "portable build completion"
     ],
-    "address_diagnosis_run": 44092467384,
-    "runtime_state_run": 44094485795,
     "publication_qualified": false,
-    "rationale": "Candidate loss screens passed in independent replications; the remaining identical-binary control has broad confidence intervals covering equality. Product validation is additional evidence, not a replacement for that control or a publication gate override."
+    "rationale": "Product validation is independent additional evidence and can proceed while the frozen native outliers are investigated. It does not override or erase any failed observation."
   },
   "timing_protocol": {
     "cycles": 32,
@@ -281,5 +247,5 @@
     "consumer_unchanged": true,
     "publication_qualified": false
   },
-  "public_state_scope": "The seeded complete-state probe covers x86. Separate dedicated probes compare 4390912 complete public and 4390912 private records, including cursors, errors and unused output bytes, plus 3145728 protected-page extents."
+  "public_state_scope": "Seeded complete-state product probe plus separate four-compiler 6946816 public records, 6946816 private records and 3145728 protected-page extents per compiler."
 }
