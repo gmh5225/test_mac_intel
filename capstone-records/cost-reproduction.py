@@ -88,11 +88,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
     content=raw.read_text();events=next(line[8:].split()for line in content.splitlines()if line.startswith('events: '))
     counts=list(map(int,next(line[8:].split()for line in content.splitlines()if line.startswith('totals: '))))
     assert len(events)==len(counts) and counts[0]>0
-    costs.append(dict(case=name,mode=mode,variant=label,events=dict(zip(events,counts)),result=result,collected_traversals=2))
+    costs.append(dict(case=name,mode=mode,variant=label,events=dict(zip(events,counts)),result=result,collected_traversals=3))
     with gzip.open(e/(name+'-'+label+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
     raw.unlink();write('instruction-costs',costs)
   assert len(costs)==6
-  write('cost-protocol',dict(consumer_unchanged=True,symbol='_ZL3runR7SessionRKSt6vectorIhSaIhEEj',traversals=2,same_inode=True,padded_size=maximum,aslr_disabled=True,scope='Original warmed mixed consumer, one warm and one measured traversal. Counts and simulated cache events are separate from native timing.'))
+  write('cost-protocol',dict(consumer_unchanged=True,symbol='_ZL3runR7SessionRKSt6vectorIhSaIhEEj',traversals=3,same_inode=True,padded_size=maximum,aslr_disabled=True,scope='Original warmed mixed consumer, initial, expected and measured traversals. Counts and simulated cache events are separate from native timing.'))
   write('complete',dict(success=True,cases=len(costs),cc=cc,host=platform.platform(),active=True,native_qualification=False,cost_only=True))
 
  finally:
