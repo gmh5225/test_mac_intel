@@ -1,7 +1,7 @@
-name: Measure canonical EVEX register scan plans with original layout and A/A controls
+name: Compare EVEX transfer dispatch with complete layout records and A/A controls
 on:
   push:
-    branches: [codex/capstone-evex-canonical-scan-native]
+    branches: [codex/capstone-evex-transfer-comparison-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -36,12 +36,13 @@ jobs:
           sudo apt-get install -y valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
+          "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/prepare_baseline.py
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
       - if: always()
         run: rm -rf -- "$RUNNER_TEMP/capstone-elf-venv" "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-canonical-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-transfer-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

@@ -1,79 +1,27 @@
 from pathlib import Path
-import hashlib
-from elftools.elf.elffile import ELFFile
+from split_layout import decoder_proof as split_proof, leaf_proof
+from merged_layout import decoder_proof as merged_proof, symbols
 
+def object_proof(label,before,after,leaf):
+    if label=='scan':
+        return dict(original_plan_relocation=split_proof(before,after),new_leaf=leaf_proof(leaf))
+    assert label=='merge'
+    return merged_proof(before,after)
 
-def object_sections(path):
-    with Path(path).open('rb') as stream:
-        elf = ELFFile(stream)
-        rows = []
-        for sec in elf.iter_sections():
-            if sec['sh_flags'] & 2:
-                rows.append((sec.name, sec['sh_type'], sec['sh_flags'], sec['sh_size'],
-                             sec['sh_addralign'], hashlib.sha256(sec.data()).hexdigest()))
-        relocations = []
-        for sec in elf.iter_sections():
-            if sec['sh_type'] not in ('SHT_RELA', 'SHT_REL'):
-                continue
-            target = elf.get_section(sec['sh_info']).name
-            symbols = elf.get_section(sec['sh_link'])
-            for rel in sec.iter_relocations():
-                sym = symbols.get_symbol(rel['r_info_sym'])
-                name = sym.name
-                if sym['st_info']['type'] == 'STT_SECTION':
-                    name = 'section:' + elf.get_section(sym['st_shndx']).name
-                relocations.append((target, rel['r_offset'], rel['r_info_type'],
-                                    rel.entry.get('r_addend', 0), name))
-        return rows, sorted(relocations)
-
-
-def decoder_proof(before, after):
-    left, left_rel = object_sections(before)
-    right, right_rel = object_sections(after)
-    assert left == right, (left, right)
-    changed = [x for x in right_rel if x[-1] == 'X86_decodeScanFeatureExtension']
-    assert changed
-    normalized = sorted((*x[:-1], 'X86_decodeFeatureExtension'
-                         if x[-1] == 'X86_decodeScanFeatureExtension' else x[-1])
-                        for x in right_rel)
-    assert left_rel == normalized
-    return dict(all_allocated_section_bytes_sizes_alignments_identical=True,
-                only_relocation_change='X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension',
-                changed_call_sites=changed)
-
-
-def leaf_proof(path):
-    sections, _ = object_sections(path)
-    extra_text = [x for x in sections if x[0] == '.cs_x86_evex_scan_text']
-    extra_data = [x for x in sections if x[0] == '.cs_x86_evex_scan_rodata']
-    assert len(extra_text) == len(extra_data) == 1
-    assert 0 < extra_text[0][3] <= 512, extra_text
-    assert 452 <= extra_data[0][3] <= 512, extra_data
-    other = [x for x in sections if x[0] not in (
-        '.cs_x86_evex_scan_text', '.cs_x86_evex_scan_rodata', '.eh_frame', '.note.gnu.property') and x[3]]
-    assert not other, other
-    return dict(sections=sections, no_ordinary_code_or_data=True)
-
-
-def symbols(path, kinds):
-    rows = []
-    for line in Path(path).read_text().splitlines():
-        fields = line.split(maxsplit=3)
-        if len(fields) == 4 and fields[2] in kinds:
-            rows.append((fields[3], fields[2], int(fields[0], 16), int(fields[1], 16)))
-    return sorted(rows)
-
-
-def linked_proof(before, after):
-    old_text, new_text = symbols(before, 'tTwW'), symbols(after, 'tTwW')
-    entries = [x for x in new_text if x[0] == 'X86_decodeScanFeatureExtension' or x[0].startswith('decodeEvexRegisterScan')]
-    retained = [x for x in new_text if x not in entries]
-    assert len(entries) == 2
-    assert old_text == retained, dict(missing=sorted(set(old_text)-set(retained))[:12],
-                                      changed=sorted(set(retained)-set(old_text))[:12])
-    old_data = symbols(before, 'rR')
-    new_data = [x for x in symbols(after, 'rR') if x[0] not in ('evex_scan_index', 'evex_scan_plans')]
-    assert old_data == new_data, dict(missing=sorted(set(old_data)-set(new_data))[:12],
-                                      changed=sorted(set(new_data)-set(old_data))[:12])
-    return dict(original_text_positions_identical=True, original_readonly_positions_identical=True,
-                text_symbols=len(old_text), readonly_symbols=len(old_data), new_entries=entries)
+def linked_layout(before,after,label):
+    old,new=symbols(before,'tTwW'),symbols(after,'tTwW')
+    owned=lambda x:x[0] in ('X86_decodeScanFeatureExtension','X86_decodeEvexTransferScan') or x[0].startswith('decodeEvexRegisterScan')
+    left,right=[x for x in old if not owned(x)],[x for x in new if not owned(x)]
+    assert left==right,dict(missing=sorted(set(left)-set(right))[:12],changed=sorted(set(right)-set(left))[:12])
+    result=dict(unmodified_text_positions_identical=True,text_symbols=len(left),
+                plan_entries=dict(before=[x for x in old if owned(x)],after=[x for x in new if owned(x)]))
+    for key,kinds in (('readonly','rR'),('writable','bBdDgGsSvV')):
+        left,right=symbols(before,kinds),symbols(after,kinds)
+        added=[x for x in right if x[0] in ('evex_transfer_scan_ids','evex_transfer_lengths')]
+        right=[x for x in right if x not in added]
+        assert [(x[0],x[1],x[3]) for x in left]==[(x[0],x[1],x[3]) for x in right]
+        moves=[dict(symbol=a[0],before=a[2],after=b[2],bytes=a[3],delta=b[2]-a[2]) for a,b in zip(left,right) if a!=b]
+        result[key]=dict(original_symbols=len(left),moves=moves,added=added,
+                         address_deltas=sorted({x['delta'] for x in moves}))
+    result['criterion']='Record every data address change; actual timing and A/A controls determine performance acceptance. This supersedes the earlier exact-address proxy before any timing of these candidates was collected.'
+    return result
