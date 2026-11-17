@@ -1,0 +1,1387 @@
+{
+  "complete": true,
+  "rows": [
+    {
+      "experiment": "round1402-output-mode-specialization",
+      "host": "output-mode-specialization-cost-ubuntu-22.04-clang-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "78feb322f655437b39c71a5709eb445bc057719c",
+        "sha256": "92835b0967051c855ef7a362da801b02b329804b470792909ec3f4568e5178de",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 815865104,
+          "Dr": 182929020,
+          "Dw": 129275514,
+          "I1mr": 1575453,
+          "D1mr": 137693,
+          "D1mw": 1702,
+          "ILmr": 1442,
+          "DLmr": 717,
+          "DLmw": 0,
+          "Bc": 111822966,
+          "Bcm": 7139172,
+          "Bi": 2327388,
+          "Bim": 213959
+        },
+        "modes": {
+          "Ir": 792174662,
+          "Dr": 181884706,
+          "Dw": 130133254,
+          "I1mr": 1523870,
+          "D1mr": 134047,
+          "D1mw": 1680,
+          "ILmr": 1426,
+          "DLmr": 710,
+          "DLmw": 0,
+          "Bc": 111520936,
+          "Bcm": 7125673,
+          "Bi": 2327388,
+          "Bim": 207434
+        }
+      },
+      "instruction_reduction": 0.029037204660244953,
+      "changed_functions": [
+        {
+          "function": "X86_trySimpleOutput",
+          "before": [
+            273322216,
+            65206910,
+            43747658
+          ],
+          "after": [
+            37284900,
+            10439772,
+            8948376
+          ],
+          "delta": [
+            -236037316,
+            -54767138,
+            -34799282
+          ]
+        },
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            212346874,
+            53722824,
+            35657022
+          ],
+          "delta": [
+            212346874,
+            53722824,
+            35657022
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "0x00000000001e22d0",
+            "calls": 539044
+          }
+        ],
+        "modes": [
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22d0",
+            "calls": 539044
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": 6,
+      "selector_assembly": [
+        " 120:\t55                   \tpush   %rbp",
+        " 121:\t41 57                \tpush   %r15",
+        " 123:\t41 56                \tpush   %r14",
+        " 125:\t41 55                \tpush   %r13",
+        " 127:\t41 54                \tpush   %r12",
+        " 129:\t53                   \tpush   %rbx",
+        " 12a:\t48 83 ec 68          \tsub    $0x68,%rsp",
+        " 12e:\t4d 89 c7             \tmov    %r8,%r15",
+        " 131:\t49 89 f6             \tmov    %rsi,%r14",
+        " 134:\t8b 47 04             \tmov    0x4(%rdi),%eax",
+        " 137:\t31 ed                \txor    %ebp,%ebp",
+        " 139:\t83 f8 08             \tcmp    $0x8,%eax",
+        " 13c:\t74 22                \tje     160 <X86_trySimpleOutput+0x40>",
+        " 13e:\t83 f8 04             \tcmp    $0x4,%eax",
+        " 141:\t0f 85 75 02 00 00    \tjne    3bc <X86_trySimpleOutput+0x29c>",
+        " 147:\t4c 89 f6             \tmov    %r14,%rsi",
+        " 14a:\t4d 89 f8             \tmov    %r15,%r8",
+        " 14d:\t48 83 c4 68          \tadd    $0x68,%rsp",
+        " 151:\t5b                   \tpop    %rbx",
+        " 152:\t41 5c                \tpop    %r12",
+        " 154:\t41 5d                \tpop    %r13",
+        " 156:\t41 5e                \tpop    %r14",
+        " 158:\t41 5f                \tpop    %r15",
+        " 15a:\t5d                   \tpop    %rbp",
+        " 15b:\te9 00 00 00 00       \tjmp    160 <X86_trySimpleOutput+0x40>",
+        "\t\t\t15c: R_X86_64_PLT32\t.cs_x86_output32-0x4",
+        " 160:\t45 0f b6 26          \tmovzbl (%r14),%r12d",
+        " 164:\t45 89 e3             \tmov    %r12d,%r11d",
+        " 167:\t41 80 e3 f0          \tand    $0xf0,%r11b",
+        " 16b:\t41 80 fb 40          \tcmp    $0x40,%r11b",
+        " 16f:\t0f 94 c0             \tsete   %al",
+        " 172:\t45 89 e5             \tmov    %r12d,%r13d"
+      ],
+      "mode32_prologue": [
+        "   0:\t55                   \tpush   %rbp",
+        "   1:\t41 57                \tpush   %r15",
+        "   3:\t41 56                \tpush   %r14",
+        "   5:\t41 55                \tpush   %r13",
+        "   7:\t41 54                \tpush   %r12",
+        "   9:\t53                   \tpush   %rbx",
+        "   a:\t48 83 ec 68          \tsub    $0x68,%rsp",
+        "   e:\t44 8a 36             \tmov    (%rsi),%r14b",
+        "  11:\t31 c0                \txor    %eax,%eax",
+        "  13:\t41 80 fe 0f          \tcmp    $0xf,%r14b",
+        "  17:\t0f 94 c0             \tsete   %al",
+        "  1a:\t48 39 d0             \tcmp    %rdx,%rax",
+        "  1d:\t0f 83 49 01 00 00    \tjae    16c <X86_writeSimpleOutput32+0x16c>",
+        "  23:\t48 89 f3             \tmov    %rsi,%rbx",
+        "  26:\t31 f6                \txor    %esi,%esi",
+        "  28:\t41 80 fe 0f          \tcmp    $0xf,%r14b",
+        "  2c:\t40 0f 94 c6          \tsete   %sil",
+        "  30:\t44 8a 2c 03          \tmov    (%rbx,%rax,1),%r13b",
+        "  34:\t41 0f b6 ed          \tmovzbl %r13b,%ebp",
+        "  38:\t4c 8d 1c 76          \tlea    (%rsi,%rsi,2),%r11",
+        "  3c:\t4c 89 d8             \tmov    %r11,%rax",
+        "  3f:\t48 c1 e0 09          \tshl    $0x9,%rax"
+      ],
+      "object_disassembly_sha256": "dd3fbdc6d0b88f5ad50b2096d6fbcb0ca3b57f9db28630bbb990a5b60667b1b4"
+    },
+    {
+      "experiment": "round1402-output-mode-specialization",
+      "host": "output-mode-specialization-cost-ubuntu-22.04-gcc-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "78feb322f655437b39c71a5709eb445bc057719c",
+        "sha256": "92835b0967051c855ef7a362da801b02b329804b470792909ec3f4568e5178de",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 811442322,
+          "Dr": 175978216,
+          "Dw": 128914560,
+          "I1mr": 1064430,
+          "D1mr": 142022,
+          "D1mw": 2165,
+          "ILmr": 1156,
+          "DLmr": 658,
+          "DLmw": 0,
+          "Bc": 128070016,
+          "Bcm": 7480815,
+          "Bi": 4318562,
+          "Bim": 156254
+        },
+        "modes": {
+          "Ir": 834080570,
+          "Dr": 188905682,
+          "Dw": 126530720,
+          "I1mr": 963310,
+          "D1mr": 142315,
+          "D1mw": 2129,
+          "ILmr": 1139,
+          "DLmr": 658,
+          "DLmw": 0,
+          "Bc": 128268040,
+          "Bcm": 7722940,
+          "Bi": 4318562,
+          "Bim": 167360
+        }
+      },
+      "instruction_reduction": -0.02789877651957129,
+      "changed_functions": [
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            225412518,
+            54100504,
+            31767038
+          ],
+          "delta": [
+            225412518,
+            54100504,
+            31767038
+          ]
+        },
+        {
+          "function": "X86_disasmIter",
+          "before": [
+            305016892,
+            73983750,
+            59596576
+          ],
+          "after": [
+            102242622,
+            32810712,
+            25445698
+          ],
+          "delta": [
+            -202774270,
+            -41173038,
+            -34150878
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [],
+        "modes": [
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e2300",
+            "calls": 1467456
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e2308",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": null,
+      "selector_assembly": [],
+      "mode32_prologue": [
+        "   0:\t41 57                \tpush   %r15",
+        "   2:\t41 56                \tpush   %r14",
+        "   4:\t41 55                \tpush   %r13",
+        "   6:\t41 54                \tpush   %r12",
+        "   8:\t55                   \tpush   %rbp",
+        "   9:\t48 89 f5             \tmov    %rsi,%rbp",
+        "   c:\t53                   \tpush   %rbx",
+        "   d:\t48 83 ec 58          \tsub    $0x58,%rsp",
+        "  11:\t0f b6 1e             \tmovzbl (%rsi),%ebx",
+        "  14:\t64 48 8b 04 25 28 00 \tmov    %fs:0x28,%rax",
+        "  1b:\t00 00 ",
+        "  1d:\t48 89 44 24 48       \tmov    %rax,0x48(%rsp)",
+        "  22:\t31 c0                \txor    %eax,%eax",
+        "  24:\t31 c0                \txor    %eax,%eax",
+        "  26:\t80 fb 0f             \tcmp    $0xf,%bl",
+        "  29:\t0f 94 c0             \tsete   %al",
+        "  2c:\t48 39 c2             \tcmp    %rax,%rdx",
+        "  2f:\t0f 86 fb 01 00 00    \tjbe    230 <X86_writeSimpleOutput32+0x230>",
+        "  35:\t44 0f b6 5c 05 00    \tmovzbl 0x0(%rbp,%rax,1),%r11d",
+        "  3b:\t31 c0                \txor    %eax,%eax",
+        "  3d:\t80 fb 0f             \tcmp    $0xf,%bl",
+        "  40:\t48 89 d6             \tmov    %rdx,%rsi"
+      ],
+      "object_disassembly_sha256": "5e71e769f285a52f5079ddb04fd4d300019f08fd39eaf62c21ca11fe5bfc3fdc"
+    },
+    {
+      "experiment": "round1402-output-mode-specialization",
+      "host": "output-mode-specialization-cost-ubuntu-24.04-clang-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "78feb322f655437b39c71a5709eb445bc057719c",
+        "sha256": "92835b0967051c855ef7a362da801b02b329804b470792909ec3f4568e5178de",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 796728276,
+          "Dr": 183448974,
+          "Dw": 127514556,
+          "I1mr": 444316,
+          "D1mr": 108092,
+          "D1mw": 385,
+          "ILmr": 1141,
+          "DLmr": 699,
+          "DLmw": 0,
+          "Bc": 112061044,
+          "Bcm": 7292002,
+          "Bi": 2266170,
+          "Bim": 213231
+        },
+        "modes": {
+          "Ir": 772837526,
+          "Dr": 186641018,
+          "Dw": 129484274,
+          "I1mr": 468780,
+          "D1mr": 108082,
+          "D1mw": 385,
+          "ILmr": 1146,
+          "DLmr": 699,
+          "DLmw": 0,
+          "Bc": 111759014,
+          "Bcm": 7880970,
+          "Bi": 2266170,
+          "Bim": 213231
+        }
+      },
+      "instruction_reduction": 0.02998607018184951,
+      "changed_functions": [
+        {
+          "function": "X86_trySimpleOutput",
+          "before": [
+            259581584,
+            61542432,
+            41315060
+          ],
+          "after": [
+            31319316,
+            10439772,
+            8948376
+          ],
+          "delta": [
+            -228262268,
+            -51102660,
+            -32366684
+          ]
+        },
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            204371518,
+            54294704,
+            34336402
+          ],
+          "delta": [
+            204371518,
+            54294704,
+            34336402
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "0x00000000001e22a0",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          }
+        ],
+        "modes": [
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22a0",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": 6,
+      "selector_assembly": [
+        " 100:\t55                   \tpush   %rbp",
+        " 101:\t41 57                \tpush   %r15",
+        " 103:\t41 56                \tpush   %r14",
+        " 105:\t41 55                \tpush   %r13",
+        " 107:\t41 54                \tpush   %r12",
+        " 109:\t53                   \tpush   %rbx",
+        " 10a:\t48 83 ec 68          \tsub    $0x68,%rsp",
+        " 10e:\t8b 47 04             \tmov    0x4(%rdi),%eax",
+        " 111:\t31 ed                \txor    %ebp,%ebp",
+        " 113:\t83 f8 08             \tcmp    $0x8,%eax",
+        " 116:\t74 1c                \tje     134 <X86_trySimpleOutput+0x34>",
+        " 118:\t83 f8 04             \tcmp    $0x4,%eax",
+        " 11b:\t0f 85 82 01 00 00    \tjne    2a3 <X86_trySimpleOutput+0x1a3>",
+        " 121:\t48 83 c4 68          \tadd    $0x68,%rsp",
+        " 125:\t5b                   \tpop    %rbx",
+        " 126:\t41 5c                \tpop    %r12",
+        " 128:\t41 5d                \tpop    %r13",
+        " 12a:\t41 5e                \tpop    %r14",
+        " 12c:\t41 5f                \tpop    %r15",
+        " 12e:\t5d                   \tpop    %rbp",
+        " 12f:\te9 00 00 00 00       \tjmp    134 <X86_trySimpleOutput+0x34>",
+        "\t\t\t130: R_X86_64_PLT32\t.cs_x86_output32-0x4",
+        " 134:\t0f b6 1e             \tmovzbl (%rsi),%ebx",
+        " 137:\t48 83 fb 0f          \tcmp    $0xf,%rbx",
+        " 13b:\t41 0f 94 c1          \tsete   %r9b",
+        " 13f:\t89 d8                \tmov    %ebx,%eax",
+        " 141:\t24 f0                \tand    $0xf0,%al",
+        " 143:\t3c 40                \tcmp    $0x40,%al",
+        " 145:\t41 bd 00 00 00 00    \tmov    $0x0,%r13d",
+        " 14b:\t44 0f 44 eb          \tcmove  %ebx,%r13d",
+        " 14f:\t41 0f 94 c2          \tsete   %r10b",
+        " 153:\t45 08 ca             \tor     %r9b,%r10b"
+      ],
+      "mode32_prologue": [
+        "   0:\t55                   \tpush   %rbp",
+        "   1:\t41 57                \tpush   %r15",
+        "   3:\t41 56                \tpush   %r14",
+        "   5:\t41 55                \tpush   %r13",
+        "   7:\t41 54                \tpush   %r12",
+        "   9:\t53                   \tpush   %rbx",
+        "   a:\t48 83 ec 58          \tsub    $0x58,%rsp",
+        "   e:\t44 0f b6 3e          \tmovzbl (%rsi),%r15d",
+        "  12:\t31 c0                \txor    %eax,%eax",
+        "  14:\t41 80 ff 0f          \tcmp    $0xf,%r15b",
+        "  18:\t0f 94 c0             \tsete   %al",
+        "  1b:\t48 39 d0             \tcmp    %rdx,%rax",
+        "  1e:\t0f 83 eb 00 00 00    \tjae    10f <X86_writeSimpleOutput32+0x10f>",
+        "  24:\t45 31 c9             \txor    %r9d,%r9d",
+        "  27:\t41 80 ff 0f          \tcmp    $0xf,%r15b",
+        "  2b:\t41 0f 94 c1          \tsete   %r9b",
+        "  2f:\t44 0f b6 2c 06       \tmovzbl (%rsi,%rax,1),%r13d",
+        "  34:\t41 0f b6 dd          \tmovzbl %r13b,%ebx",
+        "  38:\t4b 8d 04 49          \tlea    (%r9,%r9,2),%rax",
+        "  3c:\t41 89 c2             \tmov    %eax,%r10d",
+        "  3f:\t41 c1 e2 09          \tshl    $0x9,%r10d",
+        "  43:\t4c 8d 0d 00 00 00 00 \tlea    0x0(%rip),%r9        # 4a <X86_writeSimpleOutput32+0x4a>"
+      ],
+      "object_disassembly_sha256": "039938707cef2ccdc996e605be8c62c31789c5b70e6e08df3670a454f25c9497"
+    },
+    {
+      "experiment": "round1402-output-mode-specialization",
+      "host": "output-mode-specialization-cost-ubuntu-24.04-gcc-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "78feb322f655437b39c71a5709eb445bc057719c",
+        "sha256": "92835b0967051c855ef7a362da801b02b329804b470792909ec3f4568e5178de",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 783327390,
+          "Dr": 176215064,
+          "Dw": 131488576,
+          "I1mr": 789350,
+          "D1mr": 106551,
+          "D1mw": 266,
+          "ILmr": 1130,
+          "DLmr": 662,
+          "DLmw": 0,
+          "Bc": 122644598,
+          "Bcm": 7696480,
+          "Bi": 2844040,
+          "Bim": 156257
+        },
+        "modes": {
+          "Ir": 805676118,
+          "Dr": 187764852,
+          "Dw": 126416884,
+          "I1mr": 588091,
+          "D1mr": 106625,
+          "D1mw": 266,
+          "ILmr": 1122,
+          "DLmr": 662,
+          "DLmw": 0,
+          "Bc": 122842622,
+          "Bcm": 7989796,
+          "Bi": 2844040,
+          "Bim": 156257
+        }
+      },
+      "instruction_reduction": -0.028530507531467686,
+      "changed_functions": [
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            223572042,
+            52459958,
+            30103942
+          ],
+          "delta": [
+            223572042,
+            52459958,
+            30103942
+          ]
+        },
+        {
+          "function": "X86_disasmIter",
+          "before": [
+            306540694,
+            75212278,
+            62112728
+          ],
+          "after": [
+            105317380,
+            34302108,
+            26937094
+          ],
+          "delta": [
+            -201223314,
+            -40910170,
+            -35175634
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [],
+        "modes": [
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22d0",
+            "calls": 733728
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22d8",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": null,
+      "selector_assembly": [],
+      "mode32_prologue": [
+        "   0:\t41 57                \tpush   %r15",
+        "   2:\t41 56                \tpush   %r14",
+        "   4:\t41 55                \tpush   %r13",
+        "   6:\t41 54                \tpush   %r12",
+        "   8:\t55                   \tpush   %rbp",
+        "   9:\t53                   \tpush   %rbx",
+        "   a:\t48 89 f3             \tmov    %rsi,%rbx",
+        "   d:\t48 83 ec 58          \tsub    $0x58,%rsp",
+        "  11:\t44 0f b6 2e          \tmovzbl (%rsi),%r13d",
+        "  15:\t64 48 8b 04 25 28 00 \tmov    %fs:0x28,%rax",
+        "  1c:\t00 00 ",
+        "  1e:\t48 89 44 24 48       \tmov    %rax,0x48(%rsp)",
+        "  23:\t31 c0                \txor    %eax,%eax",
+        "  25:\t31 c0                \txor    %eax,%eax",
+        "  27:\t41 80 fd 0f          \tcmp    $0xf,%r13b",
+        "  2b:\t0f 94 c0             \tsete   %al",
+        "  2e:\t48 39 d0             \tcmp    %rdx,%rax",
+        "  31:\t0f 83 e9 01 00 00    \tjae    220 <X86_writeSimpleOutput32+0x220>",
+        "  37:\t44 0f b6 3c 03       \tmovzbl (%rbx,%rax,1),%r15d",
+        "  3c:\t31 c0                \txor    %eax,%eax",
+        "  3e:\t41 80 fd 0f          \tcmp    $0xf,%r13b",
+        "  42:\t48 89 d6             \tmov    %rdx,%rsi"
+      ],
+      "object_disassembly_sha256": "b7693438f20bdaf01d01d3f8630c4bd2f85d5bed5c7ffa2c80f49d29b710155c"
+    },
+    {
+      "experiment": "round1404-output-mode-leaves",
+      "host": "output-mode-leaves-cost-ubuntu-22.04-clang-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "d8eb14f3ade7f69d0267c6d4aae75892f27c55a6",
+        "sha256": "0a8d09f2b26b319a53cab779fadd2087a8042620149c070bb28bcdb9ebddd009",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 815865104,
+          "Dr": 182929020,
+          "Dw": 129275514,
+          "I1mr": 1575453,
+          "D1mr": 137956,
+          "D1mw": 1773,
+          "ILmr": 1442,
+          "DLmr": 717,
+          "DLmw": 0,
+          "Bc": 111822966,
+          "Bcm": 7139174,
+          "Bi": 2327388,
+          "Bim": 213959
+        },
+        "modes": {
+          "Ir": 763838138,
+          "Dr": 172936330,
+          "Dw": 121184878,
+          "I1mr": 1354932,
+          "D1mr": 134255,
+          "D1mw": 1736,
+          "ILmr": 1425,
+          "DLmr": 710,
+          "DLmw": 0,
+          "Bc": 111520936,
+          "Bcm": 7066955,
+          "Bi": 2327388,
+          "Bim": 208324
+        }
+      },
+      "instruction_reduction": 0.06376907866867165,
+      "changed_functions": [
+        {
+          "function": "X86_trySimpleOutput",
+          "before": [
+            273322216,
+            65206910,
+            43747658
+          ],
+          "after": [
+            8948376,
+            1491396,
+            0
+          ],
+          "delta": [
+            -264373840,
+            -63715514,
+            -43747658
+          ]
+        },
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            212346874,
+            53722824,
+            35657022
+          ],
+          "delta": [
+            212346874,
+            53722824,
+            35657022
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "0x00000000001e22d0",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          }
+        ],
+        "modes": [
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22d0",
+            "calls": 539044
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": 0,
+      "selector_assembly": [
+        " 120:\t8b 47 04             \tmov    0x4(%rdi),%eax",
+        " 123:\t83 f8 08             \tcmp    $0x8,%eax",
+        " 126:\t74 0a                \tje     132 <X86_trySimpleOutput+0x12>",
+        " 128:\t83 f8 04             \tcmp    $0x4,%eax",
+        " 12b:\t75 07                \tjne    134 <X86_trySimpleOutput+0x14>",
+        " 12d:\te9 00 00 00 00       \tjmp    132 <X86_trySimpleOutput+0x12>",
+        "\t\t\t12e: R_X86_64_PLT32\t.cs_x86_output32-0x4",
+        " 132:\teb 0c                \tjmp    140 <X86_writeSimpleOutput64>",
+        " 134:\t31 c0                \txor    %eax,%eax",
+        " 136:\tc3                   \tret    ",
+        " 137:\t66 0f 1f 84 00 00 00 \tnopw   0x0(%rax,%rax,1)",
+        " 13e:\t00 00 "
+      ],
+      "mode32_prologue": [
+        "   0:\t55                   \tpush   %rbp",
+        "   1:\t41 57                \tpush   %r15",
+        "   3:\t41 56                \tpush   %r14",
+        "   5:\t41 55                \tpush   %r13",
+        "   7:\t41 54                \tpush   %r12",
+        "   9:\t53                   \tpush   %rbx",
+        "   a:\t48 83 ec 68          \tsub    $0x68,%rsp",
+        "   e:\t44 8a 36             \tmov    (%rsi),%r14b",
+        "  11:\t31 c0                \txor    %eax,%eax",
+        "  13:\t41 80 fe 0f          \tcmp    $0xf,%r14b",
+        "  17:\t0f 94 c0             \tsete   %al",
+        "  1a:\t48 39 d0             \tcmp    %rdx,%rax",
+        "  1d:\t0f 83 49 01 00 00    \tjae    16c <X86_writeSimpleOutput32+0x16c>",
+        "  23:\t48 89 f3             \tmov    %rsi,%rbx",
+        "  26:\t31 f6                \txor    %esi,%esi",
+        "  28:\t41 80 fe 0f          \tcmp    $0xf,%r14b",
+        "  2c:\t40 0f 94 c6          \tsete   %sil",
+        "  30:\t44 8a 2c 03          \tmov    (%rbx,%rax,1),%r13b",
+        "  34:\t41 0f b6 ed          \tmovzbl %r13b,%ebp",
+        "  38:\t4c 8d 1c 76          \tlea    (%rsi,%rsi,2),%r11",
+        "  3c:\t4c 89 d8             \tmov    %r11,%rax",
+        "  3f:\t48 c1 e0 09          \tshl    $0x9,%rax"
+      ],
+      "object_disassembly_sha256": "b112e8001ea666b587930aa1bcf8d6cd0bf6a5faef773e8093b6a5f6aaf1919d"
+    },
+    {
+      "experiment": "round1404-output-mode-leaves",
+      "host": "output-mode-leaves-cost-ubuntu-22.04-gcc-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "d8eb14f3ade7f69d0267c6d4aae75892f27c55a6",
+        "sha256": "0a8d09f2b26b319a53cab779fadd2087a8042620149c070bb28bcdb9ebddd009",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 811442322,
+          "Dr": 175978216,
+          "Dw": 128914560,
+          "I1mr": 1064430,
+          "D1mr": 142339,
+          "D1mw": 2185,
+          "ILmr": 1156,
+          "DLmr": 658,
+          "DLmw": 0,
+          "Bc": 128070016,
+          "Bcm": 7480815,
+          "Bi": 4318562,
+          "Bim": 156254
+        },
+        "modes": {
+          "Ir": 831097778,
+          "Dr": 190489044,
+          "Dw": 128114082,
+          "I1mr": 884916,
+          "D1mr": 141645,
+          "D1mw": 1581,
+          "ILmr": 1139,
+          "DLmr": 658,
+          "DLmw": 0,
+          "Bc": 128268040,
+          "Bcm": 7709979,
+          "Bi": 4318562,
+          "Bim": 156254
+        }
+      },
+      "instruction_reduction": -0.02422286275573393,
+      "changed_functions": [
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            225412518,
+            54100504,
+            31767038
+          ],
+          "delta": [
+            225412518,
+            54100504,
+            31767038
+          ]
+        },
+        {
+          "function": "X86_disasmIter",
+          "before": [
+            305016892,
+            73983750,
+            59596576
+          ],
+          "after": [
+            99259830,
+            34394074,
+            27029060
+          ],
+          "delta": [
+            -205757062,
+            -39589676,
+            -32567516
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [],
+        "modes": [
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e2300",
+            "calls": 1467456
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e2308",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": null,
+      "selector_assembly": [],
+      "mode32_prologue": [
+        "   0:\t41 57                \tpush   %r15",
+        "   2:\t41 56                \tpush   %r14",
+        "   4:\t41 55                \tpush   %r13",
+        "   6:\t41 54                \tpush   %r12",
+        "   8:\t55                   \tpush   %rbp",
+        "   9:\t48 89 f5             \tmov    %rsi,%rbp",
+        "   c:\t53                   \tpush   %rbx",
+        "   d:\t48 83 ec 58          \tsub    $0x58,%rsp",
+        "  11:\t0f b6 1e             \tmovzbl (%rsi),%ebx",
+        "  14:\t64 48 8b 04 25 28 00 \tmov    %fs:0x28,%rax",
+        "  1b:\t00 00 ",
+        "  1d:\t48 89 44 24 48       \tmov    %rax,0x48(%rsp)",
+        "  22:\t31 c0                \txor    %eax,%eax",
+        "  24:\t31 c0                \txor    %eax,%eax",
+        "  26:\t80 fb 0f             \tcmp    $0xf,%bl",
+        "  29:\t0f 94 c0             \tsete   %al",
+        "  2c:\t48 39 c2             \tcmp    %rax,%rdx",
+        "  2f:\t0f 86 fb 01 00 00    \tjbe    230 <X86_writeSimpleOutput32+0x230>",
+        "  35:\t44 0f b6 5c 05 00    \tmovzbl 0x0(%rbp,%rax,1),%r11d",
+        "  3b:\t31 c0                \txor    %eax,%eax",
+        "  3d:\t80 fb 0f             \tcmp    $0xf,%bl",
+        "  40:\t48 89 d6             \tmov    %rdx,%rsi"
+      ],
+      "object_disassembly_sha256": "288f3d4d4090039f84acfeddb3f14ff0a9e9ab12ff132e9d121f7824beb60bbd"
+    },
+    {
+      "experiment": "round1404-output-mode-leaves",
+      "host": "output-mode-leaves-cost-ubuntu-24.04-clang-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "d8eb14f3ade7f69d0267c6d4aae75892f27c55a6",
+        "sha256": "0a8d09f2b26b319a53cab779fadd2087a8042620149c070bb28bcdb9ebddd009",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 796728276,
+          "Dr": 183448974,
+          "Dw": 127514556,
+          "I1mr": 3765,
+          "D1mr": 108128,
+          "D1mw": 385,
+          "ILmr": 1141,
+          "DLmr": 699,
+          "DLmw": 0,
+          "Bc": 112061044,
+          "Bcm": 7292002,
+          "Bi": 2266170,
+          "Bim": 213231
+        },
+        "modes": {
+          "Ir": 748975190,
+          "Dr": 177692642,
+          "Dw": 120535898,
+          "I1mr": 3579,
+          "D1mr": 108145,
+          "D1mw": 317,
+          "ILmr": 1122,
+          "DLmr": 699,
+          "DLmw": 0,
+          "Bc": 111759014,
+          "Bcm": 7126719,
+          "Bi": 2266170,
+          "Bim": 213234
+        }
+      },
+      "instruction_reduction": 0.05993647701289817,
+      "changed_functions": [
+        {
+          "function": "X86_trySimpleOutput",
+          "before": [
+            259581584,
+            61542432,
+            41315060
+          ],
+          "after": [
+            7456980,
+            1491396,
+            0
+          ],
+          "delta": [
+            -252124604,
+            -60051036,
+            -41315060
+          ]
+        },
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            204371518,
+            54294704,
+            34336402
+          ],
+          "delta": [
+            204371518,
+            54294704,
+            34336402
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "0x00000000001e22a0",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          }
+        ],
+        "modes": [
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_trySimpleOutput",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_trySimpleOutput",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22a0",
+            "calls": 539044
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": 0,
+      "selector_assembly": [
+        " 100:\t8b 47 04             \tmov    0x4(%rdi),%eax",
+        " 103:\t83 f8 08             \tcmp    $0x8,%eax",
+        " 106:\t74 18                \tje     120 <X86_writeSimpleOutput64>",
+        " 108:\t83 f8 04             \tcmp    $0x4,%eax",
+        " 10b:\t0f 84 00 00 00 00    \tje     111 <X86_trySimpleOutput+0x11>",
+        "\t\t\t10d: R_X86_64_PLT32\t.cs_x86_output32-0x4",
+        " 111:\t31 c0                \txor    %eax,%eax",
+        " 113:\tc3                   \tret",
+        " 114:\t66 66 66 2e 0f 1f 84 \tdata16 data16 cs nopw 0x0(%rax,%rax,1)",
+        " 11b:\t00 00 00 00 00 "
+      ],
+      "mode32_prologue": [
+        "   0:\t55                   \tpush   %rbp",
+        "   1:\t41 57                \tpush   %r15",
+        "   3:\t41 56                \tpush   %r14",
+        "   5:\t41 55                \tpush   %r13",
+        "   7:\t41 54                \tpush   %r12",
+        "   9:\t53                   \tpush   %rbx",
+        "   a:\t48 83 ec 58          \tsub    $0x58,%rsp",
+        "   e:\t44 0f b6 3e          \tmovzbl (%rsi),%r15d",
+        "  12:\t31 c0                \txor    %eax,%eax",
+        "  14:\t41 80 ff 0f          \tcmp    $0xf,%r15b",
+        "  18:\t0f 94 c0             \tsete   %al",
+        "  1b:\t48 39 d0             \tcmp    %rdx,%rax",
+        "  1e:\t0f 83 eb 00 00 00    \tjae    10f <X86_writeSimpleOutput32+0x10f>",
+        "  24:\t45 31 c9             \txor    %r9d,%r9d",
+        "  27:\t41 80 ff 0f          \tcmp    $0xf,%r15b",
+        "  2b:\t41 0f 94 c1          \tsete   %r9b",
+        "  2f:\t44 0f b6 2c 06       \tmovzbl (%rsi,%rax,1),%r13d",
+        "  34:\t41 0f b6 dd          \tmovzbl %r13b,%ebx",
+        "  38:\t4b 8d 04 49          \tlea    (%r9,%r9,2),%rax",
+        "  3c:\t41 89 c2             \tmov    %eax,%r10d",
+        "  3f:\t41 c1 e2 09          \tshl    $0x9,%r10d",
+        "  43:\t4c 8d 0d 00 00 00 00 \tlea    0x0(%rip),%r9        # 4a <X86_writeSimpleOutput32+0x4a>"
+      ],
+      "object_disassembly_sha256": "188763c0203841b448edf33af22740acec2f0ba6ac2bd2b4746a75dbb451e1cb"
+    },
+    {
+      "experiment": "round1404-output-mode-leaves",
+      "host": "output-mode-leaves-cost-ubuntu-24.04-gcc-1",
+      "source": {
+        "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+        "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+        "tree": "d8eb14f3ade7f69d0267c6d4aae75892f27c55a6",
+        "sha256": "0a8d09f2b26b319a53cab779fadd2087a8042620149c070bb28bcdb9ebddd009",
+        "files": [
+          "arch/X86/X86OutputIterator.c"
+        ]
+      },
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 783327390,
+          "Dr": 176215064,
+          "Dw": 131488576,
+          "I1mr": 9906,
+          "D1mr": 106356,
+          "D1mw": 466,
+          "ILmr": 1130,
+          "DLmr": 662,
+          "DLmw": 0,
+          "Bc": 122644598,
+          "Bcm": 7696481,
+          "Bi": 2844040,
+          "Bim": 156257
+        },
+        "modes": {
+          "Ir": 799618568,
+          "Dr": 187856818,
+          "Dw": 126508850,
+          "I1mr": 6262,
+          "D1mr": 106236,
+          "D1mw": 369,
+          "ILmr": 1121,
+          "DLmr": 662,
+          "DLmw": 0,
+          "Bc": 122842622,
+          "Bcm": 7836672,
+          "Bi": 2844040,
+          "Bim": 156256
+        }
+      },
+      "instruction_reduction": -0.02079740630542748,
+      "changed_functions": [
+        {
+          "function": "X86_writeSimpleOutput32",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            223572042,
+            52459958,
+            30103942
+          ],
+          "delta": [
+            223572042,
+            52459958,
+            30103942
+          ]
+        },
+        {
+          "function": "X86_disasmIter",
+          "before": [
+            306540694,
+            75212278,
+            62112728
+          ],
+          "after": [
+            99259830,
+            34394074,
+            27029060
+          ],
+          "delta": [
+            -207280864,
+            -40818204,
+            -35083668
+          ]
+        }
+      ],
+      "calls": {
+        "integer": [],
+        "modes": [
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeImmediateOutput",
+            "calls": 312434
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22d0",
+            "calls": 733728
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "0x00000000001e22d8",
+            "calls": 539044
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeMemoryOutput",
+            "calls": 357938
+          },
+          {
+            "caller": "X86_writeSimpleOutput32",
+            "callee": "X86_writeVectorOutput",
+            "calls": 6208
+          },
+          {
+            "caller": "X86_disasmIter",
+            "callee": "X86_writeSimpleOutput32",
+            "calls": 1491396
+          }
+        ]
+      },
+      "selector_pushes_before_mode_test": null,
+      "selector_assembly": [],
+      "mode32_prologue": [
+        "   0:\t41 57                \tpush   %r15",
+        "   2:\t41 56                \tpush   %r14",
+        "   4:\t41 55                \tpush   %r13",
+        "   6:\t41 54                \tpush   %r12",
+        "   8:\t55                   \tpush   %rbp",
+        "   9:\t53                   \tpush   %rbx",
+        "   a:\t48 89 f3             \tmov    %rsi,%rbx",
+        "   d:\t48 83 ec 58          \tsub    $0x58,%rsp",
+        "  11:\t44 0f b6 2e          \tmovzbl (%rsi),%r13d",
+        "  15:\t64 48 8b 04 25 28 00 \tmov    %fs:0x28,%rax",
+        "  1c:\t00 00 ",
+        "  1e:\t48 89 44 24 48       \tmov    %rax,0x48(%rsp)",
+        "  23:\t31 c0                \txor    %eax,%eax",
+        "  25:\t31 c0                \txor    %eax,%eax",
+        "  27:\t41 80 fd 0f          \tcmp    $0xf,%r13b",
+        "  2b:\t0f 94 c0             \tsete   %al",
+        "  2e:\t48 39 d0             \tcmp    %rdx,%rax",
+        "  31:\t0f 83 e9 01 00 00    \tjae    220 <X86_writeSimpleOutput32+0x220>",
+        "  37:\t44 0f b6 3c 03       \tmovzbl (%rbx,%rax,1),%r15d",
+        "  3c:\t31 c0                \txor    %eax,%eax",
+        "  3e:\t41 80 fd 0f          \tcmp    $0xf,%r13b",
+        "  42:\t48 89 d6             \tmov    %rdx,%rsi"
+      ],
+      "object_disassembly_sha256": "c5cddf1383425559ddfb72c2922a13389683c50f522410996142a573f4d7f0f1"
+    }
+  ],
+  "conclusion": "Clang previously saved and restored six registers before jumping into a second 32-bit frame. Separate leaves remove that frame. GCC previously inlined output into the iterator; both leaf experiments introduce an additional per-instruction call, callee prologue and stack-protector work. The next experiment keeps GCC inlining while retaining constant bitness.",
+  "scope": "Actual recorded call edges and exclusive instruction/read/write counts, matched to the frozen disassembly; no native cycle or cache-stall inference.",
+  "followup": "../round1407-output-mode-inline",
+  "original_negative_evidence_preserved": true
+}
