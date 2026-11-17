@@ -1,117 +1,548 @@
 {
   "inputs": {
-    "baseline_commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-    "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+    "baseline_commit": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "source_parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "baseline_patch_sha256": "1a6654521a094cedac21c882be4239037e3ca3d8b7a9cf7b41c00bdc04909ad0",
     "variants": {
-      "scan": {
-        "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
-        "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
-        "experiment": "round1365-evex-transfer-scan",
+      "output": {
+        "tree": "dc4590d6ba35d07c7803248ccd0be05022c7e5e3",
+        "sha256": "5eb1025b2973f517b5a1f9bccd4e7f03bbce9ed829382de50aedb141897b78cf",
+        "experiment": "round1385-vex32-register-output",
         "semantic_run": {
-          "id": 44126683875,
-          "head_sha": "4f6cd701df3d593d0c50e166cc1017edfaf693fc",
+          "id": 44164275295,
+          "head_sha": "e41f81750d02b492e1e224264d886e43bcc02cd7",
           "status": "completed",
           "conclusion": "success",
-          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44126683875",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44164275295",
           "run_attempt": 1
         },
-        "earlier_layout_failures": [
-          {
-            "profile": "evex-transfer-scan-ubuntu-24.04-gcc",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('AArch64PostprocessFlags', 'r', 16946720, 8264), ('AArch64RegDesc', 'r', 14226176, 16872), ('AArch64RegDiffLists', 'r', 14243776, 4976), ('AArch64SubRegIdxLists', 'r', 14243072, 682), ('ACC128', 'r', 16468062, 2), ('ACC128Bits', 'r', 16468000, 62), ('ACC64', 'r', 16469098, 2), ('ACC64Bits', 'r', 16469092, 5), ('ACC64DSP', 'r', 16469824, 8), ('ACC64DSPBits', 'r', 16469816, 5), ('AFGR64', 'r', 16470592, 32), ('AFGR64Bits', 'r', 16470544, 19)], 'changed': [('AArch64PostprocessFlags', 'r', 16950816, 8264), ('AArch64RegDesc', 'r', 14230272, 16872), ('AArch64RegDiffLists', 'r', 14247872, 4976), ('AArch64SubRegIdxLists', 'r', 14247168, 682), ('ACC128', 'r', 16472158, 2), ('ACC128Bits', 'r', 16472096, 62), ('ACC64', 'r', 16473194, 2), ('ACC64Bits', 'r', 16473188, 5), ('ACC64DSP', 'r', 16473920, 8), ('ACC64DSPBits', 'r', 16473912, 5), ('AFGR64', 'r', 16474688, 32), ('AFGR64Bits', 'r', 16474640, 19)]}"
-            }
-          }
-        ]
-      },
-      "merge": {
-        "tree": "59f9eeed7df5f4fda55c4bc8af3b550616e17139",
-        "sha256": "3e160884f4ae567420757430b217159ccb88e3940476cb7d420885db49555756",
-        "experiment": "round1366-evex-transfer-plan",
-        "semantic_run": {
-          "id": 44129341218,
-          "head_sha": "3d89704a7db16bb078cdfd611747ad8d4c54f7a3",
-          "status": "completed",
-          "conclusion": "success",
-          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44129341218",
-          "run_attempt": 1
-        },
-        "earlier_layout_failures": [
-          {
-            "profile": "evex-transfer-plan-ubuntu-22.04-clang",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('evex_scan_index', 'r', 17644064, 256), ('evex_scan_plans', 'r', 17643856, 196)], 'changed': [('evex_scan_index', 'r', 17643856, 256), ('evex_scan_plans', 'r', 17644112, 196)]}"
-            }
-          },
-          {
-            "profile": "evex-transfer-plan-ubuntu-22.04-gcc",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('evex_scan_index', 'r', 17443040, 256), ('evex_scan_plans', 'r', 17443296, 196)], 'changed': [('evex_scan_index', 'r', 17443136, 256), ('evex_scan_plans', 'r', 17443392, 196)]}"
-            }
-          },
-          {
-            "profile": "evex-transfer-plan-ubuntu-24.04-clang",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('evex_scan_index', 'r', 16952736, 256), ('evex_scan_plans', 'r', 16952528, 196)], 'changed': [('evex_scan_index', 'r', 16952528, 256), ('evex_scan_plans', 'r', 16952784, 196)]}"
-            }
-          },
-          {
-            "profile": "evex-transfer-plan-ubuntu-24.04-gcc",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('AArch64PostprocessFlags', 'r', 16946720, 8264), ('AArch64RegDesc', 'r', 14226176, 16872), ('AArch64RegDiffLists', 'r', 14243776, 4976), ('AArch64SubRegIdxLists', 'r', 14243072, 682), ('ACC128', 'r', 16468062, 2), ('ACC128Bits', 'r', 16468000, 62), ('ACC64', 'r', 16469098, 2), ('ACC64Bits', 'r', 16469092, 5), ('ACC64DSP', 'r', 16469824, 8), ('ACC64DSPBits', 'r', 16469816, 5), ('AFGR64', 'r', 16470592, 32), ('AFGR64Bits', 'r', 16470544, 19)], 'changed': [('AArch64PostprocessFlags', 'r', 16950816, 8264), ('AArch64RegDesc', 'r', 14230272, 16872), ('AArch64RegDiffLists', 'r', 14247872, 4976), ('AArch64SubRegIdxLists', 'r', 14247168, 682), ('ACC128', 'r', 16472158, 2), ('ACC128Bits', 'r', 16472096, 62), ('ACC64', 'r', 16473194, 2), ('ACC64Bits', 'r', 16473188, 5), ('ACC64DSP', 'r', 16473920, 8), ('ACC64DSPBits', 'r', 16473912, 5), ('AFGR64', 'r', 16474688, 32), ('AFGR64Bits', 'r', 16474640, 19)]}"
-            }
-          }
-        ]
+        "preformat_tree": "98703cebc053d0567b34b6c69f59141972bfd4b8"
       }
-    },
-    "source_parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
-    "baseline_patch_sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452",
-    "baseline_publication_pending": true
+    }
   },
-  "created_before_any_native_timing": true,
-  "question": "Does either semantic-equivalent EVEX transfer implementation improve real scanning without regressing PE32, formatted/detail output or other architectures, including the observed linker relocation?",
-  "methodology_change": "R1365 and R1366 retain their failed exact-address gates and are not published. Data address equality was a conservative proxy, not a measured performance requirement. This fresh predeclared comparison retains every layout difference and evaluates both implementations, without any timing results having been observed or discarded.",
-  "native": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
-    ],
-    "panels": 7,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 60,
-    "rows_per_variant": 168
-  },
-  "mixed": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
-    ],
-    "cases": 8,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 80,
-    "rows_per_variant": 192
-  },
-  "controls": [
-    "byte-identical A/A",
-    "original images",
-    "same-file-fixed with ASLR disabled"
+  "cycles": 32,
+  "native_target_ms": 80,
+  "mixed_target_ms": 80,
+  "launches": [
+    "images",
+    "same-file-fixed"
   ],
-  "gate": "Preserve every result. Investigate each median candidate loss beyond 1% and every A/A deviation beyond 1%; exclude unstable observations from gain claims. No candidate is qualified by instruction-count reductions or symbol movement alone.",
-  "layout": "Require all unmodified runtime object hashes and text symbol positions unchanged. Record all read-only and writable address moves. The edited EVEX helpers and their own tables are explicit exceptions.",
-  "consumer": "Frozen original consumers, original mode semantics, common instruction-boundary filtering and frozen real PE/ELF corpora; forked iced 8b8d90b benchmark unchanged.",
-  "production_unchanged": true,
-  "publication_qualified": false,
-  "cleanup": "Remove owned builds and source exports in finally; preserve diagnostics and original observations.",
-  "baseline_assembly": "Reconstruct the exact locally prepared baseline commit from its published parent, frozen patch and verified commit object. Git tree and commit hashes must match before compilation. Baseline product qualification is independent and remains required before production publication."
+  "native_rows": 168,
+  "mixed_rows": 192,
+  "purpose": "Measure 32-bit VEX register output through existing canonical rows, with the published EVEX transfer baseline and frozen scalar/SIMD and cross-architecture consumers.",
+  "gates": "Preserve all predeclared panels and A/A controls. Only VectorOutput and OutputIterator objects may change; no new object. Record every linked text/data relocation. Native timings determine qualification, not simulated instruction counts.",
+  "cost_run": {
+    "id": 44164275295,
+    "head_sha": "e41f81750d02b492e1e224264d886e43bcc02cd7",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44164275295",
+    "run_attempt": 1
+  },
+  "instruction_increases": [
+    {
+      "host": "vex32-register-output-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 348919771,
+          "Dr": 75936443,
+          "Dw": 54594063,
+          "I1mr": 2144088,
+          "D1mr": 102261,
+          "D1mw": 496,
+          "ILmr": 2408,
+          "DLmr": 1560,
+          "DLmw": 0,
+          "Bc": 49225095,
+          "Bcm": 2029587,
+          "Bi": 1317544,
+          "Bim": 261406
+        },
+        "vex32": {
+          "Ir": 349002109,
+          "Dr": 75918933,
+          "Dw": 54576553,
+          "I1mr": 1555151,
+          "D1mr": 101788,
+          "D1mw": 474,
+          "ILmr": 2450,
+          "DLmr": 1561,
+          "DLmw": 0,
+          "Bc": 49275019,
+          "Bcm": 1972249,
+          "Bi": 1317544,
+          "Bim": 275650
+        }
+      },
+      "ir_change": 82338,
+      "instruction_reduction": -0.00023597974905231744,
+      "changed_function_costs": [
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            12897182,
+            2387660,
+            2197610
+          ],
+          "after": [
+            12979520,
+            2370150,
+            2180100
+          ],
+          "delta": [
+            82338,
+            -17510,
+            -17510
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vex32-register-output-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 525543884,
+          "Dr": 117515774,
+          "Dw": 81627405,
+          "I1mr": 4495950,
+          "D1mr": 241092,
+          "D1mw": 2949,
+          "ILmr": 2643,
+          "DLmr": 2204,
+          "DLmw": 0,
+          "Bc": 77812397,
+          "Bcm": 3550294,
+          "Bi": 2433619,
+          "Bim": 262694
+        },
+        "vex32": {
+          "Ir": 525608712,
+          "Dr": 117498264,
+          "Dw": 81609895,
+          "I1mr": 4199499,
+          "D1mr": 242886,
+          "D1mw": 2931,
+          "ILmr": 2681,
+          "DLmr": 2205,
+          "DLmw": 0,
+          "Bc": 77862321,
+          "Bcm": 3565239,
+          "Bi": 2433619,
+          "Bim": 275951
+        }
+      },
+      "ir_change": 64828,
+      "instruction_reduction": -0.0001233541136596017,
+      "changed_function_costs": [
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            13613342,
+            2548006,
+            2553152
+          ],
+          "after": [
+            13678170,
+            2530496,
+            2535642
+          ],
+          "delta": [
+            64828,
+            -17510,
+            -17510
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vex32-register-output-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 353645096,
+          "Dr": 73669402,
+          "Dw": 54600321,
+          "I1mr": 1153129,
+          "D1mr": 83137,
+          "D1mw": 770,
+          "ILmr": 1986,
+          "DLmr": 1470,
+          "DLmw": 0,
+          "Bc": 59274372,
+          "Bcm": 2549596,
+          "Bi": 1417203,
+          "Bim": 209246
+        },
+        "vex32": {
+          "Ir": 354360928,
+          "Dr": 73948120,
+          "Dw": 54753837,
+          "I1mr": 877741,
+          "D1mr": 82780,
+          "D1mw": 651,
+          "ILmr": 1986,
+          "DLmr": 1470,
+          "DLmw": 0,
+          "Bc": 59946768,
+          "Bcm": 2481325,
+          "Bi": 1417249,
+          "Bim": 214323
+        }
+      },
+      "ir_change": 715832,
+      "instruction_reduction": -0.002024153616426716,
+      "changed_function_costs": [
+        {
+          "function": "writeVexRegisterOutput",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            7386334,
+            1115608,
+            1490814
+          ],
+          "delta": [
+            7386334,
+            1115608,
+            1490814
+          ]
+        },
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            22187576,
+            4102026,
+            3727198
+          ],
+          "after": [
+            15516476,
+            3265044,
+            2389808
+          ],
+          "delta": [
+            -6671100,
+            -836982,
+            -1337390
+          ]
+        },
+        {
+          "function": "__memset_avx2_unaligned_erms",
+          "before": [
+            8029296,
+            622022,
+            2387708
+          ],
+          "after": [
+            8029848,
+            622068,
+            2387800
+          ],
+          "delta": [
+            552,
+            46,
+            92
+          ]
+        },
+        {
+          "function": "0x00000000001e2300",
+          "before": [
+            334746,
+            334746,
+            0
+          ],
+          "after": [
+            334792,
+            334792,
+            0
+          ],
+          "delta": [
+            46,
+            46,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vex32-register-output-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 529162484,
+          "Dr": 110316742,
+          "Dw": 86013282,
+          "I1mr": 4386463,
+          "D1mr": 211114,
+          "D1mw": 1987,
+          "ILmr": 2259,
+          "DLmr": 2093,
+          "DLmw": 0,
+          "Bc": 92870159,
+          "Bcm": 4078248,
+          "Bi": 2279603,
+          "Bim": 252402
+        },
+        "vex32": {
+          "Ir": 529777990,
+          "Dr": 110538354,
+          "Dw": 86095086,
+          "I1mr": 2998945,
+          "D1mr": 206616,
+          "D1mw": 1805,
+          "ILmr": 2259,
+          "DLmr": 2093,
+          "DLmw": 0,
+          "Bc": 93540581,
+          "Bcm": 4022442,
+          "Bi": 2279649,
+          "Bim": 218200
+        }
+      },
+      "ir_change": 615506,
+      "instruction_reduction": -0.001163170138871683,
+      "changed_function_costs": [
+        {
+          "function": "writeVexRegisterOutput",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9659046,
+            1741132,
+            2316288
+          ],
+          "delta": [
+            9659046,
+            1741132,
+            2316288
+          ]
+        },
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            25344454,
+            4945486,
+            4980892
+          ],
+          "after": [
+            16315220,
+            3428210,
+            2746316
+          ],
+          "delta": [
+            -9029234,
+            -1517276,
+            -2234576
+          ]
+        },
+        {
+          "function": "__strchr_avx2",
+          "before": [
+            1675088,
+            224932,
+            0
+          ],
+          "after": [
+            1658736,
+            222596,
+            0
+          ],
+          "delta": [
+            -16352,
+            -2336,
+            0
+          ]
+        },
+        {
+          "function": "__strcmp_avx2",
+          "before": [
+            123748,
+            27740,
+            0
+          ],
+          "after": [
+            125196,
+            27740,
+            0
+          ],
+          "delta": [
+            1448,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "__memset_avx2_unaligned_erms",
+          "before": [
+            22393096,
+            1196574,
+            8133228
+          ],
+          "after": [
+            22393648,
+            1196620,
+            8133320
+          ],
+          "delta": [
+            552,
+            46,
+            92
+          ]
+        },
+        {
+          "function": "0x00000000001e2300",
+          "before": [
+            622022,
+            622022,
+            0
+          ],
+          "after": [
+            622068,
+            622068,
+            0
+          ],
+          "delta": [
+            46,
+            46,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vex32-register-output-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 342161248,
+          "Dr": 76017377,
+          "Dw": 54013856,
+          "I1mr": 755288,
+          "D1mr": 102667,
+          "D1mw": 417,
+          "ILmr": 1955,
+          "DLmr": 1495,
+          "DLmw": 0,
+          "Bc": 49415146,
+          "Bcm": 2198447,
+          "Bi": 1392297,
+          "Bim": 267485
+        },
+        "vex32": {
+          "Ir": 342261096,
+          "Dr": 76017377,
+          "Dw": 54013856,
+          "I1mr": 699343,
+          "D1mr": 101871,
+          "D1mw": 429,
+          "ILmr": 1945,
+          "DLmr": 1495,
+          "DLmw": 0,
+          "Bc": 49465070,
+          "Bcm": 2127414,
+          "Bi": 1392297,
+          "Bim": 266962
+        }
+      },
+      "ir_change": 99848,
+      "instruction_reduction": -0.00029181562957125706,
+      "changed_function_costs": [
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            10750628,
+            2344558,
+            2167128
+          ],
+          "after": [
+            10850476,
+            2344558,
+            2167128
+          ],
+          "delta": [
+            99848,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vex32-register-output-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 514776062,
+          "Dr": 116891672,
+          "Dw": 81067360,
+          "I1mr": 2797400,
+          "D1mr": 219415,
+          "D1mw": 942,
+          "ILmr": 2182,
+          "DLmr": 2141,
+          "DLmw": 0,
+          "Bc": 77878351,
+          "Bcm": 4346090,
+          "Bi": 2508370,
+          "Bim": 402036
+        },
+        "vex32": {
+          "Ir": 514875910,
+          "Dr": 116891672,
+          "Dw": 81067360,
+          "I1mr": 2700514,
+          "D1mr": 213958,
+          "D1mw": 950,
+          "ILmr": 2174,
+          "DLmr": 2140,
+          "DLmw": 0,
+          "Bc": 77928275,
+          "Bcm": 4316783,
+          "Bi": 2508370,
+          "Bim": 386698
+        }
+      },
+      "ir_change": 99848,
+      "instruction_reduction": -0.0001939639532033688,
+      "changed_function_costs": [
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            11447784,
+            2500824,
+            2518590
+          ],
+          "after": [
+            11547632,
+            2500824,
+            2518590
+          ],
+          "delta": [
+            99848,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "prior_failures_preserved": [
+    "R1379 memory-output JPEG64 and cross-architecture losses",
+    "R1382 packed-admission layout failure"
+  ],
+  "publication_qualified": false
 }
