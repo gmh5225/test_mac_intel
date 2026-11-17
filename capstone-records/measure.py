@@ -1,8 +1,10 @@
 from pathlib import Path
 import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
+import gzip
 from layout import object_proof, linked_layout
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
+focus=json.loads((r/'geometry.json').read_text())['focus']['mixed'][os.environ['GEOMETRY_PROFILE']]
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def run(args,label,cwd=None):
@@ -10,7 +12,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-geometry-mixed-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -70,23 +72,27 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed
   maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
   image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
+  assert probe.returncode==0
+  launches=['images','images-fixed','same-file','same-file-fixed']
   write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Two predeclared canonical EVEX transfer implementations; all unmodified runtime objects and instruction semantics are preserved, while data relocation is recorded and measured; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
-   if launch=='images':args=[str(bins[key]),*tail]
+   if launch in ('images','images-fixed'):
+    args=[str(bins[key]),*tail]
+    if launch=='images-fixed':args=['setarch',platform.machine(),'-R',*args]
    else:
     with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
     assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
+    args=[str(image),*tail]
+    if launch=='same-file-fixed':args=['setarch',platform.machine(),'-R',*args]
    return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
    for mode in (0,1,2):
+    if [x['name'],mode] not in focus:continue
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*60e6/warm['cpu_ns'])))
      runs=[];reference=None;keys=['base','aa','scan','merge']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
@@ -97,6 +103,31 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-transfer-comparison-mixed
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  costs=[]
+  for x in cases:
+   for mode in (0,1,2):
+    if [x['name'],mode] not in focus:continue
+    signatures={}
+    for label in ('base','scan','merge'):
+     ident=x['name']+'-'+str(mode)+'-'+label
+     raw=t/(ident+'.callgrind')
+     args=[bins[label],str(x['selector']),str(mode),x['path'],'1']
+     run(['valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no','--toggle-collect=_ZL3runR7SessionRKSt6vectorIhSaIhEEj','--dump-instr=yes','--collect-jumps=yes','--cache-sim=yes','--branch-sim=yes','--callgrind-out-file='+str(raw),*args],'cost-'+ident)
+     log=(e/('cost-'+ident+'.log')).read_text()
+     result=json.loads(next(line for line in log.splitlines() if line.startswith('{')))
+     signatures[label]=(result['first'],result['result'])
+     assert signatures[label]==signatures['base']
+     content=raw.read_text()
+     events=next(line[8:].split()for line in content.splitlines()if line.startswith('events: '))
+     counts=list(map(int,next(line[8:].split()for line in content.splitlines()if line.startswith('totals: '))))
+     assert len(events)==len(counts) and counts[0]>0
+     costs.append(dict(case=x['name'],mode=mode,variant=label,events=dict(zip(events,counts)),result=signatures[label],collected_traversals=3))
+     with gzip.open(e/(ident+'.callgrind.gz'),'wb')as out:out.write(raw.read_bytes())
+     raw.unlink()
+     write('instruction-costs',costs)
+  assert len(costs)==len(focus)*3
+
+  assert len(data)==len(focus)*4
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
