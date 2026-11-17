@@ -1,0 +1,4887 @@
+{
+  "review": {
+    "inputs": {
+      "neverd": "02ace371079999d9bd16695229643604b7399c7f",
+      "capstone": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+      "variants": {
+        "evex-canonical-scan": {
+          "source": "round1364-evex-canonical-scan-plan",
+          "patch": "evex-canonical-scan.patch",
+          "patch_sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "changed": [
+            "X86DisassemblerDecoder.c.o"
+          ],
+          "added": [
+            "X86EvexScan.c.o"
+          ]
+        }
+      },
+      "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+      "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
+      "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+      "scope": "Actual NeverD raw, text, detail and batch paths: 96 paired observations across 15 real and targeted workloads. Use unmodified latest NeverSight LLVM main built from source, prebuilt disabled; preserve dependencies between variants.",
+      "qualification_pending": [
+        "product validation",
+        "focused native outliers",
+        "portable builds"
+      ],
+      "validation_entry": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86DisassemblerDecoder.c",
+            "arch/X86/X86EvexAdmission.h",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexScan.inc",
+            "arch/X86/X86VectorOutput.c",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+        },
+        "native_run": {
+          "id": 44117159626,
+          "head_sha": "d2754b1147bb62d4b6856c8136b5d95d99fde1fe",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44117159626",
+          "run_attempt": 1
+        },
+        "mixed_run": {
+          "id": 44117219216,
+          "head_sha": "0a2de8ffe2d723ce720a3c95796131b420fb7063",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44117219216",
+          "run_attempt": 1
+        },
+        "profiles_run": {
+          "id": 44119046576,
+          "head_sha": "0fc7c0d0d8b1699afecc759467f731536a69ac2f",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44119046576",
+          "run_attempt": 1
+        },
+        "original_native_flags": [
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "libjpeg62-turbo-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "images",
+            "gain": 0.9809091671402883,
+            "aa": 0.999465261438544,
+            "ci95": [
+              0.9488437603564459,
+              0.9884082010530986
+            ],
+            "aa_ci95": [
+              0.9682976164953067,
+              1.016651732377539
+            ],
+            "vs_iced": 0.5101972997094624,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "libzstd1-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "same-file-fixed",
+            "gain": 0.9774894123046751,
+            "aa": 0.9970840309114899,
+            "ci95": [
+              0.9699206495663406,
+              1.0030774546750316
+            ],
+            "aa_ci95": [
+              0.9852333655620991,
+              1.006001446131598
+            ],
+            "vs_iced": 0.8250308769040758,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "libzstd1-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "images",
+            "gain": 1.0086243323184936,
+            "aa": 1.0124412319698084,
+            "ci95": [
+              0.9882069821634689,
+              1.019659211698895
+            ],
+            "aa_ci95": [
+              1.0073497051315903,
+              1.0292871197215077
+            ],
+            "vs_iced": 0.8464520008160021,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "jpeg-avx2-i386",
+            "panel": "simd-functions",
+            "mode": "detail",
+            "launch": "images",
+            "gain": 1.0006191356517493,
+            "aa": 1.012289205380156,
+            "ci95": [
+              0.9798456467561701,
+              1.0183712401675973
+            ],
+            "aa_ci95": [
+              0.9972414274739856,
+              1.0352359275146634
+            ],
+            "vs_iced": 0.6277734811377503,
+            "vs_fast": 0.37841096906938304
+          }
+        ],
+        "original_mixed_flags": [
+          {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-ls",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.007105065203512,
+            "aa": 1.0186669749993575,
+            "ci95": [
+              1.0041140958890984,
+              1.0163542648977535
+            ],
+            "aa_ci95": [
+              1.0134254599881294,
+              1.020902351033904
+            ]
+          },
+          {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-sort",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.0090907446814923,
+            "aa": 1.0155991779635694,
+            "ci95": [
+              1.0028248756994715,
+              1.0159796875568106
+            ],
+            "aa_ci95": [
+              1.0138249692880323,
+              1.0196871990540393
+            ]
+          },
+          {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-cp",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.0122010448662413,
+            "aa": 1.0170176362200578,
+            "ci95": [
+              1.005999723696935,
+              1.0148998486426986
+            ],
+            "aa_ci95": [
+              1.0141265117874887,
+              1.0246125918417375
+            ]
+          },
+          {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "amd64-ls",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.0126273291925465,
+            "aa": 1.0108920773549595,
+            "ci95": [
+              1.0070878216636745,
+              1.0138379501558412
+            ],
+            "aa_ci95": [
+              1.0098350451291627,
+              1.0147578440063427
+            ]
+          },
+          {
+            "host": "evex-canonical-scan-images-four-ubuntu-24.04-gcc-44117219216",
+            "case": "amd64-ls",
+            "mode": 2,
+            "launch": "images",
+            "gain": 0.9967146908391148,
+            "aa": 0.9864389131297104,
+            "ci95": [
+              0.9898296921119907,
+              1.0028852211162909
+            ],
+            "aa_ci95": [
+              0.9829753489495889,
+              0.9893288332444069
+            ]
+          }
+        ],
+        "unresolved": [
+          "focused native timing and executed-PC investigation",
+          "portable build completion"
+        ],
+        "publication_qualified": false,
+        "rationale": "Product validation is independent additional evidence and can proceed while the frozen native outliers are investigated. It does not override or erase any failed observation."
+      },
+      "timing_protocol": {
+        "cycles": 32,
+        "calibration_cpu_ms": 100,
+        "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+        "consumer_unchanged": true,
+        "publication_qualified": false
+      },
+      "public_state_scope": "Seeded complete-state product probe plus separate four-compiler 6946816 public records, 6946816 private records and 3145728 protected-page extents per compiler."
+    },
+    "complete": true,
+    "run": {
+      "id": 44122907418,
+      "head_sha": "c74415284ab8d252533c2e8670c054fdcb4f4d1f",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44122907418",
+      "run_attempt": 1
+    },
+    "source": {
+      "neverd": "02ace371079999d9bd16695229643604b7399c7f",
+      "capstone": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+      "llvm_fork": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+      "llvm_source": "/home/runner/work/test_mac_intel/test_mac_intel/neverd/third_party/llvm-project"
+    },
+    "llvm_identity": {
+      "revision": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+      "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "untracked": {}
+    },
+    "managed_source_identity": {
+      "neverd_highway": {
+        "repository": "https://github.com/NeverSight/highway.git",
+        "branch": "master",
+        "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+        "sha256": "f5149df5acb77cd9730ed8e5160f2deff0b02fe49cc45443fd396fdb5f0519d2"
+      },
+      "neverd_simdutf": {
+        "repository": "https://github.com/NeverSight/simdutf.git",
+        "branch": "master",
+        "commit": "8d82299606e675b50de8dc16fd118aae4b65bfde",
+        "sha256": "48e9c9fc33940bcc81cdaec785ce6e21ea20f7b03b7a26bff56abb41d2cf5126"
+      },
+      "neverd_simdjson": {
+        "repository": "https://github.com/NeverSight/simdjson.git",
+        "branch": "master",
+        "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+        "sha256": "e4e849bbb16878f8555501cc09bf4a6d90d4a06ccfc67a202a3c030486c3823d"
+      },
+      "neverd_tbb": {
+        "repository": "https://github.com/NeverSight/oneTBB.git",
+        "branch": "master",
+        "commit": "d26e0502ca39f888c1266cbbf1e2c2226d31e41b",
+        "sha256": "98300a443e43d047eabae27d3e30232efe7508b20d8e24a92ff2d54ef511761b"
+      },
+      "neverd_mimalloc": {
+        "repository": "https://github.com/NeverSight/mimalloc.git",
+        "branch": "main3",
+        "commit": "e8e7bc41ce904b4c83fe20e87d93f24d5286315a",
+        "sha256": "aea4126df4ada4e8f733e2a0f08642a8aabe6c2afc01886a1a9a259c18231ac3"
+      }
+    },
+    "tests": {
+      "base": [
+        "100% tests passed, 0 tests failed out of 34"
+      ],
+      "evex-canonical-scan": [
+        "100% tests passed, 0 tests failed out of 34"
+      ]
+    },
+    "states": {
+      "base": "40068 15880932718584834093",
+      "evex-canonical-scan": "40068 15880932718584834093"
+    },
+    "rows": [
+      {
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "reps": 68,
+        "signature": [
+          1972272,
+          0,
+          5239784734336263845,
+          802639088
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9986854520765922,
+            "ci95": [
+              0.9949196808700941,
+              1.0017927675191358
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0014618214134936,
+            "ci95": [
+              1.000097594551142,
+              1.0025979018640976
+            ]
+          }
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 67,
+        "signature": [
+          1943268,
+          0,
+          7040914127525643397,
+          790835572
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9995841982658371,
+            "ci95": [
+              0.997413014365719,
+              1.0013596368787288
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997934549550707,
+            "ci95": [
+              0.9964507772020725,
+              1.0018287708682099
+            ]
+          }
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "reps": 18,
+        "signature": [
+          522072,
+          0,
+          1440614565876004709,
+          220359636
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998923536362678,
+            "ci95": [
+              0.9989331757304991,
+              1.0013319610098685
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9991927413806467,
+            "ci95": [
+              0.9983584752412566,
+              0.9999446671730459
+            ]
+          }
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 18,
+        "signature": [
+          522072,
+          0,
+          1440614565876004709,
+          220359636
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998441688427475,
+            "ci95": [
+              0.9987662234011805,
+              1.0006697081863816
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9999374060870424,
+            "ci95": [
+              0.9986464795890129,
+              1.0005104237043632
+            ]
+          }
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "reps": 15,
+        "signature": [
+          435060,
+          0,
+          6139539121445165829,
+          375297540
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000500134953124,
+            "ci95": [
+              0.9993903825091442,
+              1.0017638167025602
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0003983160801075,
+            "ci95": [
+              0.9993793138383134,
+              1.0023099486611184
+            ]
+          }
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 15,
+        "signature": [
+          435060,
+          0,
+          6139539121445165829,
+          375297540
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0004003179157845,
+            "ci95": [
+              0.998574083320893,
+              1.0016282360522843
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0000361817770886,
+            "ci95": [
+              0.9994618815518508,
+              1.0016087588788238
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "reps": 89,
+        "signature": [
+          2265050,
+          3115,
+          16962085690809311727,
+          161734538
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0071205402383563,
+            "ci95": [
+              1.0011484055667734,
+              1.0094312174395177
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001388588964637,
+            "ci95": [
+              0.9974328776193603,
+              1.008897402682943
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 91,
+        "signature": [
+          2315950,
+          3185,
+          7108393711893056311,
+          165369022
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998240990037717,
+            "ci95": [
+              0.9990300110342727,
+              1.0013089745030985
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0010316989705341,
+            "ci95": [
+              0.999490220281107,
+              1.0020654840132714
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "reps": 22,
+        "signature": [
+          559900,
+          770,
+          2416893203151067405,
+          47595636
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998296453434903,
+            "ci95": [
+              0.998407988352936,
+              1.0021553379726305
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0013072152884135,
+            "ci95": [
+              0.9984739033455764,
+              1.0051093900045927
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 22,
+        "signature": [
+          559900,
+          770,
+          2416893203151067405,
+          47595636
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0000982898479345,
+            "ci95": [
+              0.9998494214751216,
+              1.0010484683020004
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001939950691352,
+            "ci95": [
+              0.9993985065553552,
+              1.0014058132360784
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "reps": 13,
+        "signature": [
+          330850,
+          455,
+          9654126669519425759,
+          67442648
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0019169907769685,
+            "ci95": [
+              0.9954073452877192,
+              1.0044331465370249
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9981209571165854,
+            "ci95": [
+              0.9941413672775373,
+              1.0002976225087021
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 13,
+        "signature": [
+          330850,
+          455,
+          9654126669519425759,
+          67442648
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9987295298748217,
+            "ci95": [
+              0.9978441296648757,
+              1.0009631328626891
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9991210625779514,
+            "ci95": [
+              0.9966545820169772,
+              1.0027007168814663
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "reps": 18,
+        "signature": [
+          5092308,
+          54,
+          16974803543808769549,
+          2098693566
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.999209852990863,
+            "ci95": [
+              0.9984512932339915,
+              1.0002375344930408
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9980929943961911,
+            "ci95": [
+              0.9967699021396249,
+              1.0004805069348162
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 18,
+        "signature": [
+          5092308,
+          54,
+          16974803543808769549,
+          2098693566
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0005062753089662,
+            "ci95": [
+              0.9992261458356191,
+              1.0011417845496018
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9994907612301973,
+            "ci95": [
+              0.99849186413663,
+              1.0001662293080424
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "reps": 8,
+        "signature": [
+          2263248,
+          24,
+          17565747584236164613,
+          964212584
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0007475632143148,
+            "ci95": [
+              0.9984435448084363,
+              1.0018691036326373
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.999720915480387,
+            "ci95": [
+              0.9987873046935992,
+              1.0007155619986285
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 8,
+        "signature": [
+          2263248,
+          24,
+          17565747584236164613,
+          964212584
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9994688908973475,
+            "ci95": [
+              0.9990215613957396,
+              1.0001730085665455
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001308920428564,
+            "ci95": [
+              0.9989481256893082,
+              1.0008039969459828
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "reps": 5,
+        "signature": [
+          1414530,
+          15,
+          7801069537565874201,
+          704236865
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0002947544194947,
+            "ci95": [
+              0.9984388329160928,
+              1.0012371685558565
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0006111392911003,
+            "ci95": [
+              1.0001335797612394,
+              1.001380498794965
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 5,
+        "signature": [
+          1414530,
+          15,
+          7801069537565874201,
+          704236865
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9991104190820408,
+            "ci95": [
+              0.9976590127214939,
+              1.0006021152350568
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0000917111129177,
+            "ci95": [
+              0.9981024038062571,
+              1.001653057601846
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 3,
+        "launch": "images",
+        "reps": 26,
+        "signature": [
+          7355556,
+          78,
+          12695331913943471341,
+          3031446262
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000206037653658,
+            "ci95": [
+              0.9997021557842725,
+              1.001035923554919
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0002036666527903,
+            "ci95": [
+              0.9996884005241166,
+              1.0009173283321953
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 26,
+        "signature": [
+          7355556,
+          78,
+          12695331913943471341,
+          3031446262
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9996449479197965,
+            "ci95": [
+              0.9992794770646628,
+              1.0002710041009064
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9998543424490717,
+            "ci95": [
+              0.9993665713118104,
+              1.0002786068092093
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "reps": 17,
+        "signature": [
+          4414798,
+          59755,
+          6586553106680166621,
+          1800956336
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0002714427439543,
+            "ci95": [
+              0.9995095917489721,
+              1.001849198849839
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0000531506765427,
+            "ci95": [
+              0.9988002065467211,
+              1.0015695158373799
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 17,
+        "signature": [
+          4414798,
+          59755,
+          6586553106680166621,
+          1800956336
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003352983761316,
+            "ci95": [
+              0.999517015850052,
+              1.0011669991754581
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0000991322118684,
+            "ci95": [
+              0.9992082725034952,
+              1.0003863771549424
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "reps": 8,
+        "signature": [
+          2077552,
+          28120,
+          18181879010259129125,
+          879557840
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9997631507453943,
+            "ci95": [
+              0.9986357297838815,
+              1.000397506277077
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9998138770669855,
+            "ci95": [
+              0.9990765553392582,
+              1.000316585389221
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 8,
+        "signature": [
+          2077552,
+          28120,
+          18181879010259129125,
+          879557840
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998338196152508,
+            "ci95": [
+              0.9987827084234565,
+              1.0003575421245052
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997360034016154,
+            "ci95": [
+              0.9987360266462487,
+              1.00038707357985
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "reps": 5,
+        "signature": [
+          1298470,
+          17575,
+          18199114599289802973,
+          713942810
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9994353677178267,
+            "ci95": [
+              0.9986381668541654,
+              1.0003394213982753
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997763922719379,
+            "ci95": [
+              0.9979460756168022,
+              1.0009755519144532
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 5,
+        "signature": [
+          1298470,
+          17575,
+          18199114599289802973,
+          713942810
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0002337964996901,
+            "ci95": [
+              0.9996994627897366,
+              1.0018039388612068
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0006274795248777,
+            "ci95": [
+              0.9990446748674352,
+              1.0018237312426432
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 3,
+        "launch": "images",
+        "reps": 22,
+        "signature": [
+          5713268,
+          77330,
+          7926656586590158629,
+          2330649376
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000088873128636,
+            "ci95": [
+              0.9988950530964646,
+              1.0013185916185712
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0002144448347225,
+            "ci95": [
+              0.9998668588000732,
+              1.0014826999388502
+            ]
+          }
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 22,
+        "signature": [
+          5713268,
+          77330,
+          7926656586590158629,
+          2330649376
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998272395787318,
+            "ci95": [
+              0.9993552479150395,
+              1.0003245954336752
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0000628701963463,
+            "ci95": [
+              0.9995598222520332,
+              1.0005429111675823
+            ]
+          }
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "reps": 76,
+        "signature": [
+          1711748,
+          0,
+          16692912633307487333,
+          744314284
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.00047178666545,
+            "ci95": [
+              0.9993085510643978,
+              1.0022514074668774
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001279162568153,
+            "ci95": [
+              0.9995198620167073,
+              1.0013215626002518
+            ]
+          }
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 78,
+        "signature": [
+          1756794,
+          0,
+          16605528824012392133,
+          763901502
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0009308697551695,
+            "ci95": [
+              0.99938070994739,
+              1.001842111103713
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0007030662150957,
+            "ci95": [
+              0.9995217879138698,
+              1.0015639211162626
+            ]
+          }
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "reps": 54,
+        "signature": [
+          1216242,
+          0,
+          12336137060376721477,
+          662037462
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9994112995932368,
+            "ci95": [
+              0.9982525692692463,
+              1.0005202646384843
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9992796684959743,
+            "ci95": [
+              0.997879758248724,
+              1.000938208868107
+            ]
+          }
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 54,
+        "signature": [
+          1216242,
+          0,
+          12336137060376721477,
+          662037462
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0004604134929471,
+            "ci95": [
+              0.9988646288209607,
+              1.0017927631578947
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9999670504893472,
+            "ci95": [
+              0.9984488801329603,
+              1.002155518461095
+            ]
+          }
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 3,
+        "launch": "images",
+        "reps": 208,
+        "signature": [
+          4684784,
+          0,
+          5708734440172465189,
+          1966006224
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0007446566793698,
+            "ci95": [
+              0.9998064839193022,
+              1.0012571807519168
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0008012275164844,
+            "ci95": [
+              1.0000387698146378,
+              1.0021823812337065
+            ]
+          }
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 216,
+        "signature": [
+          4864968,
+          0,
+          1407422385453120421,
+          2041621848
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0014250936849316,
+            "ci95": [
+              0.999525448536895,
+              1.0021211757374087
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997781476207794,
+            "ci95": [
+              0.9992809778700966,
+              1.0012528072582252
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "reps": 81,
+        "signature": [
+          1941813,
+          0,
+          5106875434381339571,
+          1047408165
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9974974311278959,
+            "ci95": [
+              0.9955206077728314,
+              1.000310682575068
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0006219125771452,
+            "ci95": [
+              0.9937289172691293,
+              1.0036671304224576
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 81,
+        "signature": [
+          1941813,
+          0,
+          5106875434381339571,
+          1047408165
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9999423399820027,
+            "ci95": [
+              0.9991704931390639,
+              1.0005427915665828
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997700350002698,
+            "ci95": [
+              0.9988486224059742,
+              1.0006755828962184
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "reps": 17,
+        "signature": [
+          407541,
+          0,
+          9743426667038549427,
+          225351575
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.998346068528237,
+            "ci95": [
+              0.9972758421253505,
+              1.0002086002824977
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.998985861248007,
+            "ci95": [
+              0.9977991498085562,
+              1.0002991133752723
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 17,
+        "signature": [
+          407541,
+          0,
+          9743426667038549427,
+          225351575
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0005301463635434,
+            "ci95": [
+              0.9988192068356284,
+              1.001618642352315
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9994971688318166,
+            "ci95": [
+              0.9982960885430803,
+              1.0005388690799943
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "reps": 12,
+        "signature": [
+          287676,
+          0,
+          6513759373111551173,
+          244231020
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9989744127696609,
+            "ci95": [
+              0.9959738968104966,
+              1.0022604452063617
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.999484032408587,
+            "ci95": [
+              0.9972661842672563,
+              1.003643979671652
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 12,
+        "signature": [
+          287676,
+          0,
+          6513759373111551173,
+          244231020
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003155161809651,
+            "ci95": [
+              0.9990254805069619,
+              1.001341933708292
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997582176664583,
+            "ci95": [
+              0.999019236816997,
+              1.0004088071013488
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 0,
+        "launch": "images",
+        "reps": 103,
+        "signature": [
+          1899835,
+          0,
+          13030755405300450211,
+          1049275729
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0019719277378578,
+            "ci95": [
+              0.9971076646885753,
+              1.0049859275817585
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9968313633881258,
+            "ci95": [
+              0.9941646166669444,
+              1.0012176730156956
+            ]
+          }
+        }
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 101,
+        "signature": [
+          1862945,
+          0,
+          12216621217837701139,
+          1028901443
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0006193089137492,
+            "ci95": [
+              0.9994110184849583,
+              1.0021340201352293
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.999934834851353,
+            "ci95": [
+              0.9986650451112934,
+              1.001532332209623
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "launch": "images",
+        "reps": 4,
+        "signature": [
+          3443644,
+          2844,
+          4932088555328177189,
+          2066137300
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0000511141291588,
+            "ci95": [
+              0.998643222054929,
+              1.0004681114754113
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.1305977441057347,
+            "ci95": [
+              1.129865083123854,
+              1.1320605533491062
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 4,
+        "signature": [
+          3443644,
+          2844,
+          4932088555328177189,
+          2066137300
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998519644618591,
+            "ci95": [
+              0.9982090419181,
+              1.000992689703542
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.1293208348285408,
+            "ci95": [
+              1.128628012349648,
+              1.130685968928067
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 1,
+        "launch": "images",
+        "reps": 3,
+        "signature": [
+          2582733,
+          2133,
+          13350051667106787423,
+          1592234040
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0007021304345312,
+            "ci95": [
+              0.9994533518131345,
+              1.0014653723280462
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.999989201579872,
+            "ci95": [
+              0.9989886446558192,
+              1.0013464779310552
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 3,
+        "signature": [
+          2582733,
+          2133,
+          13350051667106787423,
+          1592234040
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9996932369133084,
+            "ci95": [
+              0.9993802528185376,
+              1.000674362309212
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997951542858323,
+            "ci95": [
+              0.9987753356654545,
+              1.000393130734651
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 2,
+        "launch": "images",
+        "reps": 2,
+        "signature": [
+          1721822,
+          1422,
+          14641755784462448293,
+          1362754360
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0001268306379727,
+            "ci95": [
+              0.9994831271682377,
+              1.001849428938022
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0007903728326473,
+            "ci95": [
+              0.9993847174282061,
+              1.0025261089226862
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 2,
+        "signature": [
+          1721822,
+          1422,
+          14641755784462448293,
+          1362754360
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998307362790557,
+            "ci95": [
+              0.9990219687551618,
+              1.000498089933386
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.999985050217514,
+            "ci95": [
+              0.9990214247363043,
+              1.0019310236604886
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 3,
+        "launch": "images",
+        "reps": 6,
+        "signature": [
+          5165466,
+          4266,
+          2642198292610024357,
+          3099205950
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9997454359222147,
+            "ci95": [
+              0.9982268001597668,
+              1.0008062901734183
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.1735045407594593,
+            "ci95": [
+              1.1723983075607882,
+              1.1742444823576714
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 6,
+        "signature": [
+          5165466,
+          4266,
+          2642198292610024357,
+          3099205950
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000013949933699,
+            "ci95": [
+              0.9996503529104623,
+              1.0005639894024487
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.173076609576159,
+            "ci95": [
+              1.1728469291820627,
+              1.173916844710858
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 0,
+        "launch": "images",
+        "reps": 49,
+        "signature": [
+          4630647,
+          0,
+          17719176078726474773,
+          2123172254
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0010344196712615,
+            "ci95": [
+              0.9996129342720549,
+              1.001664466509786
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9995987238136093,
+            "ci95": [
+              0.9988598273506661,
+              1.0016644473869887
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 49,
+        "signature": [
+          4630647,
+          0,
+          17719176078726474773,
+          2123172254
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003311671703068,
+            "ci95": [
+              0.9989776908267212,
+              1.0008487496025111
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9992112785252496,
+            "ci95": [
+              0.9980257201543639,
+              1.0009944991764304
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 1,
+        "launch": "images",
+        "reps": 19,
+        "signature": [
+          1795557,
+          0,
+          17641028928571029845,
+          854896165
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000892153966714,
+            "ci95": [
+              0.9998440553915249,
+              1.0025578112220712
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0007152833260562,
+            "ci95": [
+              0.9996624079776733,
+              1.001437305935588
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 19,
+        "signature": [
+          1795557,
+          0,
+          17641028928571029845,
+          854896165
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0001458004347596,
+            "ci95": [
+              0.9993548588493596,
+              1.0008688639733618
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0002004806804248,
+            "ci95": [
+              0.9996876431635501,
+              1.0007042074072092
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 2,
+        "launch": "images",
+        "reps": 13,
+        "signature": [
+          1228539,
+          0,
+          14839374833353037205,
+          710624473
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9992680879713404,
+            "ci95": [
+              0.9979461557070705,
+              1.0013446862564133
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9991734452189054,
+            "ci95": [
+              0.9980432084676241,
+              1.0001383665824937
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 12,
+        "signature": [
+          1134036,
+          0,
+          15090757478586660261,
+          655961052
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0000132773859431,
+            "ci95": [
+              0.9987547431991877,
+              1.0023048204736034
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0020355549017705,
+            "ci95": [
+              0.9998161982809973,
+              1.0029506897438094
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 3,
+        "launch": "images",
+        "reps": 67,
+        "signature": [
+          6331701,
+          0,
+          13445079156687182677,
+          2903113082
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003693054996057,
+            "ci95": [
+              0.9995804241238774,
+              1.0019383105145265
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0005849827634705,
+            "ci95": [
+              0.9991272786000152,
+              1.002011468834235
+            ]
+          }
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 68,
+        "signature": [
+          6426204,
+          0,
+          417680769749717157,
+          2946443128
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000002539089881,
+            "ci95": [
+              0.9994934911473097,
+              1.0010625644278803
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001109684631642,
+            "ci95": [
+              0.9995404387489369,
+              1.0007595778013387
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 0,
+        "launch": "images",
+        "reps": 6,
+        "signature": [
+          5227872,
+          12780,
+          7137381921111751565,
+          2393409780
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9996856694703344,
+            "ci95": [
+              0.9977994047646859,
+              1.0005149105678512
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9999556473070099,
+            "ci95": [
+              0.9991609075901154,
+              1.0003054571264451
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 6,
+        "signature": [
+          5227872,
+          12780,
+          7137381921111751565,
+          2393409780
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9999603965155623,
+            "ci95": [
+              0.9992650925491354,
+              1.0010116953860133
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0002127039566096,
+            "ci95": [
+              0.999473840690149,
+              1.0010334858733654
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 1,
+        "launch": "images",
+        "reps": 3,
+        "signature": [
+          2613936,
+          6390,
+          14796607081077732657,
+          1234253346
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9996841912053509,
+            "ci95": [
+              0.9975339461628809,
+              1.0016596364983676
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0012501727157948,
+            "ci95": [
+              0.9990937747965329,
+              1.0026398557227367
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 3,
+        "signature": [
+          2613936,
+          6390,
+          14796607081077732657,
+          1234253346
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9999369025305745,
+            "ci95": [
+              0.9989142429400664,
+              1.0009433815898858
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9993159873681319,
+            "ci95": [
+              0.9986523848441113,
+              0.9999870227059389
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 2,
+        "launch": "images",
+        "reps": 2,
+        "signature": [
+          1742624,
+          4260,
+          11448850127589711389,
+          951463788
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003610657428925,
+            "ci95": [
+              0.9993000965606733,
+              1.0020771757333944
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0012056789597221,
+            "ci95": [
+              0.9983889448881308,
+              1.0023829459886715
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 2,
+        "signature": [
+          1742624,
+          4260,
+          11448850127589711389,
+          951463788
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003519513195798,
+            "ci95": [
+              0.9990221379005071,
+              1.0015661200346877
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9993475085604739,
+            "ci95": [
+              0.9987775256488364,
+              1.0013406212550975
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 3,
+        "launch": "images",
+        "reps": 8,
+        "signature": [
+          6970496,
+          17040,
+          2971414651265800773,
+          3191213040
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9993689678972403,
+            "ci95": [
+              0.9986559120129317,
+              1.0008078287278992
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0006914476138893,
+            "ci95": [
+              0.9994924929103225,
+              1.001717702409317
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 8,
+        "signature": [
+          6970496,
+          17040,
+          2971414651265800773,
+          3191213040
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9993064997142128,
+            "ci95": [
+              0.9981538368415478,
+              1.0003419026884612
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9992482572120942,
+            "ci95": [
+              0.9988112009544747,
+              1.000090919652283
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 0,
+        "launch": "images",
+        "reps": 25,
+        "signature": [
+          5012500,
+          0,
+          15444594803038360401,
+          2042742400
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0009266034480704,
+            "ci95": [
+              0.9988994256986699,
+              1.0021614060383446
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0000850591875796,
+            "ci95": [
+              0.9992730375162036,
+              1.0014023559580094
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 25,
+        "signature": [
+          5012500,
+          0,
+          15444594803038360401,
+          2042742400
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0005649144888125,
+            "ci95": [
+              0.9997648306780882,
+              1.001169754351586
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997507919859789,
+            "ci95": [
+              0.9987338747703225,
+              1.0001298629945408
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 1,
+        "launch": "images",
+        "reps": 11,
+        "signature": [
+          2205500,
+          0,
+          15163282356743802865,
+          939088359
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998031078174965,
+            "ci95": [
+              0.9991836293086914,
+              1.0011954896095718
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.00028307542793,
+            "ci95": [
+              0.9986366811154729,
+              1.0010959367370011
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 11,
+        "signature": [
+          2205500,
+          0,
+          15163282356743802865,
+          939088359
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000318043535274,
+            "ci95": [
+              0.9995704124577488,
+              1.0009908044166616
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001619827011443,
+            "ci95": [
+              0.9992029300876777,
+              1.001039436646273
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 2,
+        "launch": "images",
+        "reps": 7,
+        "signature": [
+          1403500,
+          0,
+          4299453880173547825,
+          686304234
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9989424247475571,
+            "ci95": [
+              0.9971771199014343,
+              1.0001442347317233
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9987742135240424,
+            "ci95": [
+              0.9970901452258674,
+              1.0014939520698964
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 7,
+        "signature": [
+          1403500,
+          0,
+          4299453880173547825,
+          686304234
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.999586416297497,
+            "ci95": [
+              0.9987612352085437,
+              1.0019636267055456
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001807711179402,
+            "ci95": [
+              0.9991698863461677,
+              1.001585860346249
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 3,
+        "launch": "images",
+        "reps": 36,
+        "signature": [
+          7218000,
+          0,
+          86432655448747493,
+          2941549056
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000284728523805,
+            "ci95": [
+              0.9990517509469745,
+              1.001306186342475
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0007270477745795,
+            "ci95": [
+              0.9996944590142229,
+              1.0015301021128182
+            ]
+          }
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 35,
+        "signature": [
+          7017500,
+          0,
+          14025483590632773233,
+          2859839360
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.999410397059102,
+            "ci95": [
+              0.9980130294193739,
+              1.001093604567361
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.000786931350738,
+            "ci95": [
+              0.9994323478405783,
+              1.001631288152272
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 1,
+        "launch": "images",
+        "reps": 578,
+        "signature": [
+          3100970,
+          0,
+          16173595921297004135,
+          1664105350
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.002394803186546,
+            "ci95": [
+              0.9981817851233659,
+              1.0048806298944468
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0026781747371856,
+            "ci95": [
+              0.9995943164011039,
+              1.0057677870618464
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 568,
+        "signature": [
+          3047320,
+          0,
+          6565248847136360557,
+          1635314600
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0006265696012915,
+            "ci95": [
+              1.0002052340912484,
+              1.0019950373446054
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.00006025376005,
+            "ci95": [
+              0.9988035156457347,
+              1.0016415242289578
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 2,
+        "launch": "images",
+        "reps": 348,
+        "signature": [
+          1867020,
+          0,
+          3227781735365646129,
+          1107618228
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0006447975072268,
+            "ci95": [
+              0.9990197873056551,
+              1.0033361908170761
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9998688606318391,
+            "ci95": [
+              0.9971485246714604,
+              1.0033864716440726
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 361,
+        "signature": [
+          1936765,
+          0,
+          5214701292117505270,
+          1148994771
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9990036371308413,
+            "ci95": [
+              0.9974481966877706,
+              1.0018543272375644
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9992441553493827,
+            "ci95": [
+              0.997125683867848,
+              1.0033159378300605
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 1,
+        "launch": "images",
+        "reps": 575,
+        "signature": [
+          1986625,
+          0,
+          10356870805542680356,
+          1061404575
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000131025238364,
+            "ci95": [
+              0.9985360603575373,
+              1.0018960225614701
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0003013325587105,
+            "ci95": [
+              0.9983543554985533,
+              1.001532453408473
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 588,
+        "signature": [
+          2031540,
+          0,
+          11662939779824597569,
+          1085401548
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9993690007703254,
+            "ci95": [
+              0.9981257177039135,
+              1.0017162611944506
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0002973239566062,
+            "ci95": [
+              0.9992818621865915,
+              1.0009055716853312
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 2,
+        "launch": "images",
+        "reps": 389,
+        "signature": [
+          1343995,
+          0,
+          14941633446941380974,
+          951746461
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0018264410753528,
+            "ci95": [
+              0.9992926954732511,
+              1.0032526751338617
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0010597660748872,
+            "ci95": [
+              0.9981863510570632,
+              1.0036869930722427
+            ]
+          }
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 398,
+        "signature": [
+          1375090,
+          0,
+          1996196226841716411,
+          973766302
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0005522794097472,
+            "ci95": [
+              0.9994662703963382,
+              1.0015638708786865
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001945227672984,
+            "ci95": [
+              0.9992138972852979,
+              1.001501170029582
+            ]
+          }
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 0,
+        "launch": "images",
+        "reps": 917,
+        "signature": [
+          5281003,
+          0,
+          7984444341658837192,
+          3263170176
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.999181203239186,
+            "ci95": [
+              0.9967236594482776,
+              1.0012257181675515
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.99832648499917,
+            "ci95": [
+              0.997215617569766,
+              1.002140008108113
+            ]
+          }
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 943,
+        "signature": [
+          5430737,
+          0,
+          753405831773656042,
+          3355691904
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9991486289785878,
+            "ci95": [
+              0.9968884581620798,
+              1.0004426631191738
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9980461387649072,
+            "ci95": [
+              0.996708141477824,
+              1.0014147373832603
+            ]
+          }
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 1,
+        "launch": "images",
+        "reps": 490,
+        "signature": [
+          2821910,
+          0,
+          14428980120509109343,
+          1800788220
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0001592264837909,
+            "ci95": [
+              0.99854756966273,
+              1.000937300823575
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9993029734312857,
+            "ci95": [
+              0.9981447466449775,
+              1.000936674741315
+            ]
+          }
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 441,
+        "signature": [
+          2539719,
+          0,
+          6097044422723381844,
+          1620709398
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9996931968611011,
+            "ci95": [
+              0.9984817104645208,
+              1.0004077965164502
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9998176058830257,
+            "ci95": [
+              0.998594700030559,
+              1.0011357926111528
+            ]
+          }
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 2,
+        "launch": "images",
+        "reps": 300,
+        "signature": [
+          1727700,
+          0,
+          16076659491347624529,
+          1421987100
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0008901359437328,
+            "ci95": [
+              0.9972611510279576,
+              1.0029489881415035
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0012083278406199,
+            "ci95": [
+              1.0001545815596091,
+              1.0037466915389415
+            ]
+          }
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 304,
+        "signature": [
+          1750736,
+          0,
+          10739339840029577909,
+          1440946928
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0004362018748352,
+            "ci95": [
+              0.9994888306560594,
+              1.001988788263374
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9996072742212064,
+            "ci95": [
+              0.9989462993770268,
+              1.0015525224208943
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 0,
+        "launch": "images",
+        "reps": 264,
+        "signature": [
+          2049696,
+          0,
+          11811788636211282213,
+          1771240152
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9999078500389538,
+            "ci95": [
+              0.9985609876806758,
+              1.0019215584223256
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0001405081756323,
+            "ci95": [
+              0.9988633397324826,
+              1.0008804181539706
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 272,
+        "signature": [
+          2111808,
+          0,
+          17198232828222723877,
+          1824914096
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0004739286057256,
+            "ci95": [
+              0.9989437514205874,
+              1.0019833869845856
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.0009099928458847,
+            "ci95": [
+              0.9994505844513961,
+              1.0031822912496997
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 1,
+        "launch": "images",
+        "reps": 151,
+        "signature": [
+          1172364,
+          0,
+          5121689491487475105,
+          1037064527
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0006964918882342,
+            "ci95": [
+              0.9983976846346494,
+              1.0022378536332757
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9997870960211475,
+            "ci95": [
+              0.9989562682575855,
+              1.0012704872876794
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "reps": 152,
+        "signature": [
+          1180128,
+          0,
+          12081676311433557285,
+          1043932504
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000285137895711,
+            "ci95": [
+              0.9996623301674229,
+              1.0014439773350392
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9999877174468833,
+            "ci95": [
+              0.9988947290858181,
+              1.0010906561265485
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 2,
+        "launch": "images",
+        "reps": 97,
+        "signature": [
+          753108,
+          0,
+          518193139628795425,
+          846215584
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9993748480646758,
+            "ci95": [
+              0.9980503270812163,
+              1.0009918897563292
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9991931360251947,
+            "ci95": [
+              0.9968891466026195,
+              1.0008109163673145
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "reps": 98,
+        "signature": [
+          760872,
+          0,
+          1202161666985859749,
+          854939456
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9999710159967933,
+            "ci95": [
+              0.9986780937695172,
+              1.001949236648026
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.000725897718834,
+            "ci95": [
+              0.9986013655865117,
+              1.0020923106103263
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 3,
+        "launch": "images",
+        "reps": 350,
+        "signature": [
+          2717400,
+          0,
+          13509865632125202341,
+          2348235050
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0003972122650477,
+            "ci95": [
+              0.9967980840568015,
+              1.0012841573506508
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9988048491963214,
+            "ci95": [
+              0.9976283263885055,
+              1.0000780751864045
+            ]
+          }
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 358,
+        "signature": [
+          2779512,
+          0,
+          8086754752294528421,
+          2401908994
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0005394198765067,
+            "ci95": [
+              0.9999302751595748,
+              1.0014260528347498
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 0.9984573253218645,
+            "ci95": [
+              0.9978123359070832,
+              0.9997654040756286
+            ]
+          }
+        }
+      }
+    ],
+    "losses": {
+      "evex-canonical-scan": []
+    },
+    "aa_outside_one_percent": [],
+    "cleanup": {
+      "bytes": 1479543855,
+      "removed": true
+    },
+    "raw": "product/product-evex-canonical-scan-ubuntu-24.04-clang",
+    "avx32_corpus": {
+      "provenance": {
+        "package": "libjpeg62-turbo-dev",
+        "version": "1:2.1.5-4",
+        "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb",
+        "package_sha256": "7539d7d7a4fe527071f737ce4919887cde17dfc72d6b3fa9d0176b4dacb6e412",
+        "text_sha256": "4d879d6881a2ee0c2e1b48456ef0153149f788674220dfd89ec0da7c60064a1d",
+        "members": {
+          "jccolor-avx2.asm.o": {
+            "sha256": "2e8b1ae43c6d15a5f0bad04857f4db30b599c792ae128ab9fdbf36ffce3d2db5",
+            "functions": 7,
+            "section_bytes": 8384
+          },
+          "jcgray-avx2.asm.o": {
+            "sha256": "a53b3309db8314a3a72b087ef0fc2cd371ce4c55e2d159c1207298620f9dda9c",
+            "functions": 7,
+            "section_bytes": 4800
+          },
+          "jcsample-avx2.asm.o": {
+            "sha256": "ac100c60c2dc894f6be87393c35833a913749c93962bd94c84366ba8cf0dcc3d",
+            "functions": 2,
+            "section_bytes": 672
+          },
+          "jdcolor-avx2.asm.o": {
+            "sha256": "21ab2e5647b6191d3434ca327240c7a3673623a0894cef8b7906af297282d163",
+            "functions": 7,
+            "section_bytes": 5792
+          },
+          "jdmerge-avx2.asm.o": {
+            "sha256": "edc189ef3a3fc43041d718f584ad04bbc942426439f6df003931a6855a2145dd",
+            "functions": 14,
+            "section_bytes": 6464
+          },
+          "jdsample-avx2.asm.o": {
+            "sha256": "4d1c213560ab99f952e12f3f54b1c9743e42a3ecddc38ca0a63bcf668c6903e4",
+            "functions": 4,
+            "section_bytes": 1824
+          },
+          "jfdctint-avx2.asm.o": {
+            "sha256": "ad7dbb14a23fd3fbc5ed3333dc901e2b5dccd24c3862c76a554325d0c9af9e35",
+            "functions": 1,
+            "section_bytes": 832
+          },
+          "jidctint-avx2.asm.o": {
+            "sha256": "edbdc208b82031fccf1caa14b0037792331f84598c18c8cedb3dd8a541c509ed",
+            "functions": 1,
+            "section_bytes": 1344
+          },
+          "jquanti-avx2.asm.o": {
+            "sha256": "c7c2f57f57c5c5c62ae6684fa78e7d96f4cf67fc65486c13b416e75a67b844d3",
+            "functions": 2,
+            "section_bytes": 384
+          }
+        },
+        "selection": "ELF .text in AVX2 i386 libjpeg.a objects, extents bounded by external assembly entry symbols within each object"
+      },
+      "selected_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        25,
+        27,
+        29,
+        31,
+        33,
+        35,
+        37,
+        38,
+        40,
+        41,
+        42,
+        43,
+        44
+      ],
+      "functions": 45,
+      "selected_functions": 37,
+      "selected_instructions": 7764,
+      "selected_bytes": 29664,
+      "intervals_sha256": "9d41a35a2ee1832768ce9d30b0728176d50fa840f339e8c3729095fef75b4429",
+      "executable_was_run": false,
+      "selection": "Same 37 canonical SIMD function extents used in the frozen standalone benchmark."
+    },
+    "original_probe_equivalence": {
+      "checks": [
+        {
+          "case": "mips64el-ls",
+          "mode": 0,
+          "signature": [
+            29004,
+            0,
+            8860006801696042565,
+            11803516
+          ]
+        },
+        {
+          "case": "mips64el-ls",
+          "mode": 1,
+          "signature": [
+            29004,
+            0,
+            8860006801696042565,
+            12242202
+          ]
+        },
+        {
+          "case": "mips64el-ls",
+          "mode": 2,
+          "signature": [
+            29004,
+            0,
+            8860006801696042565,
+            25019836
+          ]
+        },
+        {
+          "case": "putty-32-0.85",
+          "mode": 0,
+          "signature": [
+            282906,
+            3,
+            7225451397909626697,
+            116594087
+          ]
+        },
+        {
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "signature": [
+            282906,
+            3,
+            7225451397909626697,
+            120526573
+          ]
+        },
+        {
+          "case": "putty-32-0.85",
+          "mode": 2,
+          "signature": [
+            282906,
+            3,
+            7225451397909626697,
+            140847373
+          ]
+        },
+        {
+          "case": "putty-64-0.85",
+          "mode": 0,
+          "signature": [
+            259694,
+            3515,
+            3307435160057796829,
+            105938608
+          ]
+        },
+        {
+          "case": "putty-64-0.85",
+          "mode": 1,
+          "signature": [
+            259694,
+            3515,
+            3307435160057796829,
+            109944730
+          ]
+        },
+        {
+          "case": "putty-64-0.85",
+          "mode": 2,
+          "signature": [
+            259694,
+            3515,
+            3307435160057796829,
+            142788562
+          ]
+        },
+        {
+          "case": "amd64-ls",
+          "mode": 0,
+          "signature": [
+            22523,
+            0,
+            11761163436424087017,
+            9451953
+          ]
+        },
+        {
+          "case": "amd64-ls",
+          "mode": 1,
+          "signature": [
+            22523,
+            0,
+            11761163436424087017,
+            9793609
+          ]
+        },
+        {
+          "case": "amd64-ls",
+          "mode": 2,
+          "signature": [
+            22523,
+            0,
+            11761163436424087017,
+            12259953
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 0,
+          "signature": [
+            23973,
+            0,
+            8816264938314345267,
+            12930965
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 1,
+          "signature": [
+            23973,
+            0,
+            8816264938314345267,
+            13255975
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 2,
+          "signature": [
+            23973,
+            0,
+            8816264938314345267,
+            20352585
+          ]
+        },
+        {
+          "case": "arm-cp",
+          "mode": 0,
+          "signature": [
+            25450,
+            35,
+            919594885373331023,
+            1817242
+          ]
+        },
+        {
+          "case": "arm-cp",
+          "mode": 1,
+          "signature": [
+            25450,
+            35,
+            919594885373331023,
+            2163438
+          ]
+        },
+        {
+          "case": "arm-cp",
+          "mode": 2,
+          "signature": [
+            25450,
+            35,
+            919594885373331023,
+            5187896
+          ]
+        },
+        {
+          "case": "arm64-sort",
+          "mode": 0,
+          "signature": [
+            18445,
+            0,
+            4428522272880934003,
+            10187143
+          ]
+        },
+        {
+          "case": "arm64-sort",
+          "mode": 1,
+          "signature": [
+            18445,
+            0,
+            4428522272880934003,
+            10435797
+          ]
+        },
+        {
+          "case": "arm64-sort",
+          "mode": 2,
+          "signature": [
+            18445,
+            0,
+            4428522272880934003,
+            15931282
+          ]
+        },
+        {
+          "case": "libssl3t64-amd64",
+          "mode": 0,
+          "signature": [
+            860911,
+            711,
+            6528060278436147935,
+            516534325
+          ]
+        },
+        {
+          "case": "libssl3t64-amd64",
+          "mode": 1,
+          "signature": [
+            860911,
+            711,
+            6528060278436147935,
+            530744680
+          ]
+        },
+        {
+          "case": "libssl3t64-amd64",
+          "mode": 2,
+          "signature": [
+            860911,
+            711,
+            6528060278436147935,
+            681377180
+          ]
+        },
+        {
+          "case": "libjpeg62-turbo-i386",
+          "mode": 0,
+          "signature": [
+            94503,
+            0,
+            7131687437590387221,
+            43330046
+          ]
+        },
+        {
+          "case": "libjpeg62-turbo-i386",
+          "mode": 1,
+          "signature": [
+            94503,
+            0,
+            7131687437590387221,
+            44994535
+          ]
+        },
+        {
+          "case": "libjpeg62-turbo-i386",
+          "mode": 2,
+          "signature": [
+            94503,
+            0,
+            7131687437590387221,
+            54663421
+          ]
+        },
+        {
+          "case": "libssl3t64-i386",
+          "mode": 0,
+          "signature": [
+            871312,
+            2130,
+            14076048977032015961,
+            398901630
+          ]
+        },
+        {
+          "case": "libssl3t64-i386",
+          "mode": 1,
+          "signature": [
+            871312,
+            2130,
+            14076048977032015961,
+            411417782
+          ]
+        },
+        {
+          "case": "libssl3t64-i386",
+          "mode": 2,
+          "signature": [
+            871312,
+            2130,
+            14076048977032015961,
+            475731894
+          ]
+        },
+        {
+          "case": "libzstd1-i386",
+          "mode": 0,
+          "signature": [
+            200500,
+            0,
+            3733692014535413969,
+            81709696
+          ]
+        },
+        {
+          "case": "libzstd1-i386",
+          "mode": 1,
+          "signature": [
+            200500,
+            0,
+            3733692014535413969,
+            85371669
+          ]
+        },
+        {
+          "case": "libzstd1-i386",
+          "mode": 2,
+          "signature": [
+            200500,
+            0,
+            3733692014535413969,
+            98043462
+          ]
+        },
+        {
+          "case": "scalar32",
+          "mode": 0,
+          "signature": [
+            5365,
+            0,
+            8537845126210120430,
+            2823667
+          ]
+        },
+        {
+          "case": "scalar32",
+          "mode": 1,
+          "signature": [
+            5365,
+            0,
+            8537845126210120430,
+            2879075
+          ]
+        },
+        {
+          "case": "scalar32",
+          "mode": 2,
+          "signature": [
+            5365,
+            0,
+            8537845126210120430,
+            3182811
+          ]
+        },
+        {
+          "case": "scalar64",
+          "mode": 0,
+          "signature": [
+            3455,
+            0,
+            1412881932028552554,
+            1805727
+          ]
+        },
+        {
+          "case": "scalar64",
+          "mode": 1,
+          "signature": [
+            3455,
+            0,
+            1412881932028552554,
+            1845921
+          ]
+        },
+        {
+          "case": "scalar64",
+          "mode": 2,
+          "signature": [
+            3455,
+            0,
+            1412881932028552554,
+            2446649
+          ]
+        },
+        {
+          "case": "simd64",
+          "mode": 0,
+          "signature": [
+            5759,
+            0,
+            14579131296982040540,
+            3558528
+          ]
+        },
+        {
+          "case": "simd64",
+          "mode": 1,
+          "signature": [
+            5759,
+            0,
+            14579131296982040540,
+            3675078
+          ]
+        },
+        {
+          "case": "simd64",
+          "mode": 2,
+          "signature": [
+            5759,
+            0,
+            14579131296982040540,
+            4739957
+          ]
+        },
+        {
+          "case": "jpeg-avx2-i386",
+          "mode": 0,
+          "signature": [
+            7764,
+            0,
+            565079957198679585,
+            6709243
+          ]
+        },
+        {
+          "case": "jpeg-avx2-i386",
+          "mode": 1,
+          "signature": [
+            7764,
+            0,
+            565079957198679585,
+            6867977
+          ]
+        },
+        {
+          "case": "jpeg-avx2-i386",
+          "mode": 2,
+          "signature": [
+            7764,
+            0,
+            565079957198679585,
+            8723872
+          ]
+        }
+      ],
+      "unchanged": true
+    },
+    "batch_probe_equivalence": {
+      "checks": [
+        {
+          "case": "putty-32-0.85",
+          "signature": [
+            282906,
+            3,
+            7225451397909626697,
+            116594087
+          ]
+        },
+        {
+          "case": "putty-64-0.85",
+          "signature": [
+            259694,
+            3515,
+            3307435160057796829,
+            105938608
+          ]
+        },
+        {
+          "case": "amd64-ls",
+          "signature": [
+            22523,
+            0,
+            11761163436424087017,
+            9451953
+          ]
+        },
+        {
+          "case": "libssl3t64-amd64",
+          "signature": [
+            860911,
+            711,
+            6528060278436147935,
+            516534325
+          ]
+        },
+        {
+          "case": "libjpeg62-turbo-i386",
+          "signature": [
+            94503,
+            0,
+            7131687437590387221,
+            43330046
+          ]
+        },
+        {
+          "case": "libssl3t64-i386",
+          "signature": [
+            871312,
+            2130,
+            14076048977032015961,
+            398901630
+          ]
+        },
+        {
+          "case": "libzstd1-i386",
+          "signature": [
+            200500,
+            0,
+            3733692014535413969,
+            81709696
+          ]
+        },
+        {
+          "case": "scalar32",
+          "signature": [
+            5365,
+            0,
+            8537845126210120430,
+            2823667
+          ]
+        },
+        {
+          "case": "scalar64",
+          "signature": [
+            3455,
+            0,
+            1412881932028552554,
+            1805727
+          ]
+        },
+        {
+          "case": "simd64",
+          "signature": [
+            5759,
+            0,
+            14579131296982040540,
+            3558528
+          ]
+        },
+        {
+          "case": "jpeg-avx2-i386",
+          "signature": [
+            7764,
+            0,
+            565079957198679585,
+            6709243
+          ]
+        }
+      ],
+      "unchanged": true,
+      "capacity": 64,
+      "fallback": "Decoder::decodeOneLight"
+    },
+    "publication_authorized_by_report": false,
+    "statistical_scope": "2000 deterministic resamples of 32 interleaved balanced cycles; no outlier removal"
+  },
+  "qualification": {
+    "qualified_for_publication": true,
+    "goal_complete": false,
+    "source": {
+      "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+      "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+      "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+      "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+      "files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86DisassemblerDecoder.c",
+        "arch/X86/X86EvexAdmission.h",
+        "arch/X86/X86EvexScan.c",
+        "arch/X86/X86FeatureExtension.h",
+        "arch/X86/X86GenEvexScan.inc",
+        "arch/X86/X86VectorOutput.c",
+        "suite/synctools/x86_vector_output.cpp",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ],
+      "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+    },
+    "publication_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+    "commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "documentation_identity": {
+      "tested_source": {
+        "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+        "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+        "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+        "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+        "files": [
+          "CMakeLists.txt",
+          "Makefile",
+          "arch/X86/X86DisassemblerDecoder.c",
+          "arch/X86/X86EvexAdmission.h",
+          "arch/X86/X86EvexScan.c",
+          "arch/X86/X86FeatureExtension.h",
+          "arch/X86/X86GenEvexScan.inc",
+          "arch/X86/X86VectorOutput.c",
+          "suite/synctools/x86_vector_output.cpp",
+          "xcode/Capstone.xcodeproj/project.pbxproj"
+        ],
+        "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+        "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+      },
+      "publication_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+      "publication_patch_sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452",
+      "changed_from_tested_tree": [
+        "docs/ARCHITECTURE.md"
+      ],
+      "identical_other_tree_entries": 4205,
+      "runtime_and_build_sources_identical": true,
+      "publication_qualified": false
+    },
+    "scope": "Incremental canonical EVEX register raw-scan optimization in ELF x86-64 full userspace builds. Other hosts and excluded build profiles retain the original path.",
+    "correctness": {
+      "cases_per_compiler": {
+        "public_records": 6946816,
+        "private_records": 6946816,
+        "protected_page_extents": 3145728
+      },
+      "compilers": 4,
+      "native_units": 272,
+      "alternate_units": 285,
+      "adapter_cases": 24,
+      "portable_checks": 36,
+      "product_tests": {
+        "base": [
+          "100% tests passed, 0 tests failed out of 34"
+        ],
+        "evex-canonical-scan": [
+          "100% tests passed, 0 tests failed out of 34"
+        ]
+      },
+      "product_states": {
+        "base": "40068 15880932718584834093",
+        "evex-canonical-scan": "40068 15880932718584834093"
+      },
+      "product_symbol_identity": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 5147,
+        "readonly_symbols": 1669,
+        "new_entries": [
+          [
+            "X86_decodeScanFeatureExtension",
+            "t",
+            5467696,
+            40
+          ],
+          [
+            "decodeEvexRegisterScan",
+            "t",
+            5467744,
+            307
+          ]
+        ],
+        "original_writable_positions_identical": true,
+        "writable_symbols": 963,
+        "symbol_files_sha256": {
+          "timed-symbols-base.log": "f1397018be9bebbc039cbf2643da06c98925f6471f3a19bbdbb058c97ede3309",
+          "timed-symbols-evex-canonical-scan.log": "be6c98031cb2ef43428c00c10551488906e36a2b4de3bd27a7a1cc8a0f4de9d4"
+        },
+        "run": {
+          "id": 44122907418,
+          "head_sha": "c74415284ab8d252533c2e8670c054fdcb4f4d1f",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44122907418",
+          "run_attempt": 1
+        },
+        "source": {
+          "source": "round1364-evex-canonical-scan-plan",
+          "patch": "evex-canonical-scan.patch",
+          "patch_sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "changed": [
+            "X86DisassemblerDecoder.c.o"
+          ],
+          "added": [
+            "X86EvexScan.c.o"
+          ]
+        }
+      }
+    },
+    "native_ssl64_raw": [
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-clang-1",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.6350729474828694,
+        "aa": 1.002867350180953,
+        "ci95": [
+          1.63083210353048,
+          1.6403934642345575
+        ],
+        "aa_ci95": [
+          1.000667266689426,
+          1.0042257329367685
+        ],
+        "vs_iced": 0.6482579408128769,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-clang-1",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.6344046749452155,
+        "aa": 1.000580189992883,
+        "ci95": [
+          1.6320778564206269,
+          1.637009510612836
+        ],
+        "aa_ci95": [
+          0.9996218435512749,
+          1.0031685776262784
+        ],
+        "vs_iced": 0.6525003792283965,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.5121211022041665,
+        "aa": 0.9979965491581416,
+        "ci95": [
+          1.5093247588424434,
+          1.5144952143782466
+        ],
+        "aa_ci95": [
+          0.99406050955414,
+          1.0072781146525693
+        ],
+        "vs_iced": 0.5155635887233734,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.50162201567341,
+        "aa": 1.0008130081300812,
+        "ci95": [
+          1.4866721487760137,
+          1.5161615282251542
+        ],
+        "aa_ci95": [
+          0.9949473267065155,
+          1.0075270299864545
+        ],
+        "vs_iced": 0.5081361941438963,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-24.04-clang-1",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.6017640784727296,
+        "aa": 1.0018176650110706,
+        "ci95": [
+          1.5967798012252579,
+          1.6115606242497
+        ],
+        "aa_ci95": [
+          0.9997391544131349,
+          1.0061721467848728
+        ],
+        "vs_iced": 0.6007121362889786,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-24.04-clang-1",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.6014002781374381,
+        "aa": 1.00181307360929,
+        "ci95": [
+          1.5976748072286278,
+          1.6050187211981566
+        ],
+        "aa_ci95": [
+          0.9992067055829966,
+          1.0037374199794367
+        ],
+        "vs_iced": 0.605959512620918,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-24.04-gcc-1",
+        "cpu": "Intel(R) Xeon(R) 6975P-C",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "gain": 1.544298098789089,
+        "aa": 0.999325089425651,
+        "ci95": [
+          1.5427837794073422,
+          1.549545581007141
+        ],
+        "aa_ci95": [
+          0.9937184804989406,
+          1.001358807852558
+        ],
+        "vs_iced": 0.4856068494735624,
+        "vs_fast": null
+      },
+      {
+        "host": "evex-canonical-scan-ubuntu-24.04-gcc-1",
+        "cpu": "Intel(R) Xeon(R) 6975P-C",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "gain": 1.5454450674204163,
+        "aa": 0.9993199210809518,
+        "ci95": [
+          1.5428419801797435,
+          1.5471713433943877
+        ],
+        "aa_ci95": [
+          0.9967583878581459,
+          1.000330000825002
+        ],
+        "vs_iced": 0.48477354788524724,
+        "vs_fast": null
+      }
+    ],
+    "product_ssl64_raw_and_batch": [
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "launch": "images",
+        "reps": 4,
+        "signature": [
+          3443644,
+          2844,
+          4932088555328177189,
+          2066137300
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.0000511141291588,
+            "ci95": [
+              0.998643222054929,
+              1.0004681114754113
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.1305977441057347,
+            "ci95": [
+              1.129865083123854,
+              1.1320605533491062
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "reps": 4,
+        "signature": [
+          3443644,
+          2844,
+          4932088555328177189,
+          2066137300
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9998519644618591,
+            "ci95": [
+              0.9982090419181,
+              1.000992689703542
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.1293208348285408,
+            "ci95": [
+              1.128628012349648,
+              1.130685968928067
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 3,
+        "launch": "images",
+        "reps": 6,
+        "signature": [
+          5165466,
+          4266,
+          2642198292610024357,
+          3099205950
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 0.9997454359222147,
+            "ci95": [
+              0.9982268001597668,
+              1.0008062901734183
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.1735045407594593,
+            "ci95": [
+              1.1723983075607882,
+              1.1742444823576714
+            ]
+          }
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 3,
+        "launch": "same-file-fixed",
+        "reps": 6,
+        "signature": [
+          5165466,
+          4266,
+          2642198292610024357,
+          3099205950
+        ],
+        "comparisons": {
+          "base-copy": {
+            "median": 1.000013949933699,
+            "ci95": [
+              0.9996503529104623,
+              1.0005639894024487
+            ]
+          },
+          "evex-canonical-scan": {
+            "median": 1.173076609576159,
+            "ci95": [
+              1.1728469291820627,
+              1.173916844710858
+            ]
+          }
+        }
+      }
+    ],
+    "observations": {
+      "native_rows": 168,
+      "native_original_losses": [
+        {
+          "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+          "cpu": "AMD EPYC 9V45 96-Core Processor",
+          "case": "libjpeg62-turbo-amd64",
+          "panel": "simd-functions",
+          "mode": "scan",
+          "launch": "images",
+          "gain": 0.9809091671402883,
+          "aa": 0.999465261438544,
+          "ci95": [
+            0.9488437603564459,
+            0.9884082010530986
+          ],
+          "aa_ci95": [
+            0.9682976164953067,
+            1.016651732377539
+          ],
+          "vs_iced": 0.5101972997094624,
+          "vs_fast": null
+        },
+        {
+          "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+          "cpu": "AMD EPYC 9V45 96-Core Processor",
+          "case": "libzstd1-amd64",
+          "panel": "simd-functions",
+          "mode": "scan",
+          "launch": "same-file-fixed",
+          "gain": 0.9774894123046751,
+          "aa": 0.9970840309114899,
+          "ci95": [
+            0.9699206495663406,
+            1.0030774546750316
+          ],
+          "aa_ci95": [
+            0.9852333655620991,
+            1.006001446131598
+          ],
+          "vs_iced": 0.8250308769040758,
+          "vs_fast": null
+        }
+      ],
+      "native_original_aa": [
+        {
+          "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+          "cpu": "AMD EPYC 9V45 96-Core Processor",
+          "case": "libzstd1-amd64",
+          "panel": "simd-functions",
+          "mode": "scan",
+          "launch": "images",
+          "gain": 1.0086243323184936,
+          "aa": 1.0124412319698084,
+          "ci95": [
+            0.9882069821634689,
+            1.019659211698895
+          ],
+          "aa_ci95": [
+            1.0073497051315903,
+            1.0292871197215077
+          ],
+          "vs_iced": 0.8464520008160021,
+          "vs_fast": null
+        },
+        {
+          "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+          "cpu": "AMD EPYC 9V45 96-Core Processor",
+          "case": "jpeg-avx2-i386",
+          "panel": "simd-functions",
+          "mode": "detail",
+          "launch": "images",
+          "gain": 1.0006191356517493,
+          "aa": 1.012289205380156,
+          "ci95": [
+            0.9798456467561701,
+            1.0183712401675973
+          ],
+          "aa_ci95": [
+            0.9972414274739856,
+            1.0352359275146634
+          ],
+          "vs_iced": 0.6277734811377503,
+          "vs_fast": 0.37841096906938304
+        }
+      ],
+      "focused_rows": 12,
+      "focused_losses": [],
+      "focused_aa": [
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-2",
+          "cpu": "AMD EPYC 9V74 80-Core Processor",
+          "case": "libjpeg62-turbo-amd64",
+          "mode": "scan",
+          "launch": "images",
+          "gain": 0.9937393005624848,
+          "aa": 0.9894969728918068,
+          "ci95": [
+            0.9919847483064941,
+            0.9982575779114492
+          ],
+          "aa_ci95": [
+            0.9871099213813728,
+            0.9938626539433977
+          ]
+        },
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-2",
+          "cpu": "AMD EPYC 9V74 80-Core Processor",
+          "case": "libzstd1-amd64",
+          "mode": "scan",
+          "launch": "images",
+          "gain": 0.9967568470428846,
+          "aa": 0.9868304523991979,
+          "ci95": [
+            0.9934368095653627,
+            1.0008209644466421
+          ],
+          "aa_ci95": [
+            0.9842207083719182,
+            0.9882496917499402
+          ]
+        }
+      ],
+      "focused_executed_work": [
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-1",
+          "case": "jpeg-avx2-i386",
+          "mode": "detail",
+          "totals": {
+            "integer": [
+              29355566,
+              6590185,
+              5262201
+            ],
+            "scan": [
+              29355566,
+              6590185,
+              5262201
+            ]
+          },
+          "totals_equal": true,
+          "function_counts_equal": true,
+          "executable_pc_counts_equal": true,
+          "changed_pc_count": 0,
+          "changed_executed_bytes": 0,
+          "examples": [],
+          "extension_functions": {
+            "integer": {
+              "X86_decodeFeatureExtension": [
+                2790,
+                0,
+                0
+              ]
+            },
+            "scan": {
+              "X86_decodeFeatureExtension": [
+                2790,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-1",
+          "case": "libjpeg62-turbo-amd64",
+          "mode": "scan",
+          "totals": {
+            "integer": [
+              3377978,
+              554796,
+              675856
+            ],
+            "scan": [
+              3377978,
+              554796,
+              675856
+            ]
+          },
+          "totals_equal": true,
+          "function_counts_equal": true,
+          "executable_pc_counts_equal": true,
+          "changed_pc_count": 0,
+          "changed_executed_bytes": 0,
+          "examples": [],
+          "extension_functions": {
+            "integer": {},
+            "scan": {}
+          }
+        },
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-1",
+          "case": "libzstd1-amd64",
+          "mode": "scan",
+          "totals": {
+            "integer": [
+              2652570,
+              479712,
+              458992
+            ],
+            "scan": [
+              2652570,
+              479712,
+              458992
+            ]
+          },
+          "totals_equal": true,
+          "function_counts_equal": true,
+          "executable_pc_counts_equal": true,
+          "changed_pc_count": 0,
+          "changed_executed_bytes": 0,
+          "examples": [],
+          "extension_functions": {
+            "integer": {},
+            "scan": {}
+          }
+        },
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-2",
+          "case": "jpeg-avx2-i386",
+          "mode": "detail",
+          "totals": {
+            "integer": [
+              29355566,
+              6590185,
+              5262201
+            ],
+            "scan": [
+              29355566,
+              6590185,
+              5262201
+            ]
+          },
+          "totals_equal": true,
+          "function_counts_equal": true,
+          "executable_pc_counts_equal": true,
+          "changed_pc_count": 0,
+          "changed_executed_bytes": 0,
+          "examples": [],
+          "extension_functions": {
+            "integer": {
+              "X86_decodeFeatureExtension": [
+                2790,
+                0,
+                0
+              ]
+            },
+            "scan": {
+              "X86_decodeFeatureExtension": [
+                2790,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-2",
+          "case": "libjpeg62-turbo-amd64",
+          "mode": "scan",
+          "totals": {
+            "integer": [
+              3377978,
+              554796,
+              675856
+            ],
+            "scan": [
+              3377978,
+              554796,
+              675856
+            ]
+          },
+          "totals_equal": true,
+          "function_counts_equal": true,
+          "executable_pc_counts_equal": true,
+          "changed_pc_count": 0,
+          "changed_executed_bytes": 0,
+          "examples": [],
+          "extension_functions": {
+            "integer": {},
+            "scan": {}
+          }
+        },
+        {
+          "host": "evex-canonical-scan-focused-ubuntu-22.04-gcc-2",
+          "case": "libzstd1-amd64",
+          "mode": "scan",
+          "totals": {
+            "integer": [
+              2652570,
+              479712,
+              458992
+            ],
+            "scan": [
+              2652570,
+              479712,
+              458992
+            ]
+          },
+          "totals_equal": true,
+          "function_counts_equal": true,
+          "executable_pc_counts_equal": true,
+          "changed_pc_count": 0,
+          "changed_executed_bytes": 0,
+          "examples": [],
+          "extension_functions": {
+            "integer": {},
+            "scan": {}
+          }
+        }
+      ],
+      "original_cpu_attempt": {
+        "complete": true,
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86DisassemblerDecoder.c",
+            "arch/X86/X86EvexAdmission.h",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexScan.inc",
+            "arch/X86/X86VectorOutput.c",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+        },
+        "run": {
+          "id": 44123373286,
+          "head_sha": "7fbee17827ed82c21a820a3ec2232e734289eb83",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44123373286",
+          "run_attempt": 1
+        },
+        "profiles": [
+          {
+            "name": "evex-canonical-scan-focused-9v45-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 7763 64-Core Processor",
+            "skipped": true,
+            "cleanup": {
+              "removed": true,
+              "bytes": 0,
+              "files": 0
+            }
+          },
+          {
+            "name": "evex-canonical-scan-focused-9v45-ubuntu-22.04-gcc-2",
+            "cpu": "AMD EPYC 7763 64-Core Processor",
+            "skipped": true,
+            "cleanup": {
+              "removed": true,
+              "bytes": 0,
+              "files": 0
+            }
+          },
+          {
+            "name": "evex-canonical-scan-focused-9v45-ubuntu-22.04-gcc-3",
+            "cpu": "AMD EPYC 7763 64-Core Processor",
+            "skipped": true,
+            "cleanup": {
+              "removed": true,
+              "bytes": 0,
+              "files": 0
+            }
+          },
+          {
+            "name": "evex-canonical-scan-focused-9v45-ubuntu-22.04-gcc-4",
+            "cpu": "AMD EPYC 9V74 80-Core Processor",
+            "skipped": true,
+            "cleanup": {
+              "removed": true,
+              "bytes": 0,
+              "files": 0
+            }
+          }
+        ],
+        "rows": [],
+        "costs": [],
+        "selected_profiles": 0,
+        "original_flags": [
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "libjpeg62-turbo-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "images",
+            "gain": 0.9809091671402883,
+            "aa": 0.999465261438544,
+            "ci95": [
+              0.9488437603564459,
+              0.9884082010530986
+            ],
+            "aa_ci95": [
+              0.9682976164953067,
+              1.016651732377539
+            ],
+            "vs_iced": 0.5101972997094624,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "libzstd1-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "same-file-fixed",
+            "gain": 0.9774894123046751,
+            "aa": 0.9970840309114899,
+            "ci95": [
+              0.9699206495663406,
+              1.0030774546750316
+            ],
+            "aa_ci95": [
+              0.9852333655620991,
+              1.006001446131598
+            ],
+            "vs_iced": 0.8250308769040758,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "libzstd1-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "images",
+            "gain": 1.0086243323184936,
+            "aa": 1.0124412319698084,
+            "ci95": [
+              0.9882069821634689,
+              1.019659211698895
+            ],
+            "aa_ci95": [
+              1.0073497051315903,
+              1.0292871197215077
+            ],
+            "vs_iced": 0.8464520008160021,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-canonical-scan-ubuntu-22.04-gcc-1",
+            "cpu": "AMD EPYC 9V45 96-Core Processor",
+            "case": "jpeg-avx2-i386",
+            "panel": "simd-functions",
+            "mode": "detail",
+            "launch": "images",
+            "gain": 1.0006191356517493,
+            "aa": 1.012289205380156,
+            "ci95": [
+              0.9798456467561701,
+              1.0183712401675973
+            ],
+            "aa_ci95": [
+              0.9972414274739856,
+              1.0352359275146634
+            ],
+            "vs_iced": 0.6277734811377503,
+            "vs_fast": 0.37841096906938304
+          }
+        ],
+        "losses": [],
+        "timing_obtained": false,
+        "outcome": "inconclusive: none of four predeclared allocations provided AMD EPYC 9V45",
+        "aa_outside_one_percent": [],
+        "parser_sha256": "ba46b121b0d01ae620f7e600a6e67b5809d38404ac777522f4da1247c0b76652",
+        "publication_qualified": false,
+        "limits": "All original observations remain recorded. Executed-PC and instruction/read/write equality are workload-specific software evidence, not hardware cache/predictor attribution or proof of all-host timing equivalence."
+      },
+      "mixed_rows": 192,
+      "mixed_losses": [],
+      "mixed_aa_controls": [
+        {
+          "flagged": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-ls",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.007105065203512,
+            "aa": 1.0186669749993575,
+            "ci95": [
+              1.0041140958890984,
+              1.0163542648977535
+            ],
+            "aa_ci95": [
+              1.0134254599881294,
+              1.020902351033904
+            ]
+          },
+          "paired_fixed": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-ls",
+            "mode": 1,
+            "launch": "same-file-fixed",
+            "gain": 0.9995988249453237,
+            "aa": 0.9994320418740037,
+            "ci95": [
+              0.9983962648491002,
+              1.0010354713659808
+            ],
+            "aa_ci95": [
+              0.998302864480825,
+              1.0016902174616948
+            ]
+          }
+        },
+        {
+          "flagged": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-sort",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.0090907446814923,
+            "aa": 1.0155991779635694,
+            "ci95": [
+              1.0028248756994715,
+              1.0159796875568106
+            ],
+            "aa_ci95": [
+              1.0138249692880323,
+              1.0196871990540393
+            ]
+          },
+          "paired_fixed": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-sort",
+            "mode": 1,
+            "launch": "same-file-fixed",
+            "gain": 1.0002266059934224,
+            "aa": 0.9984791849897391,
+            "ci95": [
+              0.9972737918079578,
+              1.0033508533343134
+            ],
+            "aa_ci95": [
+              0.9977000666735991,
+              1.0034870537766203
+            ]
+          }
+        },
+        {
+          "flagged": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-cp",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.0122010448662413,
+            "aa": 1.0170176362200578,
+            "ci95": [
+              1.005999723696935,
+              1.0148998486426986
+            ],
+            "aa_ci95": [
+              1.0141265117874887,
+              1.0246125918417375
+            ]
+          },
+          "paired_fixed": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "arm-cp",
+            "mode": 1,
+            "launch": "same-file-fixed",
+            "gain": 0.999700937262619,
+            "aa": 1.0005262937556443,
+            "ci95": [
+              0.9958196015557733,
+              1.0012630419557396
+            ],
+            "aa_ci95": [
+              0.9998746620351304,
+              1.0018781252242983
+            ]
+          }
+        },
+        {
+          "flagged": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "amd64-ls",
+            "mode": 1,
+            "launch": "images",
+            "gain": 1.0126273291925465,
+            "aa": 1.0108920773549595,
+            "ci95": [
+              1.0070878216636745,
+              1.0138379501558412
+            ],
+            "aa_ci95": [
+              1.0098350451291627,
+              1.0147578440063427
+            ]
+          },
+          "paired_fixed": {
+            "host": "evex-canonical-scan-images-four-ubuntu-22.04-gcc-44117219216",
+            "case": "amd64-ls",
+            "mode": 1,
+            "launch": "same-file-fixed",
+            "gain": 1.0005895740485986,
+            "aa": 0.9994229476594504,
+            "ci95": [
+              0.9976461506337043,
+              1.0058415364319058
+            ],
+            "aa_ci95": [
+              0.9955599377009646,
+              1.0006600534389418
+            ]
+          }
+        },
+        {
+          "flagged": {
+            "host": "evex-canonical-scan-images-four-ubuntu-24.04-gcc-44117219216",
+            "case": "amd64-ls",
+            "mode": 2,
+            "launch": "images",
+            "gain": 0.9967146908391148,
+            "aa": 0.9864389131297104,
+            "ci95": [
+              0.9898296921119907,
+              1.0028852211162909
+            ],
+            "aa_ci95": [
+              0.9829753489495889,
+              0.9893288332444069
+            ]
+          },
+          "paired_fixed": {
+            "host": "evex-canonical-scan-images-four-ubuntu-24.04-gcc-44117219216",
+            "case": "amd64-ls",
+            "mode": 2,
+            "launch": "same-file-fixed",
+            "gain": 0.9985686237253785,
+            "aa": 1.0006397628443475,
+            "ci95": [
+              0.9974145178929269,
+              1.0009693298952744
+            ],
+            "aa_ci95": [
+              0.9993164686746454,
+              1.0012043686889496
+            ]
+          }
+        }
+      ],
+      "product_rows": 96,
+      "product_losses": {
+        "evex-canonical-scan": []
+      },
+      "product_aa_controls": []
+    },
+    "timing_interpretation": "The intended SSL64 raw improvement repeats in all four native compiler profiles and both launch controls, and is separately checked in NeverD. Original native losses remain in the report; their panels execute identical PCs, bytes, instruction and read/write counts in independent focused checks. This excludes added executed software work in those panels, not every hardware or load-layout effect.",
+    "limits": [
+      "No comprehensive superiority to iced: native SSL64 raw remains approximately 0.49-0.65 times iced throughput.",
+      "The four predeclared AMD EPYC 9V45 requests were unavailable; no same-model focused timing result is claimed.",
+      "A/A-flagged observations are excluded from improvement claims; favorable repeats do not erase original losses.",
+      "No hardware PMU diagnosis or universal zero-regression guarantee is claimed."
+    ],
+    "evidence": {
+      "native": {
+        "file": "native-review.json",
+        "run": {
+          "id": 44113734594,
+          "head_sha": "7137ef52b28c46c0c58944ba20c945eb9939cdba",
+          "conclusion": "success",
+          "status": "completed",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44113734594",
+          "run_attempt": 1
+        },
+        "sha256": "8d7b56c42590b901257f34a1aceee50504961df5ba25db20096b32daf62416af"
+      },
+      "native-timing": {
+        "file": "native-timing-review.json",
+        "run": {
+          "id": 44117159626,
+          "head_sha": "d2754b1147bb62d4b6856c8136b5d95d99fde1fe",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44117159626",
+          "run_attempt": 1
+        },
+        "sha256": "ab81fcd23dc951a2a2a70b314300fa5a372c92dd697c2b011df1996bad186a3a"
+      },
+      "mixed-timing": {
+        "file": "mixed-timing-review.json",
+        "run": {
+          "id": 44117219216,
+          "head_sha": "0a2de8ffe2d723ce720a3c95796131b420fb7063",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44117219216",
+          "run_attempt": 1
+        },
+        "sha256": "02ebc498f4d3b6b99e2c20c3983ed861b9bd485f55a0f33abc1c8fd904582bbf"
+      },
+      "profiles": {
+        "file": "profiles-review.json",
+        "run": {
+          "id": 44119046576,
+          "head_sha": "0fc7c0d0d8b1699afecc759467f731536a69ac2f",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44119046576",
+          "run_attempt": 1
+        },
+        "sha256": "20ae2466a6ef2073a321154f98fa110deb7900534af80c3cb0ac224b1909349f"
+      },
+      "focused": {
+        "file": "focused-review.json",
+        "run": {
+          "id": 44120926770,
+          "head_sha": "efd8983ed54b3eb41edadba53ffaf5645d80bb9b",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44120926770",
+          "run_attempt": 1
+        },
+        "sha256": "31eb34d44545bad73e633d9c3703dd7bc38ef4779d5a3f34005e1033bff7188d"
+      },
+      "focused-9v45": {
+        "file": "focused-9v45-review.json",
+        "run": {
+          "id": 44123373286,
+          "head_sha": "7fbee17827ed82c21a820a3ec2232e734289eb83",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44123373286",
+          "run_attempt": 1
+        },
+        "sha256": "55d876e99ef986843ca28dc72244a7d1a88efb6bc98ac3a955fd9d3cef43504a"
+      },
+      "build": {
+        "file": "build-review.json",
+        "run": {
+          "id": 44121251849,
+          "head_sha": "a2f2531764810366c37c7f1ad429eef344c19bfc",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44121251849",
+          "run_attempt": 1
+        },
+        "sha256": "d0ba53414a100ea3bee78b72243393ac54d30ff4bf6909d092164ac6e3632447"
+      },
+      "product": {
+        "file": "product-review.json",
+        "run": {
+          "id": 44122907418,
+          "head_sha": "c74415284ab8d252533c2e8670c054fdcb4f4d1f",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44122907418",
+          "run_attempt": 1
+        },
+        "sha256": "6289115e1820395344c220d8f88766c7ab6ad4d053be59a8b0bd956097f8f2b4"
+      }
+    }
+  },
+  "publication": {
+    "qualification": "qualification.json",
+    "goal_complete": false,
+    "capstone": {
+      "branch": "next",
+      "commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+      "published": true
+    },
+    "neverd": {
+      "branch": "dev",
+      "before": "ee5204910bd8d9b860b1c6e57a4993f581b3923d",
+      "tested_commit": "02ace371079999d9bd16695229643604b7399c7f",
+      "integration_review": {
+        "tested_commit": "02ace371079999d9bd16695229643604b7399c7f",
+        "integration_commit": "ee5204910bd8d9b860b1c6e57a4993f581b3923d",
+        "changed_files": [
+          "docs/architecture.md",
+          "docs/testing.md",
+          "include/neverd/backend/Limits.h",
+          "lib/backend/c/LLVMC/LLVMCExprWriter.cpp",
+          "lib/backend/c/LLVMC/LLVMCFuncWriter.cpp",
+          "lib/backend/c/LLVMC/LLVMCStmtWriter.cpp",
+          "lib/backend/c/LLVMC/LLVMCWriter.h",
+          "unittests/lift/core/LLVMCValueTests.cpp"
+        ],
+        "decoder_build_and_dependency_sources_identical": true,
+        "capstone_gitlink_identical": true,
+        "evidence": "Complete intervening diff inspected: one independent LLVMC output fix, its backend-only limit, lift tests and documentation. Product probes link NeverDDecode; no modified backend object is in the product build log.",
+        "scope": "The 96 timing observations and 34 tests per variant were run at the tested commit. No fresh timing of the later LLVMC change is claimed; it is preserved unchanged."
+      },
+      "published": true,
+      "commit": "3a55853a144c46823d01bd2693862f3702519a0a",
+      "capstone": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+      "dependency_update": "gitlink only; local dependency is uninitialized"
+    }
+  },
+  "all_original_observations_retained": true,
+  "goal_complete": false
+}
