@@ -1123,8 +1123,36 @@ index 00000000..93622fbe
 +		115, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 +	},
 +};
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..88957245 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -76,11 +76,23 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		return false;
+ 
+ 	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
++#ifdef CAPSTONE_X86_VEX32_OUTPUT
++		if (plan == X86_PLAN_VECTOR) {
++			static bool (*const writers[2])(
++				const uint8_t *, size_t, cs_insn *, uint16_t *,
++				const struct X86SimpleRegister *,
++				bool) = { X86_writeVectorOutput32,
++					  X86_writeVectorOutput };
++			return writers[wide](code, size, insn, insn_size,
++					     x86_simple_registers[3], wide);
++		}
++#else
+ 		if (plan == X86_PLAN_VECTOR)
+ 			return X86_writeVectorOutput(code, size, insn,
+ 						     insn_size,
+ 						     x86_simple_registers[3],
+ 						     wide);
++#endif
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
 diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index 7675273f..d75c8ae4 100644
+index 7675273f..c640e943 100644
 --- a/arch/X86/X86SimpleOutput.h
 +++ b/arch/X86/X86SimpleOutput.h
 @@ -51,6 +51,15 @@ enum X86SimpleForm {
@@ -1143,10 +1171,17 @@ index 7675273f..d75c8ae4 100644
  #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
  #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
  
-@@ -68,6 +77,14 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -68,6 +77,21 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
  		      bool wide);
  
++/* The 32-bit vector plan also owns the existing padding and legacy forms.
++ * Their generated records do not read the supplied address-register array. */
++CAPSTONE_INTERNAL bool
++X86_writeVectorOutput32(const uint8_t *code, size_t size, cs_insn *insn,
++			uint16_t *insn_size,
++			const struct X86SimpleRegister *regs, bool wide);
++
 +CAPSTONE_INTERNAL bool X86_writeVex32RegisterOutput(const uint8_t *code,
 +						    size_t size, cs_insn *insn,
 +						    uint16_t *insn_size);
@@ -1159,7 +1194,7 @@ index 7675273f..d75c8ae4 100644
  {
  	if (displacement) {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..9b621f12 100644
+index 6df1472d..1550ce3a 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -19,87 +19,12 @@ struct PaddingOutput {
@@ -1311,19 +1346,6 @@ index 6df1472d..9b621f12 100644
  
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
-@@ -515,6 +408,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 						 wide);
- 	if (code[0] == 0x62)
- 		return writeEvexOutput(code, size, insn, insn_size, regs);
-+#ifdef CAPSTONE_X86_VEX32_OUTPUT
-+	/* Remaining 32-bit vector plans admit only bare C4 and C5. */
-+	if (!wide)
-+		return X86_writeVex32RegisterOutput(code, size, insn,
-+						    insn_size);
-+#endif
- 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
- 		return writeVexRipLoad(code, size, insn, insn_size);
- 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
 diff --git a/arch/X86/X86VectorRegisterOutput.inc b/arch/X86/X86VectorRegisterOutput.inc
 new file mode 100644
 index 00000000..037641f2
@@ -1504,10 +1526,10 @@ index 00000000..3c36662c
 +#endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 new file mode 100644
-index 00000000..28b16bca
+index 00000000..fc2995f1
 --- /dev/null
 +++ b/arch/X86/X86Vex32Output.c
-@@ -0,0 +1,173 @@
+@@ -0,0 +1,184 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1676,6 +1698,17 @@ index 00000000..28b16bca
 +	if (code[3] < 0xc0)
 +		return writeVex32Memory(code, size, insn, insn_size);
 +	return writeVexRegisterOutput(code, size, insn, insn_size, 2);
++}
++
++/* The mode-indexed caller passes false. Preserve the old 32-bit vector
++ * domain while keeping its generic prologue off the C4/C5 output route. */
++X86_VECTOR_REGISTER_TEXT bool X86_writeVectorOutput32(
++	const uint8_t *code, size_t size, cs_insn *insn, uint16_t *insn_size,
++	const struct X86SimpleRegister *regs, bool wide)
++{
++	if ((code[0] & 0xfe) == 0xc4)
++		return X86_writeVex32RegisterOutput(code, size, insn, insn_size);
++	return X86_writeVectorOutput(code, size, insn, insn_size, regs, wide);
 +}
 +
 +#endif

@@ -1,103 +1,72 @@
 from pathlib import Path
-import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
-import corpus
-from geometry import Geometry
-from jpeg_fixture import prepare_jpeg
-r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
-sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
-def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
-def run(args,label,cwd=None):
- print(label,flush=True)
- with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
- if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
-assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
- t=Path(tmp);b=t/'build'
- try:
-  import re
-  mapping=(s/'arch/ARM/ARMGenCSMappingInsn.inc').read_text()
-  rows=re.findall(r'^\s*(ARM_[\w]+) /\* (\d+) \*/, (ARM_INS_[\w]+)',mapping,re.M)
-  enums=dict(re.findall(r'^\s*(ARM_[\w]+)\s*=\s*(\d+)',(s/'arch/ARM/ARMGenInstrInfo.inc').read_text(),re.M))
-  assert [int(row[1]) for row in rows]==list(range(4465)) and all(enums[name]==idx for name,idx,_ in rows)
-  write('mapping',dict(rows=len(rows),sha256=hashlib.sha256(mapping.encode()).hexdigest()))
-  if Path('/proc/cpuinfo').exists():
-   write('cpu',{'model':next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith(('model name','CPU part')))})
-  mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
-  all_inputs=corpus.prepare(r,t,e,run)
-  all_inputs.append(prepare_jpeg(r,t,e,run))
-  choices={'arm64-ls','mips64el-ls','jpeg-avx2-i386'}
-  cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
+from collections import Counter
+import hashlib
+import json
+import shutil
+import subprocess as sp
+import tempfile
+from code_shape import elf, symbols
 
-  run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
-  bins={};objects={};libs={};ownedlibs={}
-  geometry=Geometry(e)
-  write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
-  libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','shared','mode','scan'):
-   variant=r/('baseline.patch' if key=='base' else key+'.patch')
-   if key!='base':
-    run(['git','apply',variant],'apply-'+key,s)
-    run(['git','add','-A'],'stage-tested-source-'+key,s)
-    tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/('candidate.json' if key=='scan' else key+'.json')).read_text())['tree'],tested
-    write('tested-source-'+key,dict(tree=tested,patch_sha256=sha(variant)))
-    run(['git','reset','-q'],'unstage-tested-source-'+key,s)
-   run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
-   link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
-   (e/(key+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',f]))
-   (e/(key+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',f]))
-   geometry.capture(key,b,f)
-   objdir=b/'CMakeFiles/capstone.dir'
-   objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
-   libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
-   if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('shared','mode','scan'):
-   changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
-   added=set(objects[key])-set(objects['base'])
-   assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'},added
-   assert set(objects['base']) <= set(objects[key])
-   assert set(changed) <= {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'},changed
-   active=bool(changed)
-   write('scope-'+key,dict(active=active,source_applies=True,policy='ELF x86-64 Clang admission; unchanged baseline, shared-prefix gate, admitted-mode gate, private-record-pool candidate'))
-   write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==4;write('binaries',digests)
-  assert active
-  geometry.finish()
-  write('all-binaries',{key:sha(path) for key,path in bins.items()})
-  payloads={key:path.read_bytes()for key,path in bins.items()}
-  assert payloads['base']==payloads['aa']
-  maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-  image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
-  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Timing checks selected output values and boundaries. Complete-record source equality is established separately for each candidate. Old vector constants must be byte-identical in the private-pool candidate. Source variants isolate gate simplification and pool storage changes; linked placement is recorded without assuming a timing result.'))
-  if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps,launch):
-   tail=list(map(str,[x['selector'],mode,x['path'],reps]))
-   if launch=='images':args=[str(bins[key]),*tail]
-   else:
-    with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
-    assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
-   return json.loads(sp.check_output(args,text=True))
-  data=[]
-  for x in cases:
-   for mode in ((0,2) if x['name']=='arm64-ls' else (1,2) if x['name']=='jpeg-avx2-i386' else (2,)):
-    for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','shared','mode','scan']
-     for k in range(21):
-      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-      for v in seq+seq[::-1]:
-       vout=sample(v,x,mode,n,launch)
-       if reference is None:reference=(vout['first'],vout['result'])
-       assert reference==(vout['first'],vout['result'])
-       ticks[v].append(vout['cpu_ns'])
-      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-     data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  assert len(data)==10
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
- finally:
-  n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
+r = Path(__file__).resolve().parent
+s, e = r.parent/'source', r.parent/'evidence'
+e.mkdir()
+meta = json.loads((r/'candidate.json').read_text())
+sha = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+def write(name, value):
+    (e/(name+'.json')).write_text(json.dumps(value,indent=2)+'\n')
+def run(args, label, cwd=None):
+    print(label,flush=True)
+    with (e/(label+'.log')).open('wb') as out:
+        sp.run(list(map(str,args)),cwd=cwd,stdout=out,stderr=sp.STDOUT,check=True)
+
+with tempfile.TemporaryDirectory(prefix='vex32-mode-table-audit-') as tmp:
+    w=Path(tmp); b=w/'build'
+    try:
+        assert sp.check_output(['git','rev-parse','HEAD'],cwd=s,text=True).strip()==meta['parent']
+        assert sha(r/'scan.patch')==meta['sha256']
+        write('compiler',dict(version=sp.check_output(['clang','--version'],text=True)))
+        write('cpu',dict(model=next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith('model name'))))
+        run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',w/'consumer.o'],'consumer')
+        run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER=clang','-DCMAKE_C_FLAGS=-Wno-error=incompatible-pointer-types-discards-qualifiers','-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in ['X86','ARM','AARCH64','MIPS']],'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+        objects, syms, shapes, allocated, old_backend = {}, {}, {}, {}, set()
+        for label in ('base','scan'):
+            if label=='scan':
+                run(['git','apply','--index',r/'scan.patch'],'apply',s)
+                assert sp.check_output(['git','write-tree'],cwd=s,text=True).strip()==meta['tree']
+            run(['cmake','--build',b,'--target','capstone_static','-j4'],'build-'+label)
+            root=b/'CMakeFiles/capstone.dir'
+            objects[label]={str(p.relative_to(root)):sha(p) for p in root.rglob('*.o')}
+            binary=w/label
+            run(['clang++',w/'consumer.o',b/'libcapstone.a','-lm','-o',binary],'link-'+label)
+            syms[label]=symbols(binary)
+            (e/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',binary]))
+            (e/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',binary]))
+            shapes[label]={};allocated[label]={}
+            for name in ('X86OutputIterator','X86VectorOutput'):
+                path=root/('arch/X86/'+name+'.c.o')
+                data,_,sections,names=elf(path)
+                shapes[label][name]={n:dict(size=v[5],alignment=v[8]) for n,v in zip(names,sections) if v[2]&2}
+                allocated[label][name]={n:hashlib.sha256(data[v[4]:v[4]+v[5]]).hexdigest() for n,v in zip(names,sections) if v[2]&2 and v[1]!=8}
+                (e/(label+'-'+name+'-assembly.txt')).write_bytes(sp.check_output(['objdump','-dr',path]))
+            if label=='base':
+                for arch in ('ARM','AArch64','Mips'):
+                    for path in (root/'arch'/arch).glob('*.o'):old_backend.update(symbols(path))
+            else:
+                for name in ('X86Vex32Output','X86Vex32C4Output'):
+                    (e/(name+'-assembly.txt')).write_bytes(sp.check_output(['objdump','-dr',root/('arch/X86/'+name+'.c.o')]))
+        changed=[n for n,h in objects['base'].items() if objects['scan'].get(n)!=h]
+        added=set(objects['scan'])-set(objects['base'])
+        assert changed==['arch/X86/X86OutputIterator.c.o'],changed
+        assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'}
+        movements={}
+        for kind in ('t','r'):
+            entries={name:syms['scan'][name][0][0]-syms['base'][name][0][0] for name in old_backend
+                     if len(syms['base'].get(name,[]))==len(syms['scan'].get(name,[]))==1 and syms['base'][name][0][2].lower()==kind}
+            movements[kind]=dict(symbols=len(entries),deltas=dict(Counter(entries.values())))
+        write('complete',dict(source=meta,changed=changed,added=sorted(added),vector_object_identical=True,
+                              shapes=shapes,allocated_section_hashes=allocated,backend_movements=movements,
+                              consumer_sha256=sha(w/'consumer.o'),native_timing=False,qualified=False))
+    finally:
+        size=sum(p.stat().st_size for p in w.rglob('*') if p.is_file())
+        shutil.rmtree(w)
+        write('cleanup',dict(bytes=size,removed=not w.exists()))
