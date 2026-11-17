@@ -1,17 +1,19 @@
 {
   "candidate_measured": false,
-  "hypothesis": "Uncontrolled process addresses and/or separate executable identities contribute to the remaining identical-binary timing variation. An A/A deviation alone cannot be attributed to a source change.",
-  "intervention": "Use one identical production baseline executable in a 2x2 design: separate versus same pathname/inode, ASLR enabled versus disabled. Interleave all four cells within each balanced cycle and record process addresses, faults, context switches, CPU time and wall time.",
+  "hypothesis": "Clang14 amd64 raw decode has unusually broad per-process timing even with fixed image, stack and heap addresses; simple ASLR or visible context-switch explanations were not sufficient.",
+  "intervention": "Build Clang14 and GCC11 production baseline on each of two identical runner profiles; on each runner alternate retained-process bursts and restarted processes with fixed addresses. Add a small integer calibration outside the timed region and run Memcheck with origins.",
   "cases": {
     "amd64-ls": 0,
     "mips64el-ls": 1
   },
-  "compilers": [
+  "compilers_on_each_runner": [
     "clang",
     "gcc"
   ],
-  "replicas_per_compiler": 2,
-  "cycles": 40,
+  "replicas": 2,
+  "blocks": 8,
+  "samples_per_retained_process": 8,
+  "fresh_processes_per_block": 8,
   "calibration_cpu_ms": 80,
-  "constraints": "This instrumented consumer is diagnostic only. It cannot replace the original consumer performance results, erase initial flags, or prove a candidate gain. Do not infer physical cache conflicts without counters."
+  "constraints": "Baseline only, diagnostic instrumentation, no candidate performance qualification. Check undefined-value errors before attributing unexplained variation to hardware or the runner."
 }
