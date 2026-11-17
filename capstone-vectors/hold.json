@@ -1,0 +1,1549 @@
+{
+  "decision": "hold",
+  "publication_qualified": false,
+  "native_timing_started": false,
+  "semantic_checks_passed": true,
+  "source": {
+    "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "tree": "42fc3e8897c0ea2fe08ca6957a8c3e3c819202e6",
+    "sha256": "79bc04350eefa9bfda700b26ba6d0ca7822c2d958f372a626677a6268a21ee27",
+    "files": [
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86EvexScan.c",
+      "arch/X86/X86FeatureExtension.h"
+    ]
+  },
+  "run": {
+    "id": 44142336930,
+    "head_sha": "5206eecc19a36c1b60193ec92537f64f89207903",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44142336930",
+    "run_attempt": 1
+  },
+  "evidence": "Isolating EVEX result construction restores the original Clang 18 shared fallback saved-register set and removes PE32 extra data reads/writes. Remaining shared control-flow instructions add 0.18\u20130.29% PE32 AVX raw work. SSL64 work reduction shrinks to 0.56\u20132.57%; the extra boundary consumes much of the direct-projection saving.",
+  "instruction_scope": "Unchanged original consumer; two traversals. This is instruction-work evidence, not native throughput.",
+  "focus": [
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 8951872,
+          "Dr": 1779082,
+          "Dw": 1541694,
+          "I1mr": 775,
+          "D1mr": 1382,
+          "D1mw": 9,
+          "ILmr": 386,
+          "DLmr": 182,
+          "DLmw": 0,
+          "Bc": 1270088,
+          "Bcm": 23497,
+          "Bi": 50382,
+          "Bim": 12689
+        },
+        "boundary": {
+          "Ir": 8968372,
+          "Dr": 1779082,
+          "Dw": 1541694,
+          "I1mr": 768,
+          "D1mr": 1382,
+          "D1mw": 9,
+          "ILmr": 384,
+          "DLmr": 182,
+          "DLmw": 0,
+          "Bc": 1278338,
+          "Bcm": 23426,
+          "Bi": 50382,
+          "Bim": 12146
+        }
+      },
+      "ir_change": 16500,
+      "instruction_reduction": -0.0018431898936892566,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            214182,
+            62772,
+            61656
+          ],
+          "after": [
+            230682,
+            62772,
+            61656
+          ],
+          "delta": [
+            16500,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            3348,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -3348,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            3348,
+            0,
+            0
+          ],
+          "delta": [
+            3348,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 2871656,
+          "Dr": 480910,
+          "Dw": 354108,
+          "I1mr": 295,
+          "D1mr": 801,
+          "D1mw": 3,
+          "ILmr": 251,
+          "DLmr": 127,
+          "DLmw": 0,
+          "Bc": 497172,
+          "Bcm": 17018,
+          "Bi": 15092,
+          "Bim": 4122
+        },
+        "boundary": {
+          "Ir": 2872652,
+          "Dr": 480910,
+          "Dw": 354108,
+          "I1mr": 805,
+          "D1mr": 801,
+          "D1mw": 3,
+          "ILmr": 257,
+          "DLmr": 127,
+          "DLmw": 0,
+          "Bc": 497670,
+          "Bcm": 16495,
+          "Bi": 15092,
+          "Bim": 4122
+        }
+      },
+      "ir_change": 996,
+      "instruction_reduction": -0.0003468382006759363,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            11952,
+            3486,
+            3486
+          ],
+          "after": [
+            12948,
+            3486,
+            3486
+          ],
+          "delta": [
+            996,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 162820318,
+          "Dr": 33431844,
+          "Dw": 27141170,
+          "I1mr": 77501,
+          "D1mr": 40630,
+          "D1mw": 66,
+          "ILmr": 966,
+          "DLmr": 635,
+          "DLmw": 0,
+          "Bc": 24274424,
+          "Bcm": 606133,
+          "Bi": 728084,
+          "Bim": 183363
+        },
+        "boundary": {
+          "Ir": 159688076,
+          "Dr": 31711230,
+          "Dw": 24938504,
+          "I1mr": 97073,
+          "D1mr": 40630,
+          "D1mw": 66,
+          "ILmr": 967,
+          "DLmr": 635,
+          "DLmw": 0,
+          "Bc": 24261426,
+          "Bcm": 680199,
+          "Bi": 728084,
+          "Bim": 200835
+        }
+      },
+      "ir_change": -3132242,
+      "instruction_reduction": 0.019237414829272104,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan",
+          "before": [
+            10319100,
+            2855576,
+            1714716
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -10319100,
+            -2855576,
+            -1714716
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            8963952,
+            1977868,
+            193058
+          ],
+          "delta": [
+            8963952,
+            1977868,
+            193058
+          ]
+        },
+        {
+          "function": "decodeEvexScanResult",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            7089180,
+            1544464,
+            2208764
+          ],
+          "delta": [
+            7089180,
+            1544464,
+            2208764
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            11565502,
+            2820810,
+            3784396
+          ],
+          "after": [
+            4610902,
+            1012614,
+            1280740
+          ],
+          "delta": [
+            -6954600,
+            -1808196,
+            -2503656
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1952624,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1952624,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1079320,
+            377636,
+            53966
+          ],
+          "after": [
+            1101364,
+            377636,
+            53966
+          ],
+          "delta": [
+            22044,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            7414408,
+            1916016,
+            1569516
+          ],
+          "after": [
+            7433314,
+            1722958,
+            1183400
+          ],
+          "delta": [
+            18906,
+            -193058,
+            -386116
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 266781430,
+          "Dr": 51364594,
+          "Dw": 40120270,
+          "I1mr": 572,
+          "D1mr": 92726,
+          "D1mw": 669,
+          "ILmr": 322,
+          "DLmr": 198,
+          "DLmw": 0,
+          "Bc": 42614290,
+          "Bcm": 1673172,
+          "Bi": 1652826,
+          "Bim": 804965
+        },
+        "boundary": {
+          "Ir": 266790410,
+          "Dr": 51364594,
+          "Dw": 40120270,
+          "I1mr": 426,
+          "D1mr": 92771,
+          "D1mw": 673,
+          "ILmr": 315,
+          "DLmr": 198,
+          "DLmw": 0,
+          "Bc": 42618780,
+          "Bcm": 1678850,
+          "Bi": 1652826,
+          "Bim": 804965
+        }
+      },
+      "ir_change": 8980,
+      "instruction_reduction": -3.366051377717838e-05,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            107760,
+            31430,
+            31430
+          ],
+          "after": [
+            116740,
+            31430,
+            31430
+          ],
+          "delta": [
+            8980,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-gcc-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 9053000,
+          "Dr": 1811276,
+          "Dw": 1767230,
+          "I1mr": 517,
+          "D1mr": 1416,
+          "D1mw": 17,
+          "ILmr": 351,
+          "DLmr": 172,
+          "DLmw": 0,
+          "Bc": 1807946,
+          "Bcm": 52680,
+          "Bi": 34412,
+          "Bim": 6488
+        },
+        "boundary": {
+          "Ir": 9078308,
+          "Dr": 1811276,
+          "Dw": 1767230,
+          "I1mr": 566,
+          "D1mr": 1416,
+          "D1mw": 17,
+          "ILmr": 353,
+          "DLmr": 172,
+          "DLmw": 0,
+          "Bc": 1815638,
+          "Bcm": 52805,
+          "Bi": 34412,
+          "Bim": 6509
+        }
+      },
+      "ir_change": 25308,
+      "instruction_reduction": -0.0027955373909200887,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            285204,
+            89196,
+            70464
+          ],
+          "after": [
+            310512,
+            89196,
+            70464
+          ],
+          "delta": [
+            25308,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            2790,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -2790,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            2790,
+            0,
+            0
+          ],
+          "delta": [
+            2790,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-gcc-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 3377978,
+          "Dr": 554796,
+          "Dw": 675856,
+          "I1mr": 267,
+          "D1mr": 801,
+          "D1mw": 3,
+          "ILmr": 260,
+          "DLmr": 123,
+          "DLmw": 0,
+          "Bc": 752502,
+          "Bcm": 27783,
+          "Bi": 5892,
+          "Bim": 1389
+        },
+        "boundary": {
+          "Ir": 3379472,
+          "Dr": 554796,
+          "Dw": 675856,
+          "I1mr": 264,
+          "D1mr": 801,
+          "D1mw": 3,
+          "ILmr": 259,
+          "DLmr": 123,
+          "DLmw": 0,
+          "Bc": 753000,
+          "Bcm": 25014,
+          "Bi": 5892,
+          "Bim": 1389
+        }
+      },
+      "ir_change": 1494,
+      "instruction_reduction": -0.0004422764150624481,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            15936,
+            4980,
+            3984
+          ],
+          "after": [
+            17430,
+            4980,
+            3984
+          ],
+          "delta": [
+            1494,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 175901470,
+          "Dr": 36733902,
+          "Dw": 32443292,
+          "I1mr": 67091,
+          "D1mr": 39834,
+          "D1mw": 57,
+          "ILmr": 884,
+          "DLmr": 588,
+          "DLmw": 0,
+          "Bc": 31211018,
+          "Bcm": 946689,
+          "Bi": 298990,
+          "Bim": 90920
+        },
+        "boundary": {
+          "Ir": 171381640,
+          "Dr": 34925544,
+          "Dw": 30269168,
+          "I1mr": 69576,
+          "D1mr": 39823,
+          "D1mw": 78,
+          "ILmr": 886,
+          "DLmr": 588,
+          "DLmw": 0,
+          "Bc": 30558028,
+          "Bcm": 888140,
+          "Bi": 298990,
+          "Bim": 90920
+        }
+      },
+      "ir_change": -4519830,
+      "instruction_reduction": 0.02569523722570366,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan.constprop.0",
+          "before": [
+            10197258,
+            2440918,
+            1300058
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -10197258,
+            -2440918,
+            -1300058
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9685736,
+            1923902,
+            139092
+          ],
+          "delta": [
+            9685736,
+            1923902,
+            139092
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            13099922,
+            3638668,
+            3981128
+          ],
+          "after": [
+            5032586,
+            1274104,
+            1338380
+          ],
+          "delta": [
+            -8067336,
+            -2364564,
+            -2642748
+          ]
+        },
+        {
+          "function": "decodeEvexScanResult.constprop.0",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            5791740,
+            1459338,
+            1822648
+          ],
+          "delta": [
+            5791740,
+            1459338,
+            1822648
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1948950,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1948950,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            10222282,
+            2623068,
+            2244676
+          ],
+          "after": [
+            10420150,
+            2623068,
+            2051618
+          ],
+          "delta": [
+            197868,
+            0,
+            -193058
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1241218,
+            377636,
+            53966
+          ],
+          "after": [
+            1259588,
+            377636,
+            53966
+          ],
+          "delta": [
+            18370,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 264550798,
+          "Dr": 54397770,
+          "Dw": 40894090,
+          "I1mr": 644,
+          "D1mr": 92727,
+          "D1mw": 836,
+          "ILmr": 349,
+          "DLmr": 185,
+          "DLmw": 0,
+          "Bc": 40846118,
+          "Bcm": 2084366,
+          "Bi": 152076,
+          "Bim": 34972
+        },
+        "boundary": {
+          "Ir": 264564268,
+          "Dr": 54397770,
+          "Dw": 40894090,
+          "I1mr": 832,
+          "D1mr": 92727,
+          "D1mw": 836,
+          "ILmr": 348,
+          "DLmr": 185,
+          "DLmw": 0,
+          "Bc": 40850608,
+          "Bcm": 2079535,
+          "Bi": 152076,
+          "Bim": 34628
+        }
+      },
+      "ir_change": 13470,
+      "instruction_reduction": -5.0916497329911437e-05,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            143680,
+            44900,
+            35920
+          ],
+          "after": [
+            157150,
+            44900,
+            35920
+          ],
+          "delta": [
+            13470,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 9016188,
+          "Dr": 1911224,
+          "Dw": 1631406,
+          "I1mr": 363,
+          "D1mr": 1174,
+          "D1mw": 5,
+          "ILmr": 363,
+          "DLmr": 185,
+          "DLmw": 0,
+          "Bc": 1267964,
+          "Bcm": 21354,
+          "Bi": 55066,
+          "Bim": 11493
+        },
+        "boundary": {
+          "Ir": 9032688,
+          "Dr": 1911224,
+          "Dw": 1631406,
+          "I1mr": 372,
+          "D1mr": 1174,
+          "D1mw": 4,
+          "ILmr": 372,
+          "DLmr": 185,
+          "DLmw": 0,
+          "Bc": 1276214,
+          "Bcm": 20667,
+          "Bi": 55066,
+          "Bim": 11493
+        }
+      },
+      "ir_change": 16500,
+      "instruction_reduction": -0.0018300416983318968,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            284646,
+            106812,
+            114504
+          ],
+          "after": [
+            301146,
+            106812,
+            114504
+          ],
+          "delta": [
+            16500,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            3348,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -3348,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            3348,
+            0,
+            0
+          ],
+          "delta": [
+            3348,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 2882730,
+          "Dr": 491972,
+          "Dw": 357208,
+          "I1mr": 252,
+          "D1mr": 578,
+          "D1mw": 3,
+          "ILmr": 252,
+          "DLmr": 127,
+          "DLmw": 0,
+          "Bc": 516270,
+          "Bcm": 19259,
+          "Bi": 7536,
+          "Bim": 2237
+        },
+        "boundary": {
+          "Ir": 2883726,
+          "Dr": 491972,
+          "Dw": 357208,
+          "I1mr": 258,
+          "D1mr": 578,
+          "D1mw": 3,
+          "ILmr": 257,
+          "DLmr": 127,
+          "DLmw": 0,
+          "Bc": 516768,
+          "Bcm": 17102,
+          "Bi": 7536,
+          "Bim": 2237
+        }
+      },
+      "ir_change": 996,
+      "instruction_reduction": -0.00034550582260561846,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            15936,
+            5976,
+            6474
+          ],
+          "after": [
+            16932,
+            5976,
+            6474
+          ],
+          "delta": [
+            996,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 170176294,
+          "Dr": 36380904,
+          "Dw": 29224808,
+          "I1mr": 973,
+          "D1mr": 38077,
+          "D1mw": 43,
+          "ILmr": 862,
+          "DLmr": 615,
+          "DLmw": 0,
+          "Bc": 24950594,
+          "Bcm": 622520,
+          "Bi": 608854,
+          "Bim": 128863
+        },
+        "boundary": {
+          "Ir": 169229080,
+          "Dr": 35335528,
+          "Dw": 27504322,
+          "I1mr": 1034,
+          "D1mr": 38077,
+          "D1mw": 41,
+          "ILmr": 873,
+          "DLmr": 615,
+          "DLmw": 0,
+          "Bc": 24937596,
+          "Bcm": 612672,
+          "Bi": 608854,
+          "Bim": 128213
+        }
+      },
+      "ir_change": -947214,
+      "instruction_reduction": 0.0055660749081772876,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan",
+          "before": [
+            11292744,
+            2855576,
+            1714716
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -11292744,
+            -2855576,
+            -1714716
+          ]
+        },
+        {
+          "function": "decodeEvexScanResult",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            10487452,
+            2895870,
+            3367112
+          ],
+          "delta": [
+            10487452,
+            2895870,
+            3367112
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9868248,
+            2082286,
+            297476
+          ],
+          "delta": [
+            9868248,
+            2082286,
+            297476
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            13915300,
+            4270104,
+            5233690
+          ],
+          "after": [
+            5430688,
+            1488264,
+            1756390
+          ],
+          "delta": [
+            -8484612,
+            -2781840,
+            -3477300
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1952624,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1952624,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            9333192,
+            3019812,
+            2891916
+          ],
+          "after": [
+            9738214,
+            3019812,
+            2698858
+          ],
+          "delta": [
+            405022,
+            0,
+            -193058
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1079320,
+            377636,
+            53966
+          ],
+          "after": [
+            1101364,
+            377636,
+            53966
+          ],
+          "delta": [
+            22044,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 246741860,
+          "Dr": 46836782,
+          "Dw": 35671536,
+          "I1mr": 324,
+          "D1mr": 91674,
+          "D1mw": 614,
+          "ILmr": 324,
+          "DLmr": 200,
+          "DLmw": 0,
+          "Bc": 41868692,
+          "Bcm": 1924099,
+          "Bi": 728346,
+          "Bim": 403730
+        },
+        "boundary": {
+          "Ir": 246750840,
+          "Dr": 46836782,
+          "Dw": 35671536,
+          "I1mr": 329,
+          "D1mr": 91674,
+          "D1mw": 614,
+          "ILmr": 328,
+          "DLmr": 200,
+          "DLmw": 0,
+          "Bc": 41873182,
+          "Bcm": 1909009,
+          "Bi": 728346,
+          "Bim": 403730
+        }
+      },
+      "ir_change": 8980,
+      "instruction_reduction": -3.63943110424092e-05,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            143680,
+            53880,
+            58370
+          ],
+          "after": [
+            152660,
+            53880,
+            58370
+          ],
+          "delta": [
+            8980,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-gcc-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 8783510,
+          "Dr": 1896716,
+          "Dw": 1578218,
+          "I1mr": 405,
+          "D1mr": 1403,
+          "D1mw": 15,
+          "ILmr": 353,
+          "DLmr": 176,
+          "DLmw": 0,
+          "Bc": 1588354,
+          "Bcm": 44038,
+          "Bi": 34324,
+          "Bim": 6521
+        },
+        "boundary": {
+          "Ir": 8808818,
+          "Dr": 1896716,
+          "Dw": 1578218,
+          "I1mr": 424,
+          "D1mr": 1403,
+          "D1mw": 15,
+          "ILmr": 349,
+          "DLmr": 176,
+          "DLmw": 0,
+          "Bc": 1596046,
+          "Bcm": 44708,
+          "Bi": 34324,
+          "Bim": 6521
+        }
+      },
+      "ir_change": 25308,
+      "instruction_reduction": -0.0028813082697007886,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            285204,
+            89196,
+            70464
+          ],
+          "after": [
+            310512,
+            89196,
+            70464
+          ],
+          "delta": [
+            25308,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            2790,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -2790,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            2790,
+            0,
+            0
+          ],
+          "delta": [
+            2790,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-gcc-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 3294500,
+          "Dr": 554836,
+          "Dw": 702240,
+          "I1mr": 252,
+          "D1mr": 829,
+          "D1mw": 4,
+          "ILmr": 251,
+          "DLmr": 126,
+          "DLmw": 0,
+          "Bc": 742330,
+          "Bcm": 24276,
+          "Bi": 6080,
+          "Bim": 1511
+        },
+        "boundary": {
+          "Ir": 3295994,
+          "Dr": 554836,
+          "Dw": 702240,
+          "I1mr": 252,
+          "D1mr": 829,
+          "D1mw": 4,
+          "ILmr": 247,
+          "DLmr": 126,
+          "DLmw": 0,
+          "Bc": 742828,
+          "Bcm": 24493,
+          "Bi": 6080,
+          "Bim": 1511
+        }
+      },
+      "ir_change": 1494,
+      "instruction_reduction": -0.0004534830778570864,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            15936,
+            4980,
+            3984
+          ],
+          "after": [
+            17430,
+            4980,
+            3984
+          ],
+          "delta": [
+            1494,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 173488562,
+          "Dr": 36885686,
+          "Dw": 33341508,
+          "I1mr": 16619,
+          "D1mr": 40458,
+          "D1mw": 60,
+          "ILmr": 933,
+          "DLmr": 606,
+          "DLmw": 0,
+          "Bc": 30517930,
+          "Bcm": 901096,
+          "Bi": 321560,
+          "Bim": 104155
+        },
+        "boundary": {
+          "Ir": 169087988,
+          "Dr": 35084332,
+          "Dw": 31220816,
+          "I1mr": 37696,
+          "D1mr": 40450,
+          "D1mw": 68,
+          "ILmr": 935,
+          "DLmr": 606,
+          "DLmw": 0,
+          "Bc": 29864940,
+          "Bcm": 889275,
+          "Bi": 321560,
+          "Bim": 104147
+        }
+      },
+      "ir_change": -4400574,
+      "instruction_reduction": 0.025365211108268948,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan.constprop.0",
+          "before": [
+            10336350,
+            2440918,
+            1300058
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -10336350,
+            -2440918,
+            -1300058
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9703732,
+            1923902,
+            139092
+          ],
+          "delta": [
+            9703732,
+            1923902,
+            139092
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            12835240,
+            3638668,
+            3981128
+          ],
+          "after": [
+            4906996,
+            1274104,
+            1338380
+          ],
+          "delta": [
+            -7928244,
+            -2364564,
+            -2642748
+          ]
+        },
+        {
+          "function": "decodeEvexScanResult.constprop.0",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            5791740,
+            1459338,
+            1822648
+          ],
+          "delta": [
+            5791740,
+            1459338,
+            1822648
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1948950,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1948950,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            10186244,
+            2607914,
+            2242880
+          ],
+          "after": [
+            10485372,
+            2614918,
+            2103254
+          ],
+          "delta": [
+            299128,
+            7004,
+            -139626
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1241218,
+            377636,
+            53966
+          ],
+          "after": [
+            1259588,
+            377636,
+            53966
+          ],
+          "delta": [
+            18370,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-result-boundary-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "totals": {
+        "integer": {
+          "Ir": 257838958,
+          "Dr": 52976062,
+          "Dw": 42230332,
+          "I1mr": 476,
+          "D1mr": 92778,
+          "D1mw": 1020,
+          "ILmr": 343,
+          "DLmr": 185,
+          "DLmw": 0,
+          "Bc": 40446324,
+          "Bcm": 2120422,
+          "Bi": 76408,
+          "Bim": 34631
+        },
+        "boundary": {
+          "Ir": 257852428,
+          "Dr": 52976062,
+          "Dw": 42230332,
+          "I1mr": 471,
+          "D1mr": 92778,
+          "D1mw": 1020,
+          "ILmr": 338,
+          "DLmr": 185,
+          "DLmw": 0,
+          "Bc": 40450814,
+          "Bcm": 2122015,
+          "Bi": 76408,
+          "Bim": 34631
+        }
+      },
+      "ir_change": 13470,
+      "instruction_reduction": -5.224191140262846e-05,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            143680,
+            44900,
+            35920
+          ],
+          "after": [
+            157150,
+            44900,
+            35920
+          ],
+          "delta": [
+            13470,
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "next": "Preserve the original dispatch and ABI, and move only full MCInst initialization behind the existing canonical projection miss boundary."
+}
