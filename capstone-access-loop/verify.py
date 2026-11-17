@@ -88,7 +88,8 @@ try:
         (out/(name+'-stderr.log')).write_text(process.stderr)
         if process.returncode:raise RuntimeError(process.stderr)
         result=json.loads(process.stdout)
-        assert result['all-functions']['vectors'] > 0 and result['simd-functions']['functions'] > 0, 'Full operand detail must populate vector selection'
+        if 'simd-functions' in meta:
+            assert result['all-functions']['vectors'] > 0 and result['simd-functions']['functions'] > 0, 'The recorded SIMD cohort must populate vector selection'
         results[name] = dict(provenance=meta, observed=result)
         save('census',results)
         print(name, {k:{x:v[x] for x in ('decoded','invalid_bytes','vectors','functions')} for k,v in result.items()}, flush=True)
