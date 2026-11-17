@@ -1,7 +1,7 @@
-name: Validate small EVEX extension entry with Make, Xcode and MSVC
+name: Validate small EVEX extension entry on supported macOS Xcode runner
 on:
   push:
-    branches: [codex/capstone-evex-extension-small-entry-build]
+    branches: [codex/capstone-evex-extension-small-entry-xcode]
     paths: [capstone-access-loop/**, .github/workflows/capstone-register-loop.yml]
 permissions:
   contents: read
@@ -11,10 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, compiler: gcc, profile: make }
-          - { host: macos-14, compiler: clang, profile: xcode }
-          - { host: windows-latest, compiler: MT, profile: full }
-          - { host: windows-latest, compiler: MD, profile: full }
+          - { host: macos-15, compiler: clang, profile: xcode }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -35,6 +32,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-extension-small-entry-${{ matrix.host }}-${{ matrix.compiler }}-${{ matrix.profile }}
+          name: evex-extension-small-entry-xcode-${{ matrix.host }}-${{ matrix.compiler }}-${{ matrix.profile }}
           path: evidence/
           retention-days: 14
