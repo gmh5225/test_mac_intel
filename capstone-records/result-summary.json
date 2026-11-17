@@ -1,0 +1,3679 @@
+{
+  "status": "held-focused-native-regressions",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "08e8d3a9243ddeb82de147a7c11cd5f61220be12",
+      "sha256": "830bdbc515814547d224f419e2b0ed2ae941f7a6cc89a74b6489fb9cf943f0d9",
+      "files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86EvexMemoryOutput.c",
+        "arch/X86/X86GenEvexMemoryOutput.inc",
+        "arch/X86/X86SimpleOutput.h",
+        "arch/X86/X86VectorOutput.c",
+        "suite/synctools/x86_vector_output.cpp",
+        "tests/unit/x86_simple_output.c",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ]
+    },
+    "run": {
+      "id": 44061234944,
+      "head_sha": "c928a37d13b5b36c5e1ad2ed5533ee85a4b2d930",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44061234944",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "name": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "complete": {
+          "cases": 48,
+          "cc": "clang",
+          "host": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false
+        },
+        "cleanup": {
+          "bytes": 224413338,
+          "removed": true
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86EvexMemoryOutput.c.o"
+          ],
+          "identical": 36
+        },
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "name": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "complete": {
+          "cases": 48,
+          "cc": "gcc",
+          "host": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false
+        },
+        "cleanup": {
+          "bytes": 220522698,
+          "removed": true
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86EvexMemoryOutput.c.o"
+          ],
+          "identical": 36
+        },
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "compiler": {
+          "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      },
+      {
+        "name": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "complete": {
+          "cases": 48,
+          "cc": "clang",
+          "host": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false
+        },
+        "cleanup": {
+          "bytes": 215777278,
+          "removed": true
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86EvexMemoryOutput.c.o"
+          ],
+          "identical": 36
+        },
+        "cpu": {
+          "model": "INTEL(R) XEON(R) PLATINUM 8573C"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "name": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "complete": {
+          "cases": 48,
+          "cc": "gcc",
+          "host": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false
+        },
+        "cleanup": {
+          "bytes": 220211519,
+          "removed": true
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86EvexMemoryOutput.c.o"
+          ],
+          "identical": 36
+        },
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "compiler": {
+          "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0057789307721783,
+        "aa": 1.0010282711877159,
+        "ci95": [
+          0.9996681505970159,
+          1.0131552240320698
+        ],
+        "aa_ci95": [
+          0.990969254101751,
+          1.0077283637231864
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0077946444873982,
+        "aa": 1.0006589434312754,
+        "ci95": [
+          1.0045576204423796,
+          1.0119610447657839
+        ],
+        "aa_ci95": [
+          0.9993367289474013,
+          1.0044249449228921
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9884018187613428,
+        "aa": 1.0014760629612698,
+        "ci95": [
+          0.9827860186668569,
+          0.9939857704234561
+        ],
+        "aa_ci95": [
+          0.9947143397160995,
+          1.0027320618570177
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9877621139132898,
+        "aa": 0.9999460166268789,
+        "ci95": [
+          0.9863737486095662,
+          0.9903475703218857
+        ],
+        "aa_ci95": [
+          0.9985231247570929,
+          1.002804897783052
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.001201427982974,
+        "aa": 1.0010903564784213,
+        "ci95": [
+          0.9965294391169276,
+          1.0089156609992942
+        ],
+        "aa_ci95": [
+          0.9981091762971256,
+          1.006494402804809
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.991562985739206,
+        "aa": 1.0015499091314337,
+        "ci95": [
+          0.9895304267739358,
+          0.9944129891189556
+        ],
+        "aa_ci95": [
+          0.9992604968365698,
+          1.0031526582641273
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0033303646467053,
+        "aa": 1.0028269206977607,
+        "ci95": [
+          0.9960509928842772,
+          1.0183115701901122
+        ],
+        "aa_ci95": [
+          0.9975644180208086,
+          1.0100307863127083
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0027141732333869,
+        "aa": 1.0004722580315775,
+        "ci95": [
+          1.0018252499311529,
+          1.005830176121237
+        ],
+        "aa_ci95": [
+          0.9991185825785931,
+          1.0017586899034632
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9911922786488905,
+        "aa": 0.9994641797804413,
+        "ci95": [
+          0.9880245553281914,
+          0.9990973467078582
+        ],
+        "aa_ci95": [
+          0.9927492600315635,
+          1.0066631112938773
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9881474059370778,
+        "aa": 0.9985987138880891,
+        "ci95": [
+          0.9855026548896858,
+          0.99243778183414
+        ],
+        "aa_ci95": [
+          0.9955832650553053,
+          1.0032453316162266
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0050996868829163,
+        "aa": 1.004560466456406,
+        "ci95": [
+          0.9982371520211542,
+          1.0083501650327602
+        ],
+        "aa_ci95": [
+          0.9966327497173587,
+          1.012572786542577
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.988747881846664,
+        "aa": 1.0008330299458839,
+        "ci95": [
+          0.9869910571137703,
+          0.9896604731172302
+        ],
+        "aa_ci95": [
+          0.99857528771787,
+          1.0049305327576916
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.008318218775408,
+        "aa": 0.9986198774451172,
+        "ci95": [
+          1.001488812286099,
+          1.0124613328480985
+        ],
+        "aa_ci95": [
+          0.9883937684498744,
+          1.0018146783155295
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0078372210467101,
+        "aa": 1.0015691306888928,
+        "ci95": [
+          1.0068245864032257,
+          1.00985473859346
+        ],
+        "aa_ci95": [
+          1.0005326096605247,
+          1.0033353547604609
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9897002389399754,
+        "aa": 1.0015580432449012,
+        "ci95": [
+          0.9823017977296307,
+          0.9914433959401645
+        ],
+        "aa_ci95": [
+          0.9945974556936611,
+          1.0065270717488515
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9881287383206032,
+        "aa": 0.9994694567483868,
+        "ci95": [
+          0.9854893391684368,
+          0.9900430898069479
+        ],
+        "aa_ci95": [
+          0.993799141043577,
+          1.0018584406215996
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.001247196735038,
+        "aa": 1.0006352380672294,
+        "ci95": [
+          0.9905869810978145,
+          1.0038450733899853
+        ],
+        "aa_ci95": [
+          0.9976176930735315,
+          1.0039524999416174
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9864940192776681,
+        "aa": 0.998408438213927,
+        "ci95": [
+          0.9858911436759604,
+          0.9884551090060597
+        ],
+        "aa_ci95": [
+          0.9956704384558678,
+          1.0000998367375704
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0246356240718106,
+        "aa": 1.0004815934965614,
+        "ci95": [
+          1.0188222430490472,
+          1.028941866428224
+        ],
+        "aa_ci95": [
+          0.9975434860690646,
+          1.001916645227682
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0292917984273826,
+        "aa": 1.0011409808632155,
+        "ci95": [
+          1.0221235197336334,
+          1.0328793381101715
+        ],
+        "aa_ci95": [
+          0.9982269052824241,
+          1.0058589756695973
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0039205642460303,
+        "aa": 1.0073896993270686,
+        "ci95": [
+          0.9999934068687242,
+          1.0082233822102142
+        ],
+        "aa_ci95": [
+          1.0051861212025484,
+          1.0131999499153173
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0144007810593116,
+        "aa": 1.0007966722607862,
+        "ci95": [
+          1.0137317026385242,
+          1.019015349660511
+        ],
+        "aa_ci95": [
+          0.9989640141519576,
+          1.0088843985268716
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0163009712918365,
+        "aa": 1.0144470582439373,
+        "ci95": [
+          1.0109963833303854,
+          1.0216537717010974
+        ],
+        "aa_ci95": [
+          1.0038677310135184,
+          1.017874796598201
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0142855386582412,
+        "aa": 0.9995698976841111,
+        "ci95": [
+          1.011648245091842,
+          1.0164234025795018
+        ],
+        "aa_ci95": [
+          0.9967973943261209,
+          1.0016786657940029
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.000285563522364,
+        "aa": 0.9997087204149805,
+        "ci95": [
+          0.9963607604713093,
+          1.0013198497973752
+        ],
+        "aa_ci95": [
+          0.9985750749634476,
+          1.001671212281236
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9988539317534845,
+        "aa": 0.9989279773273366,
+        "ci95": [
+          0.996517655180065,
+          1.0062241176834168
+        ],
+        "aa_ci95": [
+          0.9954417284572524,
+          1.0029225674105928
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0175414260132665,
+        "aa": 1.0133031753152884,
+        "ci95": [
+          1.015782490866905,
+          1.0218781427297394
+        ],
+        "aa_ci95": [
+          1.0078548297180654,
+          1.0171842234137398
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9995916501599879,
+        "aa": 0.994716383443056,
+        "ci95": [
+          0.9934567401019587,
+          1.008908740328525
+        ],
+        "aa_ci95": [
+          0.9923025171375062,
+          1.0058024961681629
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.007033011836355,
+        "aa": 1.0057337996401328,
+        "ci95": [
+          1.0014811079948318,
+          1.0131469525859058
+        ],
+        "aa_ci95": [
+          1.0017535357657532,
+          1.0121875964208578
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0013209873436832,
+        "aa": 0.9979302818579797,
+        "ci95": [
+          0.9851517797137133,
+          1.0086259003677027
+        ],
+        "aa_ci95": [
+          0.9900680465510102,
+          1.0039882412417849
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0005026403759507,
+        "aa": 1.0007374809584835,
+        "ci95": [
+          0.9924128375987381,
+          1.0017790579464587
+        ],
+        "aa_ci95": [
+          0.9970049595940725,
+          1.0018850255263874
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9986831551602361,
+        "aa": 0.9999699625733665,
+        "ci95": [
+          0.9977640838738296,
+          1.0023330854305113
+        ],
+        "aa_ci95": [
+          0.997914926601811,
+          1.0031198374119017
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.009684655280867,
+        "aa": 1.000804897537131,
+        "ci95": [
+          1.007317290288122,
+          1.0142329870405529
+        ],
+        "aa_ci95": [
+          0.9986958220342879,
+          1.0036331511882335
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0047593957535998,
+        "aa": 0.9975855565150207,
+        "ci95": [
+          0.9969186016430291,
+          1.0096922380891615
+        ],
+        "aa_ci95": [
+          0.990603896585778,
+          1.0030480251217193
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0122041102116526,
+        "aa": 1.0022729904144398,
+        "ci95": [
+          1.0028336363581083,
+          1.015466758103822
+        ],
+        "aa_ci95": [
+          0.9952417904342543,
+          1.0051354301990132
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0025577298940713,
+        "aa": 0.9996748809401962,
+        "ci95": [
+          0.9985340414794165,
+          1.0059472013346695
+        ],
+        "aa_ci95": [
+          0.9934410047215252,
+          1.001284770982103
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0014248276213011,
+        "aa": 0.9981601028814444,
+        "ci95": [
+          0.9983095702383062,
+          1.0029806259314455
+        ],
+        "aa_ci95": [
+          0.9951201319839951,
+          1.0025854932178564
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0006616154868917,
+        "aa": 1.0015516250558714,
+        "ci95": [
+          0.9953975883618351,
+          1.0018481343402479
+        ],
+        "aa_ci95": [
+          0.997742778480731,
+          1.0029127633729547
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0068165219508236,
+        "aa": 1.0014218127180836,
+        "ci95": [
+          1.001339580555521,
+          1.012602043371563
+        ],
+        "aa_ci95": [
+          0.9980686403968851,
+          1.0081598636705704
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.003890161635264,
+        "aa": 0.9999055135965934,
+        "ci95": [
+          1.0006261027946952,
+          1.0067363132956557
+        ],
+        "aa_ci95": [
+          0.9987562110526748,
+          1.0010677685532683
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.007756506530294,
+        "aa": 1.0077566309735517,
+        "ci95": [
+          1.0030113854259004,
+          1.0107875138646807
+        ],
+        "aa_ci95": [
+          1.000199985001125,
+          1.009750723389706
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.002317723957182,
+        "aa": 0.9994651733467564,
+        "ci95": [
+          0.9995174773465014,
+          1.004877647594706
+        ],
+        "aa_ci95": [
+          0.9965151095790453,
+          1.0049033289353497
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.980501186696668,
+        "aa": 1.0049726567467887,
+        "ci95": [
+          0.9725781240384497,
+          0.9923879796928704
+        ],
+        "aa_ci95": [
+          0.9952863704417997,
+          1.0120312838898173
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9762729456063916,
+        "aa": 0.9985680603389747,
+        "ci95": [
+          0.9729958162532223,
+          0.9802170520213798
+        ],
+        "aa_ci95": [
+          0.9963963405179097,
+          1.0029222424040232
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9981017158342389,
+        "aa": 1.005679471991877,
+        "ci95": [
+          0.9953782273590158,
+          1.0042014547116793
+        ],
+        "aa_ci95": [
+          1.0053359764293763,
+          1.0107055827834515
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9790489697367496,
+        "aa": 1.000321587450943,
+        "ci95": [
+          0.9738716095926275,
+          0.9826600754672828
+        ],
+        "aa_ci95": [
+          0.9985048741104001,
+          1.0025357790044676
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0041770158713426,
+        "aa": 1.0032318365520057,
+        "ci95": [
+          0.9977253821358012,
+          1.0086226771798774
+        ],
+        "aa_ci95": [
+          1.0022779341493748,
+          1.0156132554428812
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9936290187918256,
+        "aa": 0.999366044570948,
+        "ci95": [
+          0.9927841212113424,
+          0.9963577994662404
+        ],
+        "aa_ci95": [
+          0.9977781222549476,
+          1.0027274901273906
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9922315948078895,
+        "aa": 0.9991981750713251,
+        "ci95": [
+          0.9906707196520363,
+          0.9951765112774525
+        ],
+        "aa_ci95": [
+          0.9971939823052898,
+          1.0026445149648435
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9948751357220412,
+        "aa": 1.001298855383693,
+        "ci95": [
+          0.9933313087616439,
+          0.9967538056710031
+        ],
+        "aa_ci95": [
+          0.9995299356754083,
+          1.0028827415307793
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9925756999873305,
+        "aa": 0.9990597448430869,
+        "ci95": [
+          0.98868600300598,
+          0.9944969960373259
+        ],
+        "aa_ci95": [
+          0.9961801625681654,
+          1.0025082857253396
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9908808170787897,
+        "aa": 1.0007581059015629,
+        "ci95": [
+          0.9891021251815779,
+          0.9946424456563484
+        ],
+        "aa_ci95": [
+          0.9981626923027158,
+          1.004994630125642
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9869335538410021,
+        "aa": 0.9941955136303658,
+        "ci95": [
+          0.9757328568115784,
+          0.9902086230876217
+        ],
+        "aa_ci95": [
+          0.9869065522427186,
+          1.003741618144746
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9969868195041265,
+        "aa": 1.0007696299362723,
+        "ci95": [
+          0.9912108586004317,
+          1.0009945329766197
+        ],
+        "aa_ci95": [
+          0.9986604191554261,
+          1.0029486320328662
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9935541451804839,
+        "aa": 1.0001870475786692,
+        "ci95": [
+          0.9927375578185501,
+          0.994446434969545
+        ],
+        "aa_ci95": [
+          0.9988866774474437,
+          1.001755062920873
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9943015173217752,
+        "aa": 1.001015310635223,
+        "ci95": [
+          0.9926894888208554,
+          0.9952930975753259
+        ],
+        "aa_ci95": [
+          0.9995265328498985,
+          1.0021526980482205
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9912291852040168,
+        "aa": 1.0001221463557635,
+        "ci95": [
+          0.9864589073864359,
+          0.9953310979196099
+        ],
+        "aa_ci95": [
+          0.9948088749916026,
+          1.0041904738600076
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9900493301736228,
+        "aa": 1.0012744082885554,
+        "ci95": [
+          0.9859186396874566,
+          0.9934703983299755
+        ],
+        "aa_ci95": [
+          0.9967609166849322,
+          1.0036454383089082
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9700084256066736,
+        "aa": 0.9968735707080516,
+        "ci95": [
+          0.9666204588618224,
+          0.9761246590776164
+        ],
+        "aa_ci95": [
+          0.9909502262443439,
+          1.0025863159226003
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0028164606477858,
+        "aa": 1.000270020785321,
+        "ci95": [
+          1.0004141150486898,
+          1.0041864569057766
+        ],
+        "aa_ci95": [
+          0.9931705917573096,
+          1.004853545976831
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9956919250559922,
+        "aa": 0.9993004458068085,
+        "ci95": [
+          0.9942094359585157,
+          0.9990931919642857
+        ],
+        "aa_ci95": [
+          0.9978171342272084,
+          1.0018226544476592
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9960443086796877,
+        "aa": 1.000278284530472,
+        "ci95": [
+          0.9946134074502232,
+          0.9982356025787347
+        ],
+        "aa_ci95": [
+          0.9992323312366896,
+          1.0007420645472478
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9912642498635039,
+        "aa": 1.0005101060623125,
+        "ci95": [
+          0.9883464381346445,
+          0.9964442049084432
+        ],
+        "aa_ci95": [
+          0.9954225538445256,
+          1.0085740192548738
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9872205227538474,
+        "aa": 0.9997666682620974,
+        "ci95": [
+          0.984586707878888,
+          0.9886875687438648
+        ],
+        "aa_ci95": [
+          0.9957794588407819,
+          1.0027769447609909
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9880581639056968,
+        "aa": 0.9988145741192045,
+        "ci95": [
+          0.9769308397315974,
+          0.9928219815626957
+        ],
+        "aa_ci95": [
+          0.9914752559476664,
+          1.0041713212749268
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9981215264691278,
+        "aa": 0.9994298095563918,
+        "ci95": [
+          0.9951383448844984,
+          1.0018370033508857
+        ],
+        "aa_ci95": [
+          0.9945780362698322,
+          1.0043046775094109
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9826312148354037,
+        "aa": 0.9978854800893073,
+        "ci95": [
+          0.9766010376560894,
+          0.9852977271611605
+        ],
+        "aa_ci95": [
+          0.9952117137381294,
+          0.9993961991671283
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9844750546978521,
+        "aa": 1.000845006947835,
+        "ci95": [
+          0.9837696496139293,
+          0.9857720699144846
+        ],
+        "aa_ci95": [
+          0.9983488582198823,
+          1.0044190618855913
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9748901328226658,
+        "aa": 1.0000378017048568,
+        "ci95": [
+          0.9709070200362514,
+          0.977894395218821
+        ],
+        "aa_ci95": [
+          0.9950171637997578,
+          1.0052619653062767
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9399625211933728,
+        "aa": 0.9982947871010117,
+        "ci95": [
+          0.9396263031464849,
+          0.943200219078916
+        ],
+        "aa_ci95": [
+          0.9936509326560995,
+          1.0001380695368394
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9949716289154403,
+        "aa": 1.008223530511167,
+        "ci95": [
+          0.9812084335644545,
+          0.9982091608311331
+        ],
+        "aa_ci95": [
+          0.9958659654119106,
+          1.0206075016900948
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9701483164541064,
+        "aa": 1.0007714686171278,
+        "ci95": [
+          0.9679540930118475,
+          0.9720364150306415
+        ],
+        "aa_ci95": [
+          0.9988953457626522,
+          1.0016939681792782
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9980495356037151,
+        "aa": 0.999789160362148,
+        "ci95": [
+          0.9955538539441021,
+          1.0013035624499524
+        ],
+        "aa_ci95": [
+          0.9978024018818868,
+          1.001148198259704
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0013093127960622,
+        "aa": 0.9994316075620907,
+        "ci95": [
+          0.9993972235378058,
+          1.0020364085158902
+        ],
+        "aa_ci95": [
+          0.9895456348600897,
+          1.0017694074302992
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0006991826795573,
+        "aa": 0.9959329724902397,
+        "ci95": [
+          0.9972501130710086,
+          1.0039982553067752
+        ],
+        "aa_ci95": [
+          0.9946028653226626,
+          0.9978393798598907
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0,
+        "aa": 1.0005636510347446,
+        "ci95": [
+          0.9973471022879017,
+          1.006310656403882
+        ],
+        "aa_ci95": [
+          0.9992175552157058,
+          1.0018543886200357
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9997371784916435,
+        "aa": 0.9966900116233104,
+        "ci95": [
+          0.9921134518401946,
+          1.0026819717856568
+        ],
+        "aa_ci95": [
+          0.9936075298395005,
+          1.0015378815532006
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0008806902707528,
+        "aa": 0.9965715510160351,
+        "ci95": [
+          0.9976388302396261,
+          1.0051061189916608
+        ],
+        "aa_ci95": [
+          0.9941919533007205,
+          0.9997857742179271
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9963516542415826,
+        "aa": 0.9990514772476929,
+        "ci95": [
+          0.9944273916538771,
+          0.9984977039807803
+        ],
+        "aa_ci95": [
+          0.9977457334329785,
+          1.0005155145326001
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.999629224410406,
+        "aa": 0.9996293595819662,
+        "ci95": [
+          0.9974304458753492,
+          1.0021606816798538
+        ],
+        "aa_ci95": [
+          0.9976644585183567,
+          1.0025383324549129
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0051059682624877,
+        "aa": 1.0019025741123082,
+        "ci95": [
+          1.002239483932759,
+          1.0075325963718822
+        ],
+        "aa_ci95": [
+          0.9987123738759657,
+          1.005880565156238
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0053756658256239,
+        "aa": 0.9999582443125274,
+        "ci95": [
+          1.0022673838576222,
+          1.006580610725623
+        ],
+        "aa_ci95": [
+          0.996258113783887,
+          1.0018382095978304
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0025067124188103,
+        "aa": 1.0029124483499838,
+        "ci95": [
+          1.000496501918303,
+          1.0106353567781357
+        ],
+        "aa_ci95": [
+          0.9974264870429217,
+          1.005015310487684
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.003138378523011,
+        "aa": 1.0002160222004353,
+        "ci95": [
+          0.9970741150442478,
+          1.00780999014058
+        ],
+        "aa_ci95": [
+          0.9938786622154513,
+          1.0023365393687458
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9953217103826841,
+        "aa": 0.9996006962858516,
+        "ci95": [
+          0.9926626173109955,
+          0.9979402291963149
+        ],
+        "aa_ci95": [
+          0.9961631234924325,
+          1.0011087516208446
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0006890529274517,
+        "aa": 1.0005797259601286,
+        "ci95": [
+          0.9962685814558583,
+          1.003025923890551
+        ],
+        "aa_ci95": [
+          0.9953516462636737,
+          1.003025249962102
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.009847470563946,
+        "aa": 1.0026678772652082,
+        "ci95": [
+          1.0043524210342003,
+          1.0143286905290545
+        ],
+        "aa_ci95": [
+          1.000936683890898,
+          1.003701791169206
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0016830543006467,
+        "aa": 0.9997416688194265,
+        "ci95": [
+          0.9996026214369966,
+          1.0074189249222567
+        ],
+        "aa_ci95": [
+          0.9941087443245069,
+          1.0026969159155934
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0042945434402404,
+        "aa": 0.9992383051981025,
+        "ci95": [
+          0.997626969522358,
+          1.011322381699232
+        ],
+        "aa_ci95": [
+          0.9954062554171517,
+          1.0037645278525447
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0096638197113688,
+        "aa": 0.999201910307488,
+        "ci95": [
+          1.0061536684590804,
+          1.0130966520078324
+        ],
+        "aa_ci95": [
+          0.9911988898815747,
+          1.0039815978713764
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.00601507497095,
+        "aa": 1.0008218196198622,
+        "ci95": [
+          1.0041948076088978,
+          1.007345075503147
+        ],
+        "aa_ci95": [
+          0.9989941996791312,
+          1.0024467099165895
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0053129019629774,
+        "aa": 0.9995864376230656,
+        "ci95": [
+          1.0044898263767972,
+          1.0068451756928427
+        ],
+        "aa_ci95": [
+          0.9983772644256873,
+          1.0008967833309625
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9913167205533924,
+        "aa": 1.001535062365923,
+        "ci95": [
+          0.988215381091159,
+          0.9958312851515867
+        ],
+        "aa_ci95": [
+          0.9981797365442009,
+          1.00434365111588
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9885554068693048,
+        "aa": 0.9992198229449427,
+        "ci95": [
+          0.9862106302347059,
+          0.989229875444499
+        ],
+        "aa_ci95": [
+          0.9958290220374167,
+          1.0016548615582743
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9867623127760619,
+        "aa": 0.9996043746772971,
+        "ci95": [
+          0.9854922896778932,
+          0.9888336646785951
+        ],
+        "aa_ci95": [
+          0.9982406026103303,
+          1.0050603269025011
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.975061192444465,
+        "aa": 1.000607111296992,
+        "ci95": [
+          0.9725916942541545,
+          0.9770055939453768
+        ],
+        "aa_ci95": [
+          0.9976445956555875,
+          1.0013702883680744
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.011598947750594,
+        "aa": 0.9976082247016542,
+        "ci95": [
+          1.002618885285178,
+          1.0201180914564183
+        ],
+        "aa_ci95": [
+          0.9916489408566286,
+          1.0088064
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0118736411636815,
+        "aa": 1.0015319236217495,
+        "ci95": [
+          1.010574379604059,
+          1.0150932151787218
+        ],
+        "aa_ci95": [
+          0.9977636332358507,
+          1.002838870091254
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.010744285993358,
+        "aa": 1.0003931210063899,
+        "ci95": [
+          1.0091358629746219,
+          1.0128412226503327
+        ],
+        "aa_ci95": [
+          0.9991152317220582,
+          1.0031788886953492
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0101109244543436,
+        "aa": 1.0003052293892298,
+        "ci95": [
+          1.008035416286202,
+          1.011252936027657
+        ],
+        "aa_ci95": [
+          0.9974588855131622,
+          1.001420808614587
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0075361866895352,
+        "aa": 0.9981692133378569,
+        "ci95": [
+          1.0028298961079236,
+          1.0120302907863352
+        ],
+        "aa_ci95": [
+          0.9942157283506178,
+          1.0008815902085573
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.010020419213632,
+        "aa": 1.0007233179628265,
+        "ci95": [
+          1.0073427367464864,
+          1.0131069795317447
+        ],
+        "aa_ci95": [
+          0.9982576156981753,
+          1.004450070723185
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0223493158175772,
+        "aa": 1.0059012404520313,
+        "ci95": [
+          1.01128036594573,
+          1.026151648536322
+        ],
+        "aa_ci95": [
+          0.987033105389192,
+          1.0087700561635402
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0114191456975996,
+        "aa": 0.9999683834455722,
+        "ci95": [
+          1.0098543903515222,
+          1.0127586515018063
+        ],
+        "aa_ci95": [
+          0.9965107238351696,
+          1.0015240432044115
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.00897568896306,
+        "aa": 1.001109304771923,
+        "ci95": [
+          1.007244368534691,
+          1.011441927549483
+        ],
+        "aa_ci95": [
+          0.9977698483496877,
+          1.0028533396174741
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0092001417388783,
+        "aa": 0.9986792741750249,
+        "ci95": [
+          1.0062878120599978,
+          1.0104772392120498
+        ],
+        "aa_ci95": [
+          0.9976374885865158,
+          1.001638341004424
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0128845111727391,
+        "aa": 1.0011544138983863,
+        "ci95": [
+          1.008074273124387,
+          1.02767780361181
+        ],
+        "aa_ci95": [
+          0.9979454285785874,
+          1.008217979564416
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0097782744520356,
+        "aa": 1.00002515280328,
+        "ci95": [
+          1.0088799333846086,
+          1.0125298972865635
+        ],
+        "aa_ci95": [
+          0.9982166517007742,
+          1.0016255449986138
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0083902016704014,
+        "aa": 0.9966614062332991,
+        "ci95": [
+          1.0026865804669047,
+          1.0141076871846102
+        ],
+        "aa_ci95": [
+          0.9928163183001141,
+          1.003762857487325
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0099944016082654,
+        "aa": 0.9997480410189221,
+        "ci95": [
+          1.008280060495914,
+          1.0102384952148238
+        ],
+        "aa_ci95": [
+          0.9985902462663554,
+          1.0013912933992257
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0105056621425834,
+        "aa": 1.0008090926603737,
+        "ci95": [
+          1.0084351310585022,
+          1.0147952939957654
+        ],
+        "aa_ci95": [
+          0.9986200345312289,
+          1.0039404807128922
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0092861589541398,
+        "aa": 0.9989270110511437,
+        "ci95": [
+          1.0077616813952885,
+          1.0101116959481824
+        ],
+        "aa_ci95": [
+          0.9970467575323733,
+          1.0003213574137155
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.009623159737769,
+        "aa": 0.9980043625562723,
+        "ci95": [
+          1.0075088516266952,
+          1.0129237886469695
+        ],
+        "aa_ci95": [
+          0.9906004535445493,
+          1.0025289498203114
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.010836808825508,
+        "aa": 0.9993009227819278,
+        "ci95": [
+          1.0078795072457938,
+          1.0113293661478808
+        ],
+        "aa_ci95": [
+          0.995691683623758,
+          0.9998203867671613
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0222640743699984,
+        "aa": 1.000248089709239,
+        "ci95": [
+          1.0154050548824851,
+          1.0262973842495453
+        ],
+        "aa_ci95": [
+          0.9980843507628389,
+          1.0023227208301855
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.016901032735033,
+        "aa": 0.9989251209238961,
+        "ci95": [
+          1.0150845930269454,
+          1.0187134800707802
+        ],
+        "aa_ci95": [
+          0.9969078194216315,
+          1.000979745642958
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0110334473056688,
+        "aa": 0.9990589534307421,
+        "ci95": [
+          1.0064016936764373,
+          1.0127703555282197
+        ],
+        "aa_ci95": [
+          0.9973056245088378,
+          1.0030992121280011
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0144646613578732,
+        "aa": 1.0000686243316925,
+        "ci95": [
+          1.0126893423461663,
+          1.0164543558072145
+        ],
+        "aa_ci95": [
+          0.9986546439812526,
+          1.0016922594797868
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0313148549554951,
+        "aa": 0.9997753097515568,
+        "ci95": [
+          1.0293558856901601,
+          1.0321915719985684
+        ],
+        "aa_ci95": [
+          0.9968773547554886,
+          1.002051900251999
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0336332831574968,
+        "aa": 1.0010456157907228,
+        "ci95": [
+          1.0320593987205409,
+          1.0345704421723543
+        ],
+        "aa_ci95": [
+          0.9988890387295227,
+          1.0018659597467443
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0005242059821153,
+        "aa": 1.0003400372186193,
+        "ci95": [
+          0.9990982700372427,
+          1.0020415107179312
+        ],
+        "aa_ci95": [
+          0.9957404759128209,
+          1.0019854769474374
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0008602762786551,
+        "aa": 1.0001359392475144,
+        "ci95": [
+          0.9994195846943249,
+          1.0014694393809753
+        ],
+        "aa_ci95": [
+          0.9987774230795354,
+          1.0013557097666816
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9987459323189319,
+        "aa": 0.9990928975810602,
+        "ci95": [
+          0.9981043202220837,
+          1.000180347297367
+        ],
+        "aa_ci95": [
+          0.998875523684684,
+          0.9999806856591019
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9985579275358587,
+        "aa": 0.9998519176662224,
+        "ci95": [
+          0.997497007991558,
+          0.9994004255044807
+        ],
+        "aa_ci95": [
+          0.9980685659101883,
+          1.0004512519017044
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0007370887774756,
+        "aa": 0.9998045034037354,
+        "ci95": [
+          0.9991703269887751,
+          1.0026343849965502
+        ],
+        "aa_ci95": [
+          0.9970520343743916,
+          1.0029630043746245
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0000628250322852,
+        "aa": 0.999322852675081,
+        "ci95": [
+          0.9981173254865319,
+          1.0015558067171781
+        ],
+        "aa_ci95": [
+          0.9988114713984088,
+          1.001150499246946
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9995851989215172,
+        "aa": 0.9998655708655403,
+        "ci95": [
+          0.998304774681383,
+          1.0013562055567773
+        ],
+        "aa_ci95": [
+          0.9995666424556113,
+          1.0011669466931419
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0006603606302775,
+        "aa": 0.9992540370657976,
+        "ci95": [
+          0.9999694210175463,
+          1.001254705144291
+        ],
+        "aa_ci95": [
+          0.998638791393255,
+          1.0004330984841554
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.000473367035448,
+        "aa": 1.001019095916337,
+        "ci95": [
+          0.9986277914728776,
+          1.001689567676572
+        ],
+        "aa_ci95": [
+          0.9977930432357381,
+          1.0028164387561438
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9995748299319728,
+        "aa": 1.0003955551769044,
+        "ci95": [
+          0.9984145400647548,
+          1.0020062131814285
+        ],
+        "aa_ci95": [
+          0.9988521941917382,
+          1.0010334974770503
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0004663961568956,
+        "aa": 1.0010230043112325,
+        "ci95": [
+          0.9972942323379026,
+          1.0011452630463997
+        ],
+        "aa_ci95": [
+          0.9977909468504458,
+          1.0020841240353435
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0010194223273479,
+        "aa": 1.0013654013947075,
+        "ci95": [
+          0.9977716729747168,
+          1.0036171415273114
+        ],
+        "aa_ci95": [
+          0.9984994555546702,
+          1.0033339322433172
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0011561570099126,
+        "aa": 0.9994188910926111,
+        "ci95": [
+          1.0001327542718428,
+          1.0025583040654926
+        ],
+        "aa_ci95": [
+          0.998743393343142,
+          1.0020965688479007
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9994815671844672,
+        "aa": 1.000018976652392,
+        "ci95": [
+          0.9981494581006998,
+          1.0008214123237122
+        ],
+        "aa_ci95": [
+          0.9988426731089088,
+          1.0005445864309326
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9998925614611641,
+        "aa": 0.9983555015090322,
+        "ci95": [
+          0.9974108188522774,
+          1.0017990510639108
+        ],
+        "aa_ci95": [
+          0.9974263871016578,
+          1.0013996022849616
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0007093321511131,
+        "aa": 0.9999115021871602,
+        "ci95": [
+          0.9986037843131061,
+          1.0013544989619727
+        ],
+        "aa_ci95": [
+          0.9993611961444077,
+          1.0006133029843196
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0002810711365495,
+        "aa": 0.9999233716475096,
+        "ci95": [
+          0.9980850514327468,
+          1.0015179926779176
+        ],
+        "aa_ci95": [
+          0.9979649512290036,
+          1.0023362994548635
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9979060835088589,
+        "aa": 1.0005776361637506,
+        "ci95": [
+          0.9970710518150792,
+          0.9992734769406548
+        ],
+        "aa_ci95": [
+          0.999596506365888,
+          1.0020753720446143
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9932020746261141,
+        "aa": 1.0021558302808302,
+        "ci95": [
+          0.9899010938377737,
+          0.9964429000157953
+        ],
+        "aa_ci95": [
+          0.9965063120985588,
+          1.00477057468931
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.996091016272721,
+        "aa": 0.9991941272019844,
+        "ci95": [
+          0.9943584814389014,
+          0.9996028268640343
+        ],
+        "aa_ci95": [
+          0.9972864581037946,
+          1.0017540860072063
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0156104025178068,
+        "aa": 1.001320694568237,
+        "ci95": [
+          1.0114610146835978,
+          1.0193046096304206
+        ],
+        "aa_ci95": [
+          0.9996751179321907,
+          1.004332172424383
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0163629995307863,
+        "aa": 1.0008900611998284,
+        "ci95": [
+          1.0143663722430847,
+          1.0190570987857774
+        ],
+        "aa_ci95": [
+          0.9967510570413218,
+          1.0024667956324733
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0112976820587698,
+        "aa": 1.0019458780019097,
+        "ci95": [
+          1.0012016327713638,
+          1.0136940936938483
+        ],
+        "aa_ci95": [
+          0.9944057712689084,
+          1.0047752077033554
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.007779805352798,
+        "aa": 0.99975312358874,
+        "ci95": [
+          1.0051540772324241,
+          1.0095033814781282
+        ],
+        "aa_ci95": [
+          0.9989659484417084,
+          1.0014786788872192
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9888542769920877,
+        "aa": 0.9990753582986592,
+        "ci95": [
+          0.9852651524595477,
+          1.0062989764163324
+        ],
+        "aa_ci95": [
+          0.9831678868345949,
+          1.000968851119878
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0044550889122,
+        "aa": 0.9996792493176186,
+        "ci95": [
+          1.0027978122750065,
+          1.0051735900545786
+        ],
+        "aa_ci95": [
+          0.9988146504164486,
+          1.0002704385507009
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0092263199651934,
+        "aa": 1.0007261338738296,
+        "ci95": [
+          1.0046659678367806,
+          1.0100816376108372
+        ],
+        "aa_ci95": [
+          0.9990409550069089,
+          1.001829198582371
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.004704659088721,
+        "aa": 1.000330995149648,
+        "ci95": [
+          1.003305361603997,
+          1.0054242342446562
+        ],
+        "aa_ci95": [
+          0.9991054770363176,
+          1.0010544748076382
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9966274702432655,
+        "aa": 1.0006763712979145,
+        "ci95": [
+          0.9948894812972947,
+          0.9991132308356002
+        ],
+        "aa_ci95": [
+          0.9974707423161031,
+          1.001408197507191
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9978118161925602,
+        "aa": 1.0005225978519425,
+        "ci95": [
+          0.9957336912558646,
+          0.9986598061505325
+        ],
+        "aa_ci95": [
+          0.9999640632486824,
+          1.0014206163197046
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.005091725945339,
+        "aa": 1.0006180199639176,
+        "ci95": [
+          1.0020835863250266,
+          1.0102107572123094
+        ],
+        "aa_ci95": [
+          0.9962853551225644,
+          1.0052078027910767
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0039482769443224,
+        "aa": 0.9990510971688985,
+        "ci95": [
+          1.0023102952532221,
+          1.0046146022338442
+        ],
+        "aa_ci95": [
+          0.9981444226467905,
+          0.9999126495875813
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.006370313201794,
+        "aa": 1.0020888191209236,
+        "ci95": [
+          1.0031628588203356,
+          1.0101415484972416
+        ],
+        "aa_ci95": [
+          1.000785620011313,
+          1.0040683685904446
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0046664801769956,
+        "aa": 0.9999048869105366,
+        "ci95": [
+          1.0035671061851072,
+          1.0057096195926074
+        ],
+        "aa_ci95": [
+          0.998877807857881,
+          1.001097012701251
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9973271237472848,
+        "aa": 1.0009310459798315,
+        "ci95": [
+          0.996334007106,
+          0.9988791496650042
+        ],
+        "aa_ci95": [
+          0.9972221698498589,
+          1.002218706468916
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9957072387001218,
+        "aa": 1.0004150212541187,
+        "ci95": [
+          0.9951087092496685,
+          0.9980656312593988
+        ],
+        "aa_ci95": [
+          0.9995375664748193,
+          1.0009222892851317
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0032813367661164,
+        "aa": 0.9988581681755159,
+        "ci95": [
+          0.9855005739224764,
+          1.0221622663326266
+        ],
+        "aa_ci95": [
+          0.9778104564938519,
+          1.0013618591574045
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0034533946994117,
+        "aa": 0.9989989557007001,
+        "ci95": [
+          1.001829593520138,
+          1.0040436365440553
+        ],
+        "aa_ci95": [
+          0.9985920624432657,
+          1.0003531795453278
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0068910876494759,
+        "aa": 1.0033080330068183,
+        "ci95": [
+          1.0036844677990957,
+          1.0089449187806308
+        ],
+        "aa_ci95": [
+          1.0005057460058253,
+          1.0039252908756888
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.005176142910841,
+        "aa": 0.9999016177727493,
+        "ci95": [
+          1.0045793140903396,
+          1.0059670514982488
+        ],
+        "aa_ci95": [
+          0.9993439044430545,
+          1.0010326578030204
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0002197168399225,
+        "aa": 1.0007496509652616,
+        "ci95": [
+          0.9967534477422018,
+          1.0008294772922022
+        ],
+        "aa_ci95": [
+          0.9998831044702226,
+          1.0029468738408276
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9971763804533855,
+        "aa": 1.0002913012488766,
+        "ci95": [
+          0.996215932590512,
+          0.998052519939963
+        ],
+        "aa_ci95": [
+          0.9999688872848556,
+          1.0009597047824257
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0054388165135266,
+        "aa": 1.0007948417946892,
+        "ci95": [
+          1.0037471084176115,
+          1.0068659668825575
+        ],
+        "aa_ci95": [
+          1.0001142247943953,
+          1.0015963016882488
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.00454848572543,
+        "aa": 0.99995616342276,
+        "ci95": [
+          1.0035980467746082,
+          1.0064162823416591
+        ],
+        "aa_ci95": [
+          0.9990668194828051,
+          1.000951504566596
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0191746693529422,
+        "aa": 0.9990603141413387,
+        "ci95": [
+          1.0163364704091729,
+          1.0225659342411584
+        ],
+        "aa_ci95": [
+          0.9977845593145239,
+          1.003315220100703
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0184469329079646,
+        "aa": 0.9994710427384873,
+        "ci95": [
+          1.017575831467091,
+          1.0191466927270858
+        ],
+        "aa_ci95": [
+          0.9992891695865231,
+          1.0003847269699913
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0057503794993181,
+        "aa": 0.9989272304666548,
+        "ci95": [
+          1.0032292787944026,
+          1.0070413469955204
+        ],
+        "aa_ci95": [
+          0.9981169050856329,
+          1.0014096419509444
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0043478824322223,
+        "aa": 0.9994579491117463,
+        "ci95": [
+          1.003024697367994,
+          1.00540509011724
+        ],
+        "aa_ci95": [
+          0.9989016952656605,
+          1.0013321003860505
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.001441571312731,
+        "aa": 0.9975091663888973,
+        "ci95": [
+          0.9993928133386766,
+          1.0062019848788541
+        ],
+        "aa_ci95": [
+          0.9914040974602469,
+          1.0050901713529043
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9989284431374698,
+        "aa": 1.0001644977335868,
+        "ci95": [
+          0.997284490614179,
+          0.9999756674716678
+        ],
+        "aa_ci95": [
+          0.9989090247893812,
+          1.0006521050193804
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0015440260174462,
+        "aa": 1.000103102162113,
+        "ci95": [
+          1.0011002236918887,
+          1.0022723003556908
+        ],
+        "aa_ci95": [
+          0.999587336072289,
+          1.0006132101246457
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0022898862345646,
+        "aa": 0.9997334270377686,
+        "ci95": [
+          1.000580899304736,
+          1.0037658481979899
+        ],
+        "aa_ci95": [
+          0.998256557515504,
+          1.0002000751797646
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9992073448118994,
+        "aa": 1.0006496423511524,
+        "ci95": [
+          0.9972836870698031,
+          1.0005911424859604
+        ],
+        "aa_ci95": [
+          0.9992963284904176,
+          1.0045348348369045
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.995711305684407,
+        "aa": 0.9994285438885179,
+        "ci95": [
+          0.9944235106441498,
+          0.9975466446758067
+        ],
+        "aa_ci95": [
+          0.998938538629612,
+          1.0013677916007973
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.000930762306576,
+        "aa": 0.9983249478463615,
+        "ci95": [
+          0.9954192115491394,
+          1.0056322439819227
+        ],
+        "aa_ci95": [
+          0.9925618478703429,
+          1.0031184144811371
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9997359808923846,
+        "aa": 0.9999877169493816,
+        "ci95": [
+          0.998813839752792,
+          1.0007052013196462
+        ],
+        "aa_ci95": [
+          0.9981736391159923,
+          1.0016836968125666
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0021436227224008,
+        "aa": 1.0001500032609405,
+        "ci95": [
+          1.0000787293089535,
+          1.0036027475899203
+        ],
+        "aa_ci95": [
+          0.9974679744448143,
+          1.0014993588268175
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0022617422668856,
+        "aa": 1.0007914992975444,
+        "ci95": [
+          1.000566871003889,
+          1.0024510288391215
+        ],
+        "aa_ci95": [
+          0.998835725468012,
+          1.002001949266391
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9951038729206012,
+        "aa": 0.9999092511926986,
+        "ci95": [
+          0.994085465030312,
+          0.9963706109902032
+        ],
+        "aa_ci95": [
+          0.998645952109464,
+          1.000473647671016
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9958905877040191,
+        "aa": 0.9991966102134167,
+        "ci95": [
+          0.994503337259521,
+          0.9967422068795783
+        ],
+        "aa_ci95": [
+          0.9984710074505992,
+          1.000285989132413
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9979858159726749,
+        "aa": 0.9952832032522444,
+        "ci95": [
+          0.9935285615698121,
+          1.0011977458815213
+        ],
+        "aa_ci95": [
+          0.9906391597315087,
+          0.9968141039423021
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0004992012779552,
+        "aa": 1.0005268312032825,
+        "ci95": [
+          0.999501380552595,
+          1.0019990036119069
+        ],
+        "aa_ci95": [
+          0.9994836735074742,
+          1.001865473761706
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9993480931725296,
+        "aa": 1.0002835663828902,
+        "ci95": [
+          0.9984341395313738,
+          0.9998614661914538
+        ],
+        "aa_ci95": [
+          0.9996026941123052,
+          1.0015670430087227
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0000446300487742,
+        "aa": 1.0002613779078293,
+        "ci95": [
+          0.999172127441428,
+          1.0022413649976691
+        ],
+        "aa_ci95": [
+          0.9991530388710581,
+          1.0013589470393456
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9959438043970418,
+        "aa": 0.9996847434757662,
+        "ci95": [
+          0.9946726069086688,
+          0.9978390330929467
+        ],
+        "aa_ci95": [
+          0.9963385403232402,
+          1.0013887486112514
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.997006747187641,
+        "aa": 1.0004490594357844,
+        "ci95": [
+          0.9960156187744044,
+          0.9989418120385898
+        ],
+        "aa_ci95": [
+          0.9976454635108482,
+          1.0024960921329849
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9931623192523642,
+        "aa": 1.0020849357038883,
+        "ci95": [
+          0.9756135263310847,
+          0.9976184142969373
+        ],
+        "aa_ci95": [
+          0.997698332223971,
+          1.017870821120867
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9917317866179277,
+        "aa": 1.0000062239760004,
+        "ci95": [
+          0.990903244159153,
+          0.9931114800406373
+        ],
+        "aa_ci95": [
+          0.9993979156709516,
+          1.0021225022920512
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9871773905353758,
+        "aa": 0.9971665864373938,
+        "ci95": [
+          0.9848817949104051,
+          0.9881817254680817
+        ],
+        "aa_ci95": [
+          0.99569706359389,
+          0.9992777197795528
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9867635296452434,
+        "aa": 0.9992741999426679,
+        "ci95": [
+          0.9861739537451543,
+          0.9882878662294137
+        ],
+        "aa_ci95": [
+          0.998408262454435,
+          1.0008146738568728
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9993341298882333,
+        "aa": 1.0005457804350117,
+        "ci95": [
+          0.9988945541264804,
+          1.000473184155802
+        ],
+        "aa_ci95": [
+          0.9981229061390914,
+          1.003624093976506
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0002555217629756,
+        "aa": 1.0005539028367294,
+        "ci95": [
+          0.9997256909160053,
+          1.0006957213139194
+        ],
+        "aa_ci95": [
+          0.9989411859962506,
+          1.0013575141850848
+        ]
+      }
+    ],
+    "losses": [
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9884018187613428,
+        "aa": 1.0014760629612698,
+        "ci95": [
+          0.9827860186668569,
+          0.9939857704234561
+        ],
+        "aa_ci95": [
+          0.9947143397160995,
+          1.0027320618570177
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9877621139132898,
+        "aa": 0.9999460166268789,
+        "ci95": [
+          0.9863737486095662,
+          0.9903475703218857
+        ],
+        "aa_ci95": [
+          0.9985231247570929,
+          1.002804897783052
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9881474059370778,
+        "aa": 0.9985987138880891,
+        "ci95": [
+          0.9855026548896858,
+          0.99243778183414
+        ],
+        "aa_ci95": [
+          0.9955832650553053,
+          1.0032453316162266
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.988747881846664,
+        "aa": 1.0008330299458839,
+        "ci95": [
+          0.9869910571137703,
+          0.9896604731172302
+        ],
+        "aa_ci95": [
+          0.99857528771787,
+          1.0049305327576916
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9897002389399754,
+        "aa": 1.0015580432449012,
+        "ci95": [
+          0.9823017977296307,
+          0.9914433959401645
+        ],
+        "aa_ci95": [
+          0.9945974556936611,
+          1.0065270717488515
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9881287383206032,
+        "aa": 0.9994694567483868,
+        "ci95": [
+          0.9854893391684368,
+          0.9900430898069479
+        ],
+        "aa_ci95": [
+          0.993799141043577,
+          1.0018584406215996
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9864940192776681,
+        "aa": 0.998408438213927,
+        "ci95": [
+          0.9858911436759604,
+          0.9884551090060597
+        ],
+        "aa_ci95": [
+          0.9956704384558678,
+          1.0000998367375704
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.980501186696668,
+        "aa": 1.0049726567467887,
+        "ci95": [
+          0.9725781240384497,
+          0.9923879796928704
+        ],
+        "aa_ci95": [
+          0.9952863704417997,
+          1.0120312838898173
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9762729456063916,
+        "aa": 0.9985680603389747,
+        "ci95": [
+          0.9729958162532223,
+          0.9802170520213798
+        ],
+        "aa_ci95": [
+          0.9963963405179097,
+          1.0029222424040232
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9790489697367496,
+        "aa": 1.000321587450943,
+        "ci95": [
+          0.9738716095926275,
+          0.9826600754672828
+        ],
+        "aa_ci95": [
+          0.9985048741104001,
+          1.0025357790044676
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9869335538410021,
+        "aa": 0.9941955136303658,
+        "ci95": [
+          0.9757328568115784,
+          0.9902086230876217
+        ],
+        "aa_ci95": [
+          0.9869065522427186,
+          1.003741618144746
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9700084256066736,
+        "aa": 0.9968735707080516,
+        "ci95": [
+          0.9666204588618224,
+          0.9761246590776164
+        ],
+        "aa_ci95": [
+          0.9909502262443439,
+          1.0025863159226003
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9872205227538474,
+        "aa": 0.9997666682620974,
+        "ci95": [
+          0.984586707878888,
+          0.9886875687438648
+        ],
+        "aa_ci95": [
+          0.9957794588407819,
+          1.0027769447609909
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9880581639056968,
+        "aa": 0.9988145741192045,
+        "ci95": [
+          0.9769308397315974,
+          0.9928219815626957
+        ],
+        "aa_ci95": [
+          0.9914752559476664,
+          1.0041713212749268
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9826312148354037,
+        "aa": 0.9978854800893073,
+        "ci95": [
+          0.9766010376560894,
+          0.9852977271611605
+        ],
+        "aa_ci95": [
+          0.9952117137381294,
+          0.9993961991671283
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9844750546978521,
+        "aa": 1.000845006947835,
+        "ci95": [
+          0.9837696496139293,
+          0.9857720699144846
+        ],
+        "aa_ci95": [
+          0.9983488582198823,
+          1.0044190618855913
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9748901328226658,
+        "aa": 1.0000378017048568,
+        "ci95": [
+          0.9709070200362514,
+          0.977894395218821
+        ],
+        "aa_ci95": [
+          0.9950171637997578,
+          1.0052619653062767
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9399625211933728,
+        "aa": 0.9982947871010117,
+        "ci95": [
+          0.9396263031464849,
+          0.943200219078916
+        ],
+        "aa_ci95": [
+          0.9936509326560995,
+          1.0001380695368394
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9701483164541064,
+        "aa": 1.0007714686171278,
+        "ci95": [
+          0.9679540930118475,
+          0.9720364150306415
+        ],
+        "aa_ci95": [
+          0.9988953457626522,
+          1.0016939681792782
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9885554068693048,
+        "aa": 0.9992198229449427,
+        "ci95": [
+          0.9862106302347059,
+          0.989229875444499
+        ],
+        "aa_ci95": [
+          0.9958290220374167,
+          1.0016548615582743
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9867623127760619,
+        "aa": 0.9996043746772971,
+        "ci95": [
+          0.9854922896778932,
+          0.9888336646785951
+        ],
+        "aa_ci95": [
+          0.9982406026103303,
+          1.0050603269025011
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.975061192444465,
+        "aa": 1.000607111296992,
+        "ci95": [
+          0.9725916942541545,
+          0.9770055939453768
+        ],
+        "aa_ci95": [
+          0.9976445956555875,
+          1.0013702883680744
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9888542769920877,
+        "aa": 0.9990753582986592,
+        "ci95": [
+          0.9852651524595477,
+          1.0062989764163324
+        ],
+        "aa_ci95": [
+          0.9831678868345949,
+          1.000968851119878
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9871773905353758,
+        "aa": 0.9971665864373938,
+        "ci95": [
+          0.9848817949104051,
+          0.9881817254680817
+        ],
+        "aa_ci95": [
+          0.99569706359389,
+          0.9992777197795528
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-24.04-gcc-44061234944",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9867635296452434,
+        "aa": 0.9992741999426679,
+        "ci95": [
+          0.9861739537451543,
+          0.9882878662294137
+        ],
+        "aa_ci95": [
+          0.998408262454435,
+          1.0008146738568728
+        ]
+      }
+    ],
+    "aa_outside_one_percent": [
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0163009712918365,
+        "aa": 1.0144470582439373,
+        "ci95": [
+          1.0109963833303854,
+          1.0216537717010974
+        ],
+        "aa_ci95": [
+          1.0038677310135184,
+          1.017874796598201
+        ]
+      },
+      {
+        "host": "evex-memory-local-dispatch-images-four-ubuntu-22.04-clang-44061234944",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0175414260132665,
+        "aa": 1.0133031753152884,
+        "ci95": [
+          1.015782490866905,
+          1.0218781427297394
+        ],
+        "aa_ci95": [
+          1.0078548297180654,
+          1.0171842234137398
+        ]
+      }
+    ],
+    "native_qualified": false,
+    "scope": "EVEX memory-only family dispatch, four native compilers, eight frozen PE/ELF inputs, all three modes and both launch controls; 21 balanced cycles.",
+    "checksum_scope": "Native tests compare boundaries and selected values; complete private-entry records were checked separately against baseline."
+  },
+  "publication_qualified": false
+}
