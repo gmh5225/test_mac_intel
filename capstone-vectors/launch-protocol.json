@@ -2,70 +2,84 @@
   "source": {
     "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
     "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-    "tree": "aaf9dd3209a701bd28e86016c7309a14573cec50",
-    "sha256": "8f676e588220a9a4a438e678e324485d4551b603200d335f575bc1c997c61dbe",
+    "tree": "c547f8df7c3f49974bdf6536139a98e1f93c9389",
+    "sha256": "99a31e89083b9a8e0a06f41271d1c8cd316fc52d39c12e65f2d066e51535cff2",
     "files": [
-      "CMakeLists.txt",
-      "Makefile",
-      "arch/X86/X86EvexMemoryOutput.c",
-      "arch/X86/X86GenEvexMemoryOutput.inc",
-      "arch/X86/X86SimpleOutput.h",
-      "arch/X86/X86VectorOutput.c",
-      "suite/synctools/x86_vector_output.cpp",
-      "tests/unit/x86_simple_output.c"
+      "arch/X86/X86FeatureExtension.h",
+      "arch/X86/X86Mapping.c"
     ],
     "complete": true,
-    "records": "equal private-entry full records, cursor and errors for 17825792 inputs; 69120 new admitted forms; 3281920 protected-page extents",
-    "generated_output_matches_producer": true,
-    "old_vector_rows_unchanged": true,
+    "records": "equal public records, cursor and errors for 4390912 inputs",
+    "private_records": "equal private records, cursor and errors for 4390912 inputs",
+    "guard": "equal public records for 3145728 protected-page extents",
+    "unit_checks": 79,
     "changed_runtime_objects": [
-      "arch/X86/X86VectorOutput.c.o"
+      "arch/X86/X86Mapping.c.o",
+      "arch/X86/X86Disassembler.c.o",
+      "arch/X86/X86DisassemblerDecoder.c.o"
     ],
-    "added_runtime_objects": [
-      "arch/X86/X86EvexMemoryOutput.c.o"
-    ],
-    "validation_scope": "Apple Clang private-entry records and protected extents; native performance and configuration qualification pending.",
+    "added_runtime_objects": [],
+    "validation_scope": "Apple Clang complete public/private records and public guard-page extents, original extension dispatch and positive handlers retained, unprefixed complete 64-bit headers only; native instruction-cost and timing qualification pending.",
     "publication_qualified": false
   },
-  "profiles": [
-    {
-      "host": "ubuntu-22.04",
-      "compiler": "clang"
-    },
-    {
-      "host": "ubuntu-22.04",
-      "compiler": "gcc"
-    },
-    {
-      "host": "ubuntu-24.04",
-      "compiler": "clang"
-    },
-    {
-      "host": "ubuntu-24.04",
-      "compiler": "gcc"
-    }
-  ],
-  "variants": [
-    "integer",
-    "aa",
-    "scan",
-    "iced",
-    "fast"
-  ],
-  "modes": [
-    "scan",
-    "format",
-    "detail"
-  ],
-  "cycles": 21,
-  "calibration_process_cpu_ms": 60,
-  "launches": [
-    "images",
-    "same-file-fixed"
-  ],
-  "native_owner_units_per_source": 8,
-  "iced_revision": "8b8d90b13374fbf38e7279749e48c673f4ec243a",
-  "purpose": "First native real-library screen for EVEX packed move memory output; all panels retained, not conditioned on a prior timing result.",
-  "limits": "Selected common-boundary functions; broad architecture/configuration and actual NeverD qualification remain separate requirements.",
-  "publishable": false
+  "scope": "Frozen real ELF library panels with x86-32 and x86-64 SIMD. Shared-selector early negative filtering versus production and R1354 inner-dispatch filtering; same original consumer. Not combined with held EVEX memory output.",
+  "native": {
+    "profiles": [
+      "ubuntu-22.04 clang",
+      "ubuntu-22.04 gcc",
+      "ubuntu-24.04 clang",
+      "ubuntu-24.04 gcc"
+    ],
+    "cycles": 21,
+    "calibration_cpu_ms": 60,
+    "variants": [
+      "integer",
+      "aa",
+      "previous",
+      "scan",
+      "iced",
+      "fast"
+    ],
+    "controls": [
+      "original images",
+      "same inode and padded file size with ASLR disabled",
+      "byte-identical A/A"
+    ]
+  },
+  "cost": {
+    "case": "SSL64 SIMD",
+    "modes": [
+      "scan",
+      "format",
+      "detail"
+    ],
+    "traversals": 2,
+    "consumer_unchanged": true,
+    "variants": [
+      "integer",
+      "previous",
+      "scan"
+    ]
+  },
+  "publishable": false,
+  "previous": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "f51b03ce108133bccc2ed7f8a377397f6a715e1a",
+    "sha256": "4e5ff25ed49ff501edc8e5afa022194ed8e83203b19de5588f5a1d61b8f874be",
+    "files": [
+      "arch/X86/X86Mapping.c"
+    ],
+    "complete": true,
+    "records": "equal public records, cursor and errors for 4390912 inputs",
+    "private_records": "equal private records, cursor and errors for 4390912 inputs",
+    "guard": "equal public records for 3145728 protected-page extents",
+    "unit_checks": 79,
+    "changed_runtime_objects": [
+      "arch/X86/X86Mapping.c.o"
+    ],
+    "added_runtime_objects": [],
+    "validation_scope": "Apple Clang complete public/private records and public guard-page extents, original positive handlers retained; native instruction-cost and timing qualification pending.",
+    "publication_qualified": false
+  }
 }
