@@ -1,7 +1,7 @@
-name: Compare EVEX transfer dispatch with complete layout records and A/A controls
+name: Time existing-miss output with frozen consumers and complete launch controls
 on:
   push:
-    branches: [codex/capstone-evex-transfer-comparison-native]
+    branches: [codex/capstone-evex-output-existing-miss-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 413b606f938a39d053fd61ef83a6277eec4e4f6e
+          ref: 8acfcd402e9f5fb7a458faa37552e53d7da3aa9a
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -43,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-transfer-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-output-existing-miss-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
