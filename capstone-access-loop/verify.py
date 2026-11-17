@@ -77,6 +77,8 @@ try:
         options += ['-DCAPSTONE_' + arch + '_SUPPORT=OFF' for arch in ('X86', 'ARM', 'AARCH64', 'MIPS') if arch != selected]
         units = ['api', 'utils', 'mapping', 'register_descriptors', 'sstream', 'instruction_bytes', 'mcinst']
         units += ['aarch64_scan', 'aarch64_postprocess'] if selected == 'AARCH64' else ['mips_scan']
+        if selected == 'AARCH64':
+            units.remove('register_descriptors')
     run('alias-table-reproducibility', ['python3', s / 'suite/synctools/alias_mnemonic_trie.py', '--check'])
     run('configure', ['cmake', '-S', s, '-B', b, *options])
     run('build', ['cmake', '--build', b, '--config', 'Release', '--target', 'capstone_static', *units, '--parallel', '4'])

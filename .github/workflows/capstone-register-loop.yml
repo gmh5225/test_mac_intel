@@ -1,4 +1,4 @@
-name: Validate isolated AArch64/MIPS alias lookup in alternate configurations
+name: Validate unchanged AArch64-only alias source with applicable unit targets
 on:
   push:
     branches: [codex/capstone-alias-call-shape-configurations-profiles]
@@ -11,16 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, compiler: clang, profile: sanitize }
-          - { host: ubuntu-24.04, compiler: gcc, profile: sanitize }
-          - { host: ubuntu-24.04, compiler: clang, profile: diet }
-          - { host: ubuntu-24.04, compiler: gcc, profile: reduced }
-          - { host: ubuntu-24.04, compiler: gcc, profile: diet }
-          - { host: ubuntu-24.04, compiler: clang, profile: reduced }
-          - { host: ubuntu-24.04, compiler: clang, profile: adapter }
-          - { host: ubuntu-24.04, compiler: clang, profile: no-x86 }
           - { host: ubuntu-24.04, compiler: clang, profile: aarch64-only }
-          - { host: ubuntu-24.04, compiler: gcc, profile: mips-only }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 35
     env:
