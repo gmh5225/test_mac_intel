@@ -1,0 +1,37 @@
+{
+  "run": {
+    "id": 44165436683,
+    "head_sha": "0f9f1cdf854bee49fb5e5e8715cb96a526d97ab5",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44165436683",
+    "run_attempt": 1
+  },
+  "native_timing_started": false,
+  "matched_controls": 0,
+  "profiles": [
+    {
+      "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44165436683",
+      "padding_bytes": 32,
+      "reported_mismatches": [
+        "X86_writeEvexMemoryOutput"
+      ],
+      "cleanup": {
+        "bytes": 247039112,
+        "removed": true
+      }
+    },
+    {
+      "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44165436683",
+      "padding_bytes": 16,
+      "reported_mismatches": [
+        "X86_writeEvexMemoryOutput"
+      ],
+      "cleanup": {
+        "bytes": 236648242,
+        "removed": true
+      }
+    }
+  ],
+  "diagnosis": "The function comparison included nm symbol binding (T versus t) in its byte-identity tuple. The one reported mismatch is the writer forced into the control with -u. This report does not establish whether its bytes differ. The next run will separately compare addresses, sizes and bytes, retain binding differences, and require that each binding-only difference is absent from the dynamic symbol table in both binaries."
+}

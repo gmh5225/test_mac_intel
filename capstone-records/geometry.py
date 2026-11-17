@@ -46,6 +46,12 @@ def function_bytes(path, entries):
     return result
 
 
+def dynamic_symbols(path):
+    with Path(path).open('rb') as stream:
+        table = ELFFile(stream).get_section_by_name('.dynsym')
+        return {symbol.name for symbol in table.iter_symbols()} if table else set()
+
+
 def build_geometry(t, b, evidence, run, bins):
     obj = b / 'CMakeFiles/capstone.dir/arch/X86'
     before = t / 'baseline-plan.o'
@@ -85,7 +91,19 @@ def build_geometry(t, b, evidence, run, bins):
     layout = linked_layout(evidence / 'geometry-symbols.txt', evidence / 'output-symbols.txt', 'output')
     executable = {key: function_bytes(bins[key], symbols(evidence / (key + '-symbols.txt'), 'tTwW')) for key in ('geometry', 'output')}
     names = executable['geometry'].keys() | executable['output'].keys()
-    mismatches = [name for name in sorted(names - excluded) if executable['geometry'].get(name) != executable['output'].get(name)]
+    # The -u link retains a global .symtab binding for the unreachable writer.
+    # Compare executable address, size and bytes independently of that metadata.
+    compared = sorted(names - excluded)
+    bodies = {key: {name: [row[1:] for row in rows] for name, rows in entries.items()}
+              for key, entries in executable.items()}
+    mismatches = [name for name in compared if bodies['geometry'].get(name) != bodies['output'].get(name)]
+    bindings = [name for name in compared if executable['geometry'].get(name) != executable['output'].get(name)
+                and bodies['geometry'].get(name) == bodies['output'].get(name)]
+    assert set(bindings) <= {'X86_writeEvexMemoryOutput'}, bindings
+    dynamic = {key: dynamic_symbols(bins[key]) for key in ('geometry', 'output')}
+    assert all(name not in dynamic[key] for name in bindings for key in dynamic)
+    (evidence / 'geometry-function-identity.json').write_text(json.dumps({
+        name: {key: executable[key].get(name) for key in executable} for name in compared}, indent=2) + '\n')
     data_matches = all(not layout[k]['changed'] and not layout[k]['added'] and not layout[k]['removed'] for k in ('readonly', 'writable'))
     proof = dict(padding_bytes=growth, original_text_prefix_preserved=True,
         original_relocation_semantics_preserved=True,
@@ -93,6 +111,7 @@ def build_geometry(t, b, evidence, run, bins):
         method='Keep every baseline text byte and relocation; append exactly the observed text growth, then link the same otherwise-unreachable memory-writer object in the candidate archive order. This is a diagnostic binary, never a production patch.',
         layout=layout, excluded_vector_functions=sorted(excluded),
         compared_other_functions=len(names - excluded), other_function_byte_mismatches=mismatches,
+        binding_only_differences=bindings, binding_differences_absent_from_dynamic_symbols=True,
         data_symbols_match=data_matches, matched=not mismatches and data_matches)
     (evidence / 'geometry-proof.json').write_text(json.dumps(proof, indent=2) + '\n')
     return proof
