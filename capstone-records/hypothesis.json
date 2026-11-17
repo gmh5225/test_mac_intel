@@ -1,12 +1,23 @@
 {
-  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
-  "evidence": [
-    "../round1394-isolated-alias-trie/profile-review.json",
-    "../round1397-isolated-alias-native/native-review.json",
-    "../round1397-isolated-alias-native/mixed-review.json"
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "prior_candidate": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "tree": "5d99b28b0cb4ddb67bc9f3691e2f584b9e8b10a4",
+    "sha256": "71c74367b221f4cdb2e16047cda1da54221871d92f61d5579d4f0d036280b377",
+    "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+    "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+    "complete": true,
+    "publication_qualified": false,
+    "mapping_object_unchanged": true
+  },
+  "retained_negative_evidence": [
+    "../round1405-alias-call-shape-native/native-review.json",
+    "../round1410-alias-launch-factors/decision.json",
+    "../round1415-clang-rolled-alias/profile"
   ],
-  "cause": "R1397 shows useful AArch64/MIPS gains but 25 unrelated native/mixed losses. Removing two call arguments changed caller size and linked positions; Clang additionally outlined the shared trie parser into ordinary text.",
-  "change": "Preserve the existing four-argument caller shape and every original alias table. Keep the dedicated-build trie path unchanged. The new private lookup entries retain the existing calling convention, and the outlined parser uses the dedicated lookup section.",
-  "gates": "Require entire AArch64/MIPS object disassembly identical after replacing only the callee symbol name; shared Mapping and every unrelated runtime object remain byte identical. Measure all common text and data positions, full records, malformed alias strings, raw and full output controls.",
+  "observation": "Clang14 still emits a 3035-byte parser with repeated fixed-offset character reads despite the loop unroll(disable) pragma. Its 3073-byte new code section crosses the original read-only page boundary. The intended compact code was not obtained; no native performance claim is made.",
+  "change": "Apply Clang minsize only to the private shared parser, retaining every parsing and bounds rule and the unchanged four-argument caller ABI. Keep GCC on the original implementation. Remove inline from the already-noinline forward declaration.",
+  "hypothesis": "Size-oriented lowering of this small loop may avoid repeated delimiter branches and fit in the existing text-to-readonly gap. Verify compiler remarks, actual instructions and complete records before native timing.",
+  "gates": "Exact existing Mapping object and caller lowering; original GCC executable identity; direct alias oracle and full public records; native mixed and x86 controls if code-size and instruction-cost results justify them.",
   "publication_qualified": false
 }

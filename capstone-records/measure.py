@@ -9,12 +9,14 @@ import subprocess as sp
 import tempfile
 import corpus
 from layout import linked_layout
+from lowering import capture
 
 r = Path(__file__).resolve().parent
 s = r.parent / 'source'
 e = r.parent / 'evidence'
 e.mkdir()
 cc = os.environ['MEASURE_CC']
+active = cc == 'clang'
 sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 meta = json.loads((r / 'candidate.json').read_text())
 
@@ -32,7 +34,7 @@ def run(args, label, cwd=None):
 assert sp.check_output(['git', '-C', s, 'rev-parse', 'HEAD'], text=True).strip() == meta['parent']
 assert not sp.check_output(['git', '-C', s, 'status', '--porcelain'])
 assert sha(r / 'candidate.patch') == meta['sha256']
-w = Path(tempfile.mkdtemp(prefix='capstone-alias-call-shape-cost-'))
+w = Path(tempfile.mkdtemp(prefix='capstone-clang-small-alias-cost-'))
 try:
     if hasattr(os, 'sched_getaffinity'):
         os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
@@ -72,10 +74,10 @@ try:
         objects[key] = {str(f.relative_to(objdir)): sha(f) for f in objdir.rglob('*.o')}
         if key == 'trie':
             changed = [n for n in objects['base'] if objects[key].get(n) != objects['base'][n]]
-            assert set(changed) == {'arch/AArch64/AArch64Mapping.c.o', 'arch/Mips/MipsMapping.c.o'}, changed
+            assert set(changed) == ({'arch/AArch64/AArch64Mapping.c.o', 'arch/Mips/MipsMapping.c.o'} if active else set()), changed
             assert set(objects['trie']) - set(objects['base']) == {'AliasMapping.c.o'}
             assert set(objects['base']) <= set(objects['trie'])
-            save('object-isolation', dict(changed=changed, added=['AliasMapping.c.o'],
+            save('object-isolation', dict(active=active, changed=changed, added=['AliasMapping.c.o'],
                  unchanged=len(objects['base']) - len(changed), mapping_object_identical=True))
         identities = {}
         for arch in ('AArch64','Mips'):
@@ -99,8 +101,12 @@ try:
             assert len(text_rows)==1 and int(text_rows[0][2],16)==0, sections
             save('lookup-section-isolation',dict(ordinary_text_bytes=0,sections=sections))
             run(['python3', s / 'suite/synctools/alias_mnemonic_trie.py', '--check'], 'generator')
-            run(['python3', r / 'oracle.py', s, b], 'alias-oracle')
-            shutil.copyfile(r / 'direct-alias-check.log', e / 'direct-alias-check.log')
+            if active:
+                capture(s, b, w, e, run)
+                run(['python3', r / 'oracle.py', s, b], 'alias-oracle')
+                shutil.copyfile(r / 'direct-alias-check.log', e / 'direct-alias-check.log')
+            else:
+                save('direct-alias-scope', dict(active=False, reason='GCC retains the original implementation; exact object and executable identity are required.'))
         binary = w / key
         run(['clang++', w / 'single.o', b / 'libcapstone.a', '-lm',
              '-Wl,-Map,' + str(e / (key + '-link.map')), '-o', binary], 'link-' + key)
@@ -111,6 +117,11 @@ try:
         (e / (key + '-sections.txt')).write_bytes(sp.check_output(['readelf', '-WS', binary]))
         with gzip.open(e / (key + '-linked-disassembly.gz'), 'wb') as f:
             f.write(sp.check_output(['objdump', '-d', binary]))
+    identity = dict(active=active, before=sha(binaries['base']), after=sha(binaries['trie']))
+    identity['identical'] = identity['before'] == identity['after']
+    save('binary-identity', identity)
+    if not active:
+        assert identity['identical'], 'Inactive GCC executable changed'
     layout=linked_layout(e / 'base-symbols.txt', e / 'trie-symbols.txt', 'output')
     save('linked-layout',layout)
     assert not layout['text']['changed'], 'Existing linked function positions or sizes changed'

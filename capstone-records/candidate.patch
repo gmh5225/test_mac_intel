@@ -1,28 +1,31 @@
 diff --git a/AliasMapping.c b/AliasMapping.c
 new file mode 100644
-index 00000000..68f7fd23
+index 00000000..91806b68
 --- /dev/null
 +++ b/AliasMapping.c
-@@ -0,0 +1,52 @@
+@@ -0,0 +1,57 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
 +#include "Mapping.h"
 +
++#if defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP) && !defined(CAPSTONE_USE_ALIAS_TRIE)
++#define CAPSTONE_ALIAS_ROLLED_LOOP
++
 +#if defined(__ELF__) && defined(__GNUC__)
-+#define ALIAS_LOOKUP_CODE __attribute__((section(".cs_alias_lookup")))
++#define ALIAS_LOOKUP_CODE __attribute__((noinline, section(".cs_alias_lookup")))
 +#define ALIAS_LOOKUP_DATA __attribute__((section(".cs_alias_lookup_rodata")))
 +#else
-+#define ALIAS_LOOKUP_CODE
++#define ALIAS_LOOKUP_CODE __attribute__((noinline))
 +#define ALIAS_LOOKUP_DATA
 +#endif
 +
 +/* Preserve the original caller ABI while the generated trie owns lookup.
 + * Keep a compiler-outlined parser in the same dedicated code section. */
-+static inline void
-+map_set_alias_id_trie_impl(MCInst *MI, const SStream *O,
-+			   const alias_trie_node *trie,
-+			   size_t trie_size) ALIAS_LOOKUP_CODE;
++static void map_set_alias_id_trie_impl(MCInst *MI, const SStream *O,
++				       const alias_trie_node *trie,
++				       size_t trie_size) ALIAS_LOOKUP_CODE
++	__attribute__((minsize));
 +#include "MappingAlias.h"
 +
 +#ifdef CAPSTONE_HAS_AARCH64
@@ -56,8 +59,10 @@ index 00000000..68f7fd23
 +				   ARR_SIZE(mips_alias_trie));
 +}
 +#endif
++
++#endif
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 7654a7ba..c4b5d028 100644
+index f755abfb..b1bcaa48 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -260,6 +260,7 @@ set(EXTERNAL_PROJ_PATCH_DIR ${PROJECT_SOURCE_DIR}/ext_patches/)
@@ -69,10 +74,10 @@ index 7654a7ba..c4b5d028 100644
      MCInstrDesc.c
      MCInstPrinter.c
 diff --git a/Makefile b/Makefile
-index 4382db46..73a653ec 100644
+index 5955b735..a70bcb62 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -423,7 +423,7 @@ ifneq (,$(filter arc,$(CAPSTONE_ARCHS)))
+@@ -424,7 +424,7 @@ ifneq (,$(filter arc,$(CAPSTONE_ARCHS)))
  endif
  
  LIBOBJ =
@@ -144,10 +149,10 @@ index b2be73de..d3bb3e3d 100644
  
  /// Does a binary search over the given map and searches for @id.
 diff --git a/Mapping.h b/Mapping.h
-index 6f7281cd..1d296d12 100644
+index 6f7281cd..dd340ed5 100644
 --- a/Mapping.h
 +++ b/Mapping.h
-@@ -296,13 +296,24 @@ bool map_use_alias_details(const MCInst *MI);
+@@ -296,13 +296,28 @@ bool map_use_alias_details(const MCInst *MI);
  void map_set_alias_id(MCInst *MI, const SStream *O,
  		      const name_map *alias_mnem_id_map, int map_size);
  
@@ -158,6 +163,10 @@ index 6f7281cd..1d296d12 100644
  	unsigned int id;
  } alias_trie_node;
  
++#if defined(__clang__)
++#define CAPSTONE_ISOLATED_ALIAS_LOOKUP
++#endif
++
 +#ifdef CAPSTONE_HAS_AARCH64
 +CAPSTONE_INTERNAL void map_set_aarch64_alias_id(MCInst *MI, const SStream *O,
 +						const name_map *map,
@@ -175,10 +184,10 @@ index 6f7281cd..1d296d12 100644
  					    size_t trie_size);
 diff --git a/MappingAlias.h b/MappingAlias.h
 new file mode 100644
-index 00000000..911b7a05
+index 00000000..d6575cb9
 --- /dev/null
 +++ b/MappingAlias.h
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,58 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -201,9 +210,14 @@ index 00000000..911b7a05
 +	}
 +}
 +
-+static inline void map_set_alias_id_trie_impl(MCInst *MI, const SStream *O,
-+					      const alias_trie_node *trie,
-+					      size_t trie_size)
++#ifdef CAPSTONE_ALIAS_ROLLED_LOOP
++static
++#else
++static inline
++#endif
++	void map_set_alias_id_trie_impl(MCInst *MI, const SStream *O,
++					const alias_trie_node *trie,
++					size_t trie_size)
 +{
 +	unsigned int id = 0;
 +	if (MCInst_isAlias(MI)) {
@@ -212,6 +226,9 @@ index 00000000..911b7a05
 +			++name;
 +		unsigned int state = 1;
 +		/* The public alias parser considers at most 15 bytes. */
++#ifdef CAPSTONE_ALIAS_ROLLED_LOOP
++#pragma clang loop unroll(disable)
++#endif
 +		for (size_t i = 0; i < 15; ++i) {
 +			if (char_ends_mnem(name[i], MI->csh->arch))
 +				break;
@@ -230,43 +247,49 @@ index 00000000..911b7a05
 +
 +#endif
 diff --git a/arch/AArch64/AArch64Mapping.c b/arch/AArch64/AArch64Mapping.c
-index e82eaaa5..ee2ba449 100644
+index e82eaaa5..de60a62a 100644
 --- a/arch/AArch64/AArch64Mapping.c
 +++ b/arch/AArch64/AArch64Mapping.c
-@@ -1080,8 +1080,13 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -1080,8 +1080,16 @@ void AArch64_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	}
  	AArch64_check_updates_flags(MI);
  	AArch64_add_sysreg_alias_access(MI);
 +#ifdef CAPSTONE_USE_ALIAS_TRIE
  	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
  			ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
-+#else
++#elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
 +	map_set_aarch64_alias_id(MI, O, insn_alias_mnem_map,
 +				 ARR_SIZE(insn_alias_mnem_map) - 1);
++#else
++	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
++			 ARR_SIZE(insn_alias_mnem_map) - 1, alias_trie);
 +#endif
  	int syntax_opt = MI->csh->syntax;
  	if (syntax_opt & CS_OPT_SYNTAX_CS_REG_ALIAS)
  		patch_cs_reg_alias(O->buffer);
 diff --git a/arch/Mips/MipsMapping.c b/arch/Mips/MipsMapping.c
-index d6775ef0..d0acae75 100644
+index d6775ef0..551c7d06 100644
 --- a/arch/Mips/MipsMapping.c
 +++ b/arch/Mips/MipsMapping.c
-@@ -459,8 +459,13 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
+@@ -459,8 +459,16 @@ void Mips_printer(MCInst *MI, SStream *O, void * /* MCRegisterInfo* */ info)
  	}
  #endif
  #ifndef CAPSTONE_DIET
 +#ifdef CAPSTONE_USE_ALIAS_TRIE
  	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
  			ARR_SIZE(insn_alias_mnem_map), alias_trie);
-+#else
++#elif defined(CAPSTONE_ISOLATED_ALIAS_LOOKUP)
 +	map_set_mips_alias_id(MI, O, insn_alias_mnem_map,
 +			      ARR_SIZE(insn_alias_mnem_map));
++#else
++	MAP_SET_ALIAS_ID(MI, O, insn_alias_mnem_map,
++			 ARR_SIZE(insn_alias_mnem_map), alias_trie);
 +#endif
  #endif
  }
  
 diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
-index 7e0a3bf9..a8a01659 100644
+index fe2a00be..12896a4d 100644
 --- a/xcode/Capstone.xcodeproj/project.pbxproj
 +++ b/xcode/Capstone.xcodeproj/project.pbxproj
 @@ -64,6 +64,7 @@
@@ -285,7 +308,7 @@ index 7e0a3bf9..a8a01659 100644
  		DC474F9619DE6FCD00BCA449 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
  		DC474F9719DE6FCD00BCA449 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
  		DC474F9819DE6FCD00BCA449 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
-@@ -246,6 +248,7 @@
+@@ -249,6 +251,7 @@
  		DCFE24A719DDCDEE00EF8EA9 /* MCInstrDesc.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */; };
  		08825505947F9FF38595CAA2 /* MCInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = A147681900A859B6FF33B1C5 /* MCInstPrinter.c */; };
  		99F6EE7BCF49E62584A33533 /* Mapping.c in Sources */ = {isa = PBXBuildFile; fileRef = 0757CC8E95E32C807B529D06 /* Mapping.c */; };
@@ -293,7 +316,7 @@ index 7e0a3bf9..a8a01659 100644
  		DCFE24A919DDCDEE00EF8EA9 /* MCRegisterInfo.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */; };
  		DCFE24AB19DDCDEE00EF8EA9 /* SStream.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A119DDCDEE00EF8EA9 /* SStream.c */; };
  		DCFE24AD19DDCDEE00EF8EA9 /* utils.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE24A219DDCDEE00EF8EA9 /* utils.c */; };
-@@ -553,6 +556,7 @@
+@@ -557,6 +560,7 @@
  		DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCInstrDesc.c; path = ../MCInstrDesc.c; sourceTree = "<group>"; };
  		A147681900A859B6FF33B1C5 /* MCInstPrinter.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCInstPrinter.c; path = ../MCInstPrinter.c; sourceTree = "<group>"; };
  		0757CC8E95E32C807B529D06 /* Mapping.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = Mapping.c; path = ../Mapping.c; sourceTree = "<group>"; };
@@ -301,7 +324,7 @@ index 7e0a3bf9..a8a01659 100644
  		DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = MCRegisterInfo.c; path = ../MCRegisterInfo.c; sourceTree = "<group>"; };
  		DCFE24A119DDCDEE00EF8EA9 /* SStream.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = SStream.c; path = ../SStream.c; sourceTree = "<group>"; };
  		DCFE24A219DDCDEE00EF8EA9 /* utils.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = utils.c; path = ../utils.c; sourceTree = "<group>"; };
-@@ -797,6 +801,7 @@
+@@ -801,6 +805,7 @@
  				DCFE249F19DDCDEE00EF8EA9 /* MCInstrDesc.c */,
  				A147681900A859B6FF33B1C5 /* MCInstPrinter.c */,
  				0757CC8E95E32C807B529D06 /* Mapping.c */,
@@ -309,7 +332,7 @@ index 7e0a3bf9..a8a01659 100644
  				DCFE24B719DDCE1E00EF8EA9 /* MCInstrDesc.h */,
  				DCFE24A019DDCDEE00EF8EA9 /* MCRegisterInfo.c */,
  				DCFE24B819DDCE1E00EF8EA9 /* MCRegisterInfo.h */,
-@@ -1657,6 +1662,7 @@
+@@ -1663,6 +1668,7 @@
  				DC474F9519DE6FCD00BCA449 /* MCInstrDesc.c in Sources */,
  				03A4059C2E7F14C13B3E0635 /* MCInstPrinter.c in Sources */,
  				FE24CD259F3F09130FF97530 /* Mapping.c in Sources */,
@@ -317,7 +340,7 @@ index 7e0a3bf9..a8a01659 100644
  				DC474FD519DE6FDA00BCA449 /* SystemZMCTargetDesc.c in Sources */,
  				DC474F9719DE6FCD00BCA449 /* SStream.c in Sources */,
  				DC474FCE19DE6FDA00BCA449 /* SparcDisassembler.c in Sources */,
-@@ -1742,6 +1748,7 @@
+@@ -1748,6 +1754,7 @@
  				DCFE24A719DDCDEE00EF8EA9 /* MCInstrDesc.c in Sources */,
  				08825505947F9FF38595CAA2 /* MCInstPrinter.c in Sources */,
  				99F6EE7BCF49E62584A33533 /* Mapping.c in Sources */,
@@ -325,7 +348,7 @@ index 7e0a3bf9..a8a01659 100644
  				DCFE246719DDCDA000EF8EA9 /* MipsDisassembler.c in Sources */,
  				DCFE245819DDCD9200EF8EA9 /* AArch64Mapping.c in Sources */,
  				DCFE247919DDCDAD00EF8EA9 /* SparcMapping.c in Sources */,
-@@ -1807,6 +1814,7 @@
+@@ -1815,6 +1822,7 @@
  				DC474F8F19DE6FCD00BCA449 /* MCInstrDesc.c in Sources */,
  				0C6F07220265CCFEC8B56C6D /* MCInstPrinter.c in Sources */,
  				E06B2929F95A196300477770 /* Mapping.c in Sources */,
