@@ -66,7 +66,7 @@ class Geometry:
         assert self.constants['base'] == self.constants['scan']
         baseline = self.symbols['base']
         shifts = {}
-        for label in ('packed','scan'):
+        for label in ('scan',):
             current = self.symbols[label]
             common = {name for name in self.backend_symbols if name in baseline and name in current
                       and len(baseline[name]) == len(current[name]) == 1}
@@ -83,5 +83,5 @@ class Geometry:
             shifts[label] = categories
         result = dict(original_vector_constants_identical=True, constant_sha256=self.constants,
                       vector_object_shapes=self.shapes, backend_address_shifts=shifts,
-                      source_variants=['base', 'packed', 'scan'])
+                      source_variants=['base', 'scan'])
         (self.evidence / 'geometry.json').write_text(json.dumps(result, indent=2) + '\n')
