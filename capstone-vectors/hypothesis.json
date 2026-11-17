@@ -1,40 +1,335 @@
 {
-  "baseline": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-  "cause": "The register writer accepts ten parameters including a pointer to a caller-built register array. Clang 18 executed operand extraction and writer call setup accounts for 2.11% of the measured SSL64 format instruction count; this is not an available cycle saving estimate.",
-  "change": "Pass the same five scalar fields and three register numbers in one eight-byte value. Keep register formatting, detail loops, clearing, generated rows and admission unchanged.",
-  "domains": {
-    "prefix": [
-      2,
-      3,
-      4
-    ],
-    "ll": [
-      0,
-      1,
-      2
-    ],
-    "rex": "0x40..0x4f",
-    "first_ll": [
-      0,
-      1,
-      2
-    ],
-    "reg_count": [
-      2,
-      3
-    ],
-    "regs": "0..31; unused third lane initialized to zero"
+  "baseline": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "preceding_candidate": {
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "tree": "8c76907e65c9e8e340ef703c753deed2f4033841",
+    "sha256": "f2befb14d519e77e572a6f80e8ef42ab766605e539f84382f11d3ec6a4fdba69",
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86EvexMemoryOutput.c",
+      "arch/X86/X86GenEvexMemoryOutput.inc",
+      "arch/X86/X86SimpleOutput.h",
+      "arch/X86/X86VectorOutput.c",
+      "arch/X86/X86VectorRegisterWriter.h",
+      "suite/synctools/x86_vector_output.cpp",
+      "tests/unit/x86_simple_output.c",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
+    ]
   },
-  "risks": [
-    "Compiler may spill or reconstruct the compact value, offsetting caller savings.",
-    "GCC inline decisions and linked placement must be measured; R1166 established that unrolling alone changed GCC inline behavior and added work."
-  ],
-  "gates": [
-    "Full record and protected-page equality",
-    "Four compiler code generation and unchanged consumer instruction costs",
-    "Only then real native timing with A/A, PE32 and other architectures",
-    "Alternate configurations and actual NeverD product before publication"
-  ],
-  "source": "Study of local iced compact state and fixed-width formatting; no iced implementation copied.",
+  "hypothesis": "Replace the broadcast entry's four serial byte predicates with one bounded little-endian mask. This keeps the exact accepted set while reducing admission work and the code growth caused by the new tail call. Measure emitted size and all symbol movements before any further native qualification.",
+  "scope": "Only the existing broadcast admission expression changes relative to R1375. The new memory writer, canonical generator, output records and full fallback rules stay unchanged.",
+  "original_negative_observations": {
+    "native": {
+      "run": {
+        "id": 44154225887,
+        "head_sha": "5c94ce9058b06a826649c14f044ce53ef8be1c24",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44154225887",
+        "run_attempt": 1
+      },
+      "losses": {
+        "output": [
+          {
+            "host": "evex-output-existing-miss-ubuntu-22.04-clang-1",
+            "case": "libjpeg62-turbo-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "same-file-fixed",
+            "aa": 1.0001156735098298,
+            "aa_ci95": [
+              0.9920164695496498,
+              1.0037768314191078
+            ],
+            "variant": "output",
+            "gain": 0.9889053409015596,
+            "ci95": [
+              0.9797003470275714,
+              0.999247422093859
+            ],
+            "vs_iced": 0.7924310561749087,
+            "vs_fast": null
+          }
+        ]
+      },
+      "aa": [
+        {
+          "host": "evex-output-existing-miss-ubuntu-22.04-clang-1",
+          "case": "libzstd1-amd64",
+          "panel": "all-functions",
+          "mode": "format",
+          "launch": "same-file-fixed",
+          "aa": 0.9899804571030677,
+          "aa_ci95": [
+            0.9814506084848743,
+            1.0002010642337913
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-ubuntu-22.04-gcc-1",
+          "case": "libssl3t64-i386",
+          "panel": "all-functions",
+          "mode": "scan",
+          "launch": "images",
+          "aa": 0.9813734572130038,
+          "aa_ci95": [
+            0.9772012101036365,
+            0.9856399972898412
+          ]
+        }
+      ],
+      "report_sha256": "61d8bf732b16d11191dffda11fbf90e135545d7152f8dae337acd9641a5e895a"
+    },
+    "mixed": {
+      "run": {
+        "id": 44154404917,
+        "head_sha": "afcd50fc078d3e261d0a602accc124a8588b0a58",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44154404917",
+        "run_attempt": 1
+      },
+      "losses": {
+        "output": [
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.0003469502414175,
+            "aa_ci95": [
+              0.9991601056599902,
+              1.0025434166108065
+            ],
+            "variant": "output",
+            "gain": 0.9821959913910121,
+            "ci95": [
+              0.9805067025192161,
+              0.9845393583639472
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "same-file-fixed",
+            "aa": 1.0009489875532593,
+            "aa_ci95": [
+              0.9998116950480578,
+              1.0034804660460483
+            ],
+            "variant": "output",
+            "gain": 0.97976310018335,
+            "ci95": [
+              0.9769428771035857,
+              0.9810471212718683
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 0.9995631183218434,
+            "aa_ci95": [
+              0.9982212405115278,
+              1.0008872260087898
+            ],
+            "variant": "output",
+            "gain": 0.9899479106986656,
+            "ci95": [
+              0.9875369666244191,
+              0.9921748246738947
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "same-file-fixed",
+            "aa": 1.0005951390766863,
+            "aa_ci95": [
+              0.9983465371671104,
+              1.0051734017153175
+            ],
+            "variant": "output",
+            "gain": 0.989521645818408,
+            "ci95": [
+              0.9857739750527283,
+              0.9921372466639549
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 1.000066915585644,
+            "aa_ci95": [
+              0.9895196721641923,
+              1.009784480143956
+            ],
+            "variant": "output",
+            "gain": 0.9836871942281937,
+            "ci95": [
+              0.9748473115092231,
+              0.9896954008310195
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-22.04-clang-44154404917",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "same-file-fixed",
+            "aa": 1.00048599122103,
+            "aa_ci95": [
+              0.9966589942552554,
+              1.0068347922910177
+            ],
+            "variant": "output",
+            "gain": 0.9821849883997532,
+            "ci95": [
+              0.9801284417879998,
+              0.9860202970529903
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-24.04-clang-44154404917",
+            "case": "arm-sort",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9940023338551643,
+            "aa_ci95": [
+              0.9828776932624678,
+              1.0007515404502823
+            ],
+            "variant": "output",
+            "gain": 0.9885094467780942,
+            "ci95": [
+              0.9818277271059722,
+              0.9950140034914535
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-24.04-clang-44154404917",
+            "case": "arm-cp",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9973464471324285,
+            "aa_ci95": [
+              0.9857562683429142,
+              1.0007090934209937
+            ],
+            "variant": "output",
+            "gain": 0.9878152936309827,
+            "ci95": [
+              0.9815536536541379,
+              1.001821549482361
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          },
+          {
+            "host": "evex-output-existing-miss-images-four-ubuntu-24.04-clang-44154404917",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "same-file-fixed",
+            "aa": 0.9999148677168074,
+            "aa_ci95": [
+              0.9982727971860462,
+              1.0026330106042878
+            ],
+            "variant": "output",
+            "gain": 0.9884870049198586,
+            "ci95": [
+              0.9864531050533089,
+              0.9901341259335115
+            ],
+            "vs_iced": null,
+            "vs_fast": null
+          }
+        ]
+      },
+      "aa": [
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "arm-ls",
+          "panel": null,
+          "mode": 1,
+          "launch": "images",
+          "aa": 1.012794566688362,
+          "aa_ci95": [
+            1.0015859998476948,
+            1.0186812051056793
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "mips64el-ls",
+          "panel": null,
+          "mode": 1,
+          "launch": "images",
+          "aa": 0.9692935404360028,
+          "aa_ci95": [
+            0.955507900411222,
+            0.9828747194919072
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "mips64el-ls",
+          "panel": null,
+          "mode": 2,
+          "launch": "images",
+          "aa": 0.975081571654502,
+          "aa_ci95": [
+            0.9675837670023716,
+            0.9894016216071255
+          ]
+        },
+        {
+          "host": "evex-output-existing-miss-images-four-ubuntu-22.04-gcc-44154404917",
+          "case": "arm64-ls",
+          "panel": null,
+          "mode": 2,
+          "launch": "images",
+          "aa": 0.9705733960386874,
+          "aa_ci95": [
+            0.9621995279743092,
+            0.9779318089878821
+          ]
+        }
+      ],
+      "report_sha256": "fcc5703addd3483f0e110d5ec8fc7be90a39b0ae7f4a7008d31c597087ae8ffc"
+    }
+  },
+  "layout_observation": "Clang 14 moved 4025 text symbols, generally by 32 bytes; Clang 18 moved 4020, generally by 16 bytes. This is a candidate explanation for unaffected-path losses, not established hardware attribution.",
+  "validation": "Repeat canonical complete-state and protected-page checks for the changed admission boundary. Four-compiler emitted code and fixed-consumer costs precede native timing. All original failures remain in scope.",
+  "native_timing": false,
   "publication_qualified": false
 }
