@@ -1,0 +1,999 @@
+{
+  "status": "baseline-process-lifetime-diagnosis-complete-no-candidate-measured",
+  "review": {
+    "complete": true,
+    "run": {
+      "id": 44094485795,
+      "head_sha": "e119f64765212f6c031cd66a7e2eed696384e5c5",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44094485795",
+      "run_attempt": 1
+    },
+    "protocol": {
+      "candidate_measured": false,
+      "hypothesis": "Clang14 amd64 raw decode has unusually broad per-process timing even with fixed image, stack and heap addresses; simple ASLR or visible context-switch explanations were not sufficient.",
+      "intervention": "Build Clang14 and GCC11 production baseline on each of two identical runner profiles; on each runner alternate retained-process bursts and restarted processes with fixed addresses. Add a small integer calibration outside the timed region and run Memcheck with origins.",
+      "cases": {
+        "amd64-ls": 0,
+        "mips64el-ls": 1
+      },
+      "compilers_on_each_runner": [
+        "clang",
+        "gcc"
+      ],
+      "replicas": 2,
+      "blocks": 8,
+      "samples_per_retained_process": 8,
+      "fresh_processes_per_block": 8,
+      "calibration_cpu_ms": 80,
+      "constraints": "Baseline only, diagnostic instrumentation, no candidate performance qualification. Check undefined-value errors before attributing unexplained variation to hardware or the runner."
+    },
+    "profiles": [
+      {
+        "name": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "settings": {
+          "/sys/kernel/mm/transparent_hugepage/enabled": "always [madvise] never\n",
+          "/sys/kernel/mm/transparent_hugepage/defrag": "always defer defer+madvise [madvise] never\n",
+          "/sys/devices/system/clocksource/clocksource0/current_clocksource": "tsc\n",
+          "/sys/devices/system/cpu/cpu0/topology/thread_siblings_list": "0-1\n"
+        },
+        "affinity": 0,
+        "compilers": {
+          "clang": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+          "gcc": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        },
+        "cleanup": {
+          "bytes": 134087314,
+          "removed": true
+        },
+        "consumer": {
+          "original_sha256": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
+          "instrumented_sha256": "c0d4cae00fd806adb8f8e90cc787df96c71ba376082de1dda325f626c233e11e"
+        }
+      },
+      {
+        "name": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "settings": {
+          "/sys/kernel/mm/transparent_hugepage/enabled": "always [madvise] never\n",
+          "/sys/kernel/mm/transparent_hugepage/defrag": "always defer defer+madvise [madvise] never\n",
+          "/sys/devices/system/clocksource/clocksource0/current_clocksource": "tsc\n",
+          "/sys/devices/system/cpu/cpu0/topology/thread_siblings_list": "0-1\n"
+        },
+        "affinity": 0,
+        "compilers": {
+          "clang": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+          "gcc": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        },
+        "cleanup": {
+          "bytes": 134087326,
+          "removed": true
+        },
+        "consumer": {
+          "original_sha256": "5f35a0ce679ae081c8194bb7c3746b6c33a7d70dced2dbd2657e91487f00c8ab",
+          "instrumented_sha256": "c0d4cae00fd806adb8f8e90cc787df96c71ba376082de1dda325f626c233e11e"
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "clang",
+        "case": "amd64-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 73846000.0,
+          "relative_mad": 0.009926062345963221,
+          "quartiles": [
+            73190500.0,
+            73846000.0,
+            74628750.0
+          ],
+          "minimum": 72569000,
+          "maximum": 84978000
+        },
+        "calibration_ns": {
+          "median": 1528500.0,
+          "relative_mad": 0.013084723585214262,
+          "quartiles": [
+            1512250.0,
+            1528500.0,
+            1553750.0
+          ],
+          "minimum": 1507000,
+          "maximum": 1771000
+        },
+        "cpu_calibration_correlation": 0.9252089403028537,
+        "process_medians": {
+          "median": 73846000.0,
+          "relative_mad": 0.009926062345963221,
+          "quartiles": [
+            73190500.0,
+            73846000.0,
+            74628750.0
+          ],
+          "minimum": 72569000,
+          "maximum": 84978000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 16
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "clang",
+        "case": "amd64-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 74010000.0,
+          "relative_mad": 0.006992298338062424,
+          "quartiles": [
+            73352500.0,
+            74010000.0,
+            74413750.0
+          ],
+          "minimum": 72547000,
+          "maximum": 75300000
+        },
+        "calibration_ns": {
+          "median": 1548500.0,
+          "relative_mad": 0.004197610590894414,
+          "quartiles": [
+            1519250.0,
+            1548500.0,
+            1554000.0
+          ],
+          "minimum": 1506000,
+          "maximum": 1659000
+        },
+        "cpu_calibration_correlation": 0.4318782473511799,
+        "process_medians": {
+          "median": 74251750.0,
+          "relative_mad": 0.0029527923584292625,
+          "quartiles": [
+            73648875.0,
+            74251750.0,
+            74410750.0
+          ],
+          "minimum": 72851000.0,
+          "maximum": 74529000.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 18
+        },
+        "within_process_relative_mad": [
+          0.0019794247549283638,
+          0.006760389226385678,
+          0.0033417556443067894,
+          0.00602105348231063,
+          0.006264109499888141,
+          0.0019992217794415597,
+          0.003177718905711658,
+          0.0047908295593511886
+        ],
+        "trial_medians": [
+          74234000.0,
+          74410500.0,
+          74285000.0,
+          74041500.0,
+          73957000.0,
+          73610000.0,
+          74111500.0,
+          73531500.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "clang",
+        "case": "mips64el-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 79119500.0,
+          "relative_mad": 0.007400198434014371,
+          "quartiles": [
+            78413000.0,
+            79119500.0,
+            79633000.0
+          ],
+          "minimum": 77489000,
+          "maximum": 90724000
+        },
+        "calibration_ns": {
+          "median": 1547000.0,
+          "relative_mad": 0.005171299288946348,
+          "quartiles": [
+            1521250.0,
+            1547000.0,
+            1552750.0
+          ],
+          "minimum": 1507000,
+          "maximum": 1786000
+        },
+        "cpu_calibration_correlation": 0.8031194275813455,
+        "process_medians": {
+          "median": 79119500.0,
+          "relative_mad": 0.007400198434014371,
+          "quartiles": [
+            78413000.0,
+            79119500.0,
+            79633000.0
+          ],
+          "minimum": 77489000,
+          "maximum": 90724000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 16
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "clang",
+        "case": "mips64el-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 78983500.0,
+          "relative_mad": 0.008337184348629777,
+          "quartiles": [
+            78030250.0,
+            78983500.0,
+            79465250.0
+          ],
+          "minimum": 77570000,
+          "maximum": 80605000
+        },
+        "calibration_ns": {
+          "median": 1544500.0,
+          "relative_mad": 0.00809323405632891,
+          "quartiles": [
+            1517250.0,
+            1544500.0,
+            1550000.0
+          ],
+          "minimum": 1506000,
+          "maximum": 1572000
+        },
+        "cpu_calibration_correlation": 0.4606726347598944,
+        "process_medians": {
+          "median": 78508750.0,
+          "relative_mad": 0.002681229799226201,
+          "quartiles": [
+            78305875.0,
+            78508750.0,
+            79332000.0
+          ],
+          "minimum": 78294500.0,
+          "maximum": 79445000.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 14
+        },
+        "within_process_relative_mad": [
+          0.0025816363796642614,
+          0.0023601233557807287,
+          0.007764808050879927,
+          0.006488322934561176,
+          0.008701681180070097,
+          0.008325086985667316,
+          0.007963897000265464,
+          0.004393460184665613
+        ],
+        "trial_medians": [
+          78707000.0,
+          78515500.0,
+          78995500.0,
+          78095000.0,
+          78330500.0,
+          79220500.0,
+          79548000.0,
+          79342500.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "gcc",
+        "case": "amd64-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 73860500.0,
+          "relative_mad": 0.007432930998300851,
+          "quartiles": [
+            72999750.0,
+            73860500.0,
+            74346250.0
+          ],
+          "minimum": 72363000,
+          "maximum": 85800000
+        },
+        "calibration_ns": {
+          "median": 1545000.0,
+          "relative_mad": 0.01715210355987055,
+          "quartiles": [
+            1515000.0,
+            1545000.0,
+            1551750.0
+          ],
+          "minimum": 1508000,
+          "maximum": 1771000
+        },
+        "cpu_calibration_correlation": 0.9568956912335289,
+        "process_medians": {
+          "median": 73860500.0,
+          "relative_mad": 0.007432930998300851,
+          "quartiles": [
+            72999750.0,
+            73860500.0,
+            74346250.0
+          ],
+          "minimum": 72363000,
+          "maximum": 85800000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 14
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "gcc",
+        "case": "amd64-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 73973000.0,
+          "relative_mad": 0.008584213158855257,
+          "quartiles": [
+            73260250.0,
+            73973000.0,
+            74442500.0
+          ],
+          "minimum": 72205000,
+          "maximum": 84735000
+        },
+        "calibration_ns": {
+          "median": 1544000.0,
+          "relative_mad": 0.016515544041450777,
+          "quartiles": [
+            1516000.0,
+            1544000.0,
+            1553000.0
+          ],
+          "minimum": 1506000,
+          "maximum": 1807000
+        },
+        "cpu_calibration_correlation": 0.9650713495262043,
+        "process_medians": {
+          "median": 73696250.0,
+          "relative_mad": 0.0067540750038163405,
+          "quartiles": [
+            73165250.0,
+            73696250.0,
+            74260125.0
+          ],
+          "minimum": 73073500.0,
+          "maximum": 84628000.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 18
+        },
+        "within_process_relative_mad": [
+          0.007943765781751178,
+          0.0031724817582298903,
+          0.002085519765345389,
+          0.006488267789750041,
+          0.00219641658701267,
+          0.008409341279670468,
+          0.007265467977619643,
+          0.000779883726426242
+        ],
+        "trial_medians": [
+          73842500.0,
+          73669000.0,
+          73638000.0,
+          74119000.0,
+          74205500.0,
+          74243500.0,
+          73967500.0,
+          73563000.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "gcc",
+        "case": "mips64el-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 80842000.0,
+          "relative_mad": 0.00862175601791148,
+          "quartiles": [
+            80057000.0,
+            80842000.0,
+            81331750.0
+          ],
+          "minimum": 79252000,
+          "maximum": 92974000
+        },
+        "calibration_ns": {
+          "median": 1545000.0,
+          "relative_mad": 0.01423948220064725,
+          "quartiles": [
+            1518000.0,
+            1545000.0,
+            1559500.0
+          ],
+          "minimum": 1507000,
+          "maximum": 1777000
+        },
+        "cpu_calibration_correlation": 0.9824920990337549,
+        "process_medians": {
+          "median": 80842000.0,
+          "relative_mad": 0.00862175601791148,
+          "quartiles": [
+            80057000.0,
+            80842000.0,
+            81331750.0
+          ],
+          "minimum": 79252000,
+          "maximum": 92974000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 15
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-1-44094485795",
+        "cpu": "Intel(R) Xeon(R) 6973P-C",
+        "cc": "gcc",
+        "case": "mips64el-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 80918000.0,
+          "relative_mad": 0.0033861439976272277,
+          "quartiles": [
+            80511000.0,
+            80918000.0,
+            81189250.0
+          ],
+          "minimum": 79327000,
+          "maximum": 89031000
+        },
+        "calibration_ns": {
+          "median": 1546500.0,
+          "relative_mad": 0.008082767539605561,
+          "quartiles": [
+            1517250.0,
+            1546500.0,
+            1554000.0
+          ],
+          "minimum": 1506000,
+          "maximum": 1815000
+        },
+        "cpu_calibration_correlation": 0.6564285183576626,
+        "process_medians": {
+          "median": 80930750.0,
+          "relative_mad": 0.0016495584187716042,
+          "quartiles": [
+            80784375.0,
+            80930750.0,
+            81074375.0
+          ],
+          "minimum": 80372500.0,
+          "maximum": 81357000.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 16
+        },
+        "within_process_relative_mad": [
+          0.0018604708660151929,
+          0.0030903685573541503,
+          0.011873594159076663,
+          0.0048586270179476814,
+          0.0028839622058914344,
+          0.004522234835398055,
+          0.001350443056317792,
+          0.0033685044830831725
+        ],
+        "trial_medians": [
+          81062500.0,
+          80626500.0,
+          81105500.0,
+          80932000.0,
+          80770000.0,
+          81083500.0,
+          80577000.0,
+          80959000.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "clang",
+        "case": "amd64-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 77321500.0,
+          "relative_mad": 0.003065124189261719,
+          "quartiles": [
+            77112000.0,
+            77321500.0,
+            77606250.0
+          ],
+          "minimum": 76839000,
+          "maximum": 78744000
+        },
+        "calibration_ns": {
+          "median": 1960000.0,
+          "relative_mad": 0.0005102040816326531,
+          "quartiles": [
+            1959000.0,
+            1960000.0,
+            1960750.0
+          ],
+          "minimum": 1951000,
+          "maximum": 1977000
+        },
+        "cpu_calibration_correlation": 0.041374239213780695,
+        "process_medians": {
+          "median": 77321500.0,
+          "relative_mad": 0.003065124189261719,
+          "quartiles": [
+            77112000.0,
+            77321500.0,
+            77606250.0
+          ],
+          "minimum": 76839000,
+          "maximum": 78744000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 23
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "clang",
+        "case": "amd64-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 77476000.0,
+          "relative_mad": 0.002968661262842687,
+          "quartiles": [
+            77296250.0,
+            77476000.0,
+            77853750.0
+          ],
+          "minimum": 77022000,
+          "maximum": 79226000
+        },
+        "calibration_ns": {
+          "median": 1962000.0,
+          "relative_mad": 0.0005096839959225281,
+          "quartiles": [
+            1961000.0,
+            1962000.0,
+            1964000.0
+          ],
+          "minimum": 1950000,
+          "maximum": 1981000
+        },
+        "cpu_calibration_correlation": -0.1641621941751419,
+        "process_medians": {
+          "median": 77464750.0,
+          "relative_mad": 0.0022429556669323787,
+          "quartiles": [
+            77324250.0,
+            77464750.0,
+            77836625.0
+          ],
+          "minimum": 77284000.0,
+          "maximum": 78173500.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 33
+        },
+        "within_process_relative_mad": [
+          0.0007547314627079509,
+          0.0014089309495165243,
+          0.0008475011556833941,
+          0.0013110053408936795,
+          0.002419105124632296,
+          0.0015244887149076908,
+          0.0009896763176278818,
+          0.0007828269758294084
+        ],
+        "trial_medians": [
+          77365000.0,
+          77341500.0,
+          77669000.0,
+          77536500.0,
+          77456000.0,
+          77462500.0,
+          77485000.0,
+          77586000.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "clang",
+        "case": "mips64el-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 75967000.0,
+          "relative_mad": 0.002303631840141114,
+          "quartiles": [
+            75797250.0,
+            75967000.0,
+            76160250.0
+          ],
+          "minimum": 75384000,
+          "maximum": 78711000
+        },
+        "calibration_ns": {
+          "median": 1960000.0,
+          "relative_mad": 0.0005102040816326531,
+          "quartiles": [
+            1960000.0,
+            1960000.0,
+            1962000.0
+          ],
+          "minimum": 1950000,
+          "maximum": 2026000
+        },
+        "cpu_calibration_correlation": 0.07810507671362915,
+        "process_medians": {
+          "median": 75967000.0,
+          "relative_mad": 0.002303631840141114,
+          "quartiles": [
+            75797250.0,
+            75967000.0,
+            76160250.0
+          ],
+          "minimum": 75384000,
+          "maximum": 78711000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 19
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "clang",
+        "case": "mips64el-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 76119000.0,
+          "relative_mad": 0.0021873645213415834,
+          "quartiles": [
+            75947250.0,
+            76119000.0,
+            76306250.0
+          ],
+          "minimum": 75655000,
+          "maximum": 81490000
+        },
+        "calibration_ns": {
+          "median": 1963000.0,
+          "relative_mad": 0.0010188487009679063,
+          "quartiles": [
+            1962000.0,
+            1963000.0,
+            1965000.0
+          ],
+          "minimum": 1951000,
+          "maximum": 1985000
+        },
+        "cpu_calibration_correlation": -0.08325688486282981,
+        "process_medians": {
+          "median": 76089750.0,
+          "relative_mad": 0.0012386688088737313,
+          "quartiles": [
+            75990375.0,
+            76089750.0,
+            76211750.0
+          ],
+          "minimum": 75937000.0,
+          "maximum": 76302000.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 30
+        },
+        "within_process_relative_mad": [
+          0.002008243675678523,
+          0.0030173629559661795,
+          0.002123491203618482,
+          0.0006502420345350769,
+          0.00125815837068491,
+          0.0011515885341265037,
+          0.0021706099413935317,
+          0.0023696838014716985
+        ],
+        "trial_medians": [
+          76018000.0,
+          76093500.0,
+          76188000.0,
+          76169000.0,
+          76086000.0,
+          76018500.0,
+          76162500.0,
+          76200500.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "gcc",
+        "case": "amd64-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 78869500.0,
+          "relative_mad": 0.0007036940769245399,
+          "quartiles": [
+            78817250.0,
+            78869500.0,
+            78967250.0
+          ],
+          "minimum": 78744000,
+          "maximum": 81575000
+        },
+        "calibration_ns": {
+          "median": 1960000.0,
+          "relative_mad": 0.0005102040816326531,
+          "quartiles": [
+            1959000.0,
+            1960000.0,
+            1961000.0
+          ],
+          "minimum": 1950000,
+          "maximum": 1977000
+        },
+        "cpu_calibration_correlation": 0.262922478389813,
+        "process_medians": {
+          "median": 78869500.0,
+          "relative_mad": 0.0007036940769245399,
+          "quartiles": [
+            78817250.0,
+            78869500.0,
+            78967250.0
+          ],
+          "minimum": 78744000,
+          "maximum": 81575000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 25
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "gcc",
+        "case": "amd64-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 78918500.0,
+          "relative_mad": 0.0007285997579781673,
+          "quartiles": [
+            78849000.0,
+            78918500.0,
+            78974750.0
+          ],
+          "minimum": 78715000,
+          "maximum": 95349000
+        },
+        "calibration_ns": {
+          "median": 1962000.0,
+          "relative_mad": 0.0005096839959225281,
+          "quartiles": [
+            1961000.0,
+            1962000.0,
+            1964000.0
+          ],
+          "minimum": 1950000,
+          "maximum": 2023000
+        },
+        "cpu_calibration_correlation": 0.06273017136647639,
+        "process_medians": {
+          "median": 78928000.0,
+          "relative_mad": 0.0002533954996959254,
+          "quartiles": [
+            78887375.0,
+            78928000.0,
+            78945375.0
+          ],
+          "minimum": 78851500.0,
+          "maximum": 78952500.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 250
+        },
+        "within_process_relative_mad": [
+          0.0004752189175146684,
+          0.0010132674709477218,
+          0.0011399475624121291,
+          0.0003040765259256913,
+          0.0005447968731193422,
+          0.0014515812093129393,
+          0.0009565619516397752,
+          0.0007038547142413271
+        ],
+        "trial_medians": [
+          78910500.0,
+          78884500.0,
+          78920000.0,
+          78912000.0,
+          78857000.0,
+          78935500.0,
+          78940000.0,
+          78965000.0
+        ]
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "gcc",
+        "case": "mips64el-ls",
+        "policy": "restarted",
+        "cpu_ns": {
+          "median": 80205000.0,
+          "relative_mad": 0.0019263138208341125,
+          "quartiles": [
+            80064750.0,
+            80205000.0,
+            80370250.0
+          ],
+          "minimum": 79925000,
+          "maximum": 81884000
+        },
+        "calibration_ns": {
+          "median": 1961000.0,
+          "relative_mad": 0.0005099439061703213,
+          "quartiles": [
+            1960000.0,
+            1961000.0,
+            1962000.0
+          ],
+          "minimum": 1951000,
+          "maximum": 1988000
+        },
+        "cpu_calibration_correlation": 0.11287641349082772,
+        "process_medians": {
+          "median": 80205000.0,
+          "relative_mad": 0.0019263138208341125,
+          "quartiles": [
+            80064750.0,
+            80205000.0,
+            80370250.0
+          ],
+          "minimum": 79925000,
+          "maximum": 81884000
+        },
+        "events": {
+          "minor_faults": 64,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 32
+        }
+      },
+      {
+        "host": "baseline-runtime-state-four-ubuntu-22.04-both-2-44094485795",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cc": "gcc",
+        "case": "mips64el-ls",
+        "policy": "retained",
+        "cpu_ns": {
+          "median": 80517500.0,
+          "relative_mad": 0.0012668053528735988,
+          "quartiles": [
+            80408000.0,
+            80517500.0,
+            80610500.0
+          ],
+          "minimum": 80044000,
+          "maximum": 85127000
+        },
+        "calibration_ns": {
+          "median": 1963000.0,
+          "relative_mad": 0.0005094243504839531,
+          "quartiles": [
+            1962000.0,
+            1963000.0,
+            1964000.0
+          ],
+          "minimum": 1952000,
+          "maximum": 1987000
+        },
+        "cpu_calibration_correlation": -0.019455336756780857,
+        "process_medians": {
+          "median": 80537750.0,
+          "relative_mad": 0.0005339111162156877,
+          "quartiles": [
+            80436250.0,
+            80537750.0,
+            80565875.0
+          ],
+          "minimum": 80381000.0,
+          "maximum": 80592000.0
+        },
+        "events": {
+          "minor_faults": 8,
+          "major_faults": 0,
+          "voluntary_switches": 0,
+          "involuntary_switches": 28
+        },
+        "within_process_relative_mad": [
+          0.0014351302489422903,
+          0.0005709356518285455,
+          0.000627044880271678,
+          0.001247022036926742,
+          0.0009765989475124719,
+          0.0009077174636135859,
+          0.0006020731177456396,
+          0.0011360955561901687
+        ],
+        "trial_medians": [
+          80362500.0,
+          80499000.0,
+          80637000.0,
+          80464000.0,
+          80548500.0,
+          80535000.0,
+          80544500.0,
+          80479000.0
+        ]
+      }
+    ],
+    "memcheck_errors": [],
+    "candidate_measured": false,
+    "scope": "Production baseline only; paired compiler measurements on each runner and explicit process-lifetime intervention. No hardware cache mechanism or candidate gain can be inferred from this diagnostic alone."
+  },
+  "publication_qualified": false
+}
