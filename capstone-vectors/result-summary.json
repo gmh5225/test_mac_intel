@@ -1,0 +1,1540 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "bc5b343cca9bd68f0af18b7552dd91d41d7cc86d",
+    "sha256": "f271e13e868fae3cf5bb31a7ba91fd5d1632c4c15563b8d2453e008dbccb29c1",
+    "input_tree": "5fbea8c802c25105c8e28459814e79d80784261e",
+    "input_sha256": "500fe5d17cbd8b6d241e8d36582962bb7f80b7156ceb7374ed0ea9111dd5e14a",
+    "delta_files": [
+      "arch/X86/X86EvexMemoryOutput.c"
+    ],
+    "local_complete_records_pending": false,
+    "compiler_audit_only": false,
+    "complete": true,
+    "generated_output_matches_producer": true,
+    "local_runtime_objects_identical_to_parent": 38,
+    "inherited_semantics": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "5fbea8c802c25105c8e28459814e79d80784261e",
+      "sha256": "500fe5d17cbd8b6d241e8d36582962bb7f80b7156ceb7374ed0ea9111dd5e14a",
+      "input_tree": "5de0348683acf04cd04b4fd91e9c2197bad0c62a",
+      "input_sha256": "c8f70671a75069f68e125a426b7dd5b3d05f8d9c2eeddc28c1b1c7e5d0e64e6f",
+      "delta_files": [
+        "arch/X86/X86EvexMemoryOutput.c",
+        "arch/X86/X86GenEvexMemoryOutput.inc",
+        "suite/synctools/x86_vector_output.cpp"
+      ],
+      "local_complete_records_pending": false,
+      "compiler_audit_only": false,
+      "complete": true,
+      "generated_output_matches_producer": true,
+      "local_runtime_objects_identical_to_parent": 38,
+      "inherited_semantics": {
+        "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+        "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+        "tree": "5de0348683acf04cd04b4fd91e9c2197bad0c62a",
+        "sha256": "c8f70671a75069f68e125a426b7dd5b3d05f8d9c2eeddc28c1b1c7e5d0e64e6f",
+        "files": [
+          "CMakeLists.txt",
+          "Makefile",
+          "arch/X86/X86EvexMemoryOutput.c",
+          "arch/X86/X86GenEvexMemoryOutput.inc",
+          "arch/X86/X86SimpleOutput.h",
+          "arch/X86/X86VectorOutput.c",
+          "suite/synctools/x86_vector_output.cpp",
+          "tests/unit/x86_simple_output.c"
+        ],
+        "complete": true,
+        "records": "equal private-entry full records, cursor and errors for 17825792 inputs; 69120 new admitted forms; 3281920 protected-page extents",
+        "generated_output_matches_producer": true,
+        "old_vector_rows_unchanged": true,
+        "changed_runtime_objects": [
+          "arch/X86/X86VectorOutput.c.o"
+        ],
+        "added_runtime_objects": [
+          "arch/X86/X86EvexMemoryOutput.c.o"
+        ],
+        "validation_scope": "Apple Clang private-entry records and protected extents; native performance and configuration qualification pending.",
+        "publication_qualified": false,
+        "runtime_input_tree": "aaf9dd3209a701bd28e86016c7309a14573cec50",
+        "runtime_input_sha256": "8f676e588220a9a4a438e678e324485d4551b603200d335f575bc1c997c61dbe",
+        "runtime_files_identical": true,
+        "only_additional_file": "xcode/Capstone.xcodeproj/project.pbxproj",
+        "xcode_source_targets": 3,
+        "plist_lint": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1351-evex-move-memory-output/build-registration/.capstone-perf/current/source/xcode/Capstone.xcodeproj/project.pbxproj: OK",
+        "native_xcode_build": "unavailable: this host has Command Line Tools and no full Xcode.app",
+        "runtime_semantic_evidence": "/Users/gmh/code/NeverD/build-capstone-speed-20261022/round1351-evex-move-memory-output/semantic-review.json"
+      },
+      "validation_scope": "All Apple Clang runtime objects are byte-identical to the fully verified memory output candidate. ELF section placement is active only in native Linux follow-up; its old objects, memory-writer instruction bytes and table values must be checked there.",
+      "publication_qualified": false
+    },
+    "validation_scope": "All Apple Clang runtime objects are byte-identical to the fully verified memory output candidate. ELF section placement is active only in native Linux follow-up; its old objects, memory-writer instruction bytes and table values must be checked there.",
+    "publication_qualified": false
+  },
+  "run": {
+    "id": 44056433460,
+    "head_sha": "19bf67b32abae2fda1d955b7e3bf65f4938fa54e",
+    "conclusion": "success",
+    "status": "completed",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44056433460",
+    "run_attempt": 1
+  },
+  "profiles": [
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "complete": {
+        "cases": 18,
+        "success": true,
+        "native_qualification": false,
+        "controlled_replication": true,
+        "launches": [
+          "images",
+          "same-file-fixed"
+        ]
+      },
+      "identity": {
+        "functions": {
+          "X86_writeDisplacement": {
+            "bytes": 277,
+            "sha256": "11b28a9f8d1f5f71d87fbe8d0681e195ea1ad50d022309227dcf8c6e967eb08e"
+          },
+          "X86_writeEvexMemoryOutput": {
+            "bytes": 1372,
+            "sha256": "c70ea08ec4e41057c01ec849e2493dcd47d0781b6c31775a512fd53b27c34b25"
+          }
+        },
+        "arrays": {
+          "evex_memory_rows": {
+            "bytes": 312,
+            "sha256": "066e2e09739c2c0d932d2f300b65fb2eab7f3a4fea6f978181680df817efbd26"
+          },
+          ".L.str.2": {
+            "bytes": 4,
+            "sha256": "15dab3cc1c78958bc8c6d959cf708c2062e8327d3db873c2629b243c7e1a1759"
+          },
+          "X86_writeEvexMemoryOutput.vector_bases": {
+            "bytes": 12,
+            "sha256": "68570751d60e1568e41aa6697f6547d88a955b02b8c1582202c4de15e7b41fe8"
+          },
+          ".L.str.7": {
+            "bytes": 4,
+            "sha256": "3ee19f3559f65edc70bf15f0a3a6f33dae7c6641f2fd7847d8eb12cfbc8261b6"
+          },
+          ".L.str.8": {
+            "bytes": 4,
+            "sha256": "ed57f7b9916a8fb4be1264cbf6a6c46302e3ff72049480e2909c3e89a6054b86"
+          },
+          ".L.str.4": {
+            "bytes": 6,
+            "sha256": "d64ea2046067baafc912bdfc1ab55a7b72dfda9751014b345ad1d6d46fc10140"
+          },
+          ".L.str.5": {
+            "bytes": 6,
+            "sha256": "d7a1f9630cdb2bcf9006cd2e565698d2aa3a15010c57fb70f4a0e919d9c44e29"
+          },
+          "X86_writeDisp8.digits": {
+            "bytes": 17,
+            "sha256": "70ca616894848c45de4e2792711f36c998413e0eab1c6621fe9761118b8fd51a"
+          }
+        },
+        "resolved_calls": {
+          "X86_writeDisplacement": {
+            "195": "external:memcpy"
+          },
+          "X86_writeEvexMemoryOutput": {
+            "548": "external:memcpy",
+            "893": "X86_writeDisplacement",
+            "1022": "external:memset"
+          }
+        },
+        "scope": "Function instructions match after normalizing only verified direct-call displacement operands. Every normalized call resolves to the same named internal/external callee. Immutable array payloads match exactly; linked placement remains separate.",
+        "unchanged_existing_objects": 37
+      },
+      "functions": {
+        "X86_getInstructionAfterExtensions": {
+          "integer": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 2126240,
+              "size": 66649,
+              "section": ".text",
+              "sha256": "26ac3d01db8aacf8962008fcb1d0fc84978bcb2fc6aaa8da32f1e4488921be25"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 2126560,
+              "size": 66649,
+              "section": ".text",
+              "sha256": "fbd8d05875204af312e5837f605a7c84807298f7c67485d18e0d45ff69bc29f5"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 2126272,
+              "size": 66649,
+              "section": ".text",
+              "sha256": "75006d81106943f2c4b431a1135a8bbba3a8f99df44e81dfc9bf610bfc87bb33"
+            }
+          ]
+        },
+        "X86_completeScan": {
+          "integer": [
+            {
+              "name": "X86_completeScan",
+              "address": 1626416,
+              "size": 68811,
+              "section": ".text",
+              "sha256": "3be10091a0eb1ec1cefec94f406568f2c352e0ef774f5020ef28858efe5df4c6"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_completeScan",
+              "address": 1626736,
+              "size": 68811,
+              "section": ".text",
+              "sha256": "4d7c14fb8c12f83fb08d670531f4b1fce749ae78e3cea57f025b0525c049332f"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_completeScan",
+              "address": 1626448,
+              "size": 68811,
+              "section": ".text",
+              "sha256": "2e34c4b27a6db90abfcf1e74e2aa0ed1b2ed56dfd919575444003d37bea636da"
+            }
+          ]
+        },
+        "decodeEVEXInstruction": {
+          "integer": [
+            {
+              "name": "decodeEVEXInstruction",
+              "address": 2192896,
+              "size": 2002,
+              "section": ".text",
+              "sha256": "c76055fd12aaa9e7a6f4aaaeb82e2dcb9914b6c1d875d674c4208a67df67b9dc"
+            }
+          ],
+          "plain": [
+            {
+              "name": "decodeEVEXInstruction",
+              "address": 2193216,
+              "size": 2002,
+              "section": ".text",
+              "sha256": "34eec08335e9e0c33bf39aa79e608f2bfc7e1d7366b58a410a3cd2da215dd66a"
+            }
+          ],
+          "scan": [
+            {
+              "name": "decodeEVEXInstruction",
+              "address": 2192928,
+              "size": 2002,
+              "section": ".text",
+              "sha256": "668f220cdf2e4dc7e942326be1bb43d41cdbf3f2fe2bb72274accdfdbd350ffd"
+            }
+          ]
+        },
+        "decodeEVEXInstruction.constprop.0": {
+          "integer": [],
+          "plain": [],
+          "scan": []
+        },
+        "X86_writeEvexMemoryOutput": {
+          "integer": [],
+          "plain": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 4156848,
+              "size": 1372,
+              "section": ".cs_x86_evex_output",
+              "sha256": "1ccc6b351b7056e8f484a2eb4c1a78dcfbfab6158ee212b7cd8480a833347f66"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 4156560,
+              "size": 1372,
+              "section": ".cs_x86_evex_output",
+              "sha256": "fd8d4d8c02fe0ed81e35e8424206bfcffb16e40874287b93c36c66735a813a68"
+            }
+          ]
+        },
+        "X86_writeDisplacement": {
+          "integer": [],
+          "plain": [
+            {
+              "name": "X86_writeDisplacement",
+              "address": 1556944,
+              "size": 277,
+              "section": ".text",
+              "sha256": "f2860655ea67a9021898614281c6f13129fe9603fb533c47a51b295b31c86808"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_writeDisplacement",
+              "address": 4157936,
+              "size": 277,
+              "section": ".cs_x86_evex_output",
+              "sha256": "4addb5ea06b29de0ca2f5c6baf88ec7e7ec05581c7196565de19eb0c4209f760"
+            }
+          ]
+        }
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 616906262,
+        "files": 4709
+      }
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-gcc-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "complete": {
+        "cases": 0,
+        "success": true,
+        "skipped_native_after_complete_binary_identity": true,
+        "plain_scan_objects_identical": true,
+        "plain_scan_binary_identical": true
+      },
+      "identity": {
+        "functions": {
+          "X86_writeEvexMemoryOutput": {
+            "bytes": 1904,
+            "sha256": "a378affa81cb6a06bd83145b04a2c8830e3542917093ede718053903c32b9fac"
+          }
+        },
+        "arrays": {
+          "evex_memory_rows": {
+            "bytes": 312,
+            "sha256": "066e2e09739c2c0d932d2f300b65fb2eab7f3a4fea6f978181680df817efbd26"
+          },
+          "vector_bases.1": {
+            "bytes": 12,
+            "sha256": "68570751d60e1568e41aa6697f6547d88a955b02b8c1582202c4de15e7b41fe8"
+          },
+          "digits.0": {
+            "bytes": 17,
+            "sha256": "70ca616894848c45de4e2792711f36c998413e0eab1c6621fe9761118b8fd51a"
+          }
+        },
+        "resolved_calls": {
+          "X86_writeEvexMemoryOutput": {
+            "1827": "external:__stack_chk_fail",
+            "584": "external:memcpy",
+            "665": "external:memset",
+            "970": "external:memcpy",
+            "1036": "external:memset"
+          }
+        },
+        "scope": "Function instructions match after normalizing only verified direct-call displacement operands. Every normalized call resolves to the same named internal/external callee. Immutable array payloads match exactly; linked placement remains separate.",
+        "unchanged_existing_objects": 37
+      },
+      "functions": {
+        "X86_getInstructionAfterExtensions": {
+          "integer": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1757280,
+              "size": 30035,
+              "section": ".text",
+              "sha256": "38f74cde5197c0bde1451e23172962a77e6b994fa6052718d3473ef18faa8d7b"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1757312,
+              "size": 30035,
+              "section": ".text",
+              "sha256": "943500f53a7562c9f3b17d7be621772818ef4776285620243fe82b3104600f33"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1757312,
+              "size": 30035,
+              "section": ".text",
+              "sha256": "943500f53a7562c9f3b17d7be621772818ef4776285620243fe82b3104600f33"
+            }
+          ]
+        },
+        "X86_completeScan": {
+          "integer": [
+            {
+              "name": "X86_completeScan",
+              "address": 1628304,
+              "size": 32784,
+              "section": ".text",
+              "sha256": "838bcea99df82f79b6b17afa506a03d130158295a478f28a62f45b23e29d3274"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_completeScan",
+              "address": 1628336,
+              "size": 32784,
+              "section": ".text",
+              "sha256": "a931cde017e4b5e23bf8880d9c176d86d09b6a06db0079c58808ab212722e2e8"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_completeScan",
+              "address": 1628336,
+              "size": 32784,
+              "section": ".text",
+              "sha256": "a931cde017e4b5e23bf8880d9c176d86d09b6a06db0079c58808ab212722e2e8"
+            }
+          ]
+        },
+        "decodeEVEXInstruction": {
+          "integer": [],
+          "plain": [],
+          "scan": []
+        },
+        "decodeEVEXInstruction.constprop.0": {
+          "integer": [
+            {
+              "name": "decodeEVEXInstruction.constprop.0",
+              "address": 1621952,
+              "size": 2412,
+              "section": ".text",
+              "sha256": "d25db7e59e49f6f055b9db0505d11e695557755e7f57e7d3c68f435737e979d1"
+            }
+          ],
+          "plain": [
+            {
+              "name": "decodeEVEXInstruction.constprop.0",
+              "address": 1621984,
+              "size": 2412,
+              "section": ".text",
+              "sha256": "f89ab989928e3a3cbee663192e0d83bcf73ca9ec8cddb8c4e9c94eab6a94d0a7"
+            }
+          ],
+          "scan": [
+            {
+              "name": "decodeEVEXInstruction.constprop.0",
+              "address": 1621984,
+              "size": 2412,
+              "section": ".text",
+              "sha256": "f89ab989928e3a3cbee663192e0d83bcf73ca9ec8cddb8c4e9c94eab6a94d0a7"
+            }
+          ]
+        },
+        "X86_writeEvexMemoryOutput": {
+          "integer": [],
+          "plain": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 3960000,
+              "size": 1904,
+              "section": ".cs_x86_evex_output",
+              "sha256": "622f540a56ba9383b95f1b66d4989c2e36b2abd11e6c0b1889f0653046dbc2a9"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 3960000,
+              "size": 1904,
+              "section": ".cs_x86_evex_output",
+              "sha256": "622f540a56ba9383b95f1b66d4989c2e36b2abd11e6c0b1889f0653046dbc2a9"
+            }
+          ]
+        },
+        "X86_writeDisplacement": {
+          "integer": [],
+          "plain": [],
+          "scan": []
+        }
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 543239573,
+        "files": 4698
+      }
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "complete": {
+        "cases": 18,
+        "success": true,
+        "native_qualification": false,
+        "controlled_replication": true,
+        "launches": [
+          "images",
+          "same-file-fixed"
+        ]
+      },
+      "identity": {
+        "functions": {
+          "X86_writeDisplacement": {
+            "bytes": 272,
+            "sha256": "75b53d70d4236186dd620f8d69d404fc25a6e68adb99eb242c00edb7274cbbeb"
+          },
+          "X86_writeEvexMemoryOutput": {
+            "bytes": 1378,
+            "sha256": "503a10d71e1030b503ddb5f5ec5ba499be960e53d05054b5e64110a1ca36a24f"
+          }
+        },
+        "arrays": {
+          "evex_memory_rows": {
+            "bytes": 312,
+            "sha256": "066e2e09739c2c0d932d2f300b65fb2eab7f3a4fea6f978181680df817efbd26"
+          },
+          ".L.str.2": {
+            "bytes": 4,
+            "sha256": "15dab3cc1c78958bc8c6d959cf708c2062e8327d3db873c2629b243c7e1a1759"
+          },
+          "X86_writeEvexMemoryOutput.vector_bases": {
+            "bytes": 12,
+            "sha256": "68570751d60e1568e41aa6697f6547d88a955b02b8c1582202c4de15e7b41fe8"
+          },
+          ".L.str.7": {
+            "bytes": 4,
+            "sha256": "3ee19f3559f65edc70bf15f0a3a6f33dae7c6641f2fd7847d8eb12cfbc8261b6"
+          },
+          ".L.str.8": {
+            "bytes": 4,
+            "sha256": "ed57f7b9916a8fb4be1264cbf6a6c46302e3ff72049480e2909c3e89a6054b86"
+          },
+          ".L.str.4": {
+            "bytes": 6,
+            "sha256": "d64ea2046067baafc912bdfc1ab55a7b72dfda9751014b345ad1d6d46fc10140"
+          },
+          ".L.str.5": {
+            "bytes": 6,
+            "sha256": "d7a1f9630cdb2bcf9006cd2e565698d2aa3a15010c57fb70f4a0e919d9c44e29"
+          },
+          "X86_writeDisp8.digits": {
+            "bytes": 17,
+            "sha256": "70ca616894848c45de4e2792711f36c998413e0eab1c6621fe9761118b8fd51a"
+          }
+        },
+        "resolved_calls": {
+          "X86_writeDisplacement": {
+            "193": "external:memcpy"
+          },
+          "X86_writeEvexMemoryOutput": {
+            "857": "X86_writeDisplacement",
+            "978": "external:memset",
+            "548": "external:memcpy"
+          }
+        },
+        "scope": "Function instructions match after normalizing only verified direct-call displacement operands. Every normalized call resolves to the same named internal/external callee. Immutable array payloads match exactly; linked placement remains separate.",
+        "unchanged_existing_objects": 37
+      },
+      "functions": {
+        "X86_getInstructionAfterExtensions": {
+          "integer": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1593072,
+              "size": 15626,
+              "section": ".text",
+              "sha256": "d423dc5b70494f58996537a2b922b29927ac5b314e36934f621bba554114d5db"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1593392,
+              "size": 15626,
+              "section": ".text",
+              "sha256": "7a3675958b83630bb746466a8804d3d346d784fcac97efc46c3dea7707eac30f"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1593120,
+              "size": 15626,
+              "section": ".text",
+              "sha256": "8ce7c48ac3fb77eafb011edf48cf685579f2fb7b401ea48e9ffbd23065390575"
+            }
+          ]
+        },
+        "X86_completeScan": {
+          "integer": [
+            {
+              "name": "X86_completeScan",
+              "address": 1499504,
+              "size": 16603,
+              "section": ".text",
+              "sha256": "9e470ac18574b8c8e7783d311d16f955c8f07bee14be3437899c5d08600e4df5"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_completeScan",
+              "address": 1499824,
+              "size": 16603,
+              "section": ".text",
+              "sha256": "25e0320712a2fb158751c0fef24dddfed190e1cd2873b074035668f00caf6237"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_completeScan",
+              "address": 1499552,
+              "size": 16603,
+              "section": ".text",
+              "sha256": "7f0cc397afaedf01a184c9f32e1b14b0df12d45ae3cfbf1a2f01942d436c1f65"
+            }
+          ]
+        },
+        "decodeEVEXInstruction": {
+          "integer": [
+            {
+              "name": "decodeEVEXInstruction",
+              "address": 1617440,
+              "size": 2191,
+              "section": ".text",
+              "sha256": "a71d03f4d822d8ea18220999e1352503a2e06e1b875267e4700425865df48cb4"
+            }
+          ],
+          "plain": [
+            {
+              "name": "decodeEVEXInstruction",
+              "address": 1617760,
+              "size": 2191,
+              "section": ".text",
+              "sha256": "ea2a8230039501e0e836767ea11a0540491ca0b9883a52994c7a70b1455c4e53"
+            }
+          ],
+          "scan": [
+            {
+              "name": "decodeEVEXInstruction",
+              "address": 1617488,
+              "size": 2191,
+              "section": ".text",
+              "sha256": "f203513dedd5524cbe8b03e10205ae42e7eb092a1e0222da575ada28f6b599e9"
+            }
+          ]
+        },
+        "decodeEVEXInstruction.constprop.0": {
+          "integer": [],
+          "plain": [],
+          "scan": []
+        },
+        "X86_writeEvexMemoryOutput": {
+          "integer": [],
+          "plain": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 3544112,
+              "size": 1378,
+              "section": ".cs_x86_evex_output",
+              "sha256": "4ad2937c59070fb48ae38ed641eb573475ec8ed2f4a8de932b0e9105e82f2762"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 3543840,
+              "size": 1378,
+              "section": ".cs_x86_evex_output",
+              "sha256": "a759a6473c176fe31626a0c3157e51d1461a6649dcf0560ffc8ef8f461deb23e"
+            }
+          ]
+        },
+        "X86_writeDisplacement": {
+          "integer": [],
+          "plain": [
+            {
+              "name": "X86_writeDisplacement",
+              "address": 1435904,
+              "size": 272,
+              "section": ".text",
+              "sha256": "48c039f0ad6a2a1fdeed78a1ef64f0adfb1b11f8f220130e8490744c6c2517e0"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_writeDisplacement",
+              "address": 3545232,
+              "size": 272,
+              "section": ".cs_x86_evex_output",
+              "sha256": "6e3608831f1dfd0b47fff1dcde7de74cc53a5c6933b8c4707d6a27b55cf6d5fb"
+            }
+          ]
+        }
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 603342947,
+        "files": 4709
+      }
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-gcc-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "complete": {
+        "cases": 0,
+        "success": true,
+        "skipped_native_after_complete_binary_identity": true,
+        "plain_scan_objects_identical": true,
+        "plain_scan_binary_identical": true
+      },
+      "identity": {
+        "functions": {
+          "X86_writeEvexMemoryOutput": {
+            "bytes": 1926,
+            "sha256": "72819c541b0a75ec4db260f614688d0bf071e81c942b6b532d9a0fd99cd623be"
+          }
+        },
+        "arrays": {
+          "evex_memory_rows": {
+            "bytes": 312,
+            "sha256": "066e2e09739c2c0d932d2f300b65fb2eab7f3a4fea6f978181680df817efbd26"
+          },
+          "vector_bases.1": {
+            "bytes": 12,
+            "sha256": "68570751d60e1568e41aa6697f6547d88a955b02b8c1582202c4de15e7b41fe8"
+          },
+          "digits.0": {
+            "bytes": 17,
+            "sha256": "70ca616894848c45de4e2792711f36c998413e0eab1c6621fe9761118b8fd51a"
+          }
+        },
+        "resolved_calls": {
+          "X86_writeEvexMemoryOutput": {
+            "1849": "external:__stack_chk_fail",
+            "1002": "external:memcpy",
+            "588": "external:memcpy",
+            "1068": "external:memset"
+          }
+        },
+        "scope": "Function instructions match after normalizing only verified direct-call displacement operands. Every normalized call resolves to the same named internal/external callee. Immutable array payloads match exactly; linked placement remains separate.",
+        "unchanged_existing_objects": 37
+      },
+      "functions": {
+        "X86_getInstructionAfterExtensions": {
+          "integer": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1743216,
+              "size": 36593,
+              "section": ".text",
+              "sha256": "e8cf4c58d72ad0329ed6a3889ef49c54fe72ec52a0ef0b91d65e8183f47ca205"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1743312,
+              "size": 36593,
+              "section": ".text",
+              "sha256": "8491486c15e4cfdd7d546eae243f932adedfdee382e2a940a7a393e66c93bd39"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_getInstructionAfterExtensions",
+              "address": 1743312,
+              "size": 36593,
+              "section": ".text",
+              "sha256": "8491486c15e4cfdd7d546eae243f932adedfdee382e2a940a7a393e66c93bd39"
+            }
+          ]
+        },
+        "X86_completeScan": {
+          "integer": [
+            {
+              "name": "X86_completeScan",
+              "address": 1613200,
+              "size": 34880,
+              "section": ".text",
+              "sha256": "a9375d33bf53d6d70bb67567bc2352f5cd7721657b1efe82fa4b01ae43249934"
+            }
+          ],
+          "plain": [
+            {
+              "name": "X86_completeScan",
+              "address": 1613296,
+              "size": 34880,
+              "section": ".text",
+              "sha256": "82aeda02d8d0f1a5ab8e9b9c8e8c4d49cffebbe4a7683ef24497c556cd9d6dbf"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_completeScan",
+              "address": 1613296,
+              "size": 34880,
+              "section": ".text",
+              "sha256": "82aeda02d8d0f1a5ab8e9b9c8e8c4d49cffebbe4a7683ef24497c556cd9d6dbf"
+            }
+          ]
+        },
+        "decodeEVEXInstruction": {
+          "integer": [],
+          "plain": [],
+          "scan": []
+        },
+        "decodeEVEXInstruction.constprop.0": {
+          "integer": [
+            {
+              "name": "decodeEVEXInstruction.constprop.0",
+              "address": 1605856,
+              "size": 3363,
+              "section": ".text",
+              "sha256": "6a5e44a19e357e160d049c42cd03651bc818f0f7d286334e7f8f9d4f556ecb90"
+            }
+          ],
+          "plain": [
+            {
+              "name": "decodeEVEXInstruction.constprop.0",
+              "address": 1605952,
+              "size": 3363,
+              "section": ".text",
+              "sha256": "679550a1725cebfa8d232a9167ce0f24f1729e8c9de1e12f1457c2c9f95e1890"
+            }
+          ],
+          "scan": [
+            {
+              "name": "decodeEVEXInstruction.constprop.0",
+              "address": 1605952,
+              "size": 3363,
+              "section": ".text",
+              "sha256": "679550a1725cebfa8d232a9167ce0f24f1729e8c9de1e12f1457c2c9f95e1890"
+            }
+          ]
+        },
+        "X86_writeEvexMemoryOutput": {
+          "integer": [],
+          "plain": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 3911184,
+              "size": 1926,
+              "section": ".cs_x86_evex_output",
+              "sha256": "1a87e7d454749a3286f4f3a7797493b126aa75dd6e22dd6a9933472a56392620"
+            }
+          ],
+          "scan": [
+            {
+              "name": "X86_writeEvexMemoryOutput",
+              "address": 3911184,
+              "size": 1926,
+              "section": ".cs_x86_evex_output",
+              "sha256": "1a87e7d454749a3286f4f3a7797493b126aa75dd6e22dd6a9933472a56392620"
+            }
+          ]
+        },
+        "X86_writeDisplacement": {
+          "integer": [],
+          "plain": [],
+          "scan": []
+        }
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 542894763,
+        "files": 4698
+      }
+    }
+  ],
+  "rows": [
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libzstd1-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 0.9958262066888264,
+      "plain": 1.0005660664910407,
+      "aa": 0.9974358149066057,
+      "vs_plain": 0.9969093109708654,
+      "ci95": [
+        0.9909537099412954,
+        1.0014256175862444
+      ],
+      "aa_ci95": [
+        0.9921182478757058,
+        1.003965029737723
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libzstd1-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9959679604599992,
+      "plain": 0.9996543119186768,
+      "aa": 1.001340365712791,
+      "vs_plain": 0.9972467852168562,
+      "ci95": [
+        0.993692543685571,
+        1.0029698586347289
+      ],
+      "aa_ci95": [
+        0.9971632127157367,
+        1.0070373947840487
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libzstd1-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0085125913609754,
+      "plain": 0.9980328146860559,
+      "aa": 1.0045674621877545,
+      "vs_plain": 1.0040960892306627,
+      "ci95": [
+        1.0055820823743602,
+        1.013473749419235
+      ],
+      "aa_ci95": [
+        1.0018132600008594,
+        1.0091094248171668
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libzstd1-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0105577411830242,
+      "plain": 1.005952277807621,
+      "aa": 0.999707247350158,
+      "vs_plain": 1.0055926660404273,
+      "ci95": [
+        1.0085801874093565,
+        1.0127950526957583
+      ],
+      "aa_ci95": [
+        0.9980169678576355,
+        1.002128723110866
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libzstd1-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0018077860926595,
+      "plain": 0.987383748472835,
+      "aa": 1.0035184000538702,
+      "vs_plain": 1.0121135752688173,
+      "ci95": [
+        0.9944708735013048,
+        1.0080750745423983
+      ],
+      "aa_ci95": [
+        0.9987473939067857,
+        1.0103223850940044
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libzstd1-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0045716046846107,
+      "plain": 0.9915521010034516,
+      "aa": 0.9991306348922244,
+      "vs_plain": 1.0128330251352646,
+      "ci95": [
+        1.0004183171697854,
+        1.0075784761025957
+      ],
+      "aa_ci95": [
+        0.9982507239115852,
+        1.0020773736548154
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 0.9945519723418728,
+      "plain": 1.0093490650934904,
+      "aa": 0.9991657872971509,
+      "vs_plain": 0.9845713026228786,
+      "ci95": [
+        0.9902288433216269,
+        0.9984320433326206
+      ],
+      "aa_ci95": [
+        0.9978902653861454,
+        1.0016577678263867
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9954146942068058,
+      "plain": 1.0072598007309868,
+      "aa": 1.0010669398032563,
+      "vs_plain": 0.9875169453230906,
+      "ci95": [
+        0.9930894910903796,
+        0.9968414358394571
+      ],
+      "aa_ci95": [
+        0.9993400464096396,
+        1.0026723563519855
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0917425649855756,
+      "plain": 1.093338678931284,
+      "aa": 1.0036632058224966,
+      "vs_plain": 1.0022198061067318,
+      "ci95": [
+        1.0893406527115883,
+        1.1025916537399265
+      ],
+      "aa_ci95": [
+        0.998846039566332,
+        1.0089488715133366
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.094337759411747,
+      "plain": 1.095286908585617,
+      "aa": 1.0012157167866176,
+      "vs_plain": 1.0008432664038107,
+      "ci95": [
+        1.0916242830044662,
+        1.0989954449015595
+      ],
+      "aa_ci95": [
+        0.9955704660999435,
+        1.0046460192378581
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.1038079288203761,
+      "plain": 1.102098913411679,
+      "aa": 1.0003410781598245,
+      "vs_plain": 1.0026913053158188,
+      "ci95": [
+        1.0970087460539253,
+        1.1063750660603253
+      ],
+      "aa_ci95": [
+        0.9972487323460325,
+        1.008186877214678
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.103446916953472,
+      "plain": 1.0969478179547045,
+      "aa": 0.9982848664688427,
+      "vs_plain": 1.0017708319618712,
+      "ci95": [
+        1.0977996392851288,
+        1.1050673890063425
+      ],
+      "aa_ci95": [
+        0.9968221851940013,
+        0.9997734872825031
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.00245976467406,
+      "plain": 1.0103103264230706,
+      "aa": 0.997148792652464,
+      "vs_plain": 0.9908295438307457,
+      "ci95": [
+        1.00075759488876,
+        1.0053225928510767
+      ],
+      "aa_ci95": [
+        0.9912709005147932,
+        1.0034412374959936
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9998402045381911,
+      "plain": 1.0128914853270068,
+      "aa": 0.9997056795438874,
+      "vs_plain": 0.9870527623011345,
+      "ci95": [
+        0.997897963285542,
+        1.0013056369823783
+      ],
+      "aa_ci95": [
+        0.9981485845087016,
+        1.0015065030715924
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0001341156747696,
+      "plain": 0.9641121075513772,
+      "aa": 0.9961095991050409,
+      "vs_plain": 1.037523514624848,
+      "ci95": [
+        0.9912598049694957,
+        1.0036037693253175
+      ],
+      "aa_ci95": [
+        0.9918695144086128,
+        1.0015776930805702
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0085383259172196,
+      "plain": 0.9649628552971576,
+      "aa": 0.9996337026831278,
+      "vs_plain": 1.0439997979729958,
+      "ci95": [
+        1.0067986621174176,
+        1.013170344338188
+      ],
+      "aa_ci95": [
+        0.99637536909857,
+        1.0025278860031868
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0159459389572219,
+      "plain": 0.9626238815385383,
+      "aa": 0.9958853783982364,
+      "vs_plain": 1.0505431476492568,
+      "ci95": [
+        0.9997765459155171,
+        1.0174844499811384
+      ],
+      "aa_ci95": [
+        0.9879463715684187,
+        1.001675577167238
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-22.04-clang-1",
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0142551109465499,
+      "plain": 0.9820531594271994,
+      "aa": 1.0032300919534243,
+      "vs_plain": 1.03205585342877,
+      "ci95": [
+        1.0093934632030832,
+        1.0178605925431587
+      ],
+      "aa_ci95": [
+        1.00210237342322,
+        1.0053334027109295
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libzstd1-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 0.9974277145083303,
+      "plain": 0.9991624968196081,
+      "aa": 0.999529381564592,
+      "vs_plain": 0.9972667715999488,
+      "ci95": [
+        0.9953900897551651,
+        1.0001500198240483
+      ],
+      "aa_ci95": [
+        0.9961004038867403,
+        1.0016023090228037
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libzstd1-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 0.9986425097536209,
+      "plain": 1.0001069507277998,
+      "aa": 0.9998288733448845,
+      "vs_plain": 0.9985392743285458,
+      "ci95": [
+        0.9961788833024608,
+        0.9994871630500977
+      ],
+      "aa_ci95": [
+        0.9981509389596092,
+        1.0016463721014766
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libzstd1-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0088062530933948,
+      "plain": 1.0000092699024807,
+      "aa": 1.0000834755509387,
+      "vs_plain": 1.0096662512117436,
+      "ci95": [
+        1.007432268197371,
+        1.0124479386026488
+      ],
+      "aa_ci95": [
+        0.9963018093397805,
+        1.003404396271726
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libzstd1-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0084163132624657,
+      "plain": 0.9996018555383747,
+      "aa": 1.0013041761188821,
+      "vs_plain": 1.0086255460229214,
+      "ci95": [
+        1.006740670892812,
+        1.0101657643890758
+      ],
+      "aa_ci95": [
+        0.9998425561472564,
+        1.0028087032845199
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libzstd1-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0024641882673941,
+      "plain": 0.9981830994286102,
+      "aa": 1.0000939616807183,
+      "vs_plain": 1.0023917966463958,
+      "ci95": [
+        1.0002221197054353,
+        1.0081973499211794
+      ],
+      "aa_ci95": [
+        0.9964994660202403,
+        1.005393515982505
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libzstd1-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0020477116821953,
+      "plain": 0.997151239423445,
+      "aa": 1.0022055205876865,
+      "vs_plain": 1.0011452810180275,
+      "ci95": [
+        0.9967795393972527,
+        1.004363381748939
+      ],
+      "aa_ci95": [
+        1.000351045430416,
+        1.0031700019494665
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.0084855012157112,
+      "plain": 0.987362304233825,
+      "aa": 0.9995488637004456,
+      "vs_plain": 1.0207606616405986,
+      "ci95": [
+        1.0077363552636849,
+        1.0105717123912743
+      ],
+      "aa_ci95": [
+        0.9986699903634032,
+        1.0027307658227338
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 1.0104972867182633,
+      "plain": 0.9903184936691714,
+      "aa": 0.9992839070033895,
+      "vs_plain": 1.0219949633551804,
+      "ci95": [
+        1.009321290986738,
+        1.01241750537877
+      ],
+      "aa_ci95": [
+        0.9971495185321217,
+        1.001202602718997
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.073823904022351,
+      "plain": 1.0680629125580636,
+      "aa": 0.9996318312559922,
+      "vs_plain": 1.0059966812887116,
+      "ci95": [
+        1.0724303444678962,
+        1.0757880727236877
+      ],
+      "aa_ci95": [
+        0.9989093953288327,
+        1.0034560711138358
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0754556530413666,
+      "plain": 1.0695168493706861,
+      "aa": 1.0015320822598595,
+      "vs_plain": 1.003794741223131,
+      "ci95": [
+        1.0725061978079333,
+        1.0761895407181856
+      ],
+      "aa_ci95": [
+        0.9995725190839695,
+        1.001889279102897
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.070350775651947,
+      "plain": 1.0668842027980587,
+      "aa": 1.003263153872607,
+      "vs_plain": 1.0037286271211117,
+      "ci95": [
+        1.0665600155128951,
+        1.0723241602622888
+      ],
+      "aa_ci95": [
+        1.00053463682884,
+        1.0045323570549614
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "libssl3t64-amd64",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0693405680207264,
+      "plain": 1.0669067321292125,
+      "aa": 1.0006416208096498,
+      "vs_plain": 1.0025097963016936,
+      "ci95": [
+        1.0659365401006737,
+        1.0717527890280574
+      ],
+      "aa_ci95": [
+        0.9986147382763709,
+        1.0016209532713098
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "images",
+      "gain": 1.0033321582649275,
+      "plain": 0.9939254502118644,
+      "aa": 0.9991405422093905,
+      "vs_plain": 1.00796142351257,
+      "ci95": [
+        1.0008722783238837,
+        1.0049900950374884
+      ],
+      "aa_ci95": [
+        0.9970755836299529,
+        1.0002584733397257
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "scan",
+      "launch": "same-file-fixed",
+      "gain": 1.001742087322127,
+      "plain": 0.9949066072852965,
+      "aa": 0.999949893523738,
+      "vs_plain": 1.0069365419372114,
+      "ci95": [
+        0.9996904076578084,
+        1.0034409430360671
+      ],
+      "aa_ci95": [
+        0.9972290640394088,
+        1.0010535733696788
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "images",
+      "gain": 1.0104769709305912,
+      "plain": 0.9991187428561458,
+      "aa": 0.9991019425940784,
+      "vs_plain": 1.010829177882706,
+      "ci95": [
+        1.0089419434411067,
+        1.012188360775479
+      ],
+      "aa_ci95": [
+        0.9975495307612097,
+        1.001342083017421
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "format",
+      "launch": "same-file-fixed",
+      "gain": 1.0119410745233968,
+      "plain": 1.003370825462297,
+      "aa": 0.9984737168874173,
+      "vs_plain": 1.008277506927151,
+      "ci95": [
+        1.0106049290515309,
+        1.0136291433736735
+      ],
+      "aa_ci95": [
+        0.996895376792293,
+        1.0014716958264438
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "images",
+      "gain": 1.0048760866531494,
+      "plain": 1.0006537977476668,
+      "aa": 0.9995430697552976,
+      "vs_plain": 1.0041030017560846,
+      "ci95": [
+        1.0037795559636637,
+        1.005792250198955
+      ],
+      "aa_ci95": [
+        0.9981273865644058,
+        1.0012103963230121
+      ]
+    },
+    {
+      "host": "evex-helper-section-ubuntu-24.04-clang-1",
+      "cpu": "Intel(R) Xeon(R) 6975P-C",
+      "case": "jpeg-avx2-i386",
+      "mode": "detail",
+      "launch": "same-file-fixed",
+      "gain": 1.0051054274873592,
+      "plain": 0.9995831085389181,
+      "aa": 0.9988543652774482,
+      "vs_plain": 1.005450664915449,
+      "ci95": [
+        1.003019388081622,
+        1.0060609034917676
+      ],
+      "aa_ci95": [
+        0.9977060488725474,
+        1.001338000016317
+      ]
+    }
+  ],
+  "losses": [],
+  "aa_outside_one_percent": [],
+  "native_qualified": false,
+  "scope": "Focused placement counterfactual. GCC variants are byte-identical complete binaries, so not retimed. Clang tests three frozen SIMD panels with all modes and two launch controls. No new iced comparison and no broad qualification."
+}
