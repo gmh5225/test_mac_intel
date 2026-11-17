@@ -1,0 +1,521 @@
+{
+  "status": "completed-PE32-and-mixed-instruction-cost-diagnosis",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "068c0e51218da27aad1837c5552288798ec433ed",
+      "sha256": "b6eb1604dceca935b940639e848b986c47a8a7bb902f54e571d90a2d59f4c4c4",
+      "files": [
+        "arch/X86/X86Mapping.c"
+      ]
+    },
+    "run": {
+      "id": 44077965452,
+      "head_sha": "319142de5a9317a5a3b77efbded95306160c0f8d",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44077965452",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-22.04-gcc-44077965452",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "compiler": {
+          "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        },
+        "cleanup": {
+          "bytes": 294874850,
+          "removed": true
+        },
+        "identity": {
+          "changed": [
+            "arch/X86/X86Mapping.c.o"
+          ],
+          "all_other_objects_identical": true,
+          "executable_section_bytes_identical": true,
+          "sections": [
+            [
+              ".text",
+              "9dcd3f6b03b290c508f4e28c1a3a97cfb37f93f472d1e9f1e15faf89da6fd913",
+              144490
+            ],
+            [
+              ".text.unlikely",
+              "6d76340898bdf84903383f4b97a863c2e621a4c1df062ee7e58566dbef196e33",
+              653
+            ]
+          ]
+        }
+      },
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-24.04-clang-44077965452",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "cleanup": {
+          "bytes": 288218310,
+          "removed": true
+        },
+        "identity": {
+          "changed": [
+            "arch/X86/X86Mapping.c.o"
+          ],
+          "all_other_objects_identical": true,
+          "executable_section_bytes_identical": true,
+          "sections": [
+            [
+              ".text",
+              "f2cfa43fd1b8194f9ac114d9f6b87f0e6c5c5ae88150e1a3cc49d2baaa1e3adf",
+              135892
+            ]
+          ]
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-22.04-gcc-44077965452",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "totals": {
+          "base": [
+            148466817,
+            32070714,
+            24214251
+          ],
+          "previous": [
+            148451316,
+            32070714,
+            24225843
+          ],
+          "data": [
+            148451316,
+            32070714,
+            24225843
+          ],
+          "scan": [
+            148470741,
+            32070714,
+            24214251
+          ]
+        },
+        "result": {
+          "first": {
+            "instructions": 282906,
+            "rejected": 3,
+            "boundaries": 4042928095659934855,
+            "values": 116594087
+          },
+          "result": {
+            "instructions": 282906,
+            "rejected": 3,
+            "boundaries": 4042928095659934855,
+            "values": 116594087
+          }
+        },
+        "comparisons": {
+          "previous": {
+            "instruction_ratio": 0.9998955928313598,
+            "function_deltas": {
+              "cs_disasm_iter": [
+                -15501,
+                0,
+                11592
+              ]
+            }
+          },
+          "data": {
+            "instruction_ratio": 0.9998955928313598,
+            "function_deltas": {
+              "cs_disasm_iter": [
+                -15501,
+                0,
+                11592
+              ]
+            }
+          },
+          "scan": {
+            "instruction_ratio": 1.000026430148361,
+            "function_deltas": {
+              "X86_decodeFeatureExtension": [
+                -68199,
+                -11466,
+                -9792
+              ],
+              "decodeFeatureExtensionSlow": [
+                72123,
+                11466,
+                9792
+              ]
+            }
+          }
+        },
+        "data_vs_previous": 1.0,
+        "scan_vs_previous": 1.0001308509787814
+      },
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-22.04-gcc-44077965452",
+        "case": "arm-ls",
+        "mode": 2,
+        "totals": {
+          "base": [
+            332018256,
+            83196793,
+            78444883
+          ],
+          "previous": [
+            332018256,
+            83196793,
+            78444883
+          ],
+          "data": [
+            332018256,
+            83196793,
+            78444883
+          ],
+          "scan": [
+            332018256,
+            83196793,
+            78444883
+          ]
+        },
+        "result": {
+          "first": {
+            "instructions": 25942,
+            "rejected": 80,
+            "boundaries": 6490558814457196049,
+            "values": 10123864
+          },
+          "result": {
+            "instructions": 25942,
+            "rejected": 80,
+            "boundaries": 6490558814457196049,
+            "values": 10123864
+          }
+        },
+        "comparisons": {
+          "previous": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          },
+          "data": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          },
+          "scan": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          }
+        },
+        "data_vs_previous": 1.0,
+        "scan_vs_previous": 1.0
+      },
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-22.04-gcc-44077965452",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "totals": {
+          "base": [
+            240835265,
+            50409974,
+            38076837
+          ],
+          "previous": [
+            240835265,
+            50409974,
+            38076837
+          ],
+          "data": [
+            240835265,
+            50409974,
+            38076837
+          ],
+          "scan": [
+            240835265,
+            50409974,
+            38076837
+          ]
+        },
+        "result": {
+          "first": {
+            "instructions": 28893,
+            "rejected": 444,
+            "boundaries": 15104830684241799518,
+            "values": 16923194
+          },
+          "result": {
+            "instructions": 28893,
+            "rejected": 444,
+            "boundaries": 15104830684241799518,
+            "values": 16923194
+          }
+        },
+        "comparisons": {
+          "previous": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          },
+          "data": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          },
+          "scan": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          }
+        },
+        "data_vs_previous": 1.0,
+        "scan_vs_previous": 1.0
+      },
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-24.04-clang-44077965452",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "totals": {
+          "base": [
+            145236762,
+            28773927,
+            22767846
+          ],
+          "previous": [
+            151381584,
+            31516971,
+            23686125
+          ],
+          "data": [
+            151381584,
+            31516971,
+            23686125
+          ],
+          "scan": [
+            145242648,
+            28773927,
+            22767846
+          ]
+        },
+        "result": {
+          "first": {
+            "instructions": 282906,
+            "rejected": 3,
+            "boundaries": 4042928095659934855,
+            "values": 116594087
+          },
+          "result": {
+            "instructions": 282906,
+            "rejected": 3,
+            "boundaries": 4042928095659934855,
+            "values": 116594087
+          }
+        },
+        "comparisons": {
+          "previous": {
+            "instruction_ratio": 1.042308998874541,
+            "function_deltas": {
+              "cs_disasm_iter": [
+                5692416,
+                2675292,
+                860319
+              ],
+              "X86_mayDecodeFeatureExtensionImpl": [
+                452406,
+                67752,
+                57960
+              ]
+            }
+          },
+          "data": {
+            "instruction_ratio": 1.042308998874541,
+            "function_deltas": {
+              "cs_disasm_iter": [
+                5692416,
+                2675292,
+                860319
+              ],
+              "X86_mayDecodeFeatureExtensionImpl": [
+                452406,
+                67752,
+                57960
+              ]
+            }
+          },
+          "scan": {
+            "instruction_ratio": 1.000040526929401,
+            "function_deltas": {
+              "X86_decodeFeatureExtension": [
+                -100026,
+                -20544,
+                -11742
+              ],
+              "decodeFeatureExtensionSlow": [
+                105912,
+                20544,
+                11742
+              ]
+            }
+          }
+        },
+        "data_vs_previous": 1.0,
+        "scan_vs_previous": 0.9594472733222292
+      },
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-24.04-clang-44077965452",
+        "case": "arm-ls",
+        "mode": 2,
+        "totals": {
+          "base": [
+            472852612,
+            69227119,
+            234461512
+          ],
+          "previous": [
+            473321488,
+            69305185,
+            234851842
+          ],
+          "data": [
+            473321488,
+            69305185,
+            234851842
+          ],
+          "scan": [
+            472852612,
+            69227119,
+            234461512
+          ]
+        },
+        "result": {
+          "first": {
+            "instructions": 25942,
+            "rejected": 80,
+            "boundaries": 6490558814457196049,
+            "values": 10123864
+          },
+          "result": {
+            "instructions": 25942,
+            "rejected": 80,
+            "boundaries": 6490558814457196049,
+            "values": 10123864
+          }
+        },
+        "comparisons": {
+          "previous": {
+            "instruction_ratio": 1.0009915901659436,
+            "function_deltas": {
+              "__memset_avx2_unaligned_erms": [
+                546462,
+                0,
+                312264
+              ],
+              "cs_disasm_iter": [
+                -77586,
+                78066,
+                78066
+              ]
+            }
+          },
+          "data": {
+            "instruction_ratio": 1.0009915901659436,
+            "function_deltas": {
+              "__memset_avx2_unaligned_erms": [
+                546462,
+                0,
+                312264
+              ],
+              "cs_disasm_iter": [
+                -77586,
+                78066,
+                78066
+              ]
+            }
+          },
+          "scan": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          }
+        },
+        "data_vs_previous": 1.0,
+        "scan_vs_previous": 0.9990093921110972
+      },
+      {
+        "host": "evex-extension-small-entry-cost-images-four-ubuntu-24.04-clang-44077965452",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "totals": {
+          "base": [
+            225353719,
+            50535050,
+            33610438
+          ],
+          "previous": [
+            225268372,
+            50623061,
+            33698449
+          ],
+          "data": [
+            225268372,
+            50623061,
+            33698449
+          ],
+          "scan": [
+            225353719,
+            50535050,
+            33610438
+          ]
+        },
+        "result": {
+          "first": {
+            "instructions": 28893,
+            "rejected": 444,
+            "boundaries": 15104830684241799518,
+            "values": 16923194
+          },
+          "result": {
+            "instructions": 28893,
+            "rejected": 444,
+            "boundaries": 15104830684241799518,
+            "values": 16923194
+          }
+        },
+        "comparisons": {
+          "previous": {
+            "instruction_ratio": 0.9996212753870727,
+            "function_deltas": {
+              "cs_disasm_iter": [
+                -85347,
+                88011,
+                88011
+              ]
+            }
+          },
+          "data": {
+            "instruction_ratio": 0.9996212753870727,
+            "function_deltas": {
+              "cs_disasm_iter": [
+                -85347,
+                88011,
+                88011
+              ]
+            }
+          },
+          "scan": {
+            "instruction_ratio": 1.0,
+            "function_deltas": {}
+          }
+        },
+        "data_vs_previous": 1.0,
+        "scan_vs_previous": 1.0003788680996017
+      }
+    ],
+    "native_qualification": false,
+    "scope": "Exact original mixed consumer costs in PuTTY32 scan, ARM detail and MIPS formatting. Same file and argv, fixed file size, ASLR disabled, two run() traversals. Simulated cache events do not establish hardware PMU causality."
+  },
+  "publication_qualified": false
+}
