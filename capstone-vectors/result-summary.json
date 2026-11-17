@@ -1,0 +1,211 @@
+{
+  "status": "completed-original-PE32-formatting-cost-diagnosis",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "068c0e51218da27aad1837c5552288798ec433ed",
+      "sha256": "b6eb1604dceca935b940639e848b986c47a8a7bb902f54e571d90a2d59f4c4c4",
+      "files": [
+        "arch/X86/X86Mapping.c"
+      ]
+    },
+    "run": {
+      "id": 44081811086,
+      "head_sha": "4c8f63fd0853c6b11163940cd5b83c70bc43d6f4",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44081811086",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "host": "evex-extension-small-entry-pe32-cost-ubuntu-22.04-clang-1",
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+        "cleanup": {
+          "removed": true,
+          "bytes": 1669502315,
+          "files": 4813
+        }
+      },
+      {
+        "host": "evex-extension-small-entry-pe32-cost-ubuntu-24.04-clang-1",
+        "cpu": "Intel(R) Xeon(R) 6975P-C",
+        "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n",
+        "cleanup": {
+          "removed": true,
+          "bytes": 1616611380,
+          "files": 4813
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "evex-extension-small-entry-pe32-cost-ubuntu-22.04-clang-1",
+        "case": "jpeg-avx2-i386",
+        "mode": "format",
+        "totals": {
+          "integer": [
+            18425260,
+            4232630,
+            3105688
+          ],
+          "previous": [
+            18434444,
+            4232630,
+            3105688
+          ],
+          "data": [
+            18434444,
+            4232630,
+            3105688
+          ],
+          "scan": [
+            18428608,
+            4232630,
+            3105688
+          ]
+        },
+        "result": [
+          7764,
+          0,
+          5440596104452698824,
+          8205934
+        ],
+        "instruction_ratio": 1.0001817070695338,
+        "function_deltas": {
+          "decodeFeatureExtensionSlow": [
+            63612,
+            9486,
+            3906
+          ],
+          "X86_decodeFeatureExtension": [
+            -60264,
+            -9486,
+            -3906
+          ]
+        }
+      },
+      {
+        "host": "evex-extension-small-entry-pe32-cost-ubuntu-22.04-clang-1",
+        "case": "libssl3t64-i386",
+        "mode": "format",
+        "totals": {
+          "integer": [
+            815865104,
+            182929020,
+            129275514
+          ],
+          "previous": [
+            815957070,
+            182929020,
+            129275514
+          ],
+          "data": [
+            815957070,
+            182929020,
+            129275514
+          ],
+          "scan": [
+            815865104,
+            182929020,
+            129275514
+          ]
+        },
+        "result": [
+          745698,
+          0,
+          4099658056860254455,
+          494156909
+        ],
+        "instruction_ratio": 1.0,
+        "function_deltas": {}
+      },
+      {
+        "host": "evex-extension-small-entry-pe32-cost-ubuntu-24.04-clang-1",
+        "case": "jpeg-avx2-i386",
+        "mode": "format",
+        "totals": {
+          "integer": [
+            18190252,
+            4226926,
+            3081018
+          ],
+          "previous": [
+            18190252,
+            4226926,
+            3081018
+          ],
+          "data": [
+            18190252,
+            4226926,
+            3081018
+          ],
+          "scan": [
+            18193600,
+            4226926,
+            3081018
+          ]
+        },
+        "result": [
+          7764,
+          0,
+          5440596104452698824,
+          8205934
+        ],
+        "instruction_ratio": 1.0001840546244218,
+        "function_deltas": {
+          "decodeFeatureExtensionSlow": [
+            65286,
+            9486,
+            3906
+          ],
+          "X86_decodeFeatureExtension": [
+            -61938,
+            -9486,
+            -3906
+          ]
+        }
+      },
+      {
+        "host": "evex-extension-small-entry-pe32-cost-ubuntu-24.04-clang-1",
+        "case": "libssl3t64-i386",
+        "mode": "format",
+        "totals": {
+          "integer": [
+            796728276,
+            183448974,
+            127514556
+          ],
+          "previous": [
+            796728276,
+            183448974,
+            127514556
+          ],
+          "data": [
+            796728276,
+            183448974,
+            127514556
+          ],
+          "scan": [
+            796728276,
+            183448974,
+            127514556
+          ]
+        },
+        "result": [
+          745698,
+          0,
+          4099658056860254455,
+          494156909
+        ],
+        "instruction_ratio": 1.0,
+        "function_deltas": {}
+      }
+    ],
+    "scope": "Original native JPEG32 SIMD and SSL32 all-function formatting consumers. Frozen extents and original consumer object digests verified. Same file, size and argv, ASLR disabled. Dynamic execution counts do not establish native cache or branch predictor causes."
+  },
+  "publication_qualified": false
+}
