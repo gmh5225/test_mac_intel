@@ -1,0 +1,38 @@
+{
+  "round": 1330,
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "tree": "6d39365cda2ebfe5fc8d0c4a32d5f04ac17eb793",
+    "sha256": "4f8d0d41b21007b75aeb523f3695354d7d7ec1eca54639477b06ac63d3b939a2",
+    "records": "equal AArch64 public records, cursor and errors for 4194304 inputs"
+  },
+  "hosts": [
+    "ubuntu-22.04 GCC/Clang",
+    "ubuntu-24.04 GCC/Clang",
+    "ubuntu-24.04-arm GCC/Clang"
+  ],
+  "cases": [
+    "PuTTY PE32",
+    "PuTTY PE64",
+    "AMD64 ls",
+    "ARM ls/sort/cp",
+    "AArch64 ls",
+    "MIPS64EL ls"
+  ],
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "cycles": 21,
+  "minimum_process_ms": 160,
+  "controls": [
+    "byte-identical A/A",
+    "original images",
+    "same inode and size with ASLR disabled if supported",
+    "identical consumer object",
+    "complete Capstone output hash"
+  ],
+  "gate": "Keep exact unchanged-object/binary controls for inactive profiles. Check all native rows and A/A uncertainty before promotion; no product qualification yet.",
+  "reason": "Clang removes 19 owner instructions per raw/text decode and 51 per detail decode after pointer reuse restores initialization inlining. Additional libc memset changes are recorded separately and are not counted as direct algorithm savings. GNU x86 four-backend objects are identical; active compilers need native timing."
+}
