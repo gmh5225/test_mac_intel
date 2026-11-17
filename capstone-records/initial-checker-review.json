@@ -1,0 +1,657 @@
+{
+  "source_unchanged": true,
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "a1ec79c3557f54ebde318d616f5ffda6b1ae27d6",
+    "sha256": "55e32b2f07614957889a88504300a16cad288582493b3084416402bfd5db062f",
+    "files": [
+      "arch/X86/X86FeatureExtension.h",
+      "arch/X86/X86Mapping.c"
+    ]
+  },
+  "cause": "Initial symbol comparator treated the intentionally hidden full-decoder symbol and compiler-generated table serial labels as runtime differences. The actual original executable/constant object bytes and linked addresses/sizes are identical. Only label identity is normalized; no address, size, multiplicity or executable/constant byte condition was removed.",
+  "profiles": [
+    {
+      "profile": "evex-extension-isolated-entry-ubuntu-22.04-clang-1",
+      "kind": "native",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 4803,
+        "readonly_symbols": 1807,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            4156528,
+            75
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            133156,
+            "4f8114d10ff9122fe9c52223cf0bef751a7c06ee9e080d1e5edf5548c0287ec7"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata",
+            1529688,
+            "5ed0406962275dd76257d911176179b4804e6775b12a36b413105ffafe1a9569"
+          ],
+          [
+            ".rodata.cst16",
+            128,
+            "72aa837f2cbdc6bf74dbb7ce052306b22b7dec0681fac8acf02f3118f43dfd4d"
+          ],
+          [
+            ".rodata.str1.1",
+            16523,
+            "d8f15176c46a506874b7bbd8768dfda641ccb766c279610e5197b4607765889b"
+          ],
+          [
+            ".rodata.cst32",
+            160,
+            "e2746a837c165ec8672ad4855a754f2807e85550ac788278761d70d540825df5"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            75,
+            "8536682acc73a38f68853fec496bbe233f1a20af4870b96ce7a8c782597fa301"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 1575631150,
+        "files": 4798
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-ubuntu-22.04-gcc-1",
+      "kind": "native",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 4642,
+        "readonly_symbols": 2016,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            3959968,
+            85
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            144490,
+            "9dcd3f6b03b290c508f4e28c1a3a97cfb37f93f472d1e9f1e15faf89da6fd913"
+          ],
+          [
+            ".text.unlikely",
+            653,
+            "6d76340898bdf84903383f4b97a863c2e621a4c1df062ee7e58566dbef196e33"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata.str1.1",
+            16502,
+            "b1ddd199085d667e7cc53e090153e45dddc9e6aa6493cad72eba5821d9410ea4"
+          ],
+          [
+            ".rodata",
+            1510784,
+            "ed459dab6b5bd81fa92db3c1734da7e9409bffce396fb506c6f40e5abec88d04"
+          ],
+          [
+            ".rodata.cst8",
+            24,
+            "e4e5734d4d1e23f1c407bf7fda53a1504c67c46afcb7b7dfd21ded5a444342e9"
+          ],
+          [
+            ".rodata.cst16",
+            16,
+            "e54754d756710145b437c54d65be73d0f7cb2f30ec48f4b0d7dc220be68a5c27"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            85,
+            "e93c06d5cff02342b73266f1fb326de6b0aca1d3fe4bd1e6a1aa54bf954c0ddb"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 1559370409,
+        "files": 4798
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-ubuntu-24.04-clang-1",
+      "kind": "native",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 4807,
+        "readonly_symbols": 1798,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            3543792,
+            75
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            135892,
+            "f2cfa43fd1b8194f9ac114d9f6b87f0e6c5c5ae88150e1a3cc49d2baaa1e3adf"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata",
+            1522776,
+            "c56ae4c1503e07760c0320311834428d82a152c14a9c448c69742dc84f348e8d"
+          ],
+          [
+            ".rodata.cst16",
+            208,
+            "ab07e213b455e115f8a1c673b9cacf3eb98dc3acbe27ba3b6e69bcaf1bf9c700"
+          ],
+          [
+            ".rodata.str1.1",
+            16523,
+            "d8f15176c46a506874b7bbd8768dfda641ccb766c279610e5197b4607765889b"
+          ],
+          [
+            ".rodata.cst32",
+            160,
+            "e2746a837c165ec8672ad4855a754f2807e85550ac788278761d70d540825df5"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            75,
+            "09b13d755aa3790a62bebc62e2f39e6ddcf634a0ad55ca4129c7a9ec2d17b760"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 1525428895,
+        "files": 4798
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-ubuntu-24.04-gcc-1",
+      "kind": "native",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 4647,
+        "readonly_symbols": 2017,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            3911088,
+            85
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            148043,
+            "20ba7712424b19fe7b0987ba3191da8aa8bffd2b6d24be6eb97de54e59d65dbc"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata.str1.1",
+            16511,
+            "852075a2e66ab99565676f2cc406a8813526e179b256afd3d28b4dbe8dc44e30"
+          ],
+          [
+            ".rodata",
+            1510784,
+            "c3a4d07578fa997eeb7bdc4df29bfb5ded99816179bb8fb37e4ee6ccb3885fea"
+          ],
+          [
+            ".rodata.cst4",
+            4,
+            "f9cf1d567a321213a08f883cb3b4a3f9efbc8b1abab4ed7bfe6e3aecdb9ddf14"
+          ],
+          [
+            ".rodata.cst8",
+            24,
+            "e4e5734d4d1e23f1c407bf7fda53a1504c67c46afcb7b7dfd21ded5a444342e9"
+          ],
+          [
+            ".rodata.cst16",
+            16,
+            "e54754d756710145b437c54d65be73d0f7cb2f30ec48f4b0d7dc220be68a5c27"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            85,
+            "e93c06d5cff02342b73266f1fb326de6b0aca1d3fe4bd1e6a1aa54bf954c0ddb"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "removed": true,
+        "bytes": 1556789013,
+        "files": 4798
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44084188820",
+      "kind": "mixed",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 1518,
+        "readonly_symbols": 1515,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            2939744,
+            75
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            133156,
+            "4f8114d10ff9122fe9c52223cf0bef751a7c06ee9e080d1e5edf5548c0287ec7"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata",
+            1529688,
+            "5ed0406962275dd76257d911176179b4804e6775b12a36b413105ffafe1a9569"
+          ],
+          [
+            ".rodata.cst16",
+            128,
+            "72aa837f2cbdc6bf74dbb7ce052306b22b7dec0681fac8acf02f3118f43dfd4d"
+          ],
+          [
+            ".rodata.str1.1",
+            16523,
+            "d8f15176c46a506874b7bbd8768dfda641ccb766c279610e5197b4607765889b"
+          ],
+          [
+            ".rodata.cst32",
+            160,
+            "e2746a837c165ec8672ad4855a754f2807e85550ac788278761d70d540825df5"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            75,
+            "8536682acc73a38f68853fec496bbe233f1a20af4870b96ce7a8c782597fa301"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "bytes": 208089486,
+        "removed": true
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44084188820",
+      "kind": "mixed",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 1357,
+        "readonly_symbols": 1725,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            2742928,
+            85
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            144490,
+            "9dcd3f6b03b290c508f4e28c1a3a97cfb37f93f472d1e9f1e15faf89da6fd913"
+          ],
+          [
+            ".text.unlikely",
+            653,
+            "6d76340898bdf84903383f4b97a863c2e621a4c1df062ee7e58566dbef196e33"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata.str1.1",
+            16502,
+            "b1ddd199085d667e7cc53e090153e45dddc9e6aa6493cad72eba5821d9410ea4"
+          ],
+          [
+            ".rodata",
+            1510784,
+            "ed459dab6b5bd81fa92db3c1734da7e9409bffce396fb506c6f40e5abec88d04"
+          ],
+          [
+            ".rodata.cst8",
+            24,
+            "e4e5734d4d1e23f1c407bf7fda53a1504c67c46afcb7b7dfd21ded5a444342e9"
+          ],
+          [
+            ".rodata.cst16",
+            16,
+            "e54754d756710145b437c54d65be73d0f7cb2f30ec48f4b0d7dc220be68a5c27"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            85,
+            "e93c06d5cff02342b73266f1fb326de6b0aca1d3fe4bd1e6a1aa54bf954c0ddb"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "bytes": 204267644,
+        "removed": true
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-images-four-ubuntu-24.04-clang-44084188820",
+      "kind": "mixed",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 1521,
+        "readonly_symbols": 1507,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            2327136,
+            75
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            135892,
+            "f2cfa43fd1b8194f9ac114d9f6b87f0e6c5c5ae88150e1a3cc49d2baaa1e3adf"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata",
+            1522776,
+            "c56ae4c1503e07760c0320311834428d82a152c14a9c448c69742dc84f348e8d"
+          ],
+          [
+            ".rodata.cst16",
+            208,
+            "ab07e213b455e115f8a1c673b9cacf3eb98dc3acbe27ba3b6e69bcaf1bf9c700"
+          ],
+          [
+            ".rodata.str1.1",
+            16523,
+            "d8f15176c46a506874b7bbd8768dfda641ccb766c279610e5197b4607765889b"
+          ],
+          [
+            ".rodata.cst32",
+            160,
+            "e2746a837c165ec8672ad4855a754f2807e85550ac788278761d70d540825df5"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            75,
+            "09b13d755aa3790a62bebc62e2f39e6ddcf634a0ad55ca4129c7a9ec2d17b760"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "bytes": 200094416,
+        "removed": true
+      }
+    },
+    {
+      "profile": "evex-extension-isolated-entry-images-four-ubuntu-24.04-gcc-44084188820",
+      "kind": "mixed",
+      "replayed_proof": {
+        "original_text_symbol_positions_identical": true,
+        "original_readonly_symbol_positions_identical": true,
+        "text_symbols": 1361,
+        "readonly_symbols": 1726,
+        "added_entry": [
+          [
+            "X86_decodeFeatureExtension",
+            "T",
+            2694560,
+            85
+          ]
+        ],
+        "symbol_label_changes": [
+          "The renamed full decoder is intentionally hidden/local (nm t)",
+          "Compiler-generated CSWTCH and instruction-name reltable serial suffixes"
+        ],
+        "scope": "Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry."
+      },
+      "original_object_proof": {
+        "original_executable_section_bytes_identical": true,
+        "original_readonly_section_bytes_identical": true,
+        "metadata_excluded": [
+          ".eh_frame: the new entry requires an additional unwind record"
+        ],
+        "original_text": [
+          [
+            ".text",
+            148043,
+            "20ba7712424b19fe7b0987ba3191da8aa8bffd2b6d24be6eb97de54e59d65dbc"
+          ]
+        ],
+        "original_data": [
+          [
+            ".rodata.str1.1",
+            16511,
+            "852075a2e66ab99565676f2cc406a8813526e179b256afd3d28b4dbe8dc44e30"
+          ],
+          [
+            ".rodata",
+            1510784,
+            "c3a4d07578fa997eeb7bdc4df29bfb5ded99816179bb8fb37e4ee6ccb3885fea"
+          ],
+          [
+            ".rodata.cst4",
+            4,
+            "f9cf1d567a321213a08f883cb3b4a3f9efbc8b1abab4ed7bfe6e3aecdb9ddf14"
+          ],
+          [
+            ".rodata.cst8",
+            24,
+            "e4e5734d4d1e23f1c407bf7fda53a1504c67c46afcb7b7dfd21ded5a444342e9"
+          ],
+          [
+            ".rodata.cst16",
+            16,
+            "e54754d756710145b437c54d65be73d0f7cb2f30ec48f4b0d7dc220be68a5c27"
+          ]
+        ],
+        "added_entry": [
+          [
+            ".cs_x86_feature_text",
+            85,
+            "e93c06d5cff02342b73266f1fb326de6b0aca1d3fe4bd1e6a1aa54bf954c0ddb"
+          ]
+        ],
+        "added_table": [
+          [
+            ".cs_x86_feature_rodata",
+            256,
+            "2992d83a95cba2d9805efe27a8b746a8828d5f03fba1bd4e8bd76c0146020686"
+          ]
+        ]
+      },
+      "cleanup": {
+        "bytes": 204002751,
+        "removed": true
+      }
+    }
+  ],
+  "requires_native_rerun": true
+}
