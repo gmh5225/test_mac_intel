@@ -1,6 +1,8 @@
 from pathlib import Path
 import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
+from identity import payloads, compare, signatures
+from elftools.elf.elffile import ELFFile
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
@@ -9,7 +11,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-evex-helper-constant-section-mixed-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -27,36 +29,59 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as 
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
-  bins={};objects={};libs={};ownedlibs={}
+  bins={};objects={};libs={};ownedlibs={};writer={}
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan'):
+  for key in ('base','previous','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
     run(['git','add','-A'],'stage-tested-source',s)
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
-    write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
+    metadata=json.loads((r/('previous.json' if key=='previous' else 'candidate.json')).read_text())
+    assert tested==metadata['tree'] and sha(variant)==metadata['sha256'],tested
+    write('previous-source' if key=='previous' else 'tested-source',dict(tree=tested,patch_sha256=sha(variant)))
     run(['git','reset','-q'],'unstage-tested-source',s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
    (e/(key+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',f]))
    (e/(key+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',f]))
+   signatures(f,e/(key+'-linked-symbols.json.gz'))
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
+   if key != 'base':
+    writer[key]=payloads(objdir/'arch/X86/X86EvexMemoryOutput.c.o')
+    if key=='scan':
+     with (objdir/'arch/X86/X86EvexMemoryOutput.c.o').open('rb') as stream:
+      elf=ELFFile(stream);sections=list(elf.iter_sections())
+      arrays={v.name:sections[v['st_shndx']].name for v in elf.get_section_by_name('.symtab').iter_symbols() if v['st_info']['type']=='STT_OBJECT' and 'digits' in v.name}
+      assert arrays and set(arrays.values())=={'.cs_x86_evex_output_rodata'},arrays
+      write('helper-constant-sections',dict(named_digit_arrays=arrays,sections={v.name:v['sh_size'] for v in sections}))
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
   for key in ('scan',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
-   assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'},added
+   assert added=={'arch/X86/X86EvexMemoryOutput.c.o'},added
    assert set(objects['base']) <= set(objects[key])
-   assert set(changed) <= {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'},changed
+   assert set(changed) == {'arch/X86/X86VectorOutput.c.o'},changed
    active=bool(changed)
-   write('scope',dict(active=active,source_applies=True,policy='shared 32-bit C4/C5 prefix dispatch; identical lowering is retained as an object and binary identity control'))
+   write('scope',dict(active=active,source_applies=True,policy='EVEX helper constant placement; identical lowering is retained as an object and binary identity control'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
+  assert objects['previous'].keys()==objects['scan'].keys()
+  changed_from_previous=[name for name,value in objects['previous'].items() if objects['scan'][name]!=value]
+  assert changed_from_previous==['arch/X86/X86EvexMemoryOutput.c.o'],changed_from_previous
+  write('previous-object-isolation',dict(changed=changed_from_previous,all_other_objects_identical=True))
+  before,after=writer['previous'],writer['scan']
+  # Explicit sections can prevent a named array from merging with an equal
+  # literal. Check byte contents independently of compiler-generated names.
+  assert set(before[1].values())==set(after[1].values())
+  proof=compare((before[0],{},before[2],before[3]),(after[0],{},after[2],after[3]))
+  proof['before_arrays']={name:dict(bytes=len(value),sha256=hashlib.sha256(value).hexdigest()) for name,value in before[1].items()}
+  proof['after_arrays']={name:dict(bytes=len(value),sha256=hashlib.sha256(value).hexdigest()) for name,value in after[1].items()}
+  proof['array_content_sets_identical']=True
+  write('writer-identity',proof)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -66,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as 
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='shared 32-bit C4/C5 prefix dispatch; preserve complete records, original images and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='EVEX helper constant placement; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -80,8 +105,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as 
   for x in cases:
    for mode in (0,1,2):
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','aa','previous','scan']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
