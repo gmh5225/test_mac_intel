@@ -1,0 +1,34 @@
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index af2bc19c..27d411af 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -1061,19 +1061,22 @@ void ARM_setup_op(cs_arm_op *op)
+ void ARM_init_cs_detail(MCInst *MI)
+ {
+ 	if (detail_is_set(MI)) {
++		cs_detail *detail = get_detail(MI);
+ 		unsigned int i;
+ 
+-		memset(get_detail(MI), 0,
+-		       offsetof(cs_detail, arm) + sizeof(cs_arm));
++		memset(detail, 0, offsetof(cs_detail, arm) + sizeof(cs_arm));
+ 
+-		for (i = 0; i < ARR_SIZE(ARM_get_detail(MI)->operands); i++)
++#if defined(__clang__)
++#pragma clang loop unroll_count(2)
++#endif
++		for (i = 0; i < ARR_SIZE(detail->arm.operands); i++)
+ #ifdef ARM_INIT_CLEARED_OPERANDS
+-			ARM_set_op_defaults(&ARM_get_detail(MI)->operands[i]);
++			ARM_set_op_defaults(&detail->arm.operands[i]);
+ #else
+-			ARM_setup_op(&ARM_get_detail(MI)->operands[i]);
++			ARM_setup_op(&detail->arm.operands[i]);
+ #endif
+-		ARM_get_detail(MI)->cc = ARMCC_UNDEF;
+-		ARM_get_detail(MI)->vcc = ARMVCC_None;
++		detail->arm.cc = ARMCC_UNDEF;
++		detail->arm.vcc = ARMVCC_None;
+ 	}
+ }
+ #undef ARM_INIT_CLEARED_OPERANDS
