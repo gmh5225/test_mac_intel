@@ -1,7 +1,7 @@
-name: Repeat remaining mixed-backend timing and identical-binary control flags
+name: Check isolated EVEX entry on native macOS real PE and mixed-architecture samples
 on:
   push:
-    branches: [codex/capstone-evex-extension-isolated-entry-mixed-replication]
+    branches: [codex/capstone-isolated-entry-macos]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,10 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 1 }
-          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 2 }
-          - { host: ubuntu-22.04, cc: gcc, archs: four, replica: 1 }
-          - { host: ubuntu-22.04, cc: gcc, archs: four, replica: 2 }
+          - { host: macos-15, cc: clang, archs: four, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -31,7 +28,7 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Measure unchanged real-input consumer with identical-binary controls
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
@@ -42,6 +39,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-extension-isolated-entry-mixed-replication-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}-${{ github.run_id }}
+          name: identical-image-macos-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
