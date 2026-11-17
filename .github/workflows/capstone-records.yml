@@ -1,7 +1,7 @@
-name: Isolate non-x86 regressions caused by shared VEX image growth
+name: Measure VEX32 gate and record storage fixes on native Clang hosts
 on:
   push:
-    branches: [codex/capstone-vex32-layout-isolation]
+    branches: [codex/capstone-vex32-private-record-pool]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -13,8 +13,10 @@ jobs:
         include:
           - { host: ubuntu-22.04, cc: clang, archs: four, replica: 1 }
           - { host: ubuntu-22.04, cc: clang, archs: four, replica: 2 }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 3 }
           - { host: ubuntu-24.04, cc: clang, archs: four, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, archs: four, replica: 2 }
+          - { host: ubuntu-24.04, cc: clang, archs: four, replica: 3 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
     env:
@@ -31,13 +33,13 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Separate code and data placement with unchanged baseline objects and A/A controls
+      - name: Measure admitted mode and private descriptor pool changes against the unchanged baseline
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-layout-isolation-${{ matrix.host }}-${{ matrix.replica }}
+          name: vex32-private-pool-${{ matrix.host }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

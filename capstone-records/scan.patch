@@ -108,7 +108,7 @@ index a976814e..c97b0f68 100644
  			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
  			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
 diff --git a/arch/X86/X86GenVectorOutput.inc b/arch/X86/X86GenVectorOutput.inc
-index 1d237cd1..bebaa8ab 100644
+index 1d237cd1..38db0715 100644
 --- a/arch/X86/X86GenVectorOutput.inc
 +++ b/arch/X86/X86GenVectorOutput.inc
 @@ -4,6 +4,7 @@ struct VectorOutputRow {
@@ -119,7 +119,7 @@ index 1d237cd1..bebaa8ab 100644
  static const struct VectorOutputRow evex_output_rows[] = {
  	{ X86_INS_VEXTRACTF32X4, "vextractf32x4", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
  	{ X86_INS_VEXTRACTF64X2, "vextractf64x2", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-@@ -96,7 +97,412 @@ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
+@@ -96,7 +97,12 @@ static const struct VectorOutputRow vex_indexed_rows[2][2] = {
  		{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
  	},
  };
@@ -128,6 +128,97 @@ index 1d237cd1..bebaa8ab 100644
 +#ifdef X86_VEX_REGISTER_ONLY
 +enum { X86_VEX32_SHARED_ROWS = 343 };
 +extern CAPSTONE_INTERNAL const struct VectorOutputRow X86_vexRegisterRows[344];
++#ifdef X86_VEX_REGISTER_POOL
++CAPSTONE_INTERNAL const struct VectorOutputRow X86_vexRegisterRows[] X86_VECTOR_REGISTER_DATA = {
+ 	{ 0 },
+ 	{ X86_INS_VUNPCKLPD, "vunpcklpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+ 	{ X86_INS_VUNPCKHPD, "vunpckhpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
+@@ -362,8 +368,750 @@ static const struct VectorOutputRow vex_register_rows[] = {
+ 	{ X86_INS_VPCLMULQDQ, "vpclmulqdq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 1 }, 1 },
+ 	{ X86_INS_VPERM2I128, "vperm2i128", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
+ 	{ X86_INS_VGF2P8AFFINEQB, "vgf2p8affineqb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VMOVUPD, "vmovupd", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVUPD, "vmovupd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVAPD, "vmovapd", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVAPD, "vmovapd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VSQRTPD, "vsqrtpd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTPD2PS, "vcvtpd2ps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTPS2DQ, "vcvtps2dq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVDQA, "vmovdqa", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPSHUFD, "vpshufd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VMOVQ, "vmovq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTTPD2DQ, "vcvttpd2dq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPSHUFD, "vpshufd", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VMOVUPS, "vmovups", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VUNPCKLPS, "vunpcklps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VUNPCKHPS, "vunpckhps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMOVAPS, "vmovaps", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVNTPS, "vmovntps", 2, { 132, 168, 0, 0 }, { 1, 1, 0, 0 }, 0 },
++	{ X86_INS_VSQRTPS, "vsqrtps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VRSQRTPS, "vrsqrtps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VRCPPS, "vrcpps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VANDPS, "vandps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VANDNPS, "vandnps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VORPS, "vorps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VXORPS, "vxorps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VADDPS, "vaddps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMULPS, "vmulps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VCVTDQ2PS, "vcvtdq2ps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VSUBPS, "vsubps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMINPS, "vminps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VDIVPS, "vdivps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMAXPS, "vmaxps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMOVNTPD, "vmovntpd", 2, { 132, 168, 0, 0 }, { 1, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTPD2PS, "vcvtpd2ps", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTTPD2DQ, "vcvttpd2dq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVNTDQ, "vmovntdq", 2, { 132, 168, 0, 0 }, { 1, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVSLDUP, "vmovsldup", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVSHDUP, "vmovshdup", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTTPS2DQ, "vcvttps2dq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVDQU, "vmovdqu", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VHADDPS, "vhaddps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VHSUBPS, "vhsubps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VADDSUBPS, "vaddsubps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VCVTPD2DQ, "vcvtpd2dq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VLDDQU, "vlddqu", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VMOVDDUP, "vmovddup", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VCVTPH2PS, "vcvtph2ps", 1, { 138, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VBROADCASTSS, "vbroadcastss", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPABSB, "vpabsb", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPABSW, "vpabsw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPABSD, "vpabsd", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVSXBW, "vpmovsxbw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVSXBD, "vpmovsxbd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVSXBQ, "vpmovsxbq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVSXWD, "vpmovsxwd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVSXWQ, "vpmovsxwq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVSXDQ, "vpmovsxdq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVZXBW, "vpmovzxbw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVZXBD, "vpmovzxbd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVZXBQ, "vpmovzxbq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVZXWD, "vpmovzxwd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVZXWQ, "vpmovzxwq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPMOVZXDQ, "vpmovzxdq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPHMINPOSUW, "vphminposuw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPBROADCASTD, "vpbroadcastd", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPBROADCASTQ, "vpbroadcastq", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPBROADCASTB, "vpbroadcastb", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPBROADCASTW, "vpbroadcastw", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VAESIMC, "vaesimc", 2, { 132, 130, 0, 0 }, { 2, 1, 0, 0 }, 0 },
++	{ X86_INS_VPERMQ, "vpermq", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPERMPD, "vpermpd", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPERMILPS, "vpermilps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPERMILPD, "vpermilpd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VROUNDPS, "vroundps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VROUNDPS, "vroundps", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VROUNDPD, "vroundpd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VROUNDPD, "vroundpd", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VCVTPS2PH, "vcvtps2ph", 1, { 138, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
++	{ X86_INS_VPCMPESTRM, "vpcmpestrm", 0, { 0, 0, 0, 0 }, { 1, 1, 1, 0 }, 1 },
++	{ X86_INS_VPCMPISTRM, "vpcmpistrm", 0, { 0, 0, 0, 0 }, { 1, 1, 1, 0 }, 1 },
+ };
+-static const uint16_t vex_register_widths[][4] = {
++#endif
 +enum { X86_VEX32_OFFSET_BITS = 14, X86_VEX32_OFFSET_MASK = 16383, X86_VEX32_PAIR = 16384, X86_VEX32_REVERSE = 32768 };
 +typedef char X86Vex32PoolFits[(sizeof(X86_vexRegisterRows) <= X86_VEX32_PAIR) ? 1 : -1];
 +static const uint16_t vex32_register_plans[2][256] X86_VECTOR_REGISTER_DATA = {
@@ -523,108 +614,278 @@ index 1d237cd1..bebaa8ab 100644
 +	},
 +};
 +#else
-+#ifdef CAPSTONE_X86_VEX32_OUTPUT
-+#define vex_register_rows X86_vexRegisterRows
-+CAPSTONE_INTERNAL
-+#else
-+static
-+#endif
-+const struct VectorOutputRow vex_register_rows[] X86_VECTOR_REGISTER_DATA = {
- 	{ 0 },
- 	{ X86_INS_VUNPCKLPD, "vunpcklpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
- 	{ X86_INS_VUNPCKHPD, "vunpckhpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-@@ -362,8 +768,89 @@ static const struct VectorOutputRow vex_register_rows[] = {
- 	{ X86_INS_VPCLMULQDQ, "vpclmulqdq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 1 }, 1 },
- 	{ X86_INS_VPERM2I128, "vperm2i128", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
- 	{ X86_INS_VGF2P8AFFINEQB, "vgf2p8affineqb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+#ifdef CAPSTONE_X86_VEX32_OUTPUT
-+	{ X86_INS_VMOVUPD, "vmovupd", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVUPD, "vmovupd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVAPD, "vmovapd", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVAPD, "vmovapd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VSQRTPD, "vsqrtpd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTPD2PS, "vcvtpd2ps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTPS2DQ, "vcvtps2dq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVDQA, "vmovdqa", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPSHUFD, "vpshufd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VMOVQ, "vmovq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTTPD2DQ, "vcvttpd2dq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPSHUFD, "vpshufd", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VMOVUPS, "vmovups", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VUNPCKLPS, "vunpcklps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VUNPCKHPS, "vunpckhps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VMOVAPS, "vmovaps", 2, { 132, 168, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVNTPS, "vmovntps", 2, { 132, 168, 0, 0 }, { 1, 1, 0, 0 }, 0 },
-+	{ X86_INS_VSQRTPS, "vsqrtps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VRSQRTPS, "vrsqrtps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VRCPPS, "vrcpps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VANDPS, "vandps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VANDNPS, "vandnps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VORPS, "vorps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VXORPS, "vxorps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VADDPS, "vaddps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VMULPS, "vmulps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VCVTDQ2PS, "vcvtdq2ps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VSUBPS, "vsubps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VMINPS, "vminps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VDIVPS, "vdivps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VMAXPS, "vmaxps", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VMOVNTPD, "vmovntpd", 2, { 132, 168, 0, 0 }, { 1, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTPD2PS, "vcvtpd2ps", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTTPD2DQ, "vcvttpd2dq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVNTDQ, "vmovntdq", 2, { 132, 168, 0, 0 }, { 1, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVSLDUP, "vmovsldup", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVSHDUP, "vmovshdup", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTTPS2DQ, "vcvttps2dq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVDQU, "vmovdqu", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VHADDPS, "vhaddps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VHSUBPS, "vhsubps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VADDSUBPS, "vaddsubps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
-+	{ X86_INS_VCVTPD2DQ, "vcvtpd2dq", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VLDDQU, "vlddqu", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VMOVDDUP, "vmovddup", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VCVTPH2PS, "vcvtph2ps", 1, { 138, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VBROADCASTSS, "vbroadcastss", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPABSB, "vpabsb", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPABSW, "vpabsw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPABSD, "vpabsd", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVSXBW, "vpmovsxbw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVSXBD, "vpmovsxbd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVSXBQ, "vpmovsxbq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVSXWD, "vpmovsxwd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVSXWQ, "vpmovsxwq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVSXDQ, "vpmovsxdq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVZXBW, "vpmovzxbw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVZXBD, "vpmovzxbd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVZXBQ, "vpmovzxbq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVZXWD, "vpmovzxwd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVZXWQ, "vpmovzxwq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPMOVZXDQ, "vpmovzxdq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPHMINPOSUW, "vphminposuw", 0, { 0, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPBROADCASTD, "vpbroadcastd", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPBROADCASTQ, "vpbroadcastq", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPBROADCASTB, "vpbroadcastb", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPBROADCASTW, "vpbroadcastw", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VAESIMC, "vaesimc", 2, { 132, 130, 0, 0 }, { 2, 1, 0, 0 }, 0 },
-+	{ X86_INS_VPERMQ, "vpermq", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VPERMPD, "vpermpd", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VPERMILPS, "vpermilps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VPERMILPD, "vpermilpd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VROUNDPS, "vroundps", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VROUNDPS, "vroundps", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+	{ X86_INS_VROUNDPD, "vroundpd", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VROUNDPD, "vroundpd", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
-+	{ X86_INS_VCVTPS2PH, "vcvtps2ph", 1, { 138, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-+	{ X86_INS_VPCMPESTRM, "vpcmpestrm", 0, { 0, 0, 0, 0 }, { 1, 1, 1, 0 }, 1 },
-+	{ X86_INS_VPCMPISTRM, "vpcmpistrm", 0, { 0, 0, 0, 0 }, { 1, 1, 1, 0 }, 1 },
-+#endif
- };
--static const uint16_t vex_register_widths[][4] = {
++static const struct VectorOutputRow vex_register_rows[] X86_VECTOR_REGISTER_DATA = {
++	{ 0 },
++	{ X86_INS_VUNPCKLPD, "vunpcklpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VUNPCKHPD, "vunpckhpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VANDPD, "vandpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VANDNPD, "vandnpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VORPD, "vorpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VXORPD, "vxorpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VADDPD, "vaddpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMULPD, "vmulpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSUBPD, "vsubpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMINPD, "vminpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VDIVPD, "vdivpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VMAXPD, "vmaxpd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLBW, "vpunpcklbw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLBW, "vpunpcklbw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLWD, "vpunpcklwd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLWD, "vpunpcklwd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLDQ, "vpunpckldq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLDQ, "vpunpckldq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKSSWB, "vpacksswb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKSSWB, "vpacksswb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTB, "vpcmpgtb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTB, "vpcmpgtb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTW, "vpcmpgtw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTW, "vpcmpgtw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTD, "vpcmpgtd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTD, "vpcmpgtd", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKUSWB, "vpackuswb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKUSWB, "vpackuswb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHBW, "vpunpckhbw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHBW, "vpunpckhbw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHWD, "vpunpckhwd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHWD, "vpunpckhwd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHDQ, "vpunpckhdq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHDQ, "vpunpckhdq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKSSDW, "vpackssdw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKSSDW, "vpackssdw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLQDQ, "vpunpcklqdq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKLQDQ, "vpunpcklqdq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHQDQ, "vpunpckhqdq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPUNPCKHQDQ, "vpunpckhqdq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQB, "vpcmpeqb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQB, "vpcmpeqb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQW, "vpcmpeqw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQW, "vpcmpeqw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQD, "vpcmpeqd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQD, "vpcmpeqd", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VHADDPD, "vhaddpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VHSUBPD, "vhsubpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VSHUFPD, "vshufpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VADDSUBPD, "vaddsubpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRLW, "vpsrlw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRLD, "vpsrld", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRLQ, "vpsrlq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDQ, "vpaddq", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDQ, "vpaddq", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULLW, "vpmullw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULLW, "vpmullw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBUSB, "vpsubusb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBUSB, "vpsubusb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBUSW, "vpsubusw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBUSW, "vpsubusw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINUB, "vpminub", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINUB, "vpminub", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPAND, "vpand", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPAND, "vpand", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDUSB, "vpaddusb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDUSB, "vpaddusb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDUSW, "vpaddusw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDUSW, "vpaddusw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXUB, "vpmaxub", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXUB, "vpmaxub", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPANDN, "vpandn", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPANDN, "vpandn", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPAVGB, "vpavgb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPAVGB, "vpavgb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRAW, "vpsraw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRAD, "vpsrad", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPAVGW, "vpavgw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPAVGW, "vpavgw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULHUW, "vpmulhuw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULHUW, "vpmulhuw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULHW, "vpmulhw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULHW, "vpmulhw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBSB, "vpsubsb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBSB, "vpsubsb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBSW, "vpsubsw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBSW, "vpsubsw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINSW, "vpminsw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINSW, "vpminsw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPOR, "vpor", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPOR, "vpor", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDSB, "vpaddsb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDSB, "vpaddsb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDSW, "vpaddsw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDSW, "vpaddsw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXSW, "vpmaxsw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXSW, "vpmaxsw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPXOR, "vpxor", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPXOR, "vpxor", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSLLW, "vpsllw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSLLD, "vpslld", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSLLQ, "vpsllq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULUDQ, "vpmuludq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULUDQ, "vpmuludq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADDWD, "vpmaddwd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADDWD, "vpmaddwd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSADBW, "vpsadbw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSADBW, "vpsadbw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBB, "vpsubb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBB, "vpsubb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBW, "vpsubw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBW, "vpsubw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBD, "vpsubd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBD, "vpsubd", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBQ, "vpsubq", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSUBQ, "vpsubq", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDB, "vpaddb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDB, "vpaddb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDW, "vpaddw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDW, "vpaddw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDD, "vpaddd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPADDD, "vpaddd", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSHUFB, "vpshufb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSHUFB, "vpshufb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHADDW, "vphaddw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHADDW, "vphaddw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHADDD, "vphaddd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHADDD, "vphaddd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHADDSW, "vphaddsw", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMADDUBSW, "vpmaddubsw", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHSUBW, "vphsubw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHSUBW, "vphsubw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHSUBD, "vphsubd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHSUBD, "vphsubd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPHSUBSW, "vphsubsw", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSIGNB, "vpsignb", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSIGNB, "vpsignb", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSIGNW, "vpsignw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSIGNW, "vpsignw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSIGND, "vpsignd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSIGND, "vpsignd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULHRSW, "vpmulhrsw", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPERMILPS, "vpermilps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPERMILPD, "vpermilpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPERMPS, "vpermps", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULDQ, "vpmuldq", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULDQ, "vpmuldq", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQQ, "vpcmpeqq", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPEQQ, "vpcmpeqq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKUSDW, "vpackusdw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPACKUSDW, "vpackusdw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPERMD, "vpermd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTQ, "vpcmpgtq", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPCMPGTQ, "vpcmpgtq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINSB, "vpminsb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINSB, "vpminsb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINSD, "vpminsd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINSD, "vpminsd", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINUW, "vpminuw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINUW, "vpminuw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINUD, "vpminud", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMINUD, "vpminud", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXSB, "vpmaxsb", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXSB, "vpmaxsb", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXSD, "vpmaxsd", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXSD, "vpmaxsd", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXUW, "vpmaxuw", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXUW, "vpmaxuw", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXUD, "vpmaxud", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMAXUD, "vpmaxud", 2, { 133, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULLD, "vpmulld", 2, { 132, 168, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPMULLD, "vpmulld", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRLVD, "vpsrlvd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRLVQ, "vpsrlvq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSRAVD, "vpsravd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSLLVD, "vpsllvd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPSLLVQ, "vpsllvq", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB132PS, "vfmaddsub132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB132PD, "vfmaddsub132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD132PS, "vfmsubadd132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD132PD, "vfmsubadd132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD132PS, "vfmadd132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD132PD, "vfmadd132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD132SS, "vfmadd132ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD132SD, "vfmadd132sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB132PS, "vfmsub132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB132PD, "vfmsub132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB132SS, "vfmsub132ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB132SD, "vfmsub132sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD132PS, "vfnmadd132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD132PD, "vfnmadd132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD132SS, "vfnmadd132ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD132SD, "vfnmadd132sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB132PS, "vfnmsub132ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB132PD, "vfnmsub132pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB132SS, "vfnmsub132ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB132SD, "vfnmsub132sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB213PS, "vfmaddsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB213PD, "vfmaddsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD213PS, "vfmsubadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD213PD, "vfmsubadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD213PS, "vfmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD213PD, "vfmadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD213SS, "vfmadd213ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD213SD, "vfmadd213sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB213PS, "vfmsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB213PD, "vfmsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB213SS, "vfmsub213ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB213SD, "vfmsub213sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD213PS, "vfnmadd213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD213PD, "vfnmadd213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD213SS, "vfnmadd213ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD213SD, "vfnmadd213sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB213PS, "vfnmsub213ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB213PD, "vfnmsub213pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB213SS, "vfnmsub213ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB213SD, "vfnmsub213sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB231PS, "vfmaddsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADDSUB231PD, "vfmaddsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD231PS, "vfmsubadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUBADD231PD, "vfmsubadd231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD231PS, "vfmadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD231PD, "vfmadd231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD231SS, "vfmadd231ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMADD231SD, "vfmadd231sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB231PS, "vfmsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB231PD, "vfmsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB231SS, "vfmsub231ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFMSUB231SD, "vfmsub231sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD231PS, "vfnmadd231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD231PD, "vfnmadd231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD231SS, "vfnmadd231ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMADD231SD, "vfnmadd231sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB231PS, "vfnmsub231ps", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB231PD, "vfnmsub231pd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB231SS, "vfnmsub231ss", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VFNMSUB231SD, "vfnmsub231sd", 0, { 0, 0, 0, 0 }, { 3, 1, 1, 0 }, 0 },
++	{ X86_INS_VGF2P8MULB, "vgf2p8mulb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESENC, "vaesenc", 2, { 132, 130, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESENC, "vaesenc", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESENCLAST, "vaesenclast", 2, { 132, 130, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESENCLAST, "vaesenclast", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESDEC, "vaesdec", 2, { 132, 130, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESDEC, "vaesdec", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESDECLAST, "vaesdeclast", 2, { 132, 130, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VAESDECLAST, "vaesdeclast", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 0 },
++	{ X86_INS_VPBLENDD, "vpblendd", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPERM2F128, "vperm2f128", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VROUNDSS, "vroundss", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VROUNDSD, "vroundsd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VBLENDPS, "vblendps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VBLENDPD, "vblendpd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPBLENDW, "vpblendw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPBLENDW, "vpblendw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPALIGNR, "vpalignr", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VINSERTPS, "vinsertps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VDPPS, "vdpps", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VDPPD, "vdppd", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VMPSADBW, "vmpsadbw", 1, { 132, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VMPSADBW, "vmpsadbw", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPCLMULQDQ, "vpclmulqdq", 2, { 132, 155, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VPCLMULQDQ, "vpclmulqdq", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 1 }, 1 },
++	{ X86_INS_VPERM2I128, "vperm2i128", 1, { 133, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++	{ X86_INS_VGF2P8AFFINEQB, "vgf2p8affineqb", 0, { 0, 0, 0, 0 }, { 2, 1, 1, 0 }, 1 },
++};
 +static const uint16_t vex_register_widths[][4] X86_VECTOR_REGISTER_DATA = {
  	{ 0, 0, 0, 0 },
  	{ 1, 1, 1, 1 },
  	{ 2, 2, 2, 2 },
-@@ -521,7 +1008,7 @@ static const uint16_t vex_register_widths[][4] = {
+@@ -521,7 +1269,7 @@ static const uint16_t vex_register_widths[][4] = {
  	{ 0, 263, 0, 0 },
  	{ 0, 0, 264, 264 },
  };
@@ -633,7 +894,7 @@ index 1d237cd1..bebaa8ab 100644
  	{
  		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  		0, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-@@ -577,7 +1064,8 @@ static const uint8_t vex_register_plans[3][256] = {
+@@ -577,7 +1325,8 @@ static const uint8_t vex_register_plans[3][256] = {
  		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  	},
  };
@@ -643,7 +904,7 @@ index 1d237cd1..bebaa8ab 100644
  	{ X86_INS_VPSRLW, "vpsrlw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
  	{ X86_INS_VPSRLW, "vpsrlw", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
  	{ X86_INS_VPSRAW, "vpsraw", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
-@@ -599,7 +1087,7 @@ static const struct VectorOutputRow vex_shift_rows[] = { { 0 },
+@@ -599,7 +1348,7 @@ static const struct VectorOutputRow vex_shift_rows[] = { { 0 },
  	{ X86_INS_VPSLLDQ, "vpslldq", 1, { 132, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
  	{ X86_INS_VPSLLDQ, "vpslldq", 1, { 133, 0, 0, 0 }, { 2, 1, 0, 0 }, 1 },
  };
@@ -652,7 +913,7 @@ index 1d237cd1..bebaa8ab 100644
  	{
  		{ 0, 0, 0, 0 },
  		{ 0, 0, 0, 0 },
-@@ -631,6 +1119,7 @@ static const uint8_t vex_shift_plans[3][8][4] = {
+@@ -631,6 +1380,7 @@ static const uint8_t vex_shift_plans[3][8][4] = {
  		{ 19, 20, 19, 20 },
  	},
  };
@@ -660,7 +921,7 @@ index 1d237cd1..bebaa8ab 100644
  static const struct VectorOutputRow broadcast_rows[2][3] = {
  	{
  		{ 0 },
-@@ -808,3 +1297,4 @@ static const uint8_t legacy_register_plans[256] = {
+@@ -808,3 +1558,4 @@ static const uint8_t legacy_register_plans[256] = {
  	54, 55, 56, 57, 58, 59, 60, 0, 61, 62, 63, 64, 65, 66, 67, 68,
  	0, 69, 70, 71, 72, 73, 74, 0, 75, 76, 77, 78, 79, 80, 81, 0,
  };
@@ -898,7 +1159,7 @@ index 7675273f..d75c8ae4 100644
  {
  	if (displacement) {
 diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..818a1bae 100644
+index 6df1472d..9b621f12 100644
 --- a/arch/X86/X86VectorOutput.c
 +++ b/arch/X86/X86VectorOutput.c
 @@ -19,87 +19,12 @@ struct PaddingOutput {
@@ -1005,7 +1266,7 @@ index 6df1472d..818a1bae 100644
  static bool writeVexRipLoad(const uint8_t *code, size_t size, cs_insn *insn,
  			    uint16_t *insn_size)
  {
-@@ -463,48 +392,17 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
+@@ -463,43 +392,7 @@ static bool writePaddingOutput(const uint8_t *code, size_t size, cs_insn *insn,
  
  /* The VEX register plan supplies the public fields for vvvv register operands.
   * Memory forms and unsupported vector widths fall back before any output. */
@@ -1050,16 +1311,19 @@ index 6df1472d..818a1bae 100644
  
  bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
  			   uint16_t *insn_size,
- 			   const struct X86SimpleRegister *regs, bool wide)
- {
+@@ -515,6 +408,12 @@ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 						 wide);
+ 	if (code[0] == 0x62)
+ 		return writeEvexOutput(code, size, insn, insn_size, regs);
 +#ifdef CAPSTONE_X86_VEX32_OUTPUT
-+	if (!wide && (code[0] & 0xfe) == 0xc4)
++	/* Remaining 32-bit vector plans admit only bare C4 and C5. */
++	if (!wide)
 +		return X86_writeVex32RegisterOutput(code, size, insn,
 +						    insn_size);
 +#endif
- 	if (code[0] == 0x0f || code[0] == 0xf3 ||
- 	    (code[0] == 0x66 && size >= 2 &&
- 	     (code[1] == 0x90 ||
+ 	if (code[0] == 0xc5 && size >= 4 && (code[3] & 0xc7) == 5)
+ 		return writeVexRipLoad(code, size, insn, insn_size);
+ 	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
 diff --git a/arch/X86/X86VectorRegisterOutput.inc b/arch/X86/X86VectorRegisterOutput.inc
 new file mode 100644
 index 00000000..037641f2
@@ -1240,10 +1504,10 @@ index 00000000..3c36662c
 +#endif
 diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
 new file mode 100644
-index 00000000..a7af8807
+index 00000000..28b16bca
 --- /dev/null
 +++ b/arch/X86/X86Vex32Output.c
-@@ -0,0 +1,172 @@
+@@ -0,0 +1,173 @@
 +/* Capstone Disassembly Engine */
 +/* SPDX-License-Identifier: BSD-3-Clause */
 +
@@ -1266,6 +1530,7 @@ index 00000000..a7af8807
 +#define X86_VECTOR_REGISTER_DATA
 +#endif
 +#define X86_VEX_REGISTER_ONLY
++#define X86_VEX_REGISTER_POOL
 +#define X86_VECTOR_REGISTER_ADDRESS_SIZE 4
 +#define X86_VECTOR_REGISTER_REX(value) 0
 +#include "X86GenVectorOutput.inc"
@@ -1512,7 +1777,7 @@ index ccc4f0de..db052e4f 100644
  			}
  			std::cout << "\t\t},\n";
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 53824997..d22790ae 100644
+index 53824997..ca9c00bb 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
 @@ -12,6 +12,7 @@
@@ -1606,7 +1871,7 @@ index 53824997..d22790ae 100644
  {
  	Decoder decoder32(CS_MODE_32);
  	std::vector<std::string> rows;
-@@ -894,15 +915,556 @@ void emit_vex_registers(Decoder &decoder)
+@@ -894,15 +915,558 @@ void emit_vex_registers(Decoder &decoder)
  	if (!plans[0][0xef] || !plans[1][0xdc] || !plans[2][0x44])
  		throw std::runtime_error(
  			"missing the common VEX xor, AES or carry-less multiply form");
@@ -2102,12 +2367,17 @@ index 53824997..d22790ae 100644
 +	std::printf(
 +		"enum { X86_VEX32_SHARED_ROWS = %zu };\nextern CAPSTONE_INTERNAL const struct VectorOutputRow X86_vexRegisterRows[%zu];\n",
 +		rows.size(), rows.size() + 1);
++	// Preserve the original 64-bit table layout. The two 32-bit writers
++	// share their own physical pool, generated from the same canonical rows.
  	std::puts(
 -		"static const struct VectorOutputRow vex_register_rows[] = {\n\t{ 0 },");
--	for (const auto &row : rows)
--		std::printf("\t%s,\n", row.c_str());
++		"#ifdef X86_VEX_REGISTER_POOL\nCAPSTONE_INTERNAL const struct VectorOutputRow X86_vexRegisterRows[] X86_VECTOR_REGISTER_DATA = {\n\t{ 0 },");
+ 	for (const auto &row : rows)
+ 		std::printf("\t%s,\n", row.c_str());
 -	std::printf("};\nstatic const %s vex_register_widths[][4] = {\n",
 -		    rows.size() <= UINT8_MAX ? "uint8_t" : "uint16_t");
++	std::puts("};\n#endif");
++	std::puts(
 +		"enum { X86_VEX32_OFFSET_BITS = 14, X86_VEX32_OFFSET_MASK = 16383, X86_VEX32_PAIR = 16384, X86_VEX32_REVERSE = 32768 };\n"
 +		"typedef char X86Vex32PoolFits[(sizeof(X86_vexRegisterRows) <= X86_VEX32_PAIR) ? 1 : -1];");
 +	std::puts(
@@ -2150,14 +2420,9 @@ index 53824997..d22790ae 100644
 +	}
 +	std::puts("};\n#else");
 +	std::puts(
-+		"#ifdef CAPSTONE_X86_VEX32_OUTPUT\n#define vex_register_rows X86_vexRegisterRows\nCAPSTONE_INTERNAL\n#else\nstatic\n#endif\nconst struct VectorOutputRow vex_register_rows[] X86_VECTOR_REGISTER_DATA = {\n\t{ 0 },");
-+	for (size_t i = 0; i < rows.size(); ++i) {
-+		if (i == pool.original_rows)
-+			std::puts("#ifdef CAPSTONE_X86_VEX32_OUTPUT");
++		"static const struct VectorOutputRow vex_register_rows[] X86_VECTOR_REGISTER_DATA = {\n\t{ 0 },");
++	for (size_t i = 0; i < pool.original_rows; ++i)
 +		std::printf("\t%s,\n", rows[i].c_str());
-+	}
-+	if (rows.size() > pool.original_rows)
-+		std::puts("#endif");
 +	std::printf(
 +		"};\nstatic const %s vex_register_widths[][4] X86_VECTOR_REGISTER_DATA = {\n",
 +		pool.original_rows <= UINT8_MAX ? "uint8_t" : "uint16_t");
@@ -2169,7 +2434,7 @@ index 53824997..d22790ae 100644
  	for (const auto &map : plans) {
  		std::puts("\t{");
  		for (unsigned i = 0; i < map.size(); i += 16) {
-@@ -914,9 +1476,52 @@ void emit_vex_registers(Decoder &decoder)
+@@ -914,9 +1478,52 @@ void emit_vex_registers(Decoder &decoder)
  		std::puts("\t},");
  	}
  	std::puts("};");
@@ -2223,7 +2488,7 @@ index 53824997..d22790ae 100644
  void emit_output(Decoder &decoder)
  {
  	std::vector<std::string> records;
-@@ -947,7 +1552,7 @@ void emit_output(Decoder &decoder)
+@@ -947,7 +1554,7 @@ void emit_output(Decoder &decoder)
  	    plans.at(0x33b)[1][2] == UINT8_MAX)
  		throw std::runtime_error("missing EVEX extract register forms");
  	std::puts(
@@ -2232,7 +2497,7 @@ index 53824997..d22790ae 100644
  	for (const auto &row : records)
  		std::printf("\t%s,\n", row.c_str());
  	std::puts(
-@@ -962,18 +1567,28 @@ void emit_output(Decoder &decoder)
+@@ -962,18 +1569,28 @@ void emit_output(Decoder &decoder)
  	}
  	std::puts("\tdefault: return NULL;\n\t}\n}");
  	emit_vex_indexed(decoder);

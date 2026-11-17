@@ -1,69 +1,54 @@
 {
-  "source": {
-    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
-    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-    "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
-    "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
-    "records": "equal private-entry records, cursor and errors for 162398208 inputs",
-    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
-    "private_guard": "equal private-entry records for 4718598 protected-page extents",
-    "layout_identical": true,
-    "generated_output_matches_producer": true,
-    "input_source": {
-      "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
-      "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
-      "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
-      "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
-      "semantic_input": {
-        "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
-        "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
-        "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
-        "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
-        "records": "equal private-entry records, cursor and errors for 162398208 inputs",
-        "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
-        "private_guard": "equal private-entry records for 4718598 protected-page extents",
-        "unit_checks": 75,
-        "additional_c4_regression": true,
-        "cosmetic_runtime_object_equality": true,
-        "generated_output_matches_producer": true,
-        "layout_identical": true,
-        "inactive_runtime_objects_identical": true,
-        "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
-      },
-      "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
-      "inactive_runtime_objects_identical": true,
-      "local_inactive_unit_passed": true,
-      "active_semantic_validation_pending": true,
-      "native_qualified": false
-    },
-    "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
-    "shared_vector_object_identical": false,
-    "decoder_object_identical": true,
-    "inactive_runtime_objects_identical": true,
-    "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
-  },
-  "basis": "R1335 mixed: stable MIPS detail and AArch64 detail losses under Clang 14, AArch64 scan loss under Clang 18. Backend objects are identical; downstream text shifts +64/+16 bytes and read-only tables move roughly 6 KB.",
-  "question": "Can unchanged baseline code/data reproduce the loss solely by trailing padding and inert orphan sections that recreate candidate layout growth?",
-  "intervention": "Preserve every original object section prefix, symbol and relocation. Re-link baseline with text-only growth, data-only growth plus inert new sections, or both. Compare all unique common non-x86 symbols against the candidate; report incomplete geometry controls explicitly.",
-  "cases": [
-    [
-      "arm64-ls",
-      0
-    ],
-    [
-      "arm64-ls",
-      2
-    ],
-    [
-      "mips64el-ls",
-      2
-    ]
-  ],
-  "cycles": 21,
-  "launches": [
-    "images",
-    "same-file-fixed"
-  ],
+  "parent": "round1338-vex32-admitted-mode-gate",
+  "baseline": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "change": "Preserve the original static 64-bit record array; emit the complete 32-bit array once in its new private read-only section.",
+  "ownership": "One canonical collector still generates both physical arrays. Every existing 64-bit descriptor and table must remain identical; every new 32-bit offset must resolve to the same complete record.",
+  "prediction": "Remove the 2208-byte growth in existing vector object rodata while retaining the late mode-only gate. Extra linked sections may still affect whole-image placement; native timing remains required.",
   "publication_qualified": false,
-  "limitation": "Diagnostic layout controls only; no source optimization or PMU/cache mechanism is claimed."
+  "native_protocol": {
+    "allocations": 6,
+    "hosts": [
+      "ubuntu-22.04 Clang14",
+      "ubuntu-24.04 Clang18"
+    ],
+    "variants": [
+      "base",
+      "identical A/A",
+      "shared prefix gate",
+      "admitted mode gate",
+      "admitted mode gate plus private record pool"
+    ],
+    "cases": [
+      [
+        "arm64-ls",
+        0
+      ],
+      [
+        "arm64-ls",
+        2
+      ],
+      [
+        "mips64el-ls",
+        2
+      ],
+      [
+        "jpeg-avx2-i386",
+        1
+      ],
+      [
+        "jpeg-avx2-i386",
+        2
+      ]
+    ],
+    "launches": [
+      "independent images",
+      "same inode and size with ASLR disabled"
+    ],
+    "cycles": 21,
+    "order": "rotating forward and reverse pairs",
+    "target_cpu_ms": 160,
+    "drop_outliers": false,
+    "iced_comparison": false,
+    "required": "Only proceed to broad qualification after this focused root-cause follow-up; retain every timing and source-layout receipt."
+  }
 }
