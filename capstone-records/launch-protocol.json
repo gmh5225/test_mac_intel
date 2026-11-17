@@ -31,8 +31,9 @@
     "original images",
     "same inode and size with ASLR disabled if supported",
     "identical consumer object",
-    "complete Capstone output hash"
+    "Capstone boundary hash and selected-output aggregate checksum"
   ],
   "gate": "Retain all native rows and identity controls; active configurations must pass real multi-architecture timing before any publication.",
-  "reason": "Bounded Clang unrolling restores inline initialization and raw/text instruction counts, retaining a 1.21835% ARM detail instruction reduction. All owner-work savings occur in ARM_getInstruction; unrelated libc memset placement changes are not algorithm savings. GNU x86 four-backend objects are identical."
+  "reason": "Bounded Clang unrolling restores inline initialization and raw/text instruction counts, retaining a 1.21835% ARM detail instruction reduction. All owner-work savings occur in ARM_getInstruction; unrelated libc memset placement changes are not algorithm savings. GNU x86 four-backend objects are identical.",
+  "semantic_validation": "Native timing checks selected consumed values, instruction boundaries and rejection counts. It is not a byte-for-byte record comparison. Complete cs_insn/cs_detail records, unused bytes, cursors and errors are checked separately by the dedicated differential probes recorded for this source tree."
 }
