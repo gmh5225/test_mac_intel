@@ -16,7 +16,8 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
-    reference=json.loads((r/'candidate.json').read_text())['parent']
+    baseline=json.loads((r/'profile-baseline.json').read_text())
+    reference=baseline['commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
@@ -27,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',context='Compact eight-byte vector operand context; formatting and detail loops unchanged',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
+    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',isolate='Clang retains the measured isolated memory writer; other compilers retain the complete original executable',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -38,29 +39,37 @@ def main(w):
     assert inc.count('iced_trace(bits,ptr,')==1
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
-    tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
+    tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);assert sha(r/'baseline.patch')==baseline['patch_sha256'];run(['git','apply','--index',r/'baseline.patch'],'prepare-baseline',tree);assert sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()==baseline['tree'];b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects = {}
     inputs = json.loads((r/'candidate.json').read_text())
     shim = (r/'owned-shim.txt').read_text()
-    for label in ('integer','context'):
+    archives = {}
+    active = os.environ['CC'] == 'clang'
+    measured_inputs = json.loads((r/'measured.json').read_text())
+    for label in ('integer','measured','isolate'):
         if label != 'integer':
-            assert sha(r/'candidate.patch') == inputs['sha256']
-            run(['git','apply','--index',r/'candidate.patch'],'apply-context',tree)
-        expected = reference + '^{tree}' if label == 'integer' else inputs['tree']
+            which = measured_inputs if label == 'measured' else inputs
+            selected_patch = r/('measured.patch' if label == 'measured' else 'candidate.patch')
+            assert sha(selected_patch) == which['sha256']
+            run(['git','apply','--index',selected_patch],'apply-'+label,tree)
+        expected = baseline['tree'] if label == 'integer' else which['tree']
         expected = sp.check_output(['git','rev-parse',expected],cwd=tree,text=True).strip()
         tested = sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()
         assert tested == expected
-        save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else inputs['sha256']))
+        save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else which['sha256']))
         units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_encoding_accuracy','x86_scan_batch','detail_option','x86_evex_reserved_fields','x86_packed_move_access','x86_memory_scale']
+        units=sorted(set(units+['api','text_option','aarch64_scan','arm_post_index','aarch64_postprocess','mips_scan','mapping','register_descriptors','sstream','x86_kmask_access','x86_kmask_width','x86_diet_feature_details','x86_printer_prechecked']) | {f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))})
         run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot = b/'CMakeFiles/capstone.dir'
         objects[label] = {str(f.relative_to(objroot)):sha(f) for f in objroot.rglob('*.o')}
-        if label != 'integer':
-            changed=[n for n in objects['integer'] if objects['context'].get(n)!=objects['integer'][n]]
-            assert changed == ['arch/X86/X86VectorOutput.c.o'],changed
-            assert set(objects['integer']) == set(objects['context'])
-            save('object-isolation.json',dict(changed=changed,unchanged=len(objects['integer'])-1))
+        archives[label] = sha(b/'libcapstone.a')
+        if label == 'isolate':
+            changed=[n for n in objects['integer'] if objects['isolate'].get(n)!=objects['integer'][n]]
+            assert changed == (['arch/X86/X86VectorOutput.c.o'] if active else []),changed
+            assert set(objects['isolate'])-set(objects['integer']) == {'arch/X86/X86EvexMemoryOutput.c.o'}
+            assert set(objects['integer']) <= set(objects['isolate'])
+            save('object-isolation.json',dict(changed=changed,added=sorted(set(objects['isolate'])-set(objects['integer'])),unchanged=len(objects['integer'])-len(changed),active=active))
         save('object-digests.json',objects)
         with gzip.open(p/'evidence'/(label+'-vector-object.asm.gz'),'wb') as stream:
             stream.write(sp.check_output(['objdump','-dr',objroot/'arch/X86/X86VectorOutput.c.o']))
@@ -89,9 +98,22 @@ def main(w):
         iterator.write_text(original)
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
+        run(['git','apply','--index',r/'baseline.patch'],'restore-prepared-baseline-'+label,tree)
+        assert sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()==baseline['tree']
+    if active:
+        assert objects['isolate'] == objects['measured']
+        assert archives['isolate'] == archives['measured']
+    else:
+        assert all(objects['isolate'][n]==v for n,v in objects['integer'].items())
+    matched = 'measured' if active else 'integer'
+    assert sha(exe['isolate']) == sha(exe[matched]), 'The compiler scope changed the selected complete executable'
+    save('compiler-scope-identity.json',dict(active=active,matching_variant=matched,
+        matching_runtime_objects=True,archive_sha256=archives,
+        executable_sha256={k:sha(v)for k,v in exe.items()},complete_executable_identical=True,
+        measured_source=measured_inputs))
     for name in ('verify','private-guard','public-verify'):
         run(['clang++','-O2','-std=c++17','-I',tree/'include',r/(name+'.cpp'),'-ldl','-o',w/name],name+'-link')
-        run([w/name,w/'integer.so',w/'context.so'],name)
+        run([w/name,w/'integer.so',w/'isolate.so']+([str(int(active))] if name=='verify' else []),name)
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors')
     manifest, costs = {}, []
@@ -110,14 +132,14 @@ def main(w):
         save('provenance.json',manifest)
         for mode in (0,1,2):
             signatures={}
-            for label in ('integer','context'):
+            for label in ('integer','isolate'):
                 ident=name+'-'+str(mode)+'-'+label
                 raw=w/(ident+'.callgrind')
                 args=[exe[label],'capstone',str(mode),'1',f,intervals,str(bits)]
                 native=list(map(int,sp.check_output(args,text=True).split()))
                 assert len(native)==6
                 signatures[label]=native[2:]
-                if label=='context':assert signatures['integer']==signatures['context']
+                if label=='isolate':assert signatures['integer']==signatures['isolate']
                 run(['valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no','--toggle-collect=_ZZ4mainENK3$_0clEj','--cache-sim=yes','--branch-sim=yes','--dump-instr=yes','--collect-jumps=yes','--callgrind-out-file='+str(raw),*args],'cost-'+ident)
                 log=(p/'evidence'/('cost-'+ident+'.log')).read_text()
                 result=next(list(map(int,line.split()))for line in log.splitlines()if len(line.split())==6 and all(x.isdigit()for x in line.split()))
@@ -132,8 +154,8 @@ def main(w):
                 save('instruction-costs.json',costs)
         print(name,'instruction counts complete',flush=True)
     assert len(costs)==24
-    save('complete.json',dict(success=True,traces=24,cases=4,unit_checks_per_variant=9,native_qualification=False))
-w=Path(tempfile.mkdtemp(prefix='capstone-vector-context-cost-'))
+    save('complete.json',dict(success=True,traces=24,cases=4,unit_checks_per_variant=len(units),native_qualification=False))
+w=Path(tempfile.mkdtemp(prefix='capstone-vector-isolate-cost-'))
 try:
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     main(w)

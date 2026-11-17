@@ -1,40 +1,13 @@
 {
-  "baseline": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-  "cause": "The register writer accepts ten parameters including a pointer to a caller-built register array. Clang 18 executed operand extraction and writer call setup accounts for 2.11% of the measured SSL64 format instruction count; this is not an available cycle saving estimate.",
-  "change": "Pass the same five scalar fields and three register numbers in one eight-byte value. Keep register formatting, detail loops, clearing, generated rows and admission unchanged.",
-  "domains": {
-    "prefix": [
-      2,
-      3,
-      4
-    ],
-    "ll": [
-      0,
-      1,
-      2
-    ],
-    "rex": "0x40..0x4f",
-    "first_ll": [
-      0,
-      1,
-      2
-    ],
-    "reg_count": [
-      2,
-      3
-    ],
-    "regs": "0..31; unused third lane initialized to zero"
-  },
-  "risks": [
-    "Compiler may spill or reconstruct the compact value, offsetting caller savings.",
-    "GCC inline decisions and linked placement must be measured; R1166 established that unrolling alone changed GCC inline behavior and added work."
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "cause": "R1392 preserves all 192 mixed comparisons above the one-percent loss threshold and both Clang native profiles, while GCC11 retains seven native losses. GCC externalization changes broadcast lowering and surrounding text; Clang preserves every common text symbol position and size.",
+  "change": "Qualify the isolated memory dispatch for Clang, and retain the original static broadcast reader on other compilers. Require Clang runtime objects identical to the measured R1390 source and every GCC baseline runtime object identical to the release; record archive/binary identity separately.",
+  "source_runtime": "round1390-evex-memory-prechecked-dispatch",
+  "native_evidence": "round1392-evex-prechecked-dispatch-native",
+  "constraints": [
+    "No new GCC regression is accepted or hidden",
+    "No claim of comprehensive iced victory; FastFormatter and raw still lead",
+    "Multi-configuration, portable and current NeverD dev product validation required before publication"
   ],
-  "gates": [
-    "Full record and protected-page equality",
-    "Four compiler code generation and unchanged consumer instruction costs",
-    "Only then real native timing with A/A, PE32 and other architectures",
-    "Alternate configurations and actual NeverD product before publication"
-  ],
-  "source": "Study of local iced compact state and fixed-width formatting; no iced implementation copied.",
   "publication_qualified": false
 }
