@@ -1,432 +1,275 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 60eda54e..7654a7ba 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -468,6 +468,7 @@ if(CAPSTONE_X86_SUPPORT)
-         arch/X86/X86MemoryOutput.c
-         arch/X86/X86OutputIterator.c
-         arch/X86/X86VectorOutput.c
-+        arch/X86/X86EvexScan.c
-     )
-     # Use scalar/vector stores or libc for the fixed public output buffers.
-     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
-diff --git a/Makefile b/Makefile
-index 74790c01..4382db46 100644
---- a/Makefile
-+++ b/Makefile
-@@ -272,6 +272,7 @@ endif
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
- 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
-+	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
- 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
- endif
- 
-diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
-index 63dcc538..cc67e9c7 100644
---- a/arch/X86/X86DisassemblerDecoder.c
-+++ b/arch/X86/X86DisassemblerDecoder.c
-@@ -3308,8 +3308,13 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
- 	uint16_t size;
- 	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
- 	if (tryExtension)
-+#ifdef X86_EVEX_REGISTER_SCAN
-+		extension = X86_decodeScanFeatureExtension(
-+			ud, code, code_len, &instr, &size, opcode);
-+#else
- 		extension = X86_decodeFeatureExtension(ud, code, code_len,
- 						       &instr, &size, opcode);
-+#endif
- 	if (extension == X86_FEATURE_INVALID)
- 		return false;
- 	if (extension != X86_FEATURE_DECODED) {
 diff --git a/arch/X86/X86EvexAdmission.h b/arch/X86/X86EvexAdmission.h
-new file mode 100644
-index 00000000..53d4d8b8
---- /dev/null
+index 53d4d8b8..7b3f5853 100644
+--- a/arch/X86/X86EvexAdmission.h
 +++ b/arch/X86/X86EvexAdmission.h
-@@ -0,0 +1,15 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifndef CS_X86_EVEX_ADMISSION_H
-+#define CS_X86_EVEX_ADMISSION_H
-+
-+/* Arguments are local values. Keep the extent check before field reads. */
+@@ -5,9 +5,11 @@
+ #define CS_X86_EVEX_ADMISSION_H
+ 
+ /* Arguments are local values. Keep the extent check before field reads. */
+-#define X86_EVEX_REGISTER_PREFIX_REJECTS(code, size) \
+-	((size) < 6 || ((code)[2] & 7) != 5 || ((code)[3] & 0x97) || \
++#define X86_EVEX_PREFIX_REJECTS(code, size, pp) \
++	((size) < 6 || ((code)[2] & 7) != (4 | (pp)) || ((code)[3] & 0x97) || \
+ 	 ((code)[3] & 0x60) == 0x60)
 +#define X86_EVEX_REGISTER_PREFIX_REJECTS(code, size) \
-+	((size) < 6 || ((code)[2] & 7) != 5 || ((code)[3] & 0x97) || \
-+	 ((code)[3] & 0x60) == 0x60)
-+#define X86_EVEX_REGISTER_EXTRACT(key) (((key) & ~0x22u) == 0x319)
-+#define X86_EVEX_EXTRACT_SOURCE_REJECTS(code) \
-+	(((code)[2] & 0x78) != 0x78 || !((code)[3] & 8))
-+
-+#endif
++	X86_EVEX_PREFIX_REJECTS(code, size, 1)
+ #define X86_EVEX_REGISTER_EXTRACT(key) (((key) & ~0x22u) == 0x319)
+ #define X86_EVEX_EXTRACT_SOURCE_REJECTS(code) \
+ 	(((code)[2] & 0x78) != 0x78 || !((code)[3] & 8))
 diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
-new file mode 100644
-index 00000000..12cc13fb
---- /dev/null
+index 12cc13fb..ccaec06a 100644
+--- a/arch/X86/X86EvexScan.c
 +++ b/arch/X86/X86EvexScan.c
-@@ -0,0 +1,60 @@
-+/* Capstone Disassembly Engine */
-+/* SPDX-License-Identifier: BSD-3-Clause */
-+
-+#ifdef CAPSTONE_HAS_X86
-+#include "X86FeatureExtension.h"
-+#ifdef X86_EVEX_REGISTER_SCAN
-+#include "X86EvexAdmission.h"
-+#include "X86GenEvexScan.inc"
-+
-+/* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
-+ * The ordinary output generator owns the admitted IDs and widths. */
-+__attribute__((noinline, section(".cs_x86_evex_scan_text")))
-+static x86_feature_decode_result
-+decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
-+		      MCInst *instr, uint16_t *size, uint8_t opcode)
-+{
-+	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
-+	if (handle->mode == CS_MODE_64 && code[5] >= 0xc0 &&
-+	    !X86_EVEX_REGISTER_PREFIX_REJECTS(code, code_len)
-+#ifdef CAPSTONE_X86_SCAN_ADAPTER
-+	    && !handle->x86_scan_adapter
-+#endif
-+	) {
-+		const unsigned map = code[1] & 15;
-+		const struct EvexScanPlan *plan =
-+			&evex_scan_plans[evex_scan_index[code[4]]];
-+		if (plan->map == map && code_len >= plan->length) {
-+			const unsigned id =
-+				plan->ids[code[2] >> 7][code[3] >> 5];
-+			const unsigned key = (map << 8) | code[4];
-+			if (id && (!X86_EVEX_REGISTER_EXTRACT(key) ||
-+				   !X86_EVEX_EXTRACT_SOURCE_REJECTS(code))) {
-+				instr->Opcode = 0;
-+				instr->OpcodePub = id;
-+				instr->popcode_adjust = 0;
-+				*size = plan->length;
-+				return X86_FEATURE_DECODED;
-+			}
-+		}
-+	}
-+	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
-+					  opcode);
-+}
-+
-+/* Keep the non-EVEX and non-64-bit fallback ahead of the register helper's
-+ * working state. Its predicate matches the isolated full-decode entry. */
-+__attribute__((noinline, section(".cs_x86_evex_scan_text")))
-+CAPSTONE_INTERNAL x86_feature_decode_result
-+X86_decodeScanFeatureExtension(csh ud, const uint8_t *code, size_t code_len,
-+			       MCInst *instr, uint16_t *size, uint8_t opcode)
-+{
-+	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
-+	    (((cs_struct *)(uintptr_t)ud)->mode & CS_MODE_64))
-+		return decodeEvexRegisterScan(ud, code, code_len, instr, size,
-+					     opcode);
-+	return X86_decodeFeatureExtensionSlow(ud, code, code_len, instr, size,
-+					      opcode);
-+}
-+#endif
-+#endif
-diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index b3bb84b4..4d34d8ac 100644
---- a/arch/X86/X86FeatureExtension.h
-+++ b/arch/X86/X86FeatureExtension.h
-@@ -311,6 +311,17 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
- 			       size_t code_len, MCInst *instr,
- 			       uint16_t *size, uint8_t opcode);
+@@ -15,29 +15,62 @@ decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+ 		      MCInst *instr, uint16_t *size, uint8_t opcode)
+ {
+ 	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
+-	if (handle->mode == CS_MODE_64 && code[5] >= 0xc0 &&
+-	    !X86_EVEX_REGISTER_PREFIX_REJECTS(code, code_len)
++	const unsigned pp = code[2] & 3;
++	if (handle->mode == CS_MODE_64 &&
++	    !X86_EVEX_PREFIX_REJECTS(code, code_len, pp)
+ #ifdef CAPSTONE_X86_SCAN_ADAPTER
+ 	    && !handle->x86_scan_adapter
  #endif
-+#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__) && \
-+	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
-+	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
-+	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
-+	!defined(_WIN32_WCE)
-+#define X86_EVEX_REGISTER_SCAN
-+CAPSTONE_INTERNAL x86_feature_decode_result
-+X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
-+			       MCInst *instr, uint16_t *size, uint8_t opcode);
-+#endif
-+
- bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
- bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode, cs_mode mode);
- const char *X86_featureExtensionRegisterName(unsigned int reg);
+ 	) {
+ 		const unsigned map = code[1] & 15;
+-		const struct EvexScanPlan *plan =
+-			&evex_scan_plans[evex_scan_index[code[4]]];
+-		if (plan->map == map && code_len >= plan->length) {
+-			const unsigned id =
+-				plan->ids[code[2] >> 7][code[3] >> 5];
+-			const unsigned key = (map << 8) | code[4];
+-			if (id && (!X86_EVEX_REGISTER_EXTRACT(key) ||
+-				   !X86_EVEX_EXTRACT_SOURCE_REJECTS(code))) {
+-				instr->Opcode = 0;
+-				instr->OpcodePub = id;
+-				instr->popcode_adjust = 0;
+-				*size = plan->length;
+-				return X86_FEATURE_DECODED;
++		const unsigned index = evex_scan_index[code[4]];
++		unsigned id, length;
++		if (index & 128) {
++			if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
++				goto fallback;
++			unsigned kind;
++			if (index == EVEX_SCAN_MOVE) {
++				if (map != 1 || !pp)
++					goto fallback;
++				kind = pp;
++			} else {
++				if (map != 2 || pp != 1 || code[5] >= 0xc0)
++					goto fallback;
++				kind = 0;
++			}
++			id = evex_transfer_scan_ids[kind][code[2] >> 7]
++						  [code[3] >> 5];
++			length = evex_transfer_lengths[((code[5] >> 3) & 24) |
++						       (code[5] & 7)];
++			/* Only mod=0 with SIB needs its base field to determine
++			 * the extent. Every other ordinary SIB value is valid. */
++			if (!length) {
++				if (code_len < 7)
++					goto fallback;
++				length = 7 + 4 * ((code[6] & 7) == 5);
+ 			}
++		} else {
++			if (pp != 1 || code[5] < 0xc0)
++				goto fallback;
++			const struct EvexScanPlan *plan = &evex_scan_plans[index];
++			if (plan->map != map)
++				goto fallback;
++			const unsigned key = (map << 8) | code[4];
++			if (X86_EVEX_REGISTER_EXTRACT(key) &&
++			    X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
++				goto fallback;
++			id = plan->ids[code[2] >> 7][code[3] >> 5];
++			length = plan->length;
++		}
++		if (id && code_len >= length) {
++			instr->Opcode = 0;
++			instr->OpcodePub = id;
++			instr->popcode_adjust = 0;
++			*size = (uint16_t)length;
++			return X86_FEATURE_DECODED;
+ 		}
+ 	}
++fallback:
+ 	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
+ 					  opcode);
+ }
 diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
-new file mode 100644
-index 00000000..fef8d676
---- /dev/null
+index fef8d676..80cda582 100644
+--- a/arch/X86/X86GenEvexScan.inc
 +++ b/arch/X86/X86GenEvexScan.inc
-@@ -0,0 +1,41 @@
-+/* Generated by suite/synctools/x86_vector_output.cpp. */
-+struct EvexScanPlan {
-+	uint8_t map, length;
-+	uint16_t ids[2][3];
+@@ -1,4 +1,5 @@
+ /* Generated by suite/synctools/x86_vector_output.cpp. */
++enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };
+ struct EvexScanPlan {
+ 	uint8_t map, length;
+ 	uint16_t ids[2][3];
+@@ -23,13 +24,13 @@ static const struct EvexScanPlan evex_scan_plans[]
+ static const uint8_t evex_scan_index[256]
+ 	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
+ 	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 9, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 129, 9, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 12, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+@@ -39,3 +40,29 @@ static const uint8_t evex_scan_index[256]
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+ 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0,
+ };
++static const uint16_t evex_transfer_scan_ids[4][2][3]
++	__attribute__((section(".cs_x86_evex_transfer_rodata"))) = {
++	{
++		{ 0, X86_INS_VBROADCASTF32X4, X86_INS_VBROADCASTF32X4 },
++		{ 0, X86_INS_VBROADCASTF64X2, X86_INS_VBROADCASTF64X2 },
++	},
++	{
++		{ X86_INS_VMOVDQA32, X86_INS_VMOVDQA32, X86_INS_VMOVDQA32 },
++		{ X86_INS_VMOVDQA64, X86_INS_VMOVDQA64, X86_INS_VMOVDQA64 },
++	},
++	{
++		{ X86_INS_VMOVDQU32, X86_INS_VMOVDQU32, X86_INS_VMOVDQU32 },
++		{ X86_INS_VMOVDQU64, X86_INS_VMOVDQU64, X86_INS_VMOVDQU64 },
++	},
++	{
++		{ X86_INS_VMOVDQU8, X86_INS_VMOVDQU8, X86_INS_VMOVDQU8 },
++		{ X86_INS_VMOVDQU16, X86_INS_VMOVDQU16, X86_INS_VMOVDQU16 },
++	},
 +};
-+static const struct EvexScanPlan evex_scan_plans[]
-+	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
-+	{ 0 },
-+	{ 1, 6, { { X86_INS_VPXORD, X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORQ, X86_INS_VPXORQ, X86_INS_VPXORQ } } },
-+	{ 1, 6, { { X86_INS_VPADDD, X86_INS_VPADDD, X86_INS_VPADDD }, { 0, 0, 0 } } },
-+	{ 2, 6, { { X86_INS_VPSHUFB, X86_INS_VPSHUFB, X86_INS_VPSHUFB }, { X86_INS_VPSHUFB, X86_INS_VPSHUFB, X86_INS_VPSHUFB } } },
-+	{ 2, 6, { { X86_INS_VAESENC, X86_INS_VAESENC, X86_INS_VAESENC }, { X86_INS_VAESENC, X86_INS_VAESENC, X86_INS_VAESENC } } },
-+	{ 2, 6, { { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST, X86_INS_VAESENCLAST }, { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST, X86_INS_VAESENCLAST } } },
-+	{ 2, 6, { { X86_INS_VAESDEC, X86_INS_VAESDEC, X86_INS_VAESDEC }, { X86_INS_VAESDEC, X86_INS_VAESDEC, X86_INS_VAESDEC } } },
-+	{ 2, 6, { { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST, X86_INS_VAESDECLAST }, { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST, X86_INS_VAESDECLAST } } },
-+	{ 3, 7, { { 0, X86_INS_VEXTRACTF32X4, X86_INS_VEXTRACTF32X4 }, { 0, X86_INS_VEXTRACTF64X2, X86_INS_VEXTRACTF64X2 } } },
-+	{ 3, 7, { { 0, 0, X86_INS_VEXTRACTF32X8 }, { 0, 0, X86_INS_VEXTRACTF64X4 } } },
-+	{ 3, 7, { { X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD }, { X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ } } },
-+	{ 3, 7, { { 0, X86_INS_VEXTRACTI32X4, X86_INS_VEXTRACTI32X4 }, { 0, X86_INS_VEXTRACTI64X2, X86_INS_VEXTRACTI64X2 } } },
-+	{ 3, 7, { { 0, 0, X86_INS_VEXTRACTI32X8 }, { 0, 0, X86_INS_VEXTRACTI64X4 } } },
-+	{ 3, 7, { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } } },
++static const uint8_t evex_transfer_lengths[32]
++	__attribute__((section(".cs_x86_evex_transfer_rodata"))) = {
++	6, 6, 6, 6, 0, 10, 6, 6,
++	7, 7, 7, 7, 8, 7, 7, 7,
++	10, 10, 10, 10, 11, 10, 10, 10,
++	6, 6, 6, 6, 6, 6, 6, 6,
 +};
-+static const uint8_t evex_scan_index[256]
-+	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
-+	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 9, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 12, 0, 0, 0, 0,
-+	0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 5, 6, 7,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0,
-+};
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 6df1472d..8a606f4e 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -8,6 +8,7 @@
- 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
-+#include "X86EvexAdmission.h"
- struct PaddingOutput {
- 	unsigned id;
- 	uint8_t length;
-@@ -117,8 +118,7 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	if (size >= 6 && code[5] < 0xc0)
- 		return writeEvexBroadcast(code, size, insn, insn_size,
- 					  address_regs);
--	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
--	    (code[3] & 0x60) == 0x60)
-+	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, size))
- 		return false;
- 	const unsigned ll = code[3] >> 5;
- 	const unsigned w = code[2] >> 7;
-@@ -134,8 +134,8 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 				  (code[5] & 7) | ((rxb & 3) << 3) };
- 	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
-      * the full-width source, and reserve vvvv/V'. */
--	if ((key & ~0x22u) == 0x319) {
--		if ((code[2] & 0x78) != 0x78 || !(code[3] & 8))
-+	if (X86_EVEX_REGISTER_EXTRACT(key)) {
-+		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
- 			return false;
- 		const unsigned pair[] = { regs[2], regs[0] };
- 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
 diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
-index 05e91649..bc735dd6 100644
+index bc735dd6..5a2f50ae 100644
 --- a/docs/ARCHITECTURE.md
 +++ b/docs/ARCHITECTURE.md
-@@ -377,6 +377,26 @@ decoder still owns legality and handler precedence; prefixed, short and
- non-64-bit inputs retain that decoder. Other host targets retain the original
- entry and table layout.
+@@ -389,13 +389,23 @@ returns to the existing extension and generated decoders. Non-EVEX and
+ non-64-bit inputs bypass the new plan helper. DIET, reduced, custom-runtime,
+ kernel and other host builds retain their original scan entry.
  
-+On the same ELF host configuration, full userspace builds have a separate
-+raw-scan entry for unprefixed, unmasked EVEX register forms already owned by
-+the vector output generator. A byte-sized opcode index selects a compact
-+map/length/ID plan; W and vector length select the canonical public ID.
-+The shared prefix predicate and extract-source checks retain reserved-field
-+validation, and immediate forms require their final byte before admission.
-+Successful plans return only the compact ID and length; they do not construct
-+operands or text. Installed scan adapters retain precedence, and every miss
-+returns to the existing extension and generated decoders. Non-EVEX and
-+non-64-bit inputs bypass the new plan helper. DIET, reduced, custom-runtime,
-+kernel and other host builds retain their original scan entry.
++The same opcode index also tags ordinary packed EVEX moves and full-tuple
++broadcasts. Their canonical ID depends on the mandatory prefix, W and vector
++length. Reserved vvvv/V' fields, masking and broadcast/rounding modifiers keep
++their existing validation. A 32-entry ModR/M table supplies ordinary register
++and memory extents; only mod=0 with SIB needs the SIB base to distinguish a
++disp32 address. The complete instruction must fit before its ID and length
++are returned. Address, register and operand details still use the full reader.
 +
-+The scan helper and plans occupy their own code and read-only sections.
-+`suite/synctools/x86_vector_output.cpp --evex-scan` emits
-+`X86GenEvexScan.inc` from the same canonical probes as the full vector output
-+rows. Rebuild this generator against the current Capstone library after
-+changing those forms, and regenerate both the default output and the scan
-+projection. The generator rejects opcode-index collisions and IDs outside
-+the compact representation.
-+
+ The scan helper and plans occupy their own code and read-only sections.
+ `suite/synctools/x86_vector_output.cpp --evex-scan` emits
+ `X86GenEvexScan.inc` from the same canonical probes as the full vector output
+ rows. Rebuild this generator against the current Capstone library after
+ changing those forms, and regenerate both the default output and the scan
+-projection. The generator rejects opcode-index collisions and IDs outside
+-the compact representation.
++projection. Transfer probes cover load/store direction, extension registers,
++ModR/M and SIB values and displacement extents before admitting an ID. The
++generator rejects opcode-index collisions and IDs outside the compact
++representation.
+ 
  Legacy RAO-INT (`0F 38 FC` with its operation-selecting mandatory prefix) and
  VEX CMPccXADD use the source-owned atomic handler in `X86Mapping.c`. They
- reuse the existing atomic mapping and printers while retaining their own
 diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
-index 53824997..2da66fe1 100644
+index 2da66fe1..18c8d589 100644
 --- a/suite/synctools/x86_vector_output.cpp
 +++ b/suite/synctools/x86_vector_output.cpp
-@@ -917,19 +917,67 @@ void emit_vex_registers(Decoder &decoder)
+@@ -917,6 +917,62 @@ void emit_vex_registers(Decoder &decoder)
  	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
  		     rows.size(), widths.size() - 1);
  }
--void emit_output(Decoder &decoder)
-+void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
++void emit_evex_transfer_scan(Decoder &decoder)
 +{
-+	std::array<unsigned, 256> index{};
-+	std::map<unsigned, Form> descriptions;
-+	for (const auto &form : forms) {
-+		const unsigned key = form.map << 8 | form.opcode;
-+		if (form.map < 1 || form.map > 3 ||
-+		    form.extract != ((key & ~0x22u) == 0x319))
-+			throw std::runtime_error("unsupported EVEX scan form");
-+		descriptions.emplace(key, form);
-+	}
-+	unsigned plan = 0;
-+	for (const auto &[key, widths] : ids) {
-+		(void)widths;
-+		if (index[key & 255] || ++plan > UINT8_MAX)
-+			throw std::runtime_error("EVEX scan opcode plan collision");
-+		index[key & 255] = plan;
-+	}
-+	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
-+	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
-+	for (const auto &[key, widths] : ids) {
-+		const auto &form = descriptions.at(key);
-+		std::printf("\t{ %u, %u, { ", form.map, 6 + form.immediate);
++	std::puts("static const uint16_t evex_transfer_scan_ids[4][2][3]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {");
++	for (unsigned kind = 0; kind < 4; ++kind) {
++		std::puts("\t{");
 +		for (unsigned w = 0; w < 2; ++w) {
-+			std::printf("%s{ ", w ? ", " : "");
++			std::printf("\t\t{ ");
 +			for (unsigned ll = 0; ll < 3; ++ll) {
-+				if (widths[w][ll] > UINT16_MAX)
-+					throw std::runtime_error("EVEX scan ID exceeds uint16_t");
-+				std::printf("%s%s", ll ? ", " : "",
-+					    decoder.symbol(widths[w][ll]).c_str());
++				const unsigned pp = kind ? kind : 1;
++				const unsigned map = kind ? 1 : 2;
++				uint8_t bytes[11] = {
++					0x62, uint8_t(0xf0 | map),
++					uint8_t(0x7c | pp | w << 7),
++					uint8_t(8 | ll << 5),
++					uint8_t(kind ? 0x6f : 0x1a), 0x58, 0x80
++				};
++				unsigned id = decoder.decode(bytes, 7);
++				if (id > UINT16_MAX)
++					throw std::runtime_error("EVEX transfer ID exceeds uint16_t");
++				if (id) {
++					for (unsigned store = 0; store < (kind ? 2u : 1u); ++store) {
++						bytes[4] = uint8_t(kind ? 0x6f | store << 4 : 0x1a);
++						for (unsigned ext = 0; ext < 16; ++ext) {
++							bytes[1] = uint8_t(ext << 4 | map);
++							for (unsigned modrm = 0; modrm < (kind ? 256u : 192u); ++modrm) {
++								bytes[5] = uint8_t(modrm);
++								const unsigned mod = modrm >> 6, rm = modrm & 7;
++								const bool sib = mod < 3 && rm == 4;
++								for (unsigned address = 0; address < (sib ? 256u : 1u); ++address) {
++									unsigned length = 6;
++									if (sib)
++										bytes[length++] = uint8_t(address);
++									unsigned displacement = 0;
++									if (mod == 1)
++										displacement = 1;
++									else if (mod == 2 || (mod == 0 && (sib ? (address & 7) == 5 : rm == 5)))
++										displacement = 4;
++									for (unsigned j = 0; j < displacement; ++j)
++										bytes[length++] = uint8_t(0x81 + j * 37);
++									if (decoder.decode(bytes, length) != id)
++										throw std::runtime_error("EVEX transfer ID depends on address or register fields");
++								}
++							}
++						}
++					}
++				}
++				std::printf("%s%s", ll ? ", " : "", decoder.symbol(id).c_str());
 +			}
-+			std::printf(" }");
++			std::puts(" },");
 +		}
-+		std::puts(" } },");
-+	}
-+	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {");
-+	for (unsigned i = 0; i < index.size(); i += 16) {
-+		std::printf("\t");
-+		for (unsigned j = 0; j < 16; ++j)
-+			std::printf("%s%u,", j ? " " : "", index[i + j]);
-+		std::putchar('\n');
++		std::puts("\t},");
 +	}
 +	std::puts("};");
++	std::fprintf(stderr, "%llu canonical EVEX transfer probes\n", static_cast<unsigned long long>(decoder.probes));
 +}
 +
-+void emit_output(Decoder &decoder, bool scan_only)
+ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
  {
- 	std::vector<std::string> records;
--	std::map<unsigned, WidthRows> plans;
-+	std::map<unsigned, WidthRows> plans, scan_ids;
- 	for (const auto &form : forms) {
- 		auto &rows = plans[form.map << 8 | form.opcode];
-+		auto &ids = scan_ids[form.map << 8 | form.opcode];
- 		for (unsigned ll = 0; ll < 3; ++ll) {
- 			for (unsigned w = 0; w < 2; ++w) {
- 				auto row = output_record(decoder, form, w, ll);
- 				if (row.empty()) {
- 					rows[w][ll] = UINT8_MAX;
-+					ids[w][ll] = 0;
- 					continue;
- 				}
-+				ids[w][ll] = decoder.insn->id;
- 				const auto i = std::find(records.begin(),
- 							 records.end(), row);
- 				const auto index = static_cast<size_t>(
-@@ -943,6 +991,10 @@ void emit_output(Decoder &decoder)
- 			}
- 		}
+ 	std::array<unsigned, 256> index{};
+@@ -935,6 +991,11 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 			throw std::runtime_error("EVEX scan opcode plan collision");
+ 		index[key & 255] = plan;
  	}
-+	if (scan_only) {
-+		emit_evex_scan(decoder, scan_ids);
-+		return;
-+	}
- 	if (plans.at(0x339)[0][1] == UINT8_MAX ||
- 	    plans.at(0x33b)[1][2] == UINT8_MAX)
- 		throw std::runtime_error("missing EVEX extract register forms");
-@@ -972,11 +1024,14 @@ void emit_output(Decoder &decoder)
- }
++	if (index[0x6f] || index[0x7f] || index[0x1a] || plan >= 128)
++		throw std::runtime_error("EVEX transfer opcode plan collision");
++	index[0x6f] = index[0x7f] = 128;
++	index[0x1a] = 129;
++	std::puts("enum { EVEX_SCAN_MOVE = 128, EVEX_SCAN_BROADCAST = 129 };");
+ 	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
+ 	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
+ 	for (const auto &[key, widths] : ids) {
+@@ -960,6 +1021,8 @@ void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
+ 		std::putchar('\n');
+ 	}
+ 	std::puts("};");
++	emit_evex_transfer_scan(decoder);
++	std::puts("static const uint8_t evex_transfer_lengths[32]\n\t__attribute__((section(\".cs_x86_evex_transfer_rodata\"))) = {\n\t6, 6, 6, 6, 0, 10, 6, 6,\n\t7, 7, 7, 7, 8, 7, 7, 7,\n\t10, 10, 10, 10, 11, 10, 10, 10,\n\t6, 6, 6, 6, 6, 6, 6, 6,\n};");
  }
  
--int main()
-+int main(int argc, char **argv)
- {
-+	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
-+	if (argc > 1 && !scan_only)
-+		throw std::runtime_error("usage: x86_vector_output [--evex-scan]");
- 	Decoder decoder;
- 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
--	emit_output(decoder);
-+	emit_output(decoder, scan_only);
- 	std::fprintf(stderr, "%llu ordinary decoder probes\n",
- 		     static_cast<unsigned long long>(decoder.probes));
- }
-diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
-index 82c9453e..7e0a3bf9 100644
---- a/xcode/Capstone.xcodeproj/project.pbxproj
-+++ b/xcode/Capstone.xcodeproj/project.pbxproj
-@@ -113,6 +113,7 @@
- 		EE9D7FCC807402A74CD63761 /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
- 		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
- 		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
-+		E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
- 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
- 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
- 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
-@@ -161,6 +162,7 @@
- 		9DDE0C4764522FB3D109267B /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
- 		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
- 		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
-+		84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
- 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
- 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
- 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
-@@ -228,6 +230,7 @@
- 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
- 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
- 		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
-+		F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
- 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
- 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
- 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
-@@ -513,6 +516,7 @@
- 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
- 		CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86InstPrinterCommon.c; sourceTree = "<group>"; };
- 		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
-+		96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86EvexScan.c; sourceTree = "<group>"; };
- 		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
- 		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
- 		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
-@@ -988,6 +992,7 @@
- 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
- 				CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */,
- 				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
-+				96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */,
- 				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
- 				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
- 				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
-@@ -1644,6 +1649,7 @@
- 				9DDE0C4764522FB3D109267B /* X86MemoryOutput.c in Sources */,
- 				6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */,
- 				C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */,
-+				84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */,
- 				DC474FC519DE6FDA00BCA449 /* ARMModule.c in Sources */,
- 				DC474FC719DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
- 				DC474F9319DE6FCD00BCA449 /* cs.c in Sources */,
-@@ -1745,6 +1751,7 @@
- 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
- 				9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */,
- 				417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */,
-+				F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */,
- 				DCFE249719DDCDD000EF8EA9 /* XCoreMapping.c in Sources */,
- 				DCA357831BC2C0290094BB3F /* M68KDisassembler.c in Sources */,
- 				DCFE247719DDCDAD00EF8EA9 /* SparcDisassembler.c in Sources */,
-@@ -1792,6 +1799,7 @@
- 				EE9D7FCC807402A74CD63761 /* X86MemoryOutput.c in Sources */,
- 				1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */,
- 				622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */,
-+				E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */,
- 				DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */,
- 				DC474FA319DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
- 				DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */,
+ void emit_output(Decoder &decoder, bool scan_only)
