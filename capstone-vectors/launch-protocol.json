@@ -1,26 +1,45 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
-  "variants": [
-    "published baseline",
-    "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+  "round": 1333,
+  "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "patch": "b6357f7a1f41a820657c46af2570beb91dcff2dc98f4e4882560b60c810ba062",
+  "hosts": "Two independent ubuntu-24.04 Clang allocations; actual CPU identities retained",
+  "cases": [
+    "libjpeg62-turbo-amd64",
+    "libzstd1-amd64",
+    "libssl3t64-amd64",
+    "jpeg-avx2-i386",
+    "libssl3t64-i386"
   ],
-  "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
-    "SSL64 SIMD",
-    "Zstd64 all and SIMD"
+  "panels": 7,
+  "modes": [
+    "scan",
+    "format",
+    "detail"
   ],
   "cycles": 21,
-  "launch_controls": [
+  "controls": [
+    "byte-identical A/A",
     "original images",
-    "same inode and fixed addresses"
+    "same inode and file length with ASLR disabled when supported",
+    "equal-length engine arguments",
+    "rotating forward/reverse order",
+    "identical consumer object",
+    "Capstone boundary hash and selected-output aggregate checksum"
   ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "native_timing_claim": "Only native process CPU ns per decoded instruction; instruction cost is not timing proof.",
+  "gate": "No qualified promotion if a representative workload has a reproducible regression; inspect A/A and paired uncertainty without dropping rows.",
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "dca4d85bb991629d0ba7105d6e346063da531492",
+    "sha256": "b6357f7a1f41a820657c46af2570beb91dcff2dc98f4e4882560b60c810ba062",
+    "records": "equal private-entry records, cursor and errors for 151781376 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "alternate_records": "equal ATT/MASM public records, cursor and errors for 12975648 inputs",
+    "layout_identical": true,
+    "generated_tables_changed": false
+  },
+  "reason": "The only source change declares X86_register_map argument-only and side-effect-free. Complete native public/alternate syntax records pass. Native detail Ir decreases in printOperand and X86_register_map on four real panels; raw/format Ir remains identical. This does not qualify native throughput.",
+  "semantic_validation": "Native timing checks selected consumed values, instruction boundaries and rejection counts. It is not a byte-for-byte record comparison. Complete cs_insn/cs_detail records, unused bytes, cursors and errors are checked separately by the dedicated differential probes recorded for this source tree."
 }
