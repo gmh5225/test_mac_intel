@@ -1,7 +1,7 @@
-name: Compare EVEX transfer dispatch with complete layout records and A/A controls
+name: Time stable-caller 32-bit output on published memory optimization
 on:
   push:
-    branches: [codex/capstone-evex-transfer-comparison-mixed]
+    branches: [codex/capstone-mode-caller-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -28,7 +26,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 413b606f938a39d053fd61ef83a6277eec4e4f6e
+          ref: 8acfcd402e9f5fb7a458faa37552e53d7da3aa9a
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -43,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-transfer-comparison-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mode-caller-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
