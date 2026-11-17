@@ -1,0 +1,200 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 7654a7ba..ceb5c7cb 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -469,6 +469,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86OutputIterator.c
+         arch/X86/X86VectorOutput.c
+         arch/X86/X86EvexScan.c
++        arch/X86/X86Vex32Output.c
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+diff --git a/Makefile b/Makefile
+index 4382db46..178b5342 100644
+--- a/Makefile
++++ b/Makefile
+@@ -273,6 +273,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86Vex32Output.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
+index a976814e..be7708ff 100644
+--- a/arch/X86/X86GenSimpleOutput.inc
++++ b/arch/X86/X86GenSimpleOutput.inc
+@@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
+ 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
+-			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
++			0, 65533, 0, 344, 65531, 65531, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
+ 			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
+ 			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
+ 			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..e5900e00 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -81,6 +81,9 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 						     insn_size,
+ 						     x86_simple_registers[3],
+ 						     wide);
++		if (plan == X86_PLAN_VEX32)
++			return X86_writeVex32Output(code, size, insn, insn_size,
++						    x86_simple_registers[3]);
+ 		unsigned row;
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
+index 7675273f..d4cfa440 100644
+--- a/arch/X86/X86SimpleOutput.h
++++ b/arch/X86/X86SimpleOutput.h
+@@ -51,6 +51,8 @@ enum X86SimpleForm {
+ /* The vector escape uses the next reserved plan and has no register-pair ModR/M. */
+ #define X86_PLAN_PUSH_IMMEDIATE ((UINT16_MAX & ~7u) | X86_SIMPLE_FIXED)
+ #define X86_PLAN_VECTOR UINT16_MAX
++/* The low bits bypass register-pair checks; the VEX reader owns its ModR/M. */
++#define X86_PLAN_VEX32 ((UINT16_MAX & ~7u) | X86_SIMPLE_RELATIVE)
+ #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
+ #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
+ 
+@@ -68,6 +70,11 @@ X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 		      uint16_t *insn_size, const struct X86SimpleRegister *regs,
+ 		      bool wide);
+ 
++/* Called only for the unprefixed C4/C5 plans in 32-bit mode. */
++CAPSTONE_INTERNAL bool
++X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
++		     uint16_t *insn_size, const struct X86SimpleRegister *regs);
++
+ static inline char *X86_writeDisp8(char *out, int displacement)
+ {
+ 	if (displacement) {
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+new file mode 100644
+index 00000000..399f35c4
+--- /dev/null
++++ b/arch/X86/X86Vex32Output.c
+@@ -0,0 +1,36 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "../../cs_priv.h"
++#if !defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#include "X86SimpleOutput.h"
++
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_vex32_output")))
++#endif
++bool X86_writeVex32Output(const uint8_t *code, size_t size, cs_insn *insn,
++			  uint16_t *insn_size,
++			  const struct X86SimpleRegister *regs)
++{
++	const unsigned prefix = code[0] == 0xc5 ? 2 : 3;
++	/* Keep LDS/LES, memory forms, extended registers and W=1
++     * in the canonical reader. These rows use only XMM/YMM0..7. */
++	if (size < prefix + 2 || code[prefix + 1] < 0xc0 ||
++	    (prefix == 2 ?
++		     (code[1] & 0xc0) != 0xc0 :
++		     (code[1] & 0xe0) != 0xe0 || (code[2] & 0xc0) != 0x40))
++		return false;
++	if (!X86_writeVectorOutput(code, size, insn, insn_size, regs, true))
++		return false;
++	if (insn->detail) {
++		insn->detail->x86.rex = 0;
++		insn->detail->x86.addr_size = 4;
++	}
++	return true;
++}
++#endif
++#endif
+diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
+index ccc4f0de..a547af18 100644
+--- a/suite/synctools/x86_simple_output.cpp
++++ b/suite/synctools/x86_simple_output.cpp
+@@ -620,7 +620,9 @@ int main()
+ 	plans[0][3][0x1f] = plans[1][3][0x1f] = X86_PLAN_VECTOR;
+ 	plans[0][0][0xf3] = plans[1][0][0xf3] = X86_PLAN_VECTOR;
+ 	plans[1][0][0x62] = X86_PLAN_VECTOR;
++	plans[0][0][0xc4] = X86_PLAN_VEX32;
+ 	plans[1][0][0xc4] = X86_PLAN_VECTOR;
++	plans[0][0][0xc5] = X86_PLAN_VEX32;
+ 	plans[1][0][0xc5] = X86_PLAN_VECTOR;
+ 	for (unsigned wide = 0; wide < 2; ++wide) {
+ 		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index 7e0a3bf9..031fa009 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -114,6 +114,7 @@
+ 		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
+ 		E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
++		47269A07FD313B27B7B3C237 /* X86Vex32Output.c in Sources */ = {isa = PBXBuildFile; fileRef = 0CF080AEE709B5289A2CE3A0 /* X86Vex32Output.c */; };
+ 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -163,6 +164,7 @@
+ 		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
+ 		84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
++		B3068A52A0FE19524D0E9B3A /* X86Vex32Output.c in Sources */ = {isa = PBXBuildFile; fileRef = 0CF080AEE709B5289A2CE3A0 /* X86Vex32Output.c */; };
+ 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -231,6 +233,7 @@
+ 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
+ 		F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
++		476B7DF585488743780693C0 /* X86Vex32Output.c in Sources */ = {isa = PBXBuildFile; fileRef = 0CF080AEE709B5289A2CE3A0 /* X86Vex32Output.c */; };
+ 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -517,6 +520,7 @@
+ 		CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86InstPrinterCommon.c; sourceTree = "<group>"; };
+ 		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
+ 		96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86EvexScan.c; sourceTree = "<group>"; };
++		0CF080AEE709B5289A2CE3A0 /* X86Vex32Output.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86Vex32Output.c; sourceTree = "<group>"; };
+ 		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
+ 		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
+ 		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
+@@ -993,6 +997,7 @@
+ 				CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */,
+ 				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
+ 				96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */,
++				0CF080AEE709B5289A2CE3A0 /* X86Vex32Output.c */,
+ 				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
+ 				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
+ 				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
+@@ -1650,6 +1655,7 @@
+ 				6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */,
+ 				C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */,
+ 				84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */,
++				B3068A52A0FE19524D0E9B3A /* X86Vex32Output.c in Sources */,
+ 				DC474FC519DE6FDA00BCA449 /* ARMModule.c in Sources */,
+ 				DC474FC719DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
+ 				DC474F9319DE6FCD00BCA449 /* cs.c in Sources */,
+@@ -1752,6 +1758,7 @@
+ 				9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */,
+ 				417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */,
+ 				F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */,
++				476B7DF585488743780693C0 /* X86Vex32Output.c in Sources */,
+ 				DCFE249719DDCDD000EF8EA9 /* XCoreMapping.c in Sources */,
+ 				DCA357831BC2C0290094BB3F /* M68KDisassembler.c in Sources */,
+ 				DCFE247719DDCDAD00EF8EA9 /* SparcDisassembler.c in Sources */,
+@@ -1800,6 +1807,7 @@
+ 				1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */,
+ 				622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */,
+ 				E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */,
++				47269A07FD313B27B7B3C237 /* X86Vex32Output.c in Sources */,
+ 				DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */,
+ 				DC474FA319DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
+ 				DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */,
