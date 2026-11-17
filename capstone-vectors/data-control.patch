@@ -1,0 +1,64 @@
+diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
+index 28ae2a67..97298caa 100644
+--- a/arch/X86/X86FeatureExtension.h
++++ b/arch/X86/X86FeatureExtension.h
+@@ -253,6 +253,8 @@ static inline x86_vex_feature_family X86_vexFeatureFamily(uint8_t map,
+ 	}
+ }
+ 
++CAPSTONE_INTERNAL extern const uint8_t X86_evexFeatureMaps[256];
++
+ /* Classify prefixes and escapes in one lookup. In 16/32-bit modes the
+  * 40..4f opcodes end the scan; subsequent instructions cannot be extensions
+  * of the current INC/DEC. opcode receives the first non-prefix byte, or zero
+@@ -284,6 +286,14 @@ static inline bool X86_mayDecodeFeatureExtensionImpl(const uint8_t *code,
+ 							   code_len - offset);
+ 		if (flags != FEATURE_ESCAPE)
+ 			return false;
++		/* Only an unprefixed, complete header can bypass the ordered
++		 * extension validators before their duplicate-prefix checks. */
++		if (byte == 0x62 && is_64_bit && offset == 1 && code_len >= 6) {
++			const unsigned map = code[1] & 7;
++			if (map >= 1 && map <= 3)
++				return (X86_evexFeatureMaps[code[4]] &
++					(1u << map)) != 0;
++		}
+ 		/* VEX map 1 is entirely handled by the generated decoder. */
+ 		return byte != 0xc4 || offset == code_len ||
+ 		       (code[offset] & 0x1f) != 1;
+diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
+index 16e68cf4..f5209e9f 100644
+--- a/arch/X86/X86Mapping.c
++++ b/arch/X86/X86Mapping.c
+@@ -4816,6 +4816,31 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
+ 	       (code[prefix_offset + 1] & 7) <= 4;
+ }
+ 
++/* Complete EVEX opcodes that may belong to a source-owned extension.
++ * Each byte is a map bitset. The original handlers own validation and
++ * precedence; short encodings still enter those handlers unchanged. */
++#if defined(__ELF__) && defined(__GNUC__)
++__attribute__((section(".cs_x86_feature_rodata")))
++#endif
++const uint8_t X86_evexFeatureMaps[256] = {
++	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0x20 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0x30 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0x40 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0,
++	/* 0x50 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0x60 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0,
++	/* 0x70 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 4, 4, 4, 0, 0, 0,
++	/* 0x80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0x90 */ 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0xa0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0xb0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0xc0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0xd0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	/* 0xe0 */ 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
++	/* 0xf0 */ 8, 0, 4, 4, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0,
++};
++
+ #if defined(_MSC_VER)
+ __declspec(noinline)
+ #elif defined(__GNUC__)
