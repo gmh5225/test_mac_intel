@@ -1,0 +1,235 @@
+diff --git a/arch/ARM/ARMMapping.c b/arch/ARM/ARMMapping.c
+index c767e9e4..af2bc19c 100644
+--- a/arch/ARM/ARMMapping.c
++++ b/arch/ARM/ARMMapping.c
+@@ -986,6 +986,11 @@ void ARM_reg_access(const cs_insn *insn, cs_regs regs_read,
+ 		default:
+ 			break;
+ 		}
++		if (op->shift.type >= ARM_SFT_ASR_REG &&
++		    !arr_exist_inline(regs_read, read_count, op->shift.value)) {
++			regs_read[read_count] = (uint16_t)op->shift.value;
++			read_count++;
++		}
+ 	}
+ 
+ 	*regs_read_count = read_count;
+diff --git a/docs/cs_v6_release_guide.md b/docs/cs_v6_release_guide.md
+index 4d93ac23..637abcda 100644
+--- a/docs/cs_v6_release_guide.md
++++ b/docs/cs_v6_release_guide.md
+@@ -888,3 +888,10 @@ IDs are unchanged. Encoding authority: MD00076 revision 2.63, pages 118–127.
+ MIPS16e2 decoding includes LL/SC, RDHWR and DI/EI. The RDHWR hardware index is
+ an immediate in `cs_mips` (followed by selector zero), not a general register
+ read. SC's GPR is read/write and its memory operand is write-only.
++
++## ARM register-controlled shifts
++
++`cs_regs_access` now includes the register supplying a shift amount
++for A32 ASR, LSL, LSR and ROR operands. For example,
++`add r0, r1, r2, lsl r3` reads `r1`, `r2` and `r3`. Repeated input
++registers and the explicit shift operand in MOV aliases are deduplicated.
+diff --git a/tests/unit/CMakeLists.txt b/tests/unit/CMakeLists.txt
+index 81275c98..92212e8d 100644
+--- a/tests/unit/CMakeLists.txt
++++ b/tests/unit/CMakeLists.txt
+@@ -70,7 +70,7 @@ if(CAPSTONE_ARM_SUPPORT OR CAPSTONE_RISCV_SUPPORT)
+     endif()
+ endif()
+ if(CAPSTONE_ARM_SUPPORT AND NOT CAPSTONE_BUILD_DIET)
+-    list(APPEND UNIT_TEST_SOURCES arm_post_index.c arm_private_stream.c)
++    list(APPEND UNIT_TEST_SOURCES arm_post_index.c arm_private_stream.c arm_reg_access.c)
+ endif()
+ if(CAPSTONE_AARCH64_SUPPORT)
+     list(APPEND UNIT_TEST_SOURCES aarch64_postprocess.c aarch64_scan.c)
+diff --git a/tests/unit/arm_reg_access.c b/tests/unit/arm_reg_access.c
+new file mode 100644
+index 00000000..42b57f8e
+--- /dev/null
++++ b/tests/unit/arm_reg_access.c
+@@ -0,0 +1,117 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#include <capstone/capstone.h>
++#include <stdio.h>
++#include <string.h>
++
++static bool check_access(csh handle, cs_insn *insn, uint32_t word,
++			 const uint16_t *expected, unsigned count)
++{
++	cs_regs reads, writes;
++	uint8_t read_count = 0, write_count = 0;
++	cs_detail before;
++	memcpy(&before, insn->detail, sizeof(before));
++	memset(reads, 0xa5, sizeof(reads));
++	memset(writes, 0xa5, sizeof(writes));
++	if (cs_regs_access(handle, insn, reads, &read_count, writes,
++			   &write_count) != CS_ERR_OK ||
++	    read_count != count || write_count != 1 ||
++	    memcmp(reads, expected, count * sizeof(*reads)) ||
++	    writes[0] != ARM_REG_R0 ||
++	    memcmp(&before, insn->detail, sizeof(before))) {
++		fprintf(stderr, "ARM register access mismatch for %08x: reads",
++			(unsigned)word);
++		for (unsigned i = 0; i < read_count; ++i)
++			fprintf(stderr, " %u", reads[i]);
++		fputc('\n', stderr);
++		return false;
++	}
++	for (unsigned i = count; i < sizeof(reads) / sizeof(*reads); ++i)
++		if (reads[i] != 0xa5a5)
++			return false;
++	for (unsigned i = 1; i < sizeof(writes) / sizeof(*writes); ++i)
++		if (writes[i] != 0xa5a5)
++			return false;
++	return true;
++}
++
++static bool check_word(csh handle, cs_insn *slot, uint32_t word,
++		       bool big_endian, const uint16_t *expected,
++		       unsigned count)
++{
++	uint8_t bytes[4];
++	for (unsigned i = 0; i < 4; ++i)
++		bytes[big_endian ? 3 - i : i] = (uint8_t)(word >> (8 * i));
++	const uint8_t *cursor = bytes;
++	size_t left = sizeof(bytes);
++	uint64_t address = 0x1000;
++	if (!cs_disasm_iter(handle, &cursor, &left, &address, slot) || left ||
++	    !check_access(handle, slot, word, expected, count))
++		return false;
++	cs_insn *allocated = NULL;
++	size_t decoded =
++		cs_disasm(handle, bytes, sizeof(bytes), 0x1000, 1, &allocated);
++	bool ok = decoded == 1 &&
++		  check_access(handle, allocated, word, expected, count);
++	cs_free(allocated, decoded);
++	return ok;
++}
++
++static bool check_mode(bool big_endian, bool real)
++{
++	csh handle;
++	cs_mode mode = big_endian ? CS_MODE_ARM | CS_MODE_BIG_ENDIAN :
++				    CS_MODE_ARM;
++	if (cs_open(CS_ARCH_ARM, mode, &handle) != CS_ERR_OK)
++		return false;
++	bool ok = cs_option(handle, CS_OPT_DETAIL,
++			    CS_OPT_ON | (real ? CS_OPT_DETAIL_REAL : 0)) ==
++		  CS_ERR_OK;
++	cs_insn *slot = cs_malloc(handle);
++	if (!slot)
++		ok = false;
++	for (unsigned shift = 0; ok && shift < 4; ++shift) {
++		for (unsigned conditional = 0; ok && conditional < 2;
++		     ++conditional) {
++			for (unsigned rs = 0; ok && rs < 4; ++rs) {
++				uint16_t expected[4];
++				unsigned count = 0;
++				if (conditional)
++					expected[count++] = ARM_REG_CPSR;
++				expected[count++] = ARM_REG_R1;
++				expected[count++] = ARM_REG_R2;
++				if (rs == 0 || rs == 3)
++					expected[count++] =
++						(uint16_t)(ARM_REG_R0 + rs);
++				/* ADD{EQ} r0, r1, r2, <shift> r0..r3. */
++				uint32_t word = 0x00810012 | (shift << 5) |
++						(rs << 8);
++				if (!conditional)
++					word |= 0xe0000000;
++				ok = check_word(handle, slot, word, big_endian,
++						expected, count);
++			}
++		}
++		const uint16_t pair[] = { ARM_REG_R1, ARM_REG_R2 };
++		/* Immediate shifts add no register. MOV shift aliases already
++		 * expose the shift register as a separate operand in alias detail. */
++		ok = ok &&
++		     check_word(handle, slot, 0xe0810182 | (shift << 5),
++				big_endian, pair, 2) &&
++		     check_word(handle, slot, 0xe1a00211 | (shift << 5),
++				big_endian, pair, 2);
++	}
++	cs_free(slot, slot ? 1 : 0);
++	cs_close(&handle);
++	return ok;
++}
++
++int main(void)
++{
++	for (unsigned big_endian = 0; big_endian < 2; ++big_endian)
++		for (unsigned real = 0; real < 2; ++real)
++			if (!check_mode(big_endian, real))
++				return 1;
++	return 0;
++}
+diff --git a/tests/unit/text_option.c b/tests/unit/text_option.c
+index bccda589..06510090 100644
+--- a/tests/unit/text_option.c
++++ b/tests/unit/text_option.c
+@@ -29,6 +29,7 @@ static bool test_x86(void)
+ 	cs_insn *expected = NULL, *actual = NULL;
+ 	size_t expected_count, actual_count, i;
+ 	bool success = true;
++	const bool diet = cs_support(CS_SUPPORT_DIET);
+ 
+ 	if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &printed) == CS_ERR_OK &&
+ 			   cs_open(CS_ARCH_X86, CS_MODE_64, &bare) == CS_ERR_OK,
+@@ -90,11 +91,12 @@ static bool test_x86(void)
+ 	cs_free(actual, actual_count);
+ 	actual_count =
+ 		cs_disasm(bare, x86_code, sizeof(x86_code), 0x1000, 0, &actual);
+-	success &= check(actual_count == X86_COUNT &&
+-				 strcmp(actual[0].mnemonic, "mov") == 0 &&
+-				 actual[X86_COMPARE].id ==
+-					 expected[X86_COMPARE].id,
+-			 "text is printed again");
++	success &= check(
++		actual_count == X86_COUNT &&
++			strcmp(actual[0].mnemonic, diet ? "" : "mov") == 0 &&
++			(!diet || actual[0].op_str[0] == '\0') &&
++			actual[X86_COMPARE].id == expected[X86_COMPARE].id,
++		"text follows the build policy after re-enabling");
+ 
+ 	cs_free(expected, expected_count);
+ 	cs_free(actual, actual_count);
+@@ -289,6 +291,7 @@ static bool test_x86_scan_option_transition(void)
+ 	const unsigned ids[] = { 0, X86_INS_INC, X86_INS_RET };
+ 	const uint16_t lengths[] = { 3, 1, 1 };
+ 	bool success = true;
++	const bool diet = cs_support(CS_SUPPORT_DIET);
+ 	for (unsigned batch = 0; batch != 2; ++batch) {
+ 		struct scan_transition state = { 0, 0, true };
+ 		if (!check(cs_open(CS_ARCH_X86, CS_MODE_64, &state.handle) ==
+@@ -338,14 +341,24 @@ static bool test_x86_scan_option_transition(void)
+ 				success &= check(
+ 					iter->detail == saved_detail,
+ 					"callback retains iterator detail ownership");
+-			if (i == 1)
++			if (i == 1) {
++				const cs_x86 *x86 =
++					actual->detail ? &actual->detail->x86 :
++							 NULL;
+ 				success &= check(
+-					actual->detail &&
++					x86 && x86->op_count == 1 &&
++						x86->operands[0].type ==
++							X86_OP_REG &&
++						x86->operands[0].reg ==
++							X86_REG_AX &&
++						x86->operands[0].size == 2 &&
+ 						strcmp(actual->mnemonic,
+-						       "inc") == 0 &&
+-						strcmp(actual->op_str, "ax") ==
+-							0,
++						       diet ? "" : "inc") ==
++							0 &&
++						strcmp(actual->op_str,
++						       diet ? "" : "ax") == 0,
+ 					"next instruction uses new bitness, text and detail");
++			}
+ 		}
+ 		if (!batch)
+ 			success &= check(cursor == code + sizeof(code) &&
