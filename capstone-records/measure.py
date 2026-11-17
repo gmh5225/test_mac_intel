@@ -9,7 +9,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-evex-entry-negative-filter-mixed-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -50,11 +50,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as 
   for key in ('scan',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
-   assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'},added
+   assert not added,added
    assert set(objects['base']) <= set(objects[key])
-   assert set(changed) <= {'arch/X86/X86OutputIterator.c.o','arch/X86/X86VectorOutput.c.o'},changed
+   assert set(changed) == {'arch/X86/X86Mapping.c.o','arch/X86/X86Disassembler.c.o','arch/X86/X86DisassemblerDecoder.c.o'},changed
    active=bool(changed)
-   write('scope',dict(active=active,source_applies=True,policy='shared 32-bit C4/C5 prefix dispatch; identical lowering is retained as an object and binary identity control'))
+   write('scope',dict(active=active,source_applies=True,policy='EVEX negative opcode admission; identical lowering is retained as an object and binary identity control'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
@@ -66,7 +66,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as 
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='shared 32-bit C4/C5 prefix dispatch; preserve complete records, original images and controlled-image timing panels.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='EVEX negative opcode admission; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -80,7 +80,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-shared-gate-mixed-') as 
   for x in cases:
    for mode in (0,1,2):
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
      runs=[];reference=None;keys=['base','aa','scan']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
