@@ -27,7 +27,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='Shared packed bare-C5 reader for exact 32/64-bit raw scans; original output writers unchanged',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
+    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='EVEX packed move output with memory-only map dispatch and complete new-helper section isolation',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -59,9 +59,15 @@ def main(w):
         if label == 'scan':
             changed={name for name,value in objects['integer'].items() if objects['scan'][name]!=value}
             added=set(objects['scan'])-set(objects['integer'])
-            assert added=={'arch/X86/X86VexScan.c.o'},added
-            assert changed=={'arch/X86/X86DisassemblerDecoder.c.o'},changed
+            assert added=={'arch/X86/X86EvexMemoryOutput.c.o'},added
+            assert changed=={'arch/X86/X86VectorOutput.c.o'},changed
             save('object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
+            run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'generator'],'generator-build')
+            for filename,args in [('X86GenVectorOutput.inc',[]),('X86GenEvexMemoryOutput.inc',['--evex-memory'])]:
+                with (p/'evidence'/('generator-'+filename+'.log')).open('wb') as log:
+                    actual=sp.check_output([w/'generator',*args],stderr=log)
+                assert actual==(tree/'arch/X86'/filename).read_bytes()
+            save('generator-proof.json',dict(both_outputs_reproduced=True))
         save('object-digests.json', objects)
         for component in ('X86IntelInstPrinter','X86IntelInstPrinterPrechecked','X86ATTInstPrinter','X86Mapping','X86ImmediateOutput','X86VectorOutput','X86DisassemblerDecoder','X86OutputIterator'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
@@ -77,6 +83,8 @@ def main(w):
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-Wl,-Map,'+str(p/'evidence'/(label+'-link.map')),'-o',target],'link-'+label);exe[label]=target
         (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
+        from identity import signatures
+        signatures(target,p/'evidence'/(label+'-linked-symbols.json.gz'))
 
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
@@ -91,8 +99,8 @@ def main(w):
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Pilot shared packed C5 decoding against the published baseline with original-image and same-inode ASLR-disabled controls.'))
-    import deb
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Pilot packed EVEX memory output against the published baseline with original-image and same-inode ASLR-disabled controls.'))
+    import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
     for name,bits,f,spans,source in deb.prepare(w):
