@@ -1,0 +1,9 @@
+{
+  "initial_run": 44049997118,
+  "source_unchanged": true,
+  "consumer_unchanged": true,
+  "measurement_protocol_unchanged": true,
+  "reason": "Clang outlines X86_writeDisplacement. Moving only the public writer to another ELF section turns its already-resolved intra-section call displacement into an ELF relocation; raw object bytes therefore differ although the callee and opcode are unchanged.",
+  "correction": "Normalize only the four-byte immediate of a disassembled E8 direct call after resolving both sides to the same named callee. Require all remaining function bytes and every immutable array payload to remain exact.",
+  "rerun": "Only the two Clang profiles whose identity gate rejected the original check; retain the original GCC results."
+}

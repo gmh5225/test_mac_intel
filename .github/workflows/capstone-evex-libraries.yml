@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
