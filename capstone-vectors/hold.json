@@ -1,0 +1,140 @@
+{
+  "decision": "hold",
+  "publication_qualified": false,
+  "native_timing_started": false,
+  "semantic_checks_passed": true,
+  "source": {
+    "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "tree": "2858407fcc49cc1d823898a1044907e365d2a1b2",
+    "sha256": "a29da2d7beeb2efb55fb40baf0af71a77a4e80f2353f8bf95c124b984ee25f4b",
+    "files": [
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86EvexScan.c",
+      "arch/X86/X86FeatureExtension.h"
+    ]
+  },
+  "run": {
+    "id": 44144680566,
+    "head_sha": "a193d44eecb69bd3a3cd62fbbcb8802e8259e855",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44144680566",
+    "run_attempt": 1
+  },
+  "raw_work": [
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "ir_change": 558,
+      "instruction_reduction": -6.233333095018168e-05
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "ir_change": 0,
+      "instruction_reduction": 0.0
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "ir_change": -969970,
+      "instruction_reduction": 0.005957303191116425
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "ir_change": 0,
+      "instruction_reduction": 0.0
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-gcc-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "ir_change": -8808,
+      "instruction_reduction": 0.000972937147906805
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-gcc-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "ir_change": -498,
+      "instruction_reduction": 0.00014742547168744569
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "ir_change": -737486,
+      "instruction_reduction": 0.004192608509752671
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "ir_change": -4490,
+      "instruction_reduction": 1.6972165776674153e-05
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "ir_change": 558,
+      "instruction_reduction": -6.188868288914406e-05
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-clang-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "ir_change": 0,
+      "instruction_reduction": 0.0
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "ir_change": -969970,
+      "instruction_reduction": 0.005699795060762125
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "ir_change": 0,
+      "instruction_reduction": 0.0
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-gcc-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "ir_change": 558,
+      "instruction_reduction": -6.352813396914847e-05
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-gcc-1",
+      "case": "libjpeg62-turbo-amd64",
+      "mode": 0,
+      "ir_change": 0,
+      "instruction_reduction": 0.0
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "ir_change": -472804,
+      "instruction_reduction": 0.002725274764799779
+    },
+    {
+      "host": "evex-deferred-initialization-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "ir_change": 0,
+      "instruction_reduction": 0.0
+    }
+  ],
+  "reason": "Deferred initialization removes only 0.27-0.60 percent of SSL64 raw instruction work. Three compilers add one pointer reload per PE32 full fallback (558 instructions and reads across the measured two traversals). This is a small source-level saving with a new initialization contract; prioritize the already measured 19-22 percent transfer-plan benefit and the full-output bottleneck. No native slowdown or speedup is claimed.",
+  "next": "Retain this prototype and cost attribution for a future scan-boundary redesign; do not merge it or treat fewer instructions as measured throughput."
+}
