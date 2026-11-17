@@ -1,0 +1,92 @@
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 8a606f4e..9f438c29 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -33,13 +33,20 @@ static char *writeVectorRegister(char *out, unsigned length_code,
+ 	return out;
+ }
+ 
++/* All fields are bounded by the admitted VEX/EVEX register encoding. */
++struct VectorRegisterOperands {
++	uint8_t prefix, ll, rex, first_ll, reg_count, regs[3];
++};
++
+ static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
+ 				 uint16_t *insn_size,
+ 				 const struct VectorOutputRow *row,
+-				 unsigned prefix, unsigned ll, unsigned rex,
+-				 unsigned first_ll, const unsigned *regs,
+-				 unsigned reg_count)
++				 struct VectorRegisterOperands operands)
+ {
++	const unsigned prefix = operands.prefix, ll = operands.ll,
++		       rex = operands.rex, first_ll = operands.first_ll,
++		       reg_count = operands.reg_count;
++	const uint8_t *regs = operands.regs;
+ 	const unsigned len = prefix + 2 + row->immediate;
+ 	*insn_size = insn->size = (uint16_t)len;
+ 	insn->id = row->id;
+@@ -137,13 +144,23 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (X86_EVEX_REGISTER_EXTRACT(key)) {
+ 		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+ 			return false;
+-		const unsigned pair[] = { regs[2], regs[0] };
+-		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+-					    0x40 | (w << 3) | rxb,
+-					    (key & 2) != 0, pair, 2);
++		return writeVectorRegisters(code, insn, insn_size, row,
++					    (struct VectorRegisterOperands){
++						    4,
++						    ll,
++						    0x40 | (w << 3) | rxb,
++						    (key & 2) != 0,
++						    2,
++						    { regs[2], regs[0], 0 } });
+ 	}
+-	return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+-				    0x40 | (w << 3) | rxb, ll, regs, 3);
++	return writeVectorRegisters(code, insn, insn_size, row,
++				    (struct VectorRegisterOperands){
++					    4,
++					    ll,
++					    0x40 | (w << 3) | rxb,
++					    ll,
++					    3,
++					    { regs[0], regs[1], regs[2] } });
+ }
+ 
+ /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
+@@ -484,8 +501,14 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 		const unsigned regs[] = { (~flags >> 3) & 15,
+ 					  (modrm & 7) | ((rxb & 1) << 3) };
+ 		return writeVectorRegisters(code, insn, insn_size,
+-					    &vex_shift_rows[index], prefix, ll,
+-					    0x40 | (w << 3) | rxb, ll, regs, 2);
++					    &vex_shift_rows[index],
++					    (struct VectorRegisterOperands){
++						    prefix,
++						    ll,
++						    0x40 | (w << 3) | rxb,
++						    ll,
++						    2,
++						    { regs[0], regs[1], 0 } });
+ 	}
+ 	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
+ 	const unsigned index = vex_register_widths[plan][w * 2 + ll];
+@@ -497,8 +520,14 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
+ 	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
+ 				  (~flags >> 3) & 15,
+ 				  (modrm & 7) | ((rxb & 1) << 3) };
+-	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,
+-				    0x40 | (w << 3) | rxb, ll, regs, 3);
++	return writeVectorRegisters(code, insn, insn_size, row,
++				    (struct VectorRegisterOperands){
++					    prefix,
++					    ll,
++					    0x40 | (w << 3) | rxb,
++					    ll,
++					    3,
++					    { regs[0], regs[1], regs[2] } });
+ }
+ 
+ bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
