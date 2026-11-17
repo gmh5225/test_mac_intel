@@ -1,7 +1,7 @@
-name: Audit VEX32 writer index derived from validated raw mode
+name: Audit VEX32 conditional writer selection without a pointer table
 on:
   push:
-    branches: [codex/capstone-vex32-mode-derived-index-audit]
+    branches: [codex/capstone-vex32-conditional-writer-audit]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -36,6 +36,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-mode-index-audit-${{ matrix.host }}
+          name: vex32-conditional-writer-audit-${{ matrix.host }}
           path: evidence/
           retention-days: 14

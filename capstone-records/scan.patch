@@ -1124,24 +1124,22 @@ index 00000000..93622fbe
 +	},
 +};
 diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..fb3f0a54 100644
+index 11e8578a..580de059 100644
 --- a/arch/X86/X86OutputIterator.c
 +++ b/arch/X86/X86OutputIterator.c
-@@ -76,11 +76,25 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+@@ -76,11 +76,23 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
  		return false;
  
  	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
 +#ifdef CAPSTONE_X86_VEX32_OUTPUT
 +		if (plan == X86_PLAN_VECTOR) {
-+			static bool (*const writers[2])(
-+				const uint8_t *, size_t, cs_insn *, uint16_t *,
-+				const struct X86SimpleRegister *,
-+				bool) = { X86_writeVectorOutput32,
-+					  X86_writeVectorOutput };
-+			/* The mode guard above admits only CS_MODE_32 and CS_MODE_64. */
-+			return writers[(unsigned)handle->mode / CS_MODE_64](
-+				code, size, insn, insn_size,
-+				x86_simple_registers[3], wide);
++			bool (*writer)(const uint8_t *, size_t, cs_insn *,
++				       uint16_t *,
++				       const struct X86SimpleRegister *, bool) =
++				wide ? X86_writeVectorOutput :
++				       X86_writeVectorOutput32;
++			return writer(code, size, insn, insn_size,
++				      x86_simple_registers[3], wide);
 +		}
 +#else
  		if (plan == X86_PLAN_VECTOR)

@@ -1,8 +1,8 @@
 {
-  "parent": "round1341-vex32-constant-register-dispatch",
-  "observation": "Clang18 widens the boolean writer-table index, spills it at rsp+0x38, grows the frame from 104 to 120 bytes, and adds six static stack references. The call still recomputes its boolean argument from the raw mode.",
-  "change": "Derive the table index from unsigned handle->mode / CS_MODE_64 only in the already-validated vector arm. Mode 4 selects 0; mode 8 selects 1. Preserve the original constant register pointer and the no-common-64-gateway design.",
-  "prediction": "Allow Clang to derive the index from the already-live raw mode at the tail call rather than preserve an independent widened boolean. This is a compiler-lowering hypothesis, not a speedup claim.",
-  "qualification": false,
-  "full_semantic_validation_pending": true
+  "parent": "round1342-vex32-mode-derived-index",
+  "observation": "R1342 retains the original vector runtime object and removes the Clang18 boolean-index spill. Its 16-byte static writer array grows data.rel.ro by 16 bytes and moves 17 original x86 relocation-backed tables by 20464 bytes, shifting their within-page offsets by -16; 57 later data symbols move by page-multiple 20480.",
+  "change": "Select the target function address with a local conditional expression in the existing vector arm. Remove the stored two-entry function-pointer table while keeping unchanged targets, argument types, constant register row and no common 64-bit gateway.",
+  "prediction": "Remove the new data.rel.ro entries and indexed target load. The compiler may instead duplicate direct-call tails or change register liveness; inspect actual lowering before any semantic or timing qualification.",
+  "scope": "Compiler audit only. R1342 native timing is still running and no runtime loss is inferred from layout alone.",
+  "qualification": false
 }
