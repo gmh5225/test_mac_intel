@@ -19,38 +19,30 @@
     "validation_scope": "Apple Clang complete public/private records and public guard-page extents, original positive handlers retained; native instruction-cost and timing qualification pending.",
     "publication_qualified": false
   },
-  "scope": "Frozen seven real ELF library panels with x86-32 and x86-64 SIMD; raw/public and text/detail/private entries. This is an independent raw-path candidate, not combined with held R1351 output.",
-  "native": {
-    "profiles": [
-      "ubuntu-22.04 clang",
-      "ubuntu-22.04 gcc",
-      "ubuntu-24.04 clang",
-      "ubuntu-24.04 gcc"
-    ],
-    "cycles": 21,
-    "calibration_cpu_ms": 60,
-    "variants": [
-      "integer",
-      "aa",
-      "scan",
-      "iced",
-      "fast"
-    ],
-    "controls": [
-      "original images",
-      "same inode and padded file size with ASLR disabled",
-      "byte-identical A/A"
-    ]
-  },
-  "cost": {
-    "case": "SSL64 SIMD",
-    "modes": [
-      "scan",
-      "format",
-      "detail"
-    ],
-    "traversals": 2,
-    "consumer_unchanged": true
-  },
+  "source_unchanged": true,
+  "consumer_sha256": "f43f6b6480f5778db81150435c625b58f46596789fa29413f3aa2be09ad9385d",
+  "reason": "Two GCC11 original-image formatting regressions, absent in fixed-image trials.",
+  "profiles": [
+    "ubuntu-22.04 gcc replica 1",
+    "ubuntu-22.04 gcc replica 2"
+  ],
+  "cases": [
+    "JPEG64 SIMD format",
+    "zstd64 SIMD format",
+    "SSL64 SIMD raw"
+  ],
+  "cycles": 31,
+  "calibration_cpu_ms": 120,
+  "variants": [
+    "baseline",
+    "byte-identical baseline copy",
+    "candidate",
+    "byte-identical candidate copy"
+  ],
+  "launches": [
+    "original images with ASLR",
+    "same inode/argv/size with ASLR",
+    "same inode/argv/size ASLR disabled"
+  ],
   "publishable": false
 }
