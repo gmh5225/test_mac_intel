@@ -1,7 +1,7 @@
-name: Measure EVEX packed move memory output against iced
+name: Diagnose remaining JPEG32 and SSL32 formatting regressions
 on:
   push:
-    branches: [codex/capstone-evex-move-memory-pilot]
+    branches: [codex/capstone-evex-extension-small-entry-pe32-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -32,6 +30,8 @@ jobs:
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y valgrind
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           "$RUNNER_TEMP/capstone-elf-venv/bin/pip" install pyelftools==0.32
           "$RUNNER_TEMP/capstone-elf-venv/bin/python" capstone-vectors/measure.py
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-move-memory-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-extension-small-entry-pe32-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
