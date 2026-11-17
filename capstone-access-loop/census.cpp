@@ -57,8 +57,13 @@ int main(int argc, char **argv) {
         bool ok = cs_disasm_iter(full, &cursor, &left, &address, insn);
         bool raw_ok = cs_disasm_iter(raw, &raw_cursor, &raw_left, &raw_ip, scan);
         if (ok != raw_ok || cursor != raw_cursor || left != raw_left || address != raw_ip ||
-            (ok && (insn->id != scan->id || insn->size != scan->size)))
+            (ok && (insn->id != scan->id || insn->size != scan->size))) {
+          std::fprintf(stderr,"mismatch bits=%u offset=%zu ip=%llx full_ok=%u raw_ok=%u full_id=%u raw_id=%u full_size=%u raw_size=%u full_left=%zu raw_left=%zu bytes=",
+            bits,size_t(begin-bytes.data()),(unsigned long long)(address-(before-left)),ok,raw_ok,insn->id,scan->id,insn->size,scan->size,left,raw_left);
+          for(size_t i=0;i<before && i<15;++i)std::fprintf(stderr,"%02x",begin[i]);
+          std::fprintf(stderr," full_text=%s %s\n",insn->mnemonic,insn->op_str);
           throw std::runtime_error("raw/full decode mismatch");
+        }
         if (!ok) { ++local.invalid; ++cursor; --left; ++address; continue; }
         ++local.valid;
         const cs_x86 &detail = insn->detail->x86;

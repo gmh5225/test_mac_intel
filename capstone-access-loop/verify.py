@@ -83,7 +83,11 @@ try:
         assert len(intervals) == meta['functions']
         text = w/'input.text'; text.write_bytes(code)
         extents = w/'extents.tsv'; extents.write_text(''.join('%d %d %d\n'%v for v in intervals))
-        result = json.loads(sp.check_output([w/'census','64' if name.endswith('amd64') else '32',text,extents],text=True))
+        print('Census '+name,flush=True)
+        process=sp.run([w/'census','64' if name.endswith('amd64') else '32',text,extents],capture_output=True,text=True)
+        (out/(name+'-stderr.log')).write_text(process.stderr)
+        if process.returncode:raise RuntimeError(process.stderr)
+        result=json.loads(process.stdout)
         assert result['all-functions']['vectors'] > 0 and result['simd-functions']['functions'] > 0, 'Full operand detail must populate vector selection'
         results[name] = dict(provenance=meta, observed=result)
         save('census',results)
