@@ -1,7 +1,7 @@
-name: Validate Clang isolated canonical EVEX memory output through current NeverD and latest LLVM source
+name: Validate published Clang memory output with current NeverD MIPS integration and latest LLVM source
 on:
   push:
-    branches: [codex/capstone-clang-memory-output-product]
+    branches: [codex/capstone-clang-memory-current-dev]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 3e94887b6e9073601c96ff4bf1f033b1b25b0b83
+          ref: ca33d557398585a4d571be88bd0ec2ef34845089
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-clang-memory-output-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-clang-memory-current-dev-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
