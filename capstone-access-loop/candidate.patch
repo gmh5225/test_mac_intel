@@ -1,0 +1,15 @@
+diff --git a/arch/X86/X86Mapping.h b/arch/X86/X86Mapping.h
+index a2677cb8..8af92d7c 100644
+--- a/arch/X86/X86Mapping.h
++++ b/arch/X86/X86Mapping.h
+@@ -114,6 +114,10 @@ void X86_reg_access(const cs_insn *insn, cs_regs regs_read,
+ // given the instruction id, return the size of its immediate operand (or 0)
+ uint8_t X86_immediate_size(unsigned int id, uint8_t *enc_size);
+ 
++/* The result depends only on id and immutable register maps. */
++#if defined(__GNUC__) || defined(__clang__)
++__attribute__((const))
++#endif
+ unsigned short X86_register_map(unsigned short id);
+ 
+ unsigned int find_insn(unsigned int id);
