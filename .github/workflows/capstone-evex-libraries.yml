@@ -1,7 +1,7 @@
-name: Measure canonical EVEX register scan plans with original layout and A/A controls
+name: Verify isolated 32-bit output with unchanged generic body and caller shape and compare unchanged-consumer instruction costs
 on:
   push:
-    branches: [codex/capstone-evex-canonical-scan-native]
+    branches: [codex/capstone-mode-caller-shape-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -27,10 +27,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 413b606f938a39d053fd61ef83a6277eec4e4f6e
+          ref: 3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62
           path: source
           persist-credentials: false
-      - name: Build from source and time only verified common function boundaries
+      - name: Verify full output and collect unchanged-consumer instruction counts
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y valgrind
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-canonical-scan-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: mode-caller-shape-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
