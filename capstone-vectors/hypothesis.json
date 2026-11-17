@@ -1,40 +1,16 @@
 {
-  "baseline": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-  "cause": "The register writer accepts ten parameters including a pointer to a caller-built register array. Clang 18 executed operand extraction and writer call setup accounts for 2.11% of the measured SSL64 format instruction count; this is not an available cycle saving estimate.",
-  "change": "Pass the same five scalar fields and three register numbers in one eight-byte value. Keep register formatting, detail loops, clearing, generated rows and admission unchanged.",
-  "domains": {
-    "prefix": [
-      2,
-      3,
-      4
-    ],
-    "ll": [
-      0,
-      1,
-      2
-    ],
-    "rex": "0x40..0x4f",
-    "first_ll": [
-      0,
-      1,
-      2
-    ],
-    "reg_count": [
-      2,
-      3
-    ],
-    "regs": "0..31; unused third lane initialized to zero"
+  "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+  "prior_run": {
+    "id": 44142336930,
+    "head_sha": "5206eecc19a36c1b60193ec92537f64f89207903",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44142336930",
+    "run_attempt": 1
   },
-  "risks": [
-    "Compiler may spill or reconstruct the compact value, offsetting caller savings.",
-    "GCC inline decisions and linked placement must be measured; R1166 established that unrolling alone changed GCC inline behavior and added work."
-  ],
-  "gates": [
-    "Full record and protected-page equality",
-    "Four compiler code generation and unchanged consumer instruction costs",
-    "Only then real native timing with A/A, PE32 and other architectures",
-    "Alternate configurations and actual NeverD product before publication"
-  ],
-  "source": "Study of local iced compact state and fixed-width formatting; no iced implementation copied.",
+  "hypothesis": "Keep the original raw scan dispatch and function signatures. Canonical EVEX projection supplies every returned field, so postpone initializing the full MCInst until the original extension/generic reader is required. Non-extension paths initialize it before use; canonical misses initialize before calling existing readers.",
+  "expected": "Remove initialization stores and input loads on accepted EVEX scans without introducing new shared fallback branches or save registers.",
+  "constraints": "No admission, field values, full-output path or other architecture changes; public/private differential and guard-page checks remain mandatory.",
+  "prior_cost": "R1371 extra boundary restored PE32 memory traffic but retained control-flow work and consumed EVEX saving; retain its original results.",
   "publication_qualified": false
 }
