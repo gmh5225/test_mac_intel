@@ -1,0 +1,22 @@
+{
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "prior_alias": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "tree": "6a9a02762105304ce23e4bdeabd52f8a956740c3",
+    "sha256": "bd989acf0e771c226e3b65265f5de557101be6c168a62a7611dd90664e7cb0ee",
+    "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+    "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+    "complete": true,
+    "publication_qualified": false,
+    "mapping_object_unchanged": true
+  },
+  "retained_negative_evidence": [
+    "../round1405-alias-call-shape-native/native-review.json",
+    "../round1410-alias-launch-factors/decision.json"
+  ],
+  "evidence": "The isolated Clang trie parser was fully unrolled to approximately 2.8 KiB. Both Clang executables shifted common read-only data by one page after adding it. GCC retains reproducible distinct-image raw losses in R1410.",
+  "change": "Keep GCC on the published implementation with exact executable identity. In the isolated Clang-only alias unit, share one noinline canonical parser and keep its 15-step loop rolled. Preserve the original four-argument caller ABI and every parsing/bounds rule.",
+  "hypothesis": "Reducing new code size may keep the existing read-only segment at its original addresses as well as preserving ordinary text. Check actual section geometry and instruction costs before drawing a timing conclusion.",
+  "gates": "Full public records and direct alias oracle; unchanged existing Mapping object and caller machine code except target; exact GCC executable identity; actual Clang native and mixed throughput on the composed published baseline. Retain every failed observation.",
+  "publication_qualified": false
+}
