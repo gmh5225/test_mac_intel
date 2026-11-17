@@ -1,0 +1,1893 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44161029211,
+    "head_sha": "1dda8da7d2db8fc8d387320f96c24ef7fd055a63",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44161029211",
+    "run_attempt": 1
+  },
+  "protocol": {
+    "source": {
+      "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+      "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+      "tree": "8c76907e65c9e8e340ef703c753deed2f4033841",
+      "sha256": "f2befb14d519e77e572a6f80e8ef42ab766605e539f84382f11d3ec6a4fdba69",
+      "files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86EvexMemoryOutput.c",
+        "arch/X86/X86GenEvexMemoryOutput.inc",
+        "arch/X86/X86SimpleOutput.h",
+        "arch/X86/X86VectorOutput.c",
+        "arch/X86/X86VectorRegisterWriter.h",
+        "suite/synctools/x86_vector_output.cpp",
+        "tests/unit/x86_simple_output.c",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ]
+    },
+    "baseline": {
+      "commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+      "tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+      "patch_sha256": "1a6654521a094cedac21c882be4239037e3ca3d8b7a9cf7b41c00bdc04909ad0",
+      "prepared_commit": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+      "publication_pending": true,
+      "method": "Checkout the published parent, apply the frozen publication patch and verify the full tree. The baseline is the exact prepared transfer-plan source, regardless of publication timing."
+    },
+    "preceding_cost_run": {
+      "id": 44151921166,
+      "head_sha": "949654306c3865a195e757fea1ac81f364ef3ec9",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44151921166",
+      "run_attempt": 1
+    },
+    "compilers": [
+      "ubuntu-24.04-clang"
+    ],
+    "purpose": "Classify every remaining real-corpus miss using canonical public operand details, including legacy SSE and 32-bit forms.",
+    "selection": "The same frozen common iced/Capstone instruction-boundary extents and scalar/SIMD panel rules as native timing. Keep all histogram rows; this observes static corpus frequency, not application runtime frequency.",
+    "timing": false,
+    "semantic_qualification": "Reuse the completed R1375 semantic qualification; this observer checks monotonic admission and identity on the selected real corpus.",
+    "preceding_census_run": {
+      "id": 44158416072,
+      "head_sha": "1e40ea0340d6ec283494dffa22f11bbea8f20c1f",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44158416072",
+      "run_attempt": 1
+    },
+    "classification": "Canonical ModR/M offset and memory operand fields identify register, ordinary base, indexed, IP-relative and absolute addressing. Legacy family is 0x10000 | opcode map; VEX/EVEX family retains prefix-length/map encoding. This is a static corpus observer, never a native timing consumer.",
+    "legacy_prefix": "The legacy pp field records the last raw 66/F3/F2 prefix before the opcode; it is a census label, not a replacement decoder."
+  },
+  "summaries": [
+    {
+      "case": "libjpeg62-turbo-amd64",
+      "panel": "all-functions",
+      "decoded": 60157,
+      "existing": 46278,
+      "new": 0,
+      "miss": 13879,
+      "largest_remaining": [
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1669
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1010
+        },
+        {
+          "mnemonic": "sete",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 925
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 871
+        },
+        {
+          "mnemonic": "movsxd",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 859
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 600
+        },
+        {
+          "mnemonic": "call",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 572
+        },
+        {
+          "mnemonic": "movsx",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 554
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 519
+        },
+        {
+          "mnemonic": "nop",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 489
+        },
+        {
+          "mnemonic": "imul",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 422
+        },
+        {
+          "mnemonic": "shl",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 312
+        },
+        {
+          "mnemonic": "movups",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 282
+        },
+        {
+          "mnemonic": "movsxd",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 271
+        },
+        {
+          "mnemonic": "cmovns",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 253
+        },
+        {
+          "mnemonic": "neg",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 250
+        },
+        {
+          "mnemonic": "movabs",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 231
+        },
+        {
+          "mnemonic": "pslld",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 226
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 172
+        },
+        {
+          "mnemonic": "imul",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 170
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 141
+        },
+        {
+          "mnemonic": "shl",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 118
+        },
+        {
+          "mnemonic": "bswap",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 112
+        },
+        {
+          "mnemonic": "sar",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 112
+        },
+        {
+          "mnemonic": "imul",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 93
+        }
+      ]
+    },
+    {
+      "case": "libjpeg62-turbo-amd64",
+      "panel": "simd-functions",
+      "decoded": 4376,
+      "existing": 2931,
+      "new": 0,
+      "miss": 1445,
+      "largest_remaining": [
+        {
+          "mnemonic": "pslld",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 224
+        },
+        {
+          "mnemonic": "movups",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 163
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 98
+        },
+        {
+          "mnemonic": "movaps",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 79
+        },
+        {
+          "mnemonic": "movdqa",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 59
+        },
+        {
+          "mnemonic": "movaps",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 51
+        },
+        {
+          "mnemonic": "psrad",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 48
+        },
+        {
+          "mnemonic": "movss",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 40
+        },
+        {
+          "mnemonic": "call",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 37
+        },
+        {
+          "mnemonic": "addps",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 36
+        },
+        {
+          "mnemonic": "subss",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 34
+        },
+        {
+          "mnemonic": "movdqu",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 30
+        },
+        {
+          "mnemonic": "shufps",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 29
+        },
+        {
+          "mnemonic": "movapd",
+          "family": 65537,
+          "memory": 3,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 28
+        },
+        {
+          "mnemonic": "nop",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 27
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 26
+        },
+        {
+          "mnemonic": "movdqa",
+          "family": 65537,
+          "memory": 3,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 26
+        },
+        {
+          "mnemonic": "mulss",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 26
+        },
+        {
+          "mnemonic": "addss",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 25
+        },
+        {
+          "mnemonic": "pshufd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 24
+        },
+        {
+          "mnemonic": "subps",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 24
+        },
+        {
+          "mnemonic": "movd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 23
+        },
+        {
+          "mnemonic": "movq",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 20
+        },
+        {
+          "mnemonic": "psubd",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 18
+        },
+        {
+          "mnemonic": "movq",
+          "family": 65537,
+          "memory": 3,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 17
+        }
+      ]
+    },
+    {
+      "case": "libzstd1-amd64",
+      "panel": "all-functions",
+      "decoded": 172407,
+      "existing": 147347,
+      "new": 0,
+      "miss": 25060,
+      "largest_remaining": [
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 3675
+        },
+        {
+          "mnemonic": "movups",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1387
+        },
+        {
+          "mnemonic": "nop",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 1334
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1158
+        },
+        {
+          "mnemonic": "movdqu",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 1045
+        },
+        {
+          "mnemonic": "shr",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 999
+        },
+        {
+          "mnemonic": "tzcnt",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 698
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 657
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 622
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 601
+        },
+        {
+          "mnemonic": "prefetcht0",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 591
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 589
+        },
+        {
+          "mnemonic": "sete",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 557
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 548
+        },
+        {
+          "mnemonic": "shl",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 505
+        },
+        {
+          "mnemonic": "movabs",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 421
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 372
+        },
+        {
+          "mnemonic": "movsxd",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 351
+        },
+        {
+          "mnemonic": "shl",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 340
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 332
+        },
+        {
+          "mnemonic": "movaps",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 328
+        },
+        {
+          "mnemonic": "shr",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 317
+        },
+        {
+          "mnemonic": "imul",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 297
+        },
+        {
+          "mnemonic": "bsr",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 287
+        },
+        {
+          "mnemonic": "movsxd",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 285
+        }
+      ]
+    },
+    {
+      "case": "libzstd1-amd64",
+      "panel": "simd-functions",
+      "decoded": 4714,
+      "existing": 3274,
+      "new": 0,
+      "miss": 1440,
+      "largest_remaining": [
+        {
+          "mnemonic": "movups",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 302
+        },
+        {
+          "mnemonic": "movdqu",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 211
+        },
+        {
+          "mnemonic": "movaps",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 140
+        },
+        {
+          "mnemonic": "movdqa",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 105
+        },
+        {
+          "mnemonic": "movq",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 54
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 49
+        },
+        {
+          "mnemonic": "movd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 44
+        },
+        {
+          "mnemonic": "nop",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 43
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 39
+        },
+        {
+          "mnemonic": "pshufd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 27
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 25
+        },
+        {
+          "mnemonic": "shl",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 23
+        },
+        {
+          "mnemonic": "add",
+          "family": 65536,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 21
+        },
+        {
+          "mnemonic": "psrldq",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 21
+        },
+        {
+          "mnemonic": "shl",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 20
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 19
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 15
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 14
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 14
+        },
+        {
+          "mnemonic": "call",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 13
+        },
+        {
+          "mnemonic": "seta",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 13
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 4,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 12
+        },
+        {
+          "mnemonic": "sub",
+          "family": 65536,
+          "memory": 4,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 12
+        },
+        {
+          "mnemonic": "imul",
+          "family": 65537,
+          "memory": 0,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 10
+        },
+        {
+          "mnemonic": "bsr",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 9
+        }
+      ]
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "panel": "simd-functions",
+      "decoded": 187130,
+      "existing": 143638,
+      "new": 7425,
+      "miss": 36067,
+      "largest_remaining": [
+        {
+          "mnemonic": "vmovdqu8",
+          "family": 1025,
+          "memory": 2,
+          "w": 0,
+          "ll": 2,
+          "pp": 3,
+          "evex_flags": 0,
+          "count": 1824
+        },
+        {
+          "mnemonic": "movdqu",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 1803
+        },
+        {
+          "mnemonic": "movups",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1594
+        },
+        {
+          "mnemonic": "movdqa",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 1515
+        },
+        {
+          "mnemonic": "vpslldq",
+          "family": 1025,
+          "memory": 0,
+          "w": 0,
+          "ll": 2,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 1417
+        },
+        {
+          "mnemonic": "vpsrldq",
+          "family": 1025,
+          "memory": 0,
+          "w": 0,
+          "ll": 2,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 1324
+        },
+        {
+          "mnemonic": "vmovdqu",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 1272
+        },
+        {
+          "mnemonic": "vmovdqu64",
+          "family": 1025,
+          "memory": 2,
+          "w": 1,
+          "ll": 2,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 1248
+        },
+        {
+          "mnemonic": "movaps",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1130
+        },
+        {
+          "mnemonic": "vpaddd",
+          "family": 1025,
+          "memory": 3,
+          "w": 0,
+          "ll": 2,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 663
+        },
+        {
+          "mnemonic": "psrld",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 619
+        },
+        {
+          "mnemonic": "rorx",
+          "family": 771,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 3,
+          "evex_flags": 0,
+          "count": 608
+        },
+        {
+          "mnemonic": "vbroadcasti32x4",
+          "family": 1026,
+          "memory": 1,
+          "w": 0,
+          "ll": 2,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 589
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 551
+        },
+        {
+          "mnemonic": "aesenc",
+          "family": 65538,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 550
+        },
+        {
+          "mnemonic": "vshufi64x2",
+          "family": 1027,
+          "memory": 0,
+          "w": 1,
+          "ll": 2,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 549
+        },
+        {
+          "mnemonic": "pslld",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 496
+        },
+        {
+          "mnemonic": "kmovq",
+          "family": 769,
+          "memory": 2,
+          "w": 1,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 480
+        },
+        {
+          "mnemonic": "vmovdqu8",
+          "family": 1025,
+          "memory": 0,
+          "w": 0,
+          "ll": 2,
+          "pp": 3,
+          "evex_flags": 129,
+          "count": 480
+        },
+        {
+          "mnemonic": "vmovdqu",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 472
+        },
+        {
+          "mnemonic": "pshufd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 425
+        },
+        {
+          "mnemonic": "vmovdqa",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 385
+        },
+        {
+          "mnemonic": "shrd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 376
+        },
+        {
+          "mnemonic": "aesdec",
+          "family": 65538,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 346
+        },
+        {
+          "mnemonic": "nop",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 320
+        }
+      ]
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "panel": "simd-functions",
+      "decoded": 7764,
+      "existing": 3172,
+      "new": 0,
+      "miss": 4592,
+      "largest_remaining": [
+        {
+          "mnemonic": "vmovdqa",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 350
+        },
+        {
+          "mnemonic": "vmovdqu",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 2,
+          "evex_flags": 0,
+          "count": 331
+        },
+        {
+          "mnemonic": "vpaddw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 316
+        },
+        {
+          "mnemonic": "vpmaddwd",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 256
+        },
+        {
+          "mnemonic": "vmovdqa",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 225
+        },
+        {
+          "mnemonic": "vpaddd",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 210
+        },
+        {
+          "mnemonic": "vpunpckhwd",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 190
+        },
+        {
+          "mnemonic": "vpunpcklwd",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 190
+        },
+        {
+          "mnemonic": "vperm2i128",
+          "family": 771,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 181
+        },
+        {
+          "mnemonic": "vpunpcklbw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 178
+        },
+        {
+          "mnemonic": "vpsrld",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 168
+        },
+        {
+          "mnemonic": "vpunpckhbw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 142
+        },
+        {
+          "mnemonic": "vpaddd",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 126
+        },
+        {
+          "mnemonic": "test",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 98
+        },
+        {
+          "mnemonic": "vpackssdw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 98
+        },
+        {
+          "mnemonic": "vpxor",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 92
+        },
+        {
+          "mnemonic": "vpsrlw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 89
+        },
+        {
+          "mnemonic": "vpsrad",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 88
+        },
+        {
+          "mnemonic": "vpaddw",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 87
+        },
+        {
+          "mnemonic": "vpackuswb",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 86
+        },
+        {
+          "mnemonic": "vpsraw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 57
+        },
+        {
+          "mnemonic": "vpmulhw",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 56
+        },
+        {
+          "mnemonic": "vpor",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 54
+        },
+        {
+          "mnemonic": "vmovntdq",
+          "family": 513,
+          "memory": 1,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 50
+        },
+        {
+          "mnemonic": "vpsllw",
+          "family": 513,
+          "memory": 0,
+          "w": 0,
+          "ll": 1,
+          "pp": 1,
+          "evex_flags": 0,
+          "count": 50
+        }
+      ]
+    },
+    {
+      "case": "libssl3t64-i386",
+      "panel": "all-functions",
+      "decoded": 745698,
+      "existing": 699715,
+      "new": 0,
+      "miss": 45983,
+      "largest_remaining": [
+        {
+          "mnemonic": "lea",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 11564
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 8219
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 2309
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1956
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1725
+        },
+        {
+          "mnemonic": "sub",
+          "family": 65536,
+          "memory": 4,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1591
+        },
+        {
+          "mnemonic": "mov",
+          "family": 65536,
+          "memory": 4,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1557
+        },
+        {
+          "mnemonic": "cmp",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1192
+        },
+        {
+          "mnemonic": "add",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 1076
+        },
+        {
+          "mnemonic": "test",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 994
+        },
+        {
+          "mnemonic": "test",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 942
+        },
+        {
+          "mnemonic": "shrd",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 857
+        },
+        {
+          "mnemonic": "setne",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 794
+        },
+        {
+          "mnemonic": "call",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 763
+        },
+        {
+          "mnemonic": "call",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 705
+        },
+        {
+          "mnemonic": "shld",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 568
+        },
+        {
+          "mnemonic": "and",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 538
+        },
+        {
+          "mnemonic": "sete",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 471
+        },
+        {
+          "mnemonic": "movzx",
+          "family": 65537,
+          "memory": 2,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 451
+        },
+        {
+          "mnemonic": "jmp",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 409
+        },
+        {
+          "mnemonic": "add",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 379
+        },
+        {
+          "mnemonic": "shr",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 372
+        },
+        {
+          "mnemonic": "imul",
+          "family": 65536,
+          "memory": 1,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 356
+        },
+        {
+          "mnemonic": "bswap",
+          "family": 65537,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 349
+        },
+        {
+          "mnemonic": "not",
+          "family": 65536,
+          "memory": 0,
+          "w": 0,
+          "ll": 0,
+          "pp": 0,
+          "evex_flags": 0,
+          "count": 326
+        }
+      ]
+    }
+  ],
+  "raw": "results/canonical-operand-census-ubuntu-24.04-clang-1",
+  "cleanup": {
+    "removed": true,
+    "bytes": 443497325,
+    "files": 4706
+  },
+  "scope": "Static corpus admission counts on frozen common instruction boundaries. This is not a native speed measurement or application runtime-frequency sample."
+}
