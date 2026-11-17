@@ -17,6 +17,12 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
+    model=next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith('model name'))
+    selected='AMD EPYC 9V45' in model
+    save('cpu-selection.json',dict(model=model,target='AMD EPYC 9V45',selected=selected))
+    if not selected:
+        save('complete.json',dict(skipped=True,success=True,reason='Predeclared CPU-model predicate did not match; no timings collected'))
+        return
     reference=json.loads((r/'candidate.json').read_text())['parent']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'

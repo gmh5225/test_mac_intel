@@ -1,7 +1,7 @@
-name: Diagnose every flagged canonical EVEX native panel with unchanged consumers
+name: Check frozen canonical EVEX panels on the original AMD 9V45 CPU model
 on:
   push:
-    branches: [codex/capstone-evex-canonical-scan-focused]
+    branches: [codex/capstone-evex-canonical-scan-focused-9v45]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -13,6 +13,8 @@ jobs:
         include:
           - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-22.04, cc: gcc, replica: 2 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 3 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -40,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-canonical-scan-focused-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-canonical-scan-focused-9v45-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
