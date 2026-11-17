@@ -1,0 +1,31 @@
+name: WMF authored String comparison percent decoding and global String addressors static profiles
+on:
+  push:
+    branches: [codex/wmf-Swift-String-comparison-percent-decoding-static-r2103316]
+    paths:
+      - .github/workflows/wmf-Swift-String-comparison-percent-decoding-static.yml
+      - wmf-Swift-String-comparison-percent-decoding-static/**
+permissions:
+  contents: read
+jobs:
+  collect:
+    runs-on: macos-26
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.5.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Verify nine static collection boundaries
+        run: python3 -B -m unittest discover -s wmf-Swift-String-comparison-percent-decoding-static -p 'test_collect.py' -v
+      - name: Compile authored String comparison percent decoding and global String addressors to IR SIL assembly and objects
+        run: python3 -B wmf-Swift-String-comparison-percent-decoding-static/collect.py
+      - name: Preserve raw static compiler evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: wmf-Swift-String-comparison-percent-decoding-static-${{ github.run_id }}-${{ github.run_attempt }}
+          path: wmf-Swift-String-comparison-percent-decoding-static-records/
+          if-no-files-found: error
+          retention-days: 14
