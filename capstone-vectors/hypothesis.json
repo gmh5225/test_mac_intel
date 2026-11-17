@@ -1,0 +1,8 @@
+{
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "cause": "R1404 removes Clang duplicate prologues and reduces SSL32 output instructions 6.0-6.4%, but GCC adds calls, prologues and stack-protector checks to a body previously inlined into X86_disasmIter; all GCC output modes regress in instruction count.",
+  "change": "Instantiate the same constant-mode body in the existing GCC iterator, including the mode selector, while preserving Clang fixed-mode leaves exactly. No new instruction admission, metadata or public API.",
+  "evidence": "../round1404-output-mode-leaves/profile-review.json",
+  "gates": "Complete record and extent equivalence; Clang runtime-object identity versus R1404; GCC disassembly must show the intended inlining. Retain R1402 and R1404 negatives. Instruction counts are not throughput.",
+  "publication_qualified": false
+}
