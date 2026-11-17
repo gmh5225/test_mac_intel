@@ -1,26 +1,37 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
-  "variants": [
-    "published baseline",
-    "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+  "round": 1336,
+  "source": {
+    "parent": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+    "baseline_tree": "18c18802f84a648501b8333d449d6491322e1773",
+    "tree": "90f1640be5ee01760c34969f4abe4a40a23518ea",
+    "sha256": "f1c2a8182cf5159955a0f80b79562679b8fa4f21db7bc2a2fefadd138bcf51fa",
+    "local_units": [
+      "x86_reg_access",
+      "x86_encoding_accuracy",
+      "detail_option",
+      "x86_simple_output"
+    ],
+    "differential_states": 750000,
+    "native_qualified": false
+  },
+  "diagnostic_only": true,
+  "publishable": false,
+  "baseline_scope": "Exact historical countdown body and baseline from R1327/R1334; not current next and not a publication candidate.",
+  "hypothesis": "Long NOPs with repeated prefixes on frequently traversed padding intervals contribute to the reproduced AMD slowdown. Changing only their encoding should alter the body/base timing if this mechanism matters.",
+  "hosts": "Six independent Ubuntu 24.04 Clang allocations; preserve every observed CPU",
+  "cases": [
+    "JPEG64 all/detail",
+    "SSL32 all/detail"
   ],
-  "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
-    "SSL64 SIMD",
-    "Zstd64 all and SIMD"
-  ],
-  "cycles": 21,
-  "launch_controls": [
+  "cycles": 31,
+  "process_target_ms": 250,
+  "controls": [
+    "byte-identical A/A",
     "original images",
-    "same inode and fixed addresses"
+    "same inode with ASLR disabled",
+    "all effective instructions and addresses identical",
+    "only long NOP byte intervals changed",
+    "750000 complete register-output states per variant including aliasing and untouched tails"
   ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "interpretation": "The changed NOPs are a causal intervention. No PMU or hardware-stall mechanism is inferred from instruction count alone."
 }
