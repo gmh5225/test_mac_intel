@@ -1,0 +1,38 @@
+{
+  "round": 1331,
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "tree": "ea697d58344e5fd363b11de84fe1739d8f36e484",
+    "sha256": "fc1e11d4cac651905da533a59f2ce355905570d862b98630b7abd9afbefc10d6",
+    "records": "equal ARM public records, cursor and errors for 2621440 inputs"
+  },
+  "hosts": [
+    "ubuntu-22.04 GCC/Clang",
+    "ubuntu-24.04 GCC/Clang",
+    "ubuntu-24.04-arm GCC/Clang"
+  ],
+  "cases": [
+    "PuTTY PE32",
+    "PuTTY PE64",
+    "AMD64 ls",
+    "ARM ls/sort/cp",
+    "AArch64 ls",
+    "MIPS64EL ls"
+  ],
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "cycles": 21,
+  "minimum_process_ms": 160,
+  "controls": [
+    "byte-identical A/A",
+    "original images",
+    "same inode and size with ASLR disabled if supported",
+    "identical consumer object",
+    "complete Capstone output hash"
+  ],
+  "gate": "Retain all native rows and identity controls; active configurations must pass real multi-architecture timing before any publication.",
+  "reason": "Bounded Clang unrolling restores inline initialization and raw/text instruction counts, retaining a 1.21835% ARM detail instruction reduction. All owner-work savings occur in ARM_getInstruction; unrelated libc memset placement changes are not algorithm savings. GNU x86 four-backend objects are identical."
+}
