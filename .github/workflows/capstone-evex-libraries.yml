@@ -1,7 +1,7 @@
-name: Measure EVEX packed move memory output against iced
+name: Repeat JPEG64 SIMD raw A/A control on two GCC11 runners
 on:
   push:
-    branches: [codex/capstone-evex-move-memory-pilot]
+    branches: [codex/capstone-evex-extension-isolated-entry-aa]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,10 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
           - { host: ubuntu-22.04, cc: gcc, replica: 1 }
-          - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -40,6 +38,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-move-memory-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-extension-isolated-entry-aa-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
