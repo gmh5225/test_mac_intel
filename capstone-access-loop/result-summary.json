@@ -1,0 +1,544 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+    "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+    "upstream_runtime_tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+    "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
+    "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
+    "compound_sha256": "6969392e35e26da02525c0f2ed1d91133435d1718eb6a5ed3f17ba87b892e56c",
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86EvexScan.c",
+      "arch/X86/X86EvexTransferScan.c",
+      "arch/X86/X86FeatureExtension.h",
+      "arch/X86/X86GenEvexTransferScan.inc",
+      "suite/synctools/x86_vector_output.cpp",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
+    ],
+    "upstream_publication_pending": true
+  },
+  "run": {
+    "id": 44126683875,
+    "head_sha": "4f6cd701df3d593d0c50e166cc1017edfaf693fc",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44126683875",
+    "run_attempt": 1
+  },
+  "profiles": [
+    {
+      "name": "evex-transfer-scan-ubuntu-22.04-clang",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "upstream_runtime_tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
+          "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
+          "compound_sha256": "6969392e35e26da02525c0f2ed1d91133435d1718eb6a5ed3f17ba87b892e56c",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86EvexTransferScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexTransferScan.inc",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "upstream_publication_pending": true
+        },
+        "base": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452"
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 12697344 inputs",
+        "owned": "equal public records, cursor and errors for 12697344 inputs",
+        "guard": "equal public records for 5898240 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeEvexTransferScan",
+        "changed_call_sites": [
+          [
+            ".cs_x86_evex_scan_text",
+            317,
+            4,
+            -4,
+            "X86_decodeEvexTransferScan"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            4,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_transfer_text",
+            "SHT_PROGBITS",
+            6,
+            331,
+            16,
+            "8427b635e7b199f5c6d62de1b1e0ebffb349dfc9e86bf7f09aaf22fae905bccf"
+          ],
+          [
+            ".cs_x86_evex_transfer_rodata",
+            "SHT_PROGBITS",
+            2,
+            48,
+            16,
+            "1c3ba91d9c071c00afb4fff9bae7075a8280147e122ed6fb90a53e720fd77cfa"
+          ],
+          [
+            ".eh_frame",
+            "SHT_AMD64_UNWIND",
+            2,
+            80,
+            8,
+            "a513db71942713a6d535a4f0885dd1465593f69305095a1cc1fa2227d2dce033"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1521,
+        "readonly_symbols": 1518,
+        "new_entries": [
+          [
+            "X86_decodeEvexTransferScan",
+            "t",
+            2940160,
+            331
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+      },
+      "cleanup": {
+        "bytes": 1379085684,
+        "removed": true
+      }
+    },
+    {
+      "name": "evex-transfer-scan-ubuntu-22.04-gcc",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "upstream_runtime_tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
+          "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
+          "compound_sha256": "6969392e35e26da02525c0f2ed1d91133435d1718eb6a5ed3f17ba87b892e56c",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86EvexTransferScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexTransferScan.inc",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "upstream_publication_pending": true
+        },
+        "base": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452"
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 12697344 inputs",
+        "owned": "equal public records, cursor and errors for 12697344 inputs",
+        "guard": "equal public records for 5898240 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeEvexTransferScan",
+        "changed_call_sites": [
+          [
+            ".cs_x86_evex_scan_text",
+            25,
+            4,
+            -4,
+            "X86_decodeEvexTransferScan"
+          ],
+          [
+            ".cs_x86_evex_scan_text",
+            150,
+            4,
+            -4,
+            "X86_decodeEvexTransferScan"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".data",
+            "SHT_PROGBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".bss",
+            "SHT_NOBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_transfer_text",
+            "SHT_PROGBITS",
+            6,
+            410,
+            16,
+            "4caffae599ed9a32ad7987f6ad652c707de64409c10b2cf29fbf482268adf995"
+          ],
+          [
+            ".cs_x86_evex_transfer_rodata",
+            "SHT_PROGBITS",
+            2,
+            48,
+            32,
+            "1c3ba91d9c071c00afb4fff9bae7075a8280147e122ed6fb90a53e720fd77cfa"
+          ],
+          [
+            ".note.gnu.property",
+            "SHT_NOTE",
+            2,
+            32,
+            8,
+            "d6cd20a8414b70fa5c66ad93440a165a54500b1d36fd8cbf6a34914c90f5bf54"
+          ],
+          [
+            ".eh_frame",
+            "SHT_PROGBITS",
+            2,
+            80,
+            8,
+            "1297188e531716c95f424d110e623cdacf66770f5a73eb821ff4439731e8b31d"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1360,
+        "readonly_symbols": 1728,
+        "new_entries": [
+          [
+            "X86_decodeEvexTransferScan",
+            "t",
+            2743360,
+            410
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+      },
+      "cleanup": {
+        "bytes": 1362184855,
+        "removed": true
+      }
+    },
+    {
+      "name": "evex-transfer-scan-ubuntu-24.04-clang",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "upstream_runtime_tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
+          "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
+          "compound_sha256": "6969392e35e26da02525c0f2ed1d91133435d1718eb6a5ed3f17ba87b892e56c",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86EvexTransferScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexTransferScan.inc",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "upstream_publication_pending": true
+        },
+        "base": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452"
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 12697344 inputs",
+        "owned": "equal public records, cursor and errors for 12697344 inputs",
+        "guard": "equal public records for 5898240 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeEvexTransferScan",
+        "changed_call_sites": [
+          [
+            ".cs_x86_evex_scan_text",
+            351,
+            4,
+            -4,
+            "X86_decodeEvexTransferScan"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            4,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_transfer_text",
+            "SHT_PROGBITS",
+            6,
+            338,
+            16,
+            "9f51b0f0bd2bf50a977efa1f2cf92539d1bed18c11b1cfb1819e38a7f3ebe066"
+          ],
+          [
+            ".cs_x86_evex_transfer_rodata",
+            "SHT_PROGBITS",
+            2,
+            48,
+            16,
+            "1c3ba91d9c071c00afb4fff9bae7075a8280147e122ed6fb90a53e720fd77cfa"
+          ],
+          [
+            ".eh_frame",
+            "SHT_AMD64_UNWIND",
+            2,
+            72,
+            8,
+            "03f4d1f9f4781a3a92d33621da3293e7cbc40e4c51e9c19d48eb5818732e6a34"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1524,
+        "readonly_symbols": 1510,
+        "new_entries": [
+          [
+            "X86_decodeEvexTransferScan",
+            "t",
+            2327584,
+            338
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+      },
+      "cleanup": {
+        "bytes": 1326244129,
+        "removed": true
+      }
+    },
+    {
+      "name": "evex-transfer-scan-ubuntu-24.04-gcc",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "upstream_runtime_tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
+          "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
+          "compound_sha256": "6969392e35e26da02525c0f2ed1d91133435d1718eb6a5ed3f17ba87b892e56c",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86EvexTransferScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexTransferScan.inc",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "upstream_publication_pending": true
+        },
+        "base": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+          "sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452"
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 12697344 inputs",
+        "owned": "equal public records, cursor and errors for 12697344 inputs",
+        "guard": "equal public records for 5898240 protected-page extents",
+        "layout_passed": false,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeEvexTransferScan",
+        "changed_call_sites": [
+          [
+            ".cs_x86_evex_scan_text",
+            25,
+            4,
+            -4,
+            "X86_decodeEvexTransferScan"
+          ],
+          [
+            ".cs_x86_evex_scan_text",
+            149,
+            4,
+            -4,
+            "X86_decodeEvexTransferScan"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".data",
+            "SHT_PROGBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".bss",
+            "SHT_NOBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_transfer_text",
+            "SHT_PROGBITS",
+            6,
+            410,
+            16,
+            "75a2edf88376cf65141988bad7345c69344006827fb1e18e4db13d07fd7b4e0b"
+          ],
+          [
+            ".cs_x86_evex_transfer_rodata",
+            "SHT_PROGBITS",
+            2,
+            48,
+            32,
+            "1c3ba91d9c071c00afb4fff9bae7075a8280147e122ed6fb90a53e720fd77cfa"
+          ],
+          [
+            ".note.gnu.property",
+            "SHT_NOTE",
+            2,
+            32,
+            8,
+            "d6cd20a8414b70fa5c66ad93440a165a54500b1d36fd8cbf6a34914c90f5bf54"
+          ],
+          [
+            ".eh_frame",
+            "SHT_PROGBITS",
+            2,
+            80,
+            8,
+            "0202449eacae2b79cd9ec02b62729153ef51cde29df5975ad6ba730f225b5756"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "passed": false,
+        "error": "{'missing': [('AArch64PostprocessFlags', 'r', 16946720, 8264), ('AArch64RegDesc', 'r', 14226176, 16872), ('AArch64RegDiffLists', 'r', 14243776, 4976), ('AArch64SubRegIdxLists', 'r', 14243072, 682), ('ACC128', 'r', 16468062, 2), ('ACC128Bits', 'r', 16468000, 62), ('ACC64', 'r', 16469098, 2), ('ACC64Bits', 'r', 16469092, 5), ('ACC64DSP', 'r', 16469824, 8), ('ACC64DSPBits', 'r', 16469816, 5), ('AFGR64', 'r', 16470592, 32), ('AFGR64Bits', 'r', 16470544, 19)], 'changed': [('AArch64PostprocessFlags', 'r', 16950816, 8264), ('AArch64RegDesc', 'r', 14230272, 16872), ('AArch64RegDiffLists', 'r', 14247872, 4976), ('AArch64SubRegIdxLists', 'r', 14247168, 682), ('ACC128', 'r', 16472158, 2), ('ACC128Bits', 'r', 16472096, 62), ('ACC64', 'r', 16473194, 2), ('ACC64Bits', 'r', 16473188, 5), ('ACC64DSP', 'r', 16473920, 8), ('ACC64DSPBits', 'r', 16473912, 5), ('AFGR64', 'r', 16474688, 32), ('AFGR64Bits', 'r', 16474640, 19)]}"
+      },
+      "compiler": {
+        "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+      },
+      "cleanup": {
+        "bytes": 1359498505,
+        "removed": true
+      }
+    }
+  ],
+  "unit_checks": 272,
+  "cases_per_compiler": {
+    "public_records": 12697344,
+    "private_records": 12697344,
+    "protected_page_extents": 5898240
+  },
+  "original_layout_preserved": false,
+  "runtime_delta": "Only the preceding register-plan fallback relocation changes; new transfer code and table occupy separate sections",
+  "performance_pending": true,
+  "configurations_pending": true,
+  "publication_qualified": false,
+  "qualified_for_timing": false,
+  "layout_failures": [
+    {
+      "profile": "evex-transfer-scan-ubuntu-24.04-gcc",
+      "result": {
+        "passed": false,
+        "error": "{'missing': [('AArch64PostprocessFlags', 'r', 16946720, 8264), ('AArch64RegDesc', 'r', 14226176, 16872), ('AArch64RegDiffLists', 'r', 14243776, 4976), ('AArch64SubRegIdxLists', 'r', 14243072, 682), ('ACC128', 'r', 16468062, 2), ('ACC128Bits', 'r', 16468000, 62), ('ACC64', 'r', 16469098, 2), ('ACC64Bits', 'r', 16469092, 5), ('ACC64DSP', 'r', 16469824, 8), ('ACC64DSPBits', 'r', 16469816, 5), ('AFGR64', 'r', 16470592, 32), ('AFGR64Bits', 'r', 16470544, 19)], 'changed': [('AArch64PostprocessFlags', 'r', 16950816, 8264), ('AArch64RegDesc', 'r', 14230272, 16872), ('AArch64RegDiffLists', 'r', 14247872, 4976), ('AArch64SubRegIdxLists', 'r', 14247168, 682), ('ACC128', 'r', 16472158, 2), ('ACC128Bits', 'r', 16472096, 62), ('ACC64', 'r', 16473194, 2), ('ACC64Bits', 'r', 16473188, 5), ('ACC64DSP', 'r', 16473920, 8), ('ACC64DSPBits', 'r', 16473912, 5), ('AFGR64', 'r', 16474688, 32), ('AFGR64Bits', 'r', 16474640, 19)]}"
+      }
+    }
+  ]
+}
