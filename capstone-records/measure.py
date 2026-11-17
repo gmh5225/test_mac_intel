@@ -97,7 +97,7 @@ try:
         (e / (key + '-sections.txt')).write_bytes(sp.check_output(['readelf', '-WS', binary]))
         with gzip.open(e / (key + '-linked-disassembly.gz'), 'wb') as f:
             f.write(sp.check_output(['objdump', '-d', binary]))
-    save('linked-layout', linked_layout(e / 'base-symbols.txt', e / 'trie-symbols.txt', 'trie'))
+    save('linked-layout', linked_layout(e / 'base-symbols.txt', e / 'trie-symbols.txt', 'output'))
     run(['clang++', '-O2', '-std=c++17', '-I', s / 'include', r / 'verify.cpp',
          '-ldl', '-o', w / 'verify'], 'verify-build')
     run([w / 'verify', libraries['base'], libraries['trie']], 'verify')
