@@ -2,6 +2,7 @@ from pathlib import Path
 import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
 from geometry import Geometry
+from layout_control import grow_object, symbols
 from jpeg_fixture import prepare_jpeg
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
@@ -30,11 +31,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
   run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  units=['x86_simple_output','x86_reg_access','detail_option','text_option','x86_encoding_accuracy','x86_scan_batch','x86_buffer_bounds','x86_printer_prechecked']
   bins={};objects={};libs={};ownedlibs={}
   geometry=Geometry(e)
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan'):
+  for key in ('base','index','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
@@ -43,7 +45,9 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
     assert tested==json.loads((r/('candidate.json' if key=='scan' else key+'.json')).read_text())['tree'],tested
     write('tested-source-'+key,dict(tree=tested,patch_sha256=sha(variant)))
     run(['git','reset','-q'],'unstage-tested-source-'+key,s)
-   run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
+   run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+key)
+   run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+key)
+   assert '100% tests passed, 0 tests failed out of 8' in (e/('units-'+key+'.log')).read_text()
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
    (e/(key+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',f]))
    (e/(key+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',f]))
@@ -51,17 +55,48 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    objdir=b/'CMakeFiles/capstone.dir'
    objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
+   if key=='index':
+    current=geometry.symbols['index'];baseline=geometry.symbols['base'];backend=geometry.backend_symbols
+    common={name for name in backend if len(baseline.get(name,[]))==len(current.get(name,[]))==1}
+    shifts={current[name][0][0]-baseline[name][0][0] for name in common if baseline[name][0][2].lower()=='t'}
+    assert shifts in ({0},{0,-48}),shifts
+    growth=-min(shifts)
+    padded=t/'indexpad';archive=t/'indexpad.a';shutil.copy2(b/'libcapstone.a',archive)
+    padded_object=t/'padded-object'/'X86OutputIterator.c.o';padded_object.parent.mkdir()
+    object_path=objdir/'arch/X86/X86OutputIterator.c.o'
+    control=grow_object(object_path,padded_object,{'.text':growth},{})
+    members=sp.check_output(['ar','t',archive])
+    run(['ar','r',archive,padded_object],'pad-index-archive')
+    assert sp.check_output(['ar','t',archive])==members
+    assert sp.check_output(['ar','p',archive,padded_object.name])==padded_object.read_bytes()
+    run(['clang++',t/'single.o',archive,'-lm','-o',padded],'link-indexpad')
+    if not growth:assert padded.read_bytes()==bins['index'].read_bytes()
+    bins['indexpad']=padded
+    geometry.capture('indexpad',b,padded)
+    pad_syms=geometry.symbols['indexpad']
+    for name in common:
+     kind=baseline[name][0][2].lower()
+     if kind=='t':assert pad_syms[name]==baseline[name],(name,pad_syms[name],baseline[name])
+     elif kind in ('r','d','b'):assert pad_syms[name]==current[name],(name,pad_syms[name],current[name])
+    all_old_data={name for name,entries in baseline.items() if len(entries)==len(current.get(name,[]))==len(pad_syms.get(name,[]))==1 and entries[0][2].lower() in ('r','d','b') and entries[0][1:]==current[name][0][1:]}
+    assert len(all_old_data)>1000
+    assert all(pad_syms[name]==current[name] for name in all_old_data)
+    control['all_old_unique_data_symbols_unchanged']=len(all_old_data)
+    control.update(growth_bytes=growth,all_old_backend_code_addresses_restored=True,old_backend_data_addresses_identical_to_index=True,semantic_scope='Every original object section prefix, symbol table and relocation entry is exact. Only unreachable trailing text bytes are added for diagnosis. No source or runtime logic change.')
+    write('indexpad-control',control)
+    (e/'indexpad-symbols.txt').write_bytes(sp.check_output(['nm','-n','-S','--defined-only',padded]))
+    (e/'indexpad-sections.txt').write_bytes(sp.check_output(['readelf','-WS',padded]))
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('scan',):
+  for key in ('index','scan'):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added=={'arch/X86/X86Vex32Output.c.o','arch/X86/X86Vex32C4Output.c.o'},added
    assert set(objects['base']) <= set(objects[key])
    assert set(changed) <= {'arch/X86/X86OutputIterator.c.o'},changed
    active=bool(changed)
-   write('scope-'+key,dict(active=active,source_applies=True,policy='ELF x86-64 Clang admission; unchanged baseline and mode-derived index with unchanged old vector object'))
+   write('scope-'+key,dict(active=active,source_applies=True,policy='ELF x86-64 Clang; baseline, R1342 raw-mode table, inert placement-restored R1342 control, and R1343 direct function-address selection'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(4 if growth else 3);write('binaries',digests)
   assert active
   geometry.finish()
   write('all-binaries',{key:sha(path) for key,path in bins.items()})
@@ -72,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Timing checks selected output values and boundaries. Complete-record source equality is established separately for each candidate. Old vector constants must be byte-identical in the private-pool candidate. The mode-derived-index candidate preserves the old vector object; linked placement is recorded without assuming a timing result.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Timing checks selected output values and boundaries. Complete-record source equality is established separately for each candidate. Old vector constants must be byte-identical in the private-pool candidate. The placement-restored control changes only unreachable trailing text bytes and preserves every original instruction, symbol and relocation entry. It restores old backend code addresses while retaining R1342 data addresses. The conditional writer removes the added pointer table. Native timing tests these distinct interventions.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -87,7 +122,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    for mode in ((0,2) if x['name']=='arm64-ls' else (1,2) if x['name']=='jpeg-avx2-i386' else (2,)):
     for launch in launches:
      warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
+     runs=[];reference=None;keys=['base','aa','index','indexpad','scan']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
