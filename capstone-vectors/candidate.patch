@@ -1,0 +1,102 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 11e8578a..959e5331 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -19,15 +19,19 @@
+ 
+ /* The register rows distinguish AH..BH from SPL..DIL when a REX prefix is
+  * present. Memory admission and bounds checks belong to the address writer. */
+-#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
+-CAPSTONE_INTERNAL
++/* Both bitness entries instantiate this same output policy. A constant
++ * bitness removes REX selection and width-state work from 32-bit output. */
++#if defined(_MSC_VER)
++static __forceinline
++#elif defined(__GNUC__)
++static inline __attribute__((always_inline))
+ #else
+-static
++static inline
+ #endif
+-bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+-			 cs_insn *insn, uint16_t *insn_size)
++bool X86_writeSimpleOutputForMode(cs_struct *handle, const uint8_t *code,
++				 size_t size, cs_insn *insn,
++				 uint16_t *insn_size, bool wide)
+ {
+-	const bool wide = handle->mode == CS_MODE_64;
+ 	const bool has_rex = wide && (code[0] & 0xf0) == 0x40;
+ 	const uint8_t rex = has_rex ? code[0] : 0;
+ 	const bool escaped = code[0] == 0x0f;
+@@ -64,7 +68,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			return false;
+ 		}
+ 	}
+-	if ((!wide && handle->mode != CS_MODE_32) || handle->no_text ||
++	if (handle->no_text ||
+ 	    handle->imm_unsigned || handle->mnem_list || handle->doing_mem ||
+ 	    (handle->syntax != CS_OPT_SYNTAX_INTEL &&
+ 	     handle->syntax != CS_OPT_SYNTAX_DEFAULT) ||
+@@ -147,7 +151,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			delta = (int32_t)raw;
+ 		}
+ 		const uint16_t length = row->imm_offset + row->imm_size;
+-		target = X86_relativeBranchTarget(handle->mode, insn->address,
++		target = X86_relativeBranchTarget(wide ? CS_MODE_64 : CS_MODE_32,
++						  insn->address,
+ 						  length, delta, row->imm_size);
+ 		if (target <= HEX_THRESHOLD) {
+ 			insn->op_str[0] = (char)('0' + target);
+@@ -205,6 +210,52 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 	return true;
+ }
+ 
++/* Keep the second instantiation outside the established ELF text section. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__ELF__) && defined(__GNUC__)
++__attribute__((noinline, section(".cs_x86_output32")))
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool X86_writeSimpleOutput32(cs_struct *handle, const uint8_t *code,
++				    size_t size, cs_insn *insn,
++				    uint16_t *insn_size)
++{
++	return X86_writeSimpleOutputForMode(handle, code, size, insn, insn_size,
++					    false);
++}
++
++/* Keep both specialized stack frames out of the mode-selection entry. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool X86_writeSimpleOutput64(cs_struct *handle, const uint8_t *code,
++				    size_t size, cs_insn *insn,
++				    uint16_t *insn_size)
++{
++	return X86_writeSimpleOutputForMode(handle, code, size, insn, insn_size,
++					    true);
++}
++
++#ifdef CAPSTONE_X86_DEDICATED_OUTPUT
++CAPSTONE_INTERNAL
++#else
++static
++#endif
++bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
++			 cs_insn *insn, uint16_t *insn_size)
++{
++	if (handle->mode == CS_MODE_32)
++		return X86_writeSimpleOutput32(handle, code, size, insn,
++					      insn_size);
++	if (handle->mode != CS_MODE_64)
++		return false;
++	return X86_writeSimpleOutput64(handle, code, size, insn, insn_size);
++}
++
+ #ifndef CAPSTONE_X86_DEDICATED_OUTPUT
+ #define CS_DECODE_TRY_OUTPUT X86_trySimpleOutput
+ #endif

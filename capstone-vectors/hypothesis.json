@@ -1,0 +1,8 @@
+{
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "evidence": "../round1402-output-mode-specialization/profile/output-mode-specialization-cost-ubuntu-24.04-clang-1/modes-dispatch-object.asm.gz",
+  "cause": "Clang18 mode specialization reduces SSL32 format instructions by 3%, but the shared entry pushes and pops six registers before tail-jumping to the 32-bit leaf. The leaf then saves its own frame. Total SSL32 writes rise by 1969718 despite removing mode work.",
+  "change": "Keep both fixed-mode instantiations out of the small mode selector, so selecting 32-bit does not create and tear down the 64-bit frame. The body remains one shared source implementation; option/callback and record semantics remain unchanged.",
+  "expectations": "Verify generated lowering and actual calls/stack stores before native timing. Preserve all R1402 costs and every original negative observation; no throughput claim from instruction counts.",
+  "publication_qualified": false
+}
