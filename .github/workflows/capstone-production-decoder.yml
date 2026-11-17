@@ -1,7 +1,7 @@
-name: Validate canonical EVEX scan plans through current NeverD and latest LLVM source
+name: Validate canonical EVEX transfer plans through current NeverD and latest LLVM source
 on:
   push:
-    branches: [codex/capstone-evex-canonical-scan-product]
+    branches: [codex/capstone-evex-transfer-plan-product]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -24,7 +24,7 @@ jobs:
         with:
           repository: NeverSight/NeverD
           path: neverd
-          ref: 02ace371079999d9bd16695229643604b7399c7f
+          ref: 3a55853a144c46823d01bd2693862f3702519a0a
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-evex-canonical-scan-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-evex-transfer-plan-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
