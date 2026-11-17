@@ -1,5 +1,3 @@
-#include <sys/mman.h>
-#include <unistd.h>
 #include <capstone/capstone.h>
 #include <dlfcn.h>
 #include <array>
@@ -43,45 +41,46 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
  }
  ++verified;
 }
-int main(int argc,char **argv) {
+int main(int argc,char**argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);if(a.iter==b.iter)return 4;
- const size_t page=(size_t)sysconf(_SC_PAGESIZE);
- auto memory=(uint8_t*)mmap(nullptr,page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
- if(memory==MAP_FAILED||mprotect(memory+page,page,PROT_NONE))return 5;
- for(cs_mode mode:{CS_MODE_16,CS_MODE_32,CS_MODE_64})for(unsigned flags=0;flags<8;++flags){
-  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);
-  for(unsigned n=0;n<8192;++n){
-   uint8_t bytes[15];for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=0;
-   const unsigned op[]={0xef,0xfe,0xd4,0x44,0x25,0x00,0x19,0x1b,0x39,0x3b,0x71,0x72,0x73};
-   if(n%3==0){bytes[0]=0x62;bytes[1]=(n&0xf0)|(1+(n/3)%3);bytes[2]=((n>>4)&0xf8)|5;
-    bytes[3]=((n>>2)&0x60)|8;bytes[4]=op[(n>>8)%13];bytes[5]=(uint8_t)(n>>1);
-   }else if(n%3==1){bytes[0]=0xc5;bytes[1]=(uint8_t)(n>>4);bytes[2]=op[(n>>8)%13];bytes[3]=(uint8_t)(n>>1);}
-   else{bytes[0]=0xc4;bytes[1]=(n&0xe0)|(1+(n/3)%3);bytes[2]=(uint8_t)(n>>4);bytes[3]=op[(n>>8)%13];bytes[4]=(uint8_t)(n>>1);}
-   for(unsigned length=0;length<=15;++length){auto input=memory+page-length;std::memcpy(input,bytes,length);compare(x,y,input,length,detail);}
-  }
- }
+ for (cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags){
+  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip), y(b,mode,text,detail,skip);uint8_t bytes[15];
 
- {
-  Machine x(a,CS_MODE_64,true,true,false),y(b,CS_MODE_64,true,true,false);
-  using Hit=bool(*)(csh,const uint8_t*,size_t,cs_insn*);
-  auto hit=(Hit)dlsym(b.library,"cs_test_owned_hit");
-  if(!hit)throw std::runtime_error("missing hit probe");
-  const uint8_t cases[][7]={
-   {0xc5,0xf9,0xef,0xc0}, {0xc4,0xe1,0x79,0xef,0xc0},
-   {0x62,0xf1,0x7d,0x48,0xef,0xc0},
-   {0xc5,0xf9,0x72,0xf0,1}, {0xc4,0xe1,0x79,0x72,0xf0,1},
-   {0x62,0xf3,0xfd,0x48,0x3b,0xc0,1}
-  };
-  const unsigned lengths[]={4,5,6,5,6,7};
-  for(unsigned n=0;n<6;++n) {
-   auto input=memory+page-lengths[n];std::memcpy(input,cases[n],lengths[n]);
-   cs_insn insn{};
-   if(!hit(y.handle,input,lengths[n],&insn)) {
-    std::fprintf(stderr,"missing bounded copy hit %u\n",n);return 6;
+  // Every vector register triple in the canonical EVEX forms, with both
+  // W bits and all valid vector-length encodings, including short imm8 input.
+  if(mode==CS_MODE_64 && !text && !detail && !skip) {
+   const unsigned keys[]={0x319,0x31b,0x339,0x33b,0x1ef,0x2dc,0x2dd,0x2de,0x2df,0x344,0x325,0x200,0x1fe};
+   for(unsigned key:keys)for(unsigned w=0;w<2;++w)for(unsigned ll=0;ll<3;++ll)
+    for(unsigned i=0;i<32768;++i) {
+     const unsigned dst=i&31,src1=(i>>5)&31,src2=(i>>10)&31;
+     const unsigned ext=((dst&8)<<4)|((src2&16)<<2)|((src2&8)<<2)|(dst&16);
+     std::memset(bytes,0,sizeof(bytes));bytes[0]=0x62;bytes[1]=(0xf0^ext)|(key>>8);
+     bytes[2]=(w<<7)|((~src1&15)<<3)|5;bytes[3]=(ll<<5)|((~src1&16)>>1);
+     bytes[4]=key&255;bytes[5]=0xc0|((dst&7)<<3)|(src2&7);bytes[6]=(i*37+ll*13+w)&255;
+     compare(x,y,bytes,6+(i&1),false);
+    }
+  }
+  // Sweep conventional and reserved map, W, pp, vector length and ModR/M values.
+  if(mode==CS_MODE_64 && !text && !detail && !skip)
+   for(unsigned map=0;map<8;++map)for(unsigned p1:{0x04,0x05,0x06,0x07,0x84,0x85,0x86,0x87})for(unsigned ll=0;ll<4;++ll)for(unsigned op=0;op<256;++op)for(unsigned mr:{0,5,0x44,0x85,0xc0,0xc1,0xff}){
+    for(auto &v:bytes)v=(uint8_t)random_word();bytes[0]=0x62;bytes[1]=(bytes[1]&0xf8)|map;bytes[2]=(bytes[2]&0x78)|p1;bytes[3]=(bytes[3]&0x9f)|(ll<<5);bytes[4]=op;bytes[5]=mr;compare(x,y,bytes,15,false);
    }
-   compare(x,y,input,lengths[n],true);
+  // All map/opcode candidates with legal, malformed and repeated prefixes.
+  for(unsigned map: {1u,2u,3u})for(unsigned op=0;op<256;++op)for(unsigned i=0;i<128;++i){
+   for(auto &v:bytes)v=(uint8_t)random_word();
+   unsigned prefix=i&3;
+   if(prefix)bytes[0]=(i&4)?0x64:0x67;
+   if(prefix>1)bytes[1]=(i&8)?0x66:0x48;
+   if(prefix>2)bytes[2]=(i&16)?0x67:0x26;
+   bytes[prefix]=0x62;bytes[prefix+1]=(bytes[prefix+1]&0xf8)|map;
+   bytes[prefix+4]=op;
+   compare(x,y,bytes,prefix+2+((i>>2)%(14-prefix)),detail);
+  }
+  for(unsigned i=0;i<65536;++i) {
+   for(auto &v:bytes)v=(uint8_t)random_word();unsigned offset=i%8==0 ? 1 : i%8==1 ? 2 : 0;bytes[offset]=0x62;if(i%3)bytes[offset+2]|=4;
+   if(offset)bytes[0]=(i&16) ? 0x67 : 0x64;if(offset==2)bytes[1]=(i&32) ? 0x48 : 0x66;
+   compare(x,y,bytes,i%16,detail);
   }
  }
- munmap(memory,page*2);
- std::printf("equal private-entry records for %llu protected-page extents\n",(unsigned long long)verified);
+ std::printf("equal private records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
 }

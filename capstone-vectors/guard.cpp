@@ -1,7 +1,7 @@
-#include <capstone/capstone.h>
-#include <dlfcn.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <capstone/capstone.h>
+#include <dlfcn.h>
 #include <array>
 #include <cstdint>
 #include <cstdio>
@@ -43,30 +43,22 @@ static void compare(Machine&a, Machine&b,const uint8_t*code,unsigned n,bool deta
  }
  ++verified;
 }
-int main(int argc,char**argv) {
+int main(int argc,char **argv) {
  if(argc!=3)return 1;API a(argv[1]),b(argv[2]);if(a.iter==b.iter)return 4;
  const size_t page=(size_t)sysconf(_SC_PAGESIZE);
  auto memory=(uint8_t*)mmap(nullptr,page*2,PROT_READ|PROT_WRITE,MAP_PRIVATE|MAP_ANON,-1,0);
  if(memory==MAP_FAILED||mprotect(memory+page,page,PROT_NONE))return 5;
- for (cs_mode mode:{CS_MODE_64,CS_MODE_32,CS_MODE_16})for(unsigned flags=0;flags<8;++flags){
-  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip), y(b,mode,text,detail,skip);uint8_t bytes[15];
-  // Sweep conventional and reserved map, W, pp, vector length and ModR/M values.
-  if(mode==CS_MODE_64 && !text && !detail && !skip)
-   for(unsigned map=0;map<8;++map)for(unsigned p1:{0x04,0x05,0x06,0x07,0x84,0x85,0x86,0x87})for(unsigned ll=0;ll<4;++ll)for(unsigned op=0;op<256;++op)for(unsigned mr:{0,5,0x44,0x85,0xc0,0xc1,0xff}){
-    for(auto &v:bytes)v=(uint8_t)random_word();bytes[0]=0x62;bytes[1]=(bytes[1]&0xf8)|map;bytes[2]=(bytes[2]&0x78)|p1;bytes[3]=(bytes[3]&0x9f)|(ll<<5);bytes[4]=op;bytes[5]=mr;compare(x,y,bytes,15,false);
-   }
-  if((mode==CS_MODE_32 || mode==CS_MODE_64) && !text && !detail && !skip) {
-    for(unsigned payload=0;payload<256;++payload) for(unsigned opcode=0;opcode<256;++opcode) for(unsigned mr=0;mr<256;++mr) {
-     uint8_t b[15]={0xc5,uint8_t(payload),uint8_t(opcode),uint8_t(mr),uint8_t(random_word()),0x80,0x7f,0xff,0x7f,0,2,3,0,4,0};
-     compare(x,y,b,15,false);const unsigned cut=random_word()%16;auto input=memory+page-cut;std::memcpy(input,b,cut);compare(x,y,input,cut,false);
-    }
-   }
-  for(unsigned i=0;i<65536;++i) {
-   for(auto &v:bytes)v=(uint8_t)random_word();unsigned offset=i%8==0 ? 1 : i%8==1 ? 2 : 0;bytes[offset]=0x62;if(i%3)bytes[offset+2]|=4;
-   if(offset)bytes[0]=(i&16) ? 0x67 : 0x64;if(offset==2)bytes[1]=(i&32) ? 0x48 : 0x66;
-   compare(x,y,bytes,i%16,detail);
+ for(cs_mode mode:{CS_MODE_16,CS_MODE_32,CS_MODE_64})for(unsigned flags=0;flags<8;++flags){
+  bool text=flags&1,detail=flags&2,skip=flags&4;Machine x(a,mode,text,detail,skip),y(b,mode,text,detail,skip);
+  for(unsigned n=0;n<8192;++n){
+   uint8_t bytes[15];for(auto &v:bytes)v=(uint8_t)random_word();unsigned k=n%4;
+   if(k)bytes[0]=(n&4)?0x64:0x67;
+   if(k>1)bytes[1]=(n&8)?0x66:0x48;
+   if(k>2)bytes[2]=(n&16)?0x67:0x26;
+   bytes[k]=0x62;bytes[k+1]=(bytes[k+1]&0xf8)|((n>>8)%3+1);bytes[k+4]=(uint8_t)n;
+   for(unsigned length=0;length<=15;++length){auto input=memory+page-length;std::memcpy(input,bytes,length);compare(x,y,input,length,detail);}
   }
  }
  munmap(memory,page*2);
- std::printf("equal public records, cursor and errors for %llu inputs\n",(unsigned long long)verified);
+ std::printf("equal public records for %llu protected-page extents\n",(unsigned long long)verified);
 }

@@ -1,92 +1,135 @@
-diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
-index 8a606f4e..9f438c29 100644
---- a/arch/X86/X86VectorOutput.c
-+++ b/arch/X86/X86VectorOutput.c
-@@ -33,13 +33,20 @@ static char *writeVectorRegister(char *out, unsigned length_code,
- 	return out;
- }
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index cc67e9c7..b15dcb90 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3308,13 +3308,8 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	uint16_t size;
+ 	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
+ 	if (tryExtension)
+-#ifdef X86_EVEX_REGISTER_SCAN
+-		extension = X86_decodeScanFeatureExtension(
+-			ud, code, code_len, &instr, &size, opcode);
+-#else
+ 		extension = X86_decodeFeatureExtension(ud, code, code_len,
+ 						       &instr, &size, opcode);
+-#endif
+ 	if (extension == X86_FEATURE_INVALID)
+ 		return false;
+ 	if (extension != X86_FEATURE_DECODED) {
+@@ -3372,6 +3367,22 @@ decodeScanResultFallback(csh ud, const uint8_t *code, size_t code_len,
+ 			return true;
+ 		}
+ 	}
++#endif
++#ifdef X86_EVEX_REGISTER_SCAN
++	if (tryExtension && opcode == 0x62 && handle->mode == CS_MODE_64
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++	    && !handle->x86_scan_adapter
++#endif
++	) {
++		const uint32_t packed = X86_scanEvexRegister(code, code_len);
++		if (packed) {
++			result->opcode = 0;
++			result->opcode_pub = packed >> 8;
++			result->length = (uint16_t)(packed & 0xff);
++			result->popcode_adjust = 0;
++			return true;
++		}
++	}
+ #endif
+ 	if (tryExtension && (code_len >= 4 && code[0] == 0xc4 &&
+ 			     !(handle->mode & (CS_MODE_16 | CS_MODE_32)) &&
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+index 12cc13fb..d47fb83b 100644
+--- a/arch/X86/X86EvexScan.c
++++ b/arch/X86/X86EvexScan.c
+@@ -7,54 +7,26 @@
+ #include "X86EvexAdmission.h"
+ #include "X86GenEvexScan.inc"
  
-+/* All fields are bounded by the admitted VEX/EVEX register encoding. */
-+struct VectorRegisterOperands {
-+	uint8_t prefix, ll, rex, first_ll, reg_count, regs[3];
-+};
-+
- static bool writeVectorRegisters(const uint8_t *code, cs_insn *insn,
- 				 uint16_t *insn_size,
- 				 const struct VectorOutputRow *row,
--				 unsigned prefix, unsigned ll, unsigned rex,
--				 unsigned first_ll, const unsigned *regs,
--				 unsigned reg_count)
-+				 struct VectorRegisterOperands operands)
+-/* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
+- * The ordinary output generator owns the admitted IDs and widths. */
+-__attribute__((noinline, section(".cs_x86_evex_scan_text")))
+-static x86_feature_decode_result
+-decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
+-		      MCInst *instr, uint16_t *size, uint8_t opcode)
++/* The caller owns 64-bit mode and adapter priority. Zero leaves the
++ * instruction to the original feature and generic readers. */
++__attribute__((noinline,
++	       section(".cs_x86_evex_scan_text"))) CAPSTONE_INTERNAL uint32_t
++X86_scanEvexRegister(const uint8_t *code, size_t code_len)
  {
-+	const unsigned prefix = operands.prefix, ll = operands.ll,
-+		       rex = operands.rex, first_ll = operands.first_ll,
-+		       reg_count = operands.reg_count;
-+	const uint8_t *regs = operands.regs;
- 	const unsigned len = prefix + 2 + row->immediate;
- 	*insn_size = insn->size = (uint16_t)len;
- 	insn->id = row->id;
-@@ -137,13 +144,23 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	if (X86_EVEX_REGISTER_EXTRACT(key)) {
- 		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
- 			return false;
--		const unsigned pair[] = { regs[2], regs[0] };
--		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
--					    0x40 | (w << 3) | rxb,
--					    (key & 2) != 0, pair, 2);
-+		return writeVectorRegisters(code, insn, insn_size, row,
-+					    (struct VectorRegisterOperands){
-+						    4,
-+						    ll,
-+						    0x40 | (w << 3) | rxb,
-+						    (key & 2) != 0,
-+						    2,
-+						    { regs[2], regs[0], 0 } });
- 	}
--	return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
--				    0x40 | (w << 3) | rxb, ll, regs, 3);
-+	return writeVectorRegisters(code, insn, insn_size, row,
-+				    (struct VectorRegisterOperands){
-+					    4,
-+					    ll,
-+					    0x40 | (w << 3) | rxb,
-+					    ll,
-+					    3,
-+					    { regs[0], regs[1], regs[2] } });
+-	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
+-	if (handle->mode == CS_MODE_64 && code[5] >= 0xc0 &&
+-	    !X86_EVEX_REGISTER_PREFIX_REJECTS(code, code_len)
+-#ifdef CAPSTONE_X86_SCAN_ADAPTER
+-	    && !handle->x86_scan_adapter
+-#endif
+-	) {
+-		const unsigned map = code[1] & 15;
+-		const struct EvexScanPlan *plan =
+-			&evex_scan_plans[evex_scan_index[code[4]]];
+-		if (plan->map == map && code_len >= plan->length) {
+-			const unsigned id =
+-				plan->ids[code[2] >> 7][code[3] >> 5];
+-			const unsigned key = (map << 8) | code[4];
+-			if (id && (!X86_EVEX_REGISTER_EXTRACT(key) ||
+-				   !X86_EVEX_EXTRACT_SOURCE_REJECTS(code))) {
+-				instr->Opcode = 0;
+-				instr->OpcodePub = id;
+-				instr->popcode_adjust = 0;
+-				*size = plan->length;
+-				return X86_FEATURE_DECODED;
+-			}
+-		}
+-	}
+-	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
+-					  opcode);
+-}
+-
+-/* Keep the non-EVEX and non-64-bit fallback ahead of the register helper's
+- * working state. Its predicate matches the isolated full-decode entry. */
+-__attribute__((noinline, section(".cs_x86_evex_scan_text")))
+-CAPSTONE_INTERNAL x86_feature_decode_result
+-X86_decodeScanFeatureExtension(csh ud, const uint8_t *code, size_t code_len,
+-			       MCInst *instr, uint16_t *size, uint8_t opcode)
+-{
+-	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
+-	    (((cs_struct *)(uintptr_t)ud)->mode & CS_MODE_64))
+-		return decodeEvexRegisterScan(ud, code, code_len, instr, size,
+-					     opcode);
+-	return X86_decodeFeatureExtensionSlow(ud, code, code_len, instr, size,
+-					      opcode);
++	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, code_len) ||
++	    code[0] != 0x62 || code[5] < 0xc0)
++		return 0;
++	const unsigned map = code[1] & 15;
++	const struct EvexScanPlan *plan =
++		&evex_scan_plans[evex_scan_index[code[4]]];
++	if (plan->map != map || code_len < plan->length)
++		return 0;
++	const unsigned id = plan->ids[code[2] >> 7][code[3] >> 5];
++	const unsigned key = (map << 8) | code[4];
++	if (!id || (X86_EVEX_REGISTER_EXTRACT(key) &&
++		    X86_EVEX_EXTRACT_SOURCE_REJECTS(code)))
++		return 0;
++	return (id << 8) | plan->length;
  }
+ #endif
+ #endif
+diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
+index 4d34d8ac..4c87face 100644
+--- a/arch/X86/X86FeatureExtension.h
++++ b/arch/X86/X86FeatureExtension.h
+@@ -317,9 +317,8 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #define X86_EVEX_REGISTER_SCAN
+-CAPSTONE_INTERNAL x86_feature_decode_result
+-X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
+-			       MCInst *instr, uint16_t *size, uint8_t opcode);
++CAPSTONE_INTERNAL uint32_t X86_scanEvexRegister(const uint8_t *code,
++						size_t code_len);
+ #endif
  
- /* VEX packed loads and FMA with an ordinary base, index and optional disp8.
-@@ -484,8 +501,14 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
- 		const unsigned regs[] = { (~flags >> 3) & 15,
- 					  (modrm & 7) | ((rxb & 1) << 3) };
- 		return writeVectorRegisters(code, insn, insn_size,
--					    &vex_shift_rows[index], prefix, ll,
--					    0x40 | (w << 3) | rxb, ll, regs, 2);
-+					    &vex_shift_rows[index],
-+					    (struct VectorRegisterOperands){
-+						    prefix,
-+						    ll,
-+						    0x40 | (w << 3) | rxb,
-+						    ll,
-+						    2,
-+						    { regs[0], regs[1], 0 } });
- 	}
- 	const unsigned plan = vex_register_plans[map - 1][code[prefix]];
- 	const unsigned index = vex_register_widths[plan][w * 2 + ll];
-@@ -497,8 +520,14 @@ static bool writeVexRegisterOutput(const uint8_t *code, size_t size,
- 	const unsigned regs[] = { ((modrm >> 3) & 7) | ((rxb & 4) << 1),
- 				  (~flags >> 3) & 15,
- 				  (modrm & 7) | ((rxb & 1) << 3) };
--	return writeVectorRegisters(code, insn, insn_size, row, prefix, ll,
--				    0x40 | (w << 3) | rxb, ll, regs, 3);
-+	return writeVectorRegisters(code, insn, insn_size, row,
-+				    (struct VectorRegisterOperands){
-+					    prefix,
-+					    ll,
-+					    0x40 | (w << 3) | rxb,
-+					    ll,
-+					    3,
-+					    { regs[0], regs[1], regs[2] } });
- }
- 
- bool X86_writeVectorOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
