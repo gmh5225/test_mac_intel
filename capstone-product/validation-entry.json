@@ -1,920 +1,362 @@
 {
   "source": {
-    "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-    "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
-    "tree": "59f9eeed7df5f4fda55c4bc8af3b550616e17139",
-    "sha256": "3e160884f4ae567420757430b217159ccb88e3940476cb7d420885db49555756",
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "tree": "b3b21b7b2f16cca0a3633f679b521cbd6f29a3b1",
+    "sha256": "0fd44d99e6bca31335e1682754566912e8a3692e18478d6d55762a444c701f55",
     "files": [
-      "arch/X86/X86EvexAdmission.h",
-      "arch/X86/X86EvexScan.c",
-      "arch/X86/X86GenEvexScan.inc",
-      "suite/synctools/x86_vector_output.cpp"
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86EvexMemoryOutput.c",
+      "arch/X86/X86GenEvexMemoryOutput.inc",
+      "arch/X86/X86SimpleOutput.h",
+      "arch/X86/X86VectorOutput.c",
+      "arch/X86/X86VectorRegisterWriter.h",
+      "suite/synctools/x86_vector_output.cpp",
+      "tests/unit/x86_simple_output.c",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
     ]
   },
   "native_run": {
-    "id": 44140571362,
-    "head_sha": "e8fec29384e2e691d4343aa8bcf25883df15832f",
+    "id": 44172951500,
+    "head_sha": "29eef60dca5d8177e988aebb194fcce468dcfc6c",
     "status": "completed",
     "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44140571362",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44172951500",
     "run_attempt": 1
   },
   "mixed_run": {
-    "id": 44133467263,
-    "head_sha": "479dc371e9e0c63b2b13e4ac40363038c702ae19",
+    "id": 44173091531,
+    "head_sha": "7b798b81a898af359c1b6636c7cc7a3c56e8f113",
     "status": "completed",
     "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44133467263",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44173091531",
     "run_attempt": 1
   },
   "profiles_run": {
-    "id": 44143273965,
-    "head_sha": "c80645e3771911d23794698e8cc86a771e442f63",
+    "id": 44180278735,
+    "head_sha": "5650351ef5f102b1db65ad2055b863189597938b",
     "status": "completed",
     "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44143273965",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44180278735",
     "run_attempt": 1
   },
   "original_native_flags": {
     "losses": {
-      "scan": [
+      "output": [
         {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+          "case": "libjpeg62-turbo-amd64",
+          "panel": "all-functions",
+          "mode": "detail",
+          "launch": "images",
+          "aa": 0.993933029968862,
+          "aa_ci95": [
+            0.990808555160835,
+            1.002479041111783
+          ],
+          "variant": "output",
+          "gain": 0.9751087149882605,
+          "ci95": [
+            0.9679187388784961,
+            0.980100545871807
+          ],
+          "vs_iced": 1.0102402362285217,
+          "vs_fast": 0.6203264820033789
+        },
+        {
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+          "case": "libjpeg62-turbo-amd64",
+          "panel": "simd-functions",
+          "mode": "format",
+          "launch": "images",
+          "aa": 0.9960398125878858,
+          "aa_ci95": [
+            0.9910720857189808,
+            1.0036204135192133
+          ],
+          "variant": "output",
+          "gain": 0.985964827312513,
+          "ci95": [
+            0.9813852322842789,
+            0.9945352016457709
+          ],
+          "vs_iced": 1.0239928869453077,
+          "vs_fast": 0.5370134754346131
+        },
+        {
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+          "case": "libzstd1-amd64",
+          "panel": "all-functions",
+          "mode": "format",
+          "launch": "images",
+          "aa": 0.9997772419974047,
+          "aa_ci95": [
+            0.9964684378660119,
+            1.0030705587601234
+          ],
+          "variant": "output",
+          "gain": 0.9895928279338955,
+          "ci95": [
+            0.9831254396421363,
+            0.9963666091716608
+          ],
+          "vs_iced": 1.3940134911398752,
+          "vs_fast": 0.7013872806850239
+        },
+        {
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
           "case": "libzstd1-amd64",
           "panel": "all-functions",
           "mode": "detail",
           "launch": "images",
-          "aa": 0.9852673522428529,
+          "aa": 0.9979542145202727,
           "aa_ci95": [
-            0.979896590633168,
-            0.9965874904584437
+            0.9909169974300034,
+            1.0063487147723755
           ],
-          "variant": "scan",
-          "gain": 0.9847930244323423,
+          "variant": "output",
+          "gain": 0.9728089131872645,
           "ci95": [
-            0.967299645503435,
-            1.0036059626384235
+            0.9653889318674613,
+            0.9807097540548383
           ],
-          "vs_iced": 1.1863015522048113,
-          "vs_fast": 0.7174520017412972
+          "vs_iced": 1.1737297859264706,
+          "vs_fast": 0.7090453618862229
         },
         {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
           "case": "libzstd1-amd64",
-          "panel": "simd-functions",
-          "mode": "format",
-          "launch": "images",
-          "aa": 1.004053905993207,
-          "aa_ci95": [
-            1.0016060116386274,
-            1.0127016685732317
-          ],
-          "variant": "scan",
-          "gain": 0.9844267534429658,
-          "ci95": [
-            0.9774214472403991,
-            0.9912484670100565
-          ],
-          "vs_iced": 1.1862388163755373,
-          "vs_fast": 0.5644854498392031
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-          "case": "jpeg-avx2-i386",
-          "panel": "simd-functions",
-          "mode": "scan",
-          "launch": "images",
-          "aa": 1.0036286106726255,
-          "aa_ci95": [
-            0.9597794455506203,
-            1.018639708438018
-          ],
-          "variant": "scan",
-          "gain": 0.9818410122669757,
-          "ci95": [
-            0.9556723670220695,
-            1.0123414196575553
-          ],
-          "vs_iced": 0.2514909262964898,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-          "case": "jpeg-avx2-i386",
           "panel": "simd-functions",
           "mode": "detail",
           "launch": "images",
-          "aa": 0.9975934527759345,
+          "aa": 0.9974660032290605,
           "aa_ci95": [
-            0.9907759278925057,
-            1.0097088206212281
+            0.9923773784053807,
+            1.0060615042608374
           ],
-          "variant": "scan",
-          "gain": 0.9881859429843335,
+          "variant": "output",
+          "gain": 0.9739062552333135,
           "ci95": [
-            0.9813779929812093,
-            1.0118651017374816
+            0.9666319076351138,
+            0.9793164941823073
           ],
-          "vs_iced": 0.6174529242885517,
-          "vs_fast": 0.381943956738535
+          "vs_iced": 0.9390167007750199,
+          "vs_fast": 0.555538148393981
         },
         {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+          "case": "libzstd1-amd64",
+          "panel": "simd-functions",
+          "mode": "detail",
+          "launch": "same-file-fixed",
+          "aa": 0.9980821598605498,
+          "aa_ci95": [
+            0.9930443161373371,
+            1.0039688468085202
+          ],
+          "variant": "output",
+          "gain": 0.9894904477411285,
+          "ci95": [
+            0.980437324767178,
+            0.9997430735785287
+          ],
+          "vs_iced": 0.9625355889438907,
+          "vs_fast": 0.5599088811690207
+        },
+        {
+          "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
           "case": "libssl3t64-i386",
           "panel": "all-functions",
-          "mode": "format",
-          "launch": "images",
-          "aa": 1.000331394064364,
-          "aa_ci95": [
-            0.9942565176359561,
-            1.0045386218565504
-          ],
-          "variant": "scan",
-          "gain": 0.9855676872672913,
-          "ci95": [
-            0.9799003134619186,
-            0.9978814020474944
-          ],
-          "vs_iced": 1.6273794804087993,
-          "vs_fast": 0.8031695403737368
-        }
-      ],
-      "merge": [
-        {
-          "host": "evex-transfer-comparison-ubuntu-22.04-clang-1",
-          "case": "libjpeg62-turbo-amd64",
-          "panel": "simd-functions",
-          "mode": "scan",
-          "launch": "images",
-          "aa": 0.9965231683418673,
-          "aa_ci95": [
-            0.9922280765428082,
-            1.0018750865182537
-          ],
-          "variant": "merge",
-          "gain": 0.9846948991340039,
-          "ci95": [
-            0.9827057984969175,
-            0.9912754103673052
-          ],
-          "vs_iced": 0.9113954009815889,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-22.04-clang-1",
-          "case": "libzstd1-amd64",
-          "panel": "simd-functions",
-          "mode": "scan",
-          "launch": "images",
-          "aa": 0.9985127487679761,
-          "aa_ci95": [
-            0.9932813149966596,
-            1.0054687400176328
-          ],
-          "variant": "merge",
-          "gain": 0.9890017976630379,
-          "ci95": [
-            0.9842859998001399,
-            0.9915456671544167
-          ],
-          "vs_iced": 0.9713765449806058,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-          "case": "libzstd1-amd64",
-          "panel": "all-functions",
           "mode": "detail",
           "launch": "images",
-          "aa": 0.9852673522428529,
+          "aa": 0.9958721670399404,
           "aa_ci95": [
-            0.979896590633168,
-            0.9965874904584437
+            0.988891132797812,
+            1.0045230759914616
           ],
-          "variant": "merge",
-          "gain": 0.9835984487343993,
+          "variant": "output",
+          "gain": 0.9455673497207061,
           "ci95": [
-            0.9779321044660338,
-            0.9978234901837207
+            0.9360717701170364,
+            0.952870381307719
           ],
-          "vs_iced": 1.1987299384578256,
-          "vs_fast": 0.7239621789403508
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-          "case": "jpeg-avx2-i386",
-          "panel": "simd-functions",
-          "mode": "detail",
-          "launch": "images",
-          "aa": 0.9975934527759345,
-          "aa_ci95": [
-            0.9907759278925057,
-            1.0097088206212281
-          ],
-          "variant": "merge",
-          "gain": 0.9830085722518369,
-          "ci95": [
-            0.968314955203308,
-            1.0016036937826025
-          ],
-          "vs_iced": 0.6187456926257753,
-          "vs_fast": 0.3816993228641406
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-24.04-gcc-1",
-          "case": "libjpeg62-turbo-amd64",
-          "panel": "all-functions",
-          "mode": "format",
-          "launch": "images",
-          "aa": 1.0009645937358147,
-          "aa_ci95": [
-            0.9994170087691597,
-            1.0033710785826848
-          ],
-          "variant": "merge",
-          "gain": 0.9881416296674865,
-          "ci95": [
-            0.986664861032557,
-            0.9911198145631844
-          ],
-          "vs_iced": 1.3717495935740658,
-          "vs_fast": 0.6412932138284251
-        },
-        {
-          "host": "evex-transfer-comparison-ubuntu-24.04-gcc-1",
-          "case": "libzstd1-amd64",
-          "panel": "simd-functions",
-          "mode": "format",
-          "launch": "images",
-          "aa": 0.9969341827748908,
-          "aa_ci95": [
-            0.9863037485620022,
-            1.0025083888002642
-          ],
-          "variant": "merge",
-          "gain": 0.9877990169306391,
-          "ci95": [
-            0.9845217391304347,
-            0.9959908236836356
-          ],
-          "vs_iced": 1.3176521739130433,
-          "vs_fast": 0.613537594723854
+          "vs_iced": 1.4083322521650516,
+          "vs_fast": 0.8777519863434364
         }
       ]
     },
     "aa": [
       {
-        "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-        "case": "libzstd1-amd64",
-        "panel": "all-functions",
-        "mode": "scan",
-        "launch": "images",
-        "aa": 1.0108813657647204,
-        "aa_ci95": [
-          0.9961465629160431,
-          1.015152677285472
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-        "case": "libzstd1-amd64",
-        "panel": "all-functions",
-        "mode": "detail",
-        "launch": "images",
-        "aa": 0.9852673522428529,
-        "aa_ci95": [
-          0.979896590633168,
-          0.9965874904584437
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
-        "case": "libzstd1-amd64",
+        "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+        "case": "libssl3t64-amd64",
         "panel": "simd-functions",
         "mode": "scan",
         "launch": "images",
-        "aa": 0.989123988647435,
+        "aa": 1.0229243237009487,
         "aa_ci95": [
-          0.9629629629629628,
-          1.0190568152809687
+          1.0114592041962858,
+          1.0273177116987027
         ]
       },
       {
-        "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+        "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "format",
+        "launch": "images",
+        "aa": 0.9760630416297982,
+        "aa_ci95": [
+          0.9704858243655796,
+          0.9857403070251187
+        ]
+      },
+      {
+        "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "aa": 0.9844565354979578,
+        "aa_ci95": [
+          0.9774459352150732,
+          0.9975907105525803
+        ]
+      },
+      {
+        "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
+        "case": "jpeg-avx2-i386",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "same-file-fixed",
+        "aa": 0.9846672823912132,
+        "aa_ci95": [
+          0.9607148989759461,
+          1.0007774538386782
+        ]
+      },
+      {
+        "host": "evex-prechecked-dispatch-ubuntu-22.04-gcc-1",
         "case": "jpeg-avx2-i386",
         "panel": "simd-functions",
         "mode": "detail",
-        "launch": "same-file-fixed",
-        "aa": 1.01170919105716,
+        "launch": "images",
+        "aa": 1.0109359012501598,
         "aa_ci95": [
-          1.0003185919955915,
-          1.0197576419800631
+          1.0001491540372107,
+          1.018457212548999
         ]
       },
       {
-        "host": "evex-transfer-comparison-ubuntu-24.04-gcc-1",
+        "host": "evex-prechecked-dispatch-ubuntu-24.04-clang-1",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "format",
+        "launch": "images",
+        "aa": 1.013869375175059,
+        "aa_ci95": [
+          1.008423658373963,
+          1.0187604086960436
+        ]
+      },
+      {
+        "host": "evex-prechecked-dispatch-ubuntu-24.04-gcc-1",
+        "case": "libzstd1-amd64",
+        "panel": "simd-functions",
+        "mode": "scan",
+        "launch": "images",
+        "aa": 1.0117859224337176,
+        "aa_ci95": [
+          1.008755132930613,
+          1.0133139693386597
+        ]
+      },
+      {
+        "host": "evex-prechecked-dispatch-ubuntu-24.04-gcc-1",
         "case": "libssl3t64-i386",
         "panel": "all-functions",
         "mode": "scan",
         "launch": "images",
-        "aa": 0.9876463918424956,
+        "aa": 1.012820850280879,
         "aa_ci95": [
-          0.9829618272595039,
-          0.9927187539571991
+          1.0097951689091489,
+          1.0162710566615618
         ]
       }
     ]
   },
   "original_mixed_flags": {
     "losses": {
-      "scan": [
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm-ls",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 0.9970509533181432,
-          "aa_ci95": [
-            0.9929210041340838,
-            1.0005531887836205
-          ],
-          "variant": "scan",
-          "gain": 0.9761663070236757,
-          "ci95": [
-            0.9674282729635838,
-            0.9839383309725153
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm-ls",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 1.0035072550249344,
-          "aa_ci95": [
-            0.9905390684713855,
-            1.0146965780292485
-          ],
-          "variant": "scan",
-          "gain": 0.947758040897594,
-          "ci95": [
-            0.9254793583862788,
-            0.9656041925700408
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm-sort",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 0.9996524045238907,
-          "aa_ci95": [
-            0.9976378361540857,
-            1.0050618308143002
-          ],
-          "variant": "scan",
-          "gain": 0.9763119578879251,
-          "ci95": [
-            0.9694006269749085,
-            0.9818940707846538
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm-sort",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 0.9990904625907263,
-          "aa_ci95": [
-            0.98975828601729,
-            1.014078805053868
-          ],
-          "variant": "scan",
-          "gain": 0.9468588064046579,
-          "ci95": [
-            0.9419193748850482,
-            0.9656738570041624
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm-cp",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 1.002954670124171,
-          "aa_ci95": [
-            0.992114179484873,
-            1.006418773508992
-          ],
-          "variant": "scan",
-          "gain": 0.9753738795501558,
-          "ci95": [
-            0.9708482017090807,
-            0.9804792841382692
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm-cp",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 1.006363262595275,
-          "aa_ci95": [
-            0.9870643302480839,
-            1.023566755844917
-          ],
-          "variant": "scan",
-          "gain": 0.9479441562094202,
-          "ci95": [
-            0.9363832190449151,
-            0.9694336639783189
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "mips64el-ls",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 0.9874947921674198,
-          "aa_ci95": [
-            0.983635714558923,
-            1.0010257988408473
-          ],
-          "variant": "scan",
-          "gain": 0.9454831031102939,
-          "ci95": [
-            0.9368090002246413,
-            0.9492359770197144
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "putty-32-0.85",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 1.0210158215120757,
-          "aa_ci95": [
-            1.0120303547818421,
-            1.0299848734873487
-          ],
-          "variant": "scan",
-          "gain": 0.8695482571307137,
-          "ci95": [
-            0.8573070038685836,
-            0.8782138103697971
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "putty-64-0.85",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 1.0097660300522238,
-          "aa_ci95": [
-            0.9961671612265084,
-            1.0114131982908687
-          ],
-          "variant": "scan",
-          "gain": 0.8755541689928081,
-          "ci95": [
-            0.8550988933683271,
-            0.8807041965651912
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "amd64-ls",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 0.9997187666982273,
-          "aa_ci95": [
-            0.9920617089792556,
-            1.0121870606746175
-          ],
-          "variant": "scan",
-          "gain": 0.8756705382025549,
-          "ci95": [
-            0.87005918879854,
-            0.882549235032714
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm64-ls",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 0.9999745117405295,
-          "aa_ci95": [
-            0.9946374303691429,
-            1.0048337845689772
-          ],
-          "variant": "scan",
-          "gain": 0.9561559036599706,
-          "ci95": [
-            0.9493964194070272,
-            0.9580821608652013
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-          "case": "arm64-ls",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 0.9979456938117047,
-          "aa_ci95": [
-            0.9915602746250625,
-            1.0066125311097789
-          ],
-          "variant": "scan",
-          "gain": 0.9499010026726392,
-          "ci95": [
-            0.9414473989512274,
-            0.9577123170078295
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
-          "case": "mips64el-ls",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 0.9970072906867357,
-          "aa_ci95": [
-            0.9843787257553287,
-            1.0062754705151575
-          ],
-          "variant": "scan",
-          "gain": 0.988523805074055,
-          "ci95": [
-            0.9818957610559477,
-            0.9923799164138088
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-24.04-clang-44133467263",
-          "case": "arm-sort",
-          "panel": null,
-          "mode": 0,
-          "launch": "images",
-          "aa": 0.9987772010381314,
-          "aa_ci95": [
-            0.9938344242602535,
-            1.0074009338255066
-          ],
-          "variant": "scan",
-          "gain": 0.9876490656598372,
-          "ci95": [
-            0.9841196348899017,
-            1.0050028032949498
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        }
-      ],
-      "merge": [
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
-          "case": "arm-ls",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 0.9976694792157572,
-          "aa_ci95": [
-            0.9945232808829682,
-            1.0032067859728975
-          ],
-          "variant": "merge",
-          "gain": 0.9811586635547531,
-          "ci95": [
-            0.9767475657607906,
-            0.981933009751745
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
-          "case": "arm-sort",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 0.9971704786606932,
-          "aa_ci95": [
-            0.9945807552805632,
-            1.0023198153967008
-          ],
-          "variant": "merge",
-          "gain": 0.9750062918709028,
-          "ci95": [
-            0.972489127136644,
-            0.9792767849651817
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
-          "case": "arm-cp",
-          "panel": null,
-          "mode": 1,
-          "launch": "images",
-          "aa": 1.0025898193720888,
-          "aa_ci95": [
-            0.9987307461907557,
-            1.004256332410632
-          ],
-          "variant": "merge",
-          "gain": 0.977154380826185,
-          "ci95": [
-            0.9757140263649514,
-            0.9817956699742442
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        },
-        {
-          "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-          "case": "arm64-ls",
-          "panel": null,
-          "mode": 2,
-          "launch": "images",
-          "aa": 0.9986328087033713,
-          "aa_ci95": [
-            0.9969405054986457,
-            1.0005550114267059
-          ],
-          "variant": "merge",
-          "gain": 0.9899437597840581,
-          "ci95": [
-            0.988318629660635,
-            0.9911206564944224
-          ],
-          "vs_iced": null,
-          "vs_fast": null
-        }
-      ]
+      "output": []
     },
     "aa": [
       {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-        "case": "mips64el-ls",
+        "host": "evex-prechecked-dispatch-images-four-ubuntu-22.04-clang-44173091531",
+        "case": "arm-cp",
         "panel": null,
-        "mode": 1,
+        "mode": 0,
         "launch": "images",
-        "aa": 0.9874947921674198,
+        "aa": 0.9894205569255762,
         "aa_ci95": [
-          0.983635714558923,
-          1.0010257988408473
+          0.9838424801219147,
+          1.0018983266572055
         ]
       },
       {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-        "case": "mips64el-ls",
+        "host": "evex-prechecked-dispatch-images-four-ubuntu-22.04-clang-44173091531",
+        "case": "amd64-ls",
         "panel": null,
-        "mode": 2,
-        "launch": "images",
-        "aa": 1.0678812711550847,
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "aa": 1.019232531956233,
         "aa_ci95": [
-          1.0595439568409928,
-          1.0794588202559823
+          0.9801819006141207,
+          1.0494039304095968
         ]
       },
       {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-        "case": "putty-32-0.85",
+        "host": "evex-prechecked-dispatch-images-four-ubuntu-22.04-gcc-44173091531",
+        "case": "arm-cp",
         "panel": null,
-        "mode": 1,
+        "mode": 0,
         "launch": "images",
-        "aa": 1.017647752596262,
+        "aa": 1.0132184452147064,
         "aa_ci95": [
-          1.0118359974601923,
-          1.0207759261689193
+          0.9961291070188593,
+          1.016913561889032
         ]
       },
       {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-        "case": "putty-32-0.85",
-        "panel": null,
-        "mode": 2,
-        "launch": "images",
-        "aa": 1.0210158215120757,
-        "aa_ci95": [
-          1.0120303547818421,
-          1.0299848734873487
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+        "host": "evex-prechecked-dispatch-images-four-ubuntu-24.04-gcc-44173091531",
         "case": "putty-64-0.85",
         "panel": null,
-        "mode": 1,
-        "launch": "images",
-        "aa": 1.0125111546316425,
-        "aa_ci95": [
-          1.0045311913877593,
-          1.0246986965250777
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
-        "case": "arm64-ls",
-        "panel": null,
-        "mode": 0,
-        "launch": "images",
-        "aa": 1.0105708376165765,
-        "aa_ci95": [
-          0.996336691898527,
-          1.01519819650573
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
-        "case": "mips64el-ls",
-        "panel": null,
-        "mode": 1,
-        "launch": "images",
-        "aa": 0.9887730653141239,
-        "aa_ci95": [
-          0.9855556733101011,
-          0.9949236049256603
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-clang-44133467263",
-        "case": "arm-ls",
-        "panel": null,
         "mode": 2,
         "launch": "images",
-        "aa": 0.9897172699441743,
+        "aa": 1.0115139215757478,
         "aa_ci95": [
-          0.9830031712284181,
-          0.9929951343448143
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-clang-44133467263",
-        "case": "arm-cp",
-        "panel": null,
-        "mode": 2,
-        "launch": "images",
-        "aa": 0.9869988902970729,
-        "aa_ci95": [
-          0.9832683820365612,
-          0.9925853910667807
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-ls",
-        "panel": null,
-        "mode": 0,
-        "launch": "images",
-        "aa": 0.9856864758616779,
-        "aa_ci95": [
-          0.9818816384643492,
-          0.9927700068647147
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-ls",
-        "panel": null,
-        "mode": 1,
-        "launch": "images",
-        "aa": 1.0106094808126411,
-        "aa_ci95": [
-          1.0072819317069521,
-          1.0135886620973613
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-ls",
-        "panel": null,
-        "mode": 2,
-        "launch": "images",
-        "aa": 1.0199578412561143,
-        "aa_ci95": [
-          1.0119544233391384,
-          1.0220662594555237
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-sort",
-        "panel": null,
-        "mode": 0,
-        "launch": "images",
-        "aa": 0.9869150207173543,
-        "aa_ci95": [
-          0.9806605478982855,
-          0.9895881786959099
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-sort",
-        "panel": null,
-        "mode": 1,
-        "launch": "images",
-        "aa": 1.0110883572249139,
-        "aa_ci95": [
-          1.0088541828702984,
-          1.0137390025671063
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-sort",
-        "panel": null,
-        "mode": 2,
-        "launch": "images",
-        "aa": 1.016329834230249,
-        "aa_ci95": [
-          1.0131612141050805,
-          1.0199077280823274
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-cp",
-        "panel": null,
-        "mode": 0,
-        "launch": "images",
-        "aa": 0.9888940247604532,
-        "aa_ci95": [
-          0.983837178219976,
-          0.9933408230767783
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-cp",
-        "panel": null,
-        "mode": 1,
-        "launch": "images",
-        "aa": 1.012522545735635,
-        "aa_ci95": [
-          1.0085320960196333,
-          1.0161315220747145
-        ]
-      },
-      {
-        "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
-        "case": "arm-cp",
-        "panel": null,
-        "mode": 2,
-        "launch": "images",
-        "aa": 1.016682584374186,
-        "aa_ci95": [
-          1.0109783622000883,
-          1.0217763868708318
+          1.004162337083989,
+          1.012927967811012
         ]
       }
     ]
   },
   "unresolved": [
-    "mixed four-launch and executed-PC investigation",
-    "portable build completion"
+    "fresh Clang image controls including three original A/A flags",
+    "portable build completion",
+    "product timing and full state validation"
   ],
+  "compiler_scope_identity_run": {
+    "id": 44179749813,
+    "head_sha": "ef5e5cbad2e07b88facd15d9e0a5a880fb52a1f5",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44179749813",
+    "run_attempt": 1
+  },
+  "compiler_scope": {
+    "active": "Clang; runtime objects, archive and complete frozen executable match the measured candidate",
+    "inactive": "GCC; existing runtime objects and complete frozen executable match the released baseline"
+  },
   "publication_qualified": false,
   "rationale": "Product validation is independent additional evidence and can proceed while the frozen native outliers are investigated. It does not override or erase any failed observation."
 }
