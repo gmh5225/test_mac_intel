@@ -1,24 +1,22 @@
-name: Check shared 32-bit VEX prefix dispatch with PE and other backend controls
+name: Verify compiler-specific EVEX constant placement preserves prior binaries
 on:
   push:
-    branches: [codex/capstone-vex32-shared-gate-mixed]
+    branches: [codex/capstone-evex-gnu-constant-identity-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
 jobs:
-  cost:
+  verify:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
           - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04-arm, cc: clang, archs: four }
+          - { host: ubuntu-22.04, cc: gcc, archs: four }
+          - { host: ubuntu-24.04, cc: clang, archs: four }
+          - { host: ubuntu-24.04, cc: gcc, archs: four }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 45
+    timeout-minutes: 30
     env:
       BUILD_ARCHS: ${{ matrix.archs }}
       MEASURE_CC: ${{ matrix.cc }}
@@ -33,13 +31,13 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Verify all runtime objects, linked consumers and shared libraries are identical
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-shared-gate-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-gnu-constant-identity-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
