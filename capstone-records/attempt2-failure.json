@@ -1,0 +1,33 @@
+{
+  "run": {
+    "id": 44164037524,
+    "head_sha": "6c94db9f3d5bade683c928960cfe49385b0c8d5f",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44164037524",
+    "run_attempt": 1
+  },
+  "native_timing_started": false,
+  "production_modified": false,
+  "profiles": [
+    {
+      "profile": "formatter-layout-counterfactual-four-ubuntu-22.04-clang-44164037524",
+      "before_relocations": 69,
+      "after_relocations": 0,
+      "cleanup": {
+        "bytes": 208315804,
+        "removed": true
+      }
+    },
+    {
+      "profile": "formatter-layout-counterfactual-four-ubuntu-24.04-clang-44164037524",
+      "before_relocations": 67,
+      "after_relocations": 0,
+      "cleanup": {
+        "bytes": 199839186,
+        "removed": true
+      }
+    }
+  ],
+  "reason": "On both tested toolchains, objcopy --update-section discarded every .text relocation. The invariant caught this before linking or timing. Replace section rewriting with an owned ELF extent update that preserves all other section bytes, then require raw and resolved relocation equality and full linked-byte identity."
+}

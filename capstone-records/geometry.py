@@ -5,6 +5,7 @@ import shutil
 import subprocess as sp
 from elftools.elf.elffile import ELFFile
 from layout import linked_layout, symbols
+from pad_rel import pad_text
 
 
 def section(path, name):
@@ -57,7 +58,7 @@ def build_geometry(t, b, evidence, run, bins):
     text = control / 'text.bin'
     text.write_bytes(original + b'\x90' * growth)
     patched = control / 'X86VectorOutput.c.o'
-    run(['objcopy', '--update-section', '.text=' + str(text), before, patched], 'geometry-object')
+    patched.write_bytes(pad_text(before.read_bytes(), growth))
     assert section(patched, '.text') == text.read_bytes()
     original_relocations, patched_relocations = relocations(before), relocations(patched)
     (evidence / 'relocation-equivalence.json').write_text(json.dumps(dict(
