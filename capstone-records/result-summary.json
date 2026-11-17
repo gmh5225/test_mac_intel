@@ -1,0 +1,710 @@
+{
+  "status": "compiler-audit-complete-early-packed-scan",
+  "review": {
+    "complete": true,
+    "run": {
+      "id": 44027597697,
+      "head_sha": "341a8c6738e1904cf7f05cdd4eafd6ca3bb88da5",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44027597697",
+      "run_attempt": 1
+    },
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "cfb80c7a7943ef421e7bb2edc63ec23c3a57efe8",
+      "sha256": "8fb41ca83aeaf833ba1ae384bcc1efa0beef54fffcf61db7334c0de593a2f6b7",
+      "changed": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86DisassemblerDecoder.c",
+        "arch/X86/X86GenVexPublicPlans.inc",
+        "arch/X86/X86VexScan.c",
+        "arch/X86/X86VexScan.h",
+        "suite/synctools/x86_operand_specializations.py",
+        "tests/unit/x86_buffer_bounds.c",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ],
+      "local_complete_records_pending": true,
+      "compiler_audit_only": true
+    },
+    "profiles": [
+      {
+        "host": "vex32-early-scan-audit-ubuntu-22.04-clang",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "sizes": {
+          "base": {
+            "X86_getInstructionScanResult": 17115,
+            "cs_disasm_iter": 12829,
+            "X86_scanBatch": 15593,
+            "decodeScanResultFallback": 1295
+          },
+          "scan": {
+            "X86_getInstructionScanResult": 17379,
+            "cs_disasm_iter": 13803,
+            "X86_scanBatch": 15779,
+            "decodeScanResultFallback": 1295,
+            "X86_readVex32PublicPlan": 324
+          }
+        },
+        "shapes": {
+          "base": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 448407,
+                "alignment": 128
+              },
+              ".rodata": {
+                "size": 719976,
+                "alignment": 128
+              },
+              ".data.rel.ro": {
+                "size": 1824,
+                "alignment": 16
+              },
+              ".rodata.str2.16": {
+                "size": 448,
+                "alignment": 16
+              },
+              ".rodata.cst4": {
+                "size": 4,
+                "alignment": 4
+              },
+              ".eh_frame": {
+                "size": 8536,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8106,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17760,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 768,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 449751,
+                "alignment": 128
+              },
+              ".rodata": {
+                "size": 719976,
+                "alignment": 128
+              },
+              ".data.rel.ro": {
+                "size": 1824,
+                "alignment": 16
+              },
+              ".rodata.str2.16": {
+                "size": 448,
+                "alignment": 16
+              },
+              ".rodata.cst4": {
+                "size": 4,
+                "alignment": 4
+              },
+              ".eh_frame": {
+                "size": 8536,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8106,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17760,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 768,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 813,
+            "deltas": {
+              "1680": 807,
+              "0": 6
+            }
+          },
+          "r": {
+            "symbols": 1114,
+            "deltas": {
+              "6912": 88,
+              "6944": 1026
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 78635642,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-early-scan-audit-ubuntu-22.04-gcc",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "sizes": {
+          "base": {
+            "decodeScanResultFallback": 1722,
+            "X86_getInstructionScanResult": 23760,
+            "cs_disasm_iter": 14204,
+            "X86_scanBatch": 37568
+          },
+          "scan": {
+            "decodeScanResultFallback": 1722,
+            "X86_getInstructionScanResult": 21492,
+            "cs_disasm_iter": 14324,
+            "X86_scanBatch": 38244,
+            "X86_readVex32PublicPlan": 376
+          }
+        },
+        "shapes": {
+          "base": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 417622,
+                "alignment": 128
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 699648,
+                "alignment": 128
+              },
+              ".text.unlikely": {
+                "size": 58,
+                "alignment": 1
+              },
+              ".data.rel.ro.local": {
+                "size": 1712,
+                "alignment": 32
+              },
+              ".rodata.cst8": {
+                "size": 40,
+                "alignment": 8
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 8904,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 11158,
+                "alignment": 16
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata.str1.1": {
+                "size": 44,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 17832,
+                "alignment": 32
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 440,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 416134,
+                "alignment": 128
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 699648,
+                "alignment": 128
+              },
+              ".text.unlikely": {
+                "size": 58,
+                "alignment": 1
+              },
+              ".data.rel.ro.local": {
+                "size": 1712,
+                "alignment": 32
+              },
+              ".rodata.cst8": {
+                "size": 40,
+                "alignment": 8
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 8904,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 11158,
+                "alignment": 16
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata.str1.1": {
+                "size": 44,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 17832,
+                "alignment": 32
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 440,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 683,
+            "deltas": {
+              "-1104": 658,
+              "0": 25
+            }
+          },
+          "r": {
+            "symbols": 1300,
+            "deltas": {
+              "2848": 1032,
+              "2816": 268
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 76110393,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-early-scan-audit-ubuntu-24.04-clang",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "sizes": {
+          "base": {
+            "X86_getInstructionScanResult": 16331,
+            "cs_disasm_iter": 14829,
+            "X86_scanBatch": 16455,
+            "decodeScanResultFallback": 1330
+          },
+          "scan": {
+            "X86_getInstructionScanResult": 16484,
+            "cs_disasm_iter": 14889,
+            "X86_scanBatch": 16541,
+            "decodeScanResultFallback": 1330,
+            "X86_readVex32PublicPlan": 346
+          }
+        },
+        "shapes": {
+          "base": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 325142,
+                "alignment": 128
+              },
+              ".rodata": {
+                "size": 713956,
+                "alignment": 128
+              },
+              ".rodata.cst16": {
+                "size": 48,
+                "alignment": 16
+              },
+              ".data.rel.ro": {
+                "size": 1824,
+                "alignment": 16
+              },
+              ".rodata.str2.16": {
+                "size": 448,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 9584,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8037,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17728,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 760,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 325478,
+                "alignment": 128
+              },
+              ".rodata": {
+                "size": 713956,
+                "alignment": 128
+              },
+              ".rodata.cst16": {
+                "size": 48,
+                "alignment": 16
+              },
+              ".data.rel.ro": {
+                "size": 1824,
+                "alignment": 16
+              },
+              ".rodata.str2.16": {
+                "size": 448,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 9584,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 8037,
+                "alignment": 16
+              },
+              ".rodata": {
+                "size": 17728,
+                "alignment": 16
+              },
+              ".rodata.str1.1": {
+                "size": 43,
+                "alignment": 1
+              },
+              ".rodata.str1.16": {
+                "size": 17,
+                "alignment": 16
+              },
+              ".eh_frame": {
+                "size": 760,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 805,
+            "deltas": {
+              "688": 799,
+              "0": 6
+            }
+          },
+          "r": {
+            "symbols": 1112,
+            "deltas": {
+              "2848": 1026,
+              "2944": 83,
+              "0": 3
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 74831674,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-early-scan-audit-ubuntu-24.04-gcc",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "sizes": {
+          "base": {
+            "decodeScanResultFallback": 1865,
+            "X86_getInstructionScanResult": 19881,
+            "cs_disasm_iter": 14047,
+            "X86_scanBatch": 19884
+          },
+          "scan": {
+            "decodeScanResultFallback": 1865,
+            "X86_getInstructionScanResult": 24561,
+            "cs_disasm_iter": 14540,
+            "X86_scanBatch": 20065,
+            "X86_readVex32PublicPlan": 372
+          }
+        },
+        "shapes": {
+          "base": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 395443,
+                "alignment": 128
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 703872,
+                "alignment": 128
+              },
+              ".text.unlikely": {
+                "size": 14,
+                "alignment": 1
+              },
+              ".data.rel.ro.local": {
+                "size": 1712,
+                "alignment": 32
+              },
+              ".rodata.cst8": {
+                "size": 40,
+                "alignment": 8
+              },
+              ".rodata.cst4": {
+                "size": 16,
+                "alignment": 4
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 8376,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 9242,
+                "alignment": 16
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata.str1.1": {
+                "size": 44,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 17832,
+                "alignment": 32
+              },
+              ".rodata.cst2": {
+                "size": 2,
+                "alignment": 2
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 560,
+                "alignment": 8
+              }
+            }
+          },
+          "scan": {
+            "X86DisassemblerDecoder": {
+              ".text": {
+                "size": 400883,
+                "alignment": 128
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 703872,
+                "alignment": 128
+              },
+              ".text.unlikely": {
+                "size": 14,
+                "alignment": 1
+              },
+              ".data.rel.ro.local": {
+                "size": 1712,
+                "alignment": 32
+              },
+              ".rodata.cst8": {
+                "size": 40,
+                "alignment": 8
+              },
+              ".rodata.cst4": {
+                "size": 16,
+                "alignment": 4
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 8368,
+                "alignment": 8
+              }
+            },
+            "X86VectorOutput": {
+              ".text": {
+                "size": 9242,
+                "alignment": 16
+              },
+              ".data": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".bss": {
+                "size": 0,
+                "alignment": 1
+              },
+              ".rodata.str1.1": {
+                "size": 44,
+                "alignment": 1
+              },
+              ".rodata": {
+                "size": 17832,
+                "alignment": 32
+              },
+              ".rodata.cst2": {
+                "size": 2,
+                "alignment": 2
+              },
+              ".note.gnu.property": {
+                "size": 32,
+                "alignment": 8
+              },
+              ".eh_frame": {
+                "size": 560,
+                "alignment": 8
+              }
+            }
+          }
+        },
+        "backend_movements": {
+          "t": {
+            "symbols": 690,
+            "deltas": {
+              "5824": 675,
+              "0": 15
+            }
+          },
+          "r": {
+            "symbols": 1300,
+            "deltas": {
+              "11040": 1032,
+              "11008": 268
+            }
+          }
+        },
+        "cleanup": {
+          "bytes": 76085771,
+          "removed": true
+        }
+      }
+    ],
+    "original_vector_object_identical": true,
+    "only_old_runtime_object_changed": "X86DisassemblerDecoder.c.o",
+    "native_timing": false,
+    "publication_qualified": false,
+    "limits": "Code sizes and linked addresses are diagnostic; native timing is required. Scalar return does not guarantee identical caller code generation."
+  },
+  "publication_qualified": false
+}
