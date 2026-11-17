@@ -53,7 +53,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
    assert set(objects['base']) <= set(objects[key])
    assert set(changed) == {'arch/X86/X86Mapping.c.o'},changed
    active=bool(changed)
-   write('scope',dict(active=active,source_applies=True,policy='Isolated EVEX entry with original section bytes and linked symbol positions verified; identical lowering is retained as an object and binary identity control'))
+   write('scope',dict(active=active,source_applies=True,policy='Native macOS guard; only Mapping object may change. Linked Mach-O instruction/table positions are not asserted.'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
   bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
   if not active:
