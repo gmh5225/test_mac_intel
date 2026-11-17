@@ -1,5 +1,4 @@
 {
-  "round": 1335,
   "source": {
     "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
     "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
@@ -43,34 +42,28 @@
     "inactive_runtime_objects_identical": true,
     "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
   },
-  "hosts": [
-    "ubuntu-22.04 GCC/Clang",
-    "ubuntu-24.04 GCC/Clang",
-    "ubuntu-24.04-arm GCC/Clang"
-  ],
+  "basis": "R1335 mixed: stable MIPS detail and AArch64 detail losses under Clang 14, AArch64 scan loss under Clang 18. Backend objects are identical; downstream text shifts +64/+16 bytes and read-only tables move roughly 6 KB.",
+  "question": "Can unchanged baseline code/data reproduce the loss solely by trailing padding and inert orphan sections that recreate candidate layout growth?",
+  "intervention": "Preserve every original object section prefix, symbol and relocation. Re-link baseline with text-only growth, data-only growth plus inert new sections, or both. Compare all unique common non-x86 symbols against the candidate; report incomplete geometry controls explicitly.",
   "cases": [
-    "PuTTY PE32",
-    "PuTTY PE64",
-    "AMD64 ls",
-    "ARM ls/sort/cp",
-    "AArch64 ls",
-    "MIPS64EL ls"
-  ],
-  "modes": [
-    "scan",
-    "format",
-    "detail"
+    [
+      "arm64-ls",
+      0
+    ],
+    [
+      "arm64-ls",
+      2
+    ],
+    [
+      "mips64el-ls",
+      2
+    ]
   ],
   "cycles": 21,
-  "minimum_process_ms": 160,
-  "controls": [
-    "byte-identical A/A",
-    "original images",
-    "same inode and size with ASLR disabled if supported",
-    "identical consumer object",
-    "Capstone boundary hash and selected-output aggregate checksum"
+  "launches": [
+    "images",
+    "same-file-fixed"
   ],
-  "gate": "Keep exact unchanged-object/binary controls for inactive profiles. Check all native rows and A/A uncertainty before promotion; no product qualification yet.",
-  "reason": "A shared C4/C5 gate replaces two separate gates and now passes the complete active semantic probe and two native pilot allocations. Measure full mixed controls after prior footprint-only rejection.",
-  "semantic_validation": "Native timing checks instruction boundaries, rejections and selected consumed output values. Owner units run in the separate pilot and configuration suites. The separate local active-path probe compares complete cs_insn/cs_detail records, untouched bytes, cursors and errors for 162398208 inputs and guarded-page extents. These are distinct validation surfaces."
+  "publication_qualified": false,
+  "limitation": "Diagnostic layout controls only; no source optimization or PMU/cache mechanism is claimed."
 }
