@@ -1,0 +1,944 @@
+{
+  "status": "configuration-validation-complete",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+      "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+      "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+      "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+      "private_guard": "equal private-entry records for 4718598 protected-page extents",
+      "layout_identical": true,
+      "generated_output_matches_producer": true,
+      "input_source": {
+        "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+        "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+        "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+        "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+        "semantic_input": {
+          "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+          "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+          "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+          "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+          "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+          "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+          "private_guard": "equal private-entry records for 4718598 protected-page extents",
+          "unit_checks": 75,
+          "additional_c4_regression": true,
+          "cosmetic_runtime_object_equality": true,
+          "generated_output_matches_producer": true,
+          "layout_identical": true,
+          "inactive_runtime_objects_identical": true,
+          "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+        },
+        "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+        "inactive_runtime_objects_identical": true,
+        "local_inactive_unit_passed": true,
+        "active_semantic_validation_pending": true,
+        "native_qualified": false
+      },
+      "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+      "shared_vector_object_identical": false,
+      "decoder_object_identical": true,
+      "inactive_runtime_objects_identical": true,
+      "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+    },
+    "run": {
+      "id": 44005544583,
+      "head_sha": "dafe752215314494c1a70902ac93f562f65390df",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44005544583",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "profile": "vex32-shared-gate-macos-15-clang-four",
+        "complete": {
+          "compiler": "clang",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 449842465,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294850983,
+          "name": "vex32-shared-gate-macos-15-clang-four",
+          "digest": "sha256:641cfbb9a47da20f2d1bf0ffdbdc77d1669112136d56d93f3258ace9ccd03950",
+          "size_in_bytes": 5012
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-22.04-clang-four",
+        "complete": {
+          "compiler": "clang",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 480486313,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14293518429,
+          "name": "vex32-shared-gate-ubuntu-22.04-clang-four",
+          "digest": "sha256:ce0c8014a0497b708140eecc1dc95e06087fc78e94b0db9bc58893b7d218c283",
+          "size_in_bytes": 4961
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-22.04-gcc-four",
+        "complete": {
+          "compiler": "gcc",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 474598285,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294511312,
+          "name": "vex32-shared-gate-ubuntu-22.04-gcc-four",
+          "digest": "sha256:d51c6cdacca53003df08bb78dfabda19ab2fa758237f59129e136f2c984649f6",
+          "size_in_bytes": 4960
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-24.04-arm-clang-four",
+        "complete": {
+          "compiler": "clang",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 461484801,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294038146,
+          "name": "vex32-shared-gate-ubuntu-24.04-arm-clang-four",
+          "digest": "sha256:240ff88568f0a6bfb4d5f7b0d76088bf6a47062f2695b344f8793465014bcdca",
+          "size_in_bytes": 4958
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-24.04-clang-diet",
+        "complete": {
+          "compiler": "clang",
+          "profile": "diet",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 12,
+        "cleanup": {
+          "bytes": 190367865,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14293663917,
+          "name": "vex32-shared-gate-ubuntu-24.04-clang-diet",
+          "digest": "sha256:57967d660b8544456d8afb77e57db62db198206901a081eda9bac06eef228f2c",
+          "size_in_bytes": 4257
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-24.04-clang-four",
+        "complete": {
+          "compiler": "clang",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 466298185,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294231221,
+          "name": "vex32-shared-gate-ubuntu-24.04-clang-four",
+          "digest": "sha256:b60a1496f11c116090872bc97184ce8794531f97a8e058042594e75deb94f2df",
+          "size_in_bytes": 4958
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-24.04-clang-sanitize",
+        "complete": {
+          "compiler": "clang",
+          "profile": "sanitize",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 831461257,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294133240,
+          "name": "vex32-shared-gate-ubuntu-24.04-clang-sanitize",
+          "digest": "sha256:7d02d4fc98d702d327787570bca18f026aa1943a056f892ee8220dcffb97d328",
+          "size_in_bytes": 4977
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-24.04-gcc-four",
+        "complete": {
+          "compiler": "gcc",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 474007250,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14293808754,
+          "name": "vex32-shared-gate-ubuntu-24.04-gcc-four",
+          "digest": "sha256:b2ed2f0dc7fb02e2da8fcfe55939c0384fe3b366a7798c4d60ebf0d5dadbad1f",
+          "size_in_bytes": 4956
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-ubuntu-24.04-gcc-reduced",
+        "complete": {
+          "compiler": "gcc",
+          "profile": "reduced",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 12,
+        "cleanup": {
+          "bytes": 347658290,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294221266,
+          "name": "vex32-shared-gate-ubuntu-24.04-gcc-reduced",
+          "digest": "sha256:80ed0cbc9f2dc4d64d6fdecd3d272c3d74b9da248f5c0a5a26a194e25b217187",
+          "size_in_bytes": 4488
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-windows-2022-MD-four",
+        "complete": {
+          "compiler": "MD",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 495609141,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294407579,
+          "name": "vex32-shared-gate-windows-2022-MD-four",
+          "digest": "sha256:ee86e33cfdb1df5b516cbdd61c065d799b8b520a103a1db82d0a9f36b7635242",
+          "size_in_bytes": 7157
+        }
+      },
+      {
+        "profile": "vex32-shared-gate-windows-2022-MT-four",
+        "complete": {
+          "compiler": "MT",
+          "profile": "four",
+          "units": [
+            "api",
+            "utils",
+            "mapping",
+            "register_descriptors",
+            "sstream",
+            "x86_reg_access",
+            "detail_option",
+            "text_option",
+            "x86_encoding_accuracy",
+            "x86_scan_batch",
+            "x86_buffer_bounds",
+            "x86_memory_scale",
+            "x86_simple_output",
+            "x86_printer_prechecked",
+            "arm_post_index",
+            "aarch64_postprocess",
+            "mips_scan"
+          ],
+          "source": {
+            "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+            "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+            "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+            "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+            "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+            "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+            "private_guard": "equal private-entry records for 4718598 protected-page extents",
+            "layout_identical": true,
+            "generated_output_matches_producer": true,
+            "input_source": {
+              "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+              "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+              "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+              "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+              "semantic_input": {
+                "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+                "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+                "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+                "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+                "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+                "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+                "private_guard": "equal private-entry records for 4718598 protected-page extents",
+                "unit_checks": 75,
+                "additional_c4_regression": true,
+                "cosmetic_runtime_object_equality": true,
+                "generated_output_matches_producer": true,
+                "layout_identical": true,
+                "inactive_runtime_objects_identical": true,
+                "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+              },
+              "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+              "inactive_runtime_objects_identical": true,
+              "local_inactive_unit_passed": true,
+              "active_semantic_validation_pending": true,
+              "native_qualified": false
+            },
+            "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+            "shared_vector_object_identical": false,
+            "decoder_object_identical": true,
+            "inactive_runtime_objects_identical": true,
+            "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+          },
+          "success": true
+        },
+        "registered_checks": 17,
+        "cleanup": {
+          "bytes": 497916744,
+          "removed": true
+        },
+        "artifact": {
+          "id": 14294862592,
+          "name": "vex32-shared-gate-windows-2022-MT-four",
+          "digest": "sha256:f02ff2078a5b456872bc1d2e1f3b426ed5e7e61abcb4b2774085a170a5887573",
+          "size_in_bytes": 7168
+        }
+      }
+    ],
+    "registered_checks": 177,
+    "native_timing_qualified": false,
+    "scope": "Applicable unit tests across eleven Release, reduced, DIET, sanitizer, host and compiler configurations. The exact shared 32-bit VEX prefix dispatch source tree is checked in every configuration. Callback and descriptor ownership checks run in the full configurations."
+  },
+  "publication_qualified": false
+}
