@@ -1,5 +1,5 @@
 from pathlib import Path
-import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
+import gzip,hashlib,json,os,platform,re,shutil,subprocess as sp,tempfile
 import corpus
 from geometry import Geometry
 from section_identity import capture as capture_reader, compare as compare_reader
@@ -12,7 +12,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-shared-iterator-cost-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -67,45 +67,37 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-private-pool-') as tmp:
    active=bool(changed)
    write('scope-'+key,dict(active=active,source_applies=True,policy='Shared packed C5 reader with or without private ELF code/data sections; old runtime objects identical between candidates'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
-  assert active
   assert all(objects['packed'][name]==objects['scan'][name] for name in objects['base'])
   write('reader-section-identity',dict(compare_reader(reader_views['packed'],reader_views['scan']),old_runtime_objects_identical=len(objects['base'])))
   geometry.finish()
-  write('all-binaries',{key:sha(path) for key,path in bins.items()})
-  payloads={key:path.read_bytes()for key,path in bins.items()}
-  assert payloads['base']==payloads['aa']
-  maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
-  image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
-  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Timing checks selected output values and boundaries. Complete-record source equality is established separately for each candidate. The packed C5 scan changes only the old decoder object. Linked placement is recorded without assuming a timing result.'))
+  write('binaries',{key:sha(path) for key,path in bins.items()})
+  write('valgrind',dict(version=sp.check_output(['valgrind','--version'],text=True)))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps,launch):
-   tail=list(map(str,[x['selector'],mode,x['path'],reps]))
-   if launch=='images':args=[str(bins[key]),*tail]
-   else:
-    with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
-    assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
-   return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
-   for mode in ((0,2) if x['name']=='arm64-ls' else (0,1,2) if x['name']=='jpeg-avx2-i386' else (2,)):
-    for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','packed','scan']
-     for k in range(21):
-      seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
-      for v in seq+seq[::-1]:
-       vout=sample(v,x,mode,n,launch)
-       if reference is None:reference=(vout['first'],vout['result'])
-       assert reference==(vout['first'],vout['result'])
-       ticks[v].append(vout['cpu_ns'])
-      runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
-     data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+   for mode in ((0,2) if x['name']=='arm64-ls' else (0,) if x['name']=='jpeg-avx2-i386' else (2,)):
+    reference=None
+    for key in ('base','packed','scan'):
+     label=x['name']+'-'+str(mode)+'-'+key
+     tail=list(map(str,[x['selector'],mode,x['path'],1]))
+     native=json.loads(sp.check_output([str(bins[key]),*tail],text=True))
+     if reference is None:reference=(native['first'],native['result'])
+     assert reference==(native['first'],native['result'])
+     raw=t/(label+'.callgrind')
+     run(['valgrind','--tool=callgrind','--cache-sim=yes','--branch-sim=yes','--dump-instr=yes','--collect-jumps=yes','--collect-atstart=no','--callgrind-out-file='+str(raw),bins[key],*tail],label)
+     log=(e/(label+'.log')).read_text()
+     measured=json.loads(next(line for line in log.splitlines() if line.startswith('{')))
+     assert reference==(measured['first'],measured['result'])
+     content=raw.read_text()
+     events=next(line[8:].split() for line in content.splitlines() if line.startswith('events: '))
+     counts=list(map(int,next(line[9:].split() for line in content.splitlines() if line.startswith('summary: '))))
+     assert len(events)==len(counts) and counts[0]>0
+     row=dict(case=x['name'],mode=mode,variant=key,events=dict(zip(events,counts)),result=measured['result'],captured_traversals=1,warm_traversals=2)
+     data.append(row);write('instruction-costs',data)
+     with gzip.open(e/(label+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
+     run(['callgrind_annotate','--inclusive=no','--threshold=100','--show=Ir,Dr,Dw','--auto=no',raw],label+'-self')
+     raw.unlink()
   assert len(data)==12
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
+  write('complete',dict(rows=len(data),cc=cc,host=platform.platform(),native_qualification=False,scope='Deterministic dynamic instruction and memory counts; simulated cache counters do not establish native hardware behavior.'))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

@@ -1,7 +1,7 @@
-name: Isolate packed VEX2 reader code and tables from original sections
+name: Attribute shared iterator instruction and memory costs
 on:
   push:
-    branches: [codex/capstone-vex2-private-sections-native]
+    branches: [codex/capstone-shared-iterator-cost]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -31,13 +31,15 @@ jobs:
           ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
-      - name: Measure private sections for instruction-identical packed C5 readers
+      - name: Install instruction-count instrumentation
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Count shared public iterator work
         run: python3 capstone-records/measure.py
       - if: always()
         run: rm -rf -- "$GITHUB_WORKSPACE/source"
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-private-sections-${{ matrix.host }}-${{ matrix.cc }}
+          name: shared-iterator-cost-${{ matrix.host }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14
