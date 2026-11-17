@@ -1,0 +1,1741 @@
+{
+  "status": "code-and-data-placement-causes-reproduced",
+  "review": {
+    "complete": true,
+    "run": {
+      "id": 44011435556,
+      "head_sha": "1e9a0494b86f50ec91c8208d30dba5a600809cea",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44011435556",
+      "run_attempt": 1
+    },
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+      "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+      "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+      "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+      "private_guard": "equal private-entry records for 4718598 protected-page extents",
+      "layout_identical": true,
+      "generated_output_matches_producer": true,
+      "input_source": {
+        "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+        "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+        "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+        "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+        "semantic_input": {
+          "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+          "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+          "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+          "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+          "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+          "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+          "private_guard": "equal private-entry records for 4718598 protected-page extents",
+          "unit_checks": 75,
+          "additional_c4_regression": true,
+          "cosmetic_runtime_object_equality": true,
+          "generated_output_matches_producer": true,
+          "layout_identical": true,
+          "inactive_runtime_objects_identical": true,
+          "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+        },
+        "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+        "inactive_runtime_objects_identical": true,
+        "local_inactive_unit_passed": true,
+        "active_semantic_validation_pending": true,
+        "native_qualified": false
+      },
+      "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+      "shared_vector_object_identical": false,
+      "decoder_object_identical": true,
+      "inactive_runtime_objects_identical": true,
+      "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+    },
+    "profiles": [
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "geometry": {
+          "text_growth": 64,
+          "rodata_growth": 2208,
+          "reports": {
+            "text": {
+              "transformation": {
+                "original_sha256": "e89fe498607afd23d17d63b35e3f7bfc680f4d889ad170bc895db6513350bc8f",
+                "padded_sha256": "ad7001ec972a027764a73877c7a102bda336276a599dd0130c59e3cbbd6bd643",
+                "growth": {
+                  ".text": 64
+                },
+                "added_inert_sections": {},
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 813,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1114,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "da857931e15648bddf884434e3b23789743d224b11b51736794ef2f61a670788"
+            },
+            "data": {
+              "transformation": {
+                "original_sha256": "e89fe498607afd23d17d63b35e3f7bfc680f4d889ad170bc895db6513350bc8f",
+                "padded_sha256": "0e4f626054e32736028f5a628d5578a302a2c948fdee4a5f983697f26481df15",
+                "growth": {
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3730,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 813,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1114,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "da857931e15648bddf884434e3b23789743d224b11b51736794ef2f61a670788"
+            },
+            "both": {
+              "transformation": {
+                "original_sha256": "e89fe498607afd23d17d63b35e3f7bfc680f4d889ad170bc895db6513350bc8f",
+                "padded_sha256": "680e63be08c136979e56bc294e4c91f7af743240ea8411c5b725409707154daa",
+                "growth": {
+                  ".text": 64,
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3730,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 813,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1114,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "da857931e15648bddf884434e3b23789743d224b11b51736794ef2f61a670788"
+            }
+          },
+          "source_unchanged": true,
+          "claim": "No timing conclusion until measured. Data isolation is qualified only where recorded addresses match."
+        },
+        "cleanup": {
+          "bytes": 381700355,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "geometry": {
+          "text_growth": 64,
+          "rodata_growth": 2208,
+          "reports": {
+            "text": {
+              "transformation": {
+                "original_sha256": "e89fe498607afd23d17d63b35e3f7bfc680f4d889ad170bc895db6513350bc8f",
+                "padded_sha256": "ad7001ec972a027764a73877c7a102bda336276a599dd0130c59e3cbbd6bd643",
+                "growth": {
+                  ".text": 64
+                },
+                "added_inert_sections": {},
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 813,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1114,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "da857931e15648bddf884434e3b23789743d224b11b51736794ef2f61a670788"
+            },
+            "data": {
+              "transformation": {
+                "original_sha256": "e89fe498607afd23d17d63b35e3f7bfc680f4d889ad170bc895db6513350bc8f",
+                "padded_sha256": "0e4f626054e32736028f5a628d5578a302a2c948fdee4a5f983697f26481df15",
+                "growth": {
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3730,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 813,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1114,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "da857931e15648bddf884434e3b23789743d224b11b51736794ef2f61a670788"
+            },
+            "both": {
+              "transformation": {
+                "original_sha256": "e89fe498607afd23d17d63b35e3f7bfc680f4d889ad170bc895db6513350bc8f",
+                "padded_sha256": "680e63be08c136979e56bc294e4c91f7af743240ea8411c5b725409707154daa",
+                "growth": {
+                  ".text": 64,
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3730,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 813,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1114,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "da857931e15648bddf884434e3b23789743d224b11b51736794ef2f61a670788"
+            }
+          },
+          "source_unchanged": true,
+          "claim": "No timing conclusion until measured. Data isolation is qualified only where recorded addresses match."
+        },
+        "cleanup": {
+          "bytes": 381700343,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "geometry": {
+          "text_growth": 16,
+          "rodata_growth": 2208,
+          "reports": {
+            "text": {
+              "transformation": {
+                "original_sha256": "d18669bf5b2744f4da9a6958caf9150667796307f3ea000545c9a09ade5eed78",
+                "padded_sha256": "8f30c425d76fdac2e5278dfd0b6715c0f2ca0c56dabc3b2139b712baa1b53066",
+                "growth": {
+                  ".text": 16
+                },
+                "added_inert_sections": {},
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 805,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1112,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "2d78d5fe09597db20aa5a8857aaa9481151e10e521ffcbb1c4a9a80515832111"
+            },
+            "data": {
+              "transformation": {
+                "original_sha256": "d18669bf5b2744f4da9a6958caf9150667796307f3ea000545c9a09ade5eed78",
+                "padded_sha256": "d6e9eca8432fb41200c7209220f496e3696ec44eae400d076fdba267acef6aab",
+                "growth": {
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3924,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 805,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1112,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "2d78d5fe09597db20aa5a8857aaa9481151e10e521ffcbb1c4a9a80515832111"
+            },
+            "both": {
+              "transformation": {
+                "original_sha256": "d18669bf5b2744f4da9a6958caf9150667796307f3ea000545c9a09ade5eed78",
+                "padded_sha256": "18d27acb495ba74ac3028591ac562d7384ebadfaffadd9cd2aca0772e3a3c6dc",
+                "growth": {
+                  ".text": 16,
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3924,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 805,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1112,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "2d78d5fe09597db20aa5a8857aaa9481151e10e521ffcbb1c4a9a80515832111"
+            }
+          },
+          "source_unchanged": true,
+          "claim": "No timing conclusion until measured. Data isolation is qualified only where recorded addresses match."
+        },
+        "cleanup": {
+          "bytes": 364869284,
+          "removed": true
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        },
+        "geometry": {
+          "text_growth": 16,
+          "rodata_growth": 2208,
+          "reports": {
+            "text": {
+              "transformation": {
+                "original_sha256": "d18669bf5b2744f4da9a6958caf9150667796307f3ea000545c9a09ade5eed78",
+                "padded_sha256": "8f30c425d76fdac2e5278dfd0b6715c0f2ca0c56dabc3b2139b712baa1b53066",
+                "growth": {
+                  ".text": 16
+                },
+                "added_inert_sections": {},
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 805,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1112,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "2d78d5fe09597db20aa5a8857aaa9481151e10e521ffcbb1c4a9a80515832111"
+            },
+            "data": {
+              "transformation": {
+                "original_sha256": "d18669bf5b2744f4da9a6958caf9150667796307f3ea000545c9a09ade5eed78",
+                "padded_sha256": "d6e9eca8432fb41200c7209220f496e3696ec44eae400d076fdba267acef6aab",
+                "growth": {
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3924,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 805,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1112,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "2d78d5fe09597db20aa5a8857aaa9481151e10e521ffcbb1c4a9a80515832111"
+            },
+            "both": {
+              "transformation": {
+                "original_sha256": "d18669bf5b2744f4da9a6958caf9150667796307f3ea000545c9a09ade5eed78",
+                "padded_sha256": "18d27acb495ba74ac3028591ac562d7384ebadfaffadd9cd2aca0772e3a3c6dc",
+                "growth": {
+                  ".text": 16,
+                  ".rodata": 2208
+                },
+                "added_inert_sections": {
+                  ".cs_x86_vex32_text": {
+                    "size": 3924,
+                    "flags": 6,
+                    "alignment": 16
+                  },
+                  ".cs_x86_vex32_rodata": {
+                    "size": 6620,
+                    "flags": 2,
+                    "alignment": 16
+                  }
+                },
+                "all_original_section_prefixes_preserved": true,
+                "symbol_and_relocation_tables_identical": true
+              },
+              "code_symbols_checked": 805,
+              "code_addresses_match": true,
+              "data_symbols_checked": 1112,
+              "data_addresses_match": true,
+              "data_address_differences": {},
+              "incomplete_data_control": false,
+              "consumer_sha256": "2d78d5fe09597db20aa5a8857aaa9481151e10e521ffcbb1c4a9a80515832111"
+            }
+          },
+          "source_unchanged": true,
+          "claim": "No timing conclusion until measured. Data isolation is qualified only where recorded addresses match."
+        },
+        "cleanup": {
+          "bytes": 364869266,
+          "removed": true
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0023741007194245,
+            "ci95": [
+              0.998612025607973,
+              1.0125112601341206
+            ]
+          },
+          "scan": {
+            "gain": 0.9848318546297143,
+            "ci95": [
+              0.9826938282082358,
+              0.9920598410128073
+            ]
+          },
+          "text": {
+            "gain": 0.9863009501398706,
+            "ci95": [
+              0.9773900805147092,
+              0.9921327355031823
+            ]
+          },
+          "data": {
+            "gain": 1.007762491491235,
+            "ci95": [
+              1.0014364835872462,
+              1.0124364188088397
+            ]
+          },
+          "both": {
+            "gain": 0.9834712263847293,
+            "ci95": [
+              0.9792183584917191,
+              0.992152554581056
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9982399315528938,
+            "ci95": [
+              0.9916713575808198,
+              1.0029837523916159
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.999560678905781,
+            "ci95": [
+              0.9974145742552211,
+              1.0046272172732804
+            ]
+          },
+          "scan": {
+            "gain": 0.9773508949025913,
+            "ci95": [
+              0.9754108999803794,
+              0.9820333094796846
+            ]
+          },
+          "text": {
+            "gain": 0.9793316947107791,
+            "ci95": [
+              0.9765010355115062,
+              0.9838462331112822
+            ]
+          },
+          "data": {
+            "gain": 1.0002890595618106,
+            "ci95": [
+              0.9978414205006041,
+              1.0030490358160902
+            ]
+          },
+          "both": {
+            "gain": 0.9792268950344551,
+            "ci95": [
+              0.9774458469500565,
+              0.9817534085288325
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0015780050374776,
+            "ci95": [
+              0.9991388511546672,
+              1.0037330433567624
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0002116266393049,
+            "ci95": [
+              0.9979615729383655,
+              1.0146638680888878
+            ]
+          },
+          "scan": {
+            "gain": 1.0008325269864409,
+            "ci95": [
+              0.9902309058614565,
+              1.008450036516458
+            ]
+          },
+          "text": {
+            "gain": 1.0000320297235834,
+            "ci95": [
+              0.9892394351966455,
+              1.0215240783547181
+            ]
+          },
+          "data": {
+            "gain": 1.0017389741977296,
+            "ci95": [
+              0.9992517401022728,
+              1.0049905985835412
+            ]
+          },
+          "both": {
+            "gain": 1.004179292280828,
+            "ci95": [
+              0.9981266343995959,
+              1.0354144524508322
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0057793448113457,
+            "ci95": [
+              0.9944034783162657,
+              1.0163973855189472
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9989685581627248,
+            "ci95": [
+              0.9973801194366478,
+              1.000915078812334
+            ]
+          },
+          "scan": {
+            "gain": 0.9996971532404604,
+            "ci95": [
+              0.9975785118572099,
+              1.0026674800872768
+            ]
+          },
+          "text": {
+            "gain": 1.0005844133521262,
+            "ci95": [
+              0.9996576259158507,
+              1.0019742320611544
+            ]
+          },
+          "data": {
+            "gain": 1.0002653513564137,
+            "ci95": [
+              0.99841272316208,
+              1.0009637727492475
+            ]
+          },
+          "both": {
+            "gain": 0.9991245696839416,
+            "ci95": [
+              0.9974171677630251,
+              1.001758652946679
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9989647484369885,
+            "ci95": [
+              0.9983069994989465,
+              1.0012285625194886
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9983311523362328,
+            "ci95": [
+              0.9943977504671111,
+              1.004265295833372
+            ]
+          },
+          "scan": {
+            "gain": 1.0050439647046097,
+            "ci95": [
+              0.9979044932500504,
+              1.0087266821807683
+            ]
+          },
+          "text": {
+            "gain": 1.013181400732195,
+            "ci95": [
+              1.0042932474683839,
+              1.0178109291793163
+            ]
+          },
+          "data": {
+            "gain": 0.9923074339077564,
+            "ci95": [
+              0.9898454800151706,
+              0.9954785345186491
+            ]
+          },
+          "both": {
+            "gain": 1.0064857282945328,
+            "ci95": [
+              1.0025074449445577,
+              1.0098598809982238
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.004767070018099,
+            "ci95": [
+              1.0033814001178036,
+              1.008966996947405
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-1",
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9994828696707707,
+            "ci95": [
+              0.9977845754542084,
+              1.0018810412152892
+            ]
+          },
+          "scan": {
+            "gain": 0.9658128108334831,
+            "ci95": [
+              0.9644748752050043,
+              0.9671257365096542
+            ]
+          },
+          "text": {
+            "gain": 0.9722613628152323,
+            "ci95": [
+              0.9706918031310509,
+              0.9747617969044923
+            ]
+          },
+          "data": {
+            "gain": 0.9933089128594044,
+            "ci95": [
+              0.991512329086938,
+              0.9942022932878033
+            ]
+          },
+          "both": {
+            "gain": 0.966826343013463,
+            "ci95": [
+              0.9650566890712081,
+              0.9674198602431745
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.000197201531001,
+            "ci95": [
+              0.9995066453377984,
+              1.0025207769501592
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9961096357875021,
+            "ci95": [
+              0.9898690254952305,
+              1.0049307794424427
+            ]
+          },
+          "scan": {
+            "gain": 0.9850762447355584,
+            "ci95": [
+              0.9764924523541394,
+              0.9949439220537216
+            ]
+          },
+          "text": {
+            "gain": 0.9763741441829404,
+            "ci95": [
+              0.9620488804512042,
+              0.9885193146378738
+            ]
+          },
+          "data": {
+            "gain": 1.008822130602809,
+            "ci95": [
+              0.992677209569578,
+              1.015136000714534
+            ]
+          },
+          "both": {
+            "gain": 0.9782330345710627,
+            "ci95": [
+              0.9679854886763429,
+              0.9856291579429874
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9989407698311427,
+            "ci95": [
+              0.9826503215862205,
+              1.0081927589028716
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9967673138865079,
+            "ci95": [
+              0.9951083096852521,
+              1.0002338367644006
+            ]
+          },
+          "scan": {
+            "gain": 0.9777807885110419,
+            "ci95": [
+              0.9732899882646957,
+              0.9814492620032492
+            ]
+          },
+          "text": {
+            "gain": 0.9786247865066449,
+            "ci95": [
+              0.9743066219427454,
+              0.9816110362691305
+            ]
+          },
+          "data": {
+            "gain": 0.9977057406486871,
+            "ci95": [
+              0.9932268363093313,
+              1.0023430511205769
+            ]
+          },
+          "both": {
+            "gain": 0.9771943068197265,
+            "ci95": [
+              0.9742954776168485,
+              0.9808879074902668
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9990976060529808,
+            "ci95": [
+              0.9950219988905162,
+              1.0023142410845518
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9981145221520729,
+            "ci95": [
+              0.9946450880012403,
+              1.019262039557988
+            ]
+          },
+          "scan": {
+            "gain": 1.0062881261938506,
+            "ci95": [
+              0.9957917964145865,
+              1.016297624551714
+            ]
+          },
+          "text": {
+            "gain": 1.0079881798962138,
+            "ci95": [
+              0.9975748187842396,
+              1.0156145851334337
+            ]
+          },
+          "data": {
+            "gain": 1.008637549878596,
+            "ci95": [
+              1.000573216460866,
+              1.0200370592336199
+            ]
+          },
+          "both": {
+            "gain": 1.009206376268008,
+            "ci95": [
+              0.9944586698980943,
+              1.020215744025094
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9975333380027346,
+            "ci95": [
+              0.9859125663642193,
+              1.0126773079221043
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9964330695791791,
+            "ci95": [
+              0.9935431596270923,
+              1.0023294828164693
+            ]
+          },
+          "scan": {
+            "gain": 0.9853638828479353,
+            "ci95": [
+              0.9808402957567941,
+              0.9914708082045733
+            ]
+          },
+          "text": {
+            "gain": 1.0023856999283969,
+            "ci95": [
+              0.9927403383149522,
+              1.0093236724285228
+            ]
+          },
+          "data": {
+            "gain": 0.980108180821005,
+            "ci95": [
+              0.9742066476161829,
+              0.9921056507745488
+            ]
+          },
+          "both": {
+            "gain": 0.9810999548344509,
+            "ci95": [
+              0.9721769645318963,
+              0.9873695599828634
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9938936872057009,
+            "ci95": [
+              0.9885297217175396,
+              0.9981411995249032
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0039227153527177,
+            "ci95": [
+              0.9945333289133861,
+              1.0096054598797675
+            ]
+          },
+          "scan": {
+            "gain": 0.9981067647233408,
+            "ci95": [
+              0.9928524439684847,
+              1.007735541566715
+            ]
+          },
+          "text": {
+            "gain": 0.9836341000568093,
+            "ci95": [
+              0.9793824539475096,
+              0.9870374967474106
+            ]
+          },
+          "data": {
+            "gain": 0.9825311291746582,
+            "ci95": [
+              0.9780315122493893,
+              0.988229025679342
+            ]
+          },
+          "both": {
+            "gain": 1.004869877132128,
+            "ci95": [
+              1.0022427496534483,
+              1.0098092284971385
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0052954583151597,
+            "ci95": [
+              0.9971333823932409,
+              1.0093226900843022
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-22.04-2",
+        "cpu": {
+          "model": "AMD EPYC 9V45 96-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 1.001485257560024,
+            "ci95": [
+              0.9998339021401552,
+              1.0025948700206018
+            ]
+          },
+          "scan": {
+            "gain": 1.0010365330795399,
+            "ci95": [
+              0.997869311515417,
+              1.0034282551125033
+            ]
+          },
+          "text": {
+            "gain": 1.0102674352974004,
+            "ci95": [
+              1.0086172274979683,
+              1.0117894323066583
+            ]
+          },
+          "data": {
+            "gain": 0.990521327014218,
+            "ci95": [
+              0.9841051069931954,
+              0.9928513110084825
+            ]
+          },
+          "both": {
+            "gain": 1.0002322479403687,
+            "ci95": [
+              0.9972361942739454,
+              1.0024624120959713
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9991965476657511,
+            "ci95": [
+              0.9938895453697368,
+              1.0015211886555635
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9995367491605521,
+            "ci95": [
+              0.9927520711693842,
+              1.0027621889800233
+            ]
+          },
+          "scan": {
+            "gain": 1.0083492600022113,
+            "ci95": [
+              1.0021927340908805,
+              1.0107320436746416
+            ]
+          },
+          "text": {
+            "gain": 0.9796716781945052,
+            "ci95": [
+              0.9762840191993762,
+              0.9810579633084482
+            ]
+          },
+          "data": {
+            "gain": 0.9995726482395915,
+            "ci95": [
+              0.9964624877601455,
+              1.0030759035466668
+            ]
+          },
+          "both": {
+            "gain": 1.0070726791787379,
+            "ci95": [
+              1.0025875771266943,
+              1.0096143517026535
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9988941757818178,
+            "ci95": [
+              0.9921322851382398,
+              1.004447168269533
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9998151345287967,
+            "ci95": [
+              0.9988848759737758,
+              1.0008318478906715
+            ]
+          },
+          "scan": {
+            "gain": 1.0160431547193323,
+            "ci95": [
+              1.0143074658842752,
+              1.0167102840589295
+            ]
+          },
+          "text": {
+            "gain": 1.0146465961107478,
+            "ci95": [
+              1.0120717409936337,
+              1.0161753261688045
+            ]
+          },
+          "data": {
+            "gain": 0.9994671865254606,
+            "ci95": [
+              0.9985686903359976,
+              1.0007699867912836
+            ]
+          },
+          "both": {
+            "gain": 1.0156536759149304,
+            "ci95": [
+              1.0140547512620366,
+              1.016849202339761
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0003815932152724,
+            "ci95": [
+              0.9997774329755303,
+              1.000721939357094
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0047567744658867,
+            "ci95": [
+              0.9973727463684882,
+              1.0089295946823547
+            ]
+          },
+          "scan": {
+            "gain": 1.0016315189058627,
+            "ci95": [
+              0.9956686197896365,
+              1.0090927091747415
+            ]
+          },
+          "text": {
+            "gain": 1.0035909371585998,
+            "ci95": [
+              0.9877332508123162,
+              1.0131422234999383
+            ]
+          },
+          "data": {
+            "gain": 1.0054077898832439,
+            "ci95": [
+              0.9930239842066799,
+              1.0116405804448387
+            ]
+          },
+          "both": {
+            "gain": 1.0062071074374954,
+            "ci95": [
+              0.9957002878964821,
+              1.0104240506329114
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0007720663850523,
+            "ci95": [
+              0.9922332525599937,
+              1.0032518214316246
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 1.001476910254721,
+            "ci95": [
+              0.9984799190914851,
+              1.0035565547488299
+            ]
+          },
+          "scan": {
+            "gain": 0.9764637625681115,
+            "ci95": [
+              0.9745797078977344,
+              0.9784291075372433
+            ]
+          },
+          "text": {
+            "gain": 1.003083516253789,
+            "ci95": [
+              1.0025287265162446,
+              1.0044988584299965
+            ]
+          },
+          "data": {
+            "gain": 0.9752764720913234,
+            "ci95": [
+              0.9737206250745557,
+              0.9776329946204423
+            ]
+          },
+          "both": {
+            "gain": 0.976856414207474,
+            "ci95": [
+              0.9753500248794019,
+              0.9797419917141253
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.00133956666367,
+            "ci95": [
+              0.9992771858435509,
+              1.0039020290551086
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9955889508907412,
+            "ci95": [
+              0.9916508347589926,
+              0.9968627030572091
+            ]
+          },
+          "scan": {
+            "gain": 0.997064206191856,
+            "ci95": [
+              0.9925762471431949,
+              1.0022444198586777
+            ]
+          },
+          "text": {
+            "gain": 0.9935697509975251,
+            "ci95": [
+              0.9873408947700063,
+              0.9956540497642794
+            ]
+          },
+          "data": {
+            "gain": 0.9876366885200518,
+            "ci95": [
+              0.9831788233008857,
+              0.9900511689954719
+            ]
+          },
+          "both": {
+            "gain": 0.9975668328908434,
+            "ci95": [
+              0.9954732758319877,
+              1.0037919619336773
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0032639114664015,
+            "ci95": [
+              0.9957232936036728,
+              1.0082114846427765
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-1",
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0007990853157809,
+            "ci95": [
+              0.9967818064792963,
+              1.002409134423361
+            ]
+          },
+          "scan": {
+            "gain": 1.0076933872593423,
+            "ci95": [
+              1.0063969560193313,
+              1.0095889843074852
+            ]
+          },
+          "text": {
+            "gain": 1.0155231204659834,
+            "ci95": [
+              1.0145016563213585,
+              1.016684581200969
+            ]
+          },
+          "data": {
+            "gain": 0.9918775529367576,
+            "ci95": [
+              0.9894923708736771,
+              0.9928087815122123
+            ]
+          },
+          "both": {
+            "gain": 1.0082696083909386,
+            "ci95": [
+              1.0064149746192894,
+              1.0099571939688219
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9999553843163124,
+            "ci95": [
+              0.9993688518842003,
+              1.000672561407088
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9990964082226852,
+            "ci95": [
+              0.9958065784300878,
+              1.0010043406346805
+            ]
+          },
+          "scan": {
+            "gain": 1.0166670383195344,
+            "ci95": [
+              1.0141474052013078,
+              1.019104756636113
+            ]
+          },
+          "text": {
+            "gain": 1.016822084049806,
+            "ci95": [
+              1.0154762245387812,
+              1.0196140573279808
+            ]
+          },
+          "data": {
+            "gain": 1.0009760108459598,
+            "ci95": [
+              0.9983825516188589,
+              1.0017002481358441
+            ]
+          },
+          "both": {
+            "gain": 1.0165387508446269,
+            "ci95": [
+              1.014503719311688,
+              1.0180331887070537
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0000638200784349,
+            "ci95": [
+              0.9979045869452895,
+              1.0012088003214963
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 1.000103081190494,
+            "ci95": [
+              0.9976232768757349,
+              1.0005590937059792
+            ]
+          },
+          "scan": {
+            "gain": 1.0163445740018624,
+            "ci95": [
+              1.0155189415335126,
+              1.0190396165341022
+            ]
+          },
+          "text": {
+            "gain": 1.0175492257694514,
+            "ci95": [
+              1.017013274547112,
+              1.0190256594808231
+            ]
+          },
+          "data": {
+            "gain": 0.9998247749453204,
+            "ci95": [
+              0.998444282739066,
+              1.0019480742832305
+            ]
+          },
+          "both": {
+            "gain": 1.0176025862946747,
+            "ci95": [
+              1.0157407377933683,
+              1.0182888642338737
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0006435088434682,
+            "ci95": [
+              0.9992560375414903,
+              1.0016077272988266
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0021749479599362,
+            "ci95": [
+              0.9971199284176383,
+              1.004615379837064
+            ]
+          },
+          "scan": {
+            "gain": 0.9739071409177301,
+            "ci95": [
+              0.9703089470333202,
+              0.9827059370809884
+            ]
+          },
+          "text": {
+            "gain": 0.9792981976647079,
+            "ci95": [
+              0.9716286864491684,
+              0.9818954655169796
+            ]
+          },
+          "data": {
+            "gain": 1.000355574794385,
+            "ci95": [
+              0.9950656667412879,
+              1.0031104053801607
+            ]
+          },
+          "both": {
+            "gain": 0.9785584314532855,
+            "ci95": [
+              0.974398058574779,
+              0.9839069369475975
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 1.0019867791090482,
+            "ci95": [
+              0.9995211169575164,
+              1.00803697792767
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 1.0000809709034173,
+            "ci95": [
+              0.9991938155024904,
+              1.0012689487008826
+            ]
+          },
+          "scan": {
+            "gain": 0.9781814174732318,
+            "ci95": [
+              0.9773334883180286,
+              0.9791207785472407
+            ]
+          },
+          "text": {
+            "gain": 0.9780064167066819,
+            "ci95": [
+              0.9773527301592148,
+              0.9785857991970823
+            ]
+          },
+          "data": {
+            "gain": 1.000534239770558,
+            "ci95": [
+              0.9997380427426925,
+              1.0012939877897442
+            ]
+          },
+          "both": {
+            "gain": 0.9785439375424718,
+            "ci95": [
+              0.9768261504747991,
+              0.9793197728294477
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9997736781581072,
+            "ci95": [
+              0.9989779075479239,
+              1.0012270201463855
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "comparisons": {
+          "aa": {
+            "gain": 0.998519656019656,
+            "ci95": [
+              0.9967054198293309,
+              1.004224454009246
+            ]
+          },
+          "scan": {
+            "gain": 1.0128526596824305,
+            "ci95": [
+              1.0093446918424875,
+              1.017296117261812
+            ]
+          },
+          "text": {
+            "gain": 1.0133908530173235,
+            "ci95": [
+              1.0080462761573687,
+              1.0168589725680832
+            ]
+          },
+          "data": {
+            "gain": 1.0025279420225985,
+            "ci95": [
+              0.999108753510623,
+              1.0039333000941777
+            ]
+          },
+          "both": {
+            "gain": 1.015209713912524,
+            "ci95": [
+              1.0106436395420197,
+              1.018317752358916
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9994003566790322,
+            "ci95": [
+              0.9969306265915413,
+              1.0034610476516541
+            ]
+          }
+        }
+      },
+      {
+        "host": "vex32-layout-isolation-ubuntu-24.04-2",
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "comparisons": {
+          "aa": {
+            "gain": 0.9995295419952954,
+            "ci95": [
+              0.9978747351085786,
+              0.9999107999704717
+            ]
+          },
+          "scan": {
+            "gain": 1.0137578726819108,
+            "ci95": [
+              1.0128036063335297,
+              1.0145463064188662
+            ]
+          },
+          "text": {
+            "gain": 1.0133554941128957,
+            "ci95": [
+              1.0125839840768993,
+              1.0145215220798809
+            ]
+          },
+          "data": {
+            "gain": 0.9998706334954521,
+            "ci95": [
+              0.9986340731078529,
+              1.0007346522236293
+            ]
+          },
+          "both": {
+            "gain": 1.0135777664075076,
+            "ci95": [
+              1.0127193392551037,
+              1.0143004689854873
+            ]
+          },
+          "both_vs_scan": {
+            "gain": 0.9997628549764571,
+            "ci95": [
+              0.9991119752474784,
+              1.000764373338658
+            ]
+          }
+        }
+      }
+    ],
+    "aa_outside_one_percent": [],
+    "publication_qualified": false,
+    "limits": "These are diagnostics made from unchanged baseline instructions and data. Code address matches are required. Any incomplete data-address match is retained explicitly. Results identify effects of image placement, not a specific PMU/cache/predictor mechanism."
+  },
+  "publication_qualified": false
+}
