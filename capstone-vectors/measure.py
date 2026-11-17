@@ -27,7 +27,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='EVEX unmasked VMOVDQU64/VMOVDQA64 memory output for base and RIP addressing',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
+    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',plain='R1353 partial output isolation with Clang helper left in ordinary text',scan='R1355 same output instructions with the canonical outlined helper also in the private code section',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -39,35 +39,47 @@ def main(w):
     (w/'functions.cpp').write_text(inc);run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-c',w/'functions.cpp','-o',w/'driver.o'],'driver')
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
+    from identity import payloads as object_payloads, compare as compare_payloads, signatures
+    writer_payloads={}
     objects={}
-    for label in ('integer','aa','scan'):
+    for label in ('integer','aa','plain','scan'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/'scan.patch']
+        patches=[] if label=='integer' else [r/('input.patch' if label=='plain' else 'scan.patch')]
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
-        if label == 'scan':
-            run(['git','add','-A'],'stage-tested-source',tree)
+        if label in ('plain','scan'):
+            run(['git','add','-A'],'stage-tested-source-'+label,tree)
             tested=sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()
-            assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
-            save('tested-source.json',dict(tree=tested,patch_sha256=sha(r/'scan.patch')))
+            assert tested==json.loads((r/('input.json' if label=='plain' else 'candidate.json')).read_text())['tree'],tested
+            save('tested-source-'+label+'.json',dict(tree=tested,patch_sha256=sha(r/('input.patch' if label=='plain' else 'scan.patch'))))
         units=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']
         run(['cmake','--build',b,'--target','capstone_static',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
         objroot=b/'CMakeFiles/capstone.dir'
         objects[label]={str(path.relative_to(objroot)):sha(path) for path in objroot.rglob('*.o')}
         assert len(objects[label])>30
-        if label == 'scan':
-            changed={name for name,value in objects['integer'].items() if objects['scan'][name]!=value}
-            added=set(objects['scan'])-set(objects['integer'])
+        if label in ('plain','scan'):
+            changed={name for name,value in objects['integer'].items() if objects[label][name]!=value}
+            added=set(objects[label])-set(objects['integer'])
             assert added=={'arch/X86/X86EvexMemoryOutput.c.o'},added
             assert changed=={'arch/X86/X86VectorOutput.c.o'},changed
-            save('object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
-            run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'generator'],'generator-build')
+            save('object-isolation-'+label+'.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
+            writer_payloads[label]=object_payloads(objroot/'arch/X86/X86EvexMemoryOutput.c.o')
+            if label=='scan':
+                assert all(objects['plain'][name]==objects['scan'][name] for name in objects['integer'])
+                save('writer-identity.json',dict(compare_payloads(writer_payloads['plain'],writer_payloads['scan']),unchanged_existing_objects=len(objects['integer'])))
+                from elftools.elf.elffile import ELFFile
+                with (objroot/'arch/X86/X86EvexMemoryOutput.c.o').open('rb') as stream:
+                    elf=ELFFile(stream)
+                    sections={x.name:x['sh_size'] for x in elf.iter_sections()}
+                    assert sections.get('.text',0)==0,sections
+                    save('helper-section.json',dict(sections=sections,ordinary_text_empty=True))
+            run(['clang++','-O2','-std=c++17','-I',tree/'include',tree/'suite/synctools/x86_vector_output.cpp',b/'libcapstone.a','-o',w/'generator'],'generator-build-'+label)
             for filename,args in [('X86GenVectorOutput.inc',[]),('X86GenEvexMemoryOutput.inc',['--evex-memory'])]:
-                with (p/'evidence'/('generator-'+filename+'.log')).open('wb') as log:
+                with (p/'evidence'/('generator-'+label+'-'+filename+'.log')).open('wb') as log:
                     actual=sp.check_output([w/'generator',*args],stderr=log)
                 assert actual==(tree/'arch/X86'/filename).read_bytes()
-            save('generator-proof.json',dict(both_outputs_reproduced=True))
+            save('generator-proof-'+label+'.json',dict(both_outputs_reproduced=True))
         save('object-digests.json', objects)
         for component in ('X86IntelInstPrinter','X86IntelInstPrinterPrechecked','X86ATTInstPrinter','X86Mapping','X86ImmediateOutput','X86VectorOutput','X86DisassemblerDecoder','X86OutputIterator'):
             object_file=objroot/'arch/X86'/(component+'.c.o')
@@ -83,6 +95,7 @@ def main(w):
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-Wl,-Map,'+str(p/'evidence'/(label+'-link.map')),'-o',target],'link-'+label);exe[label]=target
         (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
+        signatures(target,p/'evidence'/(label+'-linked-symbols.json.gz'))
 
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
@@ -90,6 +103,11 @@ def main(w):
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
+    if os.environ['CC']=='gcc':
+        assert objects['plain']==objects['scan']
+        assert payloads['plain']==payloads['scan']
+        save('complete.json',dict(cases=0,success=True,skipped_native_after_complete_binary_identity=True,plain_scan_objects_identical=True,plain_scan_binary_identical=True))
+        return
     maximum=max(map(len,payloads.values()))
     padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
     image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
@@ -102,11 +120,11 @@ def main(w):
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-amd64', 'libzstd1-amd64', 'libssl3t64-i386'): continue
+        if name not in ('jpeg-avx2-i386','libssl3t64-amd64','libzstd1-amd64'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
+        for panel in ['simd-functions']:
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
@@ -127,7 +145,7 @@ def main(w):
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
+                cycles={launch:[]for launch in launches};labels=['integer','aa','plain','scan']
                 for i in range(21):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
@@ -140,14 +158,14 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=md('iced','scan')
-                    row['vs_fast']=md('fast','scan') if mode else None
+                    row['vs_iced']=None
+                    row['vs_fast']=None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
+    assert len(reported)==9*len(launches)
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-vex32-gate-pilot-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-evex-helper-section-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)

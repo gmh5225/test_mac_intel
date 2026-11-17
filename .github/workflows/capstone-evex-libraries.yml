@@ -1,7 +1,7 @@
-name: Measure EVEX packed move memory output against iced
+name: Verify complete EVEX helper isolation before focused placement timing
 on:
   push:
-    branches: [codex/capstone-evex-move-memory-pilot]
+    branches: [codex/capstone-evex-helper-section]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-move-memory-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-helper-section-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
