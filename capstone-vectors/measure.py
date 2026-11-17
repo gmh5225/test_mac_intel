@@ -17,6 +17,7 @@ def module(path):
     spec=importlib.util.spec_from_file_location(path.stem,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
 
 def main(w):
+    focus=json.loads((r/'geometry.json').read_text())['focus']['native'][os.environ['GEOMETRY_PROFILE']]
     reference=json.loads((r/'experiment.json').read_text())['baseline_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
     iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
@@ -98,8 +99,8 @@ def main(w):
     image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
     image_inode=image.stat().st_ino
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
+    assert probe.returncode==0
+    launches=['images','images-fixed','same-file','same-file-fixed']
     save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare both predeclared EVEX transfer implementations, including recorded table relocation, against the same baseline and frozen consumers with original-image and fixed-image controls.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
@@ -116,10 +117,12 @@ def main(w):
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
             for mode in (0,1,2):
+                if [name,panel,mode] not in focus:continue
                 def measure(lib,n,launch):
                     tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
-                    if launch=='images':
+                    if launch in ('images','images-fixed'):
                         command=[str(exe[lib]),*tail];executable=None
+                        if launch=='images-fixed':command=['setarch',platform.machine(),'-R',*command]
                     elif launch=='same-argv':
                         command=[str(image),*tail];executable=str(exe[lib])
                     else:
@@ -129,8 +132,8 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','merge','iced']+(['fast'] if mode else [])
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(80e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','merge']
                 for i in range(21):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
@@ -143,49 +146,14 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']={k:md('iced',k) for k in ('scan','merge')}
-                    row['vs_fast']={k:md('fast',k) for k in ('scan','merge')} if mode else None
+                    row['vs_iced']=None
+                    row['vs_fast']=None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
-    # Collect the original consumer lambda by symbol, without inserting client
-    # request instructions or changing the original native consumer object.
-    costs=[]
-    for name,bits,f,spans,source in deb.prepare(w):
-        if name!='libssl3t64-amd64': continue
-        intervals=w/(name+'-cost.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[list(map(int,x.split()))for x in sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True).splitlines()]
-        views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
-        sel=[a[:3]for a,v in zip(audit,views)if a[1]==a[5] and v[1]>=8 and v[1]>=0.15*v[0]]
-        assert len(sel)==manifest[name]['simd-functions']['functions']
-        intervals.write_text(''.join('%d %d %d\n'%tuple(v) for v in sel))
-        native_values={}
-        for mode in (0,1,2):
-            for label in ('integer','scan','merge'):
-                raw=w/(label+'-'+str(mode)+'.callgrind')
-                tail=['capstone',str(mode),'1',str(f),str(intervals),str(bits)]
-                # -demangle=no makes the symbol selector independent of the
-                # installed Valgrind C++ demangler's lambda spelling.
-                run(['valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no',
-                     '--toggle-collect=_ZZ4mainENK3$_0clEj','--cache-sim=yes','--branch-sim=yes',
-                     '--dump-instr=yes','--collect-jumps=yes','--callgrind-out-file='+str(raw),
-                     exe[label],*tail],'cost-'+label+'-'+str(mode))
-                log=(p/'evidence'/('cost-'+label+'-'+str(mode)+'.log')).read_text()
-                result=next(list(map(int,line.split())) for line in log.splitlines() if len(line.split())==6 and all(x.isdigit() for x in line.split()))
-                if mode in native_values: assert result[2:]==native_values[mode]
-                else:native_values[mode]=result[2:]
-                content=raw.read_text();events=next(line[8:].split() for line in content.splitlines() if line.startswith('events: '))
-                counts=list(map(int,next(line[8:].split() for line in content.splitlines() if line.startswith('totals: '))))
-                assert len(events)==len(counts) and counts[0]>0
-                costs.append(dict(case=name,mode=mode,variant=label,events=dict(zip(events,counts)),result=result[2:],collected_traversals=2))
-                with gzip.open(p/'evidence'/(label+'-'+str(mode)+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
-                raw.unlink()
-                save('instruction-costs.json',costs)
-    assert len(costs)==9
-    save('cost-protocol.json',dict(symbol='_ZZ4mainENK3$_0clEj',consumer_unchanged=True,traversals=2,scope='The original benchmark warm traversal and one timed traversal are collected. Simulated cache events do not establish native hardware causes.'))
-    save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-evex-transfer-comparison-native-'))
+    assert len(reported)==len(focus)*len(launches)
+    save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,launches=launches,selected=focus))
+w=Path(tempfile.mkdtemp(prefix='capstone-evex-transfer-geometry-native-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)
