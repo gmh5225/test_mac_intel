@@ -1,7 +1,7 @@
-name: Time existing-miss output with frozen consumers and complete launch controls
+name: Isolate formatter layout effects with baseline text and identical unowned bytes
 on:
   push:
-    branches: [codex/capstone-evex-output-existing-miss-mixed]
+    branches: [codex/capstone-formatter-layout-counterfactual]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -31,7 +29,7 @@ jobs:
           ref: 8acfcd402e9f5fb7a458faa37552e53d7da3aa9a
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Build matched placement control before focused native timing
         run: |
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
@@ -43,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-output-existing-miss-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: formatter-layout-counterfactual-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
