@@ -1,7 +1,7 @@
-name: Qualify unified VEX descriptor pool mixed
+name: Check immutable x86 register map reuse with PE and other backend controls
 on:
   push:
-    branches: [codex/capstone-vex-unified-descriptor-pool-mixed]
+    branches: [codex/capstone-immutable-register-map-mixed]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -15,6 +15,7 @@ jobs:
           - { host: ubuntu-22.04, cc: gcc, archs: four }
           - { host: ubuntu-24.04-arm, cc: gcc, archs: four }
           - { host: ubuntu-24.04, cc: clang, archs: four }
+          - { host: ubuntu-22.04, cc: clang, archs: four }
           - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 45
@@ -29,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: ce07fdfca945d55de72325eb6482aaf9dd9297b2
+          ref: 106380545da022533aa28bb9af6ba4df9f6e9970
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
@@ -39,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex-unified-descriptor-pool-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: immutable-register-map-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
