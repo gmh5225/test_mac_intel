@@ -84,6 +84,7 @@ try:
         text = w/'input.text'; text.write_bytes(code)
         extents = w/'extents.tsv'; extents.write_text(''.join('%d %d %d\n'%v for v in intervals))
         result = json.loads(sp.check_output([w/'census','64' if name.endswith('amd64') else '32',text,extents],text=True))
+        assert result['all-functions']['vectors'] > 0 and result['simd-functions']['functions'] > 0, 'Full operand detail must populate vector selection'
         results[name] = dict(provenance=meta, observed=result)
         save('census',results)
         print(name, {k:{x:v[x] for x in ('decoded','invalid_bytes','vectors','functions')} for k,v in result.items()}, flush=True)

@@ -39,7 +39,6 @@ int main(int argc, char **argv) {
     cs_mode mode = bits == 64 ? CS_MODE_64 : CS_MODE_32;
     if (cs_open(CS_ARCH_X86, mode, &full) || cs_open(CS_ARCH_X86, mode, &raw) ||
         cs_option(full, CS_OPT_DETAIL, CS_OPT_ON) ||
-        cs_option(full, CS_OPT_TEXT, CS_OPT_OFF) ||
         cs_option(raw, CS_OPT_TEXT, CS_OPT_OFF)) return 2;
     cs_insn *insn = cs_malloc(full), *scan = cs_malloc(raw);
     if (!insn || !scan) return 2;
