@@ -1,26 +1,44 @@
 {
-  "purpose": "Measure both the C4/C5 feature and its entry-section placement against the published Capstone baseline and forked iced",
-  "hosts": "Two independent Ubuntu 24.04 Clang runner allocations; retain both CPU models and every result",
+  "round": 1334,
+  "diagnostic_only": true,
+  "source": {
+    "parent": "5aafe3fa6274988f9325b2894a598ffe37f2a21a",
+    "baseline_tree": "18c18802f84a648501b8333d449d6491322e1773",
+    "tree": "90f1640be5ee01760c34969f4abe4a40a23518ea",
+    "sha256": "f1c2a8182cf5159955a0f80b79562679b8fa4f21db7bc2a2fefadd138bcf51fa",
+    "local_units": [
+      "x86_reg_access",
+      "x86_encoding_accuracy",
+      "detail_option",
+      "x86_simple_output"
+    ],
+    "differential_states": 750000,
+    "native_qualified": false
+  },
+  "source_scope": "Use the exact held R1327 source and old published baseline to reproduce the native function body; this is not a new production candidate.",
+  "reason": "R1328 shows a fixed-image AMD detail loss inside the countdown function. Its loop counter is zero-extended from op_count into EAX then decremented through AL. Isolate counter width and DEC versus SUB at the same instruction address before attributing the loss to a CPU mechanism.",
   "variants": [
-    "published baseline",
-    "byte-identical AA",
-    "plain C4/C5 candidate",
-    "C4/C5 plus single-entry placement",
-    "iced IntelFormatter",
-    "iced FastFormatter"
+    "baseline",
+    "byte-identical A/A",
+    "R1327 function body in baseline ELF (DEC AL)",
+    "same body with DEC EAX",
+    "same body with SUB AL,1"
   ],
-  "panels": [
-    "JPEG64 all and SIMD",
-    "JPEG AVX2 32 SIMD",
-    "SSL64 SIMD",
-    "Zstd64 all and SIMD"
+  "cases": [
+    "JPEG64 all/detail",
+    "Zstd64 SIMD/raw",
+    "SSL32 all/detail"
   ],
-  "cycles": 21,
-  "launch_controls": [
+  "allocations": 6,
+  "cycles": 41,
+  "minimum_process_ms": 250,
+  "controls": [
     "original images",
-    "same inode and fixed addresses"
+    "same inode/size/argv ASLR off",
+    "single instruction changed with unchanged size and addresses",
+    "boundary hash and selected-output aggregate checksum",
+    "750000 full overlapping/disjoint output-buffer comparisons per shared-library variant"
   ],
-  "native_qualification": false,
-  "initial_transition_measured_directly": true,
-  "source_only_change": "Conditional section attribute; existing helper functions keep their text section"
+  "cpu_scope": "Record actual CPU; operating system labels do not guarantee AMD assignment.",
+  "publishable": false
 }
