@@ -1,7 +1,7 @@
 """Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
 from pathlib import Path
 import gzip, os, shlex, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
-from entry_identity import object_proof, linked_proof
+from layout import decoder_proof, leaf_proof, linked_proof
 r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
@@ -28,7 +28,7 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',previous='R1361 small entry',scan='Original decoder body linkage retained; only new entry and table in separate ELF sections',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
+    save('variants.json',dict(control='byte-identical baseline copy',integer='Released four-backend Capstone, revision '+reference,aa='byte-identical reference',scan='Canonical EVEX register scan plans; original code and readonly positions retained',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -41,16 +41,16 @@ def main(w):
     profile=['-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+os.environ['CC'],'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+arch+'_SUPPORT=ON' for arch in ['X86','ARM','AARCH64','MIPS']],'-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -fomit-frame-pointer '+('-Wno-error=discarded-qualifiers' if os.environ['CC']=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_SHARED_LIBS=OFF','-DCAPSTONE_BUILD_STATIC_LIBS=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_CSTEST=ON']
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
-    for label in ('integer','aa','previous','scan'):
+    for label in ('integer','aa','scan'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
-        patches=[] if label=='integer' else [r/({'previous':'previous.patch','data':'data-control.patch'}.get(label,'scan.patch'))]
+        patches=[] if label=='integer' else [r/'scan.patch']
         for patch in patches: run(['git','apply',patch],'apply-'+label+'-'+patch.stem,tree)
-        if label in ('scan','previous'):
+        if label == 'scan':
             run(['git','add','-A'],'stage-tested-source',tree)
             tested=sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()
-            assert tested==json.loads((r/({'previous':'previous.json','data':'data-control.json'}.get(label,'candidate.json'))).read_text())['tree'],tested
-            save(({'previous':'previous-source.json','data':'data-source.json'}.get(label,'tested-source.json')),dict(tree=tested,patch_sha256=sha(patches[0])))
+            assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
+            save('tested-source.json',dict(tree=tested,patch_sha256=sha(patches[0])))
         units=['x86_simple_output','x86_encoding_accuracy','x86_reg_access','detail_option','text_option','x86_printer_prechecked','x86_buffer_bounds','x86_scan_batch']+[f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))]
         run(['cmake','--build',b,'--target','capstone_static',*units,'--parallel','4'],'build-'+label)
         run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
@@ -60,15 +60,16 @@ def main(w):
         if label == 'scan':
             changed={name for name,value in objects['integer'].items() if objects['scan'][name]!=value}
             added=set(objects['scan'])-set(objects['integer'])
-            assert not added,added
-            assert changed=={'arch/X86/X86Mapping.c.o'},changed
+            assert added=={'arch/X86/X86EvexScan.c.o'},added
+            assert changed=={'arch/X86/X86DisassemblerDecoder.c.o'},changed
             save('object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
         if label=='integer':
-            shutil.copyfile(objroot/'arch/X86/X86Mapping.c.o',w/'baseline-mapping.o')
+            shutil.copyfile(objroot/'arch/X86/X86DisassemblerDecoder.c.o',w/'baseline-decoder.o')
         if label=='scan':
-            save('entry-object-identity.json',object_proof(w/'baseline-mapping.o',objroot/'arch/X86/X86Mapping.c.o'))
+            save('decoder-object-identity.json',decoder_proof(w/'baseline-decoder.o',objroot/'arch/X86/X86DisassemblerDecoder.c.o'))
+            save('leaf-object-identity.json',leaf_proof(objroot/'arch/X86/X86EvexScan.c.o'))
         save('object-digests.json', objects)
-        for component in ('X86IntelInstPrinter','X86IntelInstPrinterPrechecked','X86ATTInstPrinter','X86Mapping','X86ImmediateOutput','X86VectorOutput','X86Disassembler','X86DisassemblerDecoder','X86OutputIterator'):
+        for component in ('X86IntelInstPrinter','X86IntelInstPrinterPrechecked','X86ATTInstPrinter','X86Mapping','X86ImmediateOutput','X86VectorOutput','X86Disassembler','X86DisassemblerDecoder','X86OutputIterator') + (('X86EvexScan',) if label=='scan' else ()):
             object_file=objroot/'arch/X86'/(component+'.c.o')
             assembly=sp.check_output(['objdump','-dr',object_file])
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
@@ -100,7 +101,7 @@ def main(w):
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Measure compact negative EVEX admission against the published baseline with original-image and same-inode ASLR-disabled controls.'))
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Measure canonical EVEX register scan plans against published 413b606f with original-image and same-inode ASLR-disabled controls.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
@@ -130,7 +131,7 @@ def main(w):
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
                 probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','previous','scan','iced']+(['fast'] if mode else [])
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
                 for i in range(21):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
@@ -162,7 +163,7 @@ def main(w):
         intervals.write_text(''.join('%d %d %d\n'%tuple(v) for v in sel))
         native_values={}
         for mode in (0,1,2):
-            for label in ('integer','previous','scan'):
+            for label in ('integer','scan'):
                 raw=w/(label+'-'+str(mode)+'.callgrind')
                 tail=['capstone',str(mode),'1',str(f),str(intervals),str(bits)]
                 # -demangle=no makes the symbol selector independent of the
@@ -182,10 +183,10 @@ def main(w):
                 with gzip.open(p/'evidence'/(label+'-'+str(mode)+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
                 raw.unlink()
                 save('instruction-costs.json',costs)
-    assert len(costs)==9
+    assert len(costs)==6
     save('cost-protocol.json',dict(symbol='_ZZ4mainENK3$_0clEj',consumer_unchanged=True,traversals=2,scope='The original benchmark warm traversal and one timed traversal are collected. Simulated cache events do not establish native hardware causes.'))
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-evex-extension-isolated-entry-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-evex-canonical-scan-native-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)

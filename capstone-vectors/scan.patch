@@ -1,93 +1,401 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 60eda54e..7654a7ba 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -468,6 +468,7 @@ if(CAPSTONE_X86_SUPPORT)
+         arch/X86/X86MemoryOutput.c
+         arch/X86/X86OutputIterator.c
+         arch/X86/X86VectorOutput.c
++        arch/X86/X86EvexScan.c
+     )
+     # Use scalar/vector stores or libc for the fixed public output buffers.
+     # Generic x64 GCC otherwise emits REP STOS even for the short clears.
+diff --git a/Makefile b/Makefile
+index 74790c01..4382db46 100644
+--- a/Makefile
++++ b/Makefile
+@@ -272,6 +272,7 @@ endif
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86MemoryOutput.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86OutputIterator.o
+ 	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86VectorOutput.o
++	LIBOBJ_X86 += $(OBJDIR)/arch/X86/X86EvexScan.o
+ 	LIBOBJ_X86_NUMBERS += $(OBJDIR)/arch/X86/X86IntelInstPrinterNumbers.o
+ endif
+ 
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..cc67e9c7 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3308,8 +3308,13 @@ decodeScanResultGeneric(csh ud, const uint8_t *code, size_t code_len,
+ 	uint16_t size;
+ 	x86_feature_decode_result extension = X86_FEATURE_NOT_HANDLED;
+ 	if (tryExtension)
++#ifdef X86_EVEX_REGISTER_SCAN
++		extension = X86_decodeScanFeatureExtension(
++			ud, code, code_len, &instr, &size, opcode);
++#else
+ 		extension = X86_decodeFeatureExtension(ud, code, code_len,
+ 						       &instr, &size, opcode);
++#endif
+ 	if (extension == X86_FEATURE_INVALID)
+ 		return false;
+ 	if (extension != X86_FEATURE_DECODED) {
+diff --git a/arch/X86/X86EvexAdmission.h b/arch/X86/X86EvexAdmission.h
+new file mode 100644
+index 00000000..53d4d8b8
+--- /dev/null
++++ b/arch/X86/X86EvexAdmission.h
+@@ -0,0 +1,15 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifndef CS_X86_EVEX_ADMISSION_H
++#define CS_X86_EVEX_ADMISSION_H
++
++/* Arguments are local values. Keep the extent check before field reads. */
++#define X86_EVEX_REGISTER_PREFIX_REJECTS(code, size) \
++	((size) < 6 || ((code)[2] & 7) != 5 || ((code)[3] & 0x97) || \
++	 ((code)[3] & 0x60) == 0x60)
++#define X86_EVEX_REGISTER_EXTRACT(key) (((key) & ~0x22u) == 0x319)
++#define X86_EVEX_EXTRACT_SOURCE_REJECTS(code) \
++	(((code)[2] & 0x78) != 0x78 || !((code)[3] & 8))
++
++#endif
+diff --git a/arch/X86/X86EvexScan.c b/arch/X86/X86EvexScan.c
+new file mode 100644
+index 00000000..12cc13fb
+--- /dev/null
++++ b/arch/X86/X86EvexScan.c
+@@ -0,0 +1,60 @@
++/* Capstone Disassembly Engine */
++/* SPDX-License-Identifier: BSD-3-Clause */
++
++#ifdef CAPSTONE_HAS_X86
++#include "X86FeatureExtension.h"
++#ifdef X86_EVEX_REGISTER_SCAN
++#include "X86EvexAdmission.h"
++#include "X86GenEvexScan.inc"
++
++/* Only a complete, unprefixed EVEX in 64-bit mode reaches this helper.
++ * The ordinary output generator owns the admitted IDs and widths. */
++__attribute__((noinline, section(".cs_x86_evex_scan_text")))
++static x86_feature_decode_result
++decodeEvexRegisterScan(csh ud, const uint8_t *code, size_t code_len,
++		      MCInst *instr, uint16_t *size, uint8_t opcode)
++{
++	const cs_struct *handle = (const cs_struct *)(uintptr_t)ud;
++	if (handle->mode == CS_MODE_64 && code[5] >= 0xc0 &&
++	    !X86_EVEX_REGISTER_PREFIX_REJECTS(code, code_len)
++#ifdef CAPSTONE_X86_SCAN_ADAPTER
++	    && !handle->x86_scan_adapter
++#endif
++	) {
++		const unsigned map = code[1] & 15;
++		const struct EvexScanPlan *plan =
++			&evex_scan_plans[evex_scan_index[code[4]]];
++		if (plan->map == map && code_len >= plan->length) {
++			const unsigned id =
++				plan->ids[code[2] >> 7][code[3] >> 5];
++			const unsigned key = (map << 8) | code[4];
++			if (id && (!X86_EVEX_REGISTER_EXTRACT(key) ||
++				   !X86_EVEX_EXTRACT_SOURCE_REJECTS(code))) {
++				instr->Opcode = 0;
++				instr->OpcodePub = id;
++				instr->popcode_adjust = 0;
++				*size = plan->length;
++				return X86_FEATURE_DECODED;
++			}
++		}
++	}
++	return X86_decodeFeatureExtension(ud, code, code_len, instr, size,
++					  opcode);
++}
++
++/* Keep the non-EVEX and non-64-bit fallback ahead of the register helper's
++ * working state. Its predicate matches the isolated full-decode entry. */
++__attribute__((noinline, section(".cs_x86_evex_scan_text")))
++CAPSTONE_INTERNAL x86_feature_decode_result
++X86_decodeScanFeatureExtension(csh ud, const uint8_t *code, size_t code_len,
++			       MCInst *instr, uint16_t *size, uint8_t opcode)
++{
++	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
++	    (((cs_struct *)(uintptr_t)ud)->mode & CS_MODE_64))
++		return decodeEvexRegisterScan(ud, code, code_len, instr, size,
++					     opcode);
++	return X86_decodeFeatureExtensionSlow(ud, code, code_len, instr, size,
++					      opcode);
++}
++#endif
++#endif
 diff --git a/arch/X86/X86FeatureExtension.h b/arch/X86/X86FeatureExtension.h
-index 28ae2a67..1705ab1b 100644
+index b3bb84b4..4d34d8ac 100644
 --- a/arch/X86/X86FeatureExtension.h
 +++ b/arch/X86/X86FeatureExtension.h
-@@ -304,6 +304,11 @@ static inline bool X86_mayDecodeFeatureExtension(const uint8_t *code,
- x86_feature_decode_result
- X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 			   MCInst *instr, uint16_t *size, uint8_t opcode);
-+/* Internal full decoder behind the isolated extension entry. */
+@@ -311,6 +311,17 @@ X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
+ 			       size_t code_len, MCInst *instr,
+ 			       uint16_t *size, uint8_t opcode);
+ #endif
++#if defined(__ELF__) && defined(__x86_64__) && defined(__GNUC__) && \
++	!defined(CAPSTONE_DIET) && !defined(CAPSTONE_X86_REDUCE) && \
++	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
++	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
++	!defined(_WIN32_WCE)
++#define X86_EVEX_REGISTER_SCAN
 +CAPSTONE_INTERNAL x86_feature_decode_result
-+X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code,
-+			       size_t code_len, MCInst *instr,
-+			       uint16_t *size, uint8_t opcode);
++X86_decodeScanFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
++			       MCInst *instr, uint16_t *size, uint8_t opcode);
++#endif
++
  bool X86_printFeatureExtension(MCInst *instr, SStream *stream, bool att_syntax);
  bool X86_mapFeatureExtension(cs_insn *insn, unsigned int opcode, cs_mode mode);
  const char *X86_featureExtensionRegisterName(unsigned int reg);
-diff --git a/arch/X86/X86Mapping.c b/arch/X86/X86Mapping.c
-index 16e68cf4..02995859 100644
---- a/arch/X86/X86Mapping.c
-+++ b/arch/X86/X86Mapping.c
-@@ -4816,13 +4816,38 @@ static bool has_duplicate_feature_evex_prefixes(const uint8_t *code,
- 	       (code[prefix_offset + 1] & 7) <= 4;
- }
- 
-+/* Complete EVEX opcodes that may belong to a source-owned extension.
-+ * Each byte is a map bitset. The original handlers own validation and
-+ * precedence; short encodings still enter those handlers unchanged. */
-+#if defined(__ELF__) && defined(__GNUC__)
-+__attribute__((section(".cs_x86_feature_rodata")))
-+#endif
-+static const uint8_t evex_feature_maps[256] = {
-+	/* 0x00 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0x10 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0x20 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0x30 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0x40 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 4, 4, 0, 0, 0, 0,
-+	/* 0x50 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0x60 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0,
-+	/* 0x70 */ 0, 0, 0, 0, 0, 0, 0, 8, 0, 0, 4, 4, 4, 0, 0, 0,
-+	/* 0x80 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0x90 */ 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0xa0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0xb0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0xc0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0xd0 */ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+	/* 0xe0 */ 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
-+	/* 0xf0 */ 8, 0, 4, 4, 0, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0,
+diff --git a/arch/X86/X86GenEvexScan.inc b/arch/X86/X86GenEvexScan.inc
+new file mode 100644
+index 00000000..fef8d676
+--- /dev/null
++++ b/arch/X86/X86GenEvexScan.inc
+@@ -0,0 +1,41 @@
++/* Generated by suite/synctools/x86_vector_output.cpp. */
++struct EvexScanPlan {
++	uint8_t map, length;
++	uint16_t ids[2][3];
 +};
-+
- #if defined(_MSC_VER)
- __declspec(noinline)
- #elif defined(__GNUC__)
- __attribute__((noinline))
- #endif
--x86_feature_decode_result
--X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
-+CAPSTONE_INTERNAL x86_feature_decode_result
-+X86_decodeFeatureExtensionSlow(csh handle, const uint8_t *code, size_t code_len,
- 			   MCInst *instr, uint16_t *size, uint8_t opcode)
- {
- 	x86_feature_decode_result result;
-@@ -5016,6 +5041,31 @@ X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
- 	}
++static const struct EvexScanPlan evex_scan_plans[]
++	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	{ 0 },
++	{ 1, 6, { { X86_INS_VPXORD, X86_INS_VPXORD, X86_INS_VPXORD }, { X86_INS_VPXORQ, X86_INS_VPXORQ, X86_INS_VPXORQ } } },
++	{ 1, 6, { { X86_INS_VPADDD, X86_INS_VPADDD, X86_INS_VPADDD }, { 0, 0, 0 } } },
++	{ 2, 6, { { X86_INS_VPSHUFB, X86_INS_VPSHUFB, X86_INS_VPSHUFB }, { X86_INS_VPSHUFB, X86_INS_VPSHUFB, X86_INS_VPSHUFB } } },
++	{ 2, 6, { { X86_INS_VAESENC, X86_INS_VAESENC, X86_INS_VAESENC }, { X86_INS_VAESENC, X86_INS_VAESENC, X86_INS_VAESENC } } },
++	{ 2, 6, { { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST, X86_INS_VAESENCLAST }, { X86_INS_VAESENCLAST, X86_INS_VAESENCLAST, X86_INS_VAESENCLAST } } },
++	{ 2, 6, { { X86_INS_VAESDEC, X86_INS_VAESDEC, X86_INS_VAESDEC }, { X86_INS_VAESDEC, X86_INS_VAESDEC, X86_INS_VAESDEC } } },
++	{ 2, 6, { { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST, X86_INS_VAESDECLAST }, { X86_INS_VAESDECLAST, X86_INS_VAESDECLAST, X86_INS_VAESDECLAST } } },
++	{ 3, 7, { { 0, X86_INS_VEXTRACTF32X4, X86_INS_VEXTRACTF32X4 }, { 0, X86_INS_VEXTRACTF64X2, X86_INS_VEXTRACTF64X2 } } },
++	{ 3, 7, { { 0, 0, X86_INS_VEXTRACTF32X8 }, { 0, 0, X86_INS_VEXTRACTF64X4 } } },
++	{ 3, 7, { { X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD, X86_INS_VPTERNLOGD }, { X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ, X86_INS_VPTERNLOGQ } } },
++	{ 3, 7, { { 0, X86_INS_VEXTRACTI32X4, X86_INS_VEXTRACTI32X4 }, { 0, X86_INS_VEXTRACTI64X2, X86_INS_VEXTRACTI64X2 } } },
++	{ 3, 7, { { 0, 0, X86_INS_VEXTRACTI32X8 }, { 0, 0, X86_INS_VEXTRACTI64X4 } } },
++	{ 3, 7, { { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ }, { X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ, X86_INS_VPCLMULQDQ } } },
++};
++static const uint8_t evex_scan_index[256]
++	__attribute__((section(".cs_x86_evex_scan_rodata"))) = {
++	3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0, 9, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 12, 0, 0, 0, 0,
++	0, 0, 0, 0, 13, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 5, 6, 7,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
++	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0,
++};
+diff --git a/arch/X86/X86VectorOutput.c b/arch/X86/X86VectorOutput.c
+index 6df1472d..8a606f4e 100644
+--- a/arch/X86/X86VectorOutput.c
++++ b/arch/X86/X86VectorOutput.c
+@@ -8,6 +8,7 @@
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
+ #include "X86SimpleOutput.h"
++#include "X86EvexAdmission.h"
+ struct PaddingOutput {
+ 	unsigned id;
+ 	uint8_t length;
+@@ -117,8 +118,7 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 	if (size >= 6 && code[5] < 0xc0)
+ 		return writeEvexBroadcast(code, size, insn, insn_size,
+ 					  address_regs);
+-	if (size < 6 || (code[2] & 7) != 5 || (code[3] & 0x97) ||
+-	    (code[3] & 0x60) == 0x60)
++	if (X86_EVEX_REGISTER_PREFIX_REJECTS(code, size))
+ 		return false;
+ 	const unsigned ll = code[3] >> 5;
+ 	const unsigned w = code[2] >> 7;
+@@ -134,8 +134,8 @@ static bool writeEvexOutput(const uint8_t *code, size_t size, cs_insn *insn,
+ 				  (code[5] & 7) | ((rxb & 3) << 3) };
+ 	/* These EVEX.0F3A extracts use r/m as the narrow destination, reg as
+      * the full-width source, and reserve vvvv/V'. */
+-	if ((key & ~0x22u) == 0x319) {
+-		if ((code[2] & 0x78) != 0x78 || !(code[3] & 8))
++	if (X86_EVEX_REGISTER_EXTRACT(key)) {
++		if (X86_EVEX_EXTRACT_SOURCE_REJECTS(code))
+ 			return false;
+ 		const unsigned pair[] = { regs[2], regs[0] };
+ 		return writeVectorRegisters(code, insn, insn_size, row, 4, ll,
+diff --git a/suite/synctools/x86_vector_output.cpp b/suite/synctools/x86_vector_output.cpp
+index 53824997..2da66fe1 100644
+--- a/suite/synctools/x86_vector_output.cpp
++++ b/suite/synctools/x86_vector_output.cpp
+@@ -917,19 +917,67 @@ void emit_vex_registers(Decoder &decoder)
+ 	std::fprintf(stderr, "%zu VEX register rows, %zu opcode plans\n",
+ 		     rows.size(), widths.size() - 1);
  }
- 
-+/* Reject ordinary unprefixed EVEX before the extension decoder needs its
-+ * full working state. All other inputs retain its original validation order. */
-+#if defined(_MSC_VER)
-+__declspec(noinline)
-+#elif defined(__GNUC__)
-+__attribute__((noinline))
-+#endif
-+#if defined(__ELF__) && defined(__GNUC__)
-+__attribute__((section(".cs_x86_feature_text")))
-+#endif
-+x86_feature_decode_result
-+X86_decodeFeatureExtension(csh handle, const uint8_t *code, size_t code_len,
-+                           MCInst *instr, uint16_t *size, uint8_t opcode)
+-void emit_output(Decoder &decoder)
++void emit_evex_scan(Decoder &decoder, const std::map<unsigned, WidthRows> &ids)
 +{
-+	if (opcode == 0x62 && code_len >= 6 && code[0] == 0x62 &&
-+	    (((cs_struct *)(uintptr_t)handle)->mode & CS_MODE_64)) {
-+		const unsigned map = code[1] & 7;
-+		if (map >= 1 && map <= 3 &&
-+		    !(evex_feature_maps[code[4]] & (1u << map)))
-+			return X86_FEATURE_NOT_HANDLED;
++	std::array<unsigned, 256> index{};
++	std::map<unsigned, Form> descriptions;
++	for (const auto &form : forms) {
++		const unsigned key = form.map << 8 | form.opcode;
++		if (form.map < 1 || form.map > 3 ||
++		    form.extract != ((key & ~0x22u) == 0x319))
++			throw std::runtime_error("unsupported EVEX scan form");
++		descriptions.emplace(key, form);
 +	}
-+	return X86_decodeFeatureExtensionSlow(handle, code, code_len, instr, size,
-+	                                  opcode);
++	unsigned plan = 0;
++	for (const auto &[key, widths] : ids) {
++		(void)widths;
++		if (index[key & 255] || ++plan > UINT8_MAX)
++			throw std::runtime_error("EVEX scan opcode plan collision");
++		index[key & 255] = plan;
++	}
++	std::puts("struct EvexScanPlan {\n\tuint8_t map, length;\n\tuint16_t ids[2][3];\n};");
++	std::puts("static const struct EvexScanPlan evex_scan_plans[]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {\n\t{ 0 },");
++	for (const auto &[key, widths] : ids) {
++		const auto &form = descriptions.at(key);
++		std::printf("\t{ %u, %u, { ", form.map, 6 + form.immediate);
++		for (unsigned w = 0; w < 2; ++w) {
++			std::printf("%s{ ", w ? ", " : "");
++			for (unsigned ll = 0; ll < 3; ++ll) {
++				if (widths[w][ll] > UINT16_MAX)
++					throw std::runtime_error("EVEX scan ID exceeds uint16_t");
++				std::printf("%s%s", ll ? ", " : "",
++					    decoder.symbol(widths[w][ll]).c_str());
++			}
++			std::printf(" }");
++		}
++		std::puts(" } },");
++	}
++	std::puts("};\nstatic const uint8_t evex_scan_index[256]\n\t__attribute__((section(\".cs_x86_evex_scan_rodata\"))) = {");
++	for (unsigned i = 0; i < index.size(); i += 16) {
++		std::printf("\t");
++		for (unsigned j = 0; j < 16; ++j)
++			std::printf("%s%u,", j ? " " : "", index[i + j]);
++		std::putchar('\n');
++	}
++	std::puts("};");
 +}
 +
- static bool print_tilezero(MCInst *instr, SStream *stream, bool att_syntax)
++void emit_output(Decoder &decoder, bool scan_only)
  {
- 	const MCOperand *operand;
+ 	std::vector<std::string> records;
+-	std::map<unsigned, WidthRows> plans;
++	std::map<unsigned, WidthRows> plans, scan_ids;
+ 	for (const auto &form : forms) {
+ 		auto &rows = plans[form.map << 8 | form.opcode];
++		auto &ids = scan_ids[form.map << 8 | form.opcode];
+ 		for (unsigned ll = 0; ll < 3; ++ll) {
+ 			for (unsigned w = 0; w < 2; ++w) {
+ 				auto row = output_record(decoder, form, w, ll);
+ 				if (row.empty()) {
+ 					rows[w][ll] = UINT8_MAX;
++					ids[w][ll] = 0;
+ 					continue;
+ 				}
++				ids[w][ll] = decoder.insn->id;
+ 				const auto i = std::find(records.begin(),
+ 							 records.end(), row);
+ 				const auto index = static_cast<size_t>(
+@@ -943,6 +991,10 @@ void emit_output(Decoder &decoder)
+ 			}
+ 		}
+ 	}
++	if (scan_only) {
++		emit_evex_scan(decoder, scan_ids);
++		return;
++	}
+ 	if (plans.at(0x339)[0][1] == UINT8_MAX ||
+ 	    plans.at(0x33b)[1][2] == UINT8_MAX)
+ 		throw std::runtime_error("missing EVEX extract register forms");
+@@ -972,11 +1024,14 @@ void emit_output(Decoder &decoder)
+ }
+ }
+ 
+-int main()
++int main(int argc, char **argv)
+ {
++	const bool scan_only = argc == 2 && !std::strcmp(argv[1], "--evex-scan");
++	if (argc > 1 && !scan_only)
++		throw std::runtime_error("usage: x86_vector_output [--evex-scan]");
+ 	Decoder decoder;
+ 	std::puts("/* Generated by suite/synctools/x86_vector_output.cpp. */");
+-	emit_output(decoder);
++	emit_output(decoder, scan_only);
+ 	std::fprintf(stderr, "%llu ordinary decoder probes\n",
+ 		     static_cast<unsigned long long>(decoder.probes));
+ }
+diff --git a/xcode/Capstone.xcodeproj/project.pbxproj b/xcode/Capstone.xcodeproj/project.pbxproj
+index 82c9453e..7e0a3bf9 100644
+--- a/xcode/Capstone.xcodeproj/project.pbxproj
++++ b/xcode/Capstone.xcodeproj/project.pbxproj
+@@ -113,6 +113,7 @@
+ 		EE9D7FCC807402A74CD63761 /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
++		E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
+ 		DC474FB519DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DC474FB619DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FB619DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -161,6 +162,7 @@
+ 		9DDE0C4764522FB3D109267B /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
++		84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
+ 		DC474FD919DE6FDA00BCA449 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DC474FDA19DE6FDA00BCA449 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FD474FDA19DE6FDA00BCA449 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -228,6 +230,7 @@
+ 		DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */; };
+ 		9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */ = {isa = PBXBuildFile; fileRef = CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */; };
+ 		417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */ = {isa = PBXBuildFile; fileRef = 3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */; };
++		F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */ = {isa = PBXBuildFile; fileRef = 96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */; };
+ 		DCFE248B19DDCDC000EF8EA9 /* X86DisassemblerDecoder.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */; };
+ 		DCFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinter.c in Sources */ = {isa = PBXBuildFile; fileRef = DCFE244519DDCD8800EF8EA9 /* X86IntelInstPrinter.c */; };
+ 		FDFE248C19DDCDC000EF8EA9 /* X86IntelInstPrinterPrechecked.c in Sources */ = {isa = PBXBuildFile; fileRef = FDFE244519DDCD8800EF8EA9 /* X86IntelInstPrinterPrechecked.c */; };
+@@ -513,6 +516,7 @@
+ 		A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86MemoryOutput.c; sourceTree = "<group>"; };
+ 		CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86InstPrinterCommon.c; sourceTree = "<group>"; };
+ 		3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86VectorOutput.c; sourceTree = "<group>"; };
++		96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86EvexScan.c; sourceTree = "<group>"; };
+ 		DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86Disassembler.h; sourceTree = "<group>"; };
+ 		DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = X86DisassemblerDecoder.c; sourceTree = "<group>"; };
+ 		DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = X86DisassemblerDecoder.h; sourceTree = "<group>"; };
+@@ -988,6 +992,7 @@
+ 				A6FC550DD32C687728F80D7F /* X86MemoryOutput.c */,
+ 				CC7598114250B3634D5EE151 /* X86InstPrinterCommon.c */,
+ 				3F9102488E04AC94E9D265E8 /* X86VectorOutput.c */,
++				96AF8FF8D75E5BF886DBDB98 /* X86EvexScan.c */,
+ 				DCFE243719DDCD8800EF8EA9 /* X86Disassembler.h */,
+ 				DCFE243819DDCD8800EF8EA9 /* X86DisassemblerDecoder.c */,
+ 				DCFE243919DDCD8800EF8EA9 /* X86DisassemblerDecoder.h */,
+@@ -1644,6 +1649,7 @@
+ 				9DDE0C4764522FB3D109267B /* X86MemoryOutput.c in Sources */,
+ 				6F07D2770C5E4BF523EBC9C5 /* X86InstPrinterCommon.c in Sources */,
+ 				C72D2A93431E319146708B3E /* X86VectorOutput.c in Sources */,
++				84EA56EA2616D916C1E70CF9 /* X86EvexScan.c in Sources */,
+ 				DC474FC519DE6FDA00BCA449 /* ARMModule.c in Sources */,
+ 				DC474FC719DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
+ 				DC474F9319DE6FCD00BCA449 /* cs.c in Sources */,
+@@ -1745,6 +1751,7 @@
+ 				DFEE6EAA73DBA4D92B9766AB /* X86MemoryOutput.c in Sources */,
+ 				9105DF150F055252784A38B6 /* X86InstPrinterCommon.c in Sources */,
+ 				417BE6BB325645C04D6B8E07 /* X86VectorOutput.c in Sources */,
++				F237EC1CB49B9025109FA311 /* X86EvexScan.c in Sources */,
+ 				DCFE249719DDCDD000EF8EA9 /* XCoreMapping.c in Sources */,
+ 				DCA357831BC2C0290094BB3F /* M68KDisassembler.c in Sources */,
+ 				DCFE247719DDCDAD00EF8EA9 /* SparcDisassembler.c in Sources */,
+@@ -1792,6 +1799,7 @@
+ 				EE9D7FCC807402A74CD63761 /* X86MemoryOutput.c in Sources */,
+ 				1FF1851645C11683FAAD600E /* X86InstPrinterCommon.c in Sources */,
+ 				622C10B6D0FEFA1B71266515 /* X86VectorOutput.c in Sources */,
++				E33028ACC3DA98FC0470062D /* X86EvexScan.c in Sources */,
+ 				DC474FA119DE6FDA00BCA449 /* ARMModule.c in Sources */,
+ 				DC474FA319DE6FDA00BCA449 /* MipsInstPrinter.c in Sources */,
+ 				DC474F8D19DE6FCD00BCA449 /* cs.c in Sources */,

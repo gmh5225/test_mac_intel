@@ -1,83 +1,88 @@
 {
   "source": {
-    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
-    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-    "tree": "a1ec79c3557f54ebde318d616f5ffda6b1ae27d6",
-    "sha256": "55e32b2f07614957889a88504300a16cad288582493b3084416402bfd5db062f",
+    "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+    "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+    "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+    "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
     "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86EvexAdmission.h",
+      "arch/X86/X86EvexScan.c",
       "arch/X86/X86FeatureExtension.h",
-      "arch/X86/X86Mapping.c"
+      "arch/X86/X86GenEvexScan.inc",
+      "arch/X86/X86VectorOutput.c",
+      "suite/synctools/x86_vector_output.cpp",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
     ],
-    "complete": true,
-    "records": "equal public records, cursor and errors for 4390912 inputs",
-    "private_records": "equal private records, cursor and errors for 4390912 inputs",
-    "guard": "equal public records for 3145728 protected-page extents",
-    "unit_checks": 79,
-    "changed_runtime_objects": [
-      "arch/X86/X86Mapping.c.o"
-    ],
-    "added_runtime_objects": [],
-    "validation_scope": "Apple Clang complete public/private records and public guard-page extents, original extension decoder body retained with hidden external linkage; new entry and data in separate ELF sections; common selectors unchanged; native instruction-cost and timing qualification pending.",
-    "publication_qualified": false
+    "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
   },
-  "scope": "Test R1362 isolated entry against production and R1361. Original executable object-section bytes and linked text/constant symbol positions must match production before timing; additional unwind entry metadata excluded from raw constant-section identity.",
+  "published_baseline": {
+    "capstone": {
+      "before": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "after": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+      "tree": "069f80f9b98844dc796040cfc11517e695b43869",
+      "branch": "next",
+      "published": true
+    },
+    "neverd": {
+      "before": "c129d2b84713ccbfa52f3b9d72d95e4b676283ed",
+      "after": "02ace371079999d9bd16695229643604b7399c7f",
+      "branch": "dev",
+      "capstone": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+      "pending": false,
+      "dependency_checkout": "uninitialized; gitlink only",
+      "published": true
+    }
+  },
+  "semantic_and_layout_run": {
+    "id": 44113734594,
+    "head_sha": "7137ef52b28c46c0c58944ba20c945eb9939cdba",
+    "conclusion": "success",
+    "status": "completed",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44113734594",
+    "run_attempt": 1
+  },
+  "source_changed_after_semantic_validation": false,
   "native": {
-    "profiles": [
-      "ubuntu-22.04 clang",
-      "ubuntu-22.04 gcc",
-      "ubuntu-24.04 clang",
-      "ubuntu-24.04 gcc"
+    "compilers": [
+      "clang14",
+      "gcc11",
+      "clang18",
+      "gcc13"
     ],
+    "panels": 7,
+    "modes": 3,
     "cycles": 21,
-    "calibration_cpu_ms": 60,
-    "variants": [
-      "integer",
-      "aa",
-      "previous",
-      "scan",
-      "iced",
-      "fast"
-    ],
-    "controls": [
-      "original images",
-      "same inode and padded file size with ASLR disabled",
-      "byte-identical A/A"
-    ]
+    "target_ms": 60,
+    "expected_rows": 168,
+    "consumers": "Unmodified R1362 native consumer and frozen iced adapters",
+    "costs": "Unmodified native consumer collected with Callgrind; simulated events are not native hardware evidence"
   },
-  "cost": {
-    "case": "SSL64 SIMD",
-    "modes": [
-      "scan",
-      "format",
-      "detail"
+  "mixed": {
+    "compilers": [
+      "clang14",
+      "gcc11",
+      "clang18",
+      "gcc13"
     ],
-    "traversals": 2,
-    "consumer_unchanged": true,
-    "variants": [
-      "integer",
-      "previous",
-      "scan"
-    ]
+    "cases": 8,
+    "modes": 3,
+    "cycles": 21,
+    "target_ms": 80,
+    "expected_rows": 192,
+    "consumers": "Unmodified R1362 mixed consumer and frozen corpus"
   },
-  "publishable": false,
-  "previous": {
-    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
-    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-    "tree": "068c0e51218da27aad1837c5552288798ec433ed",
-    "sha256": "b6eb1604dceca935b940639e848b986c47a8a7bb902f54e571d90a2d59f4c4c4",
-    "files": [
-      "arch/X86/X86Mapping.c"
-    ],
-    "complete": true,
-    "records": "equal public records, cursor and errors for 4390912 inputs",
-    "private_records": "equal private records, cursor and errors for 4390912 inputs",
-    "guard": "equal public records for 3145728 protected-page extents",
-    "unit_checks": 79,
-    "changed_runtime_objects": [
-      "arch/X86/X86Mapping.c.o"
-    ],
-    "added_runtime_objects": [],
-    "validation_scope": "Apple Clang complete public/private records and public guard-page extents, original full extension decoder body retained behind a small early rejection entry; common selectors unchanged; native instruction-cost and timing qualification pending.",
-    "publication_qualified": false
-  }
+  "controls": [
+    "byte-identical A/A",
+    "original images",
+    "same-file-fixed with ASLR disabled"
+  ],
+  "qualification": "Preserve all rows and confidence intervals; investigate any median loss beyond 1% or A/A deviation beyond 1%; do not qualify unstable panels from favorable resampling",
+  "layout_gate": "Only the decoder call relocation may change in old objects; added leaf has separate sections; every original linked text and readonly symbol retains its position and size",
+  "timing_qualified": false,
+  "publication_qualified": false,
+  "cleanup": "Every driver removes owned source/build/test products in finally and retains evidence only"
 }
