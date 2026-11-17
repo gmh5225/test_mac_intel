@@ -1,8 +1,8 @@
 {
-  "parent": "round1339-vex32-private-record-pool",
-  "observation": "Shared and late vector gates add 16/64 and 32/80 bytes to the original text, respectively. Both enter after the six-register generic vector prologue. Separate 32-bit pool storage removed the original 2208-byte constant growth and repaired the observed Clang18 AMD AArch64 raw data-placement loss.",
-  "change": "Remove the mode gate from the original vector function. Select one of two writers at the vector-only iterator call, passing the unchanged constant register-array address. The 32-bit wrapper handles old padding/legacy plans and bare C4/C5; the 64-bit target remains the original writer.",
-  "prior": "R1114 tested mode-indexed writers together with mode-indexed register rows and old scanner changes. That candidate regressed and remains held. R1264 isolated a real common gateway cost, so do not put a new gateway on the 64-bit route.",
-  "prediction": "Preserve the entire original vector runtime object, remove the new common 64-bit gateway, and avoid generic vector prologue work on 32-bit C4/C5. The indirect call and iterator growth may still regress; audit actual lowering first.",
-  "qualification": false
+  "parent": "round1341-vex32-constant-register-dispatch",
+  "observation": "Clang18 widens the boolean writer-table index, spills it at rsp+0x38, grows the frame from 104 to 120 bytes, and adds six static stack references. The call still recomputes its boolean argument from the raw mode.",
+  "change": "Derive the table index from unsigned handle->mode / CS_MODE_64 only in the already-validated vector arm. Mode 4 selects 0; mode 8 selects 1. Preserve the original constant register pointer and the no-common-64-gateway design.",
+  "prediction": "Allow Clang to derive the index from the already-live raw mode at the tail call rather than preserve an independent widened boolean. This is a compiler-lowering hypothesis, not a speedup claim.",
+  "qualification": false,
+  "full_semantic_validation_pending": true
 }
