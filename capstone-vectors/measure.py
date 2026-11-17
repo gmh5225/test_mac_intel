@@ -54,8 +54,7 @@ def main(w):
         save(label+'-tested-source.json',dict(tree=tested,patch_sha256=None if label=='integer' else inputs['sha256']))
         units=['x86_simple_output','x86_reg_access','x86_buffer_bounds','x86_encoding_accuracy','x86_scan_batch','detail_option','x86_evex_reserved_fields','x86_packed_move_access','x86_memory_scale']
         units=sorted(set(units+['api','text_option','aarch64_scan','arm_post_index','aarch64_postprocess','mips_scan','mapping','register_descriptors','sstream','x86_kmask_access','x86_kmask_width','x86_diet_feature_details','x86_printer_prechecked']) | {f.stem for f in (tree/'tests/unit').glob('x86_*.c') if f.stem.startswith(('x86_apx','x86_amx','x86_evex'))})
-        run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+label)
-        run(['ctest','--test-dir',b,'--no-tests=error','--output-on-failure','-R','^unit_('+'|'.join(units)+')$'],'units-'+label)
+        run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+label)
         objroot = b/'CMakeFiles/capstone.dir'
         objects[label] = {str(f.relative_to(objroot)):sha(f) for f in objroot.rglob('*.o')}
         if label != 'integer':
@@ -94,51 +93,31 @@ def main(w):
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
         run(['git','apply','--index',r/'baseline.patch'],'restore-prepared-baseline-'+label,tree)
         assert sp.check_output(['git','write-tree'],cwd=tree,text=True).strip()==baseline['tree']
-    for name in ('verify','private-guard','public-verify'):
-        run(['clang++','-O2','-std=c++17','-I',tree/'include',r/(name+'.cpp'),'-ldl','-o',w/name],name+'-link')
-        run([w/name,w/'integer.so',w/'existingmiss.so'],name)
     import frozen_deb as deb
+    run(['clang++','-O2','-std=c++17','-I',base/'include',r/'census.cpp','-ldl','-o',w/'census'],'census-build')
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors')
-    manifest, costs = {}, []
+    reports=[]
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64','jpeg-avx2-i386','libssl3t64-i386','libssl3t64-amd64'):continue
         intervals=w/(name+'.tsv')
         intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
         audit=[list(map(int,x.split()))for x in sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True).splitlines()]
         views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
         assert len(audit)==len(views)==len(spans)
-        simd=name!='libssl3t64-i386'
-        selected=[a[:3]for a,v in zip(audit,views)if a[1]==a[5] and (not simd or (v[1]>=8 and v[1]>=.15*v[0]))]
-        assert selected
-        intervals.write_text(''.join('%d %d %d\n'%tuple(v)for v in selected))
-        manifest[name]=dict(source,functions=len(selected),bytes=sum(x[1]for x in selected),panel='simd-functions' if simd else 'all-functions')
-        save('provenance.json',manifest)
-        for mode in (0,1,2):
-            signatures={}
-            for label in ('integer','existingmiss'):
-                ident=name+'-'+str(mode)+'-'+label
-                raw=w/(ident+'.callgrind')
-                args=[exe[label],'capstone',str(mode),'1',f,intervals,str(bits)]
-                native=list(map(int,sp.check_output(args,text=True).split()))
-                assert len(native)==6
-                signatures[label]=native[2:]
-                if label=='existingmiss':assert signatures['integer']==signatures['existingmiss']
-                run(['valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no','--toggle-collect=_ZZ4mainENK3$_0clEj','--cache-sim=yes','--branch-sim=yes','--dump-instr=yes','--collect-jumps=yes','--callgrind-out-file='+str(raw),*args],'cost-'+ident)
-                log=(p/'evidence'/('cost-'+ident+'.log')).read_text()
-                result=next(list(map(int,line.split()))for line in log.splitlines()if len(line.split())==6 and all(x.isdigit()for x in line.split()))
-                assert result[2:]==signatures[label]
-                text=raw.read_text()
-                events=next(line[8:].split()for line in text.splitlines()if line.startswith('events: '))
-                counts=list(map(int,next(line[8:].split()for line in text.splitlines()if line.startswith('totals: '))))
-                assert len(events)==len(counts) and counts[0]>0
-                costs.append(dict(case=name,panel=manifest[name]['panel'],mode=mode,variant=label,events=dict(zip(events,counts)),result=result[2:],collected_traversals=2))
-                with gzip.open(p/'evidence'/(ident+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
-                raw.unlink()
-                save('instruction-costs.json',costs)
-        print(name,'instruction counts complete',flush=True)
-    assert len(costs)==24
-    save('complete.json',dict(success=True,traces=24,cases=4,unit_checks_per_variant=len(units),native_qualification=False))
-w=Path(tempfile.mkdtemp(prefix='capstone-vector-existingmiss-cost-'))
+        common=[(a[:3],v)for a,v in zip(audit,views)if a[1]==a[5]]
+        assert common
+        panels=['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else ['all-functions'] if name=='libssl3t64-i386' else ['simd-functions']
+        for panel in panels:
+            selected=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=.15*v[0])]
+            assert selected
+            intervals.write_text(''.join('%d %d %d\n'%tuple(v)for v in selected))
+            result=json.loads(sp.check_output([w/'census',w/'integer.so',w/'existingmiss.so',str(bits),f,intervals],text=True))
+            assert result['decoded']==sum(x['count']for x in result['rows'])
+            reports.append(dict(case=name,panel=panel,bits=bits,functions=len(selected),bytes=sum(x[1]for x in selected),source=source,**result))
+            save('census.json',reports)
+            print(name,panel,result['decoded'],result['existing'],result['new'],result['miss'],flush=True)
+    assert len(reports)==7
+    save('complete.json',dict(success=True,panels=len(reports),timing=False,semantic_checks_reused=True,protocol=json.loads((r/'protocol.json').read_text())))
+w=Path(tempfile.mkdtemp(prefix='capstone-canonical-operand-census-'))
 try:
     if hasattr(os,'sched_setaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     main(w)
