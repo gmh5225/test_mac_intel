@@ -1,0 +1,59 @@
+{
+  "previous_tested": "3e94887b6e9073601c96ff4bf1f033b1b25b0b83",
+  "current": "ca33d557398585a4d571be88bd0ec2ef34845089",
+  "changed_files": [
+    "docs/mips.md",
+    "docs/testing.md",
+    "include/neverd/ir/intrinsics/MIPS/MIPSHistoricalTiming.h",
+    "include/neverd/ir/intrinsics/MIPS/MIPSScalar.def",
+    "include/neverd/ir/intrinsics/MIPS/MIPSScalar.h",
+    "include/neverd/ir/low/MIPS/MIPSHistoricalSchedule.h",
+    "include/neverd/ir/low/MIPS/MIPSScalarFPExecution.h",
+    "include/neverd/ir/low/MIPS/MIPSSystemContext.h",
+    "include/neverd/lift/MIPS/MIPSLifter.h",
+    "lib/decode/Decoder.cpp",
+    "lib/ir/low/MIPS/NdOpEmulatorMIPS.cpp",
+    "lib/lift/MIPS/MIPSLifter.cpp",
+    "lib/loader/ELF/ELFMIPSProfile.cpp",
+    "unittests/lift/CMakeLists.txt",
+    "unittests/lift/mips/MIPSControlFlowTests.cpp",
+    "unittests/lift/mips/MIPSHistoricalScheduleTests.cpp",
+    "unittests/lift/mips/MIPSHistoricalTests.cpp",
+    "unittests/lift/mips/MIPSLoaderTests.cpp",
+    "unittests/lift/mips/MIPSPipelineTests.cpp"
+  ],
+  "reason": "MIPS historical ISA admission changed in the decoder and loader. Do not label the old product run an exact-head integration test.",
+  "source_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "source_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+  "unchanged_runtime_proof": {
+    "tested_source": {
+      "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+      "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+      "tree": "b3b21b7b2f16cca0a3633f679b521cbd6f29a3b1",
+      "sha256": "0fd44d99e6bca31335e1682754566912e8a3692e18478d6d55762a444c701f55",
+      "files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86EvexMemoryOutput.c",
+        "arch/X86/X86GenEvexMemoryOutput.inc",
+        "arch/X86/X86SimpleOutput.h",
+        "arch/X86/X86VectorOutput.c",
+        "arch/X86/X86VectorRegisterWriter.h",
+        "suite/synctools/x86_vector_output.cpp",
+        "tests/unit/x86_simple_output.c",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ]
+    },
+    "publication_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "publication_patch_sha256": "17b51fd087698dde8a645c52737271d7d4f060965d06dfa86bdf2b1d4dfea52c",
+    "changed_from_tested_tree": [
+      "docs/ARCHITECTURE.md"
+    ],
+    "identical_other_tree_entries": 4208,
+    "runtime_and_build_sources_identical": true,
+    "publication_qualified": false
+  },
+  "checks": "The same frozen product consumers, 34 tests per variant, seeded complete states, real PE/ELF/AVX32 inputs and all 96 balanced timing observations.",
+  "llvm": "Latest NeverSight main from source; prebuilt OFF; each variant must use identical managed dependency inputs.",
+  "publication_qualified": false
+}
