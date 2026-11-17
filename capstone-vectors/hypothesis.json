@@ -1,40 +1,739 @@
 {
-  "baseline": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-  "cause": "The register writer accepts ten parameters including a pointer to a caller-built register array. Clang 18 executed operand extraction and writer call setup accounts for 2.11% of the measured SSL64 format instruction count; this is not an available cycle saving estimate.",
-  "change": "Pass the same five scalar fields and three register numbers in one eight-byte value. Keep register formatting, detail loops, clearing, generated rows and admission unchanged.",
-  "domains": {
-    "prefix": [
-      2,
-      3,
-      4
-    ],
-    "ll": [
-      0,
-      1,
-      2
-    ],
-    "rex": "0x40..0x4f",
-    "first_ll": [
-      0,
-      1,
-      2
-    ],
-    "reg_count": [
-      2,
-      3
-    ],
-    "regs": "0..31; unused third lane initialized to zero"
+  "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+  "previous_source": {
+    "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "tree": "a5c77165954a354b5b52b61086ee5045e4f0ff2b",
+    "sha256": "ea952d29fd7a28c1bc8d7e6dd47681d4f0a4091ab2e60b40bb4cbc890888d100",
+    "files": [
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86EvexScan.c",
+      "arch/X86/X86FeatureExtension.h"
+    ]
   },
-  "risks": [
-    "Compiler may spill or reconstruct the compact value, offsetting caller savings.",
-    "GCC inline decisions and linked placement must be measured; R1166 established that unrolling alone changed GCC inline behavior and added work."
+  "previous_run": {
+    "id": 44139429612,
+    "head_sha": "32bb94387baceef193d974e034330b4337851692",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44139429612",
+    "run_attempt": 1
+  },
+  "hypothesis": "Move the packed EVEX helper call and result stores out of the shared fallback frame, with the existing seven-argument preserve-most boundary; group the C4 branch so PE32 C4 skips the new EVEX condition. Retain the raw EVEX instruction saving without the measured shared C4 register-save cost.",
+  "evidence": "Previous four-compiler traces attribute added PE32 AVX instructions to decodeScanResultFallback; Clang 18 expands saved-register set and frame around the new ordinary-ABI packed helper.",
+  "prior_focus": [
+    {
+      "host": "evex-direct-result-cost-ubuntu-22.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "ir_change": 70464,
+      "instruction_reduction": -0.007871426222358924,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            214182,
+            62772,
+            61656
+          ],
+          "after": [
+            284646,
+            71580,
+            70464
+          ],
+          "delta": [
+            70464,
+            8808,
+            8808
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            3348,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -3348,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            3348,
+            0,
+            0
+          ],
+          "delta": [
+            3348,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "ir_change": -6301574,
+      "instruction_reduction": 0.03870262678150527,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan",
+          "before": [
+            10319100,
+            2855576,
+            1714716
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -10319100,
+            -2855576,
+            -1714716
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            8963952,
+            1977868,
+            193058
+          ],
+          "delta": [
+            8963952,
+            1977868,
+            193058
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            11565502,
+            2820810,
+            3784396
+          ],
+          "after": [
+            4610902,
+            1012614,
+            1280740
+          ],
+          "delta": [
+            -6954600,
+            -1808196,
+            -2503656
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            7414408,
+            1916016,
+            1569516
+          ],
+          "after": [
+            11353162,
+            2383440,
+            2454216
+          ],
+          "delta": [
+            3938754,
+            467424,
+            884700
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1952624,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1952624,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1079320,
+            377636,
+            53966
+          ],
+          "after": [
+            1101364,
+            377636,
+            53966
+          ],
+          "delta": [
+            22044,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-22.04-gcc-1",
+      "case": "jpeg-avx2-i386",
+      "ir_change": 79272,
+      "instruction_reduction": -0.008756434331161023,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            285204,
+            89196,
+            70464
+          ],
+          "after": [
+            364476,
+            89196,
+            70464
+          ],
+          "delta": [
+            79272,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            2790,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -2790,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            2790,
+            0,
+            0
+          ],
+          "delta": [
+            2790,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "ir_change": -7223484,
+      "instruction_reduction": 0.04106551241442158,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan.constprop.0",
+          "before": [
+            10197258,
+            2440918,
+            1300058
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -10197258,
+            -2440918,
+            -1300058
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9685736,
+            1923902,
+            139092
+          ],
+          "delta": [
+            9685736,
+            1923902,
+            139092
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            13099922,
+            3638668,
+            3981128
+          ],
+          "after": [
+            5032586,
+            1274104,
+            1338380
+          ],
+          "delta": [
+            -8067336,
+            -2364564,
+            -2642748
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            10222282,
+            2623068,
+            2244676
+          ],
+          "after": [
+            13508236,
+            3186838,
+            3225972
+          ],
+          "delta": [
+            3285954,
+            563770,
+            981296
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1948950,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1948950,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1241218,
+            377636,
+            53966
+          ],
+          "after": [
+            1259588,
+            377636,
+            53966
+          ],
+          "delta": [
+            18370,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-24.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "ir_change": 70464,
+      "instruction_reduction": -0.007815276256440074,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            284646,
+            106812,
+            114504
+          ],
+          "after": [
+            355110,
+            133236,
+            132120
+          ],
+          "delta": [
+            70464,
+            26424,
+            17616
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            3348,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -3348,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            3348,
+            0,
+            0
+          ],
+          "delta": [
+            3348,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "ir_change": -6286462,
+      "instruction_reduction": 0.03694087967387516,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan",
+          "before": [
+            11292744,
+            2855576,
+            1714716
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -11292744,
+            -2855576,
+            -1714716
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9868248,
+            2082286,
+            297476
+          ],
+          "delta": [
+            9868248,
+            2082286,
+            297476
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            13915300,
+            4270104,
+            5233690
+          ],
+          "after": [
+            5430688,
+            1488264,
+            1756390
+          ],
+          "delta": [
+            -8484612,
+            -2781840,
+            -3477300
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            9333192,
+            3019812,
+            2891916
+          ],
+          "after": [
+            14886418,
+            3928036,
+            3997016
+          ],
+          "delta": [
+            5553226,
+            908224,
+            1105100
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1952624,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1952624,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1079320,
+            377636,
+            53966
+          ],
+          "after": [
+            1101364,
+            377636,
+            53966
+          ],
+          "delta": [
+            22044,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-24.04-gcc-1",
+      "case": "jpeg-avx2-i386",
+      "ir_change": 70464,
+      "instruction_reduction": -0.008022305433704746,
+      "changed_function_costs": [
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            285204,
+            89196,
+            70464
+          ],
+          "after": [
+            355668,
+            89196,
+            70464
+          ],
+          "delta": [
+            70464,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            2790,
+            0,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -2790,
+            0,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            2790,
+            0,
+            0
+          ],
+          "delta": [
+            2790,
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "host": "evex-direct-result-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "ir_change": -7015914,
+      "instruction_reduction": 0.04044021069239134,
+      "changed_function_costs": [
+        {
+          "function": "decodeEvexRegisterScan.constprop.0",
+          "before": [
+            10336350,
+            2440918,
+            1300058
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -10336350,
+            -2440918,
+            -1300058
+          ]
+        },
+        {
+          "function": "X86_scanEvexRegister",
+          "before": [
+            0,
+            0,
+            0
+          ],
+          "after": [
+            9703732,
+            1923902,
+            139092
+          ],
+          "delta": [
+            9703732,
+            1923902,
+            139092
+          ]
+        },
+        {
+          "function": "decodeScanResultGeneric",
+          "before": [
+            12835240,
+            3638668,
+            3981128
+          ],
+          "after": [
+            4906996,
+            1274104,
+            1338380
+          ],
+          "delta": [
+            -7928244,
+            -2364564,
+            -2642748
+          ]
+        },
+        {
+          "function": "decodeScanResultFallback",
+          "before": [
+            10186244,
+            2607914,
+            2242880
+          ],
+          "after": [
+            13661772,
+            3364742,
+            3417234
+          ],
+          "delta": [
+            3475528,
+            756828,
+            1174354
+          ]
+        },
+        {
+          "function": "X86_decodeScanFeatureExtension",
+          "before": [
+            1948950,
+            386116,
+            0
+          ],
+          "after": [
+            0,
+            0,
+            0
+          ],
+          "delta": [
+            -1948950,
+            -386116,
+            0
+          ]
+        },
+        {
+          "function": "X86_decodeFeatureExtension",
+          "before": [
+            1241218,
+            377636,
+            53966
+          ],
+          "after": [
+            1259588,
+            377636,
+            53966
+          ],
+          "delta": [
+            18370,
+            0,
+            0
+          ]
+        }
+      ]
+    }
   ],
-  "gates": [
-    "Full record and protected-page equality",
-    "Four compiler code generation and unchanged consumer instruction costs",
-    "Only then real native timing with A/A, PE32 and other architectures",
-    "Alternate configurations and actual NeverD product before publication"
-  ],
-  "source": "Study of local iced compact state and fixed-width formatting; no iced implementation copied.",
+  "validation": "Four compilers; same frozen consumers and corpus; full public/private records and guard-page checks; compare per-function Ir/Dr/Dw before any native timing claim.",
   "publication_qualified": false
 }
