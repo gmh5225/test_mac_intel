@@ -1,0 +1,755 @@
+{
+  "decision": "hold",
+  "publication_qualified": false,
+  "native_timing_started": false,
+  "semantic_checks_passed": true,
+  "evidence": "All eight intended SSL64 format/detail observations execute more instructions (0.31\u20130.75%). Clang 18 caller work falls, but callee extraction and spilling more than consume the saving; the writer stack reservation increases from 24 to 56 bytes. GCC 11 also adds work while retaining inlining.",
+  "instruction_scope": "Unmodified original consumer, two traversals; these counts reject the stated work-reduction hypothesis, not establish native throughput.",
+  "clang18_writer_stack_reservation": {
+    "integer": 24,
+    "context": 56
+  },
+  "focus": [
+    {
+      "host": "vector-operand-context-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 348919771,
+          "Dr": 75936443,
+          "Dw": 54594063,
+          "I1mr": 2144088,
+          "D1mr": 101015,
+          "D1mw": 495,
+          "ILmr": 2408,
+          "DLmr": 1561,
+          "DLmw": 0,
+          "Bc": 49225095,
+          "Bcm": 2029587,
+          "Bi": 1317544,
+          "Bim": 261406
+        },
+        "context": {
+          "Ir": 351194559,
+          "Dr": 75536191,
+          "Dw": 53963833,
+          "I1mr": 1828392,
+          "D1mr": 101015,
+          "D1mw": 495,
+          "ILmr": 2411,
+          "DLmr": 1561,
+          "DLmw": 0,
+          "Bc": 49225095,
+          "Bcm": 2009599,
+          "Bi": 1317544,
+          "Bim": 274881
+        }
+      },
+      "ir_change": 2274788,
+      "instruction_reduction": -0.006519515914734431,
+      "changed_function_costs": [
+        {
+          "function": "writeVectorRegisters",
+          "before": [
+            22826074,
+            3891538,
+            6660278
+          ],
+          "after": [
+            24378036,
+            3364588,
+            7187228
+          ],
+          "delta": [
+            1551962,
+            -526950,
+            526950
+          ]
+        },
+        {
+          "function": "writeVexRegisterOutput",
+          "before": [
+            4166956,
+            548878,
+            521442
+          ],
+          "after": [
+            4573270,
+            573718,
+            342210
+          ],
+          "delta": [
+            406314,
+            24840,
+            -179232
+          ]
+        },
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            18150024,
+            2483956,
+            2572864
+          ],
+          "after": [
+            18466536,
+            2585814,
+            1594916
+          ],
+          "delta": [
+            316512,
+            101858,
+            -977948
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-22.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 525528618,
+          "Dr": 117514162,
+          "Dw": 81627405,
+          "I1mr": 4494726,
+          "D1mr": 237362,
+          "D1mw": 2260,
+          "ILmr": 2642,
+          "DLmr": 2205,
+          "DLmw": 0,
+          "Bc": 77808975,
+          "Bcm": 3549686,
+          "Bi": 2433619,
+          "Bim": 262694
+        },
+        "context": {
+          "Ir": 528131190,
+          "Dr": 116586960,
+          "Dw": 80821525,
+          "I1mr": 4615171,
+          "D1mr": 237362,
+          "D1mw": 2260,
+          "ILmr": 2645,
+          "DLmr": 2205,
+          "DLmw": 0,
+          "Bc": 77808975,
+          "Bcm": 3632077,
+          "Bi": 2433619,
+          "Bim": 275180
+        }
+      },
+      "ir_change": 2602572,
+      "instruction_reduction": -0.004952293578044609,
+      "changed_function_costs": [
+        {
+          "function": "writeVectorRegisters",
+          "before": [
+            38880108,
+            7744048,
+            11074980
+          ],
+          "after": [
+            40759854,
+            6690148,
+            11426280
+          ],
+          "delta": [
+            1879746,
+            -1053900,
+            351300
+          ]
+        },
+        {
+          "function": "writeVexRegisterOutput",
+          "before": [
+            4166956,
+            548878,
+            521442
+          ],
+          "after": [
+            4573270,
+            573718,
+            342210
+          ],
+          "delta": [
+            406314,
+            24840,
+            -179232
+          ]
+        },
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            18150024,
+            2483956,
+            2572864
+          ],
+          "after": [
+            18466536,
+            2585814,
+            1594916
+          ],
+          "delta": [
+            316512,
+            101858,
+            -977948
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 353645096,
+          "Dr": 73669402,
+          "Dw": 54600321,
+          "I1mr": 1153129,
+          "D1mr": 83026,
+          "D1mw": 770,
+          "ILmr": 1986,
+          "DLmr": 1470,
+          "DLmw": 0,
+          "Bc": 59274372,
+          "Bcm": 2549596,
+          "Bi": 1417203,
+          "Bim": 209246
+        },
+        "context": {
+          "Ir": 355934212,
+          "Dr": 74008182,
+          "Dw": 55488777,
+          "I1mr": 928589,
+          "D1mr": 83026,
+          "D1mw": 770,
+          "ILmr": 1991,
+          "DLmr": 1470,
+          "DLmw": 0,
+          "Bc": 59274372,
+          "Bcm": 2446280,
+          "Bi": 1417203,
+          "Bim": 209247
+        }
+      },
+      "ir_change": 2289116,
+      "instruction_reduction": -0.006472918827071794,
+      "changed_function_costs": [
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            31356652,
+            4250894,
+            5314268
+          ],
+          "after": [
+            32919242,
+            4526780,
+            6032992
+          ],
+          "delta": [
+            1562590,
+            275886,
+            718724
+          ]
+        },
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            22187576,
+            4102026,
+            3727198
+          ],
+          "after": [
+            22914102,
+            4164920,
+            3896930
+          ],
+          "delta": [
+            726526,
+            62894,
+            169732
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-22.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 529162484,
+          "Dr": 110316742,
+          "Dw": 86013282,
+          "I1mr": 4386463,
+          "D1mr": 210980,
+          "D1mw": 1987,
+          "ILmr": 2259,
+          "DLmr": 2093,
+          "DLmw": 0,
+          "Bc": 92870159,
+          "Bcm": 4078248,
+          "Bi": 2279603,
+          "Bim": 252402
+        },
+        "context": {
+          "Ir": 531106564,
+          "Dr": 110607212,
+          "Dw": 86829946,
+          "I1mr": 3098833,
+          "D1mr": 210980,
+          "D1mw": 1987,
+          "ILmr": 2264,
+          "DLmr": 2093,
+          "DLmw": 0,
+          "Bc": 92870159,
+          "Bcm": 4055632,
+          "Bi": 2279603,
+          "Bim": 211121
+        }
+      },
+      "ir_change": 1944080,
+      "instruction_reduction": -0.003673881007785207,
+      "changed_function_costs": [
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            38495056,
+            6192284,
+            8503296
+          ],
+          "after": [
+            39816564,
+            6456372,
+            9210222
+          ],
+          "delta": [
+            1321508,
+            264088,
+            706926
+          ]
+        },
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            25344454,
+            4945486,
+            4980892
+          ],
+          "after": [
+            25967026,
+            4971868,
+            5090630
+          ],
+          "delta": [
+            622572,
+            26382,
+            109738
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 342161248,
+          "Dr": 76017377,
+          "Dw": 54013856,
+          "I1mr": 22039,
+          "D1mr": 60066,
+          "D1mw": 132,
+          "ILmr": 1955,
+          "DLmr": 1495,
+          "DLmw": 0,
+          "Bc": 49415146,
+          "Bcm": 2198445,
+          "Bi": 1392297,
+          "Bim": 267485
+        },
+        "context": {
+          "Ir": 343226136,
+          "Dr": 75000035,
+          "Dw": 53569110,
+          "I1mr": 20839,
+          "D1mr": 60066,
+          "D1mw": 132,
+          "ILmr": 1941,
+          "DLmr": 1495,
+          "DLmw": 0,
+          "Bc": 49415146,
+          "Bcm": 2090829,
+          "Bi": 1392297,
+          "Bim": 298117
+        }
+      },
+      "ir_change": 1064888,
+      "instruction_reduction": -0.00311224022657286,
+      "changed_function_costs": [
+        {
+          "function": "writeVectorRegisters",
+          "before": [
+            22385480,
+            3989052,
+            6660278
+          ],
+          "after": [
+            23761792,
+            3110802,
+            7362878
+          ],
+          "delta": [
+            1376312,
+            -878250,
+            702600
+          ]
+        },
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            17609532,
+            2406502,
+            2572864
+          ],
+          "after": [
+            17017362,
+            2267410,
+            1629590
+          ],
+          "delta": [
+            -592170,
+            -139092,
+            -943274
+          ]
+        },
+        {
+          "function": "writeVexRegisterOutput",
+          "before": [
+            3992326,
+            548878,
+            521442
+          ],
+          "after": [
+            4273072,
+            548878,
+            317370
+          ],
+          "delta": [
+            280746,
+            0,
+            -204072
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-24.04-clang-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 514776062,
+          "Dr": 116891672,
+          "Dw": 81067360,
+          "I1mr": 73245,
+          "D1mr": 89917,
+          "D1mw": 291,
+          "ILmr": 2182,
+          "DLmr": 2141,
+          "DLmw": 0,
+          "Bc": 77878351,
+          "Bcm": 4346085,
+          "Bi": 2508370,
+          "Bim": 402036
+        },
+        "context": {
+          "Ir": 516621686,
+          "Dr": 115776816,
+          "Dw": 80973914,
+          "I1mr": 85959,
+          "D1mr": 89917,
+          "D1mw": 291,
+          "ILmr": 2171,
+          "DLmr": 2141,
+          "DLmw": 0,
+          "Bc": 77878351,
+          "Bcm": 4307043,
+          "Bi": 2508370,
+          "Bim": 417831
+        }
+      },
+      "ir_change": 1845624,
+      "instruction_reduction": -0.003585294919949078,
+      "changed_function_costs": [
+        {
+          "function": "writeVectorRegisters",
+          "before": [
+            35844208,
+            7259992,
+            10723680
+          ],
+          "after": [
+            38001256,
+            6284228,
+            11777580
+          ],
+          "delta": [
+            2157048,
+            -975764,
+            1053900
+          ]
+        },
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            17609532,
+            2406502,
+            2572864
+          ],
+          "after": [
+            17017362,
+            2267410,
+            1629590
+          ],
+          "delta": [
+            -592170,
+            -139092,
+            -943274
+          ]
+        },
+        {
+          "function": "writeVexRegisterOutput",
+          "before": [
+            3992326,
+            548878,
+            521442
+          ],
+          "after": [
+            4273072,
+            548878,
+            317370
+          ],
+          "delta": [
+            280746,
+            0,
+            -204072
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "totals": {
+        "integer": {
+          "Ir": 347834980,
+          "Dr": 75721950,
+          "Dw": 56236896,
+          "I1mr": 773414,
+          "D1mr": 93039,
+          "D1mw": 543,
+          "ILmr": 1972,
+          "DLmr": 1470,
+          "DLmw": 0,
+          "Bc": 57013198,
+          "Bcm": 2537495,
+          "Bi": 1128296,
+          "Bim": 212778
+        },
+        "context": {
+          "Ir": 350266386,
+          "Dr": 75370650,
+          "Dw": 56993594,
+          "I1mr": 803653,
+          "D1mr": 93039,
+          "D1mw": 543,
+          "ILmr": 1986,
+          "DLmr": 1470,
+          "DLmw": 0,
+          "Bc": 57188848,
+          "Bcm": 2473238,
+          "Bi": 1128296,
+          "Bim": 209245
+        }
+      },
+      "ir_change": 2431406,
+      "instruction_reduction": -0.006990113530272346,
+      "changed_function_costs": [
+        {
+          "function": "writeVectorRegisters",
+          "before": [
+            21046406,
+            3813402,
+            6835928
+          ],
+          "after": [
+            24864340,
+            3462102,
+            7714178
+          ],
+          "delta": [
+            3817934,
+            -351300,
+            878250
+          ]
+        },
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            19970030,
+            3016964,
+            2487738
+          ],
+          "after": [
+            18533840,
+            3016964,
+            2464142
+          ],
+          "delta": [
+            -1436190,
+            0,
+            -23596
+          ]
+        },
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            16949868,
+            3579604,
+            3007134
+          ],
+          "after": [
+            16999530,
+            3579604,
+            2909178
+          ],
+          "delta": [
+            49662,
+            0,
+            -97956
+          ]
+        }
+      ]
+    },
+    {
+      "host": "vector-operand-context-cost-ubuntu-24.04-gcc-1",
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "totals": {
+        "integer": {
+          "Ir": 524225788,
+          "Dr": 113591355,
+          "Dw": 87295430,
+          "I1mr": 2930021,
+          "D1mr": 202394,
+          "D1mw": 1310,
+          "ILmr": 2235,
+          "DLmr": 2100,
+          "DLmw": 0,
+          "Bc": 91447383,
+          "Bcm": 4129972,
+          "Bi": 2157801,
+          "Bim": 212827
+        },
+        "context": {
+          "Ir": 528167496,
+          "Dr": 112986269,
+          "Dw": 88052128,
+          "I1mr": 3528150,
+          "D1mr": 202394,
+          "D1mw": 1310,
+          "ILmr": 2254,
+          "DLmr": 2100,
+          "DLmw": 0,
+          "Bc": 92126467,
+          "Bcm": 4034039,
+          "Bi": 2157801,
+          "Bim": 209294
+        }
+      },
+      "ir_change": 3941708,
+      "instruction_reduction": -0.007519103581375086,
+      "changed_function_costs": [
+        {
+          "function": "writeVectorRegisters",
+          "before": [
+            32108778,
+            7338128,
+            10899330
+          ],
+          "after": [
+            37437014,
+            6733042,
+            11777580
+          ],
+          "delta": [
+            5328236,
+            -605086,
+            878250
+          ]
+        },
+        {
+          "function": "writeEvexOutput",
+          "before": [
+            19970030,
+            3016964,
+            2487738
+          ],
+          "after": [
+            18533840,
+            3016964,
+            2464142
+          ],
+          "delta": [
+            -1436190,
+            0,
+            -23596
+          ]
+        },
+        {
+          "function": "X86_writeVectorOutput",
+          "before": [
+            17783498,
+            3741816,
+            3347492
+          ],
+          "after": [
+            17833160,
+            3741816,
+            3249536
+          ],
+          "delta": [
+            49662,
+            0,
+            -97956
+          ]
+        }
+      ]
+    }
+  ],
+  "source": {
+    "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "tree": "027813bd883e535b935f8b2e82d2d8359bb23e13",
+    "sha256": "aa3220ae9687eb63a7ad8e7a6a5a10b6e37d2b5b486b96eab846a65834dc8b71",
+    "files": [
+      "arch/X86/X86VectorOutput.c"
+    ]
+  },
+  "run": {
+    "id": 44137320718,
+    "head_sha": "d40b5a7884a2025cbb8a6bca4cb60676877b2b85",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44137320718",
+    "run_attempt": 1
+  },
+  "next": "Retain original runtime. Further output work should remove construction operations rather than compress already-needed transient values at a function boundary."
+}
