@@ -1,7 +1,7 @@
-name: Measure shared packed VEX2 raw decoding against iced
+name: Measure EVEX packed move memory output against iced
 on:
   push:
-    branches: [codex/capstone-vex2-packed-scan-pilot]
+    branches: [codex/capstone-evex-memory-packed-admission-pilot]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -40,6 +40,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex2-packed-scan-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-memory-packed-admission-pilot-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
