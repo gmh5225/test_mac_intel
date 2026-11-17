@@ -1,0 +1,584 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+    "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+    "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+    "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86EvexAdmission.h",
+      "arch/X86/X86EvexScan.c",
+      "arch/X86/X86FeatureExtension.h",
+      "arch/X86/X86GenEvexScan.inc",
+      "arch/X86/X86VectorOutput.c",
+      "suite/synctools/x86_vector_output.cpp",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
+    ],
+    "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+  },
+  "run": {
+    "id": 44113734594,
+    "head_sha": "7137ef52b28c46c0c58944ba20c945eb9939cdba",
+    "conclusion": "success",
+    "status": "completed",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44113734594",
+    "run_attempt": 1
+  },
+  "profiles": [
+    {
+      "name": "evex-canonical-scan-ubuntu-22.04-clang",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86DisassemblerDecoder.c",
+            "arch/X86/X86EvexAdmission.h",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexScan.inc",
+            "arch/X86/X86VectorOutput.c",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+        },
+        "base": {
+          "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+          "tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "sha256": "d08e7d9c954a1e717183caee24849a5cbad17404d5df28c6e06e706575ca1189",
+          "files": [
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86Mapping.c",
+            "docs/ARCHITECTURE.md"
+          ]
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 6946816 inputs",
+        "owned": "equal private records, cursor and errors for 6946816 inputs",
+        "guard": "equal public records for 3145728 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension",
+        "changed_call_sites": [
+          [
+            ".text",
+            447008,
+            4,
+            -4,
+            "X86_decodeScanFeatureExtension"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            4,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_scan_text",
+            "SHT_PROGBITS",
+            6,
+            321,
+            16,
+            "cefbbf4a3a0b1dc5aa07a3a465580d9560ae43e7fb2398b507b22798c2c3ec8a"
+          ],
+          [
+            ".cs_x86_evex_scan_rodata",
+            "SHT_PROGBITS",
+            2,
+            464,
+            16,
+            "81872380834b3c84e7a91b99ef31be56cd5e4a2513eafd0cef74abecefbbd266"
+          ],
+          [
+            ".eh_frame",
+            "SHT_AMD64_UNWIND",
+            2,
+            136,
+            8,
+            "dc8cee4d373d6b01d0965e627a06dddeb8910dd6440409e658da3c2149032121"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1519,
+        "readonly_symbols": 1516,
+        "new_entries": [
+          [
+            "X86_decodeScanFeatureExtension",
+            "t",
+            2939824,
+            40
+          ],
+          [
+            "decodeEvexRegisterScan",
+            "t",
+            2939872,
+            273
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+      },
+      "cleanup": {
+        "bytes": 1380456752,
+        "removed": true
+      }
+    },
+    {
+      "name": "evex-canonical-scan-ubuntu-22.04-gcc",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86DisassemblerDecoder.c",
+            "arch/X86/X86EvexAdmission.h",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexScan.inc",
+            "arch/X86/X86VectorOutput.c",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+        },
+        "base": {
+          "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+          "tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "sha256": "d08e7d9c954a1e717183caee24849a5cbad17404d5df28c6e06e706575ca1189",
+          "files": [
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86Mapping.c",
+            "docs/ARCHITECTURE.md"
+          ]
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 6946816 inputs",
+        "owned": "equal private records, cursor and errors for 6946816 inputs",
+        "guard": "equal public records for 3145728 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension",
+        "changed_call_sites": [
+          [
+            ".text",
+            276911,
+            4,
+            -4,
+            "X86_decodeScanFeatureExtension"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".data",
+            "SHT_PROGBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".bss",
+            "SHT_NOBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_scan_text",
+            "SHT_PROGBITS",
+            6,
+            331,
+            16,
+            "0dc69a87d2827ac281f084cc4e93b5eba6e2b3745ff853e01197be20741b9b39"
+          ],
+          [
+            ".cs_x86_evex_scan_rodata",
+            "SHT_PROGBITS",
+            2,
+            452,
+            32,
+            "4836b0bd53b5c2bd6c58affb4c3993a857a4e760c99e45687ad48c40960c157a"
+          ],
+          [
+            ".note.gnu.property",
+            "SHT_NOTE",
+            2,
+            32,
+            8,
+            "d6cd20a8414b70fa5c66ad93440a165a54500b1d36fd8cbf6a34914c90f5bf54"
+          ],
+          [
+            ".eh_frame",
+            "SHT_PROGBITS",
+            2,
+            128,
+            8,
+            "943a4d30d935b2be63a7c15f8369e1244519ff0f105040106019c8850ffb4463"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1358,
+        "readonly_symbols": 1726,
+        "new_entries": [
+          [
+            "X86_decodeScanFeatureExtension",
+            "t",
+            2743312,
+            43
+          ],
+          [
+            "decodeEvexRegisterScan.constprop.0",
+            "t",
+            2743024,
+            283
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+      },
+      "cleanup": {
+        "bytes": 1363349835,
+        "removed": true
+      }
+    },
+    {
+      "name": "evex-canonical-scan-ubuntu-24.04-clang",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86DisassemblerDecoder.c",
+            "arch/X86/X86EvexAdmission.h",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexScan.inc",
+            "arch/X86/X86VectorOutput.c",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+        },
+        "base": {
+          "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+          "tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "sha256": "d08e7d9c954a1e717183caee24849a5cbad17404d5df28c6e06e706575ca1189",
+          "files": [
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86Mapping.c",
+            "docs/ARCHITECTURE.md"
+          ]
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 6946816 inputs",
+        "owned": "equal private records, cursor and errors for 6946816 inputs",
+        "guard": "equal public records for 3145728 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension",
+        "changed_call_sites": [
+          [
+            ".text",
+            323714,
+            4,
+            -4,
+            "X86_decodeScanFeatureExtension"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            4,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_scan_text",
+            "SHT_PROGBITS",
+            6,
+            355,
+            16,
+            "d9b2d5b59af9f2709e6c8c4000dac13db4b89c545448aa00fe1f5cdac49c5219"
+          ],
+          [
+            ".cs_x86_evex_scan_rodata",
+            "SHT_PROGBITS",
+            2,
+            464,
+            16,
+            "81872380834b3c84e7a91b99ef31be56cd5e4a2513eafd0cef74abecefbbd266"
+          ],
+          [
+            ".eh_frame",
+            "SHT_AMD64_UNWIND",
+            2,
+            136,
+            8,
+            "3836dc861392e14abe850af4c6f06fa2e41c55f260f701468c9246a3b83c0ed3"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1522,
+        "readonly_symbols": 1508,
+        "new_entries": [
+          [
+            "X86_decodeScanFeatureExtension",
+            "t",
+            2327216,
+            40
+          ],
+          [
+            "decodeEvexRegisterScan",
+            "t",
+            2327264,
+            307
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+      },
+      "cleanup": {
+        "bytes": 1327421771,
+        "removed": true
+      }
+    },
+    {
+      "name": "evex-canonical-scan-ubuntu-24.04-gcc",
+      "complete": {
+        "source": {
+          "parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
+          "baseline_tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "tree": "ad448f5bd1a30d34794f20db1d8feddc9c35d989",
+          "sha256": "5c3d6119d32ff16846165367c7cb1aa166a9504ad93569a26d0dcd824f999ffb",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86DisassemblerDecoder.c",
+            "arch/X86/X86EvexAdmission.h",
+            "arch/X86/X86EvexScan.c",
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86GenEvexScan.inc",
+            "arch/X86/X86VectorOutput.c",
+            "suite/synctools/x86_vector_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ],
+          "remote_parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "compound_sha256": "e00a198a75cf1a343297e8ead31c58a02cde52f664d32932c6888e732f54bd0c"
+        },
+        "base": {
+          "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+          "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+          "tree": "069f80f9b98844dc796040cfc11517e695b43869",
+          "sha256": "d08e7d9c954a1e717183caee24849a5cbad17404d5df28c6e06e706575ca1189",
+          "files": [
+            "arch/X86/X86FeatureExtension.h",
+            "arch/X86/X86Mapping.c",
+            "docs/ARCHITECTURE.md"
+          ]
+        },
+        "semantic_checks_complete": true,
+        "generated_outputs_reproduced": true,
+        "unit_checks": 68,
+        "records": "equal public records, cursor and errors for 6946816 inputs",
+        "owned": "equal private records, cursor and errors for 6946816 inputs",
+        "guard": "equal public records for 3145728 protected-page extents",
+        "layout_passed": true,
+        "timing_qualified": false,
+        "foundation_product_pending": true
+      },
+      "decoder": {
+        "all_allocated_section_bytes_sizes_alignments_identical": true,
+        "only_relocation_change": "X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension",
+        "changed_call_sites": [
+          [
+            ".text",
+            278325,
+            4,
+            -4,
+            "X86_decodeScanFeatureExtension"
+          ]
+        ]
+      },
+      "leaf": {
+        "sections": [
+          [
+            ".text",
+            "SHT_PROGBITS",
+            6,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".data",
+            "SHT_PROGBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".bss",
+            "SHT_NOBITS",
+            3,
+            0,
+            1,
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          ],
+          [
+            ".cs_x86_evex_scan_text",
+            "SHT_PROGBITS",
+            6,
+            331,
+            16,
+            "bf0e4ae8f56dec5b9fcc03d246ced9b8626d08178e087b7c0ba2a38867126425"
+          ],
+          [
+            ".cs_x86_evex_scan_rodata",
+            "SHT_PROGBITS",
+            2,
+            452,
+            32,
+            "4836b0bd53b5c2bd6c58affb4c3993a857a4e760c99e45687ad48c40960c157a"
+          ],
+          [
+            ".note.gnu.property",
+            "SHT_NOTE",
+            2,
+            32,
+            8,
+            "d6cd20a8414b70fa5c66ad93440a165a54500b1d36fd8cbf6a34914c90f5bf54"
+          ],
+          [
+            ".eh_frame",
+            "SHT_PROGBITS",
+            2,
+            128,
+            8,
+            "2b000d62bf990f66a79130cae09a9fb4faf281937d8b44405a0d2f160749ef7a"
+          ]
+        ],
+        "no_ordinary_code_or_data": true
+      },
+      "linked": {
+        "original_text_positions_identical": true,
+        "original_readonly_positions_identical": true,
+        "text_symbols": 1362,
+        "readonly_symbols": 1727,
+        "new_entries": [
+          [
+            "X86_decodeScanFeatureExtension",
+            "t",
+            2694944,
+            43
+          ],
+          [
+            "decodeEvexRegisterScan.constprop.0",
+            "t",
+            2694656,
+            279
+          ]
+        ],
+        "passed": true
+      },
+      "compiler": {
+        "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+      },
+      "cleanup": {
+        "bytes": 1360694592,
+        "removed": true
+      }
+    }
+  ],
+  "unit_checks": 272,
+  "cases_per_compiler": {
+    "public_records": 6946816,
+    "private_records": 6946816,
+    "protected_page_extents": 3145728
+  },
+  "original_layout_preserved": true,
+  "runtime_delta": "Only the existing raw decoder call relocation changes; added scan functions and tables occupy separate sections",
+  "performance_pending": true,
+  "configurations_pending": true,
+  "publication_qualified": false
+}
