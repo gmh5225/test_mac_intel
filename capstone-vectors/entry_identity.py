@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import re
 from elftools.elf.elffile import ELFFile
 
 
@@ -52,15 +53,27 @@ def linked_proof(baseline, candidate):
     # every other sized text symbol. The new public entry is the only addition.
     text = symbols(baseline, 'tTwW')
     expected = sorted((('X86_decodeFeatureExtensionSlow' if n == 'X86_decodeFeatureExtension' else n),
-                       k, a, z) for n, k, a, z in text)
+                       ('t' if n == 'X86_decodeFeatureExtension' else k), a, z)
+                      for n, k, a, z in text)
     actual = symbols(candidate, 'tTwW')
     new_entry = [x for x in actual if x[0] == 'X86_decodeFeatureExtension']
     assert len(new_entry) == 1
     actual = sorted(x for x in actual if x[0] != 'X86_decodeFeatureExtension')
     assert actual == expected, dict(missing=sorted(set(expected)-set(actual))[:20],
                                    changed=sorted(set(actual)-set(expected))[:20])
-    original_data = sorted(symbols(baseline, 'rR'))
-    actual_data = sorted(x for x in symbols(candidate, 'rR') if x[0] != 'evex_feature_maps')
+    def constant_identity(row):
+        name, kind, address, size = row
+        # These suffixes are compiler-assigned labels, not runtime names.
+        # The full multiset of addresses/sizes is still compared, and the
+        # corresponding object constant-section payloads must match exactly.
+        if re.fullmatch(r'CSWTCH\.\d+', name):
+            name = 'CSWTCH.<compiler-id>'
+        elif re.fullmatch(r'reltable\.X86_featureExtensionInstructionName\.\d+', name):
+            name = 'reltable.X86_featureExtensionInstructionName.<compiler-id>'
+        return name, kind, address, size
+    original_data = sorted(map(constant_identity, symbols(baseline, 'rR')))
+    actual_data = sorted(constant_identity(x) for x in symbols(candidate, 'rR')
+                         if x[0] != 'evex_feature_maps')
     assert actual_data == original_data, dict(
         missing=sorted(set(original_data)-set(actual_data))[:20],
         changed=sorted(set(actual_data)-set(original_data))[:20])
@@ -68,4 +81,6 @@ def linked_proof(baseline, candidate):
                 original_readonly_symbol_positions_identical=True,
                 text_symbols=len(expected), readonly_symbols=len(original_data),
                 added_entry=new_entry,
+                symbol_label_changes=['The renamed full decoder is intentionally hidden/local (nm t)',
+                                      'Compiler-generated CSWTCH and instruction-name reltable serial suffixes'],
                 scope='Original object section bytes plus linked symbol positions; final linked relocation bytes may differ because calls now target the new entry.')
