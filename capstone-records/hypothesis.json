@@ -1,0 +1,12 @@
+{
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "evidence": [
+    "../round1394-isolated-alias-trie/profile-review.json",
+    "../round1397-isolated-alias-native/native-review.json",
+    "../round1397-isolated-alias-native/mixed-review.json"
+  ],
+  "cause": "R1397 shows useful AArch64/MIPS gains but 25 unrelated native/mixed losses. Removing two call arguments changed caller size and linked positions; Clang additionally outlined the shared trie parser into ordinary text.",
+  "change": "Preserve the existing four-argument caller shape and every original alias table. Keep the dedicated-build trie path unchanged. The new private lookup entries retain the existing calling convention, and the outlined parser uses the dedicated lookup section.",
+  "gates": "Require entire AArch64/MIPS object disassembly identical after replacing only the callee symbol name; shared Mapping and every unrelated runtime object remain byte identical. Measure all common text and data positions, full records, malformed alias strings, raw and full output controls.",
+  "publication_qualified": false
+}
