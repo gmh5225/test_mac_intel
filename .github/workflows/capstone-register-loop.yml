@@ -1,7 +1,7 @@
-name: Validate EVEX memory output with Make, Xcode and MSVC
+name: Verify Windows dynamic-runtime build through a single dependency graph
 on:
   push:
-    branches: [codex/capstone-evex-move-memory-build]
+    branches: [codex/capstone-evex-memory-build-graph]
     paths: [capstone-access-loop/**, .github/workflows/capstone-register-loop.yml]
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
         include:
           - { host: windows-latest, compiler: MD, profile: full }
     runs-on: ${{ matrix.host }}
-    timeout-minutes: 70
+    timeout-minutes: 50
     env:
       TOOLCHAIN: ${{ matrix.compiler }}
       PROFILE: ${{ matrix.profile }}
@@ -32,6 +32,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-move-memory-${{ matrix.host }}-${{ matrix.compiler }}-${{ matrix.profile }}
+          name: evex-memory-build-graph-${{ matrix.host }}-${{ matrix.compiler }}-${{ matrix.profile }}
           path: evidence/
           retention-days: 14
