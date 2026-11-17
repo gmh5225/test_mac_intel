@@ -93,6 +93,24 @@ int main(int argc, char **argv) {
         ++local.counts["bare_62"];
         if (before < 6) throw std::runtime_error("short EVEX");
         const bool memory = begin[5] < 0xc0;
+        if (memory) {
+          const cs_x86_op *operand = nullptr;
+          for(unsigned i=0;i<detail.op_count;++i)if(detail.operands[i].type==X86_OP_MEM) {operand=&detail.operands[i];break;}
+          if(!operand)throw std::runtime_error("EVEX memory shape without canonical memory operand");
+          std::string address_shape = operand->mem.base==X86_REG_RIP ? "rip" :
+            operand->mem.index!=X86_REG_INVALID ? "indexed" :
+            operand->mem.base==X86_REG_INVALID ? "absolute" : "base";
+          ++local.counts[std::string("evex/address/")+name+"/"+address_shape+"/disp"+std::to_string(detail.encoding.disp_size)];
+          if((begin[1]&15)==2 && (begin[2]&0x7f)==0x7d &&
+             (begin[3]&0x9f)==8 && begin[4]==0x1a && (begin[3]>>5)>0 && (begin[3]>>5)<3) {
+            unsigned mod=begin[5]>>6, rm=begin[5]&7;
+            bool sib=rm==4;
+            unsigned rxb=(~unsigned(begin[1])>>5)&7;
+            bool current=mod<=1 && (mod || rm!=5) && (!sib || (before>=7 && !(rxb&2) && begin[6]==0x24));
+            ++local.counts[current ? "evex/broadcast/current-output-admitted" : "evex/broadcast/current-output-missed"];
+          }
+        }
+
         const bool pp = (begin[2] & 7) != 5;
         const bool mask = (begin[3] & 0x87) != 0;
         const bool broadcast = (begin[3] & 0x10) != 0;
