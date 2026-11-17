@@ -1,7 +1,7 @@
-name: Verify compact vector operands and compare unchanged-consumer instruction costs
+name: Verify prechecked memory dispatch and compare unchanged-consumer instruction costs
 on:
   push:
-    branches: [codex/capstone-vector-operand-context-cost]
+    branches: [codex/capstone-evex-memory-prechecked-dispatch-cost]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vector-operand-context-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: evex-memory-prechecked-dispatch-cost-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

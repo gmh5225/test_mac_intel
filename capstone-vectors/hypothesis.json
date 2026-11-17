@@ -1,40 +1,13 @@
 {
-  "baseline": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-  "cause": "The register writer accepts ten parameters including a pointer to a caller-built register array. Clang 18 executed operand extraction and writer call setup accounts for 2.11% of the measured SSL64 format instruction count; this is not an available cycle saving estimate.",
-  "change": "Pass the same five scalar fields and three register numbers in one eight-byte value. Keep register formatting, detail loops, clearing, generated rows and admission unchanged.",
-  "domains": {
-    "prefix": [
-      2,
-      3,
-      4
-    ],
-    "ll": [
-      0,
-      1,
-      2
-    ],
-    "rex": "0x40..0x4f",
-    "first_ll": [
-      0,
-      1,
-      2
-    ],
-    "reg_count": [
-      2,
-      3
-    ],
-    "regs": "0..31; unused third lane initialized to zero"
-  },
-  "risks": [
-    "Compiler may spill or reconstruct the compact value, offsetting caller savings.",
-    "GCC inline decisions and linked placement must be measured; R1166 established that unrolling alone changed GCC inline behavior and added work."
+  "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+  "cause": "R1384 matched placement controls reproduce the held formatter AArch64 raw-decode loss. R1375 grows the old broadcast function and moves downstream text; the new output logic is never executed by the affected architecture.",
+  "change": "Keep the isolated memory dispatcher, and express the existing six-byte caller precondition in the private broadcast entry. The previous static compiler had already removed this check; the first external prototype reintroduced two instructions and grew downstream text by eight bytes on Apple Clang.",
+  "preceding": "round1389-evex-output-isolated-dispatch/local-lowering.json",
+  "constraints": [
+    "No synthetic padding or binary patching in production source",
+    "Preserve old broadcast acceptance, final output and all failure fallbacks",
+    "Keep every prior loss; machine-code identity and throughput are not assumed from source organization",
+    "All calls to the prechecked broadcast come from the size >= 6 memory-only branch; guard-page validation must remain exact."
   ],
-  "gates": [
-    "Full record and protected-page equality",
-    "Four compiler code generation and unchanged consumer instruction costs",
-    "Only then real native timing with A/A, PE32 and other architectures",
-    "Alternate configurations and actual NeverD product before publication"
-  ],
-  "source": "Study of local iced compact state and fixed-width formatting; no iced implementation copied.",
   "publication_qualified": false
 }
