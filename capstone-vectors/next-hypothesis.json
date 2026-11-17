@@ -1,0 +1,10 @@
+{
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "evidence": "../round1409-output-mode-native/decision.json",
+  "cause": "R1407 reduced scalar output work but changed ordinary text extent and moved hundreds to thousands of common functions. Native and mixed fixed-image regressions prevent publication.",
+  "change": "Keep the existing generic output body and call ABI, instantiate the same source body with constant 32-bit mode in an isolated Clang code section, and replace only the iterator call target with a noinline mode selector in that section. GCC retains the original path. Start from the newly published memory-output baseline, so this is already a composition test.",
+  "semantic_owner": "One shared body include contains all admission, validation, output, detail and relative-target behavior. The test-only hit shim invokes the selected production dispatcher, not the unselected generic body.",
+  "gates": "First inspect ordinary text and caller lowering. Verify full records, protected-page extents, unchanged GCC objects, and complete compiler cost traces before native timing. The extra generic-mode selector may cost more; retain that result if observed.",
+  "publication_qualified": false,
+  "lowering_correction": "Attempt 1 passed semantic checks but inlined the generic body into the isolated dispatcher. Preserve that evidence, add noinline only for the existing Clang generic function, and retest the actual ordinary text identity."
+}
