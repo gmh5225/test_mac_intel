@@ -9,73 +9,254 @@
       "arch/X86/X86Mapping.c"
     ]
   },
-  "profiles": [
+  "cases": {
+    "clang": {
+      "arm-sort": [
+        0
+      ],
+      "amd64-ls": [
+        0
+      ]
+    },
+    "gcc": {
+      "mips64el-ls": [
+        0,
+        1,
+        2
+      ],
+      "putty-32-0.85": [
+        2
+      ],
+      "putty-64-0.85": [
+        2
+      ],
+      "amd64-ls": [
+        2
+      ],
+      "arm64-ls": [
+        2
+      ]
+    }
+  },
+  "replicas_per_compiler": 2,
+  "compiler_profiles": [
+    "ubuntu-22.04 gcc",
+    "ubuntu-22.04 clang"
+  ],
+  "cycles": 41,
+  "calibration_cpu_ms": 150,
+  "consumer_unchanged": true,
+  "original_flags": [
     {
-      "host": "ubuntu-22.04",
-      "compiler": "clang"
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "gain": 0.9883092305787609,
+      "aa": 0.9982767180037319,
+      "ci95": [
+        0.985915981344599,
+        0.9988454513079141
+      ],
+      "aa_ci95": [
+        0.9918615033754002,
+        1.01710825045234
+      ],
+      "vs_previous": 1.015221857263896,
+      "previous_ci95": [
+        1.0080416031032196,
+        1.0174704393619693
+      ]
     },
     {
-      "host": "ubuntu-22.04",
-      "compiler": "gcc"
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44085081426",
+      "case": "arm-sort",
+      "mode": 0,
+      "launch": "images",
+      "gain": 0.9964728415117478,
+      "aa": 0.9863266286634377,
+      "ci95": [
+        0.9845345054725498,
+        1.0063575974240004
+      ],
+      "aa_ci95": [
+        0.9739269740877716,
+        0.9989420536828568
+      ],
+      "vs_previous": 0.9952999792922985,
+      "previous_ci95": [
+        0.9898825206906171,
+        1.013666748882185
+      ]
     },
     {
-      "host": "ubuntu-24.04",
-      "compiler": "clang"
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-clang-44085081426",
+      "case": "amd64-ls",
+      "mode": 0,
+      "launch": "images",
+      "gain": 0.9991238403769696,
+      "aa": 0.945176673533542,
+      "ci95": [
+        0.9532765743762982,
+        1.0331213741409786
+      ],
+      "aa_ci95": [
+        0.9296212965494038,
+        0.9966820713354663
+      ],
+      "vs_previous": 1.0070610234297597,
+      "previous_ci95": [
+        0.9862244146664703,
+        1.055512772558252
+      ]
     },
     {
-      "host": "ubuntu-24.04",
-      "compiler": "gcc"
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "images",
+      "gain": 1.0062843623556612,
+      "aa": 0.9773743271599307,
+      "ci95": [
+        1.0014158844957324,
+        1.009261302466783
+      ],
+      "aa_ci95": [
+        0.970172842615622,
+        0.9873787359137678
+      ],
+      "vs_previous": 1.0095581040874873,
+      "previous_ci95": [
+        1.0081777329359523,
+        1.016534258176392
+      ]
+    },
+    {
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "images",
+      "gain": 1.001074006543947,
+      "aa": 0.9840034802063266,
+      "ci95": [
+        0.9842120017416304,
+        1.0212808273667462
+      ],
+      "aa_ci95": [
+        0.9799810507656102,
+        1.0047314964691652
+      ],
+      "vs_previous": 1.2074389087373778,
+      "previous_ci95": [
+        1.1928199673743525,
+        1.2334965157229565
+      ]
+    },
+    {
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "gain": 0.9950831788344942,
+      "aa": 0.9889071359960339,
+      "ci95": [
+        0.9804079895342359,
+        1.0027259887876752
+      ],
+      "aa_ci95": [
+        0.984814914557117,
+        0.9995868110073548
+      ],
+      "vs_previous": 0.9977760391318543,
+      "previous_ci95": [
+        0.9920190422850742,
+        1.0108176116144392
+      ]
+    },
+    {
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "images",
+      "gain": 1.0282453637660485,
+      "aa": 1.020515763901866,
+      "ci95": [
+        1.0093609906060945,
+        1.0464352815893536
+      ],
+      "aa_ci95": [
+        1.0128660670172518,
+        1.0304299330087296
+      ],
+      "vs_previous": 1.0010911925175372,
+      "previous_ci95": [
+        0.9822344568282529,
+        1.0145311328338749
+      ]
+    },
+    {
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "images",
+      "gain": 1.0166088844635852,
+      "aa": 1.0206965965730679,
+      "ci95": [
+        1.0126586062976117,
+        1.028588989048648
+      ],
+      "aa_ci95": [
+        1.0092170554152429,
+        1.0260009341652994
+      ],
+      "vs_previous": 0.9885911096760305,
+      "previous_ci95": [
+        0.9846327331181995,
+        0.9990605522266719
+      ]
+    },
+    {
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "images",
+      "gain": 1.0239310662470253,
+      "aa": 1.0227437123525307,
+      "ci95": [
+        1.017984594252471,
+        1.0281197452745456
+      ],
+      "aa_ci95": [
+        1.0129995779357812,
+        1.0258649976480427
+      ],
+      "vs_previous": 0.9868625094822205,
+      "previous_ci95": [
+        0.9858342418107252,
+        0.9960756355835204
+      ]
+    },
+    {
+      "host": "evex-extension-isolated-entry-images-four-ubuntu-22.04-gcc-44085081426",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "gain": 1.0145069442655055,
+      "aa": 1.014238979043177,
+      "ci95": [
+        1.0062530628246593,
+        1.0251358473540009
+      ],
+      "aa_ci95": [
+        1.0030612510746946,
+        1.0289382818421513
+      ],
+      "vs_previous": 1.1408855288756576,
+      "previous_ci95": [
+        1.1336932400690398,
+        1.152146254575349
+      ]
     }
   ],
-  "cases": [
-    "arm-ls",
-    "arm-sort",
-    "arm-cp",
-    "mips64el-ls",
-    "putty-32-0.85",
-    "putty-64-0.85",
-    "amd64-ls",
-    "arm64-ls"
-  ],
-  "modes": [
-    "scan",
-    "format",
-    "detail"
-  ],
-  "cycles": 21,
-  "calibration_process_cpu_ms": 80,
-  "controls": [
-    "identical baseline copy",
-    "original images",
-    "same inode/size, disabled ASLR"
-  ],
-  "purpose": "Verify PE32/64 and ARM/AArch64/MIPS regressions for compact EVEX negative admission; no iced comparison in this panel.",
-  "publication_qualified": false,
-  "scope": "R1362 isolated code entry versus production and R1361 on frozen PE32/64, ARM, AArch64 and MIPS. Original executable/constant object bytes and linked symbol positions must match production before timing; unwind metadata excluded from constant-byte comparison.",
-  "previous": {
-    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
-    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
-    "tree": "068c0e51218da27aad1837c5552288798ec433ed",
-    "sha256": "b6eb1604dceca935b940639e848b986c47a8a7bb902f54e571d90a2d59f4c4c4",
-    "files": [
-      "arch/X86/X86Mapping.c"
-    ],
-    "complete": true,
-    "records": "equal public records, cursor and errors for 4390912 inputs",
-    "private_records": "equal private records, cursor and errors for 4390912 inputs",
-    "guard": "equal public records for 3145728 protected-page extents",
-    "unit_checks": 79,
-    "changed_runtime_objects": [
-      "arch/X86/X86Mapping.c.o"
-    ],
-    "added_runtime_objects": [],
-    "validation_scope": "Apple Clang complete public/private records and public guard-page extents, original full extension decoder body retained behind a small early rejection entry; common selectors unchanged; native instruction-cost and timing qualification pending.",
-    "publication_qualified": false
-  },
-  "variants": [
-    "base",
-    "aa",
-    "previous",
-    "scan"
-  ]
+  "scope": "Repeat only logical workloads with a below-threshold observation or out-of-range identical-binary control. Preserve the original consumer and both launch methods, without changing source, code-byte or symbol-position gates. Keep all initial observations."
 }

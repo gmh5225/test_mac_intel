@@ -23,7 +23,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
    write('cpu',{'model':next(x.split(':',1)[1].strip() for x in Path('/proc/cpuinfo').read_text().splitlines() if x.startswith(('model name','CPU part')))})
   mixed=os.environ['BUILD_ARCHS']=='four';assert mixed
   all_inputs=corpus.prepare(r,t,e,run)
-  choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls'} if mixed else set())
+  target_modes=json.loads((r/'replication-cases.json').read_text())[cc]
+  choices=set(target_modes)
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
   run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
@@ -83,11 +84,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
    return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
-   for mode in (0,1,2):
+   for mode in target_modes[x['name']]:
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*150e6/warm['cpu_ns'])))
      runs=[];reference=None;keys=['base','aa','previous','scan']
-     for k in range(21):
+     for k in range(41):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
@@ -96,6 +97,6 @@ with tempfile.TemporaryDirectory(prefix='capstone-evex-extension-isolated-entry-
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
+  write('complete',dict(focused_replication=True,cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))

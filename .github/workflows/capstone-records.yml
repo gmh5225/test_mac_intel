@@ -1,7 +1,7 @@
-name: Verify unchanged original code and constant layout before PE and backend timing
+name: Repeat remaining mixed-backend timing and identical-binary control flags
 on:
   push:
-    branches: [codex/capstone-evex-extension-isolated-entry-mixed]
+    branches: [codex/capstone-evex-extension-isolated-entry-mixed-replication]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,10 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-22.04, cc: gcc, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 1 }
+          - { host: ubuntu-22.04, cc: clang, archs: four, replica: 2 }
+          - { host: ubuntu-22.04, cc: gcc, archs: four, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, archs: four, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-extension-isolated-entry-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: evex-extension-isolated-entry-mixed-replication-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
