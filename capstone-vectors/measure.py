@@ -83,6 +83,8 @@ def main(w):
         target=w/('run-'+label);run(['clang++',obj,b/'libcapstone.a',ad/'target/release/libiced_compare.a','-lpthread','-ldl','-lm','-Wl,-Map,'+str(p/'evidence'/(label+'-link.map')),'-o',target],'link-'+label);exe[label]=target
         (p/'evidence'/(label+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',target]))
         (p/'evidence'/(label+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',target]))
+        with gzip.open(p/'evidence'/(label+'-linked-disassembly.gz'),'wb')as stream:
+            stream.write(sp.check_output(['objdump','-d',target]))
 
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
@@ -102,7 +104,7 @@ def main(w):
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64', 'jpeg-avx2-i386', 'libssl3t64-amd64', 'libzstd1-amd64', 'libssl3t64-i386'): continue
+        if name not in ('jpeg-avx2-i386', 'libssl3t64-amd64'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
@@ -126,9 +128,9 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(60e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','scan','iced']+(['fast'] if mode else [])
-                for i in range(21):
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(120e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','scan']
+                for i in range(31):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -140,12 +142,47 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']=md('iced','scan')
-                    row['vs_fast']=md('fast','scan') if mode else None
+                    row['vs_iced']=None
+                    row['vs_fast']=None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
+    assert len(reported)==6*len(launches)
+    # Collect the original consumer lambda by symbol, without inserting client
+    # request instructions or changing the original native consumer object.
+    costs=[]
+    for name,bits,f,spans,source in deb.prepare(w):
+        if name!='libssl3t64-amd64': continue
+        intervals=w/(name+'-cost.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
+        audit=[list(map(int,x.split()))for x in sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True).splitlines()]
+        views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
+        sel=[a[:3]for a,v in zip(audit,views)if a[1]==a[5] and v[1]>=8 and v[1]>=0.15*v[0]]
+        assert len(sel)==manifest[name]['simd-functions']['functions']
+        intervals.write_text(''.join('%d %d %d\n'%tuple(v) for v in sel))
+        native_values={}
+        for mode in (0,1,2):
+            for label in ('integer','scan'):
+                raw=w/(label+'-'+str(mode)+'.callgrind')
+                tail=['capstone',str(mode),'1',str(f),str(intervals),str(bits)]
+                # -demangle=no makes the symbol selector independent of the
+                # installed Valgrind C++ demangler's lambda spelling.
+                run(['valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no',
+                     '--toggle-collect=_ZZ4mainENK3$_0clEj','--cache-sim=yes','--branch-sim=yes',
+                     '--dump-instr=yes','--collect-jumps=yes','--callgrind-out-file='+str(raw),
+                     exe[label],*tail],'cost-'+label+'-'+str(mode))
+                log=(p/'evidence'/('cost-'+label+'-'+str(mode)+'.log')).read_text()
+                result=next(list(map(int,line.split())) for line in log.splitlines() if len(line.split())==6 and all(x.isdigit() for x in line.split()))
+                if mode in native_values: assert result[2:]==native_values[mode]
+                else:native_values[mode]=result[2:]
+                content=raw.read_text();events=next(line[8:].split() for line in content.splitlines() if line.startswith('events: '))
+                counts=list(map(int,next(line[8:].split() for line in content.splitlines() if line.startswith('totals: '))))
+                assert len(events)==len(counts) and counts[0]>0
+                costs.append(dict(case=name,mode=mode,variant=label,events=dict(zip(events,counts)),result=result[2:],collected_traversals=2))
+                with gzip.open(p/'evidence'/(label+'-'+str(mode)+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
+                raw.unlink()
+                save('instruction-costs.json',costs)
+    assert len(costs)==6
+    save('cost-protocol.json',dict(symbol='_ZZ4mainENK3$_0clEj',consumer_unchanged=True,traversals=2,scope='The original benchmark warm traversal and one timed traversal are collected. Simulated cache events do not establish native hardware causes.'))
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
 w=Path(tempfile.mkdtemp(prefix='capstone-vex32-gate-pilot-'))
 try:
