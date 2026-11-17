@@ -37,7 +37,13 @@ try:
                      '-DCAPSTONE_BUILD_CSTOOL=OFF', '-DCAPSTONE_BUILD_CSTEST=OFF',
                      '-DCAPSTONE_BUILD_LEGACY_TESTS=OFF'])
     run('build', ['cmake', '--build', b, '--target', 'capstone_static', '--parallel', '4'])
-    run('consumer', ['clang++', '-O2', '-std=c++17', '-I', source, '-I', source/'include',
+    generated=(source/'arch/X86/X86GenVectorOutput.inc').read_text()
+    marker='static const struct VectorOutputRow vex_indexed_rows'
+    assert generated.count(marker)==1
+    prefix=generated[:generated.index(marker)]
+    (w/'evex_rows.inc').write_text(prefix)
+    save('canonical-rows',dict(owner='arch/X86/X86GenVectorOutput.inc',full_sha256=sha(generated.encode()),evex_prefix_sha256=sha(prefix.encode()),method='Verbatim EVEX prefix from the frozen generated owner, excluding unrelated VEX and padding rows.'))
+    run('consumer', ['clang++', '-O2', '-std=c++17', '-I', source, '-I', w, '-I', source/'include',
                      r/'census.cpp', b/'libcapstone.a', '-lm', '-o', w/'census'])
     manifest = json.loads((r/'inputs.json').read_text())
     results = {}

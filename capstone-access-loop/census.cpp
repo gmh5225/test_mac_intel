@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include "arch/X86/X86GenVectorOutput.inc"
+#include "evex_rows.inc"
 
 struct Stats {
   uint64_t valid = 0, invalid = 0, vectors = 0, functions = 0;
