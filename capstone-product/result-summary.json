@@ -1,0 +1,2039 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44153485112,
+    "head_sha": "e20ff6f4854f6a465f21208e60b9ce7393b700c8",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44153485112",
+    "run_attempt": 1
+  },
+  "inputs": {
+    "neverd": "b63022bd057effd15766bdebe9028a103a3b7f3b",
+    "capstone": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+    "variants": {
+      "evex-transfer-plan": {
+        "source": "round1372-evex-transfer-qualification",
+        "patch": "evex-transfer-plan.patch",
+        "patch_sha256": "3e160884f4ae567420757430b217159ccb88e3940476cb7d420885db49555756",
+        "tree": "59f9eeed7df5f4fda55c4bc8af3b550616e17139",
+        "changed": [
+          "X86EvexScan.c.o"
+        ],
+        "added": []
+      }
+    },
+    "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+    "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
+    "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+    "scope": "Integration of the frozen EVEX transfer plan into updated NeverD dev after MIPS and type work. Latest LLVM fork built from source; 34 decoder tests per variant, complete product states, and real-case semantic signatures. No native throughput claim from this run.",
+    "qualification_pending": [
+      "current-dev integration"
+    ],
+    "validation_entry": {
+      "source": {
+        "parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+        "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+        "tree": "59f9eeed7df5f4fda55c4bc8af3b550616e17139",
+        "sha256": "3e160884f4ae567420757430b217159ccb88e3940476cb7d420885db49555756",
+        "files": [
+          "arch/X86/X86EvexAdmission.h",
+          "arch/X86/X86EvexScan.c",
+          "arch/X86/X86GenEvexScan.inc",
+          "suite/synctools/x86_vector_output.cpp"
+        ]
+      },
+      "native_run": {
+        "id": 44140571362,
+        "head_sha": "e8fec29384e2e691d4343aa8bcf25883df15832f",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44140571362",
+        "run_attempt": 1
+      },
+      "mixed_run": {
+        "id": 44133467263,
+        "head_sha": "479dc371e9e0c63b2b13e4ac40363038c702ae19",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44133467263",
+        "run_attempt": 1
+      },
+      "profiles_run": {
+        "id": 44143273965,
+        "head_sha": "c80645e3771911d23794698e8cc86a771e442f63",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44143273965",
+        "run_attempt": 1
+      },
+      "original_native_flags": {
+        "losses": {
+          "scan": [
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "libzstd1-amd64",
+              "panel": "all-functions",
+              "mode": "detail",
+              "launch": "images",
+              "aa": 0.9852673522428529,
+              "aa_ci95": [
+                0.979896590633168,
+                0.9965874904584437
+              ],
+              "variant": "scan",
+              "gain": 0.9847930244323423,
+              "ci95": [
+                0.967299645503435,
+                1.0036059626384235
+              ],
+              "vs_iced": 1.1863015522048113,
+              "vs_fast": 0.7174520017412972
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "libzstd1-amd64",
+              "panel": "simd-functions",
+              "mode": "format",
+              "launch": "images",
+              "aa": 1.004053905993207,
+              "aa_ci95": [
+                1.0016060116386274,
+                1.0127016685732317
+              ],
+              "variant": "scan",
+              "gain": 0.9844267534429658,
+              "ci95": [
+                0.9774214472403991,
+                0.9912484670100565
+              ],
+              "vs_iced": 1.1862388163755373,
+              "vs_fast": 0.5644854498392031
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "jpeg-avx2-i386",
+              "panel": "simd-functions",
+              "mode": "scan",
+              "launch": "images",
+              "aa": 1.0036286106726255,
+              "aa_ci95": [
+                0.9597794455506203,
+                1.018639708438018
+              ],
+              "variant": "scan",
+              "gain": 0.9818410122669757,
+              "ci95": [
+                0.9556723670220695,
+                1.0123414196575553
+              ],
+              "vs_iced": 0.2514909262964898,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "jpeg-avx2-i386",
+              "panel": "simd-functions",
+              "mode": "detail",
+              "launch": "images",
+              "aa": 0.9975934527759345,
+              "aa_ci95": [
+                0.9907759278925057,
+                1.0097088206212281
+              ],
+              "variant": "scan",
+              "gain": 0.9881859429843335,
+              "ci95": [
+                0.9813779929812093,
+                1.0118651017374816
+              ],
+              "vs_iced": 0.6174529242885517,
+              "vs_fast": 0.381943956738535
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "libssl3t64-i386",
+              "panel": "all-functions",
+              "mode": "format",
+              "launch": "images",
+              "aa": 1.000331394064364,
+              "aa_ci95": [
+                0.9942565176359561,
+                1.0045386218565504
+              ],
+              "variant": "scan",
+              "gain": 0.9855676872672913,
+              "ci95": [
+                0.9799003134619186,
+                0.9978814020474944
+              ],
+              "vs_iced": 1.6273794804087993,
+              "vs_fast": 0.8031695403737368
+            }
+          ],
+          "merge": [
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-clang-1",
+              "case": "libjpeg62-turbo-amd64",
+              "panel": "simd-functions",
+              "mode": "scan",
+              "launch": "images",
+              "aa": 0.9965231683418673,
+              "aa_ci95": [
+                0.9922280765428082,
+                1.0018750865182537
+              ],
+              "variant": "merge",
+              "gain": 0.9846948991340039,
+              "ci95": [
+                0.9827057984969175,
+                0.9912754103673052
+              ],
+              "vs_iced": 0.9113954009815889,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-clang-1",
+              "case": "libzstd1-amd64",
+              "panel": "simd-functions",
+              "mode": "scan",
+              "launch": "images",
+              "aa": 0.9985127487679761,
+              "aa_ci95": [
+                0.9932813149966596,
+                1.0054687400176328
+              ],
+              "variant": "merge",
+              "gain": 0.9890017976630379,
+              "ci95": [
+                0.9842859998001399,
+                0.9915456671544167
+              ],
+              "vs_iced": 0.9713765449806058,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "libzstd1-amd64",
+              "panel": "all-functions",
+              "mode": "detail",
+              "launch": "images",
+              "aa": 0.9852673522428529,
+              "aa_ci95": [
+                0.979896590633168,
+                0.9965874904584437
+              ],
+              "variant": "merge",
+              "gain": 0.9835984487343993,
+              "ci95": [
+                0.9779321044660338,
+                0.9978234901837207
+              ],
+              "vs_iced": 1.1987299384578256,
+              "vs_fast": 0.7239621789403508
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+              "case": "jpeg-avx2-i386",
+              "panel": "simd-functions",
+              "mode": "detail",
+              "launch": "images",
+              "aa": 0.9975934527759345,
+              "aa_ci95": [
+                0.9907759278925057,
+                1.0097088206212281
+              ],
+              "variant": "merge",
+              "gain": 0.9830085722518369,
+              "ci95": [
+                0.968314955203308,
+                1.0016036937826025
+              ],
+              "vs_iced": 0.6187456926257753,
+              "vs_fast": 0.3816993228641406
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-24.04-gcc-1",
+              "case": "libjpeg62-turbo-amd64",
+              "panel": "all-functions",
+              "mode": "format",
+              "launch": "images",
+              "aa": 1.0009645937358147,
+              "aa_ci95": [
+                0.9994170087691597,
+                1.0033710785826848
+              ],
+              "variant": "merge",
+              "gain": 0.9881416296674865,
+              "ci95": [
+                0.986664861032557,
+                0.9911198145631844
+              ],
+              "vs_iced": 1.3717495935740658,
+              "vs_fast": 0.6412932138284251
+            },
+            {
+              "host": "evex-transfer-comparison-ubuntu-24.04-gcc-1",
+              "case": "libzstd1-amd64",
+              "panel": "simd-functions",
+              "mode": "format",
+              "launch": "images",
+              "aa": 0.9969341827748908,
+              "aa_ci95": [
+                0.9863037485620022,
+                1.0025083888002642
+              ],
+              "variant": "merge",
+              "gain": 0.9877990169306391,
+              "ci95": [
+                0.9845217391304347,
+                0.9959908236836356
+              ],
+              "vs_iced": 1.3176521739130433,
+              "vs_fast": 0.613537594723854
+            }
+          ]
+        },
+        "aa": [
+          {
+            "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+            "case": "libzstd1-amd64",
+            "panel": "all-functions",
+            "mode": "scan",
+            "launch": "images",
+            "aa": 1.0108813657647204,
+            "aa_ci95": [
+              0.9961465629160431,
+              1.015152677285472
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+            "case": "libzstd1-amd64",
+            "panel": "all-functions",
+            "mode": "detail",
+            "launch": "images",
+            "aa": 0.9852673522428529,
+            "aa_ci95": [
+              0.979896590633168,
+              0.9965874904584437
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+            "case": "libzstd1-amd64",
+            "panel": "simd-functions",
+            "mode": "scan",
+            "launch": "images",
+            "aa": 0.989123988647435,
+            "aa_ci95": [
+              0.9629629629629628,
+              1.0190568152809687
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-ubuntu-22.04-gcc-1",
+            "case": "jpeg-avx2-i386",
+            "panel": "simd-functions",
+            "mode": "detail",
+            "launch": "same-file-fixed",
+            "aa": 1.01170919105716,
+            "aa_ci95": [
+              1.0003185919955915,
+              1.0197576419800631
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-ubuntu-24.04-gcc-1",
+            "case": "libssl3t64-i386",
+            "panel": "all-functions",
+            "mode": "scan",
+            "launch": "images",
+            "aa": 0.9876463918424956,
+            "aa_ci95": [
+              0.9829618272595039,
+              0.9927187539571991
+            ]
+          }
+        ]
+      },
+      "original_mixed_flags": {
+        "losses": {
+          "scan": [
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm-ls",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 0.9970509533181432,
+              "aa_ci95": [
+                0.9929210041340838,
+                1.0005531887836205
+              ],
+              "variant": "scan",
+              "gain": 0.9761663070236757,
+              "ci95": [
+                0.9674282729635838,
+                0.9839383309725153
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm-ls",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 1.0035072550249344,
+              "aa_ci95": [
+                0.9905390684713855,
+                1.0146965780292485
+              ],
+              "variant": "scan",
+              "gain": 0.947758040897594,
+              "ci95": [
+                0.9254793583862788,
+                0.9656041925700408
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm-sort",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 0.9996524045238907,
+              "aa_ci95": [
+                0.9976378361540857,
+                1.0050618308143002
+              ],
+              "variant": "scan",
+              "gain": 0.9763119578879251,
+              "ci95": [
+                0.9694006269749085,
+                0.9818940707846538
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm-sort",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 0.9990904625907263,
+              "aa_ci95": [
+                0.98975828601729,
+                1.014078805053868
+              ],
+              "variant": "scan",
+              "gain": 0.9468588064046579,
+              "ci95": [
+                0.9419193748850482,
+                0.9656738570041624
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm-cp",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 1.002954670124171,
+              "aa_ci95": [
+                0.992114179484873,
+                1.006418773508992
+              ],
+              "variant": "scan",
+              "gain": 0.9753738795501558,
+              "ci95": [
+                0.9708482017090807,
+                0.9804792841382692
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm-cp",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 1.006363262595275,
+              "aa_ci95": [
+                0.9870643302480839,
+                1.023566755844917
+              ],
+              "variant": "scan",
+              "gain": 0.9479441562094202,
+              "ci95": [
+                0.9363832190449151,
+                0.9694336639783189
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "mips64el-ls",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 0.9874947921674198,
+              "aa_ci95": [
+                0.983635714558923,
+                1.0010257988408473
+              ],
+              "variant": "scan",
+              "gain": 0.9454831031102939,
+              "ci95": [
+                0.9368090002246413,
+                0.9492359770197144
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "putty-32-0.85",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 1.0210158215120757,
+              "aa_ci95": [
+                1.0120303547818421,
+                1.0299848734873487
+              ],
+              "variant": "scan",
+              "gain": 0.8695482571307137,
+              "ci95": [
+                0.8573070038685836,
+                0.8782138103697971
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "putty-64-0.85",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 1.0097660300522238,
+              "aa_ci95": [
+                0.9961671612265084,
+                1.0114131982908687
+              ],
+              "variant": "scan",
+              "gain": 0.8755541689928081,
+              "ci95": [
+                0.8550988933683271,
+                0.8807041965651912
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "amd64-ls",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 0.9997187666982273,
+              "aa_ci95": [
+                0.9920617089792556,
+                1.0121870606746175
+              ],
+              "variant": "scan",
+              "gain": 0.8756705382025549,
+              "ci95": [
+                0.87005918879854,
+                0.882549235032714
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm64-ls",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 0.9999745117405295,
+              "aa_ci95": [
+                0.9946374303691429,
+                1.0048337845689772
+              ],
+              "variant": "scan",
+              "gain": 0.9561559036599706,
+              "ci95": [
+                0.9493964194070272,
+                0.9580821608652013
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+              "case": "arm64-ls",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 0.9979456938117047,
+              "aa_ci95": [
+                0.9915602746250625,
+                1.0066125311097789
+              ],
+              "variant": "scan",
+              "gain": 0.9499010026726392,
+              "ci95": [
+                0.9414473989512274,
+                0.9577123170078295
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
+              "case": "mips64el-ls",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 0.9970072906867357,
+              "aa_ci95": [
+                0.9843787257553287,
+                1.0062754705151575
+              ],
+              "variant": "scan",
+              "gain": 0.988523805074055,
+              "ci95": [
+                0.9818957610559477,
+                0.9923799164138088
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-24.04-clang-44133467263",
+              "case": "arm-sort",
+              "panel": null,
+              "mode": 0,
+              "launch": "images",
+              "aa": 0.9987772010381314,
+              "aa_ci95": [
+                0.9938344242602535,
+                1.0074009338255066
+              ],
+              "variant": "scan",
+              "gain": 0.9876490656598372,
+              "ci95": [
+                0.9841196348899017,
+                1.0050028032949498
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            }
+          ],
+          "merge": [
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
+              "case": "arm-ls",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 0.9976694792157572,
+              "aa_ci95": [
+                0.9945232808829682,
+                1.0032067859728975
+              ],
+              "variant": "merge",
+              "gain": 0.9811586635547531,
+              "ci95": [
+                0.9767475657607906,
+                0.981933009751745
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
+              "case": "arm-sort",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 0.9971704786606932,
+              "aa_ci95": [
+                0.9945807552805632,
+                1.0023198153967008
+              ],
+              "variant": "merge",
+              "gain": 0.9750062918709028,
+              "ci95": [
+                0.972489127136644,
+                0.9792767849651817
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
+              "case": "arm-cp",
+              "panel": null,
+              "mode": 1,
+              "launch": "images",
+              "aa": 1.0025898193720888,
+              "aa_ci95": [
+                0.9987307461907557,
+                1.004256332410632
+              ],
+              "variant": "merge",
+              "gain": 0.977154380826185,
+              "ci95": [
+                0.9757140263649514,
+                0.9817956699742442
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            },
+            {
+              "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+              "case": "arm64-ls",
+              "panel": null,
+              "mode": 2,
+              "launch": "images",
+              "aa": 0.9986328087033713,
+              "aa_ci95": [
+                0.9969405054986457,
+                1.0005550114267059
+              ],
+              "variant": "merge",
+              "gain": 0.9899437597840581,
+              "ci95": [
+                0.988318629660635,
+                0.9911206564944224
+              ],
+              "vs_iced": null,
+              "vs_fast": null
+            }
+          ]
+        },
+        "aa": [
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 0.9874947921674198,
+            "aa_ci95": [
+              0.983635714558923,
+              1.0010257988408473
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 1.0678812711550847,
+            "aa_ci95": [
+              1.0595439568409928,
+              1.0794588202559823
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+            "case": "putty-32-0.85",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.017647752596262,
+            "aa_ci95": [
+              1.0118359974601923,
+              1.0207759261689193
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+            "case": "putty-32-0.85",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 1.0210158215120757,
+            "aa_ci95": [
+              1.0120303547818421,
+              1.0299848734873487
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+            "case": "putty-64-0.85",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.0125111546316425,
+            "aa_ci95": [
+              1.0045311913877593,
+              1.0246986965250777
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-clang-44133467263",
+            "case": "arm64-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 1.0105708376165765,
+            "aa_ci95": [
+              0.996336691898527,
+              1.01519819650573
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-22.04-gcc-44133467263",
+            "case": "mips64el-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 0.9887730653141239,
+            "aa_ci95": [
+              0.9855556733101011,
+              0.9949236049256603
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-clang-44133467263",
+            "case": "arm-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 0.9897172699441743,
+            "aa_ci95": [
+              0.9830031712284181,
+              0.9929951343448143
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-clang-44133467263",
+            "case": "arm-cp",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 0.9869988902970729,
+            "aa_ci95": [
+              0.9832683820365612,
+              0.9925853910667807
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-ls",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9856864758616779,
+            "aa_ci95": [
+              0.9818816384643492,
+              0.9927700068647147
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-ls",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.0106094808126411,
+            "aa_ci95": [
+              1.0072819317069521,
+              1.0135886620973613
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-ls",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 1.0199578412561143,
+            "aa_ci95": [
+              1.0119544233391384,
+              1.0220662594555237
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-sort",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9869150207173543,
+            "aa_ci95": [
+              0.9806605478982855,
+              0.9895881786959099
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-sort",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.0110883572249139,
+            "aa_ci95": [
+              1.0088541828702984,
+              1.0137390025671063
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-sort",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 1.016329834230249,
+            "aa_ci95": [
+              1.0131612141050805,
+              1.0199077280823274
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-cp",
+            "panel": null,
+            "mode": 0,
+            "launch": "images",
+            "aa": 0.9888940247604532,
+            "aa_ci95": [
+              0.983837178219976,
+              0.9933408230767783
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-cp",
+            "panel": null,
+            "mode": 1,
+            "launch": "images",
+            "aa": 1.012522545735635,
+            "aa_ci95": [
+              1.0085320960196333,
+              1.0161315220747145
+            ]
+          },
+          {
+            "host": "evex-transfer-comparison-images-four-ubuntu-24.04-gcc-44133467263",
+            "case": "arm-cp",
+            "panel": null,
+            "mode": 2,
+            "launch": "images",
+            "aa": 1.016682584374186,
+            "aa_ci95": [
+              1.0109783622000883,
+              1.0217763868708318
+            ]
+          }
+        ]
+      },
+      "unresolved": [
+        "mixed four-launch and executed-PC investigation",
+        "portable build completion"
+      ],
+      "publication_qualified": false,
+      "rationale": "Product validation is independent additional evidence and can proceed while the frozen native outliers are investigated. It does not override or erase any failed observation."
+    },
+    "timing_protocol": {
+      "cycles": 32,
+      "calibration_cpu_ms": 100,
+      "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+      "consumer_unchanged": true,
+      "publication_qualified": false
+    },
+    "public_state_scope": "Seeded complete-state product probe plus separate four-compiler 12697344 public records, 12697344 private records and 5898240 protected-page extents per compiler.",
+    "preceding_timing_run": {
+      "id": 44145142818,
+      "head_sha": "16d1c61fa814fda8c27ac154c4563006b46cb32a",
+      "status": "in_progress",
+      "conclusion": null,
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44145142818",
+      "run_attempt": 1
+    }
+  },
+  "tests": {
+    "base": [
+      "100% tests passed, 0 tests failed out of 34"
+    ],
+    "evex-transfer-plan": [
+      "100% tests passed, 0 tests failed out of 34"
+    ]
+  },
+  "states": {
+    "base": "40068 15880932718584834093",
+    "evex-transfer-plan": "40068 15880932718584834093"
+  },
+  "case_equivalence": {
+    "checks": [
+      {
+        "case": "mips64el-ls",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            29004,
+            0,
+            8860006801696042565,
+            11803516
+          ],
+          "evex-transfer-plan": [
+            29004,
+            0,
+            8860006801696042565,
+            11803516
+          ]
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            29004,
+            0,
+            8860006801696042565,
+            12242202
+          ],
+          "evex-transfer-plan": [
+            29004,
+            0,
+            8860006801696042565,
+            12242202
+          ]
+        }
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            29004,
+            0,
+            8860006801696042565,
+            25019836
+          ],
+          "evex-transfer-plan": [
+            29004,
+            0,
+            8860006801696042565,
+            25019836
+          ]
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            282906,
+            3,
+            7225451397909626697,
+            116594087
+          ],
+          "evex-transfer-plan": [
+            282906,
+            3,
+            7225451397909626697,
+            116594087
+          ]
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            282906,
+            3,
+            7225451397909626697,
+            120526573
+          ],
+          "evex-transfer-plan": [
+            282906,
+            3,
+            7225451397909626697,
+            120526573
+          ]
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            282906,
+            3,
+            7225451397909626697,
+            140847373
+          ],
+          "evex-transfer-plan": [
+            282906,
+            3,
+            7225451397909626697,
+            140847373
+          ]
+        }
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            282906,
+            3,
+            7225451397909626697,
+            116594087
+          ],
+          "evex-transfer-plan": [
+            282906,
+            3,
+            7225451397909626697,
+            116594087
+          ]
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            259694,
+            3515,
+            3307435160057796829,
+            105938608
+          ],
+          "evex-transfer-plan": [
+            259694,
+            3515,
+            3307435160057796829,
+            105938608
+          ]
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            259694,
+            3515,
+            3307435160057796829,
+            109944730
+          ],
+          "evex-transfer-plan": [
+            259694,
+            3515,
+            3307435160057796829,
+            109944730
+          ]
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            259694,
+            3515,
+            3307435160057796829,
+            142788562
+          ],
+          "evex-transfer-plan": [
+            259694,
+            3515,
+            3307435160057796829,
+            142788562
+          ]
+        }
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            259694,
+            3515,
+            3307435160057796829,
+            105938608
+          ],
+          "evex-transfer-plan": [
+            259694,
+            3515,
+            3307435160057796829,
+            105938608
+          ]
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            22523,
+            0,
+            11761163436424087017,
+            9451953
+          ],
+          "evex-transfer-plan": [
+            22523,
+            0,
+            11761163436424087017,
+            9451953
+          ]
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            22523,
+            0,
+            11761163436424087017,
+            9793609
+          ],
+          "evex-transfer-plan": [
+            22523,
+            0,
+            11761163436424087017,
+            9793609
+          ]
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            22523,
+            0,
+            11761163436424087017,
+            12259953
+          ],
+          "evex-transfer-plan": [
+            22523,
+            0,
+            11761163436424087017,
+            12259953
+          ]
+        }
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            22523,
+            0,
+            11761163436424087017,
+            9451953
+          ],
+          "evex-transfer-plan": [
+            22523,
+            0,
+            11761163436424087017,
+            9451953
+          ]
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            23973,
+            0,
+            8816264938314345267,
+            12930965
+          ],
+          "evex-transfer-plan": [
+            23973,
+            0,
+            8816264938314345267,
+            12930965
+          ]
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            23973,
+            0,
+            8816264938314345267,
+            13255975
+          ],
+          "evex-transfer-plan": [
+            23973,
+            0,
+            8816264938314345267,
+            13255975
+          ]
+        }
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            23973,
+            0,
+            8816264938314345267,
+            20352585
+          ],
+          "evex-transfer-plan": [
+            23973,
+            0,
+            8816264938314345267,
+            20352585
+          ]
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            25450,
+            35,
+            919594885373331023,
+            1817242
+          ],
+          "evex-transfer-plan": [
+            25450,
+            35,
+            919594885373331023,
+            1817242
+          ]
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            25450,
+            35,
+            919594885373331023,
+            2163438
+          ],
+          "evex-transfer-plan": [
+            25450,
+            35,
+            919594885373331023,
+            2163438
+          ]
+        }
+      },
+      {
+        "case": "arm-cp",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            25450,
+            35,
+            919594885373331023,
+            5187896
+          ],
+          "evex-transfer-plan": [
+            25450,
+            35,
+            919594885373331023,
+            5187896
+          ]
+        }
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            18445,
+            0,
+            4428522272880934003,
+            10187143
+          ],
+          "evex-transfer-plan": [
+            18445,
+            0,
+            4428522272880934003,
+            10187143
+          ]
+        }
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            18445,
+            0,
+            4428522272880934003,
+            10435797
+          ],
+          "evex-transfer-plan": [
+            18445,
+            0,
+            4428522272880934003,
+            10435797
+          ]
+        }
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            18445,
+            0,
+            4428522272880934003,
+            15931282
+          ],
+          "evex-transfer-plan": [
+            18445,
+            0,
+            4428522272880934003,
+            15931282
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            860911,
+            711,
+            6528060278436147935,
+            516534325
+          ],
+          "evex-transfer-plan": [
+            860911,
+            711,
+            6528060278436147935,
+            516534325
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            860911,
+            711,
+            6528060278436147935,
+            530744680
+          ],
+          "evex-transfer-plan": [
+            860911,
+            711,
+            6528060278436147935,
+            530744680
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            860911,
+            711,
+            6528060278436147935,
+            681377180
+          ],
+          "evex-transfer-plan": [
+            860911,
+            711,
+            6528060278436147935,
+            681377180
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            860911,
+            711,
+            6528060278436147935,
+            516534325
+          ],
+          "evex-transfer-plan": [
+            860911,
+            711,
+            6528060278436147935,
+            516534325
+          ]
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            94503,
+            0,
+            7131687437590387221,
+            43330046
+          ],
+          "evex-transfer-plan": [
+            94503,
+            0,
+            7131687437590387221,
+            43330046
+          ]
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            94503,
+            0,
+            7131687437590387221,
+            44994535
+          ],
+          "evex-transfer-plan": [
+            94503,
+            0,
+            7131687437590387221,
+            44994535
+          ]
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            94503,
+            0,
+            7131687437590387221,
+            54663421
+          ],
+          "evex-transfer-plan": [
+            94503,
+            0,
+            7131687437590387221,
+            54663421
+          ]
+        }
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            94503,
+            0,
+            7131687437590387221,
+            43330046
+          ],
+          "evex-transfer-plan": [
+            94503,
+            0,
+            7131687437590387221,
+            43330046
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            871312,
+            2130,
+            14076048977032015961,
+            398901630
+          ],
+          "evex-transfer-plan": [
+            871312,
+            2130,
+            14076048977032015961,
+            398901630
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            871312,
+            2130,
+            14076048977032015961,
+            411417782
+          ],
+          "evex-transfer-plan": [
+            871312,
+            2130,
+            14076048977032015961,
+            411417782
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            871312,
+            2130,
+            14076048977032015961,
+            475731894
+          ],
+          "evex-transfer-plan": [
+            871312,
+            2130,
+            14076048977032015961,
+            475731894
+          ]
+        }
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            871312,
+            2130,
+            14076048977032015961,
+            398901630
+          ],
+          "evex-transfer-plan": [
+            871312,
+            2130,
+            14076048977032015961,
+            398901630
+          ]
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            200500,
+            0,
+            3733692014535413969,
+            81709696
+          ],
+          "evex-transfer-plan": [
+            200500,
+            0,
+            3733692014535413969,
+            81709696
+          ]
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            200500,
+            0,
+            3733692014535413969,
+            85371669
+          ],
+          "evex-transfer-plan": [
+            200500,
+            0,
+            3733692014535413969,
+            85371669
+          ]
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            200500,
+            0,
+            3733692014535413969,
+            98043462
+          ],
+          "evex-transfer-plan": [
+            200500,
+            0,
+            3733692014535413969,
+            98043462
+          ]
+        }
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            200500,
+            0,
+            3733692014535413969,
+            81709696
+          ],
+          "evex-transfer-plan": [
+            200500,
+            0,
+            3733692014535413969,
+            81709696
+          ]
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            5365,
+            0,
+            8537845126210120430,
+            2823667
+          ],
+          "evex-transfer-plan": [
+            5365,
+            0,
+            8537845126210120430,
+            2823667
+          ]
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            5365,
+            0,
+            8537845126210120430,
+            2879075
+          ],
+          "evex-transfer-plan": [
+            5365,
+            0,
+            8537845126210120430,
+            2879075
+          ]
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            5365,
+            0,
+            8537845126210120430,
+            3182811
+          ],
+          "evex-transfer-plan": [
+            5365,
+            0,
+            8537845126210120430,
+            3182811
+          ]
+        }
+      },
+      {
+        "case": "scalar32",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            5365,
+            0,
+            8537845126210120430,
+            2823667
+          ],
+          "evex-transfer-plan": [
+            5365,
+            0,
+            8537845126210120430,
+            2823667
+          ]
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            3455,
+            0,
+            1412881932028552554,
+            1805727
+          ],
+          "evex-transfer-plan": [
+            3455,
+            0,
+            1412881932028552554,
+            1805727
+          ]
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            3455,
+            0,
+            1412881932028552554,
+            1845921
+          ],
+          "evex-transfer-plan": [
+            3455,
+            0,
+            1412881932028552554,
+            1845921
+          ]
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            3455,
+            0,
+            1412881932028552554,
+            2446649
+          ],
+          "evex-transfer-plan": [
+            3455,
+            0,
+            1412881932028552554,
+            2446649
+          ]
+        }
+      },
+      {
+        "case": "scalar64",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            3455,
+            0,
+            1412881932028552554,
+            1805727
+          ],
+          "evex-transfer-plan": [
+            3455,
+            0,
+            1412881932028552554,
+            1805727
+          ]
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            5759,
+            0,
+            14579131296982040540,
+            3558528
+          ],
+          "evex-transfer-plan": [
+            5759,
+            0,
+            14579131296982040540,
+            3558528
+          ]
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            5759,
+            0,
+            14579131296982040540,
+            3675078
+          ],
+          "evex-transfer-plan": [
+            5759,
+            0,
+            14579131296982040540,
+            3675078
+          ]
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            5759,
+            0,
+            14579131296982040540,
+            4739957
+          ],
+          "evex-transfer-plan": [
+            5759,
+            0,
+            14579131296982040540,
+            4739957
+          ]
+        }
+      },
+      {
+        "case": "simd64",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            5759,
+            0,
+            14579131296982040540,
+            3558528
+          ],
+          "evex-transfer-plan": [
+            5759,
+            0,
+            14579131296982040540,
+            3558528
+          ]
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 0,
+        "signatures": {
+          "base": [
+            7764,
+            0,
+            565079957198679585,
+            6709243
+          ],
+          "evex-transfer-plan": [
+            7764,
+            0,
+            565079957198679585,
+            6709243
+          ]
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 1,
+        "signatures": {
+          "base": [
+            7764,
+            0,
+            565079957198679585,
+            6867977
+          ],
+          "evex-transfer-plan": [
+            7764,
+            0,
+            565079957198679585,
+            6867977
+          ]
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 2,
+        "signatures": {
+          "base": [
+            7764,
+            0,
+            565079957198679585,
+            8723872
+          ],
+          "evex-transfer-plan": [
+            7764,
+            0,
+            565079957198679585,
+            8723872
+          ]
+        }
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 3,
+        "signatures": {
+          "base": [
+            7764,
+            0,
+            565079957198679585,
+            6709243
+          ],
+          "evex-transfer-plan": [
+            7764,
+            0,
+            565079957198679585,
+            6709243
+          ]
+        }
+      }
+    ],
+    "unchanged": true
+  },
+  "llvm_identity": {
+    "revision": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked": {}
+  },
+  "managed_source_identity": {
+    "neverd_highway": {
+      "repository": "https://github.com/NeverSight/highway.git",
+      "branch": "master",
+      "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+      "sha256": "f5149df5acb77cd9730ed8e5160f2deff0b02fe49cc45443fd396fdb5f0519d2"
+    },
+    "neverd_simdutf": {
+      "repository": "https://github.com/NeverSight/simdutf.git",
+      "branch": "master",
+      "commit": "8d82299606e675b50de8dc16fd118aae4b65bfde",
+      "sha256": "48e9c9fc33940bcc81cdaec785ce6e21ea20f7b03b7a26bff56abb41d2cf5126"
+    },
+    "neverd_simdjson": {
+      "repository": "https://github.com/NeverSight/simdjson.git",
+      "branch": "master",
+      "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+      "sha256": "e4e849bbb16878f8555501cc09bf4a6d90d4a06ccfc67a202a3c030486c3823d"
+    },
+    "neverd_tbb": {
+      "repository": "https://github.com/NeverSight/oneTBB.git",
+      "branch": "master",
+      "commit": "d26e0502ca39f888c1266cbbf1e2c2226d31e41b",
+      "sha256": "98300a443e43d047eabae27d3e30232efe7508b20d8e24a92ff2d54ef511761b"
+    },
+    "neverd_mimalloc": {
+      "repository": "https://github.com/NeverSight/mimalloc.git",
+      "branch": "main3",
+      "commit": "e8e7bc41ce904b4c83fe20e87d93f24d5286315a",
+      "sha256": "aea4126df4ada4e8f733e2a0f08642a8aabe6c2afc01886a1a9a259c18231ac3"
+    }
+  },
+  "cleanup": {
+    "bytes": 1435740952,
+    "removed": true
+  },
+  "raw": "results/product-evex-transfer-plan-ubuntu-24.04-clang",
+  "native_timing": false,
+  "scope": "Fresh current-dev build and semantic integration checks. Performance results remain attributed to the separately tested NeverD revision."
+}
