@@ -24,7 +24,7 @@
     "equal-length engine arguments",
     "rotating forward/reverse order",
     "identical consumer object",
-    "complete Capstone output hash"
+    "Capstone boundary hash and selected-output aggregate checksum"
   ],
   "native_timing_claim": "Only native process CPU ns per decoded instruction; instruction cost is not timing proof.",
   "gate": "No qualified promotion if a representative workload has a reproducible regression; inspect A/A and paired uncertainty without dropping rows.",
@@ -39,5 +39,6 @@
     "layout_identical": true,
     "generated_tables_changed": false
   },
-  "reason": "Complete native public output records and local private/guard/callback checks pass. Instruction costs decrease only in printOperand for all four detail panels; raw and format costs are identical. Native time remains unqualified."
+  "reason": "Complete native public output records and local private/guard/callback checks pass. Instruction costs decrease only in printOperand for all four detail panels; raw and format costs are identical. Native time remains unqualified.",
+  "semantic_validation": "Native timing checks selected consumed values, instruction boundaries and rejection counts. It is not a byte-for-byte record comparison. Complete cs_insn/cs_detail records, unused bytes, cursors and errors are checked separately by the dedicated differential probes recorded for this source tree."
 }

@@ -1,0 +1,43 @@
+{
+  "round": 1332,
+  "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+  "patch": "2f0076f132406f35bf8837628d58491f3df82bad57bc0d814021b46e84a6449f",
+  "hosts": "Two independent ubuntu-24.04 Clang allocations; actual CPU identities retained",
+  "cases": [
+    "libjpeg62-turbo-amd64",
+    "libzstd1-amd64",
+    "libssl3t64-amd64",
+    "jpeg-avx2-i386",
+    "libssl3t64-i386"
+  ],
+  "panels": 7,
+  "modes": [
+    "scan",
+    "format",
+    "detail"
+  ],
+  "cycles": 21,
+  "controls": [
+    "byte-identical A/A",
+    "original images",
+    "same inode and file length with ASLR disabled when supported",
+    "equal-length engine arguments",
+    "rotating forward/reverse order",
+    "identical consumer object",
+    "complete Capstone output hash"
+  ],
+  "native_timing_claim": "Only native process CPU ns per decoded instruction; instruction cost is not timing proof.",
+  "gate": "No qualified promotion if a representative workload has a reproducible regression; inspect A/A and paired uncertainty without dropping rows.",
+  "source": {
+    "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+    "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+    "tree": "896b3758e69af3e07dea9aeb1c2bc53db3a818fe",
+    "sha256": "2f0076f132406f35bf8837628d58491f3df82bad57bc0d814021b46e84a6449f",
+    "records": "equal private-entry records, cursor and errors for 151781376 inputs",
+    "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+    "private_guard": "equal private-entry records for 3145734 protected-page extents",
+    "layout_identical": true,
+    "generated_tables_changed": false
+  },
+  "reason": "Complete native public output records and local private/guard/callback checks pass. Instruction costs decrease only in printOperand for all four detail panels; raw and format costs are identical. Native time remains unqualified."
+}
