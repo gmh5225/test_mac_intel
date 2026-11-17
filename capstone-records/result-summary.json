@@ -1,0 +1,1947 @@
+{
+  "status": "held-mixed-regressions",
+  "review": {
+    "complete": true,
+    "source": {
+      "parent": "106380545da022533aa28bb9af6ba4df9f6e9970",
+      "baseline_tree": "eecb3148a2570229ddb6e739621fe9771bf15c3b",
+      "tree": "436fb224be8cddb72f6d28b35e18520a9fb55cb0",
+      "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+      "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+      "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+      "private_guard": "equal private-entry records for 4718598 protected-page extents",
+      "layout_identical": true,
+      "generated_output_matches_producer": true,
+      "input_source": {
+        "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+        "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+        "tree": "a74fefc8366c5e08ac3ff0530c40bb88618d381f",
+        "sha256": "6c75430b0f91f311b537c57d26a413515ce6b8fb08907b329e79d047830265e5",
+        "semantic_input": {
+          "parent": "37261a87936b29b727efb9c4a909f347b48c9221",
+          "baseline_tree": "db3cedf3ac2ad3b9ae27042d158e7fc5d1bc451d",
+          "tree": "674c5c50580dbdce29df591be43e7b5338c5f8a0",
+          "sha256": "1d84c80b96e106362bd8f185c32499155ce98c9844aade66a0262bda531978ad",
+          "records": "equal private-entry records, cursor and errors for 162398208 inputs",
+          "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+          "private_guard": "equal private-entry records for 4718598 protected-page extents",
+          "unit_checks": 75,
+          "additional_c4_regression": true,
+          "cosmetic_runtime_object_equality": true,
+          "generated_output_matches_producer": true,
+          "layout_identical": true,
+          "inactive_runtime_objects_identical": true,
+          "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+        },
+        "change_from_input": "One shared 32-bit C4/C5 prefix gate before the original vector entry; forward C4 inside the 32-bit writer",
+        "inactive_runtime_objects_identical": true,
+        "local_inactive_unit_passed": true,
+        "active_semantic_validation_pending": true,
+        "native_qualified": false
+      },
+      "qualification_reason": "The previous shared-gate source was held at a text-footprint gate without native timing. This rebase completes full semantic checks before testing actual regressions; layout size alone is not a timing verdict.",
+      "shared_vector_object_identical": false,
+      "decoder_object_identical": true,
+      "inactive_runtime_objects_identical": true,
+      "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+    },
+    "run": {
+      "id": 44005493614,
+      "head_sha": "27f4cdc8ddb4629c5fd1d4e6fcb64b7677cc96ff",
+      "conclusion": "success",
+      "status": "completed",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44005493614",
+      "run_attempt": 1
+    },
+    "profiles": [
+      {
+        "name": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "complete": {
+          "cases": 48,
+          "cc": "clang",
+          "host": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false
+        },
+        "cleanup": {
+          "bytes": 224510381,
+          "removed": true
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86OutputIterator.c.o",
+            "arch/X86/X86VectorOutput.c.o"
+          ],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "identical": 35
+        },
+        "cpu": {
+          "model": "AMD EPYC 9V74 80-Core Processor"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "name": "vex32-shared-gate-images-four-ubuntu-22.04-gcc-44005493614",
+        "complete": {
+          "cc": "gcc",
+          "host": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+          "cases": 0,
+          "active": false,
+          "identical_binary": true
+        },
+        "cleanup": {
+          "bytes": 202406459,
+          "removed": true
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "identical": 37
+        },
+        "cpu": {
+          "model": "AMD EPYC 7763 64-Core Processor"
+        },
+        "compiler": {
+          "compiler": "gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      },
+      {
+        "name": "vex32-shared-gate-images-four-ubuntu-24.04-arm-clang-44005493614",
+        "complete": {
+          "cc": "clang",
+          "host": "Linux-7.0.0-1017-azure-aarch64-with-glibc2.39",
+          "cases": 0,
+          "active": false,
+          "identical_binary": true
+        },
+        "cleanup": {
+          "bytes": 194793296,
+          "removed": true
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "identical": 37
+        },
+        "cpu": {
+          "model": "0xd49"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: aarch64-unknown-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "name": "vex32-shared-gate-images-four-ubuntu-24.04-arm-gcc-44005493614",
+        "complete": {
+          "cc": "gcc",
+          "host": "Linux-7.0.0-1017-azure-aarch64-with-glibc2.39",
+          "cases": 0,
+          "active": false,
+          "identical_binary": true
+        },
+        "cleanup": {
+          "bytes": 200723353,
+          "removed": true
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "identical": 37
+        },
+        "cpu": {
+          "model": "0xd49"
+        },
+        "compiler": {
+          "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      },
+      {
+        "name": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "complete": {
+          "cases": 48,
+          "cc": "clang",
+          "host": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+          "launches": [
+            "images",
+            "same-file-fixed"
+          ],
+          "active": true,
+          "native_qualification": false
+        },
+        "cleanup": {
+          "bytes": 215866406,
+          "removed": true
+        },
+        "objects": {
+          "changed": [
+            "arch/X86/X86VectorOutput.c.o",
+            "arch/X86/X86OutputIterator.c.o"
+          ],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "identical": 35
+        },
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "compiler": {
+          "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+        }
+      },
+      {
+        "name": "vex32-shared-gate-images-four-ubuntu-24.04-gcc-44005493614",
+        "complete": {
+          "cc": "gcc",
+          "host": "Linux-7.0.0-1014-aws-x86_64-with-glibc2.39",
+          "cases": 0,
+          "active": false,
+          "identical_binary": true
+        },
+        "cleanup": {
+          "bytes": 202136411,
+          "removed": true
+        },
+        "objects": {
+          "changed": [],
+          "added": [
+            "arch/X86/X86Vex32C4Output.c.o",
+            "arch/X86/X86Vex32Output.c.o"
+          ],
+          "identical": 37
+        },
+        "cpu": {
+          "model": "Intel(R) Xeon(R) 6975P-C"
+        },
+        "compiler": {
+          "compiler": "gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
+        }
+      }
+    ],
+    "rows": [
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.001821601390022,
+        "aa": 1.0057504096225196,
+        "ci95": [
+          0.9909510378782256,
+          1.0095121058901886
+        ],
+        "aa_ci95": [
+          0.9957243538576723,
+          1.0175657725801492
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9990398869130644,
+        "aa": 1.0003035879716569,
+        "ci95": [
+          0.9974130335618279,
+          1.0006512190005667
+        ],
+        "aa_ci95": [
+          0.998558526939878,
+          1.0038316821429805
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0139274802921912,
+        "aa": 0.9998817643251855,
+        "ci95": [
+          1.0084756853775731,
+          1.0222037368825185
+        ],
+        "aa_ci95": [
+          0.9966628931130573,
+          1.0036821206034208
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0168604962415013,
+        "aa": 0.9991670462273745,
+        "ci95": [
+          1.0147253610834723,
+          1.0203813614432224
+        ],
+        "aa_ci95": [
+          0.9975798086896392,
+          1.0028882983368892
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0089974500761099,
+        "aa": 1.009727163361018,
+        "ci95": [
+          1.0034127954360228,
+          1.0106985037599814
+        ],
+        "aa_ci95": [
+          1.0015865465956286,
+          1.0236478834044151
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9983574094521961,
+        "aa": 1.0011292296517396,
+        "ci95": [
+          0.9960806611489835,
+          0.9990190971428919
+        ],
+        "aa_ci95": [
+          1.0000855659423102,
+          1.0022589487951254
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9986718578291313,
+        "aa": 1.006784179281312,
+        "ci95": [
+          0.9830833047241391,
+          1.0211943958415817
+        ],
+        "aa_ci95": [
+          0.9886153991705956,
+          1.0145715926909165
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9986566969387333,
+        "aa": 1.0006123679182999,
+        "ci95": [
+          0.9960884872518366,
+          1.0006075508068337
+        ],
+        "aa_ci95": [
+          1.0001244249334804,
+          1.0020881426067298
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0162746062211507,
+        "aa": 0.9975427261934344,
+        "ci95": [
+          1.0107117613575947,
+          1.0203271102095153
+        ],
+        "aa_ci95": [
+          0.9903260169449537,
+          1.0042230179540919
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0170864451557182,
+        "aa": 1.000989187586788,
+        "ci95": [
+          1.0151045332623128,
+          1.018496357547574
+        ],
+        "aa_ci95": [
+          0.9999281667530747,
+          1.002850445382091
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.006476084176829,
+        "aa": 1.0072821991375203,
+        "ci95": [
+          1.0040390999631132,
+          1.0114763778918958
+        ],
+        "aa_ci95": [
+          1.0033513139866441,
+          1.0144423634419368
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9983584173778123,
+        "aa": 1.0009387278062367,
+        "ci95": [
+          0.9978927013090043,
+          0.9992484145273397
+        ],
+        "aa_ci95": [
+          0.9995039974703871,
+          1.0018948822621596
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.00308293904726,
+        "aa": 1.0073984864409,
+        "ci95": [
+          0.9895677857759136,
+          1.0109666820842438
+        ],
+        "aa_ci95": [
+          1.00202013754807,
+          1.0190220585354386
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9993442685267899,
+        "aa": 0.9990387116833015,
+        "ci95": [
+          0.9968712257377346,
+          1.0001460999259972
+        ],
+        "aa_ci95": [
+          0.9986037020934948,
+          1.0015489555659243
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0170302166225968,
+        "aa": 1.0041203003791916,
+        "ci95": [
+          1.013467474777895,
+          1.0255695508792486
+        ],
+        "aa_ci95": [
+          0.9980078220483989,
+          1.0059569971543598
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0153304003602708,
+        "aa": 1.0001271704269825,
+        "ci95": [
+          1.0142292912712338,
+          1.016073131805347
+        ],
+        "aa_ci95": [
+          0.9994788063424305,
+          1.0011857511718194
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0037003690475013,
+        "aa": 1.0063561793595823,
+        "ci95": [
+          0.9981833131298687,
+          1.012919955939049
+        ],
+        "aa_ci95": [
+          1.0016753009946482,
+          1.015103526598526
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9966889597501669,
+        "aa": 1.000390456487718,
+        "ci95": [
+          0.9934100025068939,
+          0.997265924186683
+        ],
+        "aa_ci95": [
+          0.9992750128448811,
+          1.0015302819866643
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.003041961744443,
+        "aa": 1.0012496094970322,
+        "ci95": [
+          1.0007292476275464,
+          1.00806879711222
+        ],
+        "aa_ci95": [
+          0.9987253579913954,
+          1.0110477433022451
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9994741710274572,
+        "aa": 1.001104064416448,
+        "ci95": [
+          0.9965566242257943,
+          1.0008830762705696
+        ],
+        "aa_ci95": [
+          0.9975792747950294,
+          1.0043874387375336
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9910656249187488,
+        "aa": 0.9994754648692596,
+        "ci95": [
+          0.9882006754429173,
+          0.993677874515092
+        ],
+        "aa_ci95": [
+          0.9969716768481919,
+          1.0012454769521213
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9929511000084101,
+        "aa": 0.9991394202277226,
+        "ci95": [
+          0.990856831204002,
+          0.9945833216258152
+        ],
+        "aa_ci95": [
+          0.9964222330417302,
+          1.0016873898247565
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9703906655959186,
+        "aa": 0.9999444475306928,
+        "ci95": [
+          0.9664328768866199,
+          0.9802758137460985
+        ],
+        "aa_ci95": [
+          0.990864318573613,
+          1.0024219002451276
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9800788948645456,
+        "aa": 1.0005680830456702,
+        "ci95": [
+          0.9763533931635613,
+          0.9842952038515449
+        ],
+        "aa_ci95": [
+          0.9978323272470556,
+          1.0034811127161358
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0005977361135887,
+        "aa": 1.0004917252352137,
+        "ci95": [
+          0.9983957989986276,
+          1.0038939879091362
+        ],
+        "aa_ci95": [
+          0.9992333649622652,
+          1.0027077031327056
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9999059289826533,
+        "aa": 1.0005746206090977,
+        "ci95": [
+          0.9983780110908972,
+          1.001891762377106
+        ],
+        "aa_ci95": [
+          0.998988098408213,
+          1.0027090987375349
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.006640881100937,
+        "aa": 1.0012119739285403,
+        "ci95": [
+          1.0018424875764587,
+          1.0084138224401962
+        ],
+        "aa_ci95": [
+          1.0001405086412813,
+          1.0058362962638956
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0023849243126353,
+        "aa": 0.9997961446631599,
+        "ci95": [
+          0.9960274967383009,
+          1.0029256965944273
+        ],
+        "aa_ci95": [
+          0.998884121230056,
+          1.0017244682889443
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9916933594305825,
+        "aa": 0.9974680564788808,
+        "ci95": [
+          0.9888130702152326,
+          0.9983844654266061
+        ],
+        "aa_ci95": [
+          0.9945303988489063,
+          1.0011779465422959
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9974637453700798,
+        "aa": 0.9962682007463598,
+        "ci95": [
+          0.9952523370339633,
+          0.9994576870509461
+        ],
+        "aa_ci95": [
+          0.9921819164869584,
+          1.0020264189652677
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.000696147260008,
+        "aa": 0.9998140895344801,
+        "ci95": [
+          0.998084976077745,
+          1.0012306200647008
+        ],
+        "aa_ci95": [
+          0.998435423987682,
+          1.0014740447353996
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0013301541924662,
+        "aa": 0.9994248590750126,
+        "ci95": [
+          0.998986362245702,
+          1.0032363262117623
+        ],
+        "aa_ci95": [
+          0.9977491752644255,
+          1.001840918599786
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0013796527014438,
+        "aa": 1.0003732640006178,
+        "ci95": [
+          0.995768859962397,
+          1.005888198198488
+        ],
+        "aa_ci95": [
+          0.9977620866612648,
+          1.00168865672986
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0010354143568962,
+        "aa": 0.9999904562546525,
+        "ci95": [
+          0.9974117915730979,
+          1.003879052480175
+        ],
+        "aa_ci95": [
+          0.9987426188543507,
+          1.0016531347448152
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9990419667534917,
+        "aa": 0.9998772776501125,
+        "ci95": [
+          0.9958808347196398,
+          1.0005737707419649
+        ],
+        "aa_ci95": [
+          0.995859712285091,
+          1.001417005293022
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.998377129638881,
+        "aa": 1.0012604633645563,
+        "ci95": [
+          0.996302274041241,
+          0.9993677955029187
+        ],
+        "aa_ci95": [
+          0.9991621319959709,
+          1.0029131227217496
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0344553395929863,
+        "aa": 1.0046093202302142,
+        "ci95": [
+          0.9236577775293043,
+          1.0533090775111684
+        ],
+        "aa_ci95": [
+          0.9649286532500375,
+          1.0604062000565866
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9732134999172712,
+        "aa": 0.9868132978544242,
+        "ci95": [
+          0.9555692535755614,
+          1.0270573028866867
+        ],
+        "aa_ci95": [
+          0.9397317653324505,
+          1.031267918787666
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9986027014438752,
+        "aa": 0.9973122998988122,
+        "ci95": [
+          0.9967428989471675,
+          1.002668788010983
+        ],
+        "aa_ci95": [
+          0.9959937943715205,
+          1.000744114439669
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0001672008681826,
+        "aa": 0.9975488962166789,
+        "ci95": [
+          0.9967077723012231,
+          1.0035253274420073
+        ],
+        "aa_ci95": [
+          0.9932889270429296,
+          1.0010704379665456
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9974581952255037,
+        "aa": 0.9988230557190201,
+        "ci95": [
+          0.9856813088575662,
+          0.9998664007108725
+        ],
+        "aa_ci95": [
+          0.994964147417026,
+          1.0019240528398459
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9967373880839083,
+        "aa": 1.000383722612585,
+        "ci95": [
+          0.9954558720614587,
+          1.0001635060733074
+        ],
+        "aa_ci95": [
+          0.9973715146567999,
+          1.0023177898263553
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0145106715252472,
+        "aa": 1.0136039881562322,
+        "ci95": [
+          0.9910143921222068,
+          1.0261955806566367
+        ],
+        "aa_ci95": [
+          0.9946753011990879,
+          1.0200069161248517
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9987486671266387,
+        "aa": 1.0010404551598404,
+        "ci95": [
+          0.9959306617288276,
+          1.0017924916261447
+        ],
+        "aa_ci95": [
+          0.9998366151690248,
+          1.00228782681559
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.998985643413265,
+        "aa": 1.0074788584319532,
+        "ci95": [
+          0.9863575346376486,
+          1.0104495621700318
+        ],
+        "aa_ci95": [
+          0.9902243222719109,
+          1.011654278577779
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.99085888170407,
+        "aa": 0.9992634014891567,
+        "ci95": [
+          0.9889199541221604,
+          0.9951112661147721
+        ],
+        "aa_ci95": [
+          0.9976591473788571,
+          1.0002801862160697
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.010567700899006,
+        "aa": 0.9979041786787992,
+        "ci95": [
+          1.005641474564731,
+          1.0125792023853895
+        ],
+        "aa_ci95": [
+          0.9944681408142824,
+          1.0029793619381075
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9691098958130214,
+        "aa": 0.9996975131257697,
+        "ci95": [
+          0.9662852838850831,
+          0.9706773519706774
+        ],
+        "aa_ci95": [
+          0.9983898234368771,
+          1.0009763452554563
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9987022750740109,
+        "aa": 0.9997695558344415,
+        "ci95": [
+          0.9873719762950917,
+          1.0042660667289243
+        ],
+        "aa_ci95": [
+          0.9916430364883265,
+          1.0027931130258934
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0038724000050454,
+        "aa": 1.0002737708632279,
+        "ci95": [
+          1.0032206068268015,
+          1.0046340900978308
+        ],
+        "aa_ci95": [
+          0.9993627754112924,
+          1.0005723324433877
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0122117510625148,
+        "aa": 1.0002629661312297,
+        "ci95": [
+          1.0109652342079565,
+          1.0136533037229902
+        ],
+        "aa_ci95": [
+          0.9992507594717539,
+          1.0016414411916674
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0088240237548323,
+        "aa": 1.0005179060659364,
+        "ci95": [
+          1.0080081950113802,
+          1.0094663541306736
+        ],
+        "aa_ci95": [
+          0.9994807094308084,
+          1.0014626121696755
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0065564289777817,
+        "aa": 0.9998501381538893,
+        "ci95": [
+          1.005914832701474,
+          1.0088898818983123
+        ],
+        "aa_ci95": [
+          0.9990875484739873,
+          1.0024775973530795
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0065123533462679,
+        "aa": 0.999949939458032,
+        "ci95": [
+          1.0048027132983532,
+          1.0070120751271274
+        ],
+        "aa_ci95": [
+          0.998761168255875,
+          1.001022386524447
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0029368394043472,
+        "aa": 0.9897440481878685,
+        "ci95": [
+          0.993317409125129,
+          1.0073756177312079
+        ],
+        "aa_ci95": [
+          0.9751227378176347,
+          0.995015107588046
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.00444097776995,
+        "aa": 1.0003851537327033,
+        "ci95": [
+          1.003026573567087,
+          1.0055051762506255
+        ],
+        "aa_ci95": [
+          0.9997151478726868,
+          1.0014274380454407
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0124770067957694,
+        "aa": 1.0004743337981805,
+        "ci95": [
+          1.0109829483667487,
+          1.013849129346065
+        ],
+        "aa_ci95": [
+          0.9996909589732269,
+          1.0014304442551158
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0073775208888247,
+        "aa": 0.9999720568054098,
+        "ci95": [
+          1.0064991996904846,
+          1.0089653963863037
+        ],
+        "aa_ci95": [
+          0.998862042912797,
+          1.0006273876448117
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0078497540052984,
+        "aa": 0.9994526871497198,
+        "ci95": [
+          1.003660158669765,
+          1.0088998670676634
+        ],
+        "aa_ci95": [
+          0.9984523746376653,
+          1.0014214752100972
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0062497835402426,
+        "aa": 1.0005546033645938,
+        "ci95": [
+          1.0046310170887054,
+          1.0074588940129987
+        ],
+        "aa_ci95": [
+          0.9998651060799513,
+          1.0017683493730682
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0020513613861386,
+        "aa": 0.9899930839050842,
+        "ci95": [
+          0.9897368356420081,
+          1.0050428518196497
+        ],
+        "aa_ci95": [
+          0.9870621425848265,
+          0.9967254183247314
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.00108462249808,
+        "aa": 1.0004101851156033,
+        "ci95": [
+          1.0005314011171926,
+          1.001549465512654
+        ],
+        "aa_ci95": [
+          0.9994379566602136,
+          1.0008423201693408
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0122217589625195,
+        "aa": 1.0011438638129202,
+        "ci95": [
+          1.0117495583808125,
+          1.0151310288664472
+        ],
+        "aa_ci95": [
+          0.9987137019902315,
+          1.002667192302717
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0089421979403126,
+        "aa": 0.9993978302773485,
+        "ci95": [
+          1.0072901398693355,
+          1.0101170090407314
+        ],
+        "aa_ci95": [
+          0.9989104463347033,
+          1.0011228592513424
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0060809103181305,
+        "aa": 1.0005638999813056,
+        "ci95": [
+          1.0048365956766003,
+          1.0087857054531966
+        ],
+        "aa_ci95": [
+          0.9993196194772717,
+          1.0024140289744825
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0048145859085291,
+        "aa": 0.9993731428588988,
+        "ci95": [
+          1.0030975432745017,
+          1.0053010750691647
+        ],
+        "aa_ci95": [
+          0.9980890896558515,
+          1.0005876579523043
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.003659128257297,
+        "aa": 0.9985497507384081,
+        "ci95": [
+          1.0005154703981693,
+          1.0053018738731947
+        ],
+        "aa_ci95": [
+          0.9941986835117879,
+          1.0024682773115825
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0030274532838026,
+        "aa": 0.9998225625700411,
+        "ci95": [
+          1.0023625664471814,
+          1.0043507907116405
+        ],
+        "aa_ci95": [
+          0.9986729964114832,
+          1.0011375465147445
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0055470100378998,
+        "aa": 1.000082133188442,
+        "ci95": [
+          1.0036815345651664,
+          1.0069615303923252
+        ],
+        "aa_ci95": [
+          0.9989972447956372,
+          1.00215902275812
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0047521827070005,
+        "aa": 1.0009215247275802,
+        "ci95": [
+          1.0042502846739174,
+          1.006760827364616
+        ],
+        "aa_ci95": [
+          0.9988543294039672,
+          1.002419584400797
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0179232498445547,
+        "aa": 1.000580665411174,
+        "ci95": [
+          1.016321119381529,
+          1.019218553996125
+        ],
+        "aa_ci95": [
+          0.9981551609998526,
+          1.003333761944935
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.017862723961755,
+        "aa": 1.000015637510008,
+        "ci95": [
+          1.016345845007044,
+          1.0195360234317419
+        ],
+        "aa_ci95": [
+          0.9986394898243222,
+          1.0008843535281629
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9996734488821905,
+        "aa": 0.9987077631442758,
+        "ci95": [
+          0.9972875396351992,
+          1.002418888693423
+        ],
+        "aa_ci95": [
+          0.9977805194275184,
+          1.0026294160806901
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9996818696277263,
+        "aa": 0.9998683170924414,
+        "ci95": [
+          0.9992643385023771,
+          1.0002602269178724
+        ],
+        "aa_ci95": [
+          0.9990052218202298,
+          1.000652191885263
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9984676583981514,
+        "aa": 0.9998955709810184,
+        "ci95": [
+          0.9975370665359637,
+          0.9992878586030978
+        ],
+        "aa_ci95": [
+          0.9997021277902488,
+          1.000629146999429
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 0.9992131187852521,
+        "aa": 0.9994898335505126,
+        "ci95": [
+          0.9987675796616837,
+          1.000205904859662
+        ],
+        "aa_ci95": [
+          0.9992264219868062,
+          1.0001075420796794
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9986919575879067,
+        "aa": 0.9990458738784279,
+        "ci95": [
+          0.9973858437757509,
+          0.999800694090738
+        ],
+        "aa_ci95": [
+          0.9980547511755177,
+          1.0005549302080674
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9989582123928794,
+        "aa": 0.9994179790975845,
+        "ci95": [
+          0.9978181015591745,
+          0.9996119127024443
+        ],
+        "aa_ci95": [
+          0.9970002924243234,
+          1.0014380367014717
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9994225697208047,
+        "aa": 0.9989713697925596,
+        "ci95": [
+          0.9985019007134698,
+          1.0018490234844724
+        ],
+        "aa_ci95": [
+          0.9981697887306378,
+          0.9998596530623701
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 1.0003310275908375,
+        "aa": 1.0001465813791748,
+        "ci95": [
+          0.9996723316877103,
+          1.000774840189211
+        ],
+        "aa_ci95": [
+          0.9995039001560062,
+          1.0004275985193232
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0002409962849015,
+        "aa": 0.9998218031644006,
+        "ci95": [
+          0.9991928192196626,
+          1.000588917081728
+        ],
+        "aa_ci95": [
+          0.998980434347478,
+          1.0002409631013516
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0001283255086073,
+        "aa": 0.9997903682010463,
+        "ci95": [
+          0.9999562759611481,
+          1.0008511463877912
+        ],
+        "aa_ci95": [
+          0.9992558407123918,
+          1.0007486647767319
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9995481179110998,
+        "aa": 1.0004105375324883,
+        "ci95": [
+          0.9970058978390655,
+          1.0005498987823669
+        ],
+        "aa_ci95": [
+          0.9974097482721603,
+          1.0011502455563486
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.0019160267338534,
+        "aa": 1.000054231078626,
+        "ci95": [
+          1.0009137735530411,
+          1.002589006540489
+        ],
+        "aa_ci95": [
+          0.9989683683075525,
+          1.0003620914401583
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.001337055866651,
+        "aa": 0.9987109024000711,
+        "ci95": [
+          0.9988674612414782,
+          1.0029156751031971
+        ],
+        "aa_ci95": [
+          0.997511499408783,
+          1.0021283884515102
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9997904388532814,
+        "aa": 0.9991184665178141,
+        "ci95": [
+          0.9985100507353414,
+          0.99998389968862
+        ],
+        "aa_ci95": [
+          0.9984938593322669,
+          0.999498269673618
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 0.9993919380338082,
+        "aa": 1.0000438076344191,
+        "ci95": [
+          0.9969469644103279,
+          0.9996966123800916
+        ],
+        "aa_ci95": [
+          0.9970112429731418,
+          1.0015398097145718
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0000498100989976,
+        "aa": 0.9986710153130306,
+        "ci95": [
+          0.9992762575025893,
+          1.0009460176714853
+        ],
+        "aa_ci95": [
+          0.9980439048510538,
+          1.0004413309547044
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9988037720020507,
+        "aa": 1.000325368072632,
+        "ci95": [
+          0.9962327515165034,
+          1.001456650578909
+        ],
+        "aa_ci95": [
+          0.9970715463853359,
+          1.0014114546414061
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9988954669965538,
+        "aa": 0.9996911109289996,
+        "ci95": [
+          0.997991314646664,
+          0.9994644269210534
+        ],
+        "aa_ci95": [
+          0.9994866985209313,
+          1.0005052897520923
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9780401766955392,
+        "aa": 1.0004169476531286,
+        "ci95": [
+          0.9766746517297629,
+          0.988025237134641
+        ],
+        "aa_ci95": [
+          0.99377817396472,
+          1.0059698011159666
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9785199357159257,
+        "aa": 1.0001599402889587,
+        "ci95": [
+          0.9777655003069368,
+          0.9790945255015504
+        ],
+        "aa_ci95": [
+          0.9995356192579948,
+          1.0012605872078622
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "images",
+        "gain": 1.0156038267868823,
+        "aa": 0.9987613069450423,
+        "ci95": [
+          1.014157207647398,
+          1.0183538524512736
+        ],
+        "aa_ci95": [
+          0.9964666060234776,
+          1.0013035997269237
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 1,
+        "launch": "same-file-fixed",
+        "gain": 1.0148719092791538,
+        "aa": 0.999836376827254,
+        "ci95": [
+          1.014017839744033,
+          1.016488147276924
+        ],
+        "aa_ci95": [
+          0.9990076858123725,
+          1.0012855700186485
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 1.0158504631509022,
+        "aa": 1.0043688147946597,
+        "ci95": [
+          1.0127868424973923,
+          1.0180869090254545
+        ],
+        "aa_ci95": [
+          0.9980658761367553,
+          1.007131554154382
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 1.014854075061347,
+        "aa": 0.9998617286378427,
+        "ci95": [
+          1.0131059677233178,
+          1.0166425269217347
+        ],
+        "aa_ci95": [
+          0.9976052440268555,
+          1.0018399970510898
+        ]
+      }
+    ],
+    "losses": [
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "images",
+        "gain": 0.9703906655959186,
+        "aa": 0.9999444475306928,
+        "ci95": [
+          0.9664328768866199,
+          0.9802758137460985
+        ],
+        "aa_ci95": [
+          0.990864318573613,
+          1.0024219002451276
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9800788948645456,
+        "aa": 1.0005680830456702,
+        "ci95": [
+          0.9763533931635613,
+          0.9842952038515449
+        ],
+        "aa_ci95": [
+          0.9978323272470556,
+          1.0034811127161358
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9732134999172712,
+        "aa": 0.9868132978544242,
+        "ci95": [
+          0.9555692535755614,
+          1.0270573028866867
+        ],
+        "aa_ci95": [
+          0.9397317653324505,
+          1.031267918787666
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 2,
+        "launch": "same-file-fixed",
+        "gain": 0.9691098958130214,
+        "aa": 0.9996975131257697,
+        "ci95": [
+          0.9662852838850831,
+          0.9706773519706774
+        ],
+        "aa_ci95": [
+          0.9983898234368771,
+          1.0009763452554563
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 0.9780401766955392,
+        "aa": 1.0004169476531286,
+        "ci95": [
+          0.9766746517297629,
+          0.988025237134641
+        ],
+        "aa_ci95": [
+          0.99377817396472,
+          1.0059698011159666
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9785199357159257,
+        "aa": 1.0001599402889587,
+        "ci95": [
+          0.9777655003069368,
+          0.9790945255015504
+        ],
+        "aa_ci95": [
+          0.9995356192579948,
+          1.0012605872078622
+        ]
+      }
+    ],
+    "aa_outside_one_percent": [
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "amd64-ls",
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "gain": 0.9732134999172712,
+        "aa": 0.9868132978544242,
+        "ci95": [
+          0.9555692535755614,
+          1.0270573028866867
+        ],
+        "aa_ci95": [
+          0.9397317653324505,
+          1.031267918787666
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-22.04-clang-44005493614",
+        "case": "arm64-ls",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0145106715252472,
+        "aa": 1.0136039881562322,
+        "ci95": [
+          0.9910143921222068,
+          1.0261955806566367
+        ],
+        "aa_ci95": [
+          0.9946753011990879,
+          1.0200069161248517
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-sort",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0029368394043472,
+        "aa": 0.9897440481878685,
+        "ci95": [
+          0.993317409125129,
+          1.0073756177312079
+        ],
+        "aa_ci95": [
+          0.9751227378176347,
+          0.995015107588046
+        ]
+      },
+      {
+        "host": "vex32-shared-gate-images-four-ubuntu-24.04-clang-44005493614",
+        "case": "arm-cp",
+        "mode": 0,
+        "launch": "images",
+        "gain": 1.0020513613861386,
+        "aa": 0.9899930839050842,
+        "ci95": [
+          0.9897368356420081,
+          1.0050428518196497
+        ],
+        "aa_ci95": [
+          0.9870621425848265,
+          0.9967254183247314
+        ]
+      }
+    ],
+    "native_qualified": false,
+    "scope": "Only ELF x86-64 Clang activates the shared 32-bit VEX output; four other compiler/host profiles must retain byte-identical binaries and existing runtime objects. Active profiles run all real PE and mixed-architecture panels, with no outlier removal.",
+    "checksum_scope": "Native timing checks instruction boundaries, rejections and selected consumed output values. Owner units run in the separate pilot and configuration suites. The separate local active-path probe compares complete cs_insn/cs_detail records, untouched bytes, cursors and errors for 162398208 inputs and guarded-page extents. These are distinct validation surfaces."
+  },
+  "publication_qualified": false
+}
