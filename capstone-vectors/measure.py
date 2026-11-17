@@ -6,6 +6,7 @@ r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
 lab=r; evidence=p/'evidence'; evidence.mkdir()
+protocol=json.loads((r/'launch-protocol.json').read_text());replica=int(os.environ['REPLICA'])
 pe=p/'round118-real-pe'
 
 def save(name,data):
@@ -99,9 +100,37 @@ def main(w):
     image=w/'same-image';image.write_bytes(padded['integer']);image.chmod(0o755)
     image_inode=image.stat().st_ino
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-    launches=['images']
-    if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the frozen isolated alias lookup prototype, including all recorded symbol relocation, against the same baseline and frozen consumers with original-image and fixed-image controls.'))
+    assert probe.returncode==0
+    aliases={}
+    for key in ('integer','aa','output'):
+        alias=w/('alias-'+key.ljust(7,'_'))
+        os.link(exe[key],alias);aliases[key]=alias
+        assert alias.stat().st_ino==exe[key].stat().st_ino
+    assert len({len(str(path))for path in aliases.values()})==1
+    launches=[family+'-'+randomization for family in protocol['image_controls'] for randomization in protocol['aslr_controls']]
+    if replica==2:launches=launches[::-1]
+    identities={key:dict(original=str(exe[key]),alias=str(aliases[key]),inode=exe[key].stat().st_ino,size=len(payloads[key]))for key in aliases}
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,identities=identities,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},image_inode=image_inode,image_path=str(image),fixed_size=maximum,replica=replica,protocol=protocol))
+    prepared_launch=None
+    def materialize(path,data):
+        inode=path.stat().st_ino
+        with path.open('r+b')as stream:
+            assert stream.write(data)==len(data)
+            stream.truncate(len(data))
+        assert path.stat().st_ino==inode and path.stat().st_size==len(data)
+    def selected_image(lib,launch):
+        nonlocal prepared_launch
+        family=launch.rsplit('-',1)[0]
+        if prepared_launch!=family:
+            for key in aliases:
+                materialize(exe[key],padded[key]if family=='equal-padded'else payloads[key])
+            prepared_launch=family
+        if family=='images':return exe[lib]
+        if family in ('equal-names','equal-padded'):return aliases[lib]
+        assert family in ('shared-variable','shared-padded')
+        materialize(image,padded[lib]if family=='shared-padded'else payloads[lib])
+        assert image.stat().st_ino==image_inode
+        return image
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
@@ -117,22 +146,14 @@ def main(w):
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
             for mode in (0,1,2):
+                if [name,panel,mode] not in protocol['focus']:continue
                 def measure(lib,n,launch):
-                    tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
-                    if launch=='images':
-                        command=[str(exe[lib]),*tail];executable=None
-                    elif launch=='same-argv':
-                        command=[str(image),*tail];executable=str(exe[lib])
-                    else:
-                        with image.open('r+b')as out:
-                            assert out.write(padded[lib])==maximum
-                        assert image.stat().st_ino==image_inode and image.stat().st_size==maximum
-                        command=[str(image),*tail];executable=None
-                        if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
-                    return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(80e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','output','iced']+(['fast'] if mode else [])
-                for i in range(32):
+                    command=[str(selected_image(lib,launch)),'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
+                    if launch.endswith('-fixed'):command=['setarch',platform.machine(),'-R',*command]
+                    return list(map(int,sp.check_output(command).split()))
+                probe=measure('integer',1,'images-aslr');rep=max(1,math.ceil(protocol['target_ms']*1e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','output']
+                for i in range(protocol['cycles']):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -144,12 +165,12 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']={k:md('iced',k) for k in ('output',)}
-                    row['vs_fast']={k:md('fast',k) for k in ('output',)} if mode else None
+                    row['vs_iced']=row['vs_fast']=None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
+    assert len(reported)==len(protocol['focus'])*len(launches)
+    selected_image('integer','images-fixed')
     # Collect the original consumer lambda by symbol, without inserting client
     # request instructions or changing the original native consumer object.
     costs=[]
@@ -186,7 +207,7 @@ def main(w):
     assert len(costs)==6
     save('cost-protocol.json',dict(symbol='_ZZ4mainENK3$_0clEj',consumer_unchanged=True,traversals=2,scope='The original benchmark warm traversal and one timed traversal are collected. Simulated cache events do not establish native hardware causes.'))
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-alias-call-shape-native-'))
+w=Path(tempfile.mkdtemp(prefix=protocol['temporary_prefix']))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)

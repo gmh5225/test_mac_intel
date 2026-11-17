@@ -1,7 +1,7 @@
-name: Time isolated AArch64 and MIPS alias lookup with frozen consumers and complete launch controls
+name: Isolate image launch factors for the retained alias-lookup timing regressions
 on:
   push:
-    branches: [codex/capstone-alias-call-shape-native]
+    branches: [codex/capstone-alias-launch-factors]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -11,14 +11,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, replica: 1 }
+          - { host: ubuntu-22.04, cc: gcc, replica: 2 }
           - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
       CC: ${{ matrix.cc }}
+      REPLICA: ${{ matrix.replica }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -43,6 +44,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: alias-call-shape-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: alias-launch-factors-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
