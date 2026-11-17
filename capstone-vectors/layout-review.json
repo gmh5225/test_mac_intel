@@ -1,0 +1,114 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "7e54e86ca81124be00b978dd00164803a6b1f4b7",
+    "baseline_tree": "e81791bc5d7b7524da804875b5449e732bc5911f",
+    "tree": "cd6e9c08efd7215134ce1009443ebeafa483fd30",
+    "sha256": "633855ac438ce8527faf7fe3eeb995174aa7fc1c543920917940779c2cad5791",
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86EvexMemoryOutput.c",
+      "arch/X86/X86GenEvexMemoryOutput.inc",
+      "arch/X86/X86SimpleOutput.h",
+      "arch/X86/X86VectorOutput.c",
+      "arch/X86/X86VectorRegisterWriter.h",
+      "suite/synctools/x86_vector_output.cpp",
+      "tests/unit/x86_simple_output.c",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
+    ]
+  },
+  "run": {
+    "id": 44170864212,
+    "head_sha": "1fc18564791cc3b677ddeee811a76ce0e9606248",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44170864212",
+    "run_attempt": 1
+  },
+  "profiles": [
+    {
+      "profile": "evex-memory-prechecked-dispatch-cost-ubuntu-22.04-clang-1",
+      "categories": {
+        "text": {
+          "changed": 0,
+          "added": 4,
+          "removed": 1
+        },
+        "readonly": {
+          "changed": 1739,
+          "added": 3,
+          "removed": 1
+        },
+        "writable": {
+          "changed": 253,
+          "added": 0,
+          "removed": 0
+        }
+      }
+    },
+    {
+      "profile": "evex-memory-prechecked-dispatch-cost-ubuntu-22.04-gcc-1",
+      "categories": {
+        "text": {
+          "changed": 3877,
+          "added": 3,
+          "removed": 1
+        },
+        "readonly": {
+          "changed": 1789,
+          "added": 8,
+          "removed": 5
+        },
+        "writable": {
+          "changed": 258,
+          "added": 0,
+          "removed": 0
+        }
+      }
+    },
+    {
+      "profile": "evex-memory-prechecked-dispatch-cost-ubuntu-24.04-clang-1",
+      "categories": {
+        "text": {
+          "changed": 0,
+          "added": 4,
+          "removed": 1
+        },
+        "readonly": {
+          "changed": 1089,
+          "added": 4,
+          "removed": 2
+        },
+        "writable": {
+          "changed": 0,
+          "added": 0,
+          "removed": 0
+        }
+      }
+    },
+    {
+      "profile": "evex-memory-prechecked-dispatch-cost-ubuntu-24.04-gcc-1",
+      "categories": {
+        "text": {
+          "changed": 3,
+          "added": 3,
+          "removed": 1
+        },
+        "readonly": {
+          "changed": 1086,
+          "added": 8,
+          "removed": 5
+        },
+        "writable": {
+          "changed": 0,
+          "added": 0,
+          "removed": 0
+        }
+      }
+    }
+  ],
+  "scope": "The two Clang builds retain every common text symbol position and size. GCC11 still moves downstream text and GCC13 moves three existing vector functions. The renamed broadcast is reported as a removal/addition. Readonly/writable movement remains explicit; this is not native performance qualification.",
+  "publication_qualified": false,
+  "next_experiment": "round1392-evex-prechecked-dispatch-native"
+}
