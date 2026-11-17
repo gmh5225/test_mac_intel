@@ -1,62 +1,136 @@
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -167,7 +167,7 @@
- endif()
+diff --git a/arch/X86/X86DisassemblerDecoder.c b/arch/X86/X86DisassemblerDecoder.c
+index 63dcc538..2d355a5c 100644
+--- a/arch/X86/X86DisassemblerDecoder.c
++++ b/arch/X86/X86DisassemblerDecoder.c
+@@ -3775,12 +3775,12 @@ X86_DECODE_INLINE bool decodeIteratorScan(cs_struct *handle,
+ 	return true;
+ }
  
- if(capstone_enabled_architectures STREQUAL "AARCH64")
--    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES)
-+    add_compile_definitions(CAPSTONE_AARCH64_SHORT_REGISTER_NAMES CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
- endif()
+-CAPSTONE_EXPORT
++CAPSTONE_INTERNAL
+ X86_DECODE_ALIGN
+-bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+-				 uint64_t *address, cs_insn *insn)
++bool X86_disasmIterScan(cs_struct *handle, const uint8_t **code, size_t *size,
++			uint64_t *address, cs_insn *insn)
+ {
+-	return cs_disasm_iter_core(ud, code, size, address, insn);
++	return cs_disasm_iter_checked(handle, code, size, address, insn, true);
+ }
  
- # Dedicated builds of these backends use their generated mnemonic tries.
---- a/Makefile
-+++ b/Makefile
-@@ -128,7 +128,7 @@
- endif
- 
- ifeq ($(sort $(CAPSTONE_ARCHS)),aarch64)
--CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES
-+CFLAGS += -DCAPSTONE_AARCH64_SHORT_REGISTER_NAMES -DCAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS
- endif
- 
- ifeq ($(strip $(filter-out aarch64 mips powerpc sparc,$(CAPSTONE_ARCHS))),)
+ X86_DECODE_ALIGN
+diff --git a/cs.c b/cs.c
+index 71fff034..32e87812 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1059,6 +1059,9 @@
- #ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
- 	/* The RISC-V decoder constructs each operand before reading it. */
- 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
-+#elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS)
-+	/* The AArch64 decoder constructs each operand before reading it. */
-+	MCInst_InitAArch64(&mci);
- #else
- 		MCInst_Init(&mci, handle->arch);
+@@ -1728,14 +1728,21 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
+ 	return insn;
+ }
+ 
+-#ifndef CAPSTONE_HAS_X86
+ CAPSTONE_EXPORT
+ bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
+ 				 uint64_t *address, cs_insn *insn)
+ {
++#ifdef CAPSTONE_HAS_X86
++	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
++	if (*size == 0 || !handle)
++		return false;
++	if (use_x86_scan(handle))
++		return X86_disasmIterScan(handle, code, size, address, insn);
++	return cs_disasm_iter_checked(handle, code, size, address, insn, false);
++#else
+ 	return cs_disasm_iter_core(ud, code, size, address, insn);
+-}
  #endif
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -262,6 +262,9 @@
- }
- 
- void MCInst_Init(MCInst *inst, cs_arch arch);
-+#ifdef CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS
-+void MCInst_InitAArch64(MCInst *inst);
-+#endif
- 
- CS_MCINST_INLINE void MCInst_clear(MCInst *inst)
- {
---- a/MCInst.c
-+++ b/MCInst.c
-@@ -23,6 +23,13 @@
- 	MCInst_InitStorage(inst, arch, true);
- }
- 
-+#ifdef CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS
-+void MCInst_InitAArch64(MCInst *inst)
-+{
-+	MCInst_InitStorage(inst, CS_ARCH_AARCH64, false);
 +}
+ 
+ #undef CS_DECODE_INLINE
+ #undef CS_DECODE_LIKELY
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..51acda17 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -13,11 +13,14 @@
+ #include "arch/X86/X86Disassembler.h"
+ #endif
+ 
+-/* The core owns output and iterator policy in one implementation. With x86
+- * enabled, the decoder translation unit instantiates the iterator core so
+- * the compiler can combine scan and output state without an extra boundary.
+- * Otherwise cs.c instantiates the same iterator. Input validation, option
+- * selection and callbacks keep their original order. */
++/* Output, iterator state and callbacks share one implementation. The public
++ * entry selects scan once; x86 instantiates that body beside its decoder so
++ * scan optimization does not enlarge the frame used by other backends. */
++#ifdef CAPSTONE_HAS_X86
++CAPSTONE_INTERNAL bool X86_disasmIterScan(cs_struct *handle,
++					const uint8_t **code, size_t *size,
++					uint64_t *address, cs_insn *insn);
 +#endif
-+
- // does not free @Op
- void MCInst_insert0(MCInst *inst, int index, MCOperand *Op)
+ CAPSTONE_INTERNAL CS_PRESERVE_MOST bool
+ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 		    cs_insn *insn, uint16_t *insn_size, bool batch);
+@@ -169,14 +172,14 @@ CS_DECODE_INLINE bool decode_insn(cs_struct *handle, const uint8_t *code,
+ 
+ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 					  const uint8_t **code, size_t *size,
+-					  uint64_t *address, cs_insn *insn)
++					  uint64_t *address, cs_insn *insn,
++					  bool scan)
  {
+ 	uint16_t insn_size;
+ 	bool r;
+ 
+ 	handle->errnum = CS_ERR_OK;
+ 
+-	const bool scan = use_x86_scan(handle);
+ 	insn->address = *address;
+ #ifdef CAPSTONE_DIET
+ 	// zero out mnemonic & op_str
+@@ -197,27 +200,36 @@ CS_DECODE_INLINE bool cs_disasm_iter_body(struct cs_struct *handle,
+ 	return true;
+ }
+ 
+-CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
+-					  size_t *size, uint64_t *address,
+-					  cs_insn *insn)
++/* The caller has checked the handle and nonempty input. */
++CS_DECODE_INLINE bool cs_disasm_iter_checked(struct cs_struct *handle,
++					     const uint8_t **code, size_t *size,
++					     uint64_t *address, cs_insn *insn,
++					     bool scan)
+ {
+-	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
+ 	cs_detail *detail;
+ 	bool r;
+ 
+-	if (*size == 0 || !handle)
+-		return false;
+-
+ 	// An instruction cs_malloc() allocated while detail was on keeps its
+-	// detail after detail is turned off.  Much of the decoder tests only
++	// detail after detail is turned off. Much of the decoder tests only
+ 	// whether that pointer is set, so a decode without detail hides it, as
+ 	// cs_disasm() never allocates it then; the detail is left as it was.
+ 	detail = insn->detail;
+ 	if (CS_DECODE_LIKELY(!handle->detail_opt))
+ 		insn->detail = NULL;
+-	r = cs_disasm_iter_body(handle, code, size, address, insn);
++	r = cs_disasm_iter_body(handle, code, size, address, insn, scan);
+ 	insn->detail = detail;
+ 	return r;
+ }
+ 
++CS_DECODE_INLINE bool cs_disasm_iter_core(csh ud, const uint8_t **code,
++					  size_t *size, uint64_t *address,
++					  cs_insn *insn)
++{
++	struct cs_struct *handle = (struct cs_struct *)(uintptr_t)ud;
++	if (*size == 0 || !handle)
++		return false;
++	return cs_disasm_iter_checked(handle, code, size, address, insn,
++				      use_x86_scan(handle));
++}
++
+ #endif

@@ -20,14 +20,28 @@ index 63dcc538..2d355a5c 100644
  
  X86_DECODE_ALIGN
 diff --git a/cs.c b/cs.c
-index 71fff034..32e87812 100644
+index 71fff034..26a086dd 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1728,14 +1728,21 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
+@@ -1728,14 +1728,35 @@ cs_insn *CAPSTONE_API cs_malloc(csh ud)
  	return insn;
  }
  
 -#ifndef CAPSTONE_HAS_X86
++#ifdef CAPSTONE_HAS_X86
++/* Both public branches tail-call so scan does not save the full path's frame. */
++#if defined(_MSC_VER)
++__declspec(noinline)
++#elif defined(__GNUC__)
++__attribute__((noinline))
++#endif
++static bool disasm_iter_full(cs_struct *handle, const uint8_t **code,
++			     size_t *size, uint64_t *address, cs_insn *insn)
++{
++	return cs_disasm_iter_checked(handle, code, size, address, insn, false);
++}
++#endif
++
  CAPSTONE_EXPORT
  bool CAPSTONE_API cs_disasm_iter(csh ud, const uint8_t **code, size_t *size,
  				 uint64_t *address, cs_insn *insn)
@@ -38,7 +52,7 @@ index 71fff034..32e87812 100644
 +		return false;
 +	if (use_x86_scan(handle))
 +		return X86_disasmIterScan(handle, code, size, address, insn);
-+	return cs_disasm_iter_checked(handle, code, size, address, insn, false);
++	return disasm_iter_full(handle, code, size, address, insn);
 +#else
  	return cs_disasm_iter_core(ud, code, size, address, insn);
 -}

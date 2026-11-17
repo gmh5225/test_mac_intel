@@ -11,7 +11,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-iterator-boundary-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-iterator-tail-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -35,13 +35,13 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-boundary-') as tmp:
   geometry=Geometry(e)
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','scan'):
+  for key in ('base','outline','scan'):
    variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
     run(['git','add','-A'],'stage-tested-source-'+key,s)
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
+    assert tested==json.loads((r/('candidate.json' if key=='scan' else 'input.json')).read_text())['tree'],tested
     write('tested-source-'+key,dict(tree=tested,patch_sha256=sha(variant)))
     run(['git','reset','-q'],'unstage-tested-source-'+key,s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared',*units,'--parallel','4'],'build-'+key)
@@ -57,7 +57,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-boundary-') as tmp:
     with gzip.open(e/(key+'-'+name+'-assembly.txt.gz'),'wb')as out:out.write(sp.check_output(['objdump','-dr',objdir/part]))
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('scan',):
+  for key in ('outline','scan'):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert not added,added
@@ -66,8 +66,16 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-boundary-') as tmp:
    active=bool(changed)
    write('scope-'+key,dict(active=active,source_applies=True,policy='Public iterator selects the scan path once; the x86 decoder and ordinary path instantiate one shared iterator body'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
   assert active
+  assert all(objects['outline'][name]==objects['scan'][name] for name in objects['scan'] if name!='cs.c.o')
+  import re
+  asm=gzip.open(e/'scan-core-assembly.txt.gz','rt').read()
+  match=re.search(r'^[0-9a-f]+ <cs_disasm_iter>:\n(.*?)(?=\n[0-9a-f]+ <|\Z)',asm,re.M|re.S);assert match
+  body=match[1]
+  assert not re.search(r'\t(?:push|pop|call|sub|enter|leave)\s',body),body
+  assert 'X86_disasmIterScan' in body and 'disasm_iter_full' in body,body
+  write('dispatch-codegen',dict(stackless=True,tail_targets=['X86_disasmIterScan','disasm_iter_full'],public_body=body,non_core_runtime_objects_identical_to_outline=len(objects['scan'])-1))
   geometry.finish()
   write('all-binaries',{key:sha(path) for key,path in bins.items()})
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -91,8 +99,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-boundary-') as tmp:
   for x in cases:
    for mode in ((0,2) if x['name']=='arm64-ls' else (0,1,2) if x['name']=='jpeg-avx2-i386' else (2,)):
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*160e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','scan']
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','aa','outline','scan']
      for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
