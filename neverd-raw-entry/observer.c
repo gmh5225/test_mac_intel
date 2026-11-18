@@ -146,8 +146,15 @@ static void raw_entry_walk(const arm_thread_state64_t *regs) {
   if (ipset ||
       unw_set_reg(&cursor, UNW_REG_SP, sp) || raw_pc(&cursor) != pc ||
       unw_get_proc_info(&cursor, &info) || info.start_ip != pc ||
-      info.end_ip <= pc || unw_step(&cursor) <= 0)
+      info.end_ip <= pc)
     _exit(37);
+  unw_word_t cur_lr, cur_sp;
+  unw_get_reg(&cursor, UNW_ARM64_LR, &cur_lr);
+  unw_get_reg(&cursor, UNW_REG_SP, &cur_sp);
+  fprintf(stderr,"exact before step live_lr=%lx sys_lr=%lx cur_lr=%lx sp=%lx csp=%lx fmt=%x\n",live_lr,system_lr,(unsigned long)cur_lr,sp,(unsigned long)cur_sp,(unsigned)info.format);
+  if (unw_step(&cursor) <= 0)
+    _exit(40);
+  fprintf(stderr,"exact step returned\n");
   check_raw_caller(&cursor, sp);
   exact_entry = 1;
 }

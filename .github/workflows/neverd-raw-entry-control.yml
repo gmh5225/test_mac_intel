@@ -34,5 +34,10 @@ jobs:
           /usr/bin/clang -target arm64e-apple-macosx15.0 -O2 -I../neverd/include observer.c caller.S -o observer
           /usr/bin/codesign --verify --strict frame.dylib
           /usr/bin/codesign --verify --strict observer
-          ./observer ./frame.dylib 0 3 sample raw-entry raw-entry
-          cat sample
+          for i in 1 2 3; do
+            ./observer ./frame.dylib 0 3 sample raw-entry raw-entry || {
+              /usr/bin/lldb --batch -o 'process handle SIGUSR1 -s false -n false -p true' -o run -o 'bt' -o 'register read pc lr sp fp' -- ./observer ./frame.dylib 0 3 sample raw-entry raw-entry
+              exit 1
+            }
+            cat sample
+          done
