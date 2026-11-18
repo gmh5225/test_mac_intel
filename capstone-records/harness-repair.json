@@ -1,0 +1,17 @@
+{
+  "source_tree": "313cbfb229a8d3d68c32d09e94f1293e4350c47f",
+  "product_source_changed": false,
+  "initial_run": 44300389411,
+  "failed_boundary": "Runtime object scope assertion after all unit and fixture tests passed",
+  "unexpected_object": "arch/RISCV/RISCVInstPrinter.c.o",
+  "source_chain": [
+    "arch/RISCV/RISCVInstPrinter.c:45 includes RISCVGenCompressedInstructionsInfo.inc",
+    "RISCVInstPrinter.c:428 invokes uncompressInst",
+    "RISCVGenCompressedInstructionsInfo.inc:1530 and later invoke MCOperand_CreateReg0/CreateImm0"
+  ],
+  "correction": "Include the verified generated-code constructor caller in the allowed object set; rerun the two affected all-backend configurations without changing the candidate or weakening other object checks",
+  "initial_logs": [
+    "clang-initial-job.log.gz",
+    "gcc-initial-job.log.gz"
+  ]
+}

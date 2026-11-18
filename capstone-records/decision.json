@@ -1,0 +1,89 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "313cbfb229a8d3d68c32d09e94f1293e4350c47f",
+    "sha256": "9f7a0ed93ad1ac3582268f07cecd799ea8515b2118d3a16f35854b1b6a978f06",
+    "records": {
+      "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
+    }
+  },
+  "native_run": {
+    "id": 44300114379,
+    "head_sha": "679663121e92e6082ba47519e07cc96de884d603",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44300114379",
+    "run_attempt": 1
+  },
+  "profile_run": {
+    "id": 44300389411,
+    "head_sha": "dcc674c525c0aecbeaff11b2035a1da4465b825e",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44300389411",
+    "run_attempt": 1
+  },
+  "profile_scope_recovery_run": {
+    "id": 44302372291,
+    "head_sha": "7871d9c0dc28c7c3ef5e6ef1b6c1969185504d41",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44302372291",
+    "run_attempt": 1
+  },
+  "native_panels": 264,
+  "aa_flags": 9,
+  "losses_over_one_percent": 53,
+  "below_one_descriptive_intervals": 91,
+  "profiles": 9,
+  "unit_executions": 2056,
+  "fixture_executions": 938316,
+  "skipped": [
+    {
+      "host": "coalesced-tags-profiles-macos-15-four-normal-clang",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    },
+    {
+      "host": "coalesced-tags-profiles-windows-2022-four-normal-MD",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    },
+    {
+      "host": "coalesced-tags-profiles-windows-2022-four-normal-MT",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    }
+  ],
+  "semantic_review": "semantic-review.json",
+  "cost_attribution": "cost-attribution.json",
+  "helper_call_evidence": "helper-calls.json",
+  "finding": "Coalesced tag construction reduces operand stores and improves many ARM-host non-x86 paths, but 53 of 264 native panels regress by more than one percent. GCC PE32 detail loses about 4.5 percent in the fixed-image launch; Clang14/18 also have regressions. Hold the candidate.",
+  "root_cause_evidence": "GCC13 creates 1299 physical direct-transfer sites to the new MCOperand_initReg/Imm helpers. The frozen PE32 formatting workload executes 34287 such transfers in three traversals, adding helper call/return work. Both Clang builds have no such outlined helpers. This demonstrates a specific GCC lowering defect in the prototype; it does not explain all reader inlining or all native timing differences.",
+  "portable_recovery": "Initial all-backend Clang/GCC jobs passed units and fixtures, then failed the object-scope assertion because the scope omitted RISCVInstPrinter.c. Its included RISCVGenCompressedInstructionsInfo.inc invokes the changed constructors during uncompressInst. Two repaired configurations passed with the identical candidate tree. The final nine-profile coverage combines seven successful initial configurations and these two reruns; initial failure evidence and cleanup are retained.",
+  "limits": "All nine A/A flags retained; 21-cycle bootstrap intervals are descriptive without multiplicity correction. All 23 backends build on Linux Clang/GCC, but fixture coverage is limited to existing MC directories and units. Six x87 hardware executions are skipped on Windows/macOS. ASan/UBSan exact-source semantic tests pass; sanitizer object identity is not asserted. Iced and current NeverD product qualification were not run after this failed performance screen.",
+  "cleanup_bytes_removed": 42251818912
+}
