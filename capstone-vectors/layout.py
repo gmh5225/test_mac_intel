@@ -1,79 +1,99 @@
 from pathlib import Path
+from collections import defaultdict
 import hashlib
+import re
+import subprocess as sp
+
 from elftools.elf.elffile import ELFFile
 
 
-def object_sections(path):
-    with Path(path).open('rb') as stream:
-        elf = ELFFile(stream)
-        rows = []
-        for sec in elf.iter_sections():
-            if sec['sh_flags'] & 2:
-                rows.append((sec.name, sec['sh_type'], sec['sh_flags'], sec['sh_size'],
-                             sec['sh_addralign'], hashlib.sha256(sec.data()).hexdigest()))
-        relocations = []
-        for sec in elf.iter_sections():
-            if sec['sh_type'] not in ('SHT_RELA', 'SHT_REL'):
-                continue
-            target = elf.get_section(sec['sh_info']).name
-            symbols = elf.get_section(sec['sh_link'])
-            for rel in sec.iter_relocations():
-                sym = symbols.get_symbol(rel['r_info_sym'])
-                name = sym.name
-                if sym['st_info']['type'] == 'STT_SECTION':
-                    name = 'section:' + elf.get_section(sym['st_shndx']).name
-                relocations.append((target, rel['r_offset'], rel['r_info_type'],
-                                    rel.entry.get('r_addend', 0), name))
-        return rows, sorted(relocations)
+def ordinary_text_proof(before, after, active):
+    def load(path):
+        with Path(path).open('rb') as stream:
+            elf = ELFFile(stream)
+            text = elf.get_section_by_name('.text')
+            index = elf.get_section_index('.text')
+            table = elf.get_section_by_name('.symtab')
+            functions = {s.name: (s['st_value'], s['st_size']) for s in table.iter_symbols()
+                         if s['st_info']['type'] == 'STT_FUNC' and s['st_shndx'] == index}
+            data = {section.name: section.data() for section in elf.iter_sections()
+                    if section['sh_type'] == 'SHT_PROGBITS' and section.name != '.text'}
+            relocations = []
+            section = elf.get_section_by_name('.rela.text')
+            if section:
+                for rel in section.iter_relocations():
+                    symbol = table.get_symbol(rel['r_info_sym'])
+                    name = symbol.name
+                    target = name
+                    if isinstance(symbol['st_shndx'], int) and symbol['st_info']['type'] != 'STT_FUNC':
+                        sec = elf.get_section(symbol['st_shndx'])
+                        target = (sec.name, symbol['st_value'], symbol['st_size'])
+                    relocations.append(dict(offset=rel['r_offset'], kind=rel['r_info_type'], target=target,
+                        name=name, addend=rel['r_addend']))
+            target = table.get_symbol_by_name('decodeVex32OrGeneric')
+            target = None if not target else (elf.get_section(target[0]['st_shndx']).name, target[0]['st_value'])
+            return text.data(), functions, relocations, data, target
 
-
-def decoder_proof(before, after):
-    left, left_rel = object_sections(before)
-    right, right_rel = object_sections(after)
-    assert left == right, (left, right)
-    changed = [x for x in right_rel if x[-1] == 'X86_decodeScanFeatureExtension']
-    assert changed
-    normalized = sorted((*x[:-1], 'X86_decodeFeatureExtension'
-                         if x[-1] == 'X86_decodeScanFeatureExtension' else x[-1])
-                        for x in right_rel)
-    assert left_rel == normalized
-    return dict(all_allocated_section_bytes_sizes_alignments_identical=True,
-                only_relocation_change='X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension',
-                changed_call_sites=changed)
-
-
-def leaf_proof(path):
-    sections, _ = object_sections(path)
-    extra_text = [x for x in sections if x[0] == '.cs_x86_evex_scan_text']
-    extra_data = [x for x in sections if x[0] == '.cs_x86_evex_scan_rodata']
-    assert len(extra_text) == len(extra_data) == 1
-    assert 0 < extra_text[0][3] <= 512, extra_text
-    assert 452 <= extra_data[0][3] <= 512, extra_data
-    other = [x for x in sections if x[0] not in (
-        '.cs_x86_evex_scan_text', '.cs_x86_evex_scan_rodata', '.eh_frame', '.note.gnu.property') and x[3]]
-    assert not other, other
-    return dict(sections=sections, no_ordinary_code_or_data=True)
+    left, fa, ra, da, _ = load(before)
+    right, fb, rb, db, target = load(after)
+    result = dict(active=active, before_size=len(left), after_size=len(right),
+                  original_functions=fa, candidate_functions=fb,
+                  function_positions_and_sizes_identical=fa == fb)
+    if not active:
+        result['passed'] = Path(before).read_bytes() == Path(after).read_bytes()
+        return result
+    assembly = sp.check_output(['objdump', '-dr', before], text=True)
+    calls = [int(m[1], 16) for m in re.finditer(
+        r'^\s*([0-9a-f]+):.*\b(?:callq?|jmpq?)\s+[^\n]*<decodeScanResultGeneric>', assembly, re.M)]
+    result['generic_calls'] = calls
+    if not calls or len(left) != len(right) or not target:
+        result['passed'] = False
+        return result
+    a, b = bytearray(left), bytearray(right)
+    records, redirected = [], set()
+    for pc in calls:
+        old = pc + 5 + int.from_bytes(left[pc + 1:pc + 5], 'little', signed=True)
+        refs = [v for v in rb if v['offset'] == pc + 1]
+        valid = len(refs) == 1 and (
+            (refs[0]['target'] == (target[0], 0, 0) and refs[0]['addend'] + 4 == target[1]) or
+            (refs[0]['target'] == 'decodeVex32OrGeneric' and refs[0]['addend'] == -4))
+        records.append(dict(pc=pc, before_target=old, after=refs,
+            passed=left[pc] == right[pc] and left[pc] in (0xe8, 0xe9) and old == fa['decodeScanResultGeneric'][0] and valid))
+        a[pc + 1:pc + 5] = b[pc + 1:pc + 5] = bytes(4)
+        redirected.add(pc + 1)
+    normalize = lambda rows: [(x['offset'], x['kind'], x['target'], x['addend']) for x in rows]
+    rb_other = [x for x in rb if x['offset'] not in redirected]
+    referenced = {x['target'][0] for x in ra if isinstance(x['target'], tuple)}
+    data_proof = {name: dict(before_sha256=hashlib.sha256(da[name]).hexdigest(),
+                            original_bytes_preserved=db.get(name, b'')[:len(da[name])] == da[name])
+                  for name in referenced if name in da}
+    result.update(redirects=records, dispatcher=target, original_data=data_proof,
+        normalized_relocations_identical=normalize(ra) == normalize(rb_other),
+        original_relocations=ra, candidate_relocations=rb,
+        masked_text_identical=a == b, before_masked_sha256=hashlib.sha256(a).hexdigest(),
+        after_masked_sha256=hashlib.sha256(b).hexdigest())
+    result['passed'] = (fa == fb and a == b and all(x['passed'] for x in records) and
+        result['normalized_relocations_identical'] and all(x['original_bytes_preserved'] for x in data_proof.values()))
+    return result
 
 
 def symbols(path, kinds):
-    rows = []
+    result = defaultdict(list)
     for line in Path(path).read_text().splitlines():
-        fields = line.split(maxsplit=3)
-        if len(fields) == 4 and fields[2] in kinds:
-            rows.append((fields[3], fields[2], int(fields[0], 16), int(fields[1], 16)))
-    return sorted(rows)
+        match = re.match(r'([0-9a-fA-F]+) ([0-9a-fA-F]+) (\S) (.+)$', line)
+        if match and match[3] in kinds:
+            result[match[4]].append((match[3], int(match[1], 16), int(match[2], 16)))
+    return dict(result)
 
 
-def linked_proof(before, after):
-    old_text, new_text = symbols(before, 'tTwW'), symbols(after, 'tTwW')
-    entries = [x for x in new_text if x[0] == 'X86_decodeScanFeatureExtension' or x[0].startswith('decodeEvexRegisterScan')]
-    retained = [x for x in new_text if x not in entries]
-    assert len(entries) == 2
-    assert old_text == retained, dict(missing=sorted(set(old_text)-set(retained))[:12],
-                                      changed=sorted(set(retained)-set(old_text))[:12])
-    old_data = symbols(before, 'rR')
-    new_data = [x for x in symbols(after, 'rR') if x[0] not in ('evex_scan_index', 'evex_scan_plans')]
-    assert old_data == new_data, dict(missing=sorted(set(old_data)-set(new_data))[:12],
-                                      changed=sorted(set(new_data)-set(old_data))[:12])
-    return dict(original_text_positions_identical=True, original_readonly_positions_identical=True,
-                text_symbols=len(old_text), readonly_symbols=len(old_data), new_entries=entries)
+def linked_layout(before, after, label):
+    assert label == 'output'
+    result = dict(captured=True, criterion='Require ordinary decoder object text and relocation identity except the verified fallback target, then retain every linked symbol movement for actual throughput qualification.')
+    for category, kinds in (('text', 'tTwW'), ('readonly', 'rR'), ('writable', 'bBdDgGsSvV')):
+        left, right = symbols(before, kinds), symbols(after, kinds)
+        common = left.keys() & right.keys()
+        result[category] = dict(original_symbols=len(left), unchanged=sum(left[k] == right[k] for k in common),
+            changed=[dict(symbol=k, before=left[k], after=right[k]) for k in sorted(common) if left[k] != right[k]],
+            removed=[dict(symbol=k, positions=left[k]) for k in sorted(left.keys() - right.keys())],
+            added=[dict(symbol=k, positions=right[k]) for k in sorted(right.keys() - left.keys())])
+    return result

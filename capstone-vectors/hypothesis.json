@@ -1,0 +1,750 @@
+{
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "previous": "../round1418-vex32-cold-entry",
+  "previous_failed_gate_preserved": true,
+  "observation": "All ordinary decoder instructions and function positions are identical. Clang14 changes 28 existing table references by +32 bytes; Clang18 changes one by +36 bytes. The new local 24-byte ModR/M displacement-length table was the one new named constant not assigned to the isolated plan section.",
+  "hypothesis": "Move only that constant to the existing isolated plan section and retain the exact strict text/data/relocation gate. If the gate passes with every old rodata byte preserved, that omitted table was sufficient to cause the prior layout failure.",
+  "runtime_change": "The reader and all values are unchanged. Extend the data-section macro lifetime through the reader and annotate its local extra[3][8] constant.",
+  "compiler_proofs": [
+    {
+      "profile": "vex32-cold-entry-cost-ubuntu-22.04-clang-1",
+      "ordinary_text_identical": true,
+      "changed_existing_relocations": [
+        {
+          "offset": 321513,
+          "before": {
+            "offset": 321513,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 321513,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 321780,
+          "before": {
+            "offset": 321780,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 321780,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 325175,
+          "before": {
+            "offset": 325175,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 325175,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 325442,
+          "before": {
+            "offset": 325442,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 325442,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 330080,
+          "before": {
+            "offset": 330080,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 330080,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 335655,
+          "before": {
+            "offset": 335655,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 335655,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 343091,
+          "before": {
+            "offset": 343091,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 343091,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 348291,
+          "before": {
+            "offset": 348291,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 348291,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 353499,
+          "before": {
+            "offset": 353499,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 353499,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 353766,
+          "before": {
+            "offset": 353766,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 353766,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 357117,
+          "before": {
+            "offset": 357117,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 357117,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 357384,
+          "before": {
+            "offset": 357384,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 357384,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 361199,
+          "before": {
+            "offset": 361199,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 361199,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 361466,
+          "before": {
+            "offset": 361466,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 361466,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 366631,
+          "before": {
+            "offset": 366631,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 366631,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 366898,
+          "before": {
+            "offset": 366898,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 366898,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 371517,
+          "before": {
+            "offset": 371517,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 371517,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 371784,
+          "before": {
+            "offset": 371784,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 371784,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 379387,
+          "before": {
+            "offset": 379387,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 379387,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 379654,
+          "before": {
+            "offset": 379654,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 379654,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 383742,
+          "before": {
+            "offset": 383742,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 383742,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 390123,
+          "before": {
+            "offset": 390123,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 390123,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 390390,
+          "before": {
+            "offset": 390390,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 390390,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 394478,
+          "before": {
+            "offset": 394478,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 394478,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 400631,
+          "before": {
+            "offset": 400631,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 400631,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 405640,
+          "before": {
+            "offset": 405640,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719204
+          },
+          "after": {
+            "offset": 405640,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719236
+          }
+        },
+        {
+          "offset": 405907,
+          "before": {
+            "offset": 405907,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 405907,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        },
+        {
+          "offset": 416734,
+          "before": {
+            "offset": 416734,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719460
+          },
+          "after": {
+            "offset": 416734,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 719492
+          }
+        }
+      ],
+      "original_rodata_preserved": false
+    },
+    {
+      "profile": "vex32-cold-entry-cost-ubuntu-24.04-clang-1",
+      "ordinary_text_identical": true,
+      "changed_existing_relocations": [
+        {
+          "offset": 290115,
+          "before": {
+            "offset": 290115,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 713440
+          },
+          "after": {
+            "offset": 290115,
+            "kind": 2,
+            "target": [
+              ".rodata",
+              0,
+              0
+            ],
+            "name": "",
+            "addend": 713476
+          }
+        }
+      ],
+      "original_rodata_preserved": false
+    }
+  ],
+  "publication_qualified": false
+}
