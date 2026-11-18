@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import gzip
 import json
 import os
 import shutil
@@ -17,7 +18,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-init-domain-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-optional-mapper-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
@@ -25,8 +26,8 @@ try:
  canonical=sp.check_output(['git','show','HEAD:capstone-output-release/combined.patch'],cwd=r.parent)
  assert hashlib.sha256(canonical).hexdigest()==meta['sha256']
  patch=w/'candidate.patch';patch.write_bytes(canonical)
- architectures={'four':['ARM','AARCH64','MIPS','X86'],'extra':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE'],'mips':['MIPS'],'arm':['ARM'],'x86':['X86'],'aarch64':['AARCH64'],'riscv':['RISCV']}[archs]
- arm_policy_active=archs=='four'
+ architectures={'four':['ARM','AARCH64','MIPS','X86'],'extra':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE'],'mips':['MIPS'],'arm':['ARM'],'x86':['X86'],'aarch64':['AARCH64'],'riscv':['RISCV'],'affected':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE','BPF','SPARC','SYSTEMZ','XTENSA']}[archs]
+ arm_policy_active=False
  opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in architectures],'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
  if os.name=='nt':opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if cc=='MT' else 'OFF')]
  else:
@@ -42,17 +43,6 @@ try:
    run(['git','apply',patch],'apply')
    run(['git','add','-A'],'stage')
    tree=sp.check_output(['git','write-tree'],cwd=s,text=True).strip();assert tree==meta['tree']
-  if phase=='observer':
-   h=s/'MCInst.h';text=h.read_text();needle='assert(i < MAX_MC_OPS);';assert text.count(needle)==1
-   text=text.replace(needle,'if (i >= inst->size) { fprintf(stderr, "ARM operand read before construction: opcode=%u size=%u index=%u\\n", inst->Opcode, inst->size, i); abort(); }')
-   if profile=='diet':
-    text=text.replace('static inline MCOperand *MCInst_getOperand', 'bool cs_test_arm_mcinst(const MCInst *inst);\nstatic inline MCOperand *MCInst_getOperand')
-    text=text.replace('if (i >= inst->size)', 'if (cs_test_arm_mcinst(inst) && i >= inst->size)')
-    owner=s/'MCInst.c'
-    owner.write_text(owner.read_text()+'\n#include "cs_priv.h"\nbool cs_test_arm_mcinst(const MCInst *inst) { return inst->csh && inst->csh->arch == CS_ARCH_ARM; }\n')
-   text=text.replace('#include <assert.h>','#include <assert.h>\n#include <stdio.h>\n#include <stdlib.h>');h.write_text(text)
-   core=s/'cs.c';text=core.read_text();assert text.count('MCInst mci;')==1
-   core.write_text(text.replace('MCInst mci;','MCInst mci;\nif (handle->arch == CS_ARCH_ARM) memset(&mci, 0xa5, sizeof(mci));'))
   targets=[] if phase!='observer' else ['--target','capstone_static',*(['arm_post_index','arm_private_stream','arm_reg_access','cstest'] if profile!='diet' else ['api','instruction_bytes','sstream'])]
   run(['cmake','--build',b,'--config','Release',*targets,'--parallel','4'],phase+'-build')
   diet_units=['api','utils','mapping','register_descriptors','sstream','instruction_bytes','mcinst','feature_mode',
@@ -65,22 +55,22 @@ try:
   tests[phase]=(e/(phase+'-tests.log')).read_text(errors='replace')
   if profile!='diet':
    binary=b/'suite/cstest'/('Release/cstest.exe' if os.name=='nt' else 'cstest')
-   fixture_archs=['ARM'] if phase=='observer' else [a for a in ('ARM','AARCH64','MIPS','RISCV') if a in architectures]
-   folders={'ARM':'ARM','AARCH64':'AArch64','MIPS':'Mips','RISCV':'RISCV'}
+   fixture_archs=[a for a in architectures if a!='X86']
+   folders={'ARM':'ARM','AARCH64':'AArch64','MIPS':'Mips','RISCV':'RISCV','PPC':'PowerPC','LOONGARCH':'LoongArch','ARC':'ARC','TRICORE':'TriCore','BPF':'BPF','SPARC':'Sparc','SYSTEMZ':'SystemZ','XTENSA':'Xtensa'}
    for arch in fixture_archs:run([binary,s/'tests/MC'/folders[arch]],phase+'-'+arch.lower()+'-fixtures')
   if phase!='observer' and os.name!='nt':
    objects[phase]={str(f.relative_to(b/'CMakeFiles/capstone.dir')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
-  for name in [phase+'-tests',*[phase+'-'+a+'-fixtures' for a in ('arm','aarch64','mips','riscv')]]:
+  for name in [phase+'-tests',*[phase+'-'+a+'-fixtures' for a in ('arm','aarch64','mips','riscv','ppc','loongarch','arc','tricore','bpf','sparc','systemz','xtensa')]]:
    f=e/(name+'.log')
    if f.exists():
     log=f.read_text(errors='replace');assert 'runtime error:' not in log and 'ERROR: AddressSanitizer' not in log
+    if f.stat().st_size>1000000:
+     raw=f.read_bytes();z=f.with_suffix(f.suffix+'.gz');z.write_bytes(gzip.compress(raw,mtime=0));assert gzip.decompress(z.read_bytes())==raw;f.unlink()
  if objects:
   assert objects['base'].keys()==objects['candidate'].keys()
   changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
-  allowed={'cs.c.o'} if archs!='x86' else set()
-  if 'RISCV' in architectures:allowed.add('arch/RISCV/RISCVInstPrinter.c.o')
-  assert set(changed)<=allowed,changed
-  if arm_policy_active:assert 'cs.c.o' in changed
+  allowed={'cs.c.o','arch/X86/X86DisassemblerDecoder.c.o',*[f'arch/{folder}/{name}Module.c.o' for folder,name in [('AArch64','AArch64'),('ARM','ARM'),('Mips','Mips'),('ARC','ARC'),('BPF','BPF'),('LoongArch','LoongArch'),('PowerPC','PPC'),('Sparc','Sparc'),('SystemZ','SystemZ'),('TriCore','TriCore'),('Xtensa','Xtensa')]]}
+  assert set(changed)==allowed,changed
   save('runtime-objects',dict(changed=changed,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
  save('complete',dict(profile=profile,compiler=cc,archs=archs,arm_policy_active=arm_policy_active,architectures=architectures,tested_tree=tree,phases=list(tests),observer_executed=arm_policy_active,observer_arm_owner_filtered=arm_policy_active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
 finally:

@@ -1,12 +1,12 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "basis": [
-    "R1473 Clang retains one extra MIPS dispatch instruction per decode; R1475 eliminates redundant zeroing of tied operand indices.",
-    "R1473 GCC adds one Ir, Dr and Dw per AArch64 decode inside cs_decode_full_insn. The fallback architecture is known, but MCInst_Init remains an external call with a generic SystemZ dialect test. Inline the existing full-initialization owner and test whether this removes the measured call-boundary cost."
-  ],
-  "change": "Use the existing owning full initializer inline with constant CS_ARCH_AARCH64 in the exact four-backend fallback. Continue complete operand clearing for AArch64. Retain R1475 partial-initializer range splitting.",
-  "invariant": "cs_open rejects unavailable architectures. In exact ARM/AArch64/MIPS/X86 builds, X86 and ARM/MIPS have already selected their initializers; only AArch64 can reach the full fallback.",
-  "validation": "ARM records, poisoned operands and read-before-construction observer; AArch64 full public records/cursors/errors across both byte orders, text/detail/skip options and truncated or malformed words; mcinst complete-byte default checks for all enum values. Then codegen gate and native controls.",
-  "publication_qualified": false,
-  "codegen_gate": "Before native timing, no increase in fixed-guest Ir for AArch64 raw, MIPS detail, PE32 format or PE64 format. ARM hosts report unavailable Callgrind and retain native timings."
+  "hypothesis": "An optional private mapper removes an indirect call and return per instruction for eleven architectures whose default callbacks have empty bodies; ordinary custom callbacks retain their original boundary and order.",
+  "evidence": "R1477 source audit: AArch64_get_insn_id is an empty one-byte return; full-cycle sampling motivates but does not prove causal timing attribution.",
+  "scope": "Change only the nullable private callback contract, default assignments, documentation and callback tests. Do not combine with R1476 initialization.",
+  "qualification": "Local four-backend byte-for-byte ARM/AArch64 records, current callback behavior on baseline and candidate; compiler counts and native real corpus before broader profiles. All eleven backend fixtures and private custom callbacks required before publication.",
+  "risks": [
+    "One extra null branch for required x86 and RISC-V mappers",
+    "Layout changes may affect unrelated decoder timing",
+    "Local four-backend tests do not qualify the other eight default mapper removals"
+  ]
 }

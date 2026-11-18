@@ -1,58 +1,336 @@
-diff --git a/MCInst.h b/MCInst.h
-index 641480ed..109fb678 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -227,8 +227,12 @@ static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
- 			offsetof(MCInst, Operands) + sizeof(inst->Operands);
- 		memset(inst, 0,
- 		       offsetof(MCInst, Operands) + sizeof(inst->Operands[0]));
-+		/* The tied operand indices are initialized to -1 below. */
-+		const size_t ties_begin = offsetof(MCInst, tied_op_idx);
-+		const size_t ties_end = ties_begin + sizeof(inst->tied_op_idx);
- 		memset((char *)inst + operands_end, 0,
--		       sizeof(*inst) - operands_end);
-+		       ties_begin - operands_end);
-+		memset((char *)inst + ties_end, 0, sizeof(*inst) - ties_end);
- 	}
- 	/* All zero-valued defaults are established by the clear above. */
- 	memset(inst->tied_op_idx, -1, sizeof(inst->tied_op_idx));
-diff --git a/cs.c b/cs.c
-index 71fff034..15aadb35 100644
---- a/cs.c
-+++ b/cs.c
-@@ -1076,11 +1076,20 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	else
+diff --git a/arch/AArch64/AArch64Module.c b/arch/AArch64/AArch64Module.c
+index 2adf7810..8dfae31e 100644
+--- a/arch/AArch64/AArch64Module.c
++++ b/arch/AArch64/AArch64Module.c
+@@ -22,7 +22,7 @@ cs_err AArch64_global_init(cs_struct *ud)
+ 	ud->getinsn_info = mri;
+ 	ud->disasm = AArch64_getInstruction;
+ 	ud->reg_name = AArch64_reg_name;
+-	ud->insn_id = AArch64_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = AArch64_insn_name;
+ 	ud->group_name = AArch64_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/ARC/ARCModule.c b/arch/ARC/ARCModule.c
+index 6999e661..23f9521c 100644
+--- a/arch/ARC/ARCModule.c
++++ b/arch/ARC/ARCModule.c
+@@ -22,7 +22,7 @@ cs_err ARC_global_init(cs_struct *ud)
+ 	ud->printer = ARC_printer;
+ 	ud->printer_info = mri;
+ 	ud->reg_name = ARC_reg_name;
+-	ud->insn_id = ARC_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = ARC_insn_name;
+ 	ud->group_name = ARC_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/ARM/ARMModule.c b/arch/ARM/ARMModule.c
+index 7f124ca8..e2190df4 100644
+--- a/arch/ARM/ARMModule.c
++++ b/arch/ARM/ARMModule.c
+@@ -22,7 +22,7 @@ cs_err ARM_global_init(cs_struct *ud)
+ 	ud->printer = ARM_printer;
+ 	ud->printer_info = mri;
+ 	ud->reg_name = ARM_reg_name;
+-	ud->insn_id = ARM_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = ARM_insn_name;
+ 	ud->group_name = ARM_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/BPF/BPFModule.c b/arch/BPF/BPFModule.c
+index d744b827..e05a2011 100644
+--- a/arch/BPF/BPFModule.c
++++ b/arch/BPF/BPFModule.c
+@@ -12,7 +12,7 @@ cs_err BPF_global_init(cs_struct *ud)
+ {
+ 	ud->printer = BPF_printInst;
+ 	ud->reg_name = BPF_reg_name;
+-	ud->insn_id = BPF_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = BPF_insn_name;
+ 	ud->group_name = BPF_group_name;
+ #ifndef CAPSTONE_DIET
+diff --git a/arch/LoongArch/LoongArchModule.c b/arch/LoongArch/LoongArchModule.c
+index fea4271a..f08173b5 100644
+--- a/arch/LoongArch/LoongArchModule.c
++++ b/arch/LoongArch/LoongArchModule.c
+@@ -23,7 +23,7 @@ cs_err LoongArch_global_init(cs_struct *ud)
+ 	ud->printer = LoongArch_printer;
+ 	ud->printer_info = mri;
+ 	ud->reg_name = LoongArch_reg_name;
+-	ud->insn_id = LoongArch_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = LoongArch_insn_name;
+ 	ud->group_name = LoongArch_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/Mips/MipsModule.c b/arch/Mips/MipsModule.c
+index e774efa0..3b12f21e 100644
+--- a/arch/Mips/MipsModule.c
++++ b/arch/Mips/MipsModule.c
+@@ -23,7 +23,7 @@ cs_err Mips_global_init(cs_struct *ud)
+ 	ud->printer_info = mri;
+ 	ud->getinsn_info = mri;
+ 	ud->reg_name = Mips_reg_name;
+-	ud->insn_id = Mips_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = Mips_insn_name;
+ 	ud->group_name = Mips_group_name;
+ 	ud->disasm = Mips_getInstruction;
+diff --git a/arch/PowerPC/PPCModule.c b/arch/PowerPC/PPCModule.c
+index ea0d51ee..c2a375f4 100644
+--- a/arch/PowerPC/PPCModule.c
++++ b/arch/PowerPC/PPCModule.c
+@@ -23,7 +23,7 @@ cs_err PPC_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = PPC_reg_name;
+-	ud->insn_id = PPC_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = PPC_insn_name;
+ 	ud->group_name = PPC_group_name;
+ 
+diff --git a/arch/Sparc/SparcModule.c b/arch/Sparc/SparcModule.c
+index e3684dd3..89b4a99d 100644
+--- a/arch/Sparc/SparcModule.c
++++ b/arch/Sparc/SparcModule.c
+@@ -23,7 +23,7 @@ cs_err Sparc_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = Sparc_reg_name;
+-	ud->insn_id = Sparc_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = Sparc_insn_name;
+ 	ud->group_name = Sparc_group_name;
+ 
+diff --git a/arch/SystemZ/SystemZModule.c b/arch/SystemZ/SystemZModule.c
+index 2dc87fa2..be63a21d 100644
+--- a/arch/SystemZ/SystemZModule.c
++++ b/arch/SystemZ/SystemZModule.c
+@@ -23,7 +23,7 @@ cs_err SystemZ_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = SystemZ_reg_name;
+-	ud->insn_id = SystemZ_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = SystemZ_insn_name;
+ 	ud->group_name = SystemZ_group_name;
+ 
+diff --git a/arch/TriCore/TriCoreModule.c b/arch/TriCore/TriCoreModule.c
+index 513461c2..4f83ea4a 100644
+--- a/arch/TriCore/TriCoreModule.c
++++ b/arch/TriCore/TriCoreModule.c
+@@ -23,7 +23,7 @@ cs_err TRICORE_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = TriCore_getRegisterName;
+-	ud->insn_id = TriCore_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = TriCore_insn_name;
+ 	ud->group_name = TriCore_group_name;
+ 
+diff --git a/arch/Xtensa/XtensaModule.c b/arch/Xtensa/XtensaModule.c
+index c2d5d08d..8699d106 100644
+--- a/arch/Xtensa/XtensaModule.c
++++ b/arch/Xtensa/XtensaModule.c
+@@ -20,7 +20,7 @@ cs_err Xtensa_global_init(cs_struct *ud)
+ 	ud->getinsn_info = mri;
+ 	ud->disasm = Xtensa_disasm;
+ 	ud->reg_name = Xtensa_reg_name;
+-	ud->insn_id = Xtensa_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = Xtensa_insn_name;
+ 	ud->group_name = Xtensa_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..a17c29f0 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -49,7 +49,8 @@ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+ 			     X86_get_insn_id_no_detail(handle, insn, id)))
+ 		return;
  #endif
- #ifdef CAPSTONE_HAS_MIPS
--	if (handle->arch == CS_ARCH_MIPS)
--		/* MIPS constructs each MCOperand before reading it. The public
--		 * detail and alias records are reset by the MIPS decoder. */
--		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
--	else
-+#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
-+		/* cs_open admits only these four architectures; X86 is handled above. */
-+		if (handle->arch != CS_ARCH_AARCH64)
-+#else
-+		if (handle->arch == CS_ARCH_MIPS)
-+#endif
-+			/* ARM and MIPS construct operands before reading them. Keep
-+		 * operand zero and every common metadata default initialized. */
-+			MCInst_InitStorage(&mci,
-+					   handle->arch == CS_ARCH_ARM ?
-+						   CS_ARCH_ARM :
-+						   CS_ARCH_MIPS,
-+					   false);
-+		else
- #endif
- #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
- 		/* ARM constructs each operand before reading or inserting it. */
-@@ -1094,6 +1103,9 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * performs better on some full-detail workloads with the shared
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
-+#elif defined(CAPSTONE_ARM_AARCH64_MIPS_X86)
-+	/* Only AArch64 remains after the X86 and constructed-operand paths. */
-+	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, true);
- #else
- 	MCInst_Init(&mci, handle->arch);
- #endif
+-	handle->insn_id(handle, insn, id);
++	if (handle->insn_id)
++		handle->insn_id(handle, insn, id);
+ }
+ 
+ static inline bool use_x86_scan(const cs_struct *handle)
+diff --git a/cs_priv.h b/cs_priv.h
+index 95d36ef5..d286e60c 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -114,7 +114,7 @@ struct cs_struct {
+ 	GetName_t reg_name;
+ 	GetName_t insn_name;
+ 	GetName_t group_name;
+-	GetID_t insn_id;
++	GetID_t insn_id; // Optional: NULL when the decoder already maps IDs.
+ 	PostPrinter_t post_printer;
+ 	cs_err errnum;
+ 	ARM_ITBlock ITBlock; // for Arm only
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 8daabd98..49a60d4c 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -157,6 +157,10 @@ all cache offsets/hints/base registers, and MT result fields.
+ 
+ ### Component 2 - Mapping logic
+ 
++The private `cs_struct.insn_id` callback is optional. Backends that already map
++public IDs during decoding leave it `NULL`; the core invokes a non-null mapper
++after successful decoding and before printing, in both iterator and batch APIs.
++
+ The mapping component has three different task:
+ 
+ 1. Serving as programmable interface for the Capstone core to the LLVM code.
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 7f588c14..f42dacc2 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -255,6 +255,136 @@ static bool test_full_group_map(void)
+ 	return true;
+ }
+ 
++static unsigned callback_stage;
++static unsigned callback_id;
++static bool callback_order;
++
++static bool callback_decode(csh handle, const uint8_t *code, size_t length,
++			    MCInst *mi, uint16_t *size, uint64_t address,
++			    void *info)
++{
++	(void)handle;
++	(void)address;
++	(void)info;
++	callback_order &= callback_stage == 0;
++	callback_stage = 1;
++	if (!length || !code[0])
++		return false;
++	mi->flat_insn->id = 42;
++	MCInst_setOpcode(mi, 17);
++	*size = 1;
++	return true;
++}
++
++static void callback_map(cs_struct *handle, cs_insn *insn, unsigned id)
++{
++	(void)handle;
++	callback_order &= callback_stage == 1 && id == 17 && insn->id == 42 &&
++			  insn->size == 1;
++	callback_stage = 2;
++	insn->id = 57;
++}
++
++static void callback_print(MCInst *mi, SStream *stream, void *info)
++{
++	(void)info;
++	callback_order &= callback_stage == (callback_id == 57 ? 2u : 1u) &&
++			  mi->flat_insn->id == callback_id;
++	callback_stage = 3;
++	SStream_concat0(stream, "mapped\tvalue");
++}
++
++static bool test_mapper_callbacks(void)
++{
++	static const struct {
++		cs_arch arch;
++		cs_mode mode;
++	} cases[] = {
++		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN },
++		{ CS_ARCH_ARM, CS_MODE_ARM },
++		{ CS_ARCH_MIPS, CS_MODE_MIPS32 },
++		{ CS_ARCH_ARC, CS_MODE_LITTLE_ENDIAN },
++		{ CS_ARCH_BPF, CS_MODE_BPF_EXTENDED },
++		{ CS_ARCH_LOONGARCH, CS_MODE_LOONGARCH64 },
++		{ CS_ARCH_PPC, (cs_mode)(CS_MODE_32 | CS_MODE_BIG_ENDIAN) },
++		{ CS_ARCH_SPARC, CS_MODE_BIG_ENDIAN },
++		{ CS_ARCH_SYSTEMZ, CS_MODE_BIG_ENDIAN },
++		{ CS_ARCH_TRICORE, CS_MODE_TRICORE_162 },
++		{ CS_ARCH_XTENSA, CS_MODE_XTENSA_ESP32 },
++	};
++	for (size_t i = 0; i < ARR_SIZE(cases); ++i) {
++		if (!cs_support(cases[i].arch))
++			continue;
++		csh handle;
++		if (cs_open(cases[i].arch, cases[i].mode, &handle) != CS_ERR_OK)
++			return false;
++		cs_struct *state = (cs_struct *)(uintptr_t)handle;
++		GetID_t original = state->insn_id;
++		state->disasm = callback_decode;
++		state->printer = callback_print;
++		state->post_printer = NULL;
++		bool ok = true;
++		/* Reuse the handle while replacing and restoring the callback. */
++		for (unsigned flags = 0; flags < 32 && ok; ++flags) {
++			bool custom = flags & 1, text = flags & 2;
++			bool detail = flags & 4, batch = flags & 8;
++			bool valid = !(flags & 16);
++			uint8_t byte = valid ? 1 : 0;
++			state->insn_id = custom ? callback_map : original;
++			callback_id = custom ? 57 : 42;
++			callback_stage = 0;
++			callback_order = true;
++			ok = cs_option(handle, CS_OPT_TEXT,
++				       text ? CS_OPT_ON : CS_OPT_OFF) ==
++				     CS_ERR_OK &&
++			     cs_option(handle, CS_OPT_DETAIL,
++				       detail ? CS_OPT_ON : CS_OPT_OFF) ==
++				     CS_ERR_OK;
++			if (batch) {
++				cs_insn *insn = NULL;
++				size_t count = cs_disasm(handle, &byte, 1,
++							 0x1000, 1, &insn);
++				ok &= count == (size_t)valid;
++				if (count)
++					ok &= insn->id == callback_id &&
++					      insn->size == 1;
++				cs_free(insn, count);
++			} else {
++				cs_insn *insn = cs_malloc(handle);
++				if (!insn) {
++					ok = false;
++					break;
++				}
++				const uint8_t *cursor = &byte;
++				size_t left = 1;
++				uint64_t address = 0x1000;
++				ok &= cs_disasm_iter(handle, &cursor, &left,
++						     &address, insn) == valid;
++				ok &= cursor == &byte + valid &&
++				      left == 1u - valid &&
++				      address == 0x1000u + valid;
++				if (valid)
++					ok &= insn->id == callback_id &&
++					      insn->size == 1;
++				cs_free(insn, 1);
++			}
++			ok &= callback_order &&
++			      callback_stage ==
++				      (valid ? (text ? 3u :
++						       (custom ? 2u : 1u)) :
++					       1u);
++		}
++		cs_close(&handle);
++		if (!ok) {
++			fprintf(stderr,
++				"Mapper callback ordering failed: arch=%u\n",
++				(unsigned)cases[i].arch);
++			return false;
++		}
++	}
++	return true;
++}
++
+ int main(void)
+ {
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+@@ -265,7 +395,8 @@ int main(void)
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
++	return test_mapper_callbacks() && test_full_group_map() &&
++			       test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&
