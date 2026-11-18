@@ -1,5 +1,7 @@
 from pathlib import Path
 import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
+from factorial import controls
+from runtime_probe import cost_probe
 import corpus
 from layout import object_proof, linked_layout
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
@@ -10,7 +12,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-vex32-exception-integrated-mixed-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-iterator-leaf-factorial-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -31,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-exception-integrated-mix
   bins={};objects={};libs={};ownedlibs={}
   write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','signature','classbit'):
+  for key in ('base','candidate'):
    variant=r/(key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
@@ -53,16 +55,17 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-exception-integrated-mix
     write(key+'-linked-layout',linked_layout(e/'base-symbols.txt',e/(key+'-symbols.txt'),key))
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('signature','classbit'):
+  for key in ('candidate',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
    assert added == {'arch/X86/X86Vex32Output.c.o'},added
    assert set(objects['base']) <= set(objects[key])
    assert set(changed) == {'arch/X86/X86OutputIterator.c.o'},changed
    active=bool(changed)
-   write('scope',dict(active=active,source_applies=True,policy='VEX32 exceptional-arm output; only the ordinary iterator and new VEX32 leaf may change; all original vector and other-architecture objects remain byte-identical; every linked relocation is retained'))
+   write('scope',dict(active=active,source_applies=True,policy='Diagnostic iterator/added-object factorial; only the ordinary iterator and new VEX32 leaf may change; all original vector and other-architecture objects remain byte-identical; every linked relocation is retained'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
+  bins.update(controls(b,t,e,s,t/'single.o',t/'baseline-plan.o',run))
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==4;write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -72,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-exception-integrated-mix
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='VEX32 exceptional-arm output; preserve complete records, original images and controlled-image timing panels; iterator lowering is allowed to change and is reported explicitly.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Diagnostic iterator/added-object factorial; preserve complete records, original images and controlled-image timing panels; iterator lowering is allowed to change and is reported explicitly.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -83,12 +86,13 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-exception-integrated-mix
     args=['setarch',platform.machine(),'-R',str(image),*tail]
    return json.loads(sp.check_output(args,text=True))
   data=[]
+  modes={x['name']: ((2,) if x['name']=='arm-ls' else ()) for x in cases}
   for x in cases:
-   for mode in (0,1,2):
+   for mode in modes[x['name']]:
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','signature','classbit']
-     for k in range(32):
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*60e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','aa','iterator','leaf','candidate']
+     for k in range(21):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
@@ -97,6 +101,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-exception-integrated-mix
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  assert len(data)==2
+  cost_probe(bins,cases,t,e,run)
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
