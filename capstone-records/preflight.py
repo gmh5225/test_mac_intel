@@ -3,6 +3,7 @@ import json
 import os
 import subprocess as sp
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir(exist_ok=True)
+(e/'cpuinfo.txt').write_text(Path('/proc/cpuinfo').read_text())
 installed=sorted(Path('/usr/lib/linux-tools').glob('*/perf'))
 assert installed
 perf=str(installed[-1]);setting=Path('/proc/sys/kernel/perf_event_paranoid');original=setting.read_text().strip()

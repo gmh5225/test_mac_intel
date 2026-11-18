@@ -55,8 +55,10 @@ def cost_probe(binaries,cases,temporary,evidence,run):
         if set(counts)!=set(events):return None
         return dict(counts=counts,running_percent=running)
     groups={'core':['cycles:u','instructions:u','branches:u','branch-misses:u'],
-            'memory':['cycles:u','cache-misses:u','L1-dcache-load-misses:u','iTLB-load-misses:u'],
-            'stalls':['cycles:u','stalled-cycles-frontend:u','stalled-cycles-backend:u']}
+            'delivery':['cycles:u','instructions:u','idq.dsb_uops:u','idq.mite_uops:u'],
+            'frontend_stalls':['cycles:u','instructions:u','dsb2mite_switches.penalty_cycles:u','idq_uops_not_delivered.core:u'],
+            'icache_stalls':['cycles:u','instructions:u','icache_data.stalls:u','icache_tag.stalls:u'],
+            'critical_dsb':['cycles:u','instructions:u','frontend_retired.dsb_miss:up']}
     try:
         records=[]
         for group,events in groups.items():
@@ -66,8 +68,8 @@ def cost_probe(binaries,cases,temporary,evidence,run):
             audit['groups'][group]=dict(supported=probe.returncode==0 and valid is not None,returncode=probe.returncode,stderr=probe.stderr,parsed=valid)
             save('pmu',audit)
             if not audit['groups'][group]['supported']:continue
-            keys=variants if group=='core' else ['base','aa','candidate']
-            cycles=11 if group=='core' else 5
+            keys=variants
+            cycles=11 if group=='core' else 7
             for name,mode in selected:
                 case=case_by_name[name];reference=None
                 for cycle in range(cycles):

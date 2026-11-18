@@ -1,24 +1,11 @@
 {
-  "source": {
-    "tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
-    "sha256": "0f7b38efaecf91282b24301e0319bbc5d4a939f6213819d8eb460fe0f260b972",
-    "experiment": "round1462-vex32-plan-class-bit",
-    "semantic_and_cost_run": {
-      "id": 44242322055,
-      "head_sha": "4d495ce72b9f5a5748c8c8c68b31f4359e2d8c96",
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44242322055",
-      "run_attempt": 1
-    }
-  },
-  "evidence": "../round1467-fixed-launch-memset-control/cost-attribution.json",
-  "observation": "Fixed guest state removes every observed non-x86 instruction/read/write count difference. Intel 6975P-C exposes usable user PMU events after a reversible permission adjustment; AMD 9V45 did not. Native throughput still differs with identical work.",
-  "hypothesis": "Use balanced hardware event comparisons to distinguish instruction/branch work from branch prediction and cache/translation effects of the iterator-induced layout change. Preserve the unchanged frozen consumers and four recombined objects.",
-  "controls": "Original/fixed-image native timings, then same inode/path/length and disabled ASLR for PMU runs. Byte-identical A/A controls included. No source changes.",
-  "gdb_repair": "Break at the executable memset PLT entry using verified link offsets and runtime relocation, rather than depending on unavailable libc private symbol names. Capture actual arguments and resolved target.",
-  "pmu": "Probe each event group. Unsupported events remain unavailable. Restore original perf_event_paranoid in finally. Hardware counts cover the complete unchanged process with 20 timed traversals plus its original warm/setup work.",
-  "publication_qualified": false,
-  "preflight": "Select only PMU capability before building or observing benchmark results. All four scheduled hosts retain a capability receipt, including unavailable hosts. No selection by performance or CPU brand.",
-  "reason": "R1469 obtained two AMD 7763 VMs, both lacking all requested PMU groups. Native timing and corrected PLT observations remain preserved separately."
+  "reference": "R1471 three PMU-capable Intel hosts",
+  "source": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
+  "purpose": "Discriminate front-end delivery or instruction-cache effects behind the unchanged-instruction-count AArch64 raw layout regression.",
+  "controls": "Unchanged frozen source, ordinary iterator-only control, added-leaf-only control, full candidate and byte-identical A/A. Preserve fixed and original-image native timings.",
+  "selection": "Four attempts preflight only core PMU capability before source build; all attempts retained. No selection by CPU identity or measured performance.",
+  "events_source": "https://perfmon-events.intel.com/platforms/graniterapids/core-events/core/",
+  "event_policy": "Use perf-listed named events, probe each group, record unsupported or unscheduled groups. All supported groups use balanced rotations and reverse order. Zero baselines retain counts/deltas without a ratio.",
+  "limits": "PMU covers unchanged whole process, including initialization and warm-up. Speculative front-end events are not retired instructions and cannot be attributed to an individual instruction. Association is evidence to guide the next intervention, not exact proof of a cache mechanism.",
+  "publication_qualified": false
 }

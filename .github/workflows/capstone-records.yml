@@ -1,7 +1,7 @@
-name: Select PMU-capable hosts before measuring layout effects
+name: Diagnose layout effects with supported frontend hardware events
 on:
   push:
-    branches: [codex/capstone-pmu-capable-hosts]
+    branches: [codex/capstone-frontend-layout-events]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -51,6 +51,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: pmu-capable-host-${{ matrix.slot }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: frontend-layout-host-${{ matrix.slot }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
