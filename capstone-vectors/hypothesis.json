@@ -1,0 +1,17 @@
+{
+  "parent": "c508d38a4e945445b3dd9a546e35ed29245dad65",
+  "evidence": [
+    "../round1458-vex32-existing-exception-arm/dispatch-attribution.json",
+    "published suite/synctools/x86_simple_output.cpp lines 668-680 and R1458 generated-table reproduction"
+  ],
+  "hypothesis": "The owning plan table already restricts this exceptional arm to PUSH opcodes 68/6A and 32-bit VEX C4/C5. A high-bit test preserves exactly the admitted set and can remove the temporary register used by the masked C4 comparison, independently of the call-signature experiment.",
+  "change": "Only the existing exceptional-arm predicate and its invariant comment change. Keep the four-argument leaf, all generated rows and every mode/option/bounds/encoding check unchanged.",
+  "prediction": "Compiler assembly should use a byte test/sign branch without the extra mask temporary. Measure instruction counts across whole functions because register allocation can change nonlocally.",
+  "independence": "Same R1458 parent as R1460; the two changes are not stacked.",
+  "gates": [
+    "Exhaust all 2048 generated plan cells to establish the classifier invariant",
+    "Generator bytes unchanged and complete record/bounds comparisons",
+    "Only the iterator object may change; native throughput remains separate"
+  ],
+  "publication_qualified": false
+}
