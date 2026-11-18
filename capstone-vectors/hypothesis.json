@@ -1,0 +1,10 @@
+{
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "prior_evidence": "../round1119-vex32-batch-state/cost-review.json",
+  "cause": "The earlier VEX32 public-plan reader reduced targeted AVX32 scan instructions but was attached inside shared initial legacy readers. GCC13 ordinary scan/batch costs and some SIMD64 costs increased, so the reader was held.",
+  "change": "Reuse the source-validated VEX2 plan generator and reader at one existing cold generic-fallback call boundary. Keep the generic function, initial scalar readers, call ABI and all feature/adapter routing. Only exact CS_MODE_32 bare C5 prefixes after extension rejection are eligible; every other path calls the existing generic implementation.",
+  "isolation": "Clang-only prototype. A separate code section holds the new fallback selector and a separate read-only section holds its generated plans. GCC and scan-adapter builds retain the original implementation. Preserve all previous negative evidence.",
+  "semantic_owner": "Plans are regenerated from the current canonical opcode and operand tables, including pp/L, ModR/M groups, reserved-vvvv policy and immediate extents. One existing generator owns every generated variant including reduced tables.",
+  "gates": "Require complete records and mode/vendor protected-page coverage, current source generator reproducibility, unchanged non-decoder runtime objects, and inspect ordinary decoder text identity except the one call target. Only then collect compiler costs and actual throughput.",
+  "publication_qualified": false
+}
