@@ -1,0 +1,25 @@
+{
+  "source_unchanged": true,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+    "tree": "f8950dad443feefc5cf9a5253613b54f5d93b4ff",
+    "sha256": "84e90f46f73fda452e281e55ae6ecb868bf264910f963e6e77fc7cabb6495e46",
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86GenSimpleOutput.inc",
+      "arch/X86/X86OutputIterator.c",
+      "arch/X86/X86SimpleOutput.h",
+      "arch/X86/X86Vex32Output.c",
+      "suite/synctools/x86_simple_output.cpp",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
+    ]
+  },
+  "original_driver_sha256": "44d6d8ade43c393ceba7a056bac0b9603ba12b1b301a7c2fde4bdc16100ae66f",
+  "repaired_driver_sha256": "d1e3e20e531eaeaca30aa3e60f9b16d027ef1fc7774f00abd38ac920f6124ec0",
+  "cause": "The existing main() binds evidence to a dict. The newly added assembly diagnostic incorrectly joined that dict as a filesystem path, after both Clang object-identity gates had passed.",
+  "fix": "Write the selector diagnostic through the existing p/'evidence' directory, as the surrounding disassembly receipts do.",
+  "scope": "One diagnostic destination expression changes. No production C, generated data, consumer, compiler flags, layout gate or cost calculation changes. Repeat only the stopped Clang profiles and retain the completed GCC profiles.",
+  "publication_qualified": false
+}
