@@ -1,0 +1,48 @@
+{
+  "complete": true,
+  "status": "call-boundary-cause-isolated-native-comparison-required",
+  "source_tree": "86eb7ca2aa29df055b4656fb56c1c3d23051be15",
+  "all_four_compiler_semantics_passed": true,
+  "optimized_ir_identical_outside_changed_call": true,
+  "changed_runtime_objects": [
+    "arch/X86/X86OutputIterator.c.o"
+  ],
+  "clang14_scalar32_format_ir_change": -4032420,
+  "clang14_scalar64_format_ir_change": -809958,
+  "clang18_avx32_format_ir_change": 35152,
+  "increases": [
+    {
+      "host": "vex32-exception-call-signature-cost-ubuntu-22.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "ir_change": 148,
+      "instruction_reduction": -1.5074479130960938e-05
+    },
+    {
+      "host": "vex32-exception-call-signature-cost-ubuntu-22.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "ir_change": 460,
+      "instruction_reduction": -2.9697190019550845e-05
+    },
+    {
+      "host": "vex32-exception-call-signature-cost-ubuntu-24.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "ir_change": 35152,
+      "instruction_reduction": -0.0037215014318761064
+    },
+    {
+      "host": "vex32-exception-call-signature-cost-ubuntu-24.04-clang-1",
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "ir_change": 35152,
+      "instruction_reduction": -0.0023656003272753967
+    }
+  ],
+  "finding": "Changing only the private leaf call arguments changes Clang14 machine lowering throughout the ordinary iterator while the optimized LLVM IR outside that call is identical. Clang18 retains ordinary-path work and adds four argument-preparation instructions per VEX32 leaf call. Neither compiler merges the two distinct leaf targets into a shared tail exit.",
+  "native_qualification_requested": true,
+  "native_protocol": "../round1461-vex32-exception-native",
+  "publication_qualified": false,
+  "cleaned_bytes": 7522553682
+}

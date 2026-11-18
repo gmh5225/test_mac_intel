@@ -1,0 +1,14 @@
+--- four-argument
+
++++ six-argument
+
+@@ -143,7 +143,7 @@
+
+ %value85 = icmp eq i8 %value84, -60
+ br i1 %value85, label %block22, label %block23
+ block22:
+-%value86 = tail call zeroext i1 @X86_writeVex32Output(ptr noundef nonnull %arg1, i64 noundef %arg2, ptr noundef %arg3, ptr noundef %arg4) #7
++%value86 = tail call zeroext i1 @X86_writeVex32Output(ptr noundef nonnull %arg1, i64 noundef %arg2, ptr noundef %arg3, ptr noundef %arg4, ptr noundef nonnull getelementptr inbounds (<{ <{ [8 x %struct.X86SimpleRegister], [8 x %struct.X86SimpleRegister] }>, [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister] }>, ptr @x86_simple_registers, i64 0, i32 3), i1 noundef zeroext %value3) #7
+ br label %block60
+ block23:
+ %value87 = icmp eq i8 %value14, 106

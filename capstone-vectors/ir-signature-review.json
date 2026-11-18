@@ -1,0 +1,29 @@
+{
+  "complete": true,
+  "profiles": [
+    {
+      "profile": "vex32-exception-call-signature-cost-ubuntu-22.04-clang-1",
+      "original_call": "%value87 = tail call zeroext i1 @X86_writeVex32Output(i8* noundef nonnull %arg1, i64 noundef %arg2, %struct.cs_insn* noundef %arg3, i16* noundef %arg4) #7",
+      "candidate_call": "%value87 = tail call zeroext i1 @X86_writeVex32Output(i8* noundef nonnull %arg1, i64 noundef %arg2, %struct.cs_insn* noundef %arg3, i16* noundef %arg4, %struct.X86SimpleRegister* noundef getelementptr inbounds (<{ <{ [8 x %struct.X86SimpleRegister], [8 x %struct.X86SimpleRegister] }>, [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister] }>, <{ <{ [8 x %struct.X86SimpleRegister], [8 x %struct.X86SimpleRegister] }>, [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister] }>* @x86_simple_registers, i64 0, i32 3, i64 0), i1 noundef zeroext %value3) #7",
+      "remainder_identical": true,
+      "diff": "vex32-exception-call-signature-cost-ubuntu-22.04-clang-1-canonical-iterator-ir.patch",
+      "canonical_ir_sha256": [
+        "b111e2e6b35adbb3367844eb502c4c708a0d7b2043ae19ed225af1876da00dfe",
+        "6a2fcbc27832a18d855f75c1fad8a7f3792603e962f02919331a0eb5e3cc7b0d"
+      ]
+    },
+    {
+      "profile": "vex32-exception-call-signature-cost-ubuntu-24.04-clang-1",
+      "original_call": "%value86 = tail call zeroext i1 @X86_writeVex32Output(ptr noundef nonnull %arg1, i64 noundef %arg2, ptr noundef %arg3, ptr noundef %arg4) #7",
+      "candidate_call": "%value86 = tail call zeroext i1 @X86_writeVex32Output(ptr noundef nonnull %arg1, i64 noundef %arg2, ptr noundef %arg3, ptr noundef %arg4, ptr noundef nonnull getelementptr inbounds (<{ <{ [8 x %struct.X86SimpleRegister], [8 x %struct.X86SimpleRegister] }>, [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister], [16 x %struct.X86SimpleRegister] }>, ptr @x86_simple_registers, i64 0, i32 3), i1 noundef zeroext %value3) #7",
+      "remainder_identical": true,
+      "diff": "vex32-exception-call-signature-cost-ubuntu-24.04-clang-1-canonical-iterator-ir.patch",
+      "canonical_ir_sha256": [
+        "ce0f74f85547a73db655278a6d87a8d09ffafea82d6d7432007d45a0280c1416",
+        "c6a78bc2e3aa1088b55cfd9992eebac661cac146402df8f0a199c440df20bc05"
+      ]
+    }
+  ],
+  "method": "Rename SSA definitions and block labels in their original order; retain all operations, operands, metadata, types and branch destinations. Compare the remainder after removing the one VEX32 call.",
+  "scope": "A matching remainder isolates this compiler experiment to call arguments at optimized LLVM IR, before machine register allocation. It does not assert identical machine code or native throughput."
+}
