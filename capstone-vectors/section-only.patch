@@ -1,0 +1,25 @@
+diff --git a/arch/X86/X86Vex32Output.c b/arch/X86/X86Vex32Output.c
+index 3da4dcb1..240aba80 100644
+--- a/arch/X86/X86Vex32Output.c
++++ b/arch/X86/X86Vex32Output.c
+@@ -7,6 +7,10 @@
+ 	defined(CAPSTONE_USE_SYS_DYN_MEM) && \
+ 	!defined(CAPSTONE_HAS_OSXKERNEL) && !defined(_KERNEL_MODE) && \
+ 	!defined(_WIN32_WCE)
++#if defined(__ELF__)
++/* Keep this optional writer's constants outside the ordinary decoder tables. */
++#pragma clang section rodata=".cs_x86_vex32_rodata"
++#endif
+ #include "X86SimpleOutput.h"
+ 
+ #if defined(__ELF__)
+@@ -200,5 +204,9 @@ bool X86_writeVectorOutputDispatch(const uint8_t *code, size_t size,
+ #endif
+ 	return writeVex32Output(code, size, insn, insn_size, regs, wide);
+ }
++#if defined(__ELF__)
++#pragma clang section rodata=""
++#endif
++
+ #endif
+ #endif
