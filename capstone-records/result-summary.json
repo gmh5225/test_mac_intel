@@ -1,0 +1,245 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44218062573,
+    "head_sha": "4d3161f55eb2f6306cc7472a951c9d97f371ee27",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44218062573",
+    "run_attempt": 1
+  },
+  "protocol": {
+    "inputs": {
+      "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+      "source_parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "variants": {
+        "output": {
+          "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+          "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+          "experiment": "round1417-clang-small-alias",
+          "semantic_run": {
+            "id": 44203984817,
+            "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+            "run_attempt": 1
+          }
+        }
+      }
+    },
+    "original_run": {
+      "id": 44210245544,
+      "head_sha": "012104f36530f3d6aa785480bdf95dc5bc661ef6",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44210245544",
+      "run_attempt": 1
+    },
+    "original_aa_flag": {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44210245544",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-fixed",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0145795564108604,
+          "ci95": [
+            1.0139752472315984,
+            1.0150239286802618
+          ]
+        },
+        "output": {
+          "gain": 1.0005713818691988,
+          "ci95": [
+            0.9997781414954937,
+            1.0016227451997273
+          ]
+        }
+      }
+    },
+    "original_candidate_comparisons": 68,
+    "original_candidate_losses": 0,
+    "original_observations_preserved": true,
+    "profiles": [
+      "ubuntu-22.04 clang",
+      "ubuntu-24.04 clang"
+    ],
+    "cycles": 96,
+    "calibration_cpu_ms": 120,
+    "observations_per_profile": 2,
+    "launches": [
+      "images-cross",
+      "images-fixed-cross"
+    ],
+    "scope": "Only the flagged ARM cp raw input. Every baseline, identical A/A baseline and candidate payload occupies each of three fixed-size file inodes equally, with balanced forward/reverse execution. Compare ordinary and disabled ASLR independently.",
+    "qualification": "All four new observations must have A/A median within 1%, candidate median >= 0.99, and candidate interval lower bound >= 0.99. Preserve the original significant 1.46% same-binary image effect. This establishes controlled-placement throughput, not its hardware-cache mechanism.",
+    "publication_qualified": false
+  },
+  "rows": [
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44218062573",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-cross",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0012435722194672,
+          "ci95": [
+            0.9969146839422189,
+            1.0045373723580195
+          ]
+        },
+        "output": {
+          "gain": 0.9995679916189439,
+          "ci95": [
+            0.996134807595434,
+            1.0027496500065187
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44218062573",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-fixed-cross",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9995085866509015,
+          "ci95": [
+            0.9988392093066606,
+            1.000511933118688
+          ]
+        },
+        "output": {
+          "gain": 0.9995989544871995,
+          "ci95": [
+            0.9988800461556736,
+            1.0003469609466349
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44218062573",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-cross",
+      "comparisons": {
+        "aa": {
+          "gain": 1.0004195506193923,
+          "ci95": [
+            0.99681543399703,
+            1.0044968297562133
+          ]
+        },
+        "output": {
+          "gain": 0.9954325036822529,
+          "ci95": [
+            0.99027947797269,
+            1.0015845510509302
+          ]
+        }
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44218062573",
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images-fixed-cross",
+      "comparisons": {
+        "aa": {
+          "gain": 0.9994962650327277,
+          "ci95": [
+            0.9990630672834807,
+            1.000175471579871
+          ]
+        },
+        "output": {
+          "gain": 1.0005552843920527,
+          "ci95": [
+            1.0001378981809976,
+            1.001394898775589
+          ]
+        }
+      }
+    }
+  ],
+  "profiles": [
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-22.04-clang-44218062573",
+      "crossover": {
+        "cycles": 96,
+        "slots": [
+          "/tmp/capstone-small-alias-mixed-sfz8e3fz/rotation-0",
+          "/tmp/capstone-small-alias-mixed-sfz8e3fz/rotation-1",
+          "/tmp/capstone-small-alias-mixed-sfz8e3fz/rotation-2"
+        ],
+        "inodes": [
+          9038474,
+          9038475,
+          9038476
+        ],
+        "assignment": "slot = (label_index + cycle) % 3; each payload uses every inode 32 times per launch",
+        "label_index": {
+          "base": 0,
+          "aa": 1,
+          "output": 2
+        },
+        "source_payload_sha256": {
+          "base": "e59423760b3d802784600a6efb7c1924176c8f6e4496484ec2772ea336414e95",
+          "output": "71431575fbb841d4a2415e6246656e99273b96471cbe3dcb2628508fa8c02ef1",
+          "aa": "e59423760b3d802784600a6efb7c1924176c8f6e4496484ec2772ea336414e95"
+        },
+        "padded_size": 18318744,
+        "fixed_ASLR_launch": "images-fixed-cross",
+        "aslr_disable_returncode": 0
+      },
+      "cleanup": {
+        "bytes": 281850096,
+        "removed": true
+      }
+    },
+    {
+      "profile": "alias-call-shape-images-four-ubuntu-24.04-clang-44218062573",
+      "crossover": {
+        "cycles": 96,
+        "slots": [
+          "/tmp/capstone-small-alias-mixed-uymh09q0/rotation-0",
+          "/tmp/capstone-small-alias-mixed-uymh09q0/rotation-1",
+          "/tmp/capstone-small-alias-mixed-uymh09q0/rotation-2"
+        ],
+        "inodes": [
+          4772392,
+          4772393,
+          4772394
+        ],
+        "assignment": "slot = (label_index + cycle) % 3; each payload uses every inode 32 times per launch",
+        "label_index": {
+          "base": 0,
+          "aa": 1,
+          "output": 2
+        },
+        "source_payload_sha256": {
+          "base": "e62f402bca09b7c9b1cce1af0a36dc2add3c99b7533d7956e6016f4bb5100c03",
+          "output": "65dbccb7747c212ca92641d84411519a1afb09a5c172d192702ede8d8e2d78fe",
+          "aa": "e62f402bca09b7c9b1cce1af0a36dc2add3c99b7533d7956e6016f4bb5100c03"
+        },
+        "padded_size": 17625904,
+        "fixed_ASLR_launch": "images-fixed-cross",
+        "aslr_disable_returncode": 0
+      },
+      "cleanup": {
+        "bytes": 271111632,
+        "removed": true
+      }
+    }
+  ],
+  "losses": [],
+  "uncertainty_below_threshold": [],
+  "aa_outside_one_percent": [],
+  "publication_qualified": false
+}
