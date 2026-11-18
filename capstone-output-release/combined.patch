@@ -25,15 +25,24 @@ index cda912d1..3d608c97 100644
  	return op;
  }
 diff --git a/MCInst.h b/MCInst.h
-index 641480ed..5505fc8f 100644
+index 641480ed..a4fc5e6e 100644
 --- a/MCInst.h
 +++ b/MCInst.h
-@@ -183,6 +183,33 @@ struct MCInst {
+@@ -183,6 +183,44 @@ struct MCInst {
  	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
  };
  
++/* Keep the tag stores at their construction sites. */
++#if defined(_MSC_VER)
++#define CS_MCOPERAND_INIT_INLINE static __forceinline
++#elif defined(__GNUC__) || defined(__clang__)
++#define CS_MCOPERAND_INIT_INLINE static inline __attribute__((always_inline))
++#else
++#define CS_MCOPERAND_INIT_INLINE static inline
++#endif
++
 +/* Initialize both compatibility tags together; the union keeps its type. */
-+static inline void MCOperand_initReg(MCOperand *op, unsigned Reg)
++CS_MCOPERAND_INIT_INLINE void MCOperand_initReg(MCOperand *op, unsigned Reg)
 +{
 +#ifdef __cplusplus
 +	static const MCOperand tag = { MCOperand::kRegister,
@@ -46,7 +55,7 @@ index 641480ed..5505fc8f 100644
 +	op->RegVal = Reg;
 +}
 +
-+static inline void MCOperand_initImm(MCOperand *op, int64_t Val)
++CS_MCOPERAND_INIT_INLINE void MCOperand_initImm(MCOperand *op, int64_t Val)
 +{
 +#ifdef __cplusplus
 +	static const MCOperand tag = { MCOperand::kImmediate,
@@ -59,10 +68,12 @@ index 641480ed..5505fc8f 100644
 +	op->ImmVal = Val;
 +}
 +
++#undef CS_MCOPERAND_INIT_INLINE
++
  // create Reg operand in the next slot
  CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
  {
-@@ -190,13 +217,7 @@ CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
+@@ -190,13 +228,7 @@ CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
  	MCOperand *op = &(mcInst->Operands[mcInst->size]);
  	mcInst->size++;
  
@@ -77,7 +88,7 @@ index 641480ed..5505fc8f 100644
  }
  
  // create Imm operand in the next slot
-@@ -206,13 +227,7 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
+@@ -206,13 +238,7 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
  	MCOperand *op = &(mcInst->Operands[mcInst->size]);
  	mcInst->size++;
  

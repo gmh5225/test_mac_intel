@@ -18,7 +18,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-coalesced-tags-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-inline-operand-tags-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
@@ -76,7 +76,7 @@ try:
   raw_changed=changed[:]
   save('raw-runtime-objects',dict(changed=raw_changed))
   location_control=None
-  allowed = set(['MCInst.c.o', 'arch/AArch64/AArch64Disassembler.c.o', 'arch/ARC/ARCDisassembler.c.o', 'arch/ARM/ARMDisassembler.c.o', 'arch/ARM/ARMInstPrinter.c.o', 'arch/ARM/ARMMapping.c.o', 'arch/Alpha/AlphaDisassembler.c.o', 'arch/BPF/BPFDisassembler.c.o', 'arch/HPPA/HPPADisassembler.c.o', 'arch/LoongArch/LoongArchDisassembler.c.o', 'arch/MOS65XX/MOS65XXDisassembler.c.o', 'arch/Mips/MipsDisassembler.c.o', 'arch/PowerPC/PPCDisassembler.c.o', 'arch/RISCV/RISCVDisassembler.c.o', 'arch/Sparc/SparcDisassembler.c.o', 'arch/SystemZ/SystemZDisassembler.c.o', 'arch/TMS320C64x/TMS320C64xDisassembler.c.o', 'arch/TriCore/TriCoreDisassembler.c.o', 'arch/X86/X86Disassembler.c.o', 'arch/X86/X86DisassemblerDecoder.c.o', 'arch/X86/X86Mapping.c.o', 'arch/XCore/XCoreDisassembler.c.o', 'arch/Xtensa/XtensaDisassembler.c.o'])
+  allowed = set(['MCInst.c.o', 'arch/AArch64/AArch64Disassembler.c.o', 'arch/ARC/ARCDisassembler.c.o', 'arch/ARM/ARMDisassembler.c.o', 'arch/ARM/ARMInstPrinter.c.o', 'arch/ARM/ARMMapping.c.o', 'arch/Alpha/AlphaDisassembler.c.o', 'arch/BPF/BPFDisassembler.c.o', 'arch/HPPA/HPPADisassembler.c.o', 'arch/LoongArch/LoongArchDisassembler.c.o', 'arch/MOS65XX/MOS65XXDisassembler.c.o', 'arch/Mips/MipsDisassembler.c.o', 'arch/PowerPC/PPCDisassembler.c.o', 'arch/RISCV/RISCVDisassembler.c.o', 'arch/RISCV/RISCVInstPrinter.c.o', 'arch/Sparc/SparcDisassembler.c.o', 'arch/SystemZ/SystemZDisassembler.c.o', 'arch/TMS320C64x/TMS320C64xDisassembler.c.o', 'arch/TriCore/TriCoreDisassembler.c.o', 'arch/X86/X86Disassembler.c.o', 'arch/X86/X86DisassemblerDecoder.c.o', 'arch/X86/X86Mapping.c.o', 'arch/XCore/XCoreDisassembler.c.o', 'arch/Xtensa/XtensaDisassembler.c.o'])
   identity_gate = profile != 'sanitize'
   if identity_gate:
    assert set(changed) <= allowed, changed
