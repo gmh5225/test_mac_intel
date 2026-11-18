@@ -1,19 +1,33 @@
 {
-  "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "preceding_source": {
-    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-    "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
-    "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
-    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
-    "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+  "sources": {
+    "dispatch": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+      "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+      "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+    },
+    "scan": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "472e062e08d5a63b40e8a9b8082f16a279552c99",
+      "sha256": "fd01ec9eb0798dd58f4534f164dc5382e9d7c0efad890e174287a2728ccf574b",
+      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+      "generated_table_sha256": "43cd62e2e876c13805eb4be46f068f45534f9a01a0eb5d5b41450a3d0855c694"
+    }
   },
-  "evidence": [
-    "../round1481-mov-memory-immediates/cost-attribution.json",
-    "../round1481-mov-memory-immediates/iterator-attribution.json"
-  ],
-  "hypothesis": "R1481 removes substantial PE output work but adds ordinary iterator instructions and stack references, including on scalar/SIMD samples with no C6/C7 instructions. Reuse canonical MOV plans directly and move memory opcode/group admission into the existing memory writer, where address bounds are already owned.",
-  "intervention": "Remove the new reserved dispatch branch and the public memory-immediate leaf. Move existing memory opcode classification from the common iterator to the memory-only entry. Reject reserved register-immediate plans before reading a row; retain explicit memory-only register rejection. Constant-specialize the shared address writer for immediate and register forms.",
-  "constraints": "Same admission set as R1481, same options/callback fallbacks and complete output records. No padding, assembly, archive reordering or table element widening. No nullable-mapper or initializer prototype is combined.",
-  "prior_distinction": "R1143/R1149 moved admission into new plan bits; this experiment retains the original 16-bit record encoding and moves memory-only validation to the existing memory owner.",
-  "publication_qualified": false
+  "question": "R1483 retains real PE benefits but small original scalar/SIMD regressions remain on ARM. Separate additional ARM instructions in the common iterator or memory writer from unchanged-work native placement effects.",
+  "prior_native_run": {
+    "id": 44279170154,
+    "head_sha": "22eb53386b673c71377aab7e741d038a127bbcfe",
+    "status": "in_progress",
+    "conclusion": null,
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44279170154",
+    "run_attempt": 1
+  },
+  "method": "One ARM64 host, frozen mixed-ISA consumer, three exact-source executables, fixed guest path/inode/size/ASLR, identical corpus and checksum comparisons, exclusive Callgrind Ir/Dr/Dw attribution.",
+  "cases": 7,
+  "variants": 3,
+  "expected_records": 21,
+  "support_reference": "https://valgrind.org/info/platforms.html",
+  "qualification": "Instruction counts do not measure hardware timing. Do not replace native results or qualify publication from this diagnostic alone."
 }

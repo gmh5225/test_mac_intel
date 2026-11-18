@@ -1,7 +1,7 @@
-name: Screen memory-owned admission after removing the reserved MOV dispatch
+name: Attribute ARM memory-admission instruction costs
 on:
   push:
-    branches: [codex/capstone-memory-owned-admission]
+    branches: [codex/capstone-arm-memory-admission-cost]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,9 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: gcc, archs: four }
           - { host: ubuntu-24.04-arm, cc: clang, archs: four }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
@@ -31,7 +28,7 @@ jobs:
           ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
           path: source
           persist-credentials: false
-      - name: Compare complete ARM records and independent executables with A/A controls
+      - name: Attribute three exact-source ARM executables on a fixed guest image
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y valgrind
@@ -45,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: memory-owned-admission-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-memory-admission-cost-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
