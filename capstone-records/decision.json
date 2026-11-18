@@ -1,0 +1,22 @@
+{
+  "complete": true,
+  "decision": "launch-confound-confirmed-layout-mechanism-still-open",
+  "run": 44253066051,
+  "fixed_comparisons": 18,
+  "findings": [
+    "All fixed-launch ARM/AArch64/MIPS per-function Ir/Dr/Dw events are identical across the four variants on both hosts.",
+    "Original-image libc memset work changes disappear when the guest filename, inode, file length and ASLR are controlled. Prior counts do not prove source-added initialization work.",
+    "Native ARM throughput still differs on Intel with effectively identical retired instruction/branch totals; one PMU sample per variant does not establish the microarchitectural cause.",
+    "AMD EPYC 9V45 exposes no requested hardware events after permission change; Intel 6975P-C does. Both kernel settings were restored and verified."
+  ],
+  "native_memset_probe": {
+    "complete": false,
+    "observations": 0,
+    "reason": "Only __memset_chk_ifunc was discoverable, and it was not called. GDB returned successfully without useful observations; no native alignment claim is supported."
+  },
+  "native_aa_flags": 0,
+  "native_stable_losses": 0,
+  "limitations": "This ARM-only timing round cannot erase previously measured AArch64/ARM regressions on other hosts.",
+  "publication_qualified": false,
+  "overall_goal_complete": false
+}
