@@ -1,0 +1,13 @@
+{
+  "parent": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
+  "evidence": [
+    "../round1460-vex32-exception-call-signature/ir-signature-review.json",
+    "../round1462-vex32-plan-class-bit/classify.log",
+    "../round1465-iterator-leaf-factorial-repair/hypothesis.json"
+  ],
+  "hypothesis": "The exhaustive plan table proves all six exceptional entries use prefix class zero, so their opcode equals code[0]. Testing the first input byte may shorten the separately computed opcode lifetime across option checks and alter costly register allocation, while preserving exactly the same dispatch set.",
+  "change": "Only replace the exceptional-arm byte source; no generated table, leaf writer, or public semantics change.",
+  "prediction": "If the compiler already folds the two byte sources, report that identity and do not claim an optimization. Otherwise attribute generated-code and native effects independently; the inherited candidate remains held.",
+  "independent_of": "R1465 frozen-object factorial diagnoses passive-architecture losses and is still required. This prototype does not address or excuse those losses.",
+  "publication_qualified": false
+}

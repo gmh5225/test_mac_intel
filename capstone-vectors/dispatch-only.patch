@@ -1,0 +1,15 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index e80f0d92..054c5925 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -85,8 +85,8 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 		const struct X86SimpleRegister *reg = NULL;
+ 		if (plan == X86_PLAN_PUSH_IMMEDIATE) {
+ #if defined(__clang__)
+-			/* This plan admits only PUSH 68/6A or 32-bit VEX C4/C5. */
+-			if (opcode & 0x80)
++			/* This plan admits only unprefixed PUSH 68/6A or 32-bit VEX C4/C5. */
++			if (code[0] & 0x80)
+ 				return X86_writeVex32Output(code, size, insn,
+ 							    insn_size);
+ #endif
