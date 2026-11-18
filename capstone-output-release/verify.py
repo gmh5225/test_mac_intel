@@ -18,7 +18,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-optional-mapper-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-mov-memory-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
@@ -34,6 +34,7 @@ try:
   opts+=['-G','Ninja','-DCMAKE_C_COMPILER='+cc]
   if cc=='gcc':opts+=['-DCMAKE_C_FLAGS=-Wno-error=discarded-qualifiers']
  if profile=='diet':opts+=['-DCAPSTONE_BUILD_DIET=ON']
+ if profile=='reduce':opts+=['-DCAPSTONE_X86_REDUCE=ON']
  if profile=='sanitize':opts+=['-DENABLE_ASAN=ON','-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined']
  run(['cmake','-S',s,'-B',b,*opts],'configure')
  objects={};tests={}
@@ -48,7 +49,7 @@ try:
   diet_units=['api','utils','mapping','register_descriptors','sstream','instruction_bytes','mcinst','feature_mode',
               'arm_writeback_postprocess','aarch64_postprocess','aarch64_scan','mips_scan',
               'x86_reg_access','detail_option','text_option','x86_encoding_accuracy','x86_scan_batch','x86_buffer_bounds','x86_memory_scale']
-  pattern='^unit_('+'|'.join(diet_units)+')$' if profile=='diet' else '^unit_'
+  pattern='^unit_('+'|'.join(diet_units)+')$' if profile in ('diet','reduce') else '^unit_'
   if phase=='observer':pattern='^unit_arm_(post_index|private_stream|reg_access)$' if profile!='diet' else '^unit_(api|instruction_bytes|sstream)$'
   extra=['-R',pattern]
   run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','--parallel','4',*extra],phase+'-tests')
@@ -69,9 +70,31 @@ try:
  if objects:
   assert objects['base'].keys()==objects['candidate'].keys()
   changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
-  allowed={'cs.c.o','arch/X86/X86DisassemblerDecoder.c.o',*[f'arch/{folder}/{name}Module.c.o' for folder,name in [('AArch64','AArch64'),('ARM','ARM'),('Mips','Mips'),('ARC','ARC'),('BPF','BPF'),('LoongArch','LoongArch'),('PowerPC','PPC'),('Sparc','Sparc'),('SystemZ','SystemZ'),('TriCore','TriCore'),('Xtensa','Xtensa')]]}
-  assert set(changed)==allowed,changed
-  save('runtime-objects',dict(changed=changed,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
+  active='X86' in architectures and profile not in ('diet','reduce')
+  raw_changed=changed[:]
+  save('raw-runtime-objects',dict(changed=raw_changed))
+  location_control=None
+  if profile=='sanitize':
+   header=s/'arch/X86/X86SimpleOutput.h';candidate_header=header.read_text()
+   original_header=sp.check_output(['git','show',meta['parent']+':arch/X86/X86SimpleOutput.h'],cwd=s,text=True)
+   adjusted=candidate_header;controls=[]
+   for marker in ('static inline char *X86_writeDisp8(', 'static inline void X86_writeSimpleDetail('):
+    assert original_header.count(marker)==adjusted.count(marker)==1
+    line=original_header[:original_header.index(marker)].count('\n')+1
+    adjusted=adjusted.replace(marker,'#line '+str(line)+'\n'+marker)
+    controls.append(dict(marker=marker,original_line=line))
+   header.write_text(adjusted)
+   location_control=dict(directives=controls,semantic_tests_source='Original candidate before diagnostic line restoration')
+   save('source-location-control',location_control)
+   run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],'location-control-build')
+   normalized={str(f.relative_to(b/'CMakeFiles/capstone.dir')):hashlib.sha256(f.read_bytes()).hexdigest()for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+   assert normalized.keys()==objects['base'].keys()
+   changed=[key for key,h in objects['base'].items()if normalized[key]!=h]
+   save('source-location-object-proof',dict(raw_changed=raw_changed,location_control_changed=changed,total=len(normalized)))
+  allowed={'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86ImmediateOutput.c.o'} if active else set()
+  assert set(changed)<=allowed,changed
+  if active:assert {'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o'}<=set(changed)
+  save('runtime-objects',dict(changed=changed,raw_changed=raw_changed,source_location_control=location_control,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
  save('complete',dict(profile=profile,compiler=cc,archs=archs,arm_policy_active=arm_policy_active,architectures=architectures,tested_tree=tree,phases=list(tests),observer_executed=arm_policy_active,observer_arm_owner_filtered=arm_policy_active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
 finally:
  amount=sum(f.stat().st_size for f in w.rglob('*') if f.is_file())

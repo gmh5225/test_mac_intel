@@ -2,43 +2,51 @@
   "complete": true,
   "source": {
     "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-    "tree": "b70653462ee1cce391aeaa085fe4a79e96d6d8a8",
-    "sha256": "c4b667b5a0b013356eeab1772c7bb92fe0632707bd09295515f2844d66e48bc4",
-    "records": {
-      "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
-      "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
-    }
+    "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+    "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
   },
-  "comparisons": 50331648,
-  "unit_executions": 8,
-  "callback_combinations_per_architecture": 32,
-  "callback_architectures_executed": [
-    "ARM",
-    "AARCH64",
-    "MIPS"
-  ],
-  "source_audited_empty_callbacks": 11,
+  "unit_executions": 7,
+  "canonical_memory_projections": 396,
+  "real_record_comparisons": 2409351,
+  "guard_page_comparisons": 3092,
+  "added_fast_instructions": {
+    "putty-32-0.85": 5241,
+    "putty-64-0.85": 4844,
+    "amd64-ls": 473,
+    "scalar32": 0,
+    "scalar64": 0,
+    "simd64": 0,
+    "libjpeg62-turbo-amd64": 1877,
+    "libzstd1-amd64": 1756,
+    "libssl3t64-amd64": 6290,
+    "jpeg-avx2-i386": 0,
+    "libssl3t64-i386": 8394
+  },
   "object_delta": {
     "changed": [
-      "cs.c.o",
-      "arch/Mips/MipsModule.c.o",
-      "arch/X86/X86DisassemblerDecoder.c.o",
-      "arch/ARM/ARMModule.c.o",
-      "arch/AArch64/AArch64Module.c.o"
+      "arch/X86/X86ImmediateOutput.c.o",
+      "arch/X86/X86MemoryOutput.c.o",
+      "arch/X86/X86OutputIterator.c.o"
     ],
     "allowed": [
-      "arch/AArch64/AArch64Module.c.o",
-      "arch/ARM/ARMModule.c.o",
-      "arch/Mips/MipsModule.c.o",
-      "arch/X86/X86DisassemblerDecoder.c.o",
-      "cs.c.o"
+      "arch/X86/X86ImmediateOutput.c.o",
+      "arch/X86/X86MemoryOutput.c.o",
+      "arch/X86/X86OutputIterator.c.o"
     ],
     "total": 40
   },
-  "cleanup": {
-    "bytes": 302923801,
-    "removed": true
-  },
+  "cleanup": [
+    {
+      "bytes": 336579443,
+      "removed": true
+    },
+    {
+      "bytes": 232876472,
+      "removed": true
+    }
+  ],
   "publication_qualified": false,
-  "scope": "The synthetic callback-order test passes on baseline and candidate; full records compare both shared libraries. Remaining eight changed modules require enabled-architecture validation. No timing claim."
+  "scope": "Current full-decoder generated rows retain identical regeneration. Exhaustive C6/C7 ModRM and SIB matrix, 32/64 REX classes, truncations, immediate/displacement boundaries; full poisoned records/cursor/errors on eleven real and synthetic samples. Publication additionally requires native cost and timing qualification, portable configurations and current NeverD integration."
 }
