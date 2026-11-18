@@ -1,0 +1,14 @@
+{
+  "original_run": {
+    "id": 44213587112,
+    "head_sha": "5b4d9e030d0bb91fdb8387736db7df125b48cf46",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44213587112",
+    "run_attempt": 1
+  },
+  "cause": "The new x86-only harness requested register_descriptors, but tests/unit/CMakeLists.txt creates this target only for ARC, LoongArch, MIPS, SPARC or SystemZ. Both x86-only jobs stopped before compilation. The other eight profiles completed successfully.",
+  "change": "Remove this inapplicable target only in x86-only profiles. Preserve all eight completed results and rerun only the two previously unbuilt x86-only jobs. No Capstone source or timing gate changes.",
+  "source_unchanged": true,
+  "publication_qualified": false
+}
