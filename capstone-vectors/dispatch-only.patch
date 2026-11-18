@@ -1,0 +1,16 @@
+diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
+index 054c5925..c06c41d0 100644
+--- a/arch/X86/X86OutputIterator.c
++++ b/arch/X86/X86OutputIterator.c
+@@ -89,8 +89,10 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
+ 			if (code[0] & 0x80)
+ 				return X86_writeVex32Output(code, size, insn,
+ 							    insn_size);
+-#endif
++			const bool imm8 = code[0] == 0x6a;
++#else
+ 			const bool imm8 = opcode == 0x6a;
++#endif
+ 			if (size < (imm8 ? 2u : 5u))
+ 				return false;
+ 			row = x86_push_rows[wide][imm8];

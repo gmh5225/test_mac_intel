@@ -1,0 +1,8 @@
+{
+  "parent": "168d28e8e91f386e9ed6781fd52869c2cfc04437",
+  "evidence": "../round1466-exception-first-byte/profile/exception-first-byte-cost-ubuntu-24.04-clang-1/integer-linked-disassembly.gz",
+  "observation": "R1466 removes one exceptional-arm stack read, but Clang18 still compares the computed opcode stack slot twice to choose the PUSH immediate width. All exceptional plan cells have prefix class zero; after the VEX high-bit branch, only unprefixed 68/6A remain.",
+  "change": "For the already-active Clang branch only, use code[0] for the existing imm8 equality comparison. Preserve the original GCC expression and all table entries, options, fallbacks, record construction and ABI.",
+  "prediction": "Inspect whether the two PUSH-width stack reads disappear. No executed-instruction, native-speed or inherited cross-architecture-regression improvement is presumed.",
+  "publication_qualified": false
+}
