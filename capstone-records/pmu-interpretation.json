@@ -1,0 +1,12 @@
+{
+  "sources_consulted": [
+    "https://documentation-service.arm.com/static/65de519e837c4d065f654bed",
+    "https://github.com/torvalds/linux/blob/master/drivers/perf/arm_pmuv3.c"
+  ],
+  "date_utc": "2026-11-18",
+  "notes": [
+    "Arm's Neoverse N2 telemetry specification defines frontend stalls broadly enough to include fetch latency and prediction-flow stalls; this event alone cannot identify a cache mechanism.",
+    "Upstream Linux maps generic branch misses to BR_MIS_PRED. Arm's retired-branch metrics instead use BR_MIS_PRED_RETIRED and BR_RETIRED. The running Azure kernel's exact source mapping has not been inspected, so the recorded generic count is kept under its original event name.",
+    "R1488 could not open the generic L1 instruction-cache event. Raw architected fetch, retired-branch and micro-operation events need capability and positive-count checks before use; merely accepting a raw event is insufficient."
+  ]
+}

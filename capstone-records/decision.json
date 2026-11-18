@@ -1,0 +1,2072 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "run": {
+    "id": 44289854057,
+    "head_sha": "69d69eb3f354d26e42aca5700918607bef64c2ce",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44289854057",
+    "run_attempt": 1
+  },
+  "source": {
+    "dispatch": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+      "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+      "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+    },
+    "scan": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
+      "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
+      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+      "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
+    }
+  },
+  "native_comparisons": 42,
+  "hardware_samples": 3360,
+  "hardware_comparisons": 126,
+  "counters_running_percent": 100,
+  "findings": [
+    "Tagged SIMD format repeats the roughly 0.8 percent native loss. Whole-process instructions decrease 0.20 percent, cycles increase 0.76 percent, and generic branch misses increase 60.4 percent. The A/A cycle ratio is 1.000046. Increased retired instruction work is excluded; branch behavior is a concrete lead, not yet a branch-address attribution.",
+    "AArch64 raw and format execute effectively identical instruction and branch counts but use 0.63 and 0.52 percent more cycles. Branch misses decrease, so a common increased-misprediction explanation for all three losses is contradicted. Format frontend stalls increase about 15.1 percent, but raw frontend change is comparable to A/A variation.",
+    "PE32 format retains about 4.2 percent native throughput improvement in this ARM host diagnosis. Existing cross-host losses still prevent publication."
+  ],
+  "selected": {
+    "simd64/1": {
+      "native": [
+        {
+          "case": "simd64",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "aa",
+          "median": 1.0000525037737087,
+          "ci95": [
+            0.9990809788887722,
+            1.0007621150005257
+          ]
+        },
+        {
+          "case": "simd64",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "dispatch",
+          "median": 0.9927287890436663,
+          "ci95": [
+            0.9920414729136545,
+            0.9933471337994245
+          ]
+        },
+        {
+          "case": "simd64",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "scan",
+          "median": 0.9922490701485162,
+          "ci95": [
+            0.9917400522913224,
+            0.992904563774146
+          ]
+        }
+      ],
+      "hardware": [
+        {
+          "group": "branches",
+          "case": "simd64",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9926083076090646,
+            "ci95": [
+              0.9530624013715514,
+              1.053077240585164
+            ]
+          },
+          "absolute_delta": {
+            "median": -2716.0,
+            "ci95": [
+              -18442.5,
+              19842.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "simd64",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.5515728370088122,
+            "ci95": [
+              1.4634713059715585,
+              1.6330998024910932
+            ]
+          },
+          "absolute_delta": {
+            "median": 210635.5,
+            "ci95": [
+              183085.0,
+              236297.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "simd64",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.6041814190200179,
+            "ci95": [
+              1.5582849438820325,
+              1.6623232044398253
+            ]
+          },
+          "absolute_delta": {
+            "median": 229345.5,
+            "ci95": [
+              219522.0,
+              242905.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "simd64",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9999999908058904,
+            "ci95": [
+              0.9999999829252249,
+              1.0000000302092178
+            ]
+          },
+          "absolute_delta": {
+            "median": -3.5,
+            "ci95": [
+              -6.5,
+              11.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "simd64",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9978514311422368,
+            "ci95": [
+              0.9978514154486351,
+              0.9978514836574306
+            ]
+          },
+          "absolute_delta": {
+            "median": -817914.0,
+            "ci95": [
+              -817920.0,
+              -817894.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "simd64",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9978514508721203,
+            "ci95": [
+              0.9978514285520347,
+              0.997851471765883
+            ]
+          },
+          "absolute_delta": {
+            "median": -817906.5,
+            "ci95": [
+              -817915.0,
+              -817898.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "simd64",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9957816910168991,
+            "ci95": [
+              0.9907547165226718,
+              1.0038166957165728
+            ]
+          },
+          "absolute_delta": {
+            "median": -57305.5,
+            "ci95": [
+              -124939.0,
+              51290.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "simd64",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0110875001229154,
+            "ci95": [
+              1.006946034100836,
+              1.0145211870654252
+            ]
+          },
+          "absolute_delta": {
+            "median": 149479.0,
+            "ci95": [
+              94239.0,
+              200633.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "simd64",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9356070096272243,
+            "ci95": [
+              0.9264387602196793,
+              0.9457770143800878
+            ]
+          },
+          "absolute_delta": {
+            "median": -863363.5,
+            "ci95": [
+              -1006517.5,
+              -734740.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "simd64",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0009962348379466,
+            "ci95": [
+              0.9869363170635137,
+              1.011129066202885
+            ]
+          },
+          "absolute_delta": {
+            "median": 7815.5,
+            "ci95": [
+              -103966.0,
+              86428.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "simd64",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9559790794404182,
+            "ci95": [
+              0.9461405462606383,
+              0.9773245012321883
+            ]
+          },
+          "absolute_delta": {
+            "median": -338310.5,
+            "ci95": [
+              -426727.5,
+              -189445.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "simd64",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0145768897735779,
+            "ci95": [
+              0.9994392577459168,
+              1.025629986785968
+            ]
+          },
+          "absolute_delta": {
+            "median": 113942.5,
+            "ci95": [
+              -4300.0,
+              199722.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "simd64",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.000046094599613,
+            "ci95": [
+              0.9997853446392557,
+              1.000501734697113
+            ]
+          },
+          "absolute_delta": {
+            "median": 24061.5,
+            "ci95": [
+              -112152.0,
+              274443.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "simd64",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0072984187702665,
+            "ci95": [
+              1.0067069947348226,
+              1.0086455934926766
+            ]
+          },
+          "absolute_delta": {
+            "median": 3816033.5,
+            "ci95": [
+              3501071.5,
+              4594901.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "simd64",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0076388388698403,
+            "ci95": [
+              1.007151987989316,
+              1.0084154979276376
+            ]
+          },
+          "absolute_delta": {
+            "median": 3991092.0,
+            "ci95": [
+              3739106.0,
+              4396357.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "simd64",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0,
+            "ci95": [
+              0.9999999872134495,
+              1.0000000104186708
+            ]
+          },
+          "absolute_delta": {
+            "median": 0.0,
+            "ci95": [
+              -27.0,
+              24.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "simd64",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0018500219969981,
+            "ci95": [
+              1.0018499912106202,
+              1.0018500493117233
+            ]
+          },
+          "absolute_delta": {
+            "median": 3906495.0,
+            "ci95": [
+              3906430.0,
+              3906552.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "simd64",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9979772222658909,
+            "ci95": [
+              0.9979772030314629,
+              0.9979772470783357
+            ]
+          },
+          "absolute_delta": {
+            "median": -4271285.0,
+            "ci95": [
+              -4271325.5,
+              -4271232.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        }
+      ]
+    },
+    "arm64-ls/0": {
+      "native": [
+        {
+          "case": "arm64-ls",
+          "mode": 0,
+          "launch": "same-file-fixed",
+          "variant": "aa",
+          "median": 1.0000254670011333,
+          "ci95": [
+            0.9998472777254562,
+            1.000445445636542
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 0,
+          "launch": "same-file-fixed",
+          "variant": "dispatch",
+          "median": 0.9933455626541843,
+          "ci95": [
+            0.9931269740998104,
+            0.993612365448589
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 0,
+          "launch": "same-file-fixed",
+          "variant": "scan",
+          "median": 0.9943024993036388,
+          "ci95": [
+            0.9939726998759085,
+            0.9946850916821685
+          ]
+        }
+      ],
+      "hardware": [
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "branch-misses:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9998579158595977,
+            "ci95": [
+              0.9990729013913735,
+              1.000506698041137
+            ]
+          },
+          "absolute_delta": {
+            "median": -705.0,
+            "ci95": [
+              -4061.0,
+              2986.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "branch-misses:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9571700095163256,
+            "ci95": [
+              0.9567780673232067,
+              0.9581576111399046
+            ]
+          },
+          "absolute_delta": {
+            "median": -212610.5,
+            "ci95": [
+              -214529.0,
+              -207336.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "branch-misses:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.953354664379582,
+            "ci95": [
+              0.9518583372377563,
+              0.9542985672295652
+            ]
+          },
+          "absolute_delta": {
+            "median": -231280.0,
+            "ci95": [
+              -238925.0,
+              -226637.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "branches:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0,
+            "ci95": [
+              0.9999999822056163,
+              1.0000000163115188
+            ]
+          },
+          "absolute_delta": {
+            "median": 0.0,
+            "ci95": [
+              -6.0,
+              5.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "branches:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0000000192772491,
+            "ci95": [
+              0.999999995551404,
+              1.0000000281744421
+            ]
+          },
+          "absolute_delta": {
+            "median": 6.5,
+            "ci95": [
+              -2.0,
+              9.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "branches:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0000000014828654,
+            "ci95": [
+              0.9999999911028082,
+              1.0000000192772496
+            ]
+          },
+          "absolute_delta": {
+            "median": 0.5,
+            "ci95": [
+              -3.0,
+              6.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "stalled-cycles-backend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0013285364066213,
+            "ci95": [
+              0.9952744804688469,
+              1.0111595251836991
+            ]
+          },
+          "absolute_delta": {
+            "median": 11590.0,
+            "ci95": [
+              -36162.5,
+              97162.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "stalled-cycles-backend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9776843095258587,
+            "ci95": [
+              0.9726264983946231,
+              0.9830098406785808
+            ]
+          },
+          "absolute_delta": {
+            "median": -193230.5,
+            "ci95": [
+              -238852.0,
+              -149822.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "stalled-cycles-backend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9724035324128781,
+            "ci95": [
+              0.967252300044942,
+              0.9797860115111061
+            ]
+          },
+          "absolute_delta": {
+            "median": -243261.0,
+            "ci95": [
+              -287741.0,
+              -171735.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0038480361407762,
+            "ci95": [
+              0.9985405038480231,
+              1.006600974268021
+            ]
+          },
+          "absolute_delta": {
+            "median": 179794.0,
+            "ci95": [
+              -68338.5,
+              308348.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0227303080339984,
+            "ci95": [
+              1.020203180791573,
+              1.0264374451736598
+            ]
+          },
+          "absolute_delta": {
+            "median": 1066424.0,
+            "ci95": [
+              944614.0,
+              1237094.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0039556872840985,
+            "ci95": [
+              1.0015714927195538,
+              1.0065876291944675
+            ]
+          },
+          "absolute_delta": {
+            "median": 185571.0,
+            "ci95": [
+              73995.5,
+              307732.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "cycles:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0002489405298483,
+            "ci95": [
+              0.9999460748321543,
+              1.0005349782216715
+            ]
+          },
+          "absolute_delta": {
+            "median": 135940.0,
+            "ci95": [
+              -29453.0,
+              291946.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "cycles:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0072326847365827,
+            "ci95": [
+              1.0067638516863937,
+              1.0074944182328127
+            ]
+          },
+          "absolute_delta": {
+            "median": 3948637.5,
+            "ci95": [
+              3694295.5,
+              4088746.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "cycles:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0062915817802476,
+            "ci95": [
+              1.0058739963603056,
+              1.006505610791311
+            ]
+          },
+          "absolute_delta": {
+            "median": 3433695.0,
+            "ci95": [
+              3205487.5,
+              3560330.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "instructions:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.000000016300682,
+            "ci95": [
+              0.9999999988560926,
+              1.0000000334592936
+            ]
+          },
+          "absolute_delta": {
+            "median": 28.5,
+            "ci95": [
+              -2.0,
+              58.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "instructions:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9999999982841388,
+            "ci95": [
+              0.9999999702584057,
+              1.0000000268818254
+            ]
+          },
+          "absolute_delta": {
+            "median": -3.0,
+            "ci95": [
+              -52.0,
+              47.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 0,
+          "event": "instructions:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9999999828413879,
+            "ci95": [
+              0.9999999691144983,
+              1.0000000257379185
+            ]
+          },
+          "absolute_delta": {
+            "median": -30.0,
+            "ci95": [
+              -54.0,
+              45.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        }
+      ]
+    },
+    "arm64-ls/1": {
+      "native": [
+        {
+          "case": "arm64-ls",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "aa",
+          "median": 1.00028835323271,
+          "ci95": [
+            0.9970502537682445,
+            1.0012209737152744
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "dispatch",
+          "median": 0.9905490750348874,
+          "ci95": [
+            0.9878886647698178,
+            0.992997079880691
+          ]
+        },
+        {
+          "case": "arm64-ls",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "scan",
+          "median": 0.9946200793817332,
+          "ci95": [
+            0.9919843972454175,
+            0.9966904814294246
+          ]
+        }
+      ],
+      "hardware": [
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0001603831389467,
+            "ci95": [
+              0.9962675078670515,
+              1.002813305449338
+            ]
+          },
+          "absolute_delta": {
+            "median": 1135.0,
+            "ci95": [
+              -27087.0,
+              19819.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9945350184072632,
+            "ci95": [
+              0.9922123430419465,
+              0.9964120062465702
+            ]
+          },
+          "absolute_delta": {
+            "median": -38700.5,
+            "ci95": [
+              -55060.0,
+              -25374.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9903657048915482,
+            "ci95": [
+              0.9857664285515307,
+              0.9943434055784854
+            ]
+          },
+          "absolute_delta": {
+            "median": -67949.5,
+            "ci95": [
+              -100927.5,
+              -44673.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0000000055045077,
+            "ci95": [
+              0.9999999986238731,
+              1.0000000073393436
+            ]
+          },
+          "absolute_delta": {
+            "median": 6.0,
+            "ci95": [
+              -1.5,
+              8.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0000000105503064,
+            "ci95": [
+              1.0000000055045077,
+              1.0000000160548141
+            ]
+          },
+          "absolute_delta": {
+            "median": 11.5,
+            "ci95": [
+              6.0,
+              17.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0000000045870898,
+            "ci95": [
+              0.9999999972477461,
+              1.000000015596105
+            ]
+          },
+          "absolute_delta": {
+            "median": 5.0,
+            "ci95": [
+              -3.0,
+              17.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0025796785286398,
+            "ci95": [
+              0.9943729671375888,
+              1.009556475585565
+            ]
+          },
+          "absolute_delta": {
+            "median": 43231.5,
+            "ci95": [
+              -95921.0,
+              160718.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0562287943783415,
+            "ci95": [
+              1.048631509183203,
+              1.064846221030776
+            ]
+          },
+          "absolute_delta": {
+            "median": 947681.0,
+            "ci95": [
+              835584.5,
+              1081678.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0475157631641625,
+            "ci95": [
+              1.0354856008905142,
+              1.0514075320948404
+            ]
+          },
+          "absolute_delta": {
+            "median": 799298.5,
+            "ci95": [
+              599933.0,
+              855191.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9988546220693406,
+            "ci95": [
+              0.9919601760870089,
+              1.0073530737968017
+            ]
+          },
+          "absolute_delta": {
+            "median": -107363.0,
+            "ci95": [
+              -756287.5,
+              681401.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0795574244771637,
+            "ci95": [
+              1.0706956286331446,
+              1.0930914378250662
+            ]
+          },
+          "absolute_delta": {
+            "median": 7377752.0,
+            "ci95": [
+              6643060.5,
+              8798329.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.1509737061358267,
+            "ci95": [
+              1.1362996656513538,
+              1.1665551657272055
+            ]
+          },
+          "absolute_delta": {
+            "median": 14054980.5,
+            "ci95": [
+              12804845.0,
+              15496708.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.999865537557014,
+            "ci95": [
+              0.997445214080396,
+              1.0030608213542362
+            ]
+          },
+          "absolute_delta": {
+            "median": -208389.5,
+            "ci95": [
+              -3822258.5,
+              4923399.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0080756306825465,
+            "ci95": [
+              1.007594508157892,
+              1.011125513566523
+            ]
+          },
+          "absolute_delta": {
+            "median": 12558606.0,
+            "ci95": [
+              11757233.0,
+              17216458.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0052454516683191,
+            "ci95": [
+              1.00144437690604,
+              1.0072104272617453
+            ]
+          },
+          "absolute_delta": {
+            "median": 8139513.5,
+            "ci95": [
+              2242158.5,
+              11160297.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9999999986722545,
+            "ci95": [
+              0.9999999879481558,
+              1.0000000138902612
+            ]
+          },
+          "absolute_delta": {
+            "median": -6.5,
+            "ci95": [
+              -59.0,
+              65.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.0000000100091588,
+            "ci95": [
+              0.9999999947911522,
+              1.0000000218567344
+            ]
+          },
+          "absolute_delta": {
+            "median": 49.0,
+            "ci95": [
+              -26.0,
+              107.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "arm64-ls",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.000000005310982,
+            "ci95": [
+              0.9999999907057812,
+              1.0000000107240985
+            ]
+          },
+          "absolute_delta": {
+            "median": 26.0,
+            "ci95": [
+              -45.5,
+              52.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        }
+      ]
+    },
+    "putty-32-0.85/1": {
+      "native": [
+        {
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "aa",
+          "median": 0.9996965443250853,
+          "ci95": [
+            0.9993045638243896,
+            0.9999002091694077
+          ]
+        },
+        {
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "dispatch",
+          "median": 1.044623106940349,
+          "ci95": [
+            1.0441009283114546,
+            1.0448245258865727
+          ]
+        },
+        {
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "launch": "same-file-fixed",
+          "variant": "scan",
+          "median": 1.0420386768073875,
+          "ci95": [
+            1.041347763753867,
+            1.0426655781202163
+          ]
+        }
+      ],
+      "hardware": [
+        {
+          "group": "branches",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9996432219123311,
+            "ci95": [
+              0.9986649004701674,
+              0.9999718461633691
+            ]
+          },
+          "absolute_delta": {
+            "median": -13586.5,
+            "ci95": [
+              -50840.0,
+              -1071.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9901997007267631,
+            "ci95": [
+              0.9894192901056671,
+              0.9907965928470507
+            ]
+          },
+          "absolute_delta": {
+            "median": -373008.0,
+            "ci95": [
+              -402929.5,
+              -348971.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "branch-misses:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0016159258748785,
+            "ci95": [
+              1.0010720651750635,
+              1.0021212239755757
+            ]
+          },
+          "absolute_delta": {
+            "median": 61514.0,
+            "ci95": [
+              40819.5,
+              81277.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0000000018658601,
+            "ci95": [
+              0.9999999993003025,
+              1.0000000041981851
+            ]
+          },
+          "absolute_delta": {
+            "median": 4.0,
+            "ci95": [
+              -2.0,
+              10.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9572581201875997,
+            "ci95": [
+              0.9572581182818645,
+              0.9572581227033132
+            ]
+          },
+          "absolute_delta": {
+            "median": -91629337.0,
+            "ci95": [
+              -91629341.5,
+              -91629331.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "branches",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "branches:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9576464357508465,
+            "ci95": [
+              0.9576464325349826,
+              0.9576464383164042
+            ]
+          },
+          "absolute_delta": {
+            "median": -90796872.5,
+            "ci95": [
+              -90796879.5,
+              -90796867.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 0.9996893747040683,
+            "ci95": [
+              0.996504085007826,
+              1.0017062085576565
+            ]
+          },
+          "absolute_delta": {
+            "median": -37683.5,
+            "ci95": [
+              -411820.0,
+              206989.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 1.041552126982944,
+            "ci95": [
+              1.0402754454241938,
+              1.0447106168454077
+            ]
+          },
+          "absolute_delta": {
+            "median": 5028640.0,
+            "ci95": [
+              4894649.0,
+              5431503.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "stalled-cycles-backend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 1.0223540719843958,
+            "ci95": [
+              1.0213191060538263,
+              1.0244402021286596
+            ]
+          },
+          "absolute_delta": {
+            "median": 2701456.5,
+            "ci95": [
+              2540372.0,
+              2949567.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.0010866985349531,
+            "ci95": [
+              0.9973359035074181,
+              1.0026697543088585
+            ]
+          },
+          "absolute_delta": {
+            "median": 233578.5,
+            "ci95": [
+              -578036.5,
+              572496.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9766230471836299,
+            "ci95": [
+              0.9743973807412671,
+              0.9797562013889108
+            ]
+          },
+          "absolute_delta": {
+            "median": -5028676.0,
+            "ci95": [
+              -5512921.5,
+              -4271618.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "stalls",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "stalled-cycles-frontend:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.99308971693908,
+            "ci95": [
+              0.9902368198777057,
+              0.9941345454309576
+            ]
+          },
+          "absolute_delta": {
+            "median": -1485955.0,
+            "ci95": [
+              -2098821.5,
+              -1261523.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.000179426316378,
+            "ci95": [
+              0.9996813732493695,
+              1.0006971764687753
+            ]
+          },
+          "absolute_delta": {
+            "median": 640196.5,
+            "ci95": [
+              -1137097.0,
+              2485468.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9577459562053876,
+            "ci95": [
+              0.9573310813775,
+              0.9581052417136627
+            ]
+          },
+          "absolute_delta": {
+            "median": -150629941.0,
+            "ci95": [
+              -152155681.0,
+              -149393190.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "cycles:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9595504640542205,
+            "ci95": [
+              0.9591760699621673,
+              0.9599441268907405
+            ]
+          },
+          "absolute_delta": {
+            "median": -144271647.0,
+            "ci95": [
+              -145582415.0,
+              -142862211.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "aa",
+          "cost_ratio": {
+            "median": 1.000000002364716,
+            "ci95": [
+              0.9999999988798713,
+              1.000000004729432
+            ]
+          },
+          "absolute_delta": {
+            "median": 28.5,
+            "ci95": [
+              -13.5,
+              57.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "dispatch",
+          "cost_ratio": {
+            "median": 0.9658617311564488,
+            "ci95": [
+              0.9658617286640272,
+              0.9658617348009859
+            ]
+          },
+          "absolute_delta": {
+            "median": -411440821.5,
+            "ci95": [
+              -411440852.0,
+              -411440776.5
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        },
+        {
+          "group": "work",
+          "case": "putty-32-0.85",
+          "mode": 1,
+          "event": "instructions:u",
+          "variant": "scan",
+          "cost_ratio": {
+            "median": 0.9624999604008613,
+            "ci95": [
+              0.9624999577452231,
+              0.9624999677568908
+            ]
+          },
+          "absolute_delta": {
+            "median": -451957514.0,
+            "ci95": [
+              -451957545.5,
+              -451957423.0
+            ]
+          },
+          "zero_baseline_pairs": 0,
+          "running_percent_range": [
+            100.0,
+            100.0
+          ]
+        }
+      ]
+    }
+  },
+  "limits": "Native and separate PMU groups are different launches. Whole-process counters include unchanged setup and output. Generic branch-misses is not automatically the retired-branch metric described by Arm. Frontend stalls alone do not identify an instruction-cache miss. No sampled hotspot or raw fetch event was collected here; paired bootstrap intervals are descriptive and unadjusted.",
+  "next_investigation": "../round1491-arm-raw-pmu-preflight",
+  "cleanup_bytes_removed": 285028061
+}
