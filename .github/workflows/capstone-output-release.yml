@@ -1,7 +1,7 @@
-name: Validate ARM initialization using architecture and DIET appropriate tests
+name: Validate full and partial initialization across architecture and runtime profiles
 on:
   push:
-    branches: [codex/capstone-arm-profile-scope-repair]
+    branches: [codex/capstone-init-domain-profiles]
     paths: [capstone-output-release/**, .github/workflows/capstone-output-release.yml]
 permissions:
   contents: read
@@ -26,6 +26,8 @@ jobs:
           - { host: ubuntu-24.04, cc: clang, profile: normal, archs: arm, forms: combined }
           - { host: ubuntu-24.04, cc: clang, profile: normal, archs: mips, forms: combined }
           - { host: ubuntu-24.04, cc: clang, profile: normal, archs: x86, forms: combined }
+          - { host: ubuntu-24.04, cc: clang, profile: normal, archs: aarch64, forms: combined }
+          - { host: ubuntu-24.04, cc: clang, profile: normal, archs: riscv, forms: combined }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -48,6 +50,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-profile-scope-repair-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
+          name: init-domain-profiles-${{ matrix.host }}-${{ matrix.archs }}-${{ matrix.profile }}-${{ matrix.cc }}
           path: evidence/
           retention-days: 14

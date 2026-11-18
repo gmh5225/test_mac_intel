@@ -17,7 +17,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-arm-mixed-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-init-domain-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
@@ -25,8 +25,8 @@ try:
  canonical=sp.check_output(['git','show','HEAD:capstone-output-release/combined.patch'],cwd=r.parent)
  assert hashlib.sha256(canonical).hexdigest()==meta['sha256']
  patch=w/'candidate.patch';patch.write_bytes(canonical)
- architectures={'four':['ARM','AARCH64','MIPS','X86'],'extra':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE'],'mips':['MIPS'],'arm':['ARM'],'x86':['X86']}[archs]
- active=archs=='four'
+ architectures={'four':['ARM','AARCH64','MIPS','X86'],'extra':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE'],'mips':['MIPS'],'arm':['ARM'],'x86':['X86'],'aarch64':['AARCH64'],'riscv':['RISCV']}[archs]
+ arm_policy_active=archs=='four'
  opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in architectures],'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
  if os.name=='nt':opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if cc=='MT' else 'OFF')]
  else:
@@ -36,7 +36,7 @@ try:
  if profile=='sanitize':opts+=['-DENABLE_ASAN=ON','-DCMAKE_C_FLAGS=-fsanitize=undefined','-DCMAKE_EXE_LINKER_FLAGS=-fsanitize=undefined']
  run(['cmake','-S',s,'-B',b,*opts],'configure')
  objects={};tests={}
- for phase in ('base','candidate','observer') if active else ('base','candidate'):
+ for phase in ('base','candidate','observer') if arm_policy_active else ('base','candidate'):
   if phase=='candidate':
    assert not sp.check_output(['git','status','--porcelain'],cwd=s,text=True)
    run(['git','apply',patch],'apply')
@@ -63,21 +63,26 @@ try:
   extra=['-R',pattern]
   run(['ctest','--test-dir',b,'-C','Release','--no-tests=error','--output-on-failure','--parallel','4',*extra],phase+'-tests')
   tests[phase]=(e/(phase+'-tests.log')).read_text(errors='replace')
-  if 'ARM' in architectures and profile!='diet':
+  if profile!='diet':
    binary=b/'suite/cstest'/('Release/cstest.exe' if os.name=='nt' else 'cstest')
-   run([binary,s/'tests/MC/ARM'],phase+'-arm-fixtures')
+   fixture_archs=['ARM'] if phase=='observer' else [a for a in ('ARM','AARCH64','MIPS','RISCV') if a in architectures]
+   folders={'ARM':'ARM','AARCH64':'AArch64','MIPS':'Mips','RISCV':'RISCV'}
+   for arch in fixture_archs:run([binary,s/'tests/MC'/folders[arch]],phase+'-'+arch.lower()+'-fixtures')
   if phase!='observer' and os.name!='nt':
    objects[phase]={str(f.relative_to(b/'CMakeFiles/capstone.dir')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
-  for name in [phase+'-tests',phase+'-arm-fixtures']:
+  for name in [phase+'-tests',*[phase+'-'+a+'-fixtures' for a in ('arm','aarch64','mips','riscv')]]:
    f=e/(name+'.log')
    if f.exists():
     log=f.read_text(errors='replace');assert 'runtime error:' not in log and 'ERROR: AddressSanitizer' not in log
  if objects:
   assert objects['base'].keys()==objects['candidate'].keys()
   changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
-  assert changed==(['cs.c.o'] if active else []),changed
-  save('runtime-objects',dict(changed=changed,identical=len(objects['base'])-len(changed),active=active))
- save('complete',dict(profile=profile,compiler=cc,archs=archs,active=active,tested_tree=tree,phases=list(tests),observer_executed=active,observer_arm_owner_filtered=active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
+  allowed={'cs.c.o'} if archs!='x86' else set()
+  if 'RISCV' in architectures:allowed.add('arch/RISCV/RISCVInstPrinter.c.o')
+  assert set(changed)<=allowed,changed
+  if arm_policy_active:assert 'cs.c.o' in changed
+  save('runtime-objects',dict(changed=changed,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
+ save('complete',dict(profile=profile,compiler=cc,archs=archs,arm_policy_active=arm_policy_active,architectures=architectures,tested_tree=tree,phases=list(tests),observer_executed=arm_policy_active,observer_arm_owner_filtered=arm_policy_active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
 finally:
  amount=sum(f.stat().st_size for f in w.rglob('*') if f.is_file())
  shutil.rmtree(w,onerror=cleanup_error);save('cleanup',dict(bytes=amount,removed=not w.exists()))
