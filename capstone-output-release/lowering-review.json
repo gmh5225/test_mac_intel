@@ -1,0 +1,115 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+    "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+  },
+  "rows": [
+    {
+      "host": "mov-memory-immediates-four-ubuntu-22.04-clang-44273682897",
+      "variants": {
+        "base": {
+          "indirect_jumps": []
+        },
+        "scan": {
+          "indirect_jumps": [
+            {
+              "offset": "0x28f",
+              "executions": {
+                "scalar32": 2442,
+                "scalar64": 2850,
+                "simd64": 9984
+              },
+              "sequence": [
+                {
+                  "offset": "0x274",
+                  "instruction": "cmp    $0x7,%di"
+                },
+                {
+                  "offset": "0x278",
+                  "instruction": "ja     12d0eb <X86_trySimpleOutput+0x46b>"
+                },
+                {
+                  "offset": "0x27e",
+                  "instruction": "movzwl %di,%ecx"
+                },
+                {
+                  "offset": "0x281",
+                  "instruction": "lea    0x3cb798(%rip),%rdi        # 4f86a0 <decode_feature_memory16.indexes+0x100>"
+                },
+                {
+                  "offset": "0x288",
+                  "instruction": "movslq (%rdi,%rcx,4),%rcx"
+                },
+                {
+                  "offset": "0x28c",
+                  "instruction": "add    %rdi,%rcx"
+                },
+                {
+                  "offset": "0x28f",
+                  "instruction": "jmp    *%rcx"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "host": "mov-memory-immediates-four-ubuntu-24.04-clang-44273682897",
+      "variants": {
+        "base": {
+          "indirect_jumps": []
+        },
+        "scan": {
+          "indirect_jumps": [
+            {
+              "offset": "0x241",
+              "executions": {
+                "scalar32": 2094,
+                "scalar64": 2547,
+                "simd64": 9981
+              },
+              "sequence": [
+                {
+                  "offset": "0x224",
+                  "instruction": "add    $0xffff0008,%ecx"
+                },
+                {
+                  "offset": "0x22a",
+                  "instruction": "cmp    $0x7,%ecx"
+                },
+                {
+                  "offset": "0x22d",
+                  "instruction": "ja     10f940 <X86_trySimpleOutput+0x530>"
+                },
+                {
+                  "offset": "0x233",
+                  "instruction": "lea    0x35d216(%rip),%rsi        # 46c860 <ZPR2Strided+0x640>"
+                },
+                {
+                  "offset": "0x23a",
+                  "instruction": "movslq (%rsi,%rcx,4),%rcx"
+                },
+                {
+                  "offset": "0x23e",
+                  "instruction": "add    %rsi,%rcx"
+                },
+                {
+                  "offset": "0x241",
+                  "instruction": "jmp    *%rcx"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "parser_sha256": "c262b193c9d71d86cc86e8d03b9cbf48ad2c8bb4b99a7efab22ac5de448c4c0c",
+  "finding": "Adding the memory-immediate reserved case makes both Clang builds lower the existing special-case branch chain to a range check plus indexed jump table. The table load, address formation and indirect jump execute on the original scalar/SIMD samples, which contain no admitted C6/C7 memory-immediate instructions.",
+  "limits": "Clang 14 additionally changes stack instruction traffic, documented in iterator-attribution.json; those groups include normal local storage and are not all proven allocator spills. GCC inlines the iterator and lowers differently, with lower aggregate iterator counts. Unchanged other-ISA objects and their relocated native addresses are separate evidence, not explained by this x86 jump table."
+}
