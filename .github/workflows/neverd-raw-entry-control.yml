@@ -1,0 +1,36 @@
+name: Original indexed entry system cursor
+on:
+  push:
+    branches: [codex/neverd-arm64e-mixed-data-system-unwind-20261118]
+    paths: [neverd-raw-entry/**, .github/workflows/neverd-raw-entry-control.yml]
+permissions:
+  contents: read
+jobs:
+  control:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-26, xcode-27]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: NeverSight/NeverD
+          ref: 64cc5df0cbe55cbc33a3a013c231382b49789bc5
+          path: neverd
+          persist-credentials: false
+          sparse-checkout: include/neverd/runtime
+      - name: Sample the original entry using only system tables
+        working-directory: neverd-raw-entry
+        run: |
+          ulimit -c 0
+          /usr/bin/clang -target arm64e-apple-macosx15.0 -dynamiclib -DNEVERD_TEST_EXPLICIT_RA frame.S old.S -o frame.dylib
+          /usr/bin/clang -target arm64e-apple-macosx15.0 -O2 -I../neverd/include observer.c caller.S -o observer
+          /usr/bin/codesign --verify --strict frame.dylib
+          /usr/bin/codesign --verify --strict observer
+          ./observer ./frame.dylib 0 3 sample raw-entry raw-entry
+          cat sample
