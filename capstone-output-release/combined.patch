@@ -1,38 +1,23 @@
-diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 57a2660d..60eda54e 100644
---- a/CMakeLists.txt
-+++ b/CMakeLists.txt
-@@ -163,7 +163,7 @@ elseif(capstone_enabled_architectures STREQUAL "ARM;AARCH64;MIPS;X86")
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "ARM")
--    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS)
-+    add_compile_definitions(CAPSTONE_ARM_COPY_OPERAND_DEFAULTS CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS)
- endif()
- 
- if(capstone_enabled_architectures STREQUAL "MIPS")
 diff --git a/cs.c b/cs.c
-index b2db69da..71fff034 100644
+index 71fff034..32aecf75 100644
 --- a/cs.c
 +++ b/cs.c
-@@ -1082,7 +1082,10 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
+@@ -1076,10 +1076,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
  	else
  #endif
--#ifdef CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS
-+#ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS
-+		/* ARM constructs each operand before reading or inserting it. */
-+		MCInst_InitStorage(&mci, CS_ARCH_ARM, false);
-+#elif defined(CAPSTONE_RISCV_INIT_CONSTRUCTED_OPERANDS)
- 	/* The RISC-V decoder constructs each operand before reading it. */
- 	MCInst_InitStorage(&mci, CS_ARCH_RISCV, false);
- #elif defined(CAPSTONE_AARCH64_INIT_CONSTRUCTED_OPERANDS) && \
-@@ -1092,7 +1095,7 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
- 	 * initializer below. */
- 	MCInst_InitStorage(&mci, CS_ARCH_AARCH64, false);
- #else
--		MCInst_Init(&mci, handle->arch);
-+	MCInst_Init(&mci, handle->arch);
+ #ifdef CAPSTONE_HAS_MIPS
+-	if (handle->arch == CS_ARCH_MIPS)
+-		/* MIPS constructs each MCOperand before reading it. The public
+-		 * detail and alias records are reset by the MIPS decoder. */
+-		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
++#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
++		if (handle->arch == CS_ARCH_MIPS || handle->arch == CS_ARCH_ARM)
++#else
++		if (handle->arch == CS_ARCH_MIPS)
++#endif
++		/* ARM and MIPS construct operands before reading them. Keep
++		 * operand zero and every common metadata default initialized. */
++		MCInst_InitStorage(&mci, handle->arch, false);
+ 	else
  #endif
- 	mci.csh = handle;
- 	mci.address = insn->address;
+ #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS

@@ -1,0 +1,8 @@
+{
+  "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+  "basis": "R1296 qualified ARM-only constructed-operand initialization, but the four-backend build still uses full MCInst_Init for ARM. This is independent of the held VEX32 feature.",
+  "change": "Reuse the existing MIPS partial-initialization branch for ARM only in the established four-backend CMake profile. Preserve operand zero, all common metadata defaults, tied indices and public detail initialization.",
+  "prediction": "Reduce ARM temporary initialization writes and executed work without changing constructed operands. Explicitly measure x86, AArch64 and MIPS: their code generation and layout can still change.",
+  "validation": "Current-baseline full public records, cursor and error differential; read-before-construction observer; 0xa5/0x5a poisoning; compiler/configuration coverage; frozen real inputs with A/A and fixed-image timing.",
+  "publication_qualified": false
+}
