@@ -1,0 +1,68 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "tree": "aafec4d66cd1a4990b9df9c6e2e96dd577fa187a",
+    "sha256": "6df21160655e48419242704e1c3b5f8c089ef9cd03434b0932d75e5fc6e6850f",
+    "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+    "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+    "complete": true,
+    "publication_qualified": false,
+    "mapping_object_unchanged": true
+  },
+  "original": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+    "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+    "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+    "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+    "complete": true,
+    "publication_qualified": false,
+    "mapping_object_unchanged": true
+  },
+  "before": {
+    "x86-only": {
+      "returncode": 1,
+      "sha256": null
+    },
+    "arm-only": {
+      "returncode": 1,
+      "sha256": null
+    },
+    "mips-diet": {
+      "returncode": 0,
+      "sha256": "94e93c8879d51daa603a044772e83677e9a96ed585e1d8fce8f68ed0694e0eea"
+    },
+    "four": {
+      "returncode": 0,
+      "sha256": "4e50696247e9cc5b6236ee6b7c666c9d94dfac9ac90d830f5019f1d43fe9acc6"
+    }
+  },
+  "after": {
+    "x86-only": {
+      "sha256": "94e93c8879d51daa603a044772e83677e9a96ed585e1d8fce8f68ed0694e0eea",
+      "symbols": "0000000000000000 t ltmp0\n"
+    },
+    "arm-only": {
+      "sha256": "94e93c8879d51daa603a044772e83677e9a96ed585e1d8fce8f68ed0694e0eea",
+      "symbols": "0000000000000000 t ltmp0\n"
+    },
+    "mips-diet": {
+      "sha256": "94e93c8879d51daa603a044772e83677e9a96ed585e1d8fce8f68ed0694e0eea",
+      "symbols": "0000000000000000 t ltmp0\n"
+    },
+    "four": {
+      "sha256": "4e50696247e9cc5b6236ee6b7c666c9d94dfac9ac90d830f5019f1d43fe9acc6",
+      "symbols": "0000000000000114 s _aarch64_alias_trie\n0000000000000000 T _map_set_aarch64_alias_id\n0000000000000010 t _map_set_alias_id_trie_impl\n0000000000000104 T _map_set_mips_alias_id\n000000000000175c s _mips_alias_trie\n0000000000000000 t ltmp0\n0000000000000114 s ltmp1\n0000000000002328 s ltmp2\n"
+    }
+  },
+  "failures_reproduced": [
+    "x86-only",
+    "arm-only"
+  ],
+  "active_four_backend_object_identical": true,
+  "cause": "The private non-inline parser is defined even when no enabled architecture calls it; Release -Werror -Wunused-function rejects those configurations.",
+  "fix": "Compile the private implementation only when AArch64 or non-DIET MIPS owns a caller.",
+  "publication_qualified": false,
+  "linux_identity_pending": true
+}

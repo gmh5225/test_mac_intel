@@ -1,0 +1,63 @@
+{
+  "inputs": {
+    "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "source_parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "variants": {
+      "output": {
+        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+        "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+        "experiment": "round1417-clang-small-alias",
+        "semantic_run": {
+          "id": 44203984817,
+          "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+          "run_attempt": 1
+        }
+      }
+    }
+  },
+  "original_run": {
+    "id": 44205770136,
+    "head_sha": "7ba34a9c0747e65076cdbdc2d673a9cf8ceab8d9",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205770136",
+    "run_attempt": 1
+  },
+  "original_loss": {
+    "host": "alias-call-shape-images-four-ubuntu-24.04-clang-44205770136",
+    "case": "arm-cp",
+    "panel": null,
+    "mode": 0,
+    "launch": "images",
+    "aa": 0.9902629799099877,
+    "aa_ci95": [
+      0.9740686653828028,
+      1.0022569465121542
+    ],
+    "variant": "output",
+    "gain": 0.9861372976953441,
+    "ci95": [
+      0.9778193786044265,
+      1.0022328332606363
+    ],
+    "vs_iced": null,
+    "vs_fast": null
+  },
+  "original_losses_preserved": true,
+  "source_and_consumer_unchanged": true,
+  "profiles": [
+    "ubuntu-22.04 clang",
+    "ubuntu-24.04 clang"
+  ],
+  "cycles": 64,
+  "calibration_cpu_ms": 120,
+  "observations_per_profile": 34,
+  "scope": "Repeat every raw mixed control, PE32/PE64 text and detail, and the AArch64/MIPS output gains. Retain both original image and fixed-file launches. For the sole ARM cp raw outlier, also measure separate images with fixed ASLR and same inode with ordinary ASLR.",
+  "controls": "The four ARM cp launches separate the joint image/ASLR control into its two factors. They do not by themselves establish hardware cache causes. No original observation is removed or reclassified as passing.",
+  "publication_qualified": false
+}
