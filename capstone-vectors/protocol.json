@@ -1,5 +1,5 @@
 {
-  "inputs": {
+  "source": {
     "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
     "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
     "source_parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
@@ -20,86 +20,193 @@
       }
     }
   },
-  "cycles": 32,
-  "native_target_ms": 80,
-  "mixed_target_ms": 80,
-  "launches": [
-    "images",
-    "same-file-fixed"
+  "original_decision": {
+    "disposition": "Hold: the completed 84 native and 96 mixed observations contain two losses and five A/A flags; do not publish the mode selector.",
+    "source": {
+      "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+      "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+      "source_parent": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
+      "baseline_patch_sha256": "2159258d74ab609692d42b9868171dadde011b522f370878a6495b62f2a87480",
+      "variants": {
+        "output": {
+          "tree": "565a7134bd148691c072308fad8612d04110fce3",
+          "sha256": "b246e263af4c03e97a7911b3c2aed2ccb72b70d0f1373b01e665085d8adc8e6e",
+          "experiment": "round1411-mode-caller-shape",
+          "semantic_run": {
+            "id": 44200457326,
+            "head_sha": "f0aadf9280514d54d180e5bdb97cbdb8eee89bb6",
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44200457326",
+            "run_attempt": 1
+          }
+        }
+      }
+    },
+    "runs": {
+      "native": {
+        "id": 44203886093,
+        "head_sha": "8e87153b63a322d82a0bdd8e60838dc14ea86d2f",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203886093",
+        "run_attempt": 1
+      },
+      "mixed": {
+        "id": 44202553832,
+        "head_sha": "8b62bc54f821b8ca1c354aee56739fdca3e34f80",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44202553832",
+        "run_attempt": 1
+      }
+    },
+    "rows": 180,
+    "losses": [
+      {
+        "suite": "native",
+        "host": "mode-caller-ubuntu-22.04-clang-1",
+        "case": "libssl3t64-amd64",
+        "panel": "simd-functions",
+        "mode": "detail",
+        "launch": "images",
+        "aa": 1.0004718554874044,
+        "aa_ci95": [
+          0.9984496820703475,
+          1.0066485262982758
+        ],
+        "variant": "output",
+        "gain": 0.9879201686001825,
+        "ci95": [
+          0.9863545900490539,
+          0.9909459793933955
+        ],
+        "vs_iced": 1.112731193799131,
+        "vs_fast": 0.690381428156732
+      },
+      {
+        "suite": "mixed",
+        "host": "mode-caller-images-four-ubuntu-24.04-clang-44202553832",
+        "case": "arm-cp",
+        "panel": null,
+        "mode": 0,
+        "launch": "images",
+        "aa": 0.9893834662373067,
+        "aa_ci95": [
+          0.9798842741735639,
+          0.9992619041610942
+        ],
+        "variant": "output",
+        "gain": 0.9837567683811166,
+        "ci95": [
+          0.977050899779939,
+          0.9961900535413946
+        ],
+        "vs_iced": null,
+        "vs_fast": null
+      }
+    ],
+    "aa_flags": [
+      {
+        "suite": "native",
+        "host": "mode-caller-ubuntu-24.04-clang-1",
+        "case": "libssl3t64-i386",
+        "panel": "all-functions",
+        "mode": "scan",
+        "launch": "images",
+        "aa": 0.9893936618241144,
+        "aa_ci95": [
+          0.9880791628186172,
+          0.9915159834820474
+        ]
+      },
+      {
+        "suite": "mixed",
+        "host": "mode-caller-images-four-ubuntu-22.04-clang-44202553832",
+        "case": "amd64-ls",
+        "panel": null,
+        "mode": 0,
+        "launch": "images",
+        "aa": 1.0134414691048659,
+        "aa_ci95": [
+          0.9760728327831627,
+          1.0743352738650302
+        ]
+      },
+      {
+        "suite": "mixed",
+        "host": "mode-caller-images-four-ubuntu-22.04-clang-44202553832",
+        "case": "amd64-ls",
+        "panel": null,
+        "mode": 0,
+        "launch": "same-file-fixed",
+        "aa": 1.010953532310598,
+        "aa_ci95": [
+          0.9604513013444471,
+          1.0455264408654932
+        ]
+      },
+      {
+        "suite": "mixed",
+        "host": "mode-caller-images-four-ubuntu-24.04-clang-44202553832",
+        "case": "arm-cp",
+        "panel": null,
+        "mode": 0,
+        "launch": "images",
+        "aa": 0.9893834662373067,
+        "aa_ci95": [
+          0.9798842741735639,
+          0.9992619041610942
+        ]
+      },
+      {
+        "suite": "mixed",
+        "host": "mode-caller-images-four-ubuntu-24.04-clang-44202553832",
+        "case": "amd64-ls",
+        "panel": null,
+        "mode": 0,
+        "launch": "images",
+        "aa": 0.9877979444916491,
+        "aa_ci95": [
+          0.9854972129284792,
+          0.9913239814894051
+        ]
+      }
+    ],
+    "observed": "PE32 output improves, but Clang14 SSL64 detail loses 1.21% in ordinary image launches with A/A near 1. Its fixed-file comparison also loses 0.63%, below the one-percent cutoff. A mixed ARM raw loss coincides with a noisy A/A control.",
+    "uncertainty": "The selector adds work on 64-bit fallback paths and relocates five existing EVEX functions. Native timing does not yet separate their causal contributions. Do not discard image-launch losses or claim all controls passed.",
+    "portable_fix": "../round1422-mode-code-section/portable-review.json",
+    "cleanup_complete": true,
+    "publication_qualified": false
+  },
+  "purpose": "Separate the three added mode-selector instructions from five relocated EVEX functions and any associated data placement. The former adds 1,122,780 retired simulated instructions on both SSL64 format and detail in Clang14; its native contribution is unknown.",
+  "intervention": "In a diagnostic copy of the exact candidate executable, change only the single direct call in X86_disasmIter from X86_tryModeSimpleOutput to the already present original X86_trySimpleOutput. All file bytes outside its signed relative displacement, all section sizes and all symbol addresses are identical.",
+  "predictions": "If the bypass recovers SSL64 while retaining candidate placement, selector work contributes to the loss. If bypass remains slower than baseline, placement or other process context contributes. No specific hardware cache mechanism is inferred without measurement.",
+  "cases": [
+    "SSL64 SIMD format/detail",
+    "JPEG64 SIMD format/detail",
+    "SSL32 all-functions format/detail"
   ],
-  "native_rows": 84,
-  "mixed_rows": 96,
   "profiles": [
     "ubuntu-22.04 clang",
     "ubuntu-24.04 clang"
   ],
-  "inactive_compilers": {
-    "evidence": "../round1411-mode-caller-shape/profile-partial-review.json",
-    "scope": "GCC11/13 exact original object and executable identity was checked; both remain on the published implementation."
-  },
-  "prior_failures_preserved": [
-    "../round1409-output-mode-native/decision.json",
-    "../round1411-mode-caller-shape/isolated-section-review.json"
+  "cycles": 60,
+  "calibration_cpu_ms": 100,
+  "launches": [
+    "images",
+    "same-file-fixed"
   ],
-  "purpose": "Measure native throughput of the canonical 32-bit output specialization while preserving ordinary text except the one verified call target. Five existing isolated EVEX functions still move together; record this layout cost and every timing observation.",
-  "cost_evidence": {
-    "id": 44200457326,
-    "head_sha": "f0aadf9280514d54d180e5bdb97cbdb8eee89bb6",
-    "status": "completed",
-    "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44200457326",
-    "run_attempt": 1
-  },
-  "instruction_increases": [
-    {
-      "host": "mode-section-cost-ubuntu-22.04-clang-1",
-      "case": "libjpeg62-turbo-amd64",
-      "mode": 1,
-      "instruction_reduction": -0.003383685676014103
-    },
-    {
-      "host": "mode-section-cost-ubuntu-22.04-clang-1",
-      "case": "libjpeg62-turbo-amd64",
-      "mode": 2,
-      "instruction_reduction": -0.002235158301153728
-    },
-    {
-      "host": "mode-section-cost-ubuntu-22.04-clang-1",
-      "case": "libssl3t64-amd64",
-      "mode": 1,
-      "instruction_reduction": -0.0034074042507736824
-    },
-    {
-      "host": "mode-section-cost-ubuntu-22.04-clang-1",
-      "case": "libssl3t64-amd64",
-      "mode": 2,
-      "instruction_reduction": -0.0022497298743220373
-    },
-    {
-      "host": "mode-section-cost-ubuntu-24.04-clang-1",
-      "case": "libjpeg62-turbo-amd64",
-      "mode": 1,
-      "instruction_reduction": -0.002284062530909292
-    },
-    {
-      "host": "mode-section-cost-ubuntu-24.04-clang-1",
-      "case": "libjpeg62-turbo-amd64",
-      "mode": 2,
-      "instruction_reduction": -0.0015148663133075502
-    },
-    {
-      "host": "mode-section-cost-ubuntu-24.04-clang-1",
-      "case": "libssl3t64-amd64",
-      "mode": 1,
-      "instruction_reduction": -0.0023232070820360384
-    },
-    {
-      "host": "mode-section-cost-ubuntu-24.04-clang-1",
-      "case": "libssl3t64-amd64",
-      "mode": 2,
-      "instruction_reduction": -0.0015341269545678937
-    }
+  "observations_per_profile": 12,
+  "comparisons": [
+    "candidate/baseline",
+    "bypass/baseline",
+    "candidate/bypass",
+    "identical-copy/baseline"
   ],
-  "gates": "Full records and extents already pass on both active compilers. The baseline is published Capstone next with the Clang memory optimization. Preserve scalar/SIMD PE32/64 and ARM/AArch64/MIPS observations, including every A/A flag and loss. Native and alternate-configuration qualification remain required.",
-  "publication_qualified": false
+  "frozen_consumer": true,
+  "source_and_scope_unchanged": true,
+  "native_qualification": false,
+  "publication_qualified": false,
+  "original_losses_preserved": true
 }

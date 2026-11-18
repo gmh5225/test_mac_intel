@@ -1,6 +1,7 @@
 """Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
 from pathlib import Path
 import gzip, os, shlex, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
+from bypass import make_bypass
 from layout import object_proof, linked_layout
 r=Path(__file__).resolve().parent
 p=r.parent
@@ -90,6 +91,8 @@ def main(w):
         run(['git','reset','--hard',reference],'restore-'+label,tree)
         run(['git','clean','-fdx'],'remove-generated-'+label,tree)
         assert not sp.check_output(['git','-C',tree,'status','--porcelain'])
+    exe['bypass'] = w/'run-bypass'
+    save('bypass-proof.json', make_bypass(exe['output'], exe['bypass']))
     exe['iced']=exe['fast']=exe['integer']
     payloads={key:path.read_bytes()for key,path in exe.items()}
     assert payloads['integer']==payloads['aa']
@@ -100,22 +103,22 @@ def main(w):
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the frozen stable-caller 32-bit output prototype, including all recorded symbol relocation, against the same baseline and frozen consumers with original-image and fixed-image controls.'))
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Separate the runtime selector from its linked placement: bypass changes only the verified call displacement back to the original generic output target, retaining every code and data address of the candidate. Both ordinary image launches and fixed inode/argv/ASLR controls are retained.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
     for name,bits,f,spans,source in deb.prepare(w):
-        if name not in ('libjpeg62-turbo-amd64','libzstd1-amd64','libssl3t64-amd64','jpeg-avx2-i386','libssl3t64-i386'): continue
+        if name not in ('libjpeg62-turbo-amd64','libssl3t64-amd64','libssl3t64-i386'): continue
         intervals=w/(name+'.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans));raw=sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True);rows=[list(map(int,x.split())) for x in raw.splitlines()];views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()];assert len(views)==len(rows)==len(spans)
         common=[(q[:3],vw)for q,vw in zip(rows,views)if q[1]==q[5]];assert common
         manifest[name]=dict(source,common_functions=len(common),common_bytes=sum(z[0][1]for z in common),host=platform.platform(),iced_revision=iced,selection='all FDE and symbol extents with identical instruction boundaries; SIMD subset has at least 8 explicit vector-register instructions and at least 15% vector instructions')
-        for panel in (['all-functions','simd-functions'] if name in ('libjpeg62-turbo-amd64','libzstd1-amd64') else (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions'])):
+        for panel in (['all-functions'] if name=='libssl3t64-i386' else ['simd-functions']):
             sel=[a for a,v in common if panel=='all-functions' or (v[1]>=8 and v[1]>=0.15*v[0])];manifest[name][panel]=dict(functions=len(sel),bytes=sum(z[1]for z in sel));save('provenance.json',manifest)
             if name=='jpeg-avx2-i386':assert sel,(name,manifest[name])
             if not sel:continue
             intervals.write_text(''.join('%d %d %d\n'%tuple(q) for q in sel))
             prefix_census[name+'/'+panel]=json.loads(sp.check_output([w/'prefixes',str(bits),f,intervals],text=True));save('prefix-census.json',dict(counts=prefix_census,scope='One linear pass over selected benchmark function extents; overlapping extents count as the benchmark does. Bare prefix counts are not packed-reader hit counts or application runtime frequencies.'))
-            for mode in (0,1,2):
+            for mode in (1,2):
                 def measure(lib,n,launch):
                     tail=[lib+'____' if lib in ('iced','fast') else 'capstone',str(mode),str(n),str(f),str(intervals),str(bits)]
                     if launch=='images':
@@ -129,9 +132,9 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(80e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','output','iced']+(['fast'] if mode else [])
-                for i in range(32):
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(100e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','output','bypass']
+                for i in range(60):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -143,12 +146,12 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']={k:md('iced',k) for k in ('output',)}
-                    row['vs_fast']={k:md('fast',k) for k in ('output',)} if mode else None
+                    row['dispatch_gain']=md('bypass','output')
+                    row['diagnostic_only']=True
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
-    assert len(reported)==21*len(launches)
+    assert len(reported)==6*len(launches)
     # Collect the original consumer lambda by symbol, without inserting client
     # request instructions or changing the original native consumer object.
     costs=[]
@@ -162,7 +165,7 @@ def main(w):
         intervals.write_text(''.join('%d %d %d\n'%tuple(v) for v in sel))
         native_values={}
         for mode in (0,1,2):
-            for label in ('integer','output'):
+            for label in ('integer','output','bypass'):
                 raw=w/(label+'-'+str(mode)+'.callgrind')
                 tail=['capstone',str(mode),'1',str(f),str(intervals),str(bits)]
                 # -demangle=no makes the symbol selector independent of the
@@ -182,10 +185,10 @@ def main(w):
                 with gzip.open(p/'evidence'/(label+'-'+str(mode)+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
                 raw.unlink()
                 save('instruction-costs.json',costs)
-    assert len(costs)==6
+    assert len(costs)==9
     save('cost-protocol.json',dict(symbol='_ZZ4mainENK3$_0clEj',consumer_unchanged=True,traversals=2,scope='The original benchmark warm traversal and one timed traversal are collected. Simulated cache events do not establish native hardware causes.'))
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-output-mode-inline-native-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-mode-dispatch-counterfactual-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)
