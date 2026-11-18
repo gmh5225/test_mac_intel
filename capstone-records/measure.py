@@ -71,25 +71,38 @@ with tempfile.TemporaryDirectory(prefix='capstone-small-alias-mixed-') as tmp:
   maximum=max(map(len,payloads.values()));padded={key:value+bytes(maximum-len(value))for key,value in payloads.items()}
   image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
+  assert probe.returncode==0
+  launches=['images-cross','images-fixed-cross']
   write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Isolated alias lookup; all unmodified runtime objects are preserved and every symbol relocation is recorded for native comparison; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def sample(key,x,mode,reps,launch):
-   tail=list(map(str,[x['selector'],mode,x['path'],reps]))
-   if launch=='images':args=[str(bins[key]),*tail]
-   else:
-    with image.open('r+b')as stream:assert stream.write(padded[key])==maximum
-    assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
+  slots=[t/('rotation-'+str(i)) for i in range(3)]
+  for slot in slots:
+   slot.write_bytes(bytes(maximum));slot.chmod(0o755)
+  identities=[slot.stat().st_ino for slot in slots]
+  rotation=0
+  label_index={'base':0,'aa':1,'output':2}
+  write('crossover',dict(cycles=96,slots=[str(q) for q in slots],inodes=identities,
+   assignment='slot = (label_index + cycle) % 3; each payload uses every inode 32 times per launch',
+   label_index=label_index,source_payload_sha256={k:hashlib.sha256(v).hexdigest() for k,v in payloads.items()},
+   padded_size=maximum,fixed_ASLR_launch='images-fixed-cross',aslr_disable_returncode=probe.returncode))
+  def sample(key,x,mode,n,launch):
+   tail=list(map(str,[x['selector'],mode,x['path'],n]))
+   index=(label_index[key]+rotation)%3;slot=slots[index]
+   with slot.open('r+b') as stream:assert stream.write(padded[key])==maximum
+   assert slot.stat().st_ino==identities[index] and slot.stat().st_size==maximum
+   args=[str(slot),*tail]
+   if launch=='images-fixed-cross':args=['setarch',platform.machine(),'-R',*args]
    return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
-   for mode in (0,1,2):
-    for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+   if x['name']!='arm-cp':continue
+   for mode in (0,):
+    selected_launches=launches
+    for launch in selected_launches:
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*120e6/warm['cpu_ns'])))
      runs=[];reference=None;keys=['base','aa','output']
-     for k in range(32):
+     for k in range(96):
+      rotation=k
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
@@ -98,6 +111,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-small-alias-mixed-') as tmp:
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
+  assert len(data)==2
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
  finally:
   n=sum(f.stat().st_size for f in t.rglob('*')if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=n,removed=not t.exists()))
