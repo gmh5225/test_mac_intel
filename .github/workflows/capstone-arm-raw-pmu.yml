@@ -1,0 +1,23 @@
+name: Probe ARM raw fetch events and hardware sampling
+on:
+  push:
+    branches: [codex/capstone-arm-raw-pmu-preflight]
+    paths: [arm-raw-pmu-probe/**, .github/workflows/capstone-arm-raw-pmu.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install perf tooling
+        run: sudo apt-get update && sudo apt-get install -y linux-tools-common linux-tools-generic
+      - name: Check raw-event counts and sampled profile fields
+        run: python3 arm-raw-pmu-probe/probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arm-raw-pmu-preflight-${{ github.run_id }}
+          path: evidence
+          if-no-files-found: warn
