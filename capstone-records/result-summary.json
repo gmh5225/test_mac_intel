@@ -1,0 +1,4578 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44250486132,
+    "head_sha": "c22b3d3fb1bc35657074dc7eb40a711b4ff15dc8",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44250486132",
+    "run_attempt": 1
+  },
+  "inputs": {
+    "baseline_commit": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "source_parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+    "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "variants": {
+      "candidate": {
+        "tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
+        "sha256": "0f7b38efaecf91282b24301e0319bbc5d4a939f6213819d8eb460fe0f260b972",
+        "experiment": "round1462-vex32-plan-class-bit",
+        "semantic_and_cost_run": {
+          "id": 44242322055,
+          "head_sha": "4d495ce72b9f5a5748c8c8c68b31f4359e2d8c96",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44242322055",
+          "run_attempt": 1
+        }
+      }
+    }
+  },
+  "profiles": [
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "cpu": {
+        "model": "AMD EPYC 7763 64-Core Processor"
+      },
+      "compiler": {
+        "compiler": "Ubuntu clang version 14.0.0-1ubuntu1.1\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+      },
+      "cleanup": {
+        "bytes": 302303051,
+        "removed": true
+      },
+      "pmu": {
+        "supported": false,
+        "executable": "/usr/lib/linux-tools/6.8.0-1070-azure/perf",
+        "returncode": 255,
+        "stdout": "",
+        "stderr": "Error:\nAccess to performance monitoring and observability operations is limited.\nConsider adjusting /proc/sys/kernel/perf_event_paranoid setting to open\naccess to performance monitoring and observability operations for processes\nwithout CAP_PERFMON, CAP_SYS_PTRACE or CAP_SYS_ADMIN Linux capability.\nMore information can be found at 'Perf events and tool security' document:\nhttps://www.kernel.org/doc/html/latest/admin-guide/perf-security.html\nperf_event_paranoid setting is 4:\n  -1: Allow use of (almost) all events by all users\n      Ignore mlock limit after perf_event_mlock_kb without CAP_IPC_LOCK\n>= 0: Disallow raw and ftrace function tracepoint access\n>= 1: Disallow CPU event access\n>= 2: Disallow kernel profiling\nTo make the adjusted perf_event_paranoid setting permanent preserve it\nin /etc/sysctl.conf (e.g. kernel.perf_event_paranoid = <setting>)\n",
+        "scope": "Separate whole-process counters, including setup and warm passes; unavailable counters are retained as unavailable."
+      }
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "cpu": {
+        "model": "Intel(R) Xeon(R) 6975P-C"
+      },
+      "compiler": {
+        "compiler": "Ubuntu clang version 18.1.3 (1ubuntu1)\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin\n"
+      },
+      "cleanup": {
+        "bytes": 289830354,
+        "removed": true
+      },
+      "pmu": {
+        "supported": false,
+        "executable": "/usr/lib/linux-tools/7.0.0-1014-aws/perf",
+        "returncode": 1,
+        "stdout": "",
+        "stderr": "Error:\nNo supported events found.\nAccess to performance monitoring and observability operations is limited.\nConsider adjusting /proc/sys/kernel/perf_event_paranoid setting to open\naccess to performance monitoring and observability operations for processes\nwithout CAP_PERFMON, CAP_SYS_PTRACE or CAP_SYS_ADMIN Linux capability.\nMore information can be found at 'Perf events and tool security' document:\nhttps://www.kernel.org/doc/html/latest/admin-guide/perf-security.html\nperf_event_paranoid setting is 4:\n  -1: Allow use of (almost) all events by all users\n      Ignore mlock limit after perf_event_mlock_kb without CAP_IPC_LOCK\n>= 0: Disallow raw and ftrace function tracepoint access\n>= 1: Disallow CPU event access\n>= 2: Disallow kernel profiling\nTo make the adjusted perf_event_paranoid setting permanent preserve it\nin /etc/sysctl.conf (e.g. kernel.perf_event_paranoid = <setting>)\n",
+        "scope": "Separate whole-process counters, including setup and warm passes; unavailable counters are retained as unavailable."
+      }
+    }
+  ],
+  "rows": [
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9979667442060826,
+        "ci95": [
+          0.9928596561993117,
+          1.001900290632685
+        ]
+      },
+      "gain": 0.9928100094266861,
+      "ci95": [
+        0.9844929431778353,
+        0.998896447076878
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9979667442060826,
+        "ci95": [
+          0.9928596561993117,
+          1.001900290632685
+        ]
+      },
+      "gain": 0.9988171913041977,
+      "ci95": [
+        0.9940955356070098,
+        1.0004564715609605
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9979667442060826,
+        "ci95": [
+          0.9928596561993117,
+          1.001900290632685
+        ]
+      },
+      "gain": 0.9892149550337355,
+      "ci95": [
+        0.9841606513632787,
+        0.9919096621748883
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9840141642336077,
+      "ci95": [
+        0.9833020957573693,
+        0.9856215727577414
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9984866697221526,
+      "ci95": [
+        0.9967145259345492,
+        1.0015164907537393
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9833483885262386,
+      "ci95": [
+        0.9828471808827282,
+        0.9845894922947461
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9938008391129377,
+      "ci95": [
+        0.9905313579146708,
+        0.9974178566477194
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9970483548919177,
+      "ci95": [
+        0.9824632044274626,
+        0.9995000301705932
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9891278065630397,
+      "ci95": [
+        0.982477377702227,
+        0.9967523750963462
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9829349486075124,
+      "ci95": [
+        0.9815206995491187,
+        0.9841858548395405
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9993012062926373,
+      "ci95": [
+        0.9982397127768967,
+        0.9995387855265677
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9815515569627856,
+      "ci95": [
+        0.9792173846193271,
+        0.9824296629136404
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0007275372862858,
+        "ci95": [
+          0.9965186425363417,
+          1.0031750006707747
+        ]
+      },
+      "gain": 0.9927445628246896,
+      "ci95": [
+        0.9869002086230876,
+        0.9982811053814624
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0007275372862858,
+        "ci95": [
+          0.9965186425363417,
+          1.0031750006707747
+        ]
+      },
+      "gain": 0.99998226667376,
+      "ci95": [
+        0.9942558057705841,
+        1.0022193188123065
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0007275372862858,
+        "ci95": [
+          0.9965186425363417,
+          1.0031750006707747
+        ]
+      },
+      "gain": 0.9933296028848801,
+      "ci95": [
+        0.9886184279751675,
+        0.9948871386456637
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9850365091623956,
+      "ci95": [
+        0.9829900028964391,
+        0.9856573914874206
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9980337028667011,
+      "ci95": [
+        0.9960339338751846,
+        1.0009531954317885
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9814842388305466,
+      "ci95": [
+        0.9804817929129591,
+        0.983354403708386
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9979454796104416,
+        "ci95": [
+          0.9931480307193687,
+          1.0010753252203106
+        ]
+      },
+      "gain": 1.0150874530211043,
+      "ci95": [
+        1.009475244695292,
+        1.018952848350099
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9979454796104416,
+        "ci95": [
+          0.9931480307193687,
+          1.0010753252203106
+        ]
+      },
+      "gain": 0.9962530854332037,
+      "ci95": [
+        0.9930284219121792,
+        1.0037472805576522
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9979454796104416,
+        "ci95": [
+          0.9931480307193687,
+          1.0010753252203106
+        ]
+      },
+      "gain": 1.011555833817808,
+      "ci95": [
+        1.005770721736679,
+        1.0146968551221032
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.999300980375024,
+        "ci95": [
+          0.996117282445938,
+          1.0019954315120645
+        ]
+      },
+      "gain": 1.0181868332310102,
+      "ci95": [
+        1.0142965237904482,
+        1.0202003070660906
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.999300980375024,
+        "ci95": [
+          0.996117282445938,
+          1.0019954315120645
+        ]
+      },
+      "gain": 1.0066073473702757,
+      "ci95": [
+        1.004933113303606,
+        1.0078001884018417
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.999300980375024,
+        "ci95": [
+          0.996117282445938,
+          1.0019954315120645
+        ]
+      },
+      "gain": 1.0190077577244008,
+      "ci95": [
+        1.0169307749051255,
+        1.0202737626321137
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9995648761839642,
+        "ci95": [
+          0.9951186747787784,
+          1.0020465232538158
+        ]
+      },
+      "gain": 0.9982397258666417,
+      "ci95": [
+        0.9951460105052526,
+        1.0023362112747587
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9995648761839642,
+        "ci95": [
+          0.9951186747787784,
+          1.0020465232538158
+        ]
+      },
+      "gain": 0.999665816960955,
+      "ci95": [
+        0.9968415634650778,
+        1.0017906931081877
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9995648761839642,
+        "ci95": [
+          0.9951186747787784,
+          1.0020465232538158
+        ]
+      },
+      "gain": 0.9996645865834634,
+      "ci95": [
+        0.996750964557397,
+        1.0023910359593056
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0006551955446703,
+        "ci95": [
+          0.9963143151997641,
+          1.0078257619411004
+        ]
+      },
+      "gain": 0.9962766618991357,
+      "ci95": [
+        0.9935679152478244,
+        1.0009778660789121
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0006551955446703,
+        "ci95": [
+          0.9963143151997641,
+          1.0078257619411004
+        ]
+      },
+      "gain": 0.9967600829791697,
+      "ci95": [
+        0.9943930734321516,
+        1.0041183660441109
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0006551955446703,
+        "ci95": [
+          0.9963143151997641,
+          1.0078257619411004
+        ]
+      },
+      "gain": 0.9961727168276248,
+      "ci95": [
+        0.9945921208191907,
+        1.00286081994666
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0001988086209308,
+        "ci95": [
+          0.9972082553788587,
+          1.004442070136409
+        ]
+      },
+      "gain": 1.0058871086285461,
+      "ci95": [
+        1.0018881840979494,
+        1.0087515272850391
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0001988086209308,
+        "ci95": [
+          0.9972082553788587,
+          1.004442070136409
+        ]
+      },
+      "gain": 1.0006926217556138,
+      "ci95": [
+        0.9998012703973856,
+        1.0040262330798844
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0001988086209308,
+        "ci95": [
+          0.9972082553788587,
+          1.004442070136409
+        ]
+      },
+      "gain": 1.0073094120690291,
+      "ci95": [
+        1.0062669715063668,
+        1.0115997422279506
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0008882559351646,
+        "ci95": [
+          1.000278447435719,
+          1.0046446886446887
+        ]
+      },
+      "gain": 1.005761565495443,
+      "ci95": [
+        1.0032049392903455,
+        1.0082122087680216
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0008882559351646,
+        "ci95": [
+          1.000278447435719,
+          1.0046446886446887
+        ]
+      },
+      "gain": 0.9997580325849452,
+      "ci95": [
+        0.9937299757897331,
+        1.0059786236694812
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0008882559351646,
+        "ci95": [
+          1.000278447435719,
+          1.0046446886446887
+        ]
+      },
+      "gain": 1.0048013098504291,
+      "ci95": [
+        1.002862803945279,
+        1.0090704449152543
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9959819787472323,
+        "ci95": [
+          0.9937917492003876,
+          0.9995964140963111
+        ]
+      },
+      "gain": 0.9981832049293421,
+      "ci95": [
+        0.9943956053344268,
+        1.0010077519379845
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9959819787472323,
+        "ci95": [
+          0.9937917492003876,
+          0.9995964140963111
+        ]
+      },
+      "gain": 0.9974107923661243,
+      "ci95": [
+        0.9931147008824459,
+        1.0022027000283942
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9959819787472323,
+        "ci95": [
+          0.9937917492003876,
+          0.9995964140963111
+        ]
+      },
+      "gain": 1.0041491270443723,
+      "ci95": [
+        1.0011716259756371,
+        1.0057751495659992
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000125313283208,
+        "ci95": [
+          0.9981483335001501,
+          1.0026344400769425
+        ]
+      },
+      "gain": 1.002901813633521,
+      "ci95": [
+        1.0006004703684552,
+        1.00361799954775
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.000125313283208,
+        "ci95": [
+          0.9981483335001501,
+          1.0026344400769425
+        ]
+      },
+      "gain": 1.0000083707926304,
+      "ci95": [
+        0.998370832045316,
+        1.0008621339069732
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000125313283208,
+        "ci95": [
+          0.9981483335001501,
+          1.0026344400769425
+        ]
+      },
+      "gain": 1.0032469711715946,
+      "ci95": [
+        1.0019288343969877,
+        1.0048874706079947
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9929048665890771,
+        "ci95": [
+          0.9794780952062635,
+          1.0071236058271442
+        ]
+      },
+      "gain": 1.0191887743915808,
+      "ci95": [
+        1.0164629276982615,
+        1.0299286738287818
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9929048665890771,
+        "ci95": [
+          0.9794780952062635,
+          1.0071236058271442
+        ]
+      },
+      "gain": 0.9998101009054734,
+      "ci95": [
+        0.9924006646255578,
+        1.008880979251671
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9929048665890771,
+        "ci95": [
+          0.9794780952062635,
+          1.0071236058271442
+        ]
+      },
+      "gain": 1.0118216716105393,
+      "ci95": [
+        1.001531393568147,
+        1.0255633002299904
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0016893647988356,
+        "ci95": [
+          0.9976733364355514,
+          1.0029662076517811
+        ]
+      },
+      "gain": 1.0146269258055758,
+      "ci95": [
+        1.0122622710110474,
+        1.0165969292179484
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0016893647988356,
+        "ci95": [
+          0.9976733364355514,
+          1.0029662076517811
+        ]
+      },
+      "gain": 1.001995008161397,
+      "ci95": [
+        0.9977077265128144,
+        1.003699350020744
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0016893647988356,
+        "ci95": [
+          0.9976733364355514,
+          1.0029662076517811
+        ]
+      },
+      "gain": 1.0170292117832294,
+      "ci95": [
+        1.013325050745433,
+        1.0188006568375205
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9997086478612104,
+        "ci95": [
+          0.9935129049021306,
+          1.0081484834766863
+        ]
+      },
+      "gain": 0.9972478901943025,
+      "ci95": [
+        0.9890911937922455,
+        1.005790930754135
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9997086478612104,
+        "ci95": [
+          0.9935129049021306,
+          1.0081484834766863
+        ]
+      },
+      "gain": 0.9978630607276103,
+      "ci95": [
+        0.9920426486113898,
+        1.0028704042994991
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9997086478612104,
+        "ci95": [
+          0.9935129049021306,
+          1.0081484834766863
+        ]
+      },
+      "gain": 0.9897008595787274,
+      "ci95": [
+        0.98410038245026,
+        0.997293053037073
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 0.9643571817306484,
+      "ci95": [
+        0.9631759103500799,
+        0.969280503839937
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 1.0055619100839088,
+      "ci95": [
+        1.003883274866049,
+        1.0107242351995949
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 0.9659551268609772,
+      "ci95": [
+        0.9639520366010005,
+        0.969374100960091
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9993021008553739,
+        "ci95": [
+          0.9986839278040396,
+          1.001323094252586
+        ]
+      },
+      "gain": 1.0109546024670415,
+      "ci95": [
+        1.006918736297308,
+        1.0131370328425822
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9993021008553739,
+        "ci95": [
+          0.9986839278040396,
+          1.001323094252586
+        ]
+      },
+      "gain": 1.0004212186662604,
+      "ci95": [
+        0.9955232877683811,
+        1.0015763687986459
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9993021008553739,
+        "ci95": [
+          0.9986839278040396,
+          1.001323094252586
+        ]
+      },
+      "gain": 1.0114007105053289,
+      "ci95": [
+        1.009005021857726,
+        1.0133812246670526
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9996424804704958,
+        "ci95": [
+          0.9972773691351853,
+          1.0007074605747446
+        ]
+      },
+      "gain": 1.0118377468459825,
+      "ci95": [
+        1.0112190932513674,
+        1.0122073623958983
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9996424804704958,
+        "ci95": [
+          0.9972773691351853,
+          1.0007074605747446
+        ]
+      },
+      "gain": 1.0012273566142875,
+      "ci95": [
+        1.0002330584438868,
+        1.00154080444325
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9996424804704958,
+        "ci95": [
+          0.9972773691351853,
+          1.0007074605747446
+        ]
+      },
+      "gain": 1.0102250780643647,
+      "ci95": [
+        1.0088517979366902,
+        1.0122940430925222
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0005499925794652,
+        "ci95": [
+          0.9984143302723518,
+          1.0035722998640784
+        ]
+      },
+      "gain": 1.0112869207621098,
+      "ci95": [
+        1.0096656309582657,
+        1.015778082070763
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0005499925794652,
+        "ci95": [
+          0.9984143302723518,
+          1.0035722998640784
+        ]
+      },
+      "gain": 1.0006286123382633,
+      "ci95": [
+        0.9972539926075737,
+        1.0036202560286835
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0005499925794652,
+        "ci95": [
+          0.9984143302723518,
+          1.0035722998640784
+        ]
+      },
+      "gain": 1.0113425393850453,
+      "ci95": [
+        1.008639385016838,
+        1.0139686741672183
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0003405072685205,
+        "ci95": [
+          0.9982316919136927,
+          1.0018303684270162
+        ]
+      },
+      "gain": 1.010439647717044,
+      "ci95": [
+        1.0095843546652088,
+        1.0114701159364026
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0003405072685205,
+        "ci95": [
+          0.9982316919136927,
+          1.0018303684270162
+        ]
+      },
+      "gain": 1.0009528638366318,
+      "ci95": [
+        1.0001394384117965,
+        1.0018439059345807
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0003405072685205,
+        "ci95": [
+          0.9982316919136927,
+          1.0018303684270162
+        ]
+      },
+      "gain": 1.0110838525212236,
+      "ci95": [
+        1.010252428555043,
+        1.0121980260894874
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9993337631635504,
+        "ci95": [
+          0.996431471430403,
+          1.0017101555273518
+        ]
+      },
+      "gain": 1.0126356344481569,
+      "ci95": [
+        1.0071698929382502,
+        1.016302334197851
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9993337631635504,
+        "ci95": [
+          0.996431471430403,
+          1.0017101555273518
+        ]
+      },
+      "gain": 0.9994414367964252,
+      "ci95": [
+        0.9974830156884912,
+        1.0019921391266893
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9993337631635504,
+        "ci95": [
+          0.996431471430403,
+          1.0017101555273518
+        ]
+      },
+      "gain": 1.010694432380787,
+      "ci95": [
+        1.005431202962867,
+        1.0124813650064746
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0001616161616163,
+        "ci95": [
+          0.9980081930198051,
+          1.0007588355910038
+        ]
+      },
+      "gain": 1.0106686212232265,
+      "ci95": [
+        1.0096665252716417,
+        1.011722860802245
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0001616161616163,
+        "ci95": [
+          0.9980081930198051,
+          1.0007588355910038
+        ]
+      },
+      "gain": 1.0004836057645807,
+      "ci95": [
+        0.9990484561604399,
+        1.0015835568626184
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0001616161616163,
+        "ci95": [
+          0.9980081930198051,
+          1.0007588355910038
+        ]
+      },
+      "gain": 1.0099350152282611,
+      "ci95": [
+        1.0093456419624216,
+        1.0114222309248744
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9998360995134743,
+        "ci95": [
+          0.9972223659920985,
+          1.0026972819697075
+        ]
+      },
+      "gain": 1.0205926670015069,
+      "ci95": [
+        1.0166074694049796,
+        1.0225075289269299
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9998360995134743,
+        "ci95": [
+          0.9972223659920985,
+          1.0026972819697075
+        ]
+      },
+      "gain": 0.9997584811917228,
+      "ci95": [
+        0.99870447302281,
+        1.0014678708964373
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9998360995134743,
+        "ci95": [
+          0.9972223659920985,
+          1.0026972819697075
+        ]
+      },
+      "gain": 1.0183606269482373,
+      "ci95": [
+        1.0173708630844949,
+        1.0205120987958378
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9998191152149944,
+        "ci95": [
+          0.9987489646604086,
+          1.0005429957853185
+        ]
+      },
+      "gain": 1.01981006931328,
+      "ci95": [
+        1.0191206778108541,
+        1.0206818321711526
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9998191152149944,
+        "ci95": [
+          0.9987489646604086,
+          1.0005429957853185
+        ]
+      },
+      "gain": 0.9982379920018657,
+      "ci95": [
+        0.9968348170128586,
+        1.0000345190631525
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9998191152149944,
+        "ci95": [
+          0.9987489646604086,
+          1.0005429957853185
+        ]
+      },
+      "gain": 1.0183220153340635,
+      "ci95": [
+        1.0169614966129654,
+        1.0189919071076707
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0011548936463612,
+        "ci95": [
+          0.9995778082215386,
+          1.00247311457328
+        ]
+      },
+      "gain": 1.0080265875288523,
+      "ci95": [
+        1.0065822037357046,
+        1.010439246015919
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0011548936463612,
+        "ci95": [
+          0.9995778082215386,
+          1.00247311457328
+        ]
+      },
+      "gain": 1.0001117587386736,
+      "ci95": [
+        0.9996563485313196,
+        1.0012066677009532
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0011548936463612,
+        "ci95": [
+          0.9995778082215386,
+          1.00247311457328
+        ]
+      },
+      "gain": 1.0083853438772232,
+      "ci95": [
+        1.0072228147300333,
+        1.0099795891779215
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9994229162539513,
+        "ci95": [
+          0.9992673361203293,
+          1.0005517241379311
+        ]
+      },
+      "gain": 1.0050745596563848,
+      "ci95": [
+        1.0044534553268178,
+        1.0062273953355247
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9994229162539513,
+        "ci95": [
+          0.9992673361203293,
+          1.0005517241379311
+        ]
+      },
+      "gain": 1.0001639188687872,
+      "ci95": [
+        0.9995088112370201,
+        1.0010352502717532
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9994229162539513,
+        "ci95": [
+          0.9992673361203293,
+          1.0005517241379311
+        ]
+      },
+      "gain": 1.0057376622926382,
+      "ci95": [
+        1.0051395389148898,
+        1.0075668827393505
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0002282863036371,
+        "ci95": [
+          0.9996083359172283,
+          1.0013709137793154
+        ]
+      },
+      "gain": 1.0102495653821753,
+      "ci95": [
+        1.007329713721619,
+        1.0114856285351495
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0002282863036371,
+        "ci95": [
+          0.9996083359172283,
+          1.0013709137793154
+        ]
+      },
+      "gain": 0.9995438625071271,
+      "ci95": [
+        0.9981897353099467,
+        1.0005786518227533
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0002282863036371,
+        "ci95": [
+          0.9996083359172283,
+          1.0013709137793154
+        ]
+      },
+      "gain": 1.0098011072380562,
+      "ci95": [
+        1.0077657616198803,
+        1.0105998633868538
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9999918519665278,
+        "ci95": [
+          0.9997065608111964,
+          1.000815228467778
+        ]
+      },
+      "gain": 1.0092366405935138,
+      "ci95": [
+        1.0080952694039909,
+        1.0097061823446187
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9999918519665278,
+        "ci95": [
+          0.9997065608111964,
+          1.000815228467778
+        ]
+      },
+      "gain": 1.0001957218466355,
+      "ci95": [
+        0.9996005999152293,
+        1.0004970867457117
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9999918519665278,
+        "ci95": [
+          0.9997065608111964,
+          1.000815228467778
+        ]
+      },
+      "gain": 1.009161937659347,
+      "ci95": [
+        1.0081915978550515,
+        1.0097748010893801
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9997498207048384,
+        "ci95": [
+          0.9987005306166649,
+          1.0016576702652273
+        ]
+      },
+      "gain": 1.011354714528125,
+      "ci95": [
+        1.0084872648968743,
+        1.0127001238009417
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9997498207048384,
+        "ci95": [
+          0.9987005306166649,
+          1.0016576702652273
+        ]
+      },
+      "gain": 1.0002167605962584,
+      "ci95": [
+        0.9992334547030054,
+        1.0019660277076616
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9997498207048384,
+        "ci95": [
+          0.9987005306166649,
+          1.0016576702652273
+        ]
+      },
+      "gain": 1.0110644245909783,
+      "ci95": [
+        1.010677808727948,
+        1.0119020601659228
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0005002292717495,
+        "ci95": [
+          1.0000500116693896,
+          1.001025179406396
+        ]
+      },
+      "gain": 1.0104875092586358,
+      "ci95": [
+        1.010134822577525,
+        1.0115742689270864
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0005002292717495,
+        "ci95": [
+          1.0000500116693896,
+          1.001025179406396
+        ]
+      },
+      "gain": 0.9994169096209913,
+      "ci95": [
+        0.9990101562954892,
+        1.0001417552637064
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0005002292717495,
+        "ci95": [
+          1.0000500116693896,
+          1.001025179406396
+        ]
+      },
+      "gain": 1.0100450090438733,
+      "ci95": [
+        1.0094577765810642,
+        1.0104208754208754
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9805874102796799,
+      "ci95": [
+        0.9772919523993331,
+        0.983210108553201
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9963807606226756,
+      "ci95": [
+        0.992453643811988,
+        1.0093186034744477
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9787481732841256,
+      "ci95": [
+        0.9731756231326485,
+        0.9844554030874786
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 0.9782336527367499,
+      "ci95": [
+        0.9772809025506867,
+        0.9786352771683966
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 1.0003012098596027,
+      "ci95": [
+        0.9993149941106201,
+        1.0008631092042637
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 0.9780635338992069,
+      "ci95": [
+        0.9766924184889354,
+        0.978723926983269
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0014308531878078,
+        "ci95": [
+          0.997863407739951,
+          1.00758934156207
+        ]
+      },
+      "gain": 1.0139152435167615,
+      "ci95": [
+        1.0070775087839934,
+        1.0178581923512866
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.0014308531878078,
+        "ci95": [
+          0.997863407739951,
+          1.00758934156207
+        ]
+      },
+      "gain": 0.997080291970803,
+      "ci95": [
+        0.993900263077089,
+        1.000231015478037
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0014308531878078,
+        "ci95": [
+          0.997863407739951,
+          1.00758934156207
+        ]
+      },
+      "gain": 1.0102179893472025,
+      "ci95": [
+        1.0046285833856454,
+        1.0130333148344348
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9998261330330679,
+        "ci95": [
+          0.9994703126810455,
+          1.000381299734748
+        ]
+      },
+      "gain": 1.0101085266132674,
+      "ci95": [
+        1.0094094228050954,
+        1.0112249674032965
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9998261330330679,
+        "ci95": [
+          0.9994703126810455,
+          1.000381299734748
+        ]
+      },
+      "gain": 0.9968065091101136,
+      "ci95": [
+        0.9945700984633131,
+        0.9969537112712683
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9998261330330679,
+        "ci95": [
+          0.9994703126810455,
+          1.000381299734748
+        ]
+      },
+      "gain": 1.0085180298298064,
+      "ci95": [
+        1.0074911684385466,
+        1.0088622714477828
+      ]
+    }
+  ],
+  "factors": [
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0041081025217033,
+      "ci95": [
+        0.9930054962929987,
+        1.0050659866223608
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9922592841753881,
+      "ci95": [
+        0.986940058215914,
+        0.99852063371923
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.0048068938820471,
+      "ci95": [
+        0.9906208325621529,
+        1.0070310393372188
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9997528675881581,
+      "ci95": [
+        0.9979427716476529,
+        1.0003918495297806
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9843945653562759,
+      "ci95": [
+        0.9829641090161007,
+        0.9857977068326158
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.0018384862522165,
+      "ci95": [
+        0.9956752025519758,
+        1.0059335155218327
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9931890510134932,
+      "ci95": [
+        0.9838252717251326,
+        0.9990504786101061
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9966925230719778,
+      "ci95": [
+        0.9860893203231842,
+        1.001309583928923
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9970561943566677,
+      "ci95": [
+        0.9899780611540463,
+        1.0042748871612182
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9992202896067175,
+      "ci95": [
+        0.9976082685572735,
+        0.9998798706034786
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9825464827349841,
+      "ci95": [
+        0.9805022510570554,
+        0.984492396465709
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9991925043945508,
+      "ci95": [
+        0.9971388599817582,
+        1.0026304973581064
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0001839442911575,
+      "ci95": [
+        0.9947487068362925,
+        1.0045411342274793
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9954182704191533,
+      "ci95": [
+        0.9888531674923581,
+        1.0033664052299192
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.0023166739770335,
+      "ci95": [
+        0.9939759933522903,
+        1.0097092601420932
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9983813956743892,
+      "ci95": [
+        0.9968202945137048,
+        0.9992109623629046
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9839686373341734,
+      "ci95": [
+        0.9816032456631225,
+        0.9848873331874862
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9972914274581033,
+      "ci95": [
+        0.993999605159763,
+        1.0035126848840812
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9963172349835925,
+      "ci95": [
+        0.9917512240119208,
+        1.0047646821301985
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.016131198023436,
+      "ci95": [
+        1.0112599720960185,
+        1.018657484012343
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9982802526688611,
+      "ci95": [
+        0.9966795457376767,
+        1.0048210190178086
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9998844742244222,
+      "ci95": [
+        0.998593016732415,
+        1.0011463304097465
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.011594819562269,
+      "ci95": [
+        1.0103299345473975,
+        1.012620315152377
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9938122483396441,
+      "ci95": [
+        0.9921978320965746,
+        0.9965312437067894
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 1.00005469690103,
+      "ci95": [
+        0.9967321535809827,
+        1.0045362114813077
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9996867584986334,
+      "ci95": [
+        0.9968838815248624,
+        1.0034593159456504
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9996449899710451,
+      "ci95": [
+        0.9967931170074135,
+        1.0037380297150056
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0016823792098244,
+      "ci95": [
+        0.9994289286237953,
+        1.002832949380487
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9995806183549367,
+      "ci95": [
+        0.9958145699470619,
+        1.002795986206468
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9987198554402625,
+      "ci95": [
+        0.992839093341434,
+        1.0106290657540116
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0022295800834058,
+      "ci95": [
+        1.000037019487058,
+        1.003191316066166
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0061643683191528,
+      "ci95": [
+        1.0022283711492344,
+        1.0122613988064386
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.0015552178703846,
+      "ci95": [
+        0.9935788079491857,
+        1.0048714874623133
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9990208637012824,
+      "ci95": [
+        0.9977214761894262,
+        0.9997055532654143
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0047733225128186,
+      "ci95": [
+        0.9965437872200504,
+        1.0121387793537757
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.0002707849067096,
+      "ci95": [
+        0.9963806814895462,
+        1.0063645982920564
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0045258953215273,
+      "ci95": [
+        1.0026136912566421,
+        1.0085607972730348
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0083860704775738,
+      "ci95": [
+        1.0032540375755705,
+        1.0092556550322218
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.0114809674097918,
+      "ci95": [
+        1.0031266208215794,
+        1.0146120030494667
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0011723034926272,
+      "ci95": [
+        0.9982332451351441,
+        1.0063692664014903
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0042622813273483,
+      "ci95": [
+        1.0028717931642999,
+        1.0081806611514887
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.0024784371307756,
+      "ci95": [
+        0.998804567809267,
+        1.0097898378564774
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9957614796929937,
+      "ci95": [
+        0.9779303708887332,
+        1.0043495349141884
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0128686093177457,
+      "ci95": [
+        1.0010458985219122,
+        1.0164625417528235
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9940852625323764,
+      "ci95": [
+        0.9790885524542354,
+        0.9963640006610804
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0010499055085043,
+      "ci95": [
+        0.9991319292215421,
+        1.003639272497121
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0162046983102568,
+      "ci95": [
+        1.014554126445549,
+        1.0169671354915646
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9996897826088111,
+      "ci95": [
+        0.9957410901313426,
+        1.00371357765107
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9954031241244046,
+      "ci95": [
+        0.9868162090155128,
+        1.003784253641576
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9937132249929953,
+      "ci95": [
+        0.9885354807105596,
+        1.000035266526776
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.0034383913656522,
+      "ci95": [
+        0.982788356724075,
+        1.011810752842667
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0005277619542272,
+      "ci95": [
+        0.9989475882230111,
+        1.0043324143363528
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9595372327930467,
+      "ci95": [
+        0.9580970727417396,
+        0.9605972451605871
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9955502279842,
+      "ci95": [
+        0.9921596762251371,
+        0.9997584439056438
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0008861801115865,
+      "ci95": [
+        0.9963800823283021,
+        1.0047487856158923
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.011548223350254,
+      "ci95": [
+        1.0078807683974866,
+        1.0140571894684371
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.000430756941385,
+      "ci95": [
+        0.9948118919013869,
+        1.0057035855755934
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9987548160646774,
+      "ci95": [
+        0.9969186839798675,
+        1.000434224095819
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0090361173610922,
+      "ci95": [
+        1.0083208490514952,
+        1.0109064578902112
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9961186076514177,
+      "ci95": [
+        0.9829363284091512,
+        0.9990454041275703
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9997703241080186,
+      "ci95": [
+        0.9984379688299768,
+        1.0006445688452503
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0119981663346087,
+      "ci95": [
+        1.0100884393369698,
+        1.014127340559082
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 1.0006041834197281,
+      "ci95": [
+        0.9935285160191573,
+        1.0080327431424396
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0005293292516166,
+      "ci95": [
+        0.9998147805149101,
+        1.0008893820115883
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0102893720573456,
+      "ci95": [
+        1.0092907119349916,
+        1.010967599735508
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9997940230361829,
+      "ci95": [
+        0.9985858873403333,
+        1.0017359766987814
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9998476555273839,
+      "ci95": [
+        0.9925269171373342,
+        1.0042299432010204
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0114720050455073,
+      "ci95": [
+        1.0062368944566913,
+        1.0138275963518681
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9992918845650006,
+      "ci95": [
+        0.9913436251040904,
+        1.006673634069657
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0003341238213987,
+      "ci95": [
+        0.9997470069287457,
+        1.0011830167743618
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0103511049069789,
+      "ci95": [
+        1.0096401290796944,
+        1.0109199151851247
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9996000931869218,
+      "ci95": [
+        0.9960080042136213,
+        1.0011593274885329
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9994448654459583,
+      "ci95": [
+        0.9969827320789241,
+        1.0013028627768583
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0192524384661432,
+      "ci95": [
+        1.017020116282138,
+        1.0205842767793525
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9979799597078755,
+      "ci95": [
+        0.9961951071225296,
+        1.002601760404841
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9993489296932052,
+      "ci95": [
+        0.997117196056955,
+        1.0009854210475377
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0199322987646722,
+      "ci95": [
+        1.0193476864601387,
+        1.0207336382828995
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.00008184943959,
+      "ci95": [
+        0.9986959039774491,
+        1.0033570489244459
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9998955322631193,
+      "ci95": [
+        0.9981705149436849,
+        1.002162791303668
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0074556830031283,
+      "ci95": [
+        1.0061474166110307,
+        1.0090679751367566
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9997837976869436,
+      "ci95": [
+        0.9953748794675807,
+        1.004110067099222
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 1.0000519606484688,
+      "ci95": [
+        0.9992974360753566,
+        1.001248547696256
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0055908050759308,
+      "ci95": [
+        1.0045031002112994,
+        1.006846640460261
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9995911897956331,
+      "ci95": [
+        0.9981361349860446,
+        1.0015159751929696
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9998684059019954,
+      "ci95": [
+        0.9990785836514414,
+        1.0010961297553898
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.009832201490077,
+      "ci95": [
+        1.0091020566039288,
+        1.0107040442994166
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.999565590836547,
+      "ci95": [
+        0.9980983617839388,
+        1.0016817149412256
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9999259807549963,
+      "ci95": [
+        0.9991701176625254,
+        1.0003702880841294
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0087792194969434,
+      "ci95": [
+        1.0081891058581707,
+        1.0098670133974128
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.0001420187372423,
+      "ci95": [
+        0.9987566824643378,
+        1.000374180723551
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9996208195353776,
+      "ci95": [
+        0.9986119406751857,
+        1.002485173203936
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.010796915167095,
+      "ci95": [
+        1.0098594274465598,
+        1.0115930559531225
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9990917124169444,
+      "ci95": [
+        0.9967643523601855,
+        1.0022679210117666
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9994865406306292,
+      "ci95": [
+        0.999066403128811,
+        0.9999915868114856
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0105890473224357,
+      "ci95": [
+        1.009686125801922,
+        1.0111784511784512
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.0003780986562516,
+      "ci95": [
+        0.998928594742821,
+        1.0011906138235525
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9992645376393292,
+      "ci95": [
+        0.9939753611918307,
+        1.0025878641494554
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9786948871018141,
+      "ci95": [
+        0.9749689461297072,
+        0.9832942004205084
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9981305808482497,
+      "ci95": [
+        0.9895201930485094,
+        1.0062902098253057
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9993368103031842,
+      "ci95": [
+        0.9990366639181655,
+        1.0007607797583502
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 0.9772379291428198,
+      "ci95": [
+        0.975718269773376,
+        0.9780579127221595
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 0.9993971785936986,
+      "ci95": [
+        0.9978202696128372,
+        0.9998486338987908
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9979716536493402,
+      "ci95": [
+        0.9941017736451205,
+        1.0008987216314738
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0129235710880058,
+      "ci95": [
+        1.0073820790208505,
+        1.0164778405798318
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "effect": "interaction",
+      "gain": 0.9986806048801645,
+      "ci95": [
+        0.9949393594759746,
+        1.00447241010548
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "leaf_given_iterator",
+      "gain": 0.9981696462151793,
+      "ci95": [
+        0.9973128823092523,
+        0.9995903352562493
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "iterator_given_leaf",
+      "gain": 1.0120997750629237,
+      "ci95": [
+        1.0111845789900442,
+        1.0131395513853294
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "effect": "interaction",
+      "gain": 1.0015089016389622,
+      "ci95": [
+        1.0000553621749622,
+        1.0048702490939536
+      ]
+    }
+  ],
+  "costs": [
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "events": {
+        "base": {
+          "Ir": 501344625,
+          "Dr": 72761380,
+          "Dw": 238907349,
+          "I1mr": 1426671,
+          "D1mr": 70015,
+          "D1mw": 1966,
+          "ILmr": 1327,
+          "DLmr": 1165,
+          "DLmw": 37,
+          "Bc": 214492094,
+          "Bcm": 2091049,
+          "Bi": 3104071,
+          "Bim": 807373
+        },
+        "iterator": {
+          "Ir": 501891087,
+          "Dr": 72761380,
+          "Dw": 239219613,
+          "I1mr": 1715962,
+          "D1mr": 71285,
+          "D1mw": 2285,
+          "ILmr": 1327,
+          "DLmr": 1165,
+          "DLmw": 37,
+          "Bc": 214570160,
+          "Bcm": 2078656,
+          "Bi": 3104071,
+          "Bim": 836071
+        },
+        "leaf": {
+          "Ir": 501344625,
+          "Dr": 72761380,
+          "Dw": 238907349,
+          "I1mr": 1426671,
+          "D1mr": 70015,
+          "D1mw": 1966,
+          "ILmr": 1327,
+          "DLmr": 1165,
+          "DLmw": 37,
+          "Bc": 214492094,
+          "Bcm": 2091050,
+          "Bi": 3104071,
+          "Bim": 807373
+        },
+        "candidate": {
+          "Ir": 501891087,
+          "Dr": 72761380,
+          "Dw": 239219613,
+          "I1mr": 1715962,
+          "D1mr": 71285,
+          "D1mw": 2285,
+          "ILmr": 1327,
+          "DLmr": 1165,
+          "DLmw": 37,
+          "Bc": 214570160,
+          "Bcm": 2078652,
+          "Bi": 3104071,
+          "Bim": 836071
+        }
+      },
+      "ir_delta": {
+        "base": 0,
+        "iterator": 546462,
+        "leaf": 0,
+        "candidate": 546462
+      }
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "events": {
+        "base": {
+          "Ir": 44034179,
+          "Dr": 8694492,
+          "Dw": 10633400,
+          "I1mr": 1953,
+          "D1mr": 8616,
+          "D1mw": 61,
+          "ILmr": 530,
+          "DLmr": 545,
+          "DLmw": 1,
+          "Bc": 4257135,
+          "Bcm": 16771,
+          "Bi": 590923,
+          "Bim": 180421
+        },
+        "iterator": {
+          "Ir": 44034179,
+          "Dr": 8694492,
+          "Dw": 10633400,
+          "I1mr": 1722,
+          "D1mr": 8616,
+          "D1mw": 61,
+          "ILmr": 530,
+          "DLmr": 545,
+          "DLmw": 1,
+          "Bc": 4257135,
+          "Bcm": 16933,
+          "Bi": 590923,
+          "Bim": 180423
+        },
+        "leaf": {
+          "Ir": 44034179,
+          "Dr": 8694492,
+          "Dw": 10633400,
+          "I1mr": 1953,
+          "D1mr": 8616,
+          "D1mw": 61,
+          "ILmr": 530,
+          "DLmr": 545,
+          "DLmw": 1,
+          "Bc": 4257135,
+          "Bcm": 16771,
+          "Bi": 590923,
+          "Bim": 180421
+        },
+        "candidate": {
+          "Ir": 44034179,
+          "Dr": 8694492,
+          "Dw": 10633400,
+          "I1mr": 1722,
+          "D1mr": 8616,
+          "D1mw": 61,
+          "ILmr": 530,
+          "DLmr": 545,
+          "DLmw": 1,
+          "Bc": 4257135,
+          "Bcm": 16930,
+          "Bi": 590923,
+          "Bim": 180423
+        }
+      },
+      "ir_delta": {
+        "base": 0,
+        "iterator": 0,
+        "leaf": 0,
+        "candidate": 0
+      }
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "events": {
+        "base": {
+          "Ir": 262135003,
+          "Dr": 58016465,
+          "Dw": 41479787,
+          "I1mr": 705267,
+          "D1mr": 48912,
+          "D1mw": 201,
+          "ILmr": 826,
+          "DLmr": 1240,
+          "DLmw": 14,
+          "Bc": 36789663,
+          "Bcm": 1999733,
+          "Bi": 2195586,
+          "Bim": 430662
+        },
+        "iterator": {
+          "Ir": 262135003,
+          "Dr": 58016465,
+          "Dw": 41479787,
+          "I1mr": 741859,
+          "D1mr": 48912,
+          "D1mw": 201,
+          "ILmr": 826,
+          "DLmr": 1240,
+          "DLmw": 14,
+          "Bc": 36789663,
+          "Bcm": 1902557,
+          "Bi": 2195586,
+          "Bim": 372168
+        },
+        "leaf": {
+          "Ir": 262135003,
+          "Dr": 58016465,
+          "Dw": 41479787,
+          "I1mr": 820681,
+          "D1mr": 49339,
+          "D1mw": 206,
+          "ILmr": 826,
+          "DLmr": 1241,
+          "DLmw": 14,
+          "Bc": 36789663,
+          "Bcm": 1979789,
+          "Bi": 2195586,
+          "Bim": 430662
+        },
+        "candidate": {
+          "Ir": 262135003,
+          "Dr": 58016465,
+          "Dw": 41479787,
+          "I1mr": 1173101,
+          "D1mr": 49339,
+          "D1mw": 206,
+          "ILmr": 826,
+          "DLmr": 1241,
+          "DLmw": 14,
+          "Bc": 36789663,
+          "Bcm": 1840473,
+          "Bi": 2195586,
+          "Bim": 372168
+        }
+      },
+      "ir_delta": {
+        "base": 0,
+        "iterator": 0,
+        "leaf": 0,
+        "candidate": 0
+      }
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "events": {
+        "base": {
+          "Ir": 473399074,
+          "Dr": 69227119,
+          "Dw": 234773776,
+          "I1mr": 12470,
+          "D1mr": 18622,
+          "D1mw": 306,
+          "ILmr": 1312,
+          "DLmr": 1159,
+          "DLmw": 37,
+          "Bc": 212024364,
+          "Bcm": 1804894,
+          "Bi": 2837014,
+          "Bim": 702628
+        },
+        "iterator": {
+          "Ir": 472852612,
+          "Dr": 69227119,
+          "Dw": 234461512,
+          "I1mr": 12766,
+          "D1mr": 18611,
+          "D1mw": 294,
+          "ILmr": 1332,
+          "DLmr": 1159,
+          "DLmw": 37,
+          "Bc": 211946298,
+          "Bcm": 1796011,
+          "Bi": 2837014,
+          "Bim": 654703
+        },
+        "leaf": {
+          "Ir": 473399074,
+          "Dr": 69227119,
+          "Dw": 234773776,
+          "I1mr": 12470,
+          "D1mr": 18622,
+          "D1mw": 306,
+          "ILmr": 1312,
+          "DLmr": 1159,
+          "DLmw": 37,
+          "Bc": 212024364,
+          "Bcm": 1804894,
+          "Bi": 2837014,
+          "Bim": 702628
+        },
+        "candidate": {
+          "Ir": 472852612,
+          "Dr": 69227119,
+          "Dw": 234461512,
+          "I1mr": 12766,
+          "D1mr": 18611,
+          "D1mw": 294,
+          "ILmr": 1332,
+          "DLmr": 1159,
+          "DLmw": 37,
+          "Bc": 211946298,
+          "Bcm": 1796010,
+          "Bi": 2837014,
+          "Bim": 654703
+        }
+      },
+      "ir_delta": {
+        "base": 0,
+        "iterator": -546462,
+        "leaf": 0,
+        "candidate": -546462
+      }
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "events": {
+        "base": {
+          "Ir": 43179790,
+          "Dr": 8598857,
+          "Dw": 10243791,
+          "I1mr": 597,
+          "D1mr": 6599,
+          "D1mw": 52,
+          "ILmr": 586,
+          "DLmr": 547,
+          "DLmw": 1,
+          "Bc": 4184137,
+          "Bcm": 21012,
+          "Bi": 590922,
+          "Bim": 212883
+        },
+        "iterator": {
+          "Ir": 43179790,
+          "Dr": 8598857,
+          "Dw": 10243791,
+          "I1mr": 606,
+          "D1mr": 6599,
+          "D1mw": 52,
+          "ILmr": 583,
+          "DLmr": 547,
+          "DLmw": 1,
+          "Bc": 4184137,
+          "Bcm": 29056,
+          "Bi": 590922,
+          "Bim": 212883
+        },
+        "leaf": {
+          "Ir": 43179790,
+          "Dr": 8598857,
+          "Dw": 10243791,
+          "I1mr": 597,
+          "D1mr": 6599,
+          "D1mw": 52,
+          "ILmr": 586,
+          "DLmr": 547,
+          "DLmw": 1,
+          "Bc": 4184137,
+          "Bcm": 21012,
+          "Bi": 590922,
+          "Bim": 212883
+        },
+        "candidate": {
+          "Ir": 43179790,
+          "Dr": 8598857,
+          "Dw": 10243791,
+          "I1mr": 606,
+          "D1mr": 6599,
+          "D1mw": 52,
+          "ILmr": 583,
+          "DLmr": 547,
+          "DLmw": 1,
+          "Bc": 4184137,
+          "Bcm": 29056,
+          "Bi": 590922,
+          "Bim": 212883
+        }
+      },
+      "ir_delta": {
+        "base": 0,
+        "iterator": 0,
+        "leaf": 0,
+        "candidate": 0
+      }
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "events": {
+        "base": {
+          "Ir": 250807036,
+          "Dr": 56853644,
+          "Dw": 39277000,
+          "I1mr": 856,
+          "D1mr": 17921,
+          "D1mw": 73,
+          "ILmr": 771,
+          "DLmr": 1227,
+          "DLmw": 14,
+          "Bc": 36365168,
+          "Bcm": 1851183,
+          "Bi": 2138729,
+          "Bim": 361097
+        },
+        "iterator": {
+          "Ir": 250807036,
+          "Dr": 56853644,
+          "Dw": 39277000,
+          "I1mr": 823,
+          "D1mr": 17921,
+          "D1mw": 73,
+          "ILmr": 766,
+          "DLmr": 1227,
+          "DLmw": 14,
+          "Bc": 36365168,
+          "Bcm": 1749733,
+          "Bi": 2138729,
+          "Bim": 393012
+        },
+        "leaf": {
+          "Ir": 250807036,
+          "Dr": 56853644,
+          "Dw": 39277000,
+          "I1mr": 861,
+          "D1mr": 18517,
+          "D1mw": 74,
+          "ILmr": 771,
+          "DLmr": 1228,
+          "DLmw": 14,
+          "Bc": 36365168,
+          "Bcm": 1840294,
+          "Bi": 2138729,
+          "Bim": 361097
+        },
+        "candidate": {
+          "Ir": 250807036,
+          "Dr": 56853644,
+          "Dw": 39277000,
+          "I1mr": 828,
+          "D1mr": 18517,
+          "D1mw": 74,
+          "ILmr": 766,
+          "DLmr": 1228,
+          "DLmw": 14,
+          "Bc": 36365168,
+          "Bcm": 1749733,
+          "Bi": 2138729,
+          "Bim": 393012
+        }
+      },
+      "ir_delta": {
+        "base": 0,
+        "iterator": 0,
+        "leaf": 0,
+        "candidate": 0
+      }
+    }
+  ],
+  "losses": [
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9979667442060826,
+        "ci95": [
+          0.9928596561993117,
+          1.001900290632685
+        ]
+      },
+      "gain": 0.9892149550337355,
+      "ci95": [
+        0.9841606513632787,
+        0.9919096621748883
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9840141642336077,
+      "ci95": [
+        0.9833020957573693,
+        0.9856215727577414
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9833483885262386,
+      "ci95": [
+        0.9828471808827282,
+        0.9845894922947461
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9891278065630397,
+      "ci95": [
+        0.982477377702227,
+        0.9967523750963462
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9829349486075124,
+      "ci95": [
+        0.9815206995491187,
+        0.9841858548395405
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9815515569627856,
+      "ci95": [
+        0.9792173846193271,
+        0.9824296629136404
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9850365091623956,
+      "ci95": [
+        0.9829900028964391,
+        0.9856573914874206
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9814842388305466,
+      "ci95": [
+        0.9804817929129591,
+        0.983354403708386
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9997086478612104,
+        "ci95": [
+          0.9935129049021306,
+          1.0081484834766863
+        ]
+      },
+      "gain": 0.9897008595787274,
+      "ci95": [
+        0.98410038245026,
+        0.997293053037073
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 0.9643571817306484,
+      "ci95": [
+        0.9631759103500799,
+        0.969280503839937
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 0.9659551268609772,
+      "ci95": [
+        0.9639520366010005,
+        0.969374100960091
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9805874102796799,
+      "ci95": [
+        0.9772919523993331,
+        0.983210108553201
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9787481732841256,
+      "ci95": [
+        0.9731756231326485,
+        0.9844554030874786
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 0.9782336527367499,
+      "ci95": [
+        0.9772809025506867,
+        0.9786352771683966
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 0.9780635338992069,
+      "ci95": [
+        0.9766924184889354,
+        0.978723926983269
+      ]
+    }
+  ],
+  "stable_losses": [
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.9979667442060826,
+        "ci95": [
+          0.9928596561993117,
+          1.001900290632685
+        ]
+      },
+      "gain": 0.9928100094266861,
+      "ci95": [
+        0.9844929431778353,
+        0.998896447076878
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9979667442060826,
+        "ci95": [
+          0.9928596561993117,
+          1.001900290632685
+        ]
+      },
+      "gain": 0.9892149550337355,
+      "ci95": [
+        0.9841606513632787,
+        0.9919096621748883
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9840141642336077,
+      "ci95": [
+        0.9833020957573693,
+        0.9856215727577414
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.999748826413068,
+        "ci95": [
+          0.9990736732750412,
+          1.0018685767673623
+        ]
+      },
+      "gain": 0.9833483885262386,
+      "ci95": [
+        0.9828471808827282,
+        0.9845894922947461
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9938008391129377,
+      "ci95": [
+        0.9905313579146708,
+        0.9974178566477194
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9970483548919177,
+      "ci95": [
+        0.9824632044274626,
+        0.9995000301705932
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.002314248786111,
+        "ci95": [
+          0.9960059389950595,
+          1.0097436390830135
+        ]
+      },
+      "gain": 0.9891278065630397,
+      "ci95": [
+        0.982477377702227,
+        0.9967523750963462
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9829349486075124,
+      "ci95": [
+        0.9815206995491187,
+        0.9841858548395405
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9993012062926373,
+      "ci95": [
+        0.9982397127768967,
+        0.9995387855265677
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-sort",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.998613690460621,
+        "ci95": [
+          0.9975217391304347,
+          0.999773185264021
+        ]
+      },
+      "gain": 0.9815515569627856,
+      "ci95": [
+        0.9792173846193271,
+        0.9824296629136404
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0007275372862858,
+        "ci95": [
+          0.9965186425363417,
+          1.0031750006707747
+        ]
+      },
+      "gain": 0.9927445628246896,
+      "ci95": [
+        0.9869002086230876,
+        0.9982811053814624
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0007275372862858,
+        "ci95": [
+          0.9965186425363417,
+          1.0031750006707747
+        ]
+      },
+      "gain": 0.9933296028848801,
+      "ci95": [
+        0.9886184279751675,
+        0.9948871386456637
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9850365091623956,
+      "ci95": [
+        0.9829900028964391,
+        0.9856573914874206
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000115837684672,
+        "ci95": [
+          0.9975939259998574,
+          1.0013776430748993
+        ]
+      },
+      "gain": 0.9814842388305466,
+      "ci95": [
+        0.9804817929129591,
+        0.983354403708386
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 0.9997086478612104,
+        "ci95": [
+          0.9935129049021306,
+          1.0081484834766863
+        ]
+      },
+      "gain": 0.9897008595787274,
+      "ci95": [
+        0.98410038245026,
+        0.997293053037073
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 0.9643571817306484,
+      "ci95": [
+        0.9631759103500799,
+        0.969280503839937
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-22.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0003731602332686,
+        "ci95": [
+          0.9982405352933019,
+          1.0040393883707222
+        ]
+      },
+      "gain": 0.9659551268609772,
+      "ci95": [
+        0.9639520366010005,
+        0.969374100960091
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9805874102796799,
+      "ci95": [
+        0.9772919523993331,
+        0.983210108553201
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.0069283287929236,
+        "ci95": [
+          0.999705963892366,
+          1.0112622042101385
+        ]
+      },
+      "gain": 0.9787481732841256,
+      "ci95": [
+        0.9731756231326485,
+        0.9844554030874786
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 0.9782336527367499,
+      "ci95": [
+        0.9772809025506867,
+        0.9786352771683966
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "aa": {
+        "gain": 1.000100479791002,
+        "ci95": [
+          0.9995310393340758,
+          1.0005349426190455
+        ]
+      },
+      "gain": 0.9780635338992069,
+      "ci95": [
+        0.9766924184889354,
+        0.978723926983269
+      ]
+    },
+    {
+      "host": "iterator-leaf-factorial-four-ubuntu-24.04-clang-44250486132",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "aa": {
+        "gain": 0.9998261330330679,
+        "ci95": [
+          0.9994703126810455,
+          1.000381299734748
+        ]
+      },
+      "gain": 0.9968065091101136,
+      "ci95": [
+        0.9945700984633131,
+        0.9969537112712683
+      ]
+    }
+  ],
+  "aa_outside_one_percent": [],
+  "publication_qualified": false,
+  "policy": "Frozen-object diagnostic, not source qualification. Every predeclared sample retained. Bootstrap intervals are descriptive, without multiplicity correction. Model differences and unavailable PMU counters remain explicit."
+}
