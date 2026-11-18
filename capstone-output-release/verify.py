@@ -18,7 +18,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-immediate-reader-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-coalesced-tags-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
@@ -26,7 +26,7 @@ try:
  canonical=sp.check_output(['git','show','HEAD:capstone-output-release/combined.patch'],cwd=r.parent)
  assert hashlib.sha256(canonical).hexdigest()==meta['sha256']
  patch=w/'candidate.patch';patch.write_bytes(canonical)
- architectures={'four':['ARM','AARCH64','MIPS','X86'],'extra':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE'],'mips':['MIPS'],'arm':['ARM'],'x86':['X86'],'aarch64':['AARCH64'],'riscv':['RISCV'],'affected':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE','BPF','SPARC','SYSTEMZ','XTENSA']}[archs]
+ architectures={'all':['ARM', 'AARCH64', 'M68K', 'MIPS', 'PPC', 'SPARC', 'SYSTEMZ', 'XCORE', 'X86', 'TMS320C64X', 'M680X', 'EVM', 'MOS65XX', 'WASM', 'BPF', 'RISCV', 'SH', 'TRICORE', 'ALPHA', 'HPPA', 'LOONGARCH', 'XTENSA', 'ARC'],'four':['ARM','AARCH64','MIPS','X86'],'extra':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE'],'mips':['MIPS'],'arm':['ARM'],'x86':['X86'],'aarch64':['AARCH64'],'riscv':['RISCV'],'affected':['ARM','AARCH64','MIPS','X86','PPC','RISCV','LOONGARCH','ARC','TRICORE','BPF','SPARC','SYSTEMZ','XTENSA']}[archs]
  arm_policy_active=False
  opts=['-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF',*['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in architectures],'-DCMAKE_BUILD_TYPE=Release','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_CSTOOL=OFF','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF']
  if os.name=='nt':opts+=['-G','Visual Studio 17 2022','-A','x64','-DCMAKE_C_FLAGS=/MP4','-DCAPSTONE_BUILD_STATIC_MSVC_RUNTIME='+('ON' if cc=='MT' else 'OFF')]
@@ -56,8 +56,10 @@ try:
   tests[phase]=(e/(phase+'-tests.log')).read_text(errors='replace')
   if profile!='diet':
    binary=b/'suite/cstest'/('Release/cstest.exe' if os.name=='nt' else 'cstest')
-   fixture_archs=[a for a in architectures if a!='X86']
-   folders={'ARM':'ARM','AARCH64':'AArch64','MIPS':'Mips','RISCV':'RISCV','PPC':'PowerPC','LOONGARCH':'LoongArch','ARC':'ARC','TRICORE':'TriCore','BPF':'BPF','SPARC':'Sparc','SYSTEMZ':'SystemZ','XTENSA':'Xtensa'}
+   fixture_archs=[]
+   folders={'ARM':'ARM','AARCH64':'AArch64','MIPS':'Mips','RISCV':'RISCV','PPC':'PowerPC','LOONGARCH':'LoongArch','ARC':'ARC','TRICORE':'TriCore','BPF':'BPF','SPARC':'Sparc','SYSTEMZ':'SystemZ','XTENSA':'Xtensa','ALPHA':'Alpha','HPPA':'HPPA'}
+   fixture_archs=[a for a in architectures if a in folders]
+   save('fixture-coverage',dict(tested=fixture_archs,without_MC_directory=[a for a in architectures if a not in folders and a!='X86'],x86='Unit tests include generated-output, bounds, encoding and option suites'))
    for arch in fixture_archs:run([binary,s/'tests/MC'/folders[arch]],phase+'-'+arch.lower()+'-fixtures')
   if phase!='observer' and os.name!='nt':
    objects[phase]={str(f.relative_to(b/'CMakeFiles/capstone.dir')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
@@ -74,27 +76,14 @@ try:
   raw_changed=changed[:]
   save('raw-runtime-objects',dict(changed=raw_changed))
   location_control=None
-  if profile=='sanitize':
-   header=s/'arch/X86/X86SimpleOutput.h';candidate_header=header.read_text()
-   original_header=sp.check_output(['git','show',meta['parent']+':arch/X86/X86SimpleOutput.h'],cwd=s,text=True)
-   adjusted=candidate_header;controls=[]
-   for marker in ('static inline char *X86_writeDisp8(', 'static inline void X86_writeSimpleDetail('):
-    assert original_header.count(marker)==adjusted.count(marker)==1
-    line=original_header[:original_header.index(marker)].count('\n')+1
-    adjusted=adjusted.replace(marker,'#line '+str(line)+'\n'+marker)
-    controls.append(dict(marker=marker,original_line=line))
-   header.write_text(adjusted)
-   location_control=dict(directives=controls,semantic_tests_source='Original candidate before diagnostic line restoration')
-   save('source-location-control',location_control)
-   run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],'location-control-build')
-   normalized={str(f.relative_to(b/'CMakeFiles/capstone.dir')):hashlib.sha256(f.read_bytes()).hexdigest()for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
-   assert normalized.keys()==objects['base'].keys()
-   changed=[key for key,h in objects['base'].items()if normalized[key]!=h]
-   save('source-location-object-proof',dict(raw_changed=raw_changed,location_control_changed=changed,total=len(normalized)))
-  allowed={'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86ImmediateOutput.c.o'} if active else set()
-  assert set(changed)<=allowed,changed
-  if active:assert {'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o'}<=set(changed)
-  save('runtime-objects',dict(changed=changed,raw_changed=raw_changed,source_location_control=location_control,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
+  allowed = set(['MCInst.c.o', 'arch/AArch64/AArch64Disassembler.c.o', 'arch/ARC/ARCDisassembler.c.o', 'arch/ARM/ARMDisassembler.c.o', 'arch/ARM/ARMInstPrinter.c.o', 'arch/ARM/ARMMapping.c.o', 'arch/Alpha/AlphaDisassembler.c.o', 'arch/BPF/BPFDisassembler.c.o', 'arch/HPPA/HPPADisassembler.c.o', 'arch/LoongArch/LoongArchDisassembler.c.o', 'arch/MOS65XX/MOS65XXDisassembler.c.o', 'arch/Mips/MipsDisassembler.c.o', 'arch/PowerPC/PPCDisassembler.c.o', 'arch/RISCV/RISCVDisassembler.c.o', 'arch/Sparc/SparcDisassembler.c.o', 'arch/SystemZ/SystemZDisassembler.c.o', 'arch/TMS320C64x/TMS320C64xDisassembler.c.o', 'arch/TriCore/TriCoreDisassembler.c.o', 'arch/X86/X86Disassembler.c.o', 'arch/X86/X86DisassemblerDecoder.c.o', 'arch/X86/X86Mapping.c.o', 'arch/XCore/XCoreDisassembler.c.o', 'arch/Xtensa/XtensaDisassembler.c.o'])
+  identity_gate = profile != 'sanitize'
+  if identity_gate:
+   assert set(changed) <= allowed, changed
+  assert 'MCInst.c.o' in changed
+  if not identity_gate:
+   save('instrumentation-scope',dict(object_identity_gate=False,reason='ASan/UBSan embeds source locations from the shared header. Exact candidate source was used for all semantic tests; raw object changes are preserved without claiming unaffected-object identity.'))
+  save('runtime-objects',dict(changed=changed,raw_changed=raw_changed,source_location_control=location_control,allowed=sorted(allowed),object_identity_gate=identity_gate,identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
  save('complete',dict(profile=profile,compiler=cc,archs=archs,arm_policy_active=arm_policy_active,architectures=architectures,tested_tree=tree,phases=list(tests),observer_executed=arm_policy_active,observer_arm_owner_filtered=arm_policy_active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
 finally:
  amount=sum(f.stat().st_size for f in w.rglob('*') if f.is_file())
