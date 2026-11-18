@@ -1,0 +1,14 @@
+{
+  "complete": true,
+  "decision": "native-layout-effect-reproduced-hardware-unavailable",
+  "run": 44256016175,
+  "findings": [
+    "Both hosts are AMD EPYC 7763 and expose none of the three requested PMU event groups. No hardware-counter causal claim is supported.",
+    "The repaired PLT observer captures eight native memset calls in every variant: MCInst_Init clears 1024 bytes, ARM_getInstruction clears 2216 bytes, and SStream initialization clears 524 bytes. Corresponding destinations have identical alignment across variants on each host.",
+    "The first memset PLT call is still lazily unresolved; later calls resolve to the same AVX2 implementation. No implementation-selection difference was observed.",
+    "Fixed-image ARM detail still regresses about 1.6-2.0 percent for iterator/candidate, while leaf-only is near the baseline. Clang14 AArch64 detail also loses about 3.4 percent."
+  ],
+  "followup": "../round1471-pmu-capable-hosts",
+  "publication_qualified": false,
+  "overall_goal_complete": false
+}
