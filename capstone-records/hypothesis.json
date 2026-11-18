@@ -1,9 +1,8 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "hypothesis": "Append ARM predicate immediate/register operands as a pair to remove a repeated capacity check, count update and operand-index calculation. Keep the existing sequential fallback when fewer than two slots remain.",
-  "semantic_contract": "Both compatibility tags and typed payloads, all untouched private bytes, original partial append and overflow behavior, predicate rejection and soft-failure decisions remain unchanged.",
-  "iced_source": "NeverSight iced 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31: src/rust/iced-x86/src/instruction.rs fixed regs and op_kinds arrays; existing decoder writes known operand positions. No code copied and no Capstone storage/layout contract removed.",
-  "prior_evidence": "R585 x86 memory batching reduced emitted instructions but regressed actual output throughput. This is a different ARM owning boundary; do not infer native benefit from shorter assembly.",
-  "scope": "Only ARM DecodePredicateOperand calls the new internal helper. All other optimized runtime objects must remain identical outside sanitizer source-location metadata.",
+  "hypothesis": "Avoid an unused MCInstrDesc_get call in ARM DecodePredicateOperand for ARMCC_AL. Lookup only when the existing predicability test consumes the descriptor.",
+  "source_evidence": "MCInstrDesc.c MCInstrDesc_get only returns a reversed-table address; no reads or side effects. Existing ARM predicate code calls this external function before checking Val != ARMCC_AL, and current Apple ARM64/x86_64 generated code retains that call.",
+  "semantic_contract": "Keep Val==15 and Thumb1 AL rejection, conditional predicate soft-failure, operand construction, count and capacity behavior unchanged. No descriptor or constructor layout changes.",
+  "scope": "Only ARMDisassembler.c runtime code changes. Do not stack the R1499 operand-pair prototype.",
   "publication_qualified": false
 }

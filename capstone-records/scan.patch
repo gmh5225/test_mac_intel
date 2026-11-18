@@ -1,129 +1,40 @@
-diff --git a/MCInst.h b/MCInst.h
-index 641480ed..d481b79e 100644
---- a/MCInst.h
-+++ b/MCInst.h
-@@ -215,6 +215,30 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
- 	op->ImmVal = Val;
- }
- 
-+/* Preserve sequential append behavior when only one slot remains. */
-+static inline void MCOperand_CreateImmReg0(MCInst *mcInst, int64_t Val,
-+					   unsigned Reg)
-+{
-+	if (mcInst->size > MAX_MC_OPS - 2) {
-+		MCOperand_CreateImm0(mcInst, Val);
-+		MCOperand_CreateReg0(mcInst, Reg);
-+		return;
-+	}
-+	MCOperand *op = &mcInst->Operands[mcInst->size];
-+	mcInst->size += 2;
-+#ifdef __cplusplus
-+	op[0].MachineOperandType = MCOperand::kImmediate;
-+	op[1].MachineOperandType = MCOperand::kRegister;
-+#else
-+	op[0].MachineOperandType = kImmediate;
-+	op[1].MachineOperandType = kRegister;
-+#endif
-+	op[0].Kind = op[0].MachineOperandType;
-+	op[0].ImmVal = Val;
-+	op[1].Kind = op[1].MachineOperandType;
-+	op[1].RegVal = Reg;
-+}
-+
- /* Callers that construct every operand before reading it may leave unused
-  * slots untouched. MCInst_Init retains complete initialization. */
- static inline void MCInst_InitStorage(MCInst *inst, cs_arch arch,
 diff --git a/arch/ARM/ARMDisassembler.c b/arch/ARM/ARMDisassembler.c
-index d7e183f8..570f12f0 100644
+index d7e183f8..53c9b98c 100644
 --- a/arch/ARM/ARMDisassembler.c
 +++ b/arch/ARM/ARMDisassembler.c
-@@ -1539,11 +1539,7 @@ static DecodeStatus DecodePredicateOperand(MCInst *Inst, unsigned Val,
+@@ -1533,12 +1533,13 @@ static DecodeStatus DecodePredicateOperand(MCInst *Inst, unsigned Val,
+ 	if (MCInst_getOpcode(Inst) == ARM_tBcc && Val == 0xE)
+ 		return MCDisassembler_Fail;
  
- 	if (Val != ARMCC_AL && !MCInst_isPredicable(Desc))
- 		Check(&S, MCDisassembler_SoftFail);
--	MCOperand_CreateImm0(Inst, (Val));
--	if (Val == ARMCC_AL) {
--		MCOperand_CreateReg0(Inst, (0));
--	} else
--		MCOperand_CreateReg0(Inst, (ARM_CPSR));
-+	MCOperand_CreateImmReg0(Inst, Val, Val == ARMCC_AL ? 0 : ARM_CPSR);
- 	return S;
- }
- 
+-	const MCInstrDesc *Desc = MCInstrDesc_get(MCInst_getOpcode(Inst),
+-						  ARMDescs.Insts,
+-						  ARR_SIZE(ARMDescs.Insts));
+-
+-	if (Val != ARMCC_AL && !MCInst_isPredicable(Desc))
+-		Check(&S, MCDisassembler_SoftFail);
++	if (Val != ARMCC_AL) {
++		const MCInstrDesc *Desc =
++			MCInstrDesc_get(MCInst_getOpcode(Inst), ARMDescs.Insts,
++					ARR_SIZE(ARMDescs.Insts));
++		if (!MCInst_isPredicable(Desc))
++			Check(&S, MCDisassembler_SoftFail);
++	}
+ 	MCOperand_CreateImm0(Inst, (Val));
+ 	if (Val == ARMCC_AL) {
+ 		MCOperand_CreateReg0(Inst, (0));
 diff --git a/suite/auto-sync/README.md b/suite/auto-sync/README.md
-index 9c1dbe81..89ac2838 100644
+index 9c1dbe81..27ca04bc 100644
 --- a/suite/auto-sync/README.md
 +++ b/suite/auto-sync/README.md
 @@ -68,6 +68,11 @@ do not yet distinguish these widths, scales and overlapping shift patterns.
  `unit_mips16_memory_calls` check this boundary; no
  generated `.inc` is patched for these corrections.
  
-+Retain the paired immediate/register append in ARM's
-+`DecodePredicateOperand` when running the Differ. `MCOperand_CreateImmReg0`
-+preserves the sequential append behavior at the capacity boundary;
-+`unit_mcinst` compares the complete private state against sequential construction.
++Keep the instruction-description lookup inside the non-`ARMCC_AL` branch of
++ARM's `DecodePredicateOperand` when running the Differ. An unconditional
++predicate does not inspect the descriptor; its rejection and operand rules
++remain outside this branch.
 +
  #### Install `llvm-mc` and `FileCheck`
  
  Additionally, we need `llvm-mc` and `FileCheck` to generate our regression tests.
-diff --git a/tests/unit/mcinst.c b/tests/unit/mcinst.c
-index 2d4478fd..718c5e46 100644
---- a/tests/unit/mcinst.c
-+++ b/tests/unit/mcinst.c
-@@ -244,9 +244,55 @@ static bool check_operands(bool registers_first, bool x86_private)
- 	       inst.Operands[1].RegVal == UINT_MAX;
- }
- 
-+/* Pair construction must also preserve partial appends and untouched bytes. */
-+static bool check_operand_pair(void)
-+{
-+	static const struct {
-+		int64_t imm;
-+		unsigned reg;
-+	} values[] = {
-+		{ 0, 0 },
-+		{ INT64_MIN, UINT_MAX },
-+		{ INT64_MAX, 1 },
-+		{ -1, UINT_MAX - 1 },
-+		{ INT64_C(0x123456789abcdef), 255 },
-+	};
-+#ifdef CAPSTONE_DEBUG
-+	const unsigned limit = MAX_MC_OPS - 1;
-+#else
-+	const unsigned limit = UINT8_MAX + 1u;
-+#endif
-+	for (unsigned poison = 0; poison <= UINT8_MAX; ++poison) {
-+		for (unsigned size = 0; size < limit; ++size) {
-+			for (unsigned v = 0;
-+			     v < sizeof(values) / sizeof(values[0]); ++v) {
-+				MCInst sequential, pair;
-+				memset(&sequential, poison, sizeof(sequential));
-+				sequential.size = size;
-+				memcpy(&pair, &sequential, sizeof(pair));
-+				MCOperand_CreateImm0(&sequential,
-+						     values[v].imm);
-+				MCOperand_CreateReg0(&sequential,
-+						     values[v].reg);
-+				MCOperand_CreateImmReg0(&pair, values[v].imm,
-+							values[v].reg);
-+				if (memcmp(&sequential, &pair, sizeof(pair)) !=
-+				    0) {
-+					fprintf(stderr,
-+						"Operand pair differs: size=%u poison=%u value=%u\n",
-+						size, poison, v);
-+					return false;
-+				}
-+			}
-+		}
-+	}
-+	return true;
-+}
-+
- int main(void)
- {
--	return check_init_metadata() && check_x86_init_metadata() &&
-+	return check_operand_pair() && check_init_metadata() &&
-+			       check_x86_init_metadata() &&
- 			       test_tie_membership() && test_alias_lookup() &&
- 			       check_operands(false, false) &&
- 			       check_operands(true, false) &&
