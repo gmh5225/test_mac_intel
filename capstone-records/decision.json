@@ -1,0 +1,394 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "b573e35b9f65d1714c673d553e1208771d6c7b93",
+    "sha256": "4376380259fbfd85bbb1dafac1365fc618ef4fafd50a77a506fb307cff6e3ec2",
+    "records": "equal ARM public records, cursor and errors for 33554432 inputs",
+    "observer_records": "equal ARM public records, cursor and errors for 33554432 inputs",
+    "poison_records": {
+      "0xa5": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "0x5a": "equal ARM public records, cursor and errors for 33554432 inputs"
+    }
+  },
+  "run": {
+    "id": 44260487534,
+    "head_sha": "c8e96ba8ea50bbf0f426857f8f242521c5e593fd",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44260487534",
+    "run_attempt": 1
+  },
+  "native_comparisons": 48,
+  "codegen_rejected_hosts": [
+    "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+    "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+    "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534"
+  ],
+  "aa_outside_one_percent": 0,
+  "losses_over_one_percent": 0,
+  "stable_losses": [
+    {
+      "host": "arm-initializer-domain-four-ubuntu-24.04-arm-clang-44260487534",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "aa": {
+        "gain": 1.000150817506482,
+        "ci95": [
+          0.9997626561978806,
+          1.0003467161486257
+        ]
+      },
+      "gain": 0.9992944595222484,
+      "ci95": [
+        0.9987945163317389,
+        0.9999582975432719
+      ]
+    }
+  ],
+  "findings": [
+    "Clang14/18 eliminate added AArch64 raw and PE32/64 format instructions, but MIPS detail retains one extra cs_decode_full_insn instruction per decode.",
+    "GCC retains one extra Ir, Dr and Dw per AArch64 decode inside cs_decode_full_insn; three x86-host native passes are deliberately skipped by the declared gate.",
+    "The ARM host completes 48 native panels; ARM raw gains about 15.3-15.6 percent, but AArch64 raw retains a small stable fixed-image loss in the unadjusted interval."
+  ],
+  "limits": "Only the ARM-host native comparison ran. No cross-host performance qualification. Small stable losses are retained; no assertion that zero losses over one percent means no regression.",
+  "cost_attribution": {
+    "complete": true,
+    "rows": [
+      {
+        "host": "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+        "case": "arm-ls",
+        "mode": 0,
+        "changes": {
+          "_dl_runtime_resolve_xsave": [
+            -41,
+            -47,
+            -51
+          ],
+          "MCInst_Init": [
+            -1483258,
+            -312266,
+            -546464
+          ],
+          "__memset_avx2_unaligned_erms": [
+            -6089148,
+            -156132,
+            -2810376
+          ],
+          "check_match": [
+            -60,
+            -20,
+            -7
+          ],
+          "cs_decode_full_insn": [
+            1483254,
+            0,
+            1405188
+          ],
+          "_dl_fixup": [
+            -99,
+            -34,
+            -12
+          ],
+          "memset": [
+            -24,
+            -4,
+            0
+          ],
+          "do_lookup_x": [
+            -419,
+            -134,
+            -46
+          ],
+          "strcmp": [
+            -91,
+            -16,
+            0
+          ],
+          "_dl_lookup_symbol_x": [
+            -152,
+            -37,
+            -25
+          ]
+        },
+        "ir_delta": -6090038
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+        "case": "arm-ls",
+        "mode": 2,
+        "changes": {
+          "MCInst_Init": [
+            -1483258,
+            -312266,
+            -546464
+          ],
+          "cs_decode_full_insn": [
+            1483254,
+            0,
+            1405188
+          ],
+          "ARM_getInstruction": [
+            4,
+            2,
+            2
+          ],
+          "__memset_avx2_unaligned_erms": [
+            -6089148,
+            -156132,
+            -2810376
+          ]
+        },
+        "ir_delta": -6089148
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+        "case": "arm64-ls",
+        "mode": 0,
+        "changes": {},
+        "ir_delta": 0
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "changes": {
+          "cs_decode_full_insn": [
+            88011,
+            0,
+            0
+          ]
+        },
+        "ir_delta": 88011
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "changes": {},
+        "ir_delta": 0
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-22.04-clang-44260487534",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "changes": {},
+        "ir_delta": 0
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+        "case": "arm-ls",
+        "mode": 0,
+        "changes": {
+          "_dl_runtime_resolve_xsave": [
+            -41,
+            -47,
+            -51
+          ],
+          "MCInst_Init": [
+            -1483258,
+            -312266,
+            -546464
+          ],
+          "__memset_avx2_unaligned_erms": [
+            -6089148,
+            -156132,
+            -2810376
+          ],
+          "check_match": [
+            -65,
+            -21,
+            -8
+          ],
+          "cs_decode_full_insn": [
+            1327122,
+            0,
+            1405188
+          ],
+          "_dl_fixup": [
+            -104,
+            -36,
+            -14
+          ],
+          "memset": [
+            -24,
+            -4,
+            0
+          ],
+          "do_lookup_x": [
+            -378,
+            -138,
+            -40
+          ],
+          "strcmp": [
+            -50,
+            -14,
+            0
+          ],
+          "_dl_lookup_symbol_x": [
+            -139,
+            -34,
+            -23
+          ]
+        },
+        "ir_delta": -6246085
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+        "case": "arm-ls",
+        "mode": 2,
+        "changes": {
+          "MCInst_Init": [
+            -1483258,
+            -312266,
+            -546464
+          ],
+          "cs_decode_full_insn": [
+            1327122,
+            0,
+            1405188
+          ],
+          "ARM_getInstruction": [
+            4,
+            2,
+            2
+          ],
+          "__memset_avx2_unaligned_erms": [
+            -6089148,
+            -156132,
+            -2810376
+          ]
+        },
+        "ir_delta": -6245280
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+        "case": "arm64-ls",
+        "mode": 0,
+        "changes": {},
+        "ir_delta": 0
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "changes": {
+          "cs_decode_full_insn": [
+            88011,
+            0,
+            0
+          ]
+        },
+        "ir_delta": 88011
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "changes": {},
+        "ir_delta": 0
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-clang-44260487534",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "changes": {},
+        "ir_delta": 0
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534",
+        "case": "arm-ls",
+        "mode": 0,
+        "changes": {
+          "MCInst_Init": [
+            -11397636,
+            -78066,
+            -10304712
+          ],
+          "cs_decode_full_insn": [
+            2654244,
+            0,
+            2420046
+          ]
+        },
+        "ir_delta": -8743392
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534",
+        "case": "arm-ls",
+        "mode": 2,
+        "changes": {
+          "MCInst_Init": [
+            -11397636,
+            -78066,
+            -10304712
+          ],
+          "cs_decode_full_insn": [
+            2712372,
+            0,
+            2420046
+          ]
+        },
+        "ir_delta": -8685264
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534",
+        "case": "arm64-ls",
+        "mode": 0,
+        "changes": {
+          "cs_decode_full_insn": [
+            71919,
+            71919,
+            71919
+          ]
+        },
+        "ir_delta": 71919
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534",
+        "case": "mips64el-ls",
+        "mode": 2,
+        "changes": {
+          "cs_decode_full_insn": [
+            -270165,
+            0,
+            0
+          ]
+        },
+        "ir_delta": -270165
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534",
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "changes": {
+          "cs_decode_full_insn": [
+            -713091,
+            0,
+            0
+          ]
+        },
+        "ir_delta": -713091
+      },
+      {
+        "host": "arm-initializer-domain-four-ubuntu-24.04-gcc-44260487534",
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "changes": {
+          "cs_decode_full_insn": [
+            -901503,
+            0,
+            0
+          ]
+        },
+        "ir_delta": -901503
+      }
+    ],
+    "parser_sha256": "ba46b121b0d01ae620f7e600a6e67b5809d38404ac777522f4da1247c0b76652",
+    "scope": "Exclusive fixed-guest Callgrind events; instructions and memory references are simulated, not hardware timings."
+  },
+  "cleanup_bytes": 1016313725,
+  "followup": "R1476 adds final-value partial stores and the known-domain full initializer; it requires its own complete validation."
+}
