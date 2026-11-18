@@ -1,0 +1,28 @@
+{
+  "original_run": {
+    "id": 44217379606,
+    "head_sha": "c63ea2f31e53dbc2b5616b551b8cbc919198fdc1",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44217379606",
+    "run_attempt": 1
+  },
+  "source": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "tree": "05cd4ab4e93930097461afd973351b9a80b675e4",
+    "sha256": "1ff538dea7c4ea7b4ebbeeba7f2b71d0e8609dd8f60e8edcd271e77e61d962e2",
+    "files": [
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86GenVexPublicPlans.inc",
+      "suite/synctools/x86_operand_specializations.py"
+    ]
+  },
+  "source_unchanged": true,
+  "original_design_gate_failed": true,
+  "observation": "musttail removes all ordinary calls and returns from both selectors. Clang14 is frameless and passes complete records and costs. Clang18 still saves/restores R9 under preserve_most, so its deliberately strict no-frame gate stopped before record and cost collection. Ordinary text/relocation identity passes on both.",
+  "scope": "Measure the unchanged Clang18 source with the remaining ABI register save explicitly recorded. Keep the original failed no-frame proof; require tail transfers, original ordinary-text identity, all records and the same cost inputs. Do not claim frame removal or performance qualification.",
+  "reuse": "Three complete R1437 compiler profiles with identical source, original consumers and manifests. Only the stopped Clang18 record/cost profile is run again.",
+  "native_qualification": false,
+  "publication_qualified": false
+}
