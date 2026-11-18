@@ -143,8 +143,15 @@ static void raw_entry_walk(const arm_thread_state64_t *regs) {
   int ipset = unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)address);
   int lookup = unw_get_proc_info(&cursor, &info);
   fprintf(stderr, "lookup=%d ipset=%d ip=%lx entry=%lx found=%lx..%lx\n",lookup, ipset, raw_pc(&cursor), pc, (unsigned long)info.start_ip, (unsigned long)info.end_ip);
+  fprintf(stderr,"recipe=%lx size=%u\n", (unsigned long)info.unwind_info, info.unwind_info_size);
+  if (!info.unwind_info) {
+    address = ptrauth_sign_unauthenticated((void *)(pc + 1), ptrauth_key_return_address, sp);
+    ipset = unw_set_reg(&cursor, UNW_REG_IP, (uintptr_t)address);
+    lookup = unw_get_proc_info(&cursor, &info);
+    fprintf(stderr,"interior lookup=%d ipset=%d ip=%lx found=%lx..%lx recipe=%lx size=%u\n",lookup,ipset,raw_pc(&cursor),(unsigned long)info.start_ip,(unsigned long)info.end_ip,(unsigned long)info.unwind_info,info.unwind_info_size);
+  }
   if (ipset ||
-      unw_set_reg(&cursor, UNW_REG_SP, sp) || raw_pc(&cursor) != pc ||
+      unw_set_reg(&cursor, UNW_REG_SP, sp) || (raw_pc(&cursor) != pc && raw_pc(&cursor) != pc + 1) ||
       unw_get_proc_info(&cursor, &info) || info.start_ip != pc ||
       info.end_ip <= pc)
     _exit(37);
