@@ -1,7 +1,7 @@
-name: Screen immediate-reader admission on unchanged output coverage
+name: Measure shared operand tag construction on all four backends
 on:
   push:
-    branches: [codex/capstone-immediate-reader-admission]
+    branches: [codex/capstone-coalesced-operand-tags]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: immediate-reader-admission-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: coalesced-operand-tags-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

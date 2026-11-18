@@ -1,540 +1,137 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..fcd82169 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 0, 32771, 32771, 0, 348, 0, 352, 356, 0, 0, 360,
- 			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
- 			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
-@@ -89,7 +89,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 772, 65535, 65535, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
-+			0, 65533, 0, 772, 65535, 65535, 32771, 32771, 0, 776, 0, 780, 784, 0, 0, 788,
- 			0, 0, 0, 0, 0, 0, 0, 792, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 799, 803, 0, 807, 808, 812, 816, 820,
- 			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
-@@ -107,7 +107,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 65533, 0, 0, 0, 0, 32771, 32771, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-@@ -125,7 +125,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 65533, 0, 0, 0, 0, 32771, 32771, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 44c4930b..a678da72 100644
---- a/arch/X86/X86ImmediateOutput.c
-+++ b/arch/X86/X86ImmediateOutput.c
-@@ -10,23 +10,6 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
- 
--static void writeUnsignedImmediate(char *out, uint64_t value)
--{
--	if (value <= HEX_THRESHOLD) {
--		*out = (char)('0' + value);
--	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
--		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
--	}
--}
--
- static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 			       const struct X86SimpleOutput *row, bool wide,
- 			       uint16_t *insn_size)
-@@ -51,8 +34,8 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 	char *out = insn->op_str;
- 	if (value < 0)
- 		*out++ = '-';
--	writeUnsignedImmediate(out,
--			       value < 0 ? (uint64_t)-value : (uint64_t)value);
-+	X86_writeUnsignedImmediate(out, value < 0 ? (uint64_t)-value :
-+						    (uint64_t)value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
- 		cs_x86_op *op = &insn->detail->x86.operands[0];
-@@ -80,7 +63,7 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
- 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
- 	char *out = insn->op_str + reg->length;
- 	memcpy(out, ", ", 2);
--	writeUnsignedImmediate(out + 2, value);
-+	X86_writeUnsignedImmediate(out + 2, value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
- 				      reg->reg, 0);
-@@ -134,7 +117,7 @@ static void writeRegisterImmediate(cs_insn *insn,
- 	out += 2;
- 	if (negative)
- 		*out++ = '-';
--	writeUnsignedImmediate(out, value);
-+	X86_writeUnsignedImmediate(out, value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      reg->reg, 0);
-diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index bd0f6c94..1c83fc22 100644
---- a/arch/X86/X86MemoryOutput.c
-+++ b/arch/X86/X86MemoryOutput.c
-@@ -10,20 +10,36 @@
- #include "X86SimpleOutput.h"
- 
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
--bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
--			   uint16_t *insn_size,
--			   const struct X86SimpleOutput *row,
--			   const struct X86SimpleRegister regs[4][16])
-+#if defined(_MSC_VER)
-+static __forceinline
-+#elif defined(__GNUC__)
-+static inline __attribute__((always_inline))
-+#else
-+static inline
-+#endif
-+	bool writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
-+			       uint16_t *insn_size,
-+			       const struct X86SimpleOutput *row,
-+			       const struct X86SimpleRegister regs[4][16],
-+			       bool immediate)
+diff --git a/MCInst.c b/MCInst.c
+index cda912d1..3d608c97 100644
+--- a/MCInst.c
++++ b/MCInst.c
+@@ -75,9 +75,7 @@ MCOperand *MCOperand_CreateReg1(MCInst *mcInst, unsigned Reg)
  {
- 	const bool wide = row->address_size == 8;
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
- 	const unsigned lead = rex != 0;
--	const uint8_t opcode = code[lead], modrm = code[lead + 1];
-+	const uint8_t opcode = code[lead];
-+	/* Immediate-store plans delegate their ModR/M admission to this reader. */
-+	if (immediate && size < lead + 2)
-+		return false;
-+	const uint8_t modrm = code[lead + 1];
-+	if (immediate && (modrm >= 0xc0 || (modrm & 0x38)))
-+		return false;
- 	const unsigned mod = modrm >> 6, rm = modrm & 7;
- 	const bool sib = rm == 4, rip = !mod && rm == 5;
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
--	const unsigned length = offset + disp_size;
-+	const unsigned imm_size = immediate ? ((opcode & 1) ? 4 : 1) : 0;
-+	const unsigned imm_offset = offset + disp_size;
-+	const unsigned length = imm_offset + imm_size;
- 	if (size < length || (rip && !wide))
- 		return false;
+ 	MCOperand *op = &(mcInst->Operands[MCINST_CACHE]);
  
-@@ -45,7 +61,7 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	}
+-	op->MachineOperandType = kRegister;
+-	op->Kind = kRegister;
+-	op->RegVal = Reg;
++	MCOperand_initReg(op, Reg);
  
- 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
--	const bool load = !push && (lea || (opcode & 2));
-+	const bool load = !immediate && !push && (lea || (opcode & 2));
- 	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) : lead;
- 	const struct X86SimpleRegister *reg =
- 		&regs[reg_width][((rex & 4) << 1) | ((modrm >> 3) & 7)];
-@@ -57,6 +73,16 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	} else if (disp_size == 4) {
- 		displacement = X86_readDisp32(code + offset);
- 	}
-+	uint64_t immediate_value = 0;
-+	if (immediate) {
-+		immediate_value =
-+			imm_size == 1 ?
-+				code[imm_offset] :
-+				(uint32_t)X86_readDisp32(code + imm_offset);
-+		if (row->ops[0].size == 8)
-+			immediate_value =
-+				(uint64_t)(int64_t)(int32_t)immediate_value;
-+	}
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)length;
- 	memcpy(insn->bytes, code, length);
-@@ -100,7 +126,10 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	}
- 	out = X86_writeDisplacement(out, displacement);
- 	*out++ = ']';
--	if (!load && !push) {
-+	if (immediate) {
-+		memcpy(out, ", ", 2);
-+		X86_writeUnsignedImmediate(out + 2, immediate_value);
-+	} else if (!load && !push) {
- 		memcpy(out, ", ", 2);
- 		memcpy(out + 2, reg->name, sizeof(reg->name));
- 	}
-@@ -108,6 +137,13 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      load ? reg->reg : 0, load ? 0 : reg->reg);
- 		cs_x86 *x = &insn->detail->x86;
-+		if (immediate) {
-+			x->operands[1].type = X86_OP_IMM;
-+			x->operands[1].imm = (int64_t)immediate_value;
-+			x->operands[1].access = 0;
-+			x->encoding.imm_offset = (uint8_t)imm_offset;
-+			x->encoding.imm_size = (uint8_t)imm_size;
-+		}
- 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
- 		mem->type = X86_OP_MEM;
- 		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-@@ -129,5 +165,21 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	return true;
+ 	return op;
  }
+@@ -86,9 +84,7 @@ MCOperand *MCOperand_CreateImm1(MCInst *mcInst, int64_t Val)
+ {
+ 	MCOperand *op = &(mcInst->Operands[MCINST_CACHE]);
  
-+bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
-+			   uint16_t *insn_size,
-+			   const struct X86SimpleOutput *row,
-+			   const struct X86SimpleRegister regs[4][16])
-+{
-+	return writeMemoryOutput(code, size, insn, insn_size, row, regs, false);
-+}
-+
-+bool X86_writeMemoryImmediateOutput(const uint8_t *code, size_t size,
-+				    cs_insn *insn, uint16_t *insn_size,
-+				    const struct X86SimpleOutput *row,
-+				    const struct X86SimpleRegister regs[4][16])
-+{
-+	return writeMemoryOutput(code, size, insn, insn_size, row, regs, true);
-+}
-+
- #endif
- #endif
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..d1f9a7d3 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -75,7 +75,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	    cs_vsnprintf != cs_default_vsnprintf)
- 		return false;
+-	op->MachineOperandType = kImmediate;
+-	op->Kind = kImmediate;
+-	op->ImmVal = Val;
++	MCOperand_initImm(op, Val);
  
--	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
-+	if (plan & X86_PLAN_SPECIAL_FLAG) {
- 		if (plan == X86_PLAN_VECTOR)
- 			return X86_writeVectorOutput(code, size, insn,
- 						     insn_size,
-@@ -94,6 +94,13 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			row = x86_simple_plans[wide][prefix_class][0x8b] >> 2;
- 			reg = &x86_simple_registers[2][((rex & 1) << 3) |
- 						       (opcode & 7)];
-+		} else if (plan == X86_PLAN_MOV_MEMORY_IMMEDIATE) {
-+			row = x86_simple_plans[wide][prefix_class]
-+					      [0x88 | (opcode & 1)] >>
-+			      2;
-+			return X86_writeMemoryImmediateOutput(
-+				code, size, insn, insn_size,
-+				&x86_simple_outputs[row], x86_simple_registers);
- 		} else {
- 			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
- 				return false;
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index aff17085..85cde1d8 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -44,6 +44,10 @@ enum X86SimpleForm {
- 	X86_SIMPLE_RELATIVE,
+ 	return op;
+ }
+diff --git a/MCInst.h b/MCInst.h
+index 641480ed..5505fc8f 100644
+--- a/MCInst.h
++++ b/MCInst.h
+@@ -183,6 +183,33 @@ struct MCInst {
+ 	MCAsmInfo MAI; ///< The equivalent to MCAsmInfo in LLVM. It holds flags relevant for the asm style to print.
  };
  
-+/* Normal plans store a row index above two form bits. Bit 15 selects a
-+ * special writer; the generator rejects normal rows that reach that domain. */
-+#define X86_PLAN_SPECIAL_FLAG (1u << 15)
-+
- /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
-  * same register-only operand check as a register pair. */
- #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
-@@ -53,12 +57,20 @@ enum X86SimpleForm {
- #define X86_PLAN_VECTOR UINT16_MAX
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
-+#define X86_PLAN_MOV_MEMORY_IMMEDIATE \
-+	(X86_PLAN_SPECIAL_FLAG | X86_SIMPLE_RELATIVE)
- 
- CAPSTONE_INTERNAL bool
- X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
- 		      const struct X86SimpleRegister regs[4][16]);
- 
-+CAPSTONE_INTERNAL bool
-+X86_writeMemoryImmediateOutput(const uint8_t *code, size_t size, cs_insn *insn,
-+			       uint16_t *insn_size,
-+			       const struct X86SimpleOutput *row,
-+			       const struct X86SimpleRegister regs[4][16]);
-+
- CAPSTONE_INTERNAL void X86_writeImmediateOutput(
- 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
- 	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
-@@ -134,6 +146,23 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
- 	return out + length;
- }
- 
-+static inline void X86_writeUnsignedImmediate(char *out, uint64_t value)
++/* Initialize both compatibility tags together; the union keeps its type. */
++static inline void MCOperand_initReg(MCOperand *op, unsigned Reg)
 +{
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		char temp[16], *end = temp + sizeof(temp), *start = end;
-+		uint64_t n = value;
-+		do {
-+			*--start = digits[n & 15];
-+			n >>= 4;
-+		} while (n);
-+		memcpy(out, "0x", 2);
-+		memcpy(out + 2, start, end - start);
-+	}
++#ifdef __cplusplus
++	static const MCOperand tag = { MCOperand::kRegister,
++				       MCOperand::kRegister,
++				       { 0 } };
++#else
++	static const MCOperand tag = { kRegister, kRegister, { 0 } };
++#endif
++	memcpy(op, &tag, offsetof(MCOperand, RegVal));
++	op->RegVal = Reg;
 +}
 +
- static inline void X86_writeSimpleDetail(cs_detail *detail,
- 					 const struct X86SimpleOutput *row,
- 					 uint8_t opcode, uint8_t rex,
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..aa2053cb 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -292,6 +292,72 @@ CheckedRow check_pair(Decoder &decoder, unsigned opcode, unsigned prefix_class,
- 	return row;
- }
- 
-+// The memory-immediate form retains the canonical MOV effects and widths.
-+// Only its explicit operand kinds, address and immediate fields differ.
-+void check_memory_immediate_projection(Decoder &decoder, unsigned cls)
++static inline void MCOperand_initImm(MCOperand *op, int64_t Val)
 +{
-+	const unsigned start = cls == 0 ? 0 : cls == 1 ? 0x40 : 0x48;
-+	for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
-+		for (unsigned opcode : { 0xc6u, 0xc7u }) {
-+			decode_pair(decoder, rex, 0x88 | (opcode & 1), 0xc0);
-+			const cs_detail reg_detail = *decoder.insn->detail;
-+			for (uint32_t raw :
-+			     { 0u, 1u, 9u, 10u, 0x7fu, 0x80u, 0xffu, 0x100u,
-+			       0x7fffffffu, 0x80000000u, 0xffffffffu }) {
-+				const unsigned width = opcode == 0xc6 ? 1 : 4;
-+				const unsigned lead = rex != 0;
-+				uint8_t bytes[] = { uint8_t(rex),
-+						    uint8_t(opcode),
-+						    0,
-+						    uint8_t(raw),
-+						    uint8_t(raw >> 8),
-+						    uint8_t(raw >> 16),
-+						    uint8_t(raw >> 24) };
-+				decoder.decode(bytes + !rex, lead + 2 + width,
-+					       lead + 2 + width, 0);
-+				const auto &actual = *decoder.insn->detail;
-+				cs_detail expected = reg_detail;
-+				auto &x = expected.x86;
-+				const int64_t immediate =
-+					width == 1 ? (int64_t)(raw & 0xff) :
-+					(rex & 8)  ? (int64_t)(int32_t)raw :
-+						     (int64_t)raw;
-+				x.opcode[0] = uint8_t(opcode);
-+				x.modrm = 0;
-+				x.encoding.imm_offset = uint8_t(lead + 2);
-+				x.encoding.imm_size = uint8_t(width);
-+				const auto first = x.operands[0],
-+					   second = x.operands[1];
-+				x.operands[0] = {};
-+				x.operands[0].type = X86_OP_MEM;
-+				x.operands[0].size = first.size;
-+				x.operands[0].access = first.access;
-+				x.operands[0].mem = actual.x86.operands[0].mem;
-+				x.operands[1] = {};
-+				x.operands[1].type = X86_OP_IMM;
-+				x.operands[1].size = second.size;
-+				x.operands[1].imm = immediate;
-+				std::ostringstream number;
-+				if ((uint64_t)immediate > HEX_THRESHOLD)
-+					number << "0x" << std::hex;
-+				number << (uint64_t)immediate;
-+				const std::string operands =
-+					decoder.insn->op_str;
-+				const auto comma = operands.rfind(", ");
-+				if (decoder.insn->id != X86_INS_MOV ||
-+				    comma == std::string::npos ||
-+				    operands.substr(comma + 2) !=
-+					    number.str() ||
-+				    std::memcmp(&expected, &actual,
-+						offsetof(cs_detail, x86) +
-+							sizeof(cs_x86)))
-+					throw std::runtime_error(
-+						"memory-immediate MOV projection changed");
-+			}
-+		}
-+	}
++#ifdef __cplusplus
++	static const MCOperand tag = { MCOperand::kImmediate,
++				       MCOperand::kImmediate,
++				       { 0 } };
++#else
++	static const MCOperand tag = { kImmediate, kImmediate, { 0 } };
++#endif
++	memcpy(op, &tag, offsetof(MCOperand, ImmVal));
++	op->ImmVal = Val;
 +}
 +
- // The register/imm8 form reuses the register row builder. Reconstruct the
- // one varying immediate separately after checking its public value and text.
- CheckedRow check_shift(Decoder &decoder, unsigned cls, unsigned group,
-@@ -512,7 +578,7 @@ void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
- 							  uint8_t(rex), 0,
- 							  nullptr, nullptr));
- 		}
--		if (rows.size() + 1 >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+		if (rows.size() + 1 >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 			throw std::runtime_error(
- 				"too many fixed output records");
- 		const uint16_t plan =
-@@ -606,7 +672,7 @@ int main()
- 					rows.begin());
- 				if (index == rows.size())
- 					rows.push_back(row.fields);
--				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+				if (index >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 					return 1;
- 				plans[wide][cls][op] = static_cast<uint16_t>(
- 					(index << 2) | form);
-@@ -644,6 +710,17 @@ int main()
- 					X86_PLAN_MOV_REG_IMM32;
- 		}
- 	}
-+	for (unsigned wide = 0; wide < 2; ++wide) {
-+		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
-+			check_memory_immediate_projection(wide ? x64 : x86,
-+							  cls);
-+			if (!plans[wide][cls][0x88] || !plans[wide][cls][0x89])
-+				throw std::runtime_error(
-+					"missing memory MOV row");
-+			plans[wide][cls][0xc6] = X86_PLAN_MOV_MEMORY_IMMEDIATE;
-+			plans[wide][cls][0xc7] = X86_PLAN_MOV_MEMORY_IMMEDIATE;
-+		}
-+	}
- 	uint16_t shifts[2][3][8]{};
- 	for (unsigned wide = 0; wide < 2; ++wide) {
- 		Decoder &decoder = wide ? x64 : x86;
-@@ -656,7 +733,7 @@ int main()
- 							 rows.end(),
- 							 row.fields) -
- 					       rows.begin();
--				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+				if (index >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 					return 1;
- 				if (index == rows.size())
- 					rows.push_back(row.fields);
-@@ -671,7 +748,7 @@ int main()
- 		for (unsigned index = 0; index < 2; ++index) {
- 			const unsigned op = index ? 0x6a : 0x68;
- 			CheckedRow row = check_push_immediate(decoder, op);
--			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+			if (rows.size() >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 				return 1;
- 			pushes[wide][index] =
- 				static_cast<uint16_t>(rows.size());
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index a1a212e6..3a0644db 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -792,6 +792,91 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
- 	return true;
+ // create Reg operand in the next slot
+ CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
+ {
+@@ -190,13 +217,7 @@ CS_MCINST_INLINE void MCOperand_CreateReg0(MCInst *mcInst, unsigned Reg)
+ 	MCOperand *op = &(mcInst->Operands[mcInst->size]);
+ 	mcInst->size++;
+ 
+-#ifdef __cplusplus
+-	op->MachineOperandType = MCOperand::kRegister;
+-#else
+-	op->MachineOperandType = kRegister;
+-#endif
+-	op->Kind = op->MachineOperandType;
+-	op->RegVal = Reg;
++	MCOperand_initReg(op, Reg);
  }
  
-+static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
+ // create Imm operand in the next slot
+@@ -206,13 +227,7 @@ CS_MCINST_INLINE void MCOperand_CreateImm0(MCInst *mcInst, int64_t Val)
+ 	MCOperand *op = &(mcInst->Operands[mcInst->size]);
+ 	mcInst->size++;
+ 
+-#ifdef __cplusplus
+-	op->MachineOperandType = MCOperand::kImmediate;
+-#else
+-	op->MachineOperandType = kImmediate;
+-#endif
+-	op->Kind = op->MachineOperandType;
+-	op->ImmVal = Val;
++	MCOperand_initImm(op, Val);
+ }
+ 
+ /* Callers that construct every operand before reading it may leave unused
+diff --git a/tests/unit/mcinst.c b/tests/unit/mcinst.c
+index 2d4478fd..62902a49 100644
+--- a/tests/unit/mcinst.c
++++ b/tests/unit/mcinst.c
+@@ -244,9 +244,37 @@ static bool check_operands(bool registers_first, bool x86_private)
+ 	       inst.Operands[1].RegVal == UINT_MAX;
+ }
+ 
++/* Scratch construction must not alter the operand count or neighboring state. */
++static bool check_scratch_operands(void)
 +{
-+	static const uint32_t values[] = { 0,	       1,	  9,
-+					   10,	       0x7f,	  0x80,
-+					   0xff,       0x100,	  0x7fffffff,
-+					   0x80000000, 0xffffffff };
-+	uint8_t bytes[15];
-+	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
-+	     ++prefix) {
-+		unsigned lead = prefix != 0;
-+		bytes[0] = (uint8_t)(0x3f + prefix);
-+		for (unsigned opcode = 0xc6; opcode <= 0xc7; ++opcode) {
-+			bytes[lead] = (uint8_t)opcode;
-+			for (unsigned mr = 0; mr < 256; ++mr) {
-+				bytes[lead + 1] = (uint8_t)mr;
-+				bool sib = mr < 0xc0 && (mr & 7) == 4;
-+				for (unsigned sb = 0; sb < (sib ? 256u : 1u);
-+				     ++sb) {
-+					unsigned offset = lead + 2;
-+					if (sib)
-+						bytes[offset++] = (uint8_t)sb;
-+					unsigned mod = mr >> 6;
-+					unsigned disp =
-+						mod == 1 ? 1 :
-+						mod == 2 ? 4 :
-+						mod == 0 && ((mr & 7) == 5 ||
-+							     (sib &&
-+							      (sb & 7) == 5)) ?
-+							   4 :
-+							   0;
-+					for (unsigned sample = 0;
-+					     sample <
-+					     sizeof(values) / sizeof(values[0]);
-+					     ++sample) {
-+						uint32_t displacement = values
-+							[(sample + 4) %
-+							 (sizeof(values) /
-+							  sizeof(values[0]))];
-+						for (unsigned i = 0; i < disp;
-+						     ++i)
-+							bytes[offset + i] =
-+								(uint8_t)(displacement >>
-+									  (i *
-+									   8));
-+						unsigned imm_offset =
-+							offset + disp;
-+						unsigned width =
-+							opcode == 0xc6 ? 1 : 4;
-+						for (unsigned i = 0; i < width;
-+						     ++i)
-+							bytes[imm_offset + i] =
-+								(uint8_t)(values[sample] >>
-+									  (i *
-+									   8));
-+						unsigned length =
-+							imm_offset + width;
-+						if (!compare(handles, bytes,
-+							     length,
-+							     sample ^ mr ^ sb))
-+							return false;
-+						if (!sample)
-+							for (unsigned truncated =
-+								     1;
-+							     truncated < length;
-+							     ++truncated)
-+								if (!compare(
-+									    handles,
-+									    bytes,
-+									    truncated,
-+									    mr ^ sb))
-+									return false;
-+					}
-+				}
-+			}
-+		}
-+	}
-+	/* Every byte value, independently of the addressing and boundary matrix. */
-+	for (unsigned imm = 0; imm < 256; ++imm) {
-+		const uint8_t simple[] = { 0xc6, 0x00, (uint8_t)imm };
-+		if (!compare(handles, simple, sizeof(simple), imm))
++	for (unsigned pattern = 0; pattern <= UINT8_MAX; ++pattern) {
++		MCInst inst, expected;
++		memset(&inst, pattern, sizeof(inst));
++		inst.size = pattern % MAX_MC_OPS;
++		memcpy(&expected, &inst, sizeof(inst));
++		MCOperand *last = &inst.Operands[MAX_MC_OPS - 1];
++		MCOperand *op = MCOperand_CreateReg1(&inst, UINT_MAX - pattern);
++		if (op != last || op->MachineOperandType != kRegister ||
++		    op->Kind != kRegister || op->RegVal != UINT_MAX - pattern)
++			return false;
++		memcpy(&expected.Operands[MAX_MC_OPS - 1], op, sizeof(*op));
++		if (memcmp(&expected, &inst, sizeof(inst)))
++			return false;
++		op = MCOperand_CreateImm1(&inst, INT64_MIN + pattern);
++		if (op != last || op->MachineOperandType != kImmediate ||
++		    op->Kind != kImmediate || op->ImmVal != INT64_MIN + pattern)
++			return false;
++		memcpy(&expected.Operands[MAX_MC_OPS - 1], op, sizeof(*op));
++		if (memcmp(&expected, &inst, sizeof(inst)))
 +			return false;
 +	}
 +	return true;
 +}
 +
- static bool check_mode(cs_mode mode)
+ int main(void)
  {
- 	csh handles[2] = { 0 };
-@@ -814,6 +899,7 @@ static bool check_mode(cs_mode mode)
- 		    !check_push_immediates(handles) ||
- 		    !check_shift_immediate(handles, mode) ||
- 		    !check_mov_imm32(handles, mode) ||
-+		    !check_mov_memory_immediates(handles, mode) ||
- 		    !check_sib_base_mov(handles, mode) ||
- 		    !check_indexed_memory(handles, mode) ||
- 		    !check_push_memory(handles, mode) ||
+-	return check_init_metadata() && check_x86_init_metadata() &&
++	return check_scratch_operands() && check_init_metadata() &&
++			       check_x86_init_metadata() &&
+ 			       test_tie_membership() && test_alias_lookup() &&
+ 			       check_operands(false, false) &&
+ 			       check_operands(true, false) &&
