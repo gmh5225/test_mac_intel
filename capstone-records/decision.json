@@ -1,0 +1,97 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "c8f0eff60323f9d7175f5ae8fbc7f16f2545076d",
+    "sha256": "7b07060f38024e695ac2599e7a3ac9a57025c6f921d903e68fcf7dfe13891756",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
+  },
+  "native_run": {
+    "id": 44297255878,
+    "head_sha": "96026d3e1457118193ef023d7984ba0506ffc57d",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44297255878",
+    "run_attempt": 1
+  },
+  "profile_run": {
+    "id": 44297696485,
+    "head_sha": "dd849a53d1ec2fcbc0a0b8e704aae160ce7c0c2e",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44297696485",
+    "run_attempt": 1
+  },
+  "native_panels": 264,
+  "aa_flags": 0,
+  "losses_over_one_percent": 18,
+  "below_one_descriptive_intervals": 51,
+  "profiles": 9,
+  "unit_executions": 2044,
+  "fixture_executions": 885228,
+  "skipped": [
+    {
+      "host": "immediate-reader-profiles-macos-15-four-normal-clang",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    },
+    {
+      "host": "immediate-reader-profiles-windows-2022-four-normal-MD",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    },
+    {
+      "host": "immediate-reader-profiles-windows-2022-four-normal-MT",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    }
+  ],
+  "fixed_launch_pe_gains": {
+    "putty-32-0.85-1": [
+      1.0239770325267374,
+      1.0428440902235774
+    ],
+    "putty-32-0.85-2": [
+      1.033388512666165,
+      1.0445613492186292
+    ],
+    "putty-64-0.85-1": [
+      1.0223253030076314,
+      1.0454397115728293
+    ],
+    "putty-64-0.85-2": [
+      1.0313252735656442,
+      1.0396972879803938
+    ]
+  },
+  "semantic_review": "semantic-review.json",
+  "cost_attribution": "cost-attribution.json",
+  "iterator_attribution": "iterator-attribution.json",
+  "lowering_review": "lowering-review.json",
+  "finding": "Moving only new C6/C7 validation to the immediate reader retains the expanded admission census and removes the reserved-plan jump table. PE formatting/detail improve, but 18 native panels lose more than one percent. Clang14 MIPS raw decoding loses about 9-10 percent; ARM-host SIMD formatting and AArch64 formatting still regress. This candidate is held.",
+  "mechanism": "Physical iterator instruction counts show Clang18 now executes one additional mov per old scalar/SIMD entry, with unchanged memory-reference counts. Clang14 and GCC also add old-path work. Other-ISA runtime object bytes remain identical, while linked addresses differ; this distinguishes source changes from placement effects but does not establish a particular frontend or branch-predictor mechanism.",
+  "limits": "All original 264 panels retained. Twenty-one-cycle bootstrap intervals are descriptive and unadjusted for multiplicity. Portable profiles cover Windows MT/MD, macOS, DIET, reduced, sanitizer, x86-only and nine-backend Linux builds. Six scheduled x87 hardware-test executions were skipped on Windows/macOS. No latest-iced or current-NeverD product qualification followed this failed performance screen.",
+  "cleanup_bytes_removed": 27337804942
+}
