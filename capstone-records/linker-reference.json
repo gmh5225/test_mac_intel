@@ -1,0 +1,14 @@
+{
+  "sources": [
+    {
+      "url": "https://sourceware.org/binutils/docs/ld/Orphan-Sections.html",
+      "observed": "Unmatched orphan output sections are positioned by section attributes; a custom section name alone does not promise terminal placement."
+    },
+    {
+      "url": "https://lld.llvm.org/ELF/linker_script.html",
+      "observed": "INSERT placement and orphan processing are separate steps; implementation details are not a universal stable-layout contract."
+    }
+  ],
+  "inference": "A source section attribute alone cannot establish preservation of all downstream code/data addresses. Inspect exact linked layouts and retain the diagnostic-only status of the after-bss control.",
+  "final_review_requirement": "Report all original symbols by type, including DecoderTable* constants outside the explicit backend-name-prefix guard. Distinguish restored readonly tables from any remaining writable/relocation-bearing data."
+}
