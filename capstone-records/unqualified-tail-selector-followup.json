@@ -1,0 +1,14 @@
+{
+  "original_wrapper": "../round1420-vex32-plan-isolation/profile-review.json",
+  "later_callsite": "../round1428-vex32-terminal-native/native-review.json",
+  "mixed_observations": "../round1428-vex32-terminal-native/mixed-review.json",
+  "observed": "R1420 preserves ordinary decoder text and relocations, but the inline VEX32 reader causes frame setup on ineligible 64-bit paths. R1424 moves the call and removes most extra instruction cost, but changes ordinary text size and thousands of linked symbol positions; it fails native x86 and mixed-architecture timing gates.",
+  "hypothesis": "Retain the R1420 callsite and all plan bytes. Split its wrapper into an eligibility-only selector and a separate same-signature plan leaf. Both selector branches forward the original arguments as tail calls; only the eligible leaf needs reader temporaries.",
+  "semantic_invariant": "Same exact-mode, extension, extent and prefix guards; unchanged plan tables, reader, complete-result writes and canonical generic fallback.",
+  "lowering_gate": "Require original ordinary text, function sizes/positions and relocations identical except the existing verified generic-call target. Inspect selector disassembly for stack/frame and actual tail transfers, then require full-record equivalence and retained native controls.",
+  "sources": [
+    "https://clang.llvm.org/docs/AttributeReference.html#preserve-most"
+  ],
+  "native_qualification": false,
+  "publication_qualified": false
+}
