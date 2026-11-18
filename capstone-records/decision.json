@@ -1,0 +1,31 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "run": {
+    "id": 44257399599,
+    "head_sha": "ceead05df88b6e2a1ee6b51d18b16f4112d8cc8d",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44257399599",
+    "run_attempt": 1
+  },
+  "attempts": 4,
+  "capable_hosts": 3,
+  "native_comparisons": 96,
+  "hardware_comparisons": 72,
+  "findings": [
+    "All three PMU-capable Intel 6975P-C hosts reproduce AArch64 raw cycle cost around +1.9 to +2.1 percent with essentially unchanged retired instructions and branches.",
+    "AArch64 raw branch misses fall around 0.9 percent, excluding increased branch-miss count as an explanation of this loss.",
+    "L1D and iTLB changes do not consistently explain the loss. Generic cache-misses remain zero, and their ratios are unavailable, not zero or infinite.",
+    "This establishes a native layout cost for the frozen iterator intervention; it does not identify the exact frontend mechanism."
+  ],
+  "review_correction": {
+    "reason": "Some successfully collected hardware events have zero baseline counts. A ratio is undefined for these pairs; the original reviewer incorrectly asserted positive counts. Preserve all samples, mark the complete ratio estimate unavailable if any pair has a zero denominator, and report paired absolute count deltas without dropping zeros.",
+    "new_measurements": false,
+    "source_change": false,
+    "original_workflow_success": true
+  },
+  "scope": "Preflight selects only by PMU availability before building. Whole-process counts include unchanged setup, warm-up and 20 traversals. No PMU sampling attribution to individual source instructions. All unsupported attempts retained.",
+  "cleanup_bytes": 869479818,
+  "followup": "Use host-supported frontend delivery, decode-cache transition, and instruction-cache events on the same frozen images."
+}
