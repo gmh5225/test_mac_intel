@@ -1,0 +1,30 @@
+{
+  "complete": true,
+  "source": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "tree": "308462b3068da9152ee8b606fa9e0ef837175f15",
+    "sha256": "94274cb4c715f018144501093382b0adae620cc43bca12f00f66a347f2664660",
+    "files": [
+      "arch/X86/X86OutputIterator.c",
+      "arch/X86/X86SimpleOutputBody.inc"
+    ]
+  },
+  "original": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "tree": "565a7134bd148691c072308fad8612d04110fce3",
+    "sha256": "b246e263af4c03e97a7911b3c2aed2ccb72b70d0f1373b01e665085d8adc8e6e",
+    "files": [
+      "arch/X86/X86OutputIterator.c",
+      "arch/X86/X86SimpleOutputBody.inc"
+    ]
+  },
+  "delta": "diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c\nindex 2425f9ca..61594d57 100644\n--- a/arch/X86/X86OutputIterator.c\n+++ b/arch/X86/X86OutputIterator.c\n@@ -40,7 +40,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,\n \t__attribute__((noinline, section(\".cs_x86_output32\")))\n #elif defined(__APPLE__)\n #define X86_MODE_OUTPUT_FN \\\n-\t__attribute__((noinline, section(\"__TEXT,__cs_out32\")))\n+\t__attribute__((noinline, section(\"__TEXT,__cs_out32,regular,pure_instructions\")))\n #else\n #define X86_MODE_OUTPUT_FN __attribute__((noinline))\n #endif\n",
+  "before_warnings": 2,
+  "after_warnings": 0,
+  "instruction_section_recognized": true,
+  "unit_checks": 1,
+  "linux_identity_pending": true,
+  "publication_qualified": false
+}
