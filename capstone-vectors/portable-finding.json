@@ -1,0 +1,10 @@
+{
+  "affected": [
+    "round1411-mode-caller-shape",
+    "round1418-vex32-cold-entry"
+  ],
+  "cause": "The explicit Mach-O function sections omitted regular,pure_instructions. Darwin ld reports that those symbols have unwind information but the section is not classified as code; objdump -d also omits the new section.",
+  "fix": "Add the code-section flags to the Mach-O function attribute. The ELF section attribute and Linux machine code are unchanged. R1418 will rerun locally before remote profiling; R1411 needs corrected Mach-O source, portable checks and proof of identical Linux objects before any publication.",
+  "publication_gate_open": true,
+  "already_published": false
+}
