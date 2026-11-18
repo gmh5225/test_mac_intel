@@ -41,3 +41,10 @@ jobs:
             }
             cat sample
           done
+      - name: Link and execute the four original embedded data records
+        working-directory: neverd-raw-entry
+        run: |
+          /usr/bin/clang -target arm64e-apple-macosx15.0 -dynamiclib -Wl,-ld_classic,-data_in_code_info,-headerpad,0 mixed.S -o mixed.dylib
+          /usr/bin/otool -G mixed.dylib
+          /usr/bin/clang -target arm64e-apple-macosx15.0 -O2 mixed-caller.c -o mixed-caller
+          ./mixed-caller ./mixed.dylib
