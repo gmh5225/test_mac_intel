@@ -1,0 +1,46 @@
+{
+  "prior": {
+    "status": "cost-verified-awaiting-dispatch-fix",
+    "native_launched": false,
+    "product_launched": false,
+    "published": false,
+    "generator_rows": 134,
+    "pair_plans": 21,
+    "unit_tests_passed": 75,
+    "local_verification": {
+      "parent": "502bd6b9d9ab35cab7727a9e9d73cc1882c4a5ff",
+      "baseline_tree": "c633ea4b4ea8560c831a574b7ac21487f5243b98",
+      "tree": "7b8ae7980393fca2c54dfc254b0bf57de6aad2d9",
+      "sha256": "4b4be8a35fde9021e173920cda3524fbc6c54ad3bf31c12a03ab0ed32798d174",
+      "records": "equal private-entry records, cursor and errors for 152961024 inputs",
+      "guard": "matched 1835008 page-ended extents (245222 decoded), full decoder vs public scan and private batch",
+      "private_guard": "equal private-entry records for 3145734 protected-page extents",
+      "layout_identical": true,
+      "generated_output_matches_producer": true,
+      "shared_vector_object_identical": true,
+      "decoder_object_identical": true,
+      "inactive_runtime_objects_identical": true,
+      "active_local_test_override": "CAPSTONE_X86_VEX32_OUTPUT in temporary build only"
+    },
+    "local_cleanup": {
+      "bytes": 1467520598,
+      "removed": true
+    },
+    "cost_review_complete": true,
+    "owned_product_bytes_removed": 1858114080
+  },
+  "prior_cost_run": {
+    "id": 43859316774,
+    "head_sha": "6512e8ca435d50b3bb0ffc2e8842e11ae878e1c4",
+    "conclusion": "success",
+    "status": "completed",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/43859316774",
+    "run_attempt": 1
+  },
+  "prior_scope": "ELF x64 Clang private C5/32 output",
+  "prior_status": "Cost verified, never native or product qualified because its common dispatch remained unqualified.",
+  "difference": "Reimplements the canonical pair idea on the new existing-plan call site and corrected archive order. Covers both C4 and C5 and maps 1-3 at W=0, rather than the prior C5-only path. The prior generated C5 plan included NDS and pair metadata; the new pair-only table is attempted after the unchanged existing vector reader rejects.",
+  "scope": "Do not claim pair support itself is a new discovery, do not reuse old timings or old source qualification, and do not overwrite the old experimental branch.",
+  "old_patch_sha256": "4b4be8a35fde9021e173920cda3524fbc6c54ad3bf31c12a03ab0ed32798d174",
+  "native_qualified": false
+}

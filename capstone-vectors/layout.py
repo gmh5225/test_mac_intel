@@ -3,77 +3,77 @@ import hashlib
 from elftools.elf.elffile import ELFFile
 
 
-def object_sections(path):
-    with Path(path).open('rb') as stream:
-        elf = ELFFile(stream)
-        rows = []
-        for sec in elf.iter_sections():
-            if sec['sh_flags'] & 2:
-                rows.append((sec.name, sec['sh_type'], sec['sh_flags'], sec['sh_size'],
-                             sec['sh_addralign'], hashlib.sha256(sec.data()).hexdigest()))
-        relocations = []
-        for sec in elf.iter_sections():
-            if sec['sh_type'] not in ('SHT_RELA', 'SHT_REL'):
-                continue
-            target = elf.get_section(sec['sh_info']).name
-            symbols = elf.get_section(sec['sh_link'])
-            for rel in sec.iter_relocations():
-                sym = symbols.get_symbol(rel['r_info_sym'])
-                name = sym.name
-                if sym['st_info']['type'] == 'STT_SECTION':
-                    name = 'section:' + elf.get_section(sym['st_shndx']).name
-                relocations.append((target, rel['r_offset'], rel['r_info_type'],
-                                    rel.entry.get('r_addend', 0), name))
-        return rows, sorted(relocations)
+def ordinary_text_proof(before, after, active):
+    def load(path):
+        with Path(path).open('rb') as stream:
+            elf = ELFFile(stream)
+            table = elf.get_section_by_name('.symtab')
+            index = elf.get_section_index('.text')
+            functions = {s.name: (s['st_value'], s['st_size']) for s in table.iter_symbols()
+                         if s['st_info']['type'] == 'STT_FUNC' and s['st_shndx'] == index}
+            data = {s.name: s.data() for s in elf.iter_sections() if s['sh_type'] == 'SHT_PROGBITS' and
+                    (s.name.startswith('.rodata') or s.name == '.data.rel.ro')}
+            plans, = table.get_symbol_by_name('x86_simple_plans')
+            plan = dict(section=elf.get_section(plans['st_shndx']).name,
+                        offset=plans['st_value'], size=plans['st_size'])
+            relocations = []
+            section = elf.get_section_by_name('.rela.text')
+            if section:
+                for rel in section.iter_relocations():
+                    symbol = table.get_symbol(rel['r_info_sym'])
+                    target = symbol.name
+                    if isinstance(symbol['st_shndx'], int) and symbol['st_info']['type'] != 'STT_FUNC':
+                        target = (elf.get_section(symbol['st_shndx']).name, symbol['st_value'], symbol['st_size'])
+                    relocations.append((rel['r_offset'], rel['r_info_type'], target, rel['r_addend']))
+            return elf.get_section_by_name('.text').data(), functions, data, plan, relocations
+
+    if not active:
+        return dict(active=False, passed=Path(before).read_bytes() == Path(after).read_bytes())
+    left, fa, da, pa, ra = load(before)
+    right, fb, db, pb, rb = load(after)
+    data_proof = {}
+    for name, raw in da.items():
+        updated = bytearray(db.get(name, b''))
+        original = bytearray(raw)
+        changes = []
+        if name == pa['section']:
+            assert pa == pb and pa['size'] == 2*4*256*2
+            for opcode in (0xc4, 0xc5):
+                offset = pa['offset']+opcode*2
+                old_value = int.from_bytes(original[offset:offset+2], 'little')
+                new_value = int.from_bytes(updated[offset:offset+2], 'little')
+                assert old_value == 0 and new_value == 65535, (opcode, old_value, new_value)
+                changes.append(dict(opcode=opcode, offset=offset, before=old_value, after=new_value))
+                updated[offset:offset+2] = original[offset:offset+2]
+        data_proof[name] = dict(allowed_plan_cells=changes, original_bytes_preserved=original == updated)
+    redirects = [x for x in rb if x[2] == 'X86_writeVectorOutputDispatch']
+    normalized = [(a, b, 'X86_writeVectorOutput' if c == 'X86_writeVectorOutputDispatch' else c, d) for a,b,c,d in rb]
+    result = dict(active=True, ordinary_text_identical=left == right,
+        function_positions_and_sizes_identical=fa == fb, original_functions=fa, candidate_functions=fb,
+        normalized_relocations_identical=ra == normalized, redirects=redirects, original_data=data_proof,
+        text_sha256=hashlib.sha256(left).hexdigest(),
+        scope='Only two existing 32-bit C4/C5 plan cells and the existing vector call relocation may change. No arbitrary text or data movement is allowed by this object proof.')
+    result['passed'] = left == right and fa == fb and ra == normalized and bool(redirects) and all(v['original_bytes_preserved'] for v in data_proof.values())
+    return result
 
 
-def decoder_proof(before, after):
-    left, left_rel = object_sections(before)
-    right, right_rel = object_sections(after)
-    assert left == right, (left, right)
-    changed = [x for x in right_rel if x[-1] == 'X86_decodeScanFeatureExtension']
-    assert changed
-    normalized = sorted((*x[:-1], 'X86_decodeFeatureExtension'
-                         if x[-1] == 'X86_decodeScanFeatureExtension' else x[-1])
-                        for x in right_rel)
-    assert left_rel == normalized
-    return dict(all_allocated_section_bytes_sizes_alignments_identical=True,
-                only_relocation_change='X86_decodeFeatureExtension -> X86_decodeScanFeatureExtension',
-                changed_call_sites=changed)
-
-
-def leaf_proof(path):
-    sections, _ = object_sections(path)
-    extra_text = [x for x in sections if x[0] == '.cs_x86_evex_scan_text']
-    extra_data = [x for x in sections if x[0] == '.cs_x86_evex_scan_rodata']
-    assert len(extra_text) == len(extra_data) == 1
-    assert 0 < extra_text[0][3] <= 512, extra_text
-    assert 452 <= extra_data[0][3] <= 512, extra_data
-    other = [x for x in sections if x[0] not in (
-        '.cs_x86_evex_scan_text', '.cs_x86_evex_scan_rodata', '.eh_frame', '.note.gnu.property') and x[3]]
-    assert not other, other
-    return dict(sections=sections, no_ordinary_code_or_data=True)
-
-
-def symbols(path, kinds):
-    rows = []
-    for line in Path(path).read_text().splitlines():
-        fields = line.split(maxsplit=3)
-        if len(fields) == 4 and fields[2] in kinds:
-            rows.append((fields[3], fields[2], int(fields[0], 16), int(fields[1], 16)))
-    return sorted(rows)
-
-
-def linked_proof(before, after):
-    old_text, new_text = symbols(before, 'tTwW'), symbols(after, 'tTwW')
-    entries = [x for x in new_text if x[0] == 'X86_decodeScanFeatureExtension' or x[0].startswith('decodeEvexRegisterScan')]
-    retained = [x for x in new_text if x not in entries]
-    assert len(entries) == 2
-    assert old_text == retained, dict(missing=sorted(set(old_text)-set(retained))[:12],
-                                      changed=sorted(set(retained)-set(old_text))[:12])
-    old_data = symbols(before, 'rR')
-    new_data = [x for x in symbols(after, 'rR') if x[0] not in ('evex_scan_index', 'evex_scan_plans')]
-    assert old_data == new_data, dict(missing=sorted(set(old_data)-set(new_data))[:12],
-                                      changed=sorted(set(new_data)-set(old_data))[:12])
-    return dict(original_text_positions_identical=True, original_readonly_positions_identical=True,
-                text_symbols=len(old_text), readonly_symbols=len(old_data), new_entries=entries)
+def linked_layout(before, after, label):
+    from collections import defaultdict
+    import re
+    assert label == 'output'
+    def symbols(path, kinds):
+        result = defaultdict(list)
+        for line in Path(path).read_text().splitlines():
+            match = re.match(r'([0-9a-fA-F]+) ([0-9a-fA-F]+) (\S) (.+)$', line)
+            if match and match[3] in kinds:
+                result[match[4]].append((match[3], int(match[1],16), int(match[2],16)))
+        return dict(result)
+    result = dict(captured=True, criterion='Exact ordinary iterator text; report all linked symbol positions independently of the object proof.')
+    for category, kinds in (('text','tTwW'),('readonly','rR'),('writable','bBdDgGsSvV')):
+        left, right = symbols(before,kinds), symbols(after,kinds)
+        common = left.keys() & right.keys()
+        result[category] = dict(original_symbols=len(left), unchanged=sum(left[k]==right[k] for k in common),
+            changed=[dict(symbol=k,before=left[k],after=right[k]) for k in sorted(common) if left[k]!=right[k]],
+            added=[dict(symbol=k,positions=right[k]) for k in sorted(right.keys()-left.keys())],
+            removed=[dict(symbol=k,positions=left[k]) for k in sorted(left.keys()-right.keys())])
+    return result

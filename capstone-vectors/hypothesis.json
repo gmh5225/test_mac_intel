@@ -1,0 +1,9 @@
+{
+  "comparison": "../round1446-vex32-archive-order/tree.json",
+  "source_census": "../round1440-output-fallback-census/formatter-next-step.json",
+  "observation": "358 real JPEG32 instructions are nonmemory VMOVDQA fallbacks. The canonical VEX table accepts only three NDS registers and group shifts; the existing complete-record writer already accepts two registers.",
+  "hypothesis": "Generate uniform reserved-vvvv two-register records from the canonical decoder, including ModR/M operand order; reuse the exact existing record writer after the current 32-bit register attempt fails.",
+  "ownership": "No hand-maintained opcode/mnemonic/access table. Same canonical complete-record checker and same output writer; all original generated vector bytes and original vector object must remain identical.",
+  "gates": "Exhaust all low-register pairs and every immediate per admitted row in the generator. Require full records/cursor/errors/guarded extents, actual path admission, four compiler costs, native and mixed timings before adoption.",
+  "publication_qualified": false
+}
