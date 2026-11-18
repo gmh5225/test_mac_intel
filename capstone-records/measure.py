@@ -25,12 +25,13 @@ def run(args,label,cwd=None):
     if result.returncode:
         raise RuntimeError((label,(e/(label+'.log')).read_text(errors='replace')[-2000:]))
 assert platform.machine()=='aarch64'
+assert '0xd49' in Path('/proc/cpuinfo').read_text()
 assert sp.check_output(['git','rev-parse','HEAD'],cwd=s,text=True).strip()==meta['scan']['parent']
 assert meta['dispatch']['parent']==meta['scan']['parent']
 save('environment',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output(['clang','--version'],text=True),
                         valgrind=sp.check_output(['valgrind','--version'],text=True),
                         platform=platform.platform()))
-w=Path(tempfile.mkdtemp(prefix='capstone-arm-tagged-hardware-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-arm-tagged-sampling-'))
 try:
     cases=corpus.prepare(r,w,e,run)
     run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include',
@@ -84,7 +85,7 @@ try:
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cost_probe(binaries,cases,w,e,run)
     save('complete',dict(complete=True,variants=['base','aa','dispatch','scan'],source=meta,
-                         native_timing=True,scope='ARM64 native and whole-process hardware-event diagnosis. Exact candidate sources and the original consumer are preserved; this is not publication qualification.'))
+                         native_timing=False,scope='ARM64 sampled hotspots and retired branch/micro-operation counts. Sampling skid prevents exact faulting-branch attribution; exact source and consumer identities are preserved.'))
 finally:
     amount=sum(f.stat().st_size for f in w.rglob('*')if f.is_file())
     shutil.rmtree(w)
