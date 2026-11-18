@@ -1,7 +1,7 @@
-name: Compare EVEX transfer dispatch with complete layout records and A/A controls
+name: Time isolated AArch64 and MIPS alias lookup with frozen consumers and complete launch controls
 on:
   push:
-    branches: [codex/capstone-evex-transfer-comparison-native]
+    branches: [codex/capstone-small-alias-native]
     paths: [capstone-vectors/**, .github/workflows/capstone-evex-libraries.yml]
 permissions:
   contents: read
@@ -12,9 +12,7 @@ jobs:
       matrix:
         include:
           - { host: ubuntu-22.04, cc: clang, replica: 1 }
-          - { host: ubuntu-22.04, cc: gcc, replica: 1 }
           - { host: ubuntu-24.04, cc: clang, replica: 1 }
-          - { host: ubuntu-24.04, cc: gcc, replica: 1 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 68
     env:
@@ -27,7 +25,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
-          ref: 413b606f938a39d053fd61ef83a6277eec4e4f6e
+          ref: 3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62
           path: source
           persist-credentials: false
       - name: Build from source and time only verified common function boundaries
@@ -43,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: evex-transfer-comparison-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
+          name: alias-call-shape-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14
