@@ -1,0 +1,28 @@
+{
+  "before": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
+  "after": "74fc484595a105a684d865634c22e06d23568781",
+  "changed": [
+    "docs/mips.md",
+    "docs/testing.md",
+    "include/neverd/ir/med/MedCallTarget.h",
+    "include/neverd/loader/ELF/MIPSImageMetadata.h",
+    "lib/ir/high/lower/NdOpCallIndLowering.cpp",
+    "lib/ir/med/CMakeLists.txt",
+    "lib/ir/med/abi/MedABIPass.cpp",
+    "lib/ir/med/abi/MedABIPassSupport.cpp",
+    "lib/ir/med/lower/LowToMed.cpp",
+    "lib/ir/med/lower/MIPS/PICGlobalPointer.cpp",
+    "lib/ir/med/lower/MIPS/PICGlobalPointer.h",
+    "lib/loader/ELF/ELFMIPSDynamic.cpp",
+    "lib/loader/ELF/ELFMIPSProfile.cpp",
+    "unittests/lift/core/MedCachedCallTargetTests.cpp",
+    "unittests/lift/mips/MIPSLoaderTests.cpp",
+    "unittests/lift/mips/MIPSPipelineTests.cpp",
+    "unittests/lift/mips/dynamic-call-roundtrip.py",
+    "unittests/lift/mips/pic-import.S",
+    "unittests/lift/mips/roundtrip.py"
+  ],
+  "hypothesis": "MIPS loader/MedIR PIC changes do not alter the linked decoder benchmark and its complete-state consumers.",
+  "required": "Exact complete ELF identity for both before/after baseline and before/after candidate. Run all 34 existing tests, complete states and all real-input signatures on all four builds. Stop transfer if any binary or dependency identity differs.",
+  "performance": "Retain the original 96 observations. A successful byte-identity proof qualifies their source transfer; this run is not another timing sample."
+}

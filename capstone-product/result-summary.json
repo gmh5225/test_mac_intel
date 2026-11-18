@@ -1,0 +1,3497 @@
+{
+  "inputs": {
+    "neverd": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
+    "capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "variants": {
+      "small-alias-output": {
+        "source": "round1417-clang-small-alias",
+        "patch": "small-alias-output.patch",
+        "patch_sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+        "changed": [
+          "AArch64Mapping.c.o",
+          "MipsMapping.c.o"
+        ],
+        "added": [
+          "AliasMapping.c.o"
+        ]
+      }
+    },
+    "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+    "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
+    "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+    "scope": "Actual current NeverD dev with the published memory optimization and compact Clang alias parser: retain all 96 comparisons and all 15 real/targeted workloads, complete-state records, existing tests, and latest LLVM fork source with prebuilts disabled.",
+    "qualification_pending": [
+      "native/mixed timing",
+      "portable builds",
+      "product validation"
+    ],
+    "validation_entry": {
+      "source": {
+        "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+        "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+        "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
+        "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
+        "complete": true,
+        "publication_qualified": false,
+        "mapping_object_unchanged": true
+      },
+      "cost_run": {
+        "id": 44203984817,
+        "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+        "run_attempt": 1
+      },
+      "alternate_profiles": {
+        "id": 44206940403,
+        "head_sha": "eba0ba561972407d427b6e6bc9d902337ab98421",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44206940403",
+        "run_attempt": 1
+      },
+      "prior_failed_alias_evidence": "../round1410-alias-launch-factors/decision.json",
+      "publication_qualified": false
+    },
+    "timing_protocol": {
+      "cycles": 32,
+      "calibration_cpu_ms": 100,
+      "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+      "consumer_unchanged": true,
+      "publication_qualified": false
+    },
+    "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases."
+  },
+  "complete": true,
+  "run": {
+    "id": 44209960457,
+    "head_sha": "648d41d8e7aa7f724ec5111e288c025547e05102",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44209960457",
+    "run_attempt": 1
+  },
+  "source": {
+    "neverd": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
+    "capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "llvm_fork": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "llvm_source": "/home/runner/work/test_mac_intel/test_mac_intel/neverd/third_party/llvm-project"
+  },
+  "llvm_identity": {
+    "revision": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked": {}
+  },
+  "managed_source_identity": {
+    "neverd_highway": {
+      "repository": "https://github.com/NeverSight/highway.git",
+      "branch": "master",
+      "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+      "sha256": "f5149df5acb77cd9730ed8e5160f2deff0b02fe49cc45443fd396fdb5f0519d2"
+    },
+    "neverd_simdutf": {
+      "repository": "https://github.com/NeverSight/simdutf.git",
+      "branch": "master",
+      "commit": "8d82299606e675b50de8dc16fd118aae4b65bfde",
+      "sha256": "48e9c9fc33940bcc81cdaec785ce6e21ea20f7b03b7a26bff56abb41d2cf5126"
+    },
+    "neverd_simdjson": {
+      "repository": "https://github.com/NeverSight/simdjson.git",
+      "branch": "master",
+      "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+      "sha256": "e4e849bbb16878f8555501cc09bf4a6d90d4a06ccfc67a202a3c030486c3823d"
+    },
+    "neverd_tbb": {
+      "repository": "https://github.com/NeverSight/oneTBB.git",
+      "branch": "master",
+      "commit": "d26e0502ca39f888c1266cbbf1e2c2226d31e41b",
+      "sha256": "98300a443e43d047eabae27d3e30232efe7508b20d8e24a92ff2d54ef511761b"
+    },
+    "neverd_mimalloc": {
+      "repository": "https://github.com/NeverSight/mimalloc.git",
+      "branch": "main3",
+      "commit": "e8e7bc41ce904b4c83fe20e87d93f24d5286315a",
+      "sha256": "aea4126df4ada4e8f733e2a0f08642a8aabe6c2afc01886a1a9a259c18231ac3"
+    }
+  },
+  "tests": {
+    "base": [
+      "100% tests passed, 0 tests failed out of 34"
+    ],
+    "small-alias-output": [
+      "100% tests passed, 0 tests failed out of 34"
+    ]
+  },
+  "states": {
+    "base": "40068 15880932718584834093",
+    "small-alias-output": "40068 15880932718584834093"
+  },
+  "rows": [
+    {
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "images",
+      "reps": 58,
+      "signature": [
+        1682232,
+        0,
+        17182940884114355301,
+        684603928
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9957868933498246,
+          "ci95": [
+            0.9925575657894737,
+            0.9999759366361023
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998362284881019,
+          "ci95": [
+            0.9975245605965861,
+            1.0010684813560378
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 57,
+      "signature": [
+        1653228,
+        0,
+        3627517575969156421,
+        672800412
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9990669371677312,
+          "ci95": [
+            0.9983301991645729,
+            1.0011717971379566
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9995228826362064,
+          "ci95": [
+            0.9987585216549753,
+            1.0012975554923638
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 18,
+      "signature": [
+        522072,
+        0,
+        1440614565876004709,
+        220359636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0014089081110398,
+          "ci95": [
+            1.0003928145160073,
+            1.003845376452754
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.1041977329143005,
+          "ci95": [
+            1.1009843685328495,
+            1.1078298307875443
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 18,
+      "signature": [
+        522072,
+        0,
+        1440614565876004709,
+        220359636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999502706789817,
+          "ci95": [
+            0.9977601028371704,
+            1.0001917090865062
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.1024333041978749,
+          "ci95": [
+            1.1004112300293134,
+            1.1031145649253273
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 14,
+      "signature": [
+        406056,
+        0,
+        8192465802522395621,
+        350277704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006842205489879,
+          "ci95": [
+            0.9972096856117525,
+            1.004050818420129
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0806003234126327,
+          "ci95": [
+            1.0754845196563192,
+            1.0830033007746613
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 14,
+      "signature": [
+        406056,
+        0,
+        8192465802522395621,
+        350277704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9989775694476666,
+          "ci95": [
+            0.9975974178350855,
+            1.0006895748462465
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.079699245362019,
+          "ci95": [
+            1.0778965663105287,
+            1.0822119184742685
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images",
+      "reps": 75,
+      "signature": [
+        1908750,
+        2625,
+        8454415719784856183,
+        136293150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9932472602060816,
+          "ci95": [
+            0.9873992495647158,
+            1.0047208792301001
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9996943012934375,
+          "ci95": [
+            0.9869313490860827,
+            1.0058475509080902
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 75,
+      "signature": [
+        1908750,
+        2625,
+        8454415719784856183,
+        136293150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994789767273453,
+          "ci95": [
+            0.998366262799804,
+            1.0012624378803479
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0006934832291647,
+          "ci95": [
+            0.9995542377444785,
+            1.0023788389709019
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 1,
+      "launch": "images",
+      "reps": 21,
+      "signature": [
+        534450,
+        735,
+        4916426761886696511,
+        45432198
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0021144338338066,
+          "ci95": [
+            0.9968526436211996,
+            1.0051044972886203
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0011473181861144,
+          "ci95": [
+            0.9965050054471634,
+            1.004620663488925
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 22,
+      "signature": [
+        559900,
+        770,
+        2416893203151067405,
+        47595636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999547156018793,
+          "ci95": [
+            0.9972615149016055,
+            1.0021321692414353
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998639590550426,
+          "ci95": [
+            0.9983071402269679,
+            1.0016379810868605
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "reps": 10,
+      "signature": [
+        254500,
+        350,
+        17167412214157606077,
+        51878960
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.002694106006802,
+          "ci95": [
+            1.00009822861072,
+            1.00458815343133
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0003940476019229,
+          "ci95": [
+            0.9944887448896381,
+            1.0039735969262094
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 11,
+      "signature": [
+        279950,
+        385,
+        4918213633961532791,
+        57066856
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000033380091726,
+          "ci95": [
+            0.9980772775046449,
+            1.0024810187122617
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0013494994300531,
+          "ci95": [
+            0.9978423145536631,
+            1.0029988367575506
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "images",
+      "reps": 17,
+      "signature": [
+        4809402,
+        51,
+        15879266738854921609,
+        1982099479
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0011922448774027,
+          "ci95": [
+            0.9981672946805343,
+            1.0034270371047644
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9991173774759963,
+          "ci95": [
+            0.997430993195465,
+            1.001381363866591
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 17,
+      "signature": [
+        4809402,
+        51,
+        15879266738854921609,
+        1982099479
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001698293457908,
+          "ci95": [
+            0.9998867893458483,
+            1.0013824924163155
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.000092633828761,
+          "ci95": [
+            0.999136668465274,
+            1.0004116035438484
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        2263248,
+        24,
+        17565747584236164613,
+        964212584
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008869291278715,
+          "ci95": [
+            0.9959634262086063,
+            1.005397885253828
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9995857336178271,
+          "ci95": [
+            0.9976051984475761,
+            1.0039712641113738
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        2263248,
+        24,
+        17565747584236164613,
+        964212584
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9992795954289441,
+          "ci95": [
+            0.9976204569924179,
+            1.0018639114468189
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0002318295755201,
+          "ci95": [
+            0.9997435465056701,
+            1.0012219435333463
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        1414530,
+        15,
+        7801069537565874201,
+        704236865
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9983705923872016,
+          "ci95": [
+            0.9960228021512609,
+            1.002832027284908
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9995948543124225,
+          "ci95": [
+            0.9954241948352363,
+            1.0036733043820183
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        1414530,
+        15,
+        7801069537565874201,
+        704236865
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996937279918872,
+          "ci95": [
+            0.9987616440553901,
+            1.0032375032760628
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0007705601473083,
+          "ci95": [
+            0.9987852503287855,
+            1.0024136166113022
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 3,
+      "launch": "images",
+      "reps": 26,
+      "signature": [
+        7355556,
+        78,
+        12695331913943471341,
+        3031446262
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0005323018571064,
+          "ci95": [
+            0.9996527631885052,
+            1.002218410755184
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0009595403764955,
+          "ci95": [
+            0.9997289688911423,
+            1.0021007076099275
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 26,
+      "signature": [
+        7355556,
+        78,
+        12695331913943471341,
+        3031446262
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.99900706567505,
+          "ci95": [
+            0.9983605049623494,
+            1.000794083292292
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.000725925260379,
+          "ci95": [
+            0.999459334208697,
+            1.0014794119466381
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "images",
+      "reps": 16,
+      "signature": [
+        4155104,
+        56240,
+        11172021174275834661,
+        1695017728
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0010666165125701,
+          "ci95": [
+            1.0004104712579611,
+            1.0029134394278227
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0000879913674119,
+          "ci95": [
+            0.9986864904919908,
+            1.0024980900565041
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 16,
+      "signature": [
+        4155104,
+        56240,
+        11172021174275834661,
+        1695017728
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998389553177769,
+          "ci95": [
+            0.9988320428845302,
+            1.0008863900759217
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.999927264223615,
+          "ci95": [
+            0.9993982091534462,
+            1.0008965510938985
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        2077552,
+        28120,
+        18181879010259129125,
+        879557840
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0024882672715805,
+          "ci95": [
+            1.0006308873956522,
+            1.0048638970538954
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0038502710786885,
+          "ci95": [
+            0.9988545987006496,
+            1.0052112460454576
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        2077552,
+        28120,
+        18181879010259129125,
+        879557840
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007170076547578,
+          "ci95": [
+            0.9996059626545256,
+            1.0015364380455614
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0000285942062188,
+          "ci95": [
+            0.9995994707126789,
+            1.0012949215003133
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        1298470,
+        17575,
+        18199114599289802973,
+        713942810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9975420498681643,
+          "ci95": [
+            0.995412273280579,
+            1.0015890351653973
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9984302966176839,
+          "ci95": [
+            0.9954997132170187,
+            1.0027405981566866
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        1298470,
+        17575,
+        18199114599289802973,
+        713942810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002895837586665,
+          "ci95": [
+            0.997453219254977,
+            1.0028224290644099
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9996959901975457,
+          "ci95": [
+            0.9962968412791838,
+            1.0025494414807392
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 3,
+      "launch": "images",
+      "reps": 22,
+      "signature": [
+        5713268,
+        77330,
+        7926656586590158629,
+        2330649376
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996150023540314,
+          "ci95": [
+            0.9977344883412881,
+            1.000271929549329
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998164097780742,
+          "ci95": [
+            0.996720068426388,
+            1.0005756807409458
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 23,
+      "signature": [
+        5972962,
+        80845,
+        17623819517628744925,
+        2436587984
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999595918164199,
+          "ci95": [
+            0.9989122761327975,
+            1.0007608745134298
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.000062923890232,
+          "ci95": [
+            0.9996626962151495,
+            1.0010406543231607
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 72,
+      "signature": [
+        1621656,
+        0,
+        737382582770495141,
+        705139848
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998587106515008,
+          "ci95": [
+            0.9947495115824728,
+            1.0016062981006848
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.998643569440492,
+          "ci95": [
+            0.9954163795821607,
+            1.0015517362988737
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 73,
+      "signature": [
+        1644179,
+        0,
+        16239609813587985769,
+        714933457
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998175728047726,
+          "ci95": [
+            0.9987094217451895,
+            1.0006445431582616
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998725688466423,
+          "ci95": [
+            0.9992298739425243,
+            1.000582599875509
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 50,
+      "signature": [
+        1126150,
+        0,
+        9083709986797538437,
+        612997650
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0010415171114138,
+          "ci95": [
+            0.9973262740982181,
+            1.0030059014946777
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9986472457195681,
+          "ci95": [
+            0.9956429485740126,
+            1.0017316035297703
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 49,
+      "signature": [
+        1103627,
+        0,
+        8337338546602119913,
+        600737697
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003770587639695,
+          "ci95": [
+            0.998246384959221,
+            1.0028833813565856
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9992015639421982,
+          "ci95": [
+            0.9966915192004377,
+            1.0022410540837299
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 3,
+      "launch": "images",
+      "reps": 205,
+      "signature": [
+        4617215,
+        0,
+        694399685767301929,
+        1937650365
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.001535032941089,
+          "ci95": [
+            0.9990293380242408,
+            1.0058287487161195
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0005876965146854,
+          "ci95": [
+            0.9983217080338491,
+            1.0061082272630306
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 213,
+      "signature": [
+        4797399,
+        0,
+        3576416914502453417,
+        2013265989
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000138717096059,
+          "ci95": [
+            0.9987121164911406,
+            1.002033027288006
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9994570347799818,
+          "ci95": [
+            0.9966496584909454,
+            1.0007795138831284
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "reps": 67,
+      "signature": [
+        1606191,
+        0,
+        13194827574937180483,
+        866374655
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0011788474853598,
+          "ci95": [
+            0.99418675736659,
+            1.009949179261611
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0024318778538372,
+          "ci95": [
+            0.9902864767553431,
+            1.0071866267694678
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 69,
+      "signature": [
+        1654137,
+        0,
+        18356331348890729171,
+        892236585
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003230369811882,
+          "ci95": [
+            0.9976255986200074,
+            1.0023969985720576
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0000667770933191,
+          "ci95": [
+            0.9983661012348546,
+            1.0022635734637275
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 15,
+      "signature": [
+        359595,
+        0,
+        11850634662298287651,
+        198839625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995179444317606,
+          "ci95": [
+            0.9958421505970927,
+            1.0024414794508814
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.1892503195282824,
+          "ci95": [
+            1.1852093379771083,
+            1.191113949713725
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 16,
+      "signature": [
+        383568,
+        0,
+        2054118168438396069,
+        212095600
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001325284249998,
+          "ci95": [
+            0.9991574239875535,
+            1.0009799559019845
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.1894193843553982,
+          "ci95": [
+            1.1871762581380982,
+            1.1916120623471227
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 11,
+      "signature": [
+        263703,
+        0,
+        15485099919388664707,
+        223878435
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0010110810921131,
+          "ci95": [
+            0.9994466948903035,
+            1.0035211805113853
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.1323141276935886,
+          "ci95": [
+            1.1292602313202265,
+            1.1381386994960643
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 11,
+      "signature": [
+        263703,
+        0,
+        15485099919388664707,
+        223878435
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008156139596662,
+          "ci95": [
+            0.9986805206512275,
+            1.0020384028525338
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.127047909073926,
+          "ci95": [
+            1.1259962934249503,
+            1.1284432135510636
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-sort",
+      "mode": 0,
+      "launch": "images",
+      "reps": 87,
+      "signature": [
+        1604715,
+        0,
+        10889597900782281507,
+        886281441
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991393633097865,
+          "ci95": [
+            0.9877545638833799,
+            1.0043788888724967
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9920426410419683,
+          "ci95": [
+            0.9853054826280221,
+            1.005982372881356
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-sort",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 87,
+      "signature": [
+        1604715,
+        0,
+        10889597900782281507,
+        886281441
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997823098363386,
+          "ci95": [
+            0.9978472956307258,
+            1.0013820765576296
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9996751003803379,
+          "ci95": [
+            0.9975602636897845,
+            1.0009563601104738
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        4304555,
+        3555,
+        15317671955829873631,
+        2582671625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.003461630706714,
+          "ci95": [
+            1.0022185273386777,
+            1.0039524367777592
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0026331935366604,
+          "ci95": [
+            1.0018876332615045,
+            1.0043159815864227
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        4304555,
+        3555,
+        15317671955829873631,
+        2582671625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002664270359078,
+          "ci95": [
+            0.9997647548478057,
+            1.0007095093159077
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9999112682301086,
+          "ci95": [
+            0.9991665527011004,
+            1.000689592275287
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1061489360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000254073042516,
+          "ci95": [
+            0.9970244355088154,
+            1.0022222222222221
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.998935134333543,
+          "ci95": [
+            0.9957763362064267,
+            1.0032422848499125
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1061489360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001703887429483,
+          "ci95": [
+            0.998387166542048,
+            1.0011159053712244
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0001706735062939,
+          "ci95": [
+            0.9990219862125055,
+            1.0025443248390218
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1362754360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9982625021604634,
+          "ci95": [
+            0.9964605614924777,
+            0.9993808116905638
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9990053823847636,
+          "ci95": [
+            0.9954485891527871,
+            1.0025275060994385
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1362754360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000578594019686,
+          "ci95": [
+            0.9984301224031129,
+            1.0026952148937711
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0005025570294896,
+          "ci95": [
+            0.9973614565397615,
+            1.005050424586168
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 3,
+      "launch": "images",
+      "reps": 7,
+      "signature": [
+        6026377,
+        4977,
+        10215425446401738079,
+        3615740275
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991429940970857,
+          "ci95": [
+            0.9979363705059525,
+            1.0004884332682944
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9995393624833562,
+          "ci95": [
+            0.9987512743342976,
+            1.0013006862724112
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 7,
+      "signature": [
+        6026377,
+        4977,
+        10215425446401738079,
+        3615740275
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004154861288144,
+          "ci95": [
+            0.9995018706656553,
+            1.001402851271462
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.00034917125412,
+          "ci95": [
+            0.9993208115080916,
+            1.0010541779120445
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 46,
+      "signature": [
+        4347138,
+        0,
+        2879721718649195621,
+        1993182116
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0018325486771924,
+          "ci95": [
+            1.0005172602968762,
+            1.0023512026476098
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0011241714236618,
+          "ci95": [
+            0.9992625021575735,
+            1.0024045522499065
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 46,
+      "signature": [
+        4347138,
+        0,
+        2879721718649195621,
+        1993182116
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008771595305817,
+          "ci95": [
+            1.0002511865950088,
+            1.0030689279860996
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.000531844910324,
+          "ci95": [
+            0.9995285094612435,
+            1.0021863594760196
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 18,
+      "signature": [
+        1701054,
+        0,
+        6028869039312533477,
+        809901630
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007310152340474,
+          "ci95": [
+            0.9948193709536319,
+            1.0035598991592973
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0007884987769602,
+          "ci95": [
+            0.999568151427962,
+            1.0029400346799866
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 18,
+      "signature": [
+        1701054,
+        0,
+        6028869039312533477,
+        809901630
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000531178468926,
+          "ci95": [
+            0.998219987358137,
+            1.0017097987022319
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0002746004856058,
+          "ci95": [
+            0.9986768746198353,
+            1.0015619434730345
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 12,
+      "signature": [
+        1134036,
+        0,
+        15090757478586660261,
+        655961052
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0020439279995665,
+          "ci95": [
+            0.9980506581601329,
+            1.003982716653311
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9986823707260872,
+          "ci95": [
+            0.9934536513838572,
+            1.0035238189425897
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 12,
+      "signature": [
+        1134036,
+        0,
+        15090757478586660261,
+        655961052
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9989507008301124,
+          "ci95": [
+            0.9975490921284926,
+            1.0024645173326263
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998175139174001,
+          "ci95": [
+            0.9958677921156028,
+            1.0009884630137795
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 65,
+      "signature": [
+        6142695,
+        0,
+        9120033186101760533,
+        2816452990
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999194537340911,
+          "ci95": [
+            0.9955943797743356,
+            1.0042163688664736
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0001069039101909,
+          "ci95": [
+            0.9984020013555437,
+            1.0019862596069928
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 67,
+      "signature": [
+        6331701,
+        0,
+        13445079156687182677,
+        2903113082
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003783011149119,
+          "ci95": [
+            0.9987311768530303,
+            1.0020255465544654
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9989420872697956,
+          "ci95": [
+            0.9973591717064206,
+            1.0009563587047554
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        4356560,
+        10650,
+        4613362280357764937,
+        1994508150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9985763827347924,
+          "ci95": [
+            0.9966555252618247,
+            1.0013617671754904
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0011300073416944,
+          "ci95": [
+            1.0001776447535582,
+            1.0028299445869897
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        4356560,
+        10650,
+        4613362280357764937,
+        1994508150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998839653695923,
+          "ci95": [
+            0.9987479289557619,
+            1.0005554357204487
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0002512732131248,
+          "ci95": [
+            0.9991455658947082,
+            1.0008652448708373
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        822835564
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999343068414104,
+          "ci95": [
+            0.9947853209220723,
+            1.002777179708406
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998393945525115,
+          "ci95": [
+            0.9975797110284704,
+            1.0043066482222254
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        822835564
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000371485156169,
+          "ci95": [
+            0.9979864710319488,
+            1.001039817089485
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9991840000003204,
+          "ci95": [
+            0.9981764137352518,
+            1.001019091125431
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        951463788
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.002582031193154,
+          "ci95": [
+            0.9974712184734145,
+            1.0049488720630708
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9989385705109957,
+          "ci95": [
+            0.9969534820138265,
+            1.0014045733935073
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        951463788
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007657425513123,
+          "ci95": [
+            0.9970167618522574,
+            1.0065825284996657
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9994163741052251,
+          "ci95": [
+            0.9960511849533705,
+            1.001185738587266
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        6970496,
+        17040,
+        2971414651265800773,
+        3191213040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0024282425945221,
+          "ci95": [
+            1.0001983691051821,
+            1.0050289210718153
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0002986356989234,
+          "ci95": [
+            0.9985612304237101,
+            1.0027991410015709
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        6970496,
+        17040,
+        2971414651265800773,
+        3191213040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991627889399418,
+          "ci95": [
+            0.9978233002925895,
+            1.0004199454764073
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9990076509142083,
+          "ci95": [
+            0.9977680465548046,
+            1.0012068185246643
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 24,
+      "signature": [
+        4812000,
+        0,
+        7741572349746978469,
+        1961032704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008444827283405,
+          "ci95": [
+            0.9994335440694184,
+            1.0019380576199146
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0006004200330172,
+          "ci95": [
+            0.9987604650322021,
+            1.002648152886394
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 24,
+      "signature": [
+        4812000,
+        0,
+        7741572349746978469,
+        1961032704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0005591385433787,
+          "ci95": [
+            0.9998126239414554,
+            1.0012858154256206
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0006671770951705,
+          "ci95": [
+            0.9998828899219383,
+            1.0015162900906684
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 10,
+      "signature": [
+        2005000,
+        0,
+        7787601005537452869,
+        853716690
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9990917789489104,
+          "ci95": [
+            0.9960282573968868,
+            1.003182193827765
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0008117155617735,
+          "ci95": [
+            0.996532154746163,
+            1.0022975896274875
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 10,
+      "signature": [
+        2005000,
+        0,
+        7787601005537452869,
+        853716690
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000010295351132,
+          "ci95": [
+            0.9987262514962708,
+            1.0012365406633137
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9996796423917464,
+          "ci95": [
+            0.9988170347003155,
+            1.0011213795866745
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 7,
+      "signature": [
+        1403500,
+        0,
+        4299453880173547825,
+        686304234
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0016220620936116,
+          "ci95": [
+            0.9969703630785699,
+            1.0082546662524197
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.000759612522413,
+          "ci95": [
+            0.9957220779839459,
+            1.0038907127637733
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 7,
+      "signature": [
+        1403500,
+        0,
+        4299453880173547825,
+        686304234
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9964268796987875,
+          "ci95": [
+            0.9950636266510573,
+            0.9995443892513208
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0005209907222103,
+          "ci95": [
+            1.0001373971298213,
+            1.0018114314091802
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 36,
+      "signature": [
+        7218000,
+        0,
+        86432655448747493,
+        2941549056
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0005004565992583,
+          "ci95": [
+            0.9987908861077525,
+            1.001781210592686
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0008796526203247,
+          "ci95": [
+            0.9983185234562832,
+            1.0025197374284458
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 37,
+      "signature": [
+        7418500,
+        0,
+        8016627814274282129,
+        3023258752
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000503149707546,
+          "ci95": [
+            0.9992007763188759,
+            1.001231527093596
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9998391797915691,
+          "ci95": [
+            0.9991881569370739,
+            1.0023440612009356
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "images",
+      "reps": 488,
+      "signature": [
+        2618120,
+        0,
+        4335634563659691645,
+        1404988600
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006338647047799,
+          "ci95": [
+            0.9948365497688675,
+            1.0037924141734174
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9966484508040244,
+          "ci95": [
+            0.9920948616600791,
+            1.0070154944222647
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 478,
+      "signature": [
+        2564470,
+        0,
+        6508623179123865475,
+        1376197850
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995289244903144,
+          "ci95": [
+            0.998639665391774,
+            1.0007732478507498
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9993416436693631,
+          "ci95": [
+            0.9976490094104389,
+            1.0008224095551599
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 2,
+      "launch": "images",
+      "reps": 290,
+      "signature": [
+        1555850,
+        0,
+        6099997299597734151,
+        923015190
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9993262096001738,
+          "ci95": [
+            0.9980553662491481,
+            1.0065350698763291
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0024290340718491,
+          "ci95": [
+            0.99453777552444,
+            1.0071057714457852
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 274,
+      "signature": [
+        1470010,
+        0,
+        4989150671218710615,
+        872090214
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9992660417968835,
+          "ci95": [
+            0.9974614429627616,
+            1.0004458508009832
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0000866412074847,
+          "ci95": [
+            0.9991460572570321,
+            1.0027997334343102
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 529,
+      "signature": [
+        1827695,
+        0,
+        1487544753251735418,
+        976492209
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000071396704926,
+          "ci95": [
+            0.9957439991083992,
+            1.003192468898547
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9985503482984054,
+          "ci95": [
+            0.9948125590675208,
+            1.0021094541263578
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 543,
+      "signature": [
+        1876065,
+        0,
+        17356503130233221316,
+        1002335103
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003985699645526,
+          "ci95": [
+            0.9981152969812619,
+            1.0009269735676214
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9996798029551346,
+          "ci95": [
+            0.9962106292528556,
+            1.0000136082193645
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 307,
+      "signature": [
+        1060685,
+        0,
+        5716034722570551448,
+        751121243
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001651572075896,
+          "ci95": [
+            0.9958510188205429,
+            1.0024611401846069
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0002189248240683,
+          "ci95": [
+            0.9973369657755832,
+            1.0039768943618483
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 296,
+      "signature": [
+        1022680,
+        0,
+        272234506350203965,
+        724208104
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0015585391181303,
+          "ci95": [
+            0.999056168612284,
+            1.0046973296595174
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.001003483467779,
+          "ci95": [
+            0.9991063948486008,
+            1.0040381843544748
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 0,
+      "launch": "images",
+      "reps": 833,
+      "signature": [
+        4797247,
+        0,
+        988004687757480732,
+        2964253824
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0033185868180432,
+          "ci95": [
+            1.002489631558642,
+            1.0044494826112522
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0038305836998376,
+          "ci95": [
+            1.0027262440139744,
+            1.0058724781372912
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 840,
+      "signature": [
+        4837560,
+        0,
+        18181371836025528669,
+        2989163520
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004383823441438,
+          "ci95": [
+            0.9995137150370117,
+            1.0015731238653307
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.000483511506435,
+          "ci95": [
+            0.9998859844938912,
+            1.0014180732230522
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 377,
+      "signature": [
+        2171143,
+        0,
+        2788781792337608212,
+        1385504406
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000438278242935,
+          "ci95": [
+            0.9975842637095325,
+            1.0055300051409595
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0004342483185993,
+          "ci95": [
+            0.9976555869380713,
+            1.0039554489867246
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 439,
+      "signature": [
+        2528201,
+        0,
+        843864628985448210,
+        1613359242
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994610942891644,
+          "ci95": [
+            0.9976745850028621,
+            1.0009374448043085
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0004905601080025,
+          "ci95": [
+            0.99860457316708,
+            1.0019572165627206
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 242,
+      "signature": [
+        1393678,
+        0,
+        114254142059472887,
+        1147069594
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000274249938372,
+          "ci95": [
+            0.9948240662903807,
+            1.0031550568576044
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9999208738551313,
+          "ci95": [
+            0.9949314879059169,
+            1.002981182517285
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 253,
+      "signature": [
+        1457027,
+        0,
+        8397903238465834064,
+        1199209121
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001966903520203,
+          "ci95": [
+            0.9983090751263786,
+            1.0011355077921325
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0002862174648537,
+          "ci95": [
+            0.9999074283003258,
+            1.0009631068035865
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 260,
+      "signature": [
+        2018640,
+        0,
+        9807224180863709733,
+        1744403180
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0015483022573866,
+          "ci95": [
+            0.9987303602602762,
+            1.006475135965661
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0010389917210385,
+          "ci95": [
+            0.9984254543472599,
+            1.0048661498400961
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 265,
+      "signature": [
+        2057460,
+        0,
+        3644641160585719841,
+        1777949395
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995397180020409,
+          "ci95": [
+            0.9984494261771792,
+            1.0003108281777697
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9996854313050825,
+          "ci95": [
+            0.9985844206416558,
+            1.0008372855203431
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 141,
+      "signature": [
+        1094724,
+        0,
+        2218717623603284257,
+        968384757
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0018672585440216,
+          "ci95": [
+            0.9970469077874995,
+            1.005089562796249
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0006104963375804,
+          "ci95": [
+            0.998142865424041,
+            1.0074262431816177
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 132,
+      "signature": [
+        1024848,
+        0,
+        14698902409914143269,
+        906572964
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000209486695224,
+          "ci95": [
+            0.9976371623036455,
+            1.003299721400768
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0044379087490718,
+          "ci95": [
+            1.0005286141116985,
+            1.0090287479793916
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 85,
+      "signature": [
+        659940,
+        0,
+        11458446065003217697,
+        741529120
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9987117203575908,
+          "ci95": [
+            0.9957539211919446,
+            1.002970644131594
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0028193922392972,
+          "ci95": [
+            0.998862559816221,
+            1.006199492825411
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 91,
+      "signature": [
+        706524,
+        0,
+        4622481888806272673,
+        793872352
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008614880697198,
+          "ci95": [
+            0.9992763439739716,
+            1.003870286842031
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0003079712279588,
+          "ci95": [
+            0.9978681587064469,
+            1.0019165709293765
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 317,
+      "signature": [
+        2461188,
+        0,
+        13767432995574820129,
+        2126830031
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0006849770904593,
+          "ci95": [
+            0.9990861802333755,
+            1.0034960524982872
+          ]
+        },
+        "small-alias-output": {
+          "median": 1.0005201872549057,
+          "ci95": [
+            0.9996467789018998,
+            1.0039281737098358
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 302,
+      "signature": [
+        2344728,
+        0,
+        7889319794635637669,
+        2026191386
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9990861971930936,
+          "ci95": [
+            0.9976487245963688,
+            1.0015490093075254
+          ]
+        },
+        "small-alias-output": {
+          "median": 0.9991717768208022,
+          "ci95": [
+            0.9971926798410329,
+            1.0023755519467448
+          ]
+        }
+      }
+    }
+  ],
+  "losses": {
+    "small-alias-output": []
+  },
+  "aa_outside_one_percent": [],
+  "cleanup": {
+    "bytes": 1480295372,
+    "removed": true
+  },
+  "raw": "product/product-small-alias-ubuntu-24.04-clang",
+  "avx32_corpus": {
+    "provenance": {
+      "package": "libjpeg62-turbo-dev",
+      "version": "1:2.1.5-4",
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb",
+      "package_sha256": "7539d7d7a4fe527071f737ce4919887cde17dfc72d6b3fa9d0176b4dacb6e412",
+      "text_sha256": "4d879d6881a2ee0c2e1b48456ef0153149f788674220dfd89ec0da7c60064a1d",
+      "members": {
+        "jccolor-avx2.asm.o": {
+          "sha256": "2e8b1ae43c6d15a5f0bad04857f4db30b599c792ae128ab9fdbf36ffce3d2db5",
+          "functions": 7,
+          "section_bytes": 8384
+        },
+        "jcgray-avx2.asm.o": {
+          "sha256": "a53b3309db8314a3a72b087ef0fc2cd371ce4c55e2d159c1207298620f9dda9c",
+          "functions": 7,
+          "section_bytes": 4800
+        },
+        "jcsample-avx2.asm.o": {
+          "sha256": "ac100c60c2dc894f6be87393c35833a913749c93962bd94c84366ba8cf0dcc3d",
+          "functions": 2,
+          "section_bytes": 672
+        },
+        "jdcolor-avx2.asm.o": {
+          "sha256": "21ab2e5647b6191d3434ca327240c7a3673623a0894cef8b7906af297282d163",
+          "functions": 7,
+          "section_bytes": 5792
+        },
+        "jdmerge-avx2.asm.o": {
+          "sha256": "edc189ef3a3fc43041d718f584ad04bbc942426439f6df003931a6855a2145dd",
+          "functions": 14,
+          "section_bytes": 6464
+        },
+        "jdsample-avx2.asm.o": {
+          "sha256": "4d1c213560ab99f952e12f3f54b1c9743e42a3ecddc38ca0a63bcf668c6903e4",
+          "functions": 4,
+          "section_bytes": 1824
+        },
+        "jfdctint-avx2.asm.o": {
+          "sha256": "ad7dbb14a23fd3fbc5ed3333dc901e2b5dccd24c3862c76a554325d0c9af9e35",
+          "functions": 1,
+          "section_bytes": 832
+        },
+        "jidctint-avx2.asm.o": {
+          "sha256": "edbdc208b82031fccf1caa14b0037792331f84598c18c8cedb3dd8a541c509ed",
+          "functions": 1,
+          "section_bytes": 1344
+        },
+        "jquanti-avx2.asm.o": {
+          "sha256": "c7c2f57f57c5c5c62ae6684fa78e7d96f4cf67fc65486c13b416e75a67b844d3",
+          "functions": 2,
+          "section_bytes": 384
+        }
+      },
+      "selection": "ELF .text in AVX2 i386 libjpeg.a objects, extents bounded by external assembly entry symbols within each object"
+    },
+    "selected_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      25,
+      27,
+      29,
+      31,
+      33,
+      35,
+      37,
+      38,
+      40,
+      41,
+      42,
+      43,
+      44
+    ],
+    "functions": 45,
+    "selected_functions": 37,
+    "selected_instructions": 7764,
+    "selected_bytes": 29664,
+    "intervals_sha256": "9d41a35a2ee1832768ce9d30b0728176d50fa840f339e8c3729095fef75b4429",
+    "executable_was_run": false,
+    "selection": "Same 37 canonical SIMD function extents used in the frozen standalone benchmark."
+  },
+  "original_probe_equivalence": {
+    "checks": [
+      {
+        "case": "mips64el-ls",
+        "mode": 0,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          11803516
+        ]
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 1,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          12242202
+        ]
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 2,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          25019836
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          116594087
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          120526573
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          140847373
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          105938608
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          109944730
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          142788562
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 0,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9451953
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 1,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9793609
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 2,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          12259953
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 0,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          12930965
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 1,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          13255975
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 2,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          20352585
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 0,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          1817242
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 1,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          2163438
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 2,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          5187896
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 0,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          10187143
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 1,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          10435797
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 2,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          15931282
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          516534325
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 1,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          530744680
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 2,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          681377180
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 0,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          43330046
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 1,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          44994535
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 2,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          54663421
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 0,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          398901630
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 1,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          411417782
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 2,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          475731894
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 0,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          81709696
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 1,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          85371669
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 2,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          98043462
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 0,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2823667
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 1,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2879075
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 2,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          3182811
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 0,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1805727
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 1,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1845921
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 2,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          2446649
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 0,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3558528
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 1,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3675078
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 2,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          4739957
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 0,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6709243
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 1,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6867977
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 2,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          8723872
+        ]
+      }
+    ],
+    "unchanged": true
+  },
+  "batch_probe_equivalence": {
+    "checks": [
+      {
+        "case": "putty-32-0.85",
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          116594087
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          105938608
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9451953
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          516534325
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          43330046
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          398901630
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          81709696
+        ]
+      },
+      {
+        "case": "scalar32",
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2823667
+        ]
+      },
+      {
+        "case": "scalar64",
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1805727
+        ]
+      },
+      {
+        "case": "simd64",
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3558528
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6709243
+        ]
+      }
+    ],
+    "unchanged": true,
+    "capacity": 64,
+    "fallback": "Decoder::decodeOneLight"
+  },
+  "publication_authorized_by_report": false,
+  "statistical_scope": "2000 deterministic resamples of 32 interleaved balanced cycles; no outlier removal"
+}
