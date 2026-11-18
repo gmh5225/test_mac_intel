@@ -1,0 +1,11 @@
+{
+  "previous": "../round1434-vex32-tail-selector",
+  "observed": "Both Intel Clang versions preserve the entire ordinary decoder text and relocations, but decline the intended generic tail transfer. Clang14 emits one push/call/return; Clang18 saves R9, adjusts RSP and emits calls to both destinations. The selector widens the narrow opcode and stack boolean arguments before those calls. AArch64 already emits two tail branches.",
+  "hypothesis": "Require tail transfer at the two same-signature selector returns where Clang supports musttail. Original argument types, calling convention and pointer lifetimes match; no local address escapes. Preserve the existing fallback on older Clang versions without the attribute.",
+  "gate": "Keep R1434 exact ordinary-code proof and no-stack/no-call selector gate unchanged. Compiler rejection or any remaining frame blocks instruction-cost and native qualification.",
+  "sources": [
+    "https://clang.llvm.org/docs/AttributeReference.html#musttail",
+    "https://clang.llvm.org/docs/AttributeReference.html#preserve-most"
+  ],
+  "publication_qualified": false
+}
