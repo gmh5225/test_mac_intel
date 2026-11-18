@@ -1,22 +1,8 @@
 {
-  "source": {
-    "tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
-    "sha256": "0f7b38efaecf91282b24301e0319bbc5d4a939f6213819d8eb460fe0f260b972",
-    "experiment": "round1462-vex32-plan-class-bit",
-    "semantic_and_cost_run": {
-      "id": 44242322055,
-      "head_sha": "4d495ce72b9f5a5748c8c8c68b31f4359e2d8c96",
-      "status": "completed",
-      "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44242322055",
-      "run_attempt": 1
-    }
-  },
-  "evidence": "../round1465-iterator-leaf-factorial-repair/clang14-arm-interim-attribution.json",
-  "observation": "On AMD 7763 Clang14, iterator/candidate add 546462 Ir and 312264 Dw solely in __memset_avx2_unaligned_erms, while baseline/leaf do not. The former executable names are longer; the existing counts were collected from original-image launches, so argument/stack geometry is a concrete competing explanation.",
-  "hypothesis": "Control the exact guest filename, inode, length and disabled ASLR for both timing and counts. Compare native memset destination alignment/size/caller separately, because Valgrind can select a different libc implementation than native execution.",
-  "controls": "Same candidate and frozen recombined objects as R1465. No code or table changes. Retain original-image and fixed-image count conditions. Native timing is narrowed to ARM detail; AArch64/MIPS count controls remain.",
-  "gdb": "Read first eight native optimized memset calls after the original run() entry, including implementation, destination mod64, size and callers. No benchmark instrumentation.",
-  "pmu": "On an ephemeral owned runner, temporarily permit user perf events with sudo sysctl if permitted, then restore the original setting in finally. Preserve unsupported hardware/permission outcomes.",
+  "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+  "basis": "R1296 qualified ARM-only constructed-operand initialization, but the four-backend build still uses full MCInst_Init for ARM. This is independent of the held VEX32 feature.",
+  "change": "Reuse the existing MIPS partial-initialization branch for ARM only in the established four-backend CMake profile. Preserve operand zero, all common metadata defaults, tied indices and public detail initialization.",
+  "prediction": "Reduce ARM temporary initialization writes and executed work without changing constructed operands. Explicitly measure x86, AArch64 and MIPS: their code generation and layout can still change.",
+  "validation": "Current-baseline full public records, cursor and error differential; read-before-construction observer; 0xa5/0x5a poisoning; compiler/configuration coverage; frozen real inputs with A/A and fixed-image timing.",
   "publication_qualified": false
 }

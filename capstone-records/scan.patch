@@ -1,0 +1,23 @@
+diff --git a/cs.c b/cs.c
+index 71fff034..32aecf75 100644
+--- a/cs.c
++++ b/cs.c
+@@ -1076,10 +1076,14 @@ cs_decode_full_insn(cs_struct *handle, const uint8_t *code, size_t size,
+ 	else
+ #endif
+ #ifdef CAPSTONE_HAS_MIPS
+-	if (handle->arch == CS_ARCH_MIPS)
+-		/* MIPS constructs each MCOperand before reading it. The public
+-		 * detail and alias records are reset by the MIPS decoder. */
+-		MCInst_InitStorage(&mci, CS_ARCH_MIPS, false);
++#ifdef CAPSTONE_ARM_AARCH64_MIPS_X86
++		if (handle->arch == CS_ARCH_MIPS || handle->arch == CS_ARCH_ARM)
++#else
++		if (handle->arch == CS_ARCH_MIPS)
++#endif
++		/* ARM and MIPS construct operands before reading them. Keep
++		 * operand zero and every common metadata default initialized. */
++		MCInst_InitStorage(&mci, handle->arch, false);
+ 	else
+ #endif
+ #ifdef CAPSTONE_ARM_INIT_CONSTRUCTED_OPERANDS

@@ -1,9 +1,6 @@
 from pathlib import Path
-import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
-from factorial import controls
-from runtime_probe import cost_probe
+import gzip,hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
-from layout import object_proof, linked_layout
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
@@ -12,7 +9,7 @@ def run(args,label,cwd=None):
  with (e/(label+'.log')).open('w') as f:rc=sp.run(list(map(str,args)),cwd=cwd,stdout=f,stderr=sp.STDOUT).returncode
  if rc:raise RuntimeError((label,(e/(label+'.log')).read_text()[-1300:]))
 assert sp.check_output(['git','-C',s,'rev-parse','HEAD'],text=True).strip()==json.loads((r/'manifest.json').read_text())['capstone_revision']
-with tempfile.TemporaryDirectory(prefix='capstone-iterator-leaf-factorial-') as tmp:
+with tempfile.TemporaryDirectory(prefix='capstone-arm-branches-') as tmp:
  t=Path(tmp);b=t/'build'
  try:
   import re
@@ -28,44 +25,49 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-leaf-factorial-') as 
   choices={'arm-ls','arm-sort','arm-cp'} | ({'putty-32-0.85','putty-64-0.85','arm64-ls','mips64el-ls','amd64-ls'} if mixed else set())
   cases=[x for x in all_inputs if x['name'] in choices];assert len(cases)==len(choices)
 
-  run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
-  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_X86_SUPPORT=ON','-DCAPSTONE_MIPS_SUPPORT=ON','-DCAPSTONE_AARCH64_SUPPORT=ON'] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
+  run(['clang++','-O3','-DNDEBUG','-std=c++17',*(['-DCAPSTONE_PERF_ARM_ONLY'] if not mixed else []),'-I',s,'-I',s/'include','-c',r/'single.cpp','-o',t/'single.o'],'consumer')
+  consumer_symbols=sp.check_output(['nm','-u',t/'single.o'],text=True)
+  if not mixed:assert 'X86_disasmIter' not in consumer_symbols
+  write('consumer-scope',dict(arm_only=not mixed,source_sha256=sha(r/'single.cpp'),x86_iterator_reference='X86_disasmIter' in consumer_symbols))
+  run(['cmake','-S',s,'-B',b,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release','-DCMAKE_C_COMPILER='+cc,'-DCMAKE_C_FLAGS='+('-Wno-error=discarded-qualifiers' if cc=='gcc' else '-Wno-error=incompatible-pointer-types-discards-qualifiers'),'-DCAPSTONE_ARCHITECTURE_DEFAULT=OFF','-DCAPSTONE_ARM_SUPPORT=ON',*(['-DCAPSTONE_'+a+'_SUPPORT=ON' for a in (['X86','MIPS','AARCH64','PPC','RISCV','LOONGARCH','ARC','TRICORE'] if os.environ['BUILD_ARCHS']=='extra' else ['X86','MIPS','AARCH64'])] if mixed else []),'-DCAPSTONE_BUILD_SHARED_LIBS=ON','-DCAPSTONE_BUILD_CSTEST=ON','-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF','-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
   bins={};objects={};libs={};ownedlibs={}
-  write('compiler',dict(compiler=sp.check_output([cc,'--version'],text=True)))
+  active=mixed
+  write('scope',dict(active=active,policy='Four-backend ARM constructed-operand initialization',inactive_requirement='All runtime objects and linked consumer must be byte-identical'))
   libname='libcapstone.dylib' if platform.system()=='Darwin' else 'libcapstone.so'
-  for key in ('base','candidate'):
-   variant=r/(key+'.patch')
+  for key in ('base','scan'):
+   variant=r/('baseline.patch' if key=='base' else key+'.patch')
    if key!='base':
     run(['git','apply',variant],'apply-'+key,s)
     run(['git','add','-A'],'stage-tested-source',s)
     tested=sp.check_output(['git','write-tree'],cwd=s,text=True).strip()
-    assert tested==json.loads((r/'inputs.json').read_text())['variants'][key]['tree'],tested
-    write(key+'-tested-source',dict(tree=tested,patch_sha256=sha(variant)))
+    assert tested==json.loads((r/'candidate.json').read_text())['tree'],tested
+    write('tested-source',dict(tree=tested,patch_sha256=sha(variant)))
     run(['git','reset','-q'],'unstage-tested-source',s)
    run(['cmake','--build',b,'--target','capstone_static','capstone_shared','--parallel','4'],'build-'+key)
    link=t/'single';run(['clang++',t/'single.o',b/'libcapstone.a','-lm','-o',link],'link-'+key);f=t/key;link.rename(f);bins[key]=f
    (e/(key+'-symbols.txt')).write_bytes(sp.check_output(['nm','-n','-S','--defined-only',f]))
    (e/(key+'-sections.txt')).write_bytes(sp.check_output(['readelf','-WS',f]))
    objdir=b/'CMakeFiles/capstone.dir'
-   members=sp.check_output(['ar','t',b/'libcapstone.a'],text=True).splitlines();assert len(set(members))==len(members)
-   objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o') if v.name in members};assert len(objects[key])==len(members)
-   if key=='base':shutil.copyfile(objdir/'arch/X86/X86OutputIterator.c.o',t/'baseline-plan.o')
-   if key!='base':
-    write(key+'-object-proof',object_proof(key,t/'baseline-plan.o',objdir/'arch/X86/X86OutputIterator.c.o'))
-    write(key+'-linked-layout',linked_layout(e/'base-symbols.txt',e/(key+'-symbols.txt'),key))
+   objects[key]={str(v.relative_to(objdir)):sha(v) for v in objdir.rglob('*.o')}
+   if active:
+    with gzip.open(e/(key+'-cs-object-assembly.gz'),'wb') as stream:stream.write(sp.check_output(['objdump','-dr',objdir/'cs.c.o']))
+    with gzip.open(e/(key+'-linked-assembly.gz'),'wb') as stream:stream.write(sp.check_output(['objdump','-dr',f]))
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
-   if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
-  for key in ('candidate',):
+   if key!='base':
+    run(['cmake','--build',b,'--target','arm_private_stream','arm_post_index','--parallel','4'],'callback-build')
+    run(['ctest','--test-dir',b,'--output-on-failure','--no-tests=error','-R','^unit_arm_(private_stream|post_index)$'],'callback-contract')
+    if active:
+     run(['clang++','-O2','-std=c++17','-I',s/'include',r/'verify-arm.cpp','-ldl','-o',t/'verify-arm'],'records-link')
+     run([t/'verify-arm',libs['base'],libs['scan']],'records')
+    run(['git','apply','-R',variant],'restore-'+key,s)
+  for key in ('scan',):
    changed=[k for k,h in objects['base'].items()if objects[key].get(k)!=h]
    added=set(objects[key])-set(objects['base'])
-   assert added == {'arch/X86/X86Vex32Output.c.o'},added
-   assert set(objects['base']) <= set(objects[key])
-   assert set(changed) == {'arch/X86/X86OutputIterator.c.o'},changed
-   active=bool(changed)
-   write('scope',dict(active=active,source_applies=True,policy='Diagnostic iterator/added-object factorial; only the ordinary iterator and new VEX32 leaf may change; all original vector and other-architecture objects remain byte-identical; every linked relocation is retained'))
+   assert not added,added
+   expected={'cs.c.o'} if active else set()
+   assert set(changed)==expected,(key,changed,expected)
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins.update(controls(b,t,e,s,t/'single.o',t/'baseline-plan.o',run))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==4;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==(2 if active else 1);write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -75,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-leaf-factorial-') as 
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
   if probe.returncode==0:launches.append('same-file-fixed')
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Diagnostic iterator/added-object factorial; preserve complete records, original images and controlled-image timing panels; iterator lowering is allowed to change and is reported explicitly.'))
+  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='ARM constructed-operand initialization; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
    tail=list(map(str,[x['selector'],mode,x['path'],reps]))
@@ -86,13 +88,12 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-leaf-factorial-') as 
     args=['setarch',platform.machine(),'-R',str(image),*tail]
    return json.loads(sp.check_output(args,text=True))
   data=[]
-  modes={x['name']: ((2,) if x['name']=='arm-ls' else ()) for x in cases}
   for x in cases:
-   for mode in modes[x['name']]:
+   for mode in (0,1,2):
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*60e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','iterator','leaf','candidate']
-     for k in range(21):
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','aa','scan']
+     for k in range(32):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
        vout=sample(v,x,mode,n,launch)
@@ -101,7 +102,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-iterator-leaf-factorial-') as 
        ticks[v].append(vout['cpu_ns'])
       runs.append({v:sum(ticks['base'])/sum(ticks[v]) for v in keys})
      data.append(dict(case=x['name'],mode=mode,launch=launch,pairs=runs,median={v:st.median(c[v]for c in runs)for v in keys},result=reference));write('timings',data)
-  assert len(data)==2
+  from mixed_cost import cost_probe
   cost_probe(bins,cases,t,e,run)
   write('complete',dict(cases=len(data),cc=cc,host=platform.platform(),launches=launches,active=active,native_qualification=False))
  finally:
