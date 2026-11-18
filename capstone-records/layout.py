@@ -55,7 +55,7 @@ def iterator_proof(before, after):
 def linked_layout(before, after, label):
     from collections import defaultdict
     import re
-    assert label in ('signature', 'classbit')
+    assert label == 'candidate'
 
     def symbols(path, kinds):
         result = defaultdict(list)
@@ -77,7 +77,7 @@ def linked_layout(before, after, label):
 
 
 def object_proof(label, before, after):
-    assert label in ('signature', 'classbit')
+    assert label == 'candidate'
     result = iterator_proof(before, after)
     assert result['passed'], result
     return result

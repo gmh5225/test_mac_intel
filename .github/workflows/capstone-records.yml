@@ -1,7 +1,7 @@
-name: Compare VEX32 dispatch controls against published next
+name: Isolate changed iterator and added writer layout contributions
 on:
   push:
-    branches: [codex/capstone-vex32-exception-integrated-mixed]
+    branches: [codex/capstone-iterator-leaf-factorial-repair]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -31,6 +31,8 @@ jobs:
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y valgrind linux-tools-generic
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
           pip install pyelftools==0.32
@@ -41,6 +43,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-exception-integrated-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: iterator-leaf-factorial-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
