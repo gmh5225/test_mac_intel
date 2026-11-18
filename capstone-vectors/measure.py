@@ -1,7 +1,7 @@
-"""Measure exact, common-boundary PE function bodies and three additional ELF text sections."""
+"""Compare real ELF library functions at common boundaries with current forked iced."""
 from pathlib import Path
 import gzip, os, shlex, platform, hashlib, importlib.util, json, math, shutil, statistics, subprocess as sp, tempfile
-from layout import object_proof, linked_layout
+from layout import linked_layout
 r=Path(__file__).resolve().parent
 p=r.parent
 base=p/'source'
@@ -19,7 +19,7 @@ def module(path):
 def main(w):
     reference=json.loads((r/'experiment.json').read_text())['baseline_commit']
     assert sp.check_output(['git','-C',base,'rev-parse',reference],text=True).strip()==reference
-    iced='8b8d90b13374fbf38e7279749e48c673f4ec243a'
+    iced='8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31'
     checkout=w/'iced';checkout.mkdir();tar=w/'iced.tar'
     run(['git','init','--bare',w/'iced-git'],'iced-repo');run(['git','-C',w/'iced-git','fetch','--depth','1','https://github.com/NeverSight/iced.git',iced],'iced-fetch');run(['git','-C',w/'iced-git','archive','--format=tar','-o',tar,iced,'src/rust/iced-x86'],'iced-archive');run(['tar','-xf',tar,'-C',checkout],'iced-extract');tar.unlink()
     ad=w/'adapter';ad.mkdir();src=(lab/'iced.rs').read_text().replace('repeats: u32,\n    output:', 'repeats: u32,\n    ip: u64,\n    output:').replace('bytes, 0x100000,','bytes, ip,').replace('set_ip(0x100000 +','set_ip(ip +')
@@ -28,7 +28,8 @@ def main(w):
     trace=(r/'iced-trace.rs').read_text().replace('iced_trace(input:', 'iced_trace(bits:u32,input:').replace('with_ip(64,','with_ip(bits,');(ad/'iced.rs').write_text(src+trace);shutil.copyfile(lab/'Cargo.lock',ad/'Cargo.lock')
     (ad/'Cargo.toml').write_text('[package]\nname="iced_compare"\nversion="0.1.0"\nedition="2021"\n[lib]\ncrate-type=["staticlib"]\npath="iced.rs"\n[dependencies]\niced-x86={path="../iced/src/rust/iced-x86",default-features=false,features=["std","decoder","intel","instr_info","fast_fmt"]}\n[profile.release]\npanic="abort"\nopt-level=3\n');run(['cargo','build','--locked','--release'],'iced-build',ad)
     save('cpu.json',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output([os.environ['CC'],'--version'],text=True)))
-    save('variants.json',dict(control='byte-identical baseline copy',integer='Exact prepared four-backend Capstone, revision '+reference,aa='byte-identical reference',signature='VEX32 exceptional arm with six forwarded arguments',classbit='VEX32 exceptional arm with four arguments and the existing plan class bit',iced='NeverSight iced IntelFormatter',fast='NeverSight iced FastFormatter'))
+    save('variants.json',dict(integer='Published four-backend Capstone '+reference,aa='Byte-identical baseline copy',memory='Canonical C6/C7 memory-immediate MOV',iced='NeverSight iced '+iced+' IntelFormatter',fast='NeverSight iced '+iced+' FastFormatter'))
+    save('iced-source.json',dict(revision=iced,source='https://github.com/NeverSight/iced.git',built_from_source=True,adapter_source_sha256=sha(ad/'iced.rs'),cargo_lock_sha256=sha(ad/'Cargo.lock')))
     save('entrypoints.json',dict(scan='cs_disasm_iter',format='X86_disasmIter',detail='X86_disasmIter',consumer='Physical X86_disasmIter output entry; actual NeverD product qualification is separate'))
     inc=(r/'driver.cpp').read_text().replace('size_t iced_trace(const','size_t iced_trace(unsigned, const').replace('if(argc!=6)','if(argc!=7)').replace('  csh handle=0;','  unsigned bits=std::stoul(argv[6]);\n  csh handle=0;').replace('cs_open(CS_ARCH_X86,CS_MODE_64,','cs_open(CS_ARCH_X86,bits==32?CS_MODE_32:CS_MODE_64,').replace('iced_create(64,mode)','iced_create(bits,mode)').replace('iced_trace(ptr,','iced_trace(bits,ptr,')
     inc=inc.replace('iced_create(bits,mode)','iced_create(bits,mode | (engine=="fast" ? 8 : 0))').replace('engine!="capstone" && engine!="iced"','engine!="capstone" && engine!="iced" && engine!="fast"')
@@ -42,7 +43,7 @@ def main(w):
     tree=w/'tree';run(['git','clone','-q','--shared','--no-checkout',base,tree],'capstone-clone');run(['git','checkout','-q','--detach',reference],'capstone-checkout',tree);b=w/'build';run(['cmake','-S',tree,'-B',b,*profile],'configure');evidence={};exe={}
     objects={}
     inputs=json.loads((r/'experiment.json').read_text())
-    for label in ('integer','aa','signature','classbit'):
+    for label in ('integer','aa','memory'):
         if label=='aa':
             exe[label]=w/'baseline-copy';shutil.copy2(exe['integer'],exe[label]);continue
         if label!='integer':
@@ -69,12 +70,12 @@ def main(w):
         else:
             changed={name for name,value in objects['integer'].items() if objects[label].get(name)!=value}
             added=set(objects[label])-set(objects['integer'])
-            assert added == {'arch/X86/X86Vex32Output.c.o'},added
-            assert changed=={'arch/X86/X86OutputIterator.c.o'},changed
-            proof=object_proof(label,w/'baseline-plan.o',objroot/'arch/X86/X86OutputIterator.c.o')
-            save(label+'-object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed),proof=proof))
+            assert not added,added
+            assert changed <= {'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o','arch/X86/X86ImmediateOutput.c.o'},changed
+            assert {'arch/X86/X86OutputIterator.c.o','arch/X86/X86MemoryOutput.c.o'} <= changed
+            save(label+'-object-isolation.json',dict(changed=sorted(changed),added=sorted(added),unchanged=len(objects['integer'])-len(changed)))
         save('object-digests.json',objects)
-        for component in ('X86OutputIterator', 'X86VectorOutput'):
+        for component in ('X86OutputIterator','X86MemoryOutput','X86ImmediateOutput','X86VectorOutput'):
             with gzip.open(p/'evidence'/(label+'-'+component+'.asm.gz'),'wb') as stream:
                 stream.write(sp.check_output(['objdump','-dr',objroot/'arch/X86'/(component+'.c.o')]))
         code=inc.replace('#include <capstone/capstone.h>','#include <capstone/capstone.h>\n#include "X86ScanAdapter.h"');old='bool ok = cs_disasm_iter(handle, &cursor, &left, &ip, insn);';assert code.count(old)==1;code=code.replace(old,'bool ok = mode ? X86_disasmIter(handle,&cursor,&left,&ip,insn) : cs_disasm_iter(handle,&cursor,&left,&ip,insn);');(w/'owned.cpp').write_text(code);obj=w/'owned.o';run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',base/'include','-I',tree/'arch/X86','-c',w/'owned.cpp','-o',obj],'owned-driver-'+label)
@@ -100,7 +101,7 @@ def main(w):
     probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
     launches=['images']
     if probe.returncode==0:launches.append('same-file-fixed')
-    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare the two independently qualified VEX32 exceptional-arm prototypes against the same published baseline and frozen consumers; preserve original-image and fixed-image controls and all symbol movements.'))
+    save('launch-controls.json',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},image_inode=image_inode,fixed_size=maximum,equal_length_engine_selectors=True,purpose='Compare canonical memory-immediate MOV against published Capstone and the current NeverSight iced fork; preserve original-image and fixed-image controls and all symbol movements.'))
     import frozen_deb as deb
     run(['clang++','-O2','-I',base/'include',r/'vectors.cpp',b/'libcapstone.a','-o',w/'vectors'],'vectors');reported=[];manifest={}
     run(['clang++','-O2','-std=c++17','-I',base/'include',r/'prefixes.cpp',b/'libcapstone.a','-o',w/'prefixes'],'prefixes');prefix_census={}
@@ -129,9 +130,9 @@ def main(w):
                         command=[str(image),*tail];executable=None
                         if launch=='same-file-fixed':command=['setarch',platform.machine(),'-R',*command]
                     return list(map(int,sp.check_output(command,executable=executable).split()))
-                probe=measure('integer',1,'images');rep=max(1,math.ceil(80e6/max(1,probe[0])))
-                cycles={launch:[]for launch in launches};labels=['integer','aa','signature','classbit','iced']+(['fast'] if mode else [])
-                for i in range(32):
+                probe=measure('integer',1,'images');rep=max(1,math.ceil(40e6/max(1,probe[0])))
+                cycles={launch:[]for launch in launches};labels=['integer','aa','memory','iced']+(['fast'] if mode else [])
+                for i in range(20):
                     launch_order=launches[i%len(launches):]+launches[:i%len(launches)]
                     for launch in launch_order:
                         order=labels[i%len(labels):]+labels[:i%len(labels)]
@@ -143,49 +144,14 @@ def main(w):
                 for launch,observations in cycles.items():
                     md=lambda a,b:statistics.median(v['ns'][a]/v['ns'][b]for v in observations)
                     row=dict(case=name,panel=panel,mode=['scan','format','detail'][mode],launch=launch,functions=len(sel),bytes=sum(z[1]for z in sel),repetitions=rep,gain={k:md('integer',k)for k in labels},cycles=observations)
-                    row['vs_iced']={k:md('iced',k) for k in ('signature','classbit')}
-                    row['vs_fast']={k:md('fast',k) for k in ('signature','classbit')} if mode else None
+                    row['vs_iced']={k:md('iced',k) for k in ('integer','memory')}
+                    row['vs_fast']={k:md('fast',k) for k in ('integer','memory')} if mode else None
                     reported.append(row)
                 save('measurements.json',reported)
             print(name,panel,len(sel),flush=True)
     assert len(reported)==21*len(launches)
-    # Collect the original consumer lambda by symbol, without inserting client
-    # request instructions or changing the original native consumer object.
-    costs=[]
-    for name,bits,f,spans,source in deb.prepare(w):
-        if name!='libssl3t64-amd64': continue
-        intervals=w/(name+'-cost.tsv');intervals.write_text(''.join('%d %d %d\n'%v for v in spans))
-        audit=[list(map(int,x.split()))for x in sp.check_output([exe['integer'],'audit','0','1',f,intervals,str(bits)],text=True).splitlines()]
-        views=[list(map(int,x.split()))for x in sp.check_output([w/'vectors',str(bits),f,intervals],text=True).splitlines()]
-        sel=[a[:3]for a,v in zip(audit,views)if a[1]==a[5] and v[1]>=8 and v[1]>=0.15*v[0]]
-        assert len(sel)==manifest[name]['simd-functions']['functions']
-        intervals.write_text(''.join('%d %d %d\n'%tuple(v) for v in sel))
-        native_values={}
-        for mode in (0,1,2):
-            for label in ('integer','signature','classbit'):
-                raw=w/(label+'-'+str(mode)+'.callgrind')
-                tail=['capstone',str(mode),'1',str(f),str(intervals),str(bits)]
-                # -demangle=no makes the symbol selector independent of the
-                # installed Valgrind C++ demangler's lambda spelling.
-                run(['valgrind','--tool=callgrind','--demangle=no','--collect-atstart=no',
-                     '--toggle-collect=_ZZ4mainENK3$_0clEj','--cache-sim=yes','--branch-sim=yes',
-                     '--dump-instr=yes','--collect-jumps=yes','--callgrind-out-file='+str(raw),
-                     exe[label],*tail],'cost-'+label+'-'+str(mode))
-                log=(p/'evidence'/('cost-'+label+'-'+str(mode)+'.log')).read_text()
-                result=next(list(map(int,line.split())) for line in log.splitlines() if len(line.split())==6 and all(x.isdigit() for x in line.split()))
-                if mode in native_values: assert result[2:]==native_values[mode]
-                else:native_values[mode]=result[2:]
-                content=raw.read_text();events=next(line[8:].split() for line in content.splitlines() if line.startswith('events: '))
-                counts=list(map(int,next(line[8:].split() for line in content.splitlines() if line.startswith('totals: '))))
-                assert len(events)==len(counts) and counts[0]>0
-                costs.append(dict(case=name,mode=mode,variant=label,events=dict(zip(events,counts)),result=result[2:],collected_traversals=2))
-                with gzip.open(p/'evidence'/(label+'-'+str(mode)+'.callgrind.gz'),'wb')as stream:stream.write(raw.read_bytes())
-                raw.unlink()
-                save('instruction-costs.json',costs)
-    assert len(costs)==6
-    save('cost-protocol.json',dict(symbol='_ZZ4mainENK3$_0clEj',consumer_unchanged=True,traversals=2,scope='The original benchmark warm traversal and one timed traversal are collected. Simulated cache events do not establish native hardware causes.'))
     save('complete.json',dict(cases=len(reported),success=True,native_qualification=False,controlled_replication=True,launches=launches))
-w=Path(tempfile.mkdtemp(prefix='capstone-vex32-exception-signature-integrated-native-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-mov-latest-iced-'))
 try:
     if hasattr(os,'sched_setaffinity'): os.sched_setaffinity(0, {min(os.sched_getaffinity(0))})
     main(w)

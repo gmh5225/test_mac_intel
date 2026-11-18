@@ -1,58 +1,39 @@
 {
-  "inputs": {
+  "source": {
     "baseline_commit": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
     "source_parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
     "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
     "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "variants": {
-      "signature": {
-        "tree": "86eb7ca2aa29df055b4656fb56c1c3d23051be15",
-        "sha256": "73dc39448d6e35350b71fec3629941d7a3b7bfaf8882391bf3ab656c10de48d1",
-        "experiment": "round1460-vex32-exception-call-signature",
-        "semantic_and_cost_run": {
-          "id": 44241234271,
-          "head_sha": "bcba11e01aa1cc0036e7b4e4f9d9643a65351e58",
-          "status": "completed",
-          "conclusion": "success",
-          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44241234271",
-          "run_attempt": 1
-        }
-      },
-      "classbit": {
-        "tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
-        "sha256": "0f7b38efaecf91282b24301e0319bbc5d4a939f6213819d8eb460fe0f260b972",
-        "experiment": "round1462-vex32-plan-class-bit",
-        "semantic_and_cost_run": {
-          "id": 44242322055,
-          "head_sha": "4d495ce72b9f5a5748c8c8c68b31f4359e2d8c96",
-          "status": "completed",
-          "conclusion": "success",
-          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44242322055",
-          "run_attempt": 1
-        }
+      "memory": {
+        "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+        "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+        "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+        "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+        "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
       }
-    }
+    },
+    "iced_revision": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31"
   },
-  "cycles": 32,
-  "native_target_ms": 80,
-  "mixed_target_ms": 80,
+  "cycles": 20,
+  "target_ms": 40,
+  "profiles": 4,
+  "rows": 168,
+  "samples": [
+    "libjpeg62-turbo-amd64/all-functions",
+    "libjpeg62-turbo-amd64/simd-functions",
+    "libzstd1-amd64/all-functions",
+    "libzstd1-amd64/simd-functions",
+    "libssl3t64-amd64/simd-functions",
+    "jpeg-avx2-i386/simd-functions",
+    "libssl3t64-i386/all-functions"
+  ],
   "launches": [
     "images",
     "same-file-fixed"
   ],
-  "native_rows": 168,
-  "mixed_rows": 192,
-  "profiles": [
-    "ubuntu-22.04 clang",
-    "ubuntu-24.04 clang"
-  ],
-  "purpose": "Compare both independent VEX32 dispatch controls and the complete register/memory implementation against published next on the same hosts using frozen consumers.",
-  "semantic_scope": "Each source passed 75 local unit checks and 214106138 complete record/protected-extent comparisons, then four compiler cost/semantic checks. Original generated records and all original runtime objects except the iterator are preserved.",
-  "prior_negative_evidence": [
-    "../round1451-vex32-pairs-integrated-native/decision.json",
-    "../round1450-vex32-existing-plan-product/decision.json",
-    "../round1458-vex32-existing-exception-arm/decision.json"
-  ],
-  "gates": "Retain every sample and A/A flag. Instruction counts and older source timings are separate evidence. Stable losses smaller than one percent remain material; product and portable validation must qualify the selected exact source.",
-  "publication_qualified": false
+  "consumer_unchanged": true,
+  "purpose": "Measure remaining scalar/SIMD and 32-bit gaps against current forked iced; complementary to the real PE and mixed-ISA screening in R1481.",
+  "publication_qualified": false,
+  "controls": "Balanced ABBA rotations, identical A/A image, complete Capstone result checks, common instruction boundaries. Preserve every panel and smaller stable losses. Native benchmark is not current NeverD product qualification."
 }
