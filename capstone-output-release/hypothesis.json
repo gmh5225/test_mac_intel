@@ -1,8 +1,10 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "evidence": "../round1480-current-scalar-fallback-census/next-step.json",
-  "hypothesis": "Canonical C6/C7 memory-immediate MOV accounts for roughly 2 percent of the real PE32/PE64 code-section instructions and currently falls back. Extend the canonical MOV output plan with a constant immediate specialization of the existing memory writer.",
-  "semantics": "Only bare or one-REX C6/C7 /0 memory forms; preserve existing address exclusions, options and callbacks. Reuse canonical MOV row fields, bounded address parsing, and unsigned number emission. Validate new operand projection against the ordinary decoder.",
-  "exclusions": "No prefix, address mode, SIB, register or opcode legality is relaxed beyond the new validated /0 memory forms. No optional mapper or initialization prototype is combined.",
-  "qualification": "Generate with baseline and candidate full decoders; exhaustive ModRM/SIB/REX/length matrix, immediate/displacement boundaries, existing x86 units; codegen costs, complete real-record comparisons and native panels still required."
+  "basis": "R1485 preserves 3-5 percent PE gains but still changes old scalar/SIMD layout and native performance. R1489 rules out increased SIMD instruction work and identifies increased branch misses. Source inspection also shows new C6/C7 ModR/M bounds/group checks in the shared iterator before the memory reader loads the same byte again.",
+  "change": "Transfer only C6/C7 ModR/M bounds and memory-/group-zero admission to the constant-specialized immediate-memory reader, sharing its one ModR/M load. Leave old memory opcode admission in the iterator and preserve the tagged plan table exactly.",
+  "distinct_from": "R1483 moved existing memory-family opcode classification into the memory reader and increased old-path work. This experiment moves only the newly admitted immediate-store check and changes no old opcode policy.",
+  "hypothesis": "A smaller common dispatch body and removal of duplicate new-path ModR/M reads may preserve PE gains with fewer effects on old output paths. Native sampling does not yet prove this fixes the branch-miss mechanism.",
+  "validation": "Seven units, generated-table identity, canonical projection checks, baseline full-record and guard-page comparison, and exact R1485 admission census before cross-host cost and timing qualification.",
+  "publication_qualified": false,
+  "padding_or_alignment_tuning": false
 }

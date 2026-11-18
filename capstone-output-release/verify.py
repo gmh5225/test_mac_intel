@@ -18,7 +18,7 @@ def run(args,name):
   result=sp.run(list(map(str,args)),cwd=s,stdout=log,stderr=sp.STDOUT)
  if result.returncode:raise RuntimeError((name,(e/(name+'.log')).read_text(errors='replace')[-2500:]))
 def cleanup_error(fn,path,exc):os.chmod(path,0o700);fn(path)
-w=Path(tempfile.mkdtemp(prefix='capstone-mov-memory-profile-'));s=w/'source';b=w/'build'
+w=Path(tempfile.mkdtemp(prefix='capstone-immediate-reader-profile-'));s=w/'source';b=w/'build'
 try:
  assert sp.check_output(['git','rev-parse','HEAD'],cwd=checkout,text=True).strip()==meta['parent']
  sp.run(['git','clone','-q','--shared','--no-checkout','--config','core.autocrlf=false',checkout,s],check=True)
