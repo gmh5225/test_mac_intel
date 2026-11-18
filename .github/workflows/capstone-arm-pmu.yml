@@ -1,0 +1,23 @@
+name: Probe ARM hardware counter availability
+on:
+  push:
+    branches: [codex/capstone-arm-pmu-preflight]
+    paths: [arm-pmu-probe/**, .github/workflows/capstone-arm-pmu.yml]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install perf tooling
+        run: sudo apt-get update && sudo apt-get install -y linux-tools-common linux-tools-generic
+      - name: Probe events and restore runner permissions
+        run: python3 arm-pmu-probe/probe.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arm-pmu-preflight-${{ github.run_id }}
+          path: evidence
+          if-no-files-found: warn
