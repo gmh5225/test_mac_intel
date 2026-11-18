@@ -1,0 +1,151 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44216314038,
+    "head_sha": "7fe1c7414c9c32bf30989644497bac15564fd751",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44216314038",
+    "run_attempt": 1
+  },
+  "source": {
+    "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "tree": "eef2ad2ecaf0e39298033bf53d47a1ab0cf25053",
+    "sha256": "dd7caa9806c13328927e3c0c3dfbac6bf172576b65812eb1fb23a48b0b5ccc3c",
+    "files": [
+      "arch/X86/X86DisassemblerDecoder.c",
+      "arch/X86/X86GenVexPublicPlans.inc",
+      "suite/synctools/x86_operand_specializations.py"
+    ]
+  },
+  "profiles": [
+    {
+      "profile": "vex32-tail-selector-cost-ubuntu-22.04-clang-1",
+      "ordinary_text_proof_passed": true,
+      "cleanup": {
+        "removed": true,
+        "bytes": 1813562474,
+        "files": 4833
+      },
+      "tail_selector": {
+        "assembly": "\n/tmp/capstone-vex32-tail-selector-cost-pkpw2vgn/build/CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nDisassembly of section .cs_x86_vex32_scan:\n\n0000000000000000 <decodeVex32OrGeneric>:\n   0:\t50                   \tpush   %rax\n   1:\t8a 44 24 10          \tmov    0x10(%rsp),%al\n   5:\t84 c0                \ttest   %al,%al\n   7:\t75 1e                \tjne    27 <decodeVex32OrGeneric+0x27>\n   9:\t48 83 fa 02          \tcmp    $0x2,%rdx\n   d:\t72 18                \tjb     27 <decodeVex32OrGeneric+0x27>\n   f:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)\n  13:\t75 12                \tjne    27 <decodeVex32OrGeneric+0x27>\n  15:\t80 3e c5             \tcmpb   $0xc5,(%rsi)\n  18:\t75 0d                \tjne    27 <decodeVex32OrGeneric+0x27>\n  1a:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)\n  1e:\t72 07                \tjb     27 <decodeVex32OrGeneric+0x27>\n  20:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  24:\t58                   \tpop    %rax\n  25:\teb 19                \tjmp    40 <decodeVex32PlanOrGeneric>\n  27:\t0f b6 c0             \tmovzbl %al,%eax\n  2a:\t89 04 24             \tmov    %eax,(%rsp)\n  2d:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  31:\te8 00 00 00 00       \tcall   36 <decodeVex32OrGeneric+0x36>\n\t\t\t32: R_X86_64_PLT32\t.text+0x6d19c\n  36:\t59                   \tpop    %rcx\n  37:\tc3                   \tret    \n",
+        "instructions": [
+          "   0:\t50                   \tpush   %rax",
+          "   1:\t8a 44 24 10          \tmov    0x10(%rsp),%al",
+          "   5:\t84 c0                \ttest   %al,%al",
+          "   7:\t75 1e                \tjne    27 <decodeVex32OrGeneric+0x27>",
+          "   9:\t48 83 fa 02          \tcmp    $0x2,%rdx",
+          "   d:\t72 18                \tjb     27 <decodeVex32OrGeneric+0x27>",
+          "   f:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)",
+          "  13:\t75 12                \tjne    27 <decodeVex32OrGeneric+0x27>",
+          "  15:\t80 3e c5             \tcmpb   $0xc5,(%rsi)",
+          "  18:\t75 0d                \tjne    27 <decodeVex32OrGeneric+0x27>",
+          "  1a:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)",
+          "  1e:\t72 07                \tjb     27 <decodeVex32OrGeneric+0x27>",
+          "  20:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  24:\t58                   \tpop    %rax",
+          "  25:\teb 19                \tjmp    40 <decodeVex32PlanOrGeneric>",
+          "  27:\t0f b6 c0             \tmovzbl %al,%eax",
+          "  2a:\t89 04 24             \tmov    %eax,(%rsp)",
+          "  2d:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  31:\te8 00 00 00 00       \tcall   36 <decodeVex32OrGeneric+0x36>",
+          "  36:\t59                   \tpop    %rcx",
+          "  37:\tc3                   \tret    "
+        ],
+        "stack_changes": [
+          "   0:\t50                   \tpush   %rax",
+          "  24:\t58                   \tpop    %rax",
+          "  36:\t59                   \tpop    %rcx"
+        ],
+        "calls_or_returns": [
+          "  31:\te8 00 00 00 00       \tcall   36 <decodeVex32OrGeneric+0x36>",
+          "  37:\tc3                   \tret    "
+        ],
+        "passed": false,
+        "scope": "No stack frame and no ordinary call/return in the selector. The seventh incoming argument may be read from the caller stack; original fallback target changes are checked separately."
+      },
+      "active_compiler_records_and_costs_run": false
+    },
+    {
+      "profile": "vex32-tail-selector-cost-ubuntu-22.04-gcc-1",
+      "ordinary_text_proof_passed": true,
+      "cleanup": {
+        "removed": true,
+        "bytes": 1862347739,
+        "files": 4848
+      },
+      "inactive_binary_identical": true
+    },
+    {
+      "profile": "vex32-tail-selector-cost-ubuntu-24.04-clang-1",
+      "ordinary_text_proof_passed": true,
+      "cleanup": {
+        "removed": true,
+        "bytes": 1753590002,
+        "files": 4833
+      },
+      "tail_selector": {
+        "assembly": "\n/tmp/capstone-vex32-tail-selector-cost-rekumdar/build/CMakeFiles/capstone.dir/arch/X86/X86DisassemblerDecoder.c.o:     file format elf64-x86-64\n\n\nDisassembly of section .text:\n\nDisassembly of section .cs_x86_vex32_scan:\n\n0000000000000000 <decodeVex32OrGeneric>:\n   0:\t41 51                \tpush   %r9\n   2:\t48 83 ec 10          \tsub    $0x10,%rsp\n   6:\t0f b6 44 24 20       \tmovzbl 0x20(%rsp),%eax\n   b:\t84 c0                \ttest   %al,%al\n   d:\t74 16                \tje     25 <decodeVex32OrGeneric+0x25>\n   f:\t0f b6 c0             \tmovzbl %al,%eax\n  12:\t89 04 24             \tmov    %eax,(%rsp)\n  15:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  19:\te8 00 00 00 00       \tcall   1e <decodeVex32OrGeneric+0x1e>\n\t\t\t1a: R_X86_64_PLT32\t.text+0x4effc\n  1e:\t48 83 c4 10          \tadd    $0x10,%rsp\n  22:\t41 59                \tpop    %r9\n  24:\tc3                   \tret\n  25:\t48 83 fa 02          \tcmp    $0x2,%rdx\n  29:\t72 e4                \tjb     f <decodeVex32OrGeneric+0xf>\n  2b:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)\n  2f:\t75 de                \tjne    f <decodeVex32OrGeneric+0xf>\n  31:\t80 3e c5             \tcmpb   $0xc5,(%rsi)\n  34:\t75 d9                \tjne    f <decodeVex32OrGeneric+0xf>\n  36:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)\n  3a:\t72 d3                \tjb     f <decodeVex32OrGeneric+0xf>\n  3c:\t45 0f b6 c9          \tmovzbl %r9b,%r9d\n  40:\te8 0b 00 00 00       \tcall   50 <decodeVex32PlanOrGeneric>\n  45:\t48 83 c4 10          \tadd    $0x10,%rsp\n  49:\t41 59                \tpop    %r9\n  4b:\tc3                   \tret\n",
+        "instructions": [
+          "   0:\t41 51                \tpush   %r9",
+          "   2:\t48 83 ec 10          \tsub    $0x10,%rsp",
+          "   6:\t0f b6 44 24 20       \tmovzbl 0x20(%rsp),%eax",
+          "   b:\t84 c0                \ttest   %al,%al",
+          "   d:\t74 16                \tje     25 <decodeVex32OrGeneric+0x25>",
+          "   f:\t0f b6 c0             \tmovzbl %al,%eax",
+          "  12:\t89 04 24             \tmov    %eax,(%rsp)",
+          "  15:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  19:\te8 00 00 00 00       \tcall   1e <decodeVex32OrGeneric+0x1e>",
+          "  1e:\t48 83 c4 10          \tadd    $0x10,%rsp",
+          "  22:\t41 59                \tpop    %r9",
+          "  24:\tc3                   \tret",
+          "  25:\t48 83 fa 02          \tcmp    $0x2,%rdx",
+          "  29:\t72 e4                \tjb     f <decodeVex32OrGeneric+0xf>",
+          "  2b:\t83 7f 04 04          \tcmpl   $0x4,0x4(%rdi)",
+          "  2f:\t75 de                \tjne    f <decodeVex32OrGeneric+0xf>",
+          "  31:\t80 3e c5             \tcmpb   $0xc5,(%rsi)",
+          "  34:\t75 d9                \tjne    f <decodeVex32OrGeneric+0xf>",
+          "  36:\t80 7e 01 c0          \tcmpb   $0xc0,0x1(%rsi)",
+          "  3a:\t72 d3                \tjb     f <decodeVex32OrGeneric+0xf>",
+          "  3c:\t45 0f b6 c9          \tmovzbl %r9b,%r9d",
+          "  40:\te8 0b 00 00 00       \tcall   50 <decodeVex32PlanOrGeneric>",
+          "  45:\t48 83 c4 10          \tadd    $0x10,%rsp",
+          "  49:\t41 59                \tpop    %r9",
+          "  4b:\tc3                   \tret"
+        ],
+        "stack_changes": [
+          "   0:\t41 51                \tpush   %r9",
+          "   2:\t48 83 ec 10          \tsub    $0x10,%rsp",
+          "  1e:\t48 83 c4 10          \tadd    $0x10,%rsp",
+          "  22:\t41 59                \tpop    %r9",
+          "  45:\t48 83 c4 10          \tadd    $0x10,%rsp",
+          "  49:\t41 59                \tpop    %r9"
+        ],
+        "calls_or_returns": [
+          "  19:\te8 00 00 00 00       \tcall   1e <decodeVex32OrGeneric+0x1e>",
+          "  24:\tc3                   \tret",
+          "  40:\te8 0b 00 00 00       \tcall   50 <decodeVex32PlanOrGeneric>",
+          "  4b:\tc3                   \tret"
+        ],
+        "passed": false,
+        "scope": "No stack frame and no ordinary call/return in the selector. The seventh incoming argument may be read from the caller stack; original fallback target changes are checked separately."
+      },
+      "active_compiler_records_and_costs_run": false
+    },
+    {
+      "profile": "vex32-tail-selector-cost-ubuntu-24.04-gcc-1",
+      "ordinary_text_proof_passed": true,
+      "cleanup": {
+        "removed": true,
+        "bytes": 1859296972,
+        "files": 4848
+      },
+      "inactive_binary_identical": true
+    }
+  ],
+  "status": "held",
+  "publication_qualified": false,
+  "scope": "Both active Clang profiles fail the intended no-frame tail-selector gate despite exact original ordinary text and relocation identity. Their instruction-cost and native stages did not run. Both inactive GCC variants remain byte-identical executables.",
+  "followup": "../round1437-vex32-musttail-selector/hypothesis.json"
+}
