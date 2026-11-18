@@ -1,0 +1,44 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "be46f53cb16387430c33085cfe1aee14acc18ba1",
+    "sha256": "e5b7b04b03b1d58c434c43d19f60003cf223bb164234fd8b257b22867e0c7f7d",
+    "records": {
+      "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
+    }
+  },
+  "native_run": {
+    "id": 44287928451,
+    "head_sha": "35dc25057e3dffc3d9dcecf3807957ea118d7c58",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44287928451",
+    "run_attempt": 1
+  },
+  "profile_run": {
+    "id": 44288088511,
+    "head_sha": "851d1e353b0ecee068576beeb25e55f4b9491862",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44288088511",
+    "run_attempt": 1
+  },
+  "native_panels": 264,
+  "aa_flags": 4,
+  "losses_over_one_percent": 36,
+  "below_one_descriptive_intervals": 94,
+  "unit_executions": 678,
+  "fixture_executions": 380524,
+  "semantic_review": "semantic-review.json",
+  "real_review": "real-review.json",
+  "cost_attribution": "cost-attribution.json",
+  "lowering_review": "lowering-review.json",
+  "finding": "The required x86 mapper avoids the optional null guard, but Clang14/18 now execute one extra unconditional jump per no-detail full-decode mapping. GCC13 splits its required detail callback memory-indirect call into a load plus register-indirect call, adding one executed instruction. Physical-PC instruction histograms prove these differences. Empty-mapper removal reduces non-x86 simulated work but native format/detail regressions remain, so the source is held.",
+  "limits": "21-cycle screening and unadjusted descriptive bootstrap intervals, not multiplicity-corrected certainty. All four A/A flags are retained. The extra x86 instructions do not by themselves explain all native regressions. No Windows/macOS/sanitizer, latest-iced or current-NeverD product qualification was run after this failed performance screen; other required non-x86 mappers still lack performance coverage.",
+  "cleanup_bytes_removed": 14309039586
+}
