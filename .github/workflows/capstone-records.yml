@@ -1,7 +1,7 @@
-name: Measure hardware causes of iterator-dependent image layout changes
+name: Select PMU-capable hosts before measuring layout effects
 on:
   push:
-    branches: [codex/capstone-native-layout-counters]
+    branches: [codex/capstone-pmu-capable-hosts]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,8 +11,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
+          - { host: ubuntu-24.04, cc: clang, archs: four, slot: 1 }
+          - { host: ubuntu-24.04, cc: clang, archs: four, slot: 2 }
+          - { host: ubuntu-24.04, cc: clang, archs: four, slot: 3 }
+          - { host: ubuntu-24.04, cc: clang, archs: four, slot: 4 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -23,16 +25,22 @@ jobs:
         with:
           sparse-checkout: capstone-records
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Probe hardware event availability before source build
+        id: pmu
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y gdb libc6-dbg linux-tools-generic
+          python3 capstone-records/preflight.py
+      - if: steps.pmu.outputs.supported == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: NeverSight/capstone
           ref: 25da25371c0e19e1cf57b394446e3f705cecd2a9
           path: source
           persist-credentials: false
       - name: Compare complete ARM records and independent executables with A/A controls
+        if: steps.pmu.outputs.supported == 'true'
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y gdb libc6-dbg linux-tools-generic
           python3 -m venv "$RUNNER_TEMP/capstone-elf-venv"
           source "$RUNNER_TEMP/capstone-elf-venv/bin/activate"
           pip install pyelftools==0.32
@@ -43,6 +51,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: native-layout-counters-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: pmu-capable-host-${{ matrix.slot }}-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

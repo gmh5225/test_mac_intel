@@ -18,5 +18,7 @@
   "controls": "Original/fixed-image native timings, then same inode/path/length and disabled ASLR for PMU runs. Byte-identical A/A controls included. No source changes.",
   "gdb_repair": "Break at the executable memset PLT entry using verified link offsets and runtime relocation, rather than depending on unavailable libc private symbol names. Capture actual arguments and resolved target.",
   "pmu": "Probe each event group. Unsupported events remain unavailable. Restore original perf_event_paranoid in finally. Hardware counts cover the complete unchanged process with 20 timed traversals plus its original warm/setup work.",
-  "publication_qualified": false
+  "publication_qualified": false,
+  "preflight": "Select only PMU capability before building or observing benchmark results. All four scheduled hosts retain a capability receipt, including unavailable hosts. No selection by performance or CPU brand.",
+  "reason": "R1469 obtained two AMD 7763 VMs, both lacking all requested PMU groups. Native timing and corrected PLT observations remain preserved separately."
 }

@@ -4,7 +4,7 @@ from factorial import controls
 from runtime_probe import cost_probe
 import corpus
 from layout import object_proof, linked_layout
-r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
+r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir(exist_ok=True);s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
 def write(n,v):(e/(n+'.json')).write_text(json.dumps(v,indent=2)+'\n')
 def run(args,label,cwd=None):
