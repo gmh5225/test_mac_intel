@@ -1,8 +1,9 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "predecessor_tree": "313cbfb229a8d3d68c32d09e94f1293e4350c47f",
-  "observed": "GCC13 emits 1299 static direct calls to the new MCOperand_initReg/Imm helpers in the linked R1494 image. PE32/64 real workloads gain executed helper and reader work despite fewer stores.",
-  "change": "Force inline only the new tag-store helpers; keep counted constructors, capacity checks, layout and public semantics unchanged.",
-  "falsifiable_prediction": "No out-of-line MCOperand_initReg/Imm call remains. Determine whether the extra executed GCC work disappears before claiming a native gain.",
-  "limits": "Inlining does not by itself explain or fix all native timing losses. All four-backend timing panels and other-backend semantic profiles still require qualification."
+  "hypothesis": "Append ARM predicate immediate/register operands as a pair to remove a repeated capacity check, count update and operand-index calculation. Keep the existing sequential fallback when fewer than two slots remain.",
+  "semantic_contract": "Both compatibility tags and typed payloads, all untouched private bytes, original partial append and overflow behavior, predicate rejection and soft-failure decisions remain unchanged.",
+  "iced_source": "NeverSight iced 8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31: src/rust/iced-x86/src/instruction.rs fixed regs and op_kinds arrays; existing decoder writes known operand positions. No code copied and no Capstone storage/layout contract removed.",
+  "prior_evidence": "R585 x86 memory batching reduced emitted instructions but regressed actual output throughput. This is a different ARM owning boundary; do not infer native benefit from shorter assembly.",
+  "scope": "Only ARM DecodePredicateOperand calls the new internal helper. All other optimized runtime objects must remain identical outside sanitizer source-location metadata.",
+  "publication_qualified": false
 }

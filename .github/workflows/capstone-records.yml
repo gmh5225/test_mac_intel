@@ -1,7 +1,7 @@
-name: Measure operand construction with the tag-store helpers inlined
+name: Measure paired ARM predicate operand construction
 on:
   push:
-    branches: [codex/capstone-inline-operand-tags]
+    branches: [codex/capstone-arm-predicate-pair]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: inline-operand-tags-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: arm-predicate-pair-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

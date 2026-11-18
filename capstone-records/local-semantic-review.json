@@ -2,8 +2,8 @@
   "complete": true,
   "source": {
     "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-    "tree": "a80fb75f404b702117c6f3067d8d81c9b3ef1927",
-    "sha256": "23cde8ce970099d0d3ab14d4a0a497c6e5179c6d5d122feb4ac2def9d836291d",
+    "tree": "dd2478965df09f73af30cc39ac2b2474934f8ee9",
+    "sha256": "aa389cfdd2fda37804f23ecdec9406880116297d311ad01e8e957469da41e61d",
     "records": {
       "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
       "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
@@ -11,35 +11,19 @@
   },
   "unit_executions": 9,
   "baseline_contract_passed": true,
-  "x86_complete_records": 2409351,
   "arm_aarch64_complete_records": 50331648,
-  "guarded_records": 3092,
-  "added_fast_admissions": 0,
+  "pair_state_comparisons": 327680,
   "cpp17_header_compiled": true,
   "object_delta": {
     "changed": [
-      "MCInst.c.o",
-      "arch/Mips/MipsDisassembler.c.o",
-      "arch/X86/X86Mapping.c.o",
-      "arch/X86/X86Disassembler.c.o",
-      "arch/X86/X86DisassemblerDecoder.c.o",
-      "arch/ARM/ARMInstPrinter.c.o",
-      "arch/ARM/ARMDisassembler.c.o",
-      "arch/ARM/ARMMapping.c.o",
-      "arch/AArch64/AArch64Disassembler.c.o"
+      "arch/ARM/ARMDisassembler.c.o"
     ],
     "total": 40
   },
-  "cleanup": [
-    {
-      "bytes": 333871035,
-      "removed": true
-    },
-    {
-      "bytes": 231980425,
-      "removed": true
-    }
-  ],
+  "cleanup": {
+    "bytes": 335949844,
+    "removed": true
+  },
   "publication_qualified": false,
-  "scope": "Shared register/immediate construction preserves both compatibility tag values, payload, capacity, count and scratch-slot boundaries. Public poisoned records, cursors and errors agree. Internal struct padding is not public output; struct layout and public initializers are unchanged."
+  "scope": "Complete private-state comparison against sequential append for all 256 count bytes, all 256 poison bytes and five extreme payload pairs. ARM/Thumb/AArch64 poisoned public records, cursors and errors agree. Only the ARM decoder runtime object changes in the local four-backend Release build; no shared record layout or existing constructor changes."
 }
