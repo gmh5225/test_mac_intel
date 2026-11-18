@@ -70,7 +70,7 @@ try:
             run(['git','apply','--index','-R',patch],'restore-'+key,s)
         assert not sp.check_output(['git','status','--porcelain'],cwd=s,text=True)
     binaries['aa']=w/'aa'
-    shutil.copyfile(binaries['base'],binaries['aa'])
+    shutil.copy2(binaries['base'],binaries['aa'])
     payloads={k:v.read_bytes()for k,v in binaries.items()}
     maximum=max(map(len,payloads.values()))
     image=w/'same-image'

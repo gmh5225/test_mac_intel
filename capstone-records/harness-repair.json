@@ -1,0 +1,19 @@
+{
+  "failed_run": {
+    "id": 44289104193,
+    "head_sha": "bb00ccdfbc9134f451d2e350b1729edac86dfaed",
+    "status": "completed",
+    "conclusion": "failure",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44289104193",
+    "run_attempt": 1
+  },
+  "reason": "A/A image copied with copyfile lost executable mode; the first original-image A/A subprocess failed before any complete timing panel or PMU record.",
+  "fix": "Use copy2 for the identical executable, matching existing native workflows.",
+  "source_changed": false,
+  "consumer_changed": false,
+  "cleanup": {
+    "bytes": 142513949,
+    "removed": true
+  },
+  "local_reproduction": "Copying an owned executable with copyfile fails to execute; copy2 preserves its mode and executes successfully. An initial attempt using /bin/echo hit macOS protected file flags during copystat, so the reproduction uses an ordinary owned executable like the CI binary."
+}
