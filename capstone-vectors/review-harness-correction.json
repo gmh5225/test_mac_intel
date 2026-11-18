@@ -1,0 +1,9 @@
+{
+  "failure": "Native collection completed, but local reviewer retained R1416-specific assertion that exactly five text symbols moved.",
+  "cause": "R1428 evaluates the distinct R1424 terminal-miss source, whose ordinary decoder text changes by 80/16 bytes on Clang14/18. The original exact-five layout assertion is inapplicable.",
+  "correction": "Retain all observed text/read-only/writable symbol movements. Keep original changed-object, source hash, fallback-owner and original-constant-byte proofs, all timings, all A/A flags and the unchanged performance gates.",
+  "original_reviewer": "review-timing-before-layout-correction.py",
+  "observations_removed": 0,
+  "performance_gate_changed": false,
+  "publication_qualified": false
+}
