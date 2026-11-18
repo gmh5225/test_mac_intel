@@ -1,0 +1,4223 @@
+{
+  "inputs": {
+    "neverd": "abe37f9dcd7edbb83de615c9d7d66620548d4e94",
+    "capstone": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "variants": {
+      "existing-plan": {
+        "source": "round1446-vex32-archive-order",
+        "patch": "existing-plan.patch",
+        "patch_sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
+        "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
+        "changed": [
+          "X86OutputIterator.c.o"
+        ],
+        "added": [
+          "X86Vex32Output.c.o"
+        ]
+      },
+      "register-pairs": {
+        "source": "round1449-vex32-register-pairs",
+        "patch": "register-pairs.patch",
+        "patch_sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
+        "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
+        "changed": [
+          "X86OutputIterator.c.o"
+        ],
+        "added": [
+          "X86Vex32Output.c.o"
+        ]
+      }
+    },
+    "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
+    "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
+    "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
+    "scope": "Freeze the latest reviewed NeverD dev head for all three builds. Use latest LLVM main source with prebuilts disabled. Measure both the corrected existing-plan selector and the separate register-pair extension against the same published Capstone baseline and 96 predeclared product observations.",
+    "qualification_pending": [
+      "complete native/mixed outcomes",
+      "portable builds",
+      "pair compiler costs and semantics",
+      "actual product outcomes"
+    ],
+    "validation_entry": {
+      "existing_plan_profiles": {
+        "id": 44226294340,
+        "head_sha": "442e1d583a499c20a7db5528a9033390a6e00a89",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44226294340",
+        "run_attempt": 1
+      },
+      "corrected_archive_order": {
+        "id": 44225231899,
+        "head_sha": "479636501a7cd09038ad13e9738e4e80885feaab",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44225231899",
+        "run_attempt": 1
+      },
+      "local_pair_source": {
+        "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+        "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
+        "sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
+        "comparison_source": {
+          "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+          "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
+          "sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
+          "runtime_sources_identical_to": {
+            "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+            "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+            "tree": "f8950dad443feefc5cf9a5253613b54f5d93b4ff",
+            "sha256": "84e90f46f73fda452e281e55ae6ecb868bf264910f963e6e77fc7cabb6495e46",
+            "files": [
+              "CMakeLists.txt",
+              "Makefile",
+              "arch/X86/X86GenSimpleOutput.inc",
+              "arch/X86/X86OutputIterator.c",
+              "arch/X86/X86SimpleOutput.h",
+              "arch/X86/X86Vex32Output.c",
+              "suite/synctools/x86_simple_output.cpp",
+              "xcode/Capstone.xcodeproj/project.pbxproj"
+            ]
+          },
+          "build_only_difference": [
+            "CMakeLists.txt",
+            "Makefile",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ]
+        },
+        "files": [
+          "CMakeLists.txt",
+          "Makefile",
+          "arch/X86/X86GenSimpleOutput.inc",
+          "arch/X86/X86GenVex32PairOutput.inc",
+          "arch/X86/X86OutputIterator.c",
+          "arch/X86/X86SimpleOutput.h",
+          "arch/X86/X86VectorOutput.c",
+          "arch/X86/X86VectorRegisterOutput.h",
+          "arch/X86/X86Vex32Output.c",
+          "suite/synctools/x86_simple_output.cpp",
+          "suite/synctools/x86_vector_output.cpp",
+          "tests/unit/x86_simple_output.c",
+          "xcode/Capstone.xcodeproj/project.pbxproj"
+        ]
+      },
+      "source_semantics_verified": true,
+      "independent_experiment": true,
+      "publication_qualified": false
+    },
+    "timing_protocol": {
+      "cycles": 32,
+      "calibration_cpu_ms": 100,
+      "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
+      "consumer_unchanged": true,
+      "publication_qualified": false
+    },
+    "public_state_scope": "40,068 complete product states per variant plus independent 129,171,462 private/public records and guarded extents on the output implementations. Product build/measurement is not permission to publish and cannot erase prior losses."
+  },
+  "complete": true,
+  "run": {
+    "id": 44228403507,
+    "head_sha": "b94b64c0d464a02d540ad9a5db1f51ff686f8d2f",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44228403507",
+    "run_attempt": 1
+  },
+  "source": {
+    "neverd": "abe37f9dcd7edbb83de615c9d7d66620548d4e94",
+    "capstone": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "llvm_fork": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "llvm_source": "/home/runner/work/test_mac_intel/test_mac_intel/neverd/third_party/llvm-project"
+  },
+  "llvm_identity": {
+    "revision": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked": {}
+  },
+  "managed_source_identity": {
+    "neverd_highway": {
+      "repository": "https://github.com/NeverSight/highway.git",
+      "branch": "master",
+      "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+      "sha256": "f5149df5acb77cd9730ed8e5160f2deff0b02fe49cc45443fd396fdb5f0519d2"
+    },
+    "neverd_simdutf": {
+      "repository": "https://github.com/NeverSight/simdutf.git",
+      "branch": "master",
+      "commit": "8d82299606e675b50de8dc16fd118aae4b65bfde",
+      "sha256": "48e9c9fc33940bcc81cdaec785ce6e21ea20f7b03b7a26bff56abb41d2cf5126"
+    },
+    "neverd_simdjson": {
+      "repository": "https://github.com/NeverSight/simdjson.git",
+      "branch": "master",
+      "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+      "sha256": "e4e849bbb16878f8555501cc09bf4a6d90d4a06ccfc67a202a3c030486c3823d"
+    },
+    "neverd_tbb": {
+      "repository": "https://github.com/NeverSight/oneTBB.git",
+      "branch": "master",
+      "commit": "d26e0502ca39f888c1266cbbf1e2c2226d31e41b",
+      "sha256": "98300a443e43d047eabae27d3e30232efe7508b20d8e24a92ff2d54ef511761b"
+    },
+    "neverd_mimalloc": {
+      "repository": "https://github.com/NeverSight/mimalloc.git",
+      "branch": "main3",
+      "commit": "e8e7bc41ce904b4c83fe20e87d93f24d5286315a",
+      "sha256": "aea4126df4ada4e8f733e2a0f08642a8aabe6c2afc01886a1a9a259c18231ac3"
+    }
+  },
+  "tests": {
+    "base": [
+      "100% tests passed, 0 tests failed out of 34"
+    ],
+    "existing-plan": [
+      "100% tests passed, 0 tests failed out of 34"
+    ],
+    "register-pairs": [
+      "100% tests passed, 0 tests failed out of 34"
+    ]
+  },
+  "states": {
+    "base": "40068 15880932718584834093",
+    "existing-plan": "40068 15880932718584834093",
+    "register-pairs": "40068 15880932718584834093"
+  },
+  "rows": [
+    {
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "images",
+      "reps": 65,
+      "signature": [
+        1885260,
+        0,
+        15006354699355715141,
+        767228540
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9987887871069562,
+          "ci95": [
+            0.9966823346666045,
+            1.000204374665926
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9975088321518832,
+          "ci95": [
+            0.9960721392775653,
+            1.000996009459052
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9989361740367217,
+          "ci95": [
+            0.9958823742882051,
+            1.0018695427782986
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 65,
+      "signature": [
+        1885260,
+        0,
+        15006354699355715141,
+        767228540
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995146930102149,
+          "ci95": [
+            0.9982831629512788,
+            1.001591465168434
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9996568481638766,
+          "ci95": [
+            0.9980317930396251,
+            1.001518654755649
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9998533142849455,
+          "ci95": [
+            0.9979693140794224,
+            1.000482240571133
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 19,
+      "signature": [
+        551076,
+        0,
+        5797410445980847749,
+        232601838
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994724662177603,
+          "ci95": [
+            0.9981991773757006,
+            1.001158453395627
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0003513317943555,
+          "ci95": [
+            0.9995968753919404,
+            1.0016960633196972
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9962236947526948,
+          "ci95": [
+            0.9948859781201266,
+            0.9975631327616372
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 20,
+      "signature": [
+        580080,
+        0,
+        10026799473722689701,
+        244844040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002869336251274,
+          "ci95": [
+            0.9990441038985259,
+            1.0008287584194322
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0008277670215338,
+          "ci95": [
+            0.9987066428237292,
+            1.0019328826629486
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9959727296432219,
+          "ci95": [
+            0.9948118259125063,
+            0.996629095122722
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 16,
+      "signature": [
+        464064,
+        0,
+        13002800270437219621,
+        400317376
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0005248589668057,
+          "ci95": [
+            0.9983374503558099,
+            1.001459569660243
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9994571704242015,
+          "ci95": [
+            0.9978412784287204,
+            0.9999262657277836
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9977562161273289,
+          "ci95": [
+            0.9968426443645426,
+            0.9989324882764881
+          ]
+        }
+      }
+    },
+    {
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 17,
+      "signature": [
+        493068,
+        0,
+        12648689402617106501,
+        425337212
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002310821009348,
+          "ci95": [
+            0.9990566459294272,
+            1.0010694655159549
+          ]
+        },
+        "existing-plan": {
+          "median": 0.999788746536401,
+          "ci95": [
+            0.9988677286659657,
+            1.0004720650621235
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9971458477578721,
+          "ci95": [
+            0.9965370535272583,
+            0.9984748996429269
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "images",
+      "reps": 90,
+      "signature": [
+        2290500,
+        3150,
+        7342413970128953853,
+        163551780
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0055721443782095,
+          "ci95": [
+            0.9983047655490429,
+            1.0090836472759852
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0033525170700386,
+          "ci95": [
+            0.9986518189828133,
+            1.009228615071283
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0060468233452113,
+          "ci95": [
+            0.9994541718395479,
+            1.009858492311433
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 90,
+      "signature": [
+        2290500,
+        3150,
+        7342413970128953853,
+        163551780
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9984827048725584,
+          "ci95": [
+            0.9969952305069436,
+            1.0003583462683294
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9987074808941359,
+          "ci95": [
+            0.9961728388499381,
+            1.0008092122425294
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9985968246706189,
+          "ci95": [
+            0.9977652323360239,
+            1.0006154076674445
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 1,
+      "launch": "images",
+      "reps": 22,
+      "signature": [
+        559900,
+        770,
+        2416893203151067405,
+        47595636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997791816829957,
+          "ci95": [
+            0.997627594426952,
+            1.0025606995081584
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9994088146950346,
+          "ci95": [
+            0.9978147848961246,
+            1.0027386297497298
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0004852364721175,
+          "ci95": [
+            0.9990836858735496,
+            1.003414950123073
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 22,
+      "signature": [
+        559900,
+        770,
+        2416893203151067405,
+        47595636
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003018010972153,
+          "ci95": [
+            0.9988792510269189,
+            1.0009596182275593
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0000937263650842,
+          "ci95": [
+            0.9992441578615402,
+            1.0005613305613306
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9991514971094034,
+          "ci95": [
+            0.9985897462584042,
+            1.0006498155708634
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "images",
+      "reps": 12,
+      "signature": [
+        305400,
+        420,
+        7092444928118646261,
+        62254752
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9982593267429508,
+          "ci95": [
+            0.9954848063374071,
+            1.0007496351441092
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9990997189561062,
+          "ci95": [
+            0.9961340424182775,
+            1.0009503661862933
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9974852691675525,
+          "ci95": [
+            0.9893858097386488,
+            1.0000765013897541
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm-cp",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 13,
+      "signature": [
+        330850,
+        455,
+        9654126669519425759,
+        67442648
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9992104000308882,
+          "ci95": [
+            0.9986111596816658,
+            1.000253997977977
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9989581967440528,
+          "ci95": [
+            0.9982517841629377,
+            1.0007710867786237
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9998877075543957,
+          "ci95": [
+            0.9990411520682575,
+            1.0003265189114272
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "images",
+      "reps": 18,
+      "signature": [
+        5092308,
+        54,
+        16974803543808769549,
+        2098693566
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999553868588777,
+          "ci95": [
+            0.9984905961570689,
+            1.0009851503009
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0002360740376262,
+          "ci95": [
+            0.9992492193870448,
+            1.0008153513021558
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0001391176732848,
+          "ci95": [
+            0.9981963185464978,
+            1.0009528460956618
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 18,
+      "signature": [
+        5092308,
+        54,
+        16974803543808769549,
+        2098693566
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003870408261213,
+          "ci95": [
+            0.9988865999130008,
+            1.001056661637285
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9998324165754481,
+          "ci95": [
+            0.999102025594724,
+            1.0011234064226129
+          ]
+        },
+        "register-pairs": {
+          "median": 0.999271397515956,
+          "ci95": [
+            0.9986662886270401,
+            1.0004967137766605
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        2263248,
+        24,
+        17565747584236164613,
+        964212584
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9988732689798041,
+          "ci95": [
+            0.9978254428477704,
+            0.9999894136204359
+          ]
+        },
+        "existing-plan": {
+          "median": 1.000097714192377,
+          "ci95": [
+            0.9990242718958661,
+            1.001047336433026
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9997407499984657,
+          "ci95": [
+            0.9986663430796228,
+            1.001249483123781
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        2263248,
+        24,
+        17565747584236164613,
+        964212584
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994518907247327,
+          "ci95": [
+            0.9981960562317742,
+            1.0005172595798586
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9997433268156561,
+          "ci95": [
+            0.9991576543116442,
+            1.0005733460864452
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9995160093564641,
+          "ci95": [
+            0.9990613002573514,
+            1.0004125805325463
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "images",
+      "reps": 6,
+      "signature": [
+        1697436,
+        18,
+        4142809533973441021,
+        845084238
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991188273109145,
+          "ci95": [
+            0.9980627991611732,
+            1.001762978396444
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9989563472462106,
+          "ci95": [
+            0.9980768778652874,
+            1.0003460951812055
+          ]
+        },
+        "register-pairs": {
+          "median": 1.000095872845228,
+          "ci95": [
+            0.998375388062837,
+            1.001342609388378
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 6,
+      "signature": [
+        1697436,
+        18,
+        4142809533973441021,
+        845084238
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9992998823214005,
+          "ci95": [
+            0.9985606383826638,
+            1.0006226591760299
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9998857575981785,
+          "ci95": [
+            0.9982927331237839,
+            1.0005101351285322
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9999765825758732,
+          "ci95": [
+            0.9984777089754279,
+            1.0005454929705477
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 3,
+      "launch": "images",
+      "reps": 26,
+      "signature": [
+        7355556,
+        78,
+        12695331913943471341,
+        3031446262
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003418145823892,
+          "ci95": [
+            0.9996632584338456,
+            1.0005262431856616
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0001046450243818,
+          "ci95": [
+            0.999509673728727,
+            1.000673685929661
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9998724277461999,
+          "ci95": [
+            0.9992808544061693,
+            1.0001276218557122
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-32-0.85",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 26,
+      "signature": [
+        7355556,
+        78,
+        12695331913943471341,
+        3031446262
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996684589743241,
+          "ci95": [
+            0.9991924790439307,
+            0.9999872903069512
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9994299350751885,
+          "ci95": [
+            0.99890642045434,
+            0.999663710373651
+          ]
+        },
+        "register-pairs": {
+          "median": 0.999747706460926,
+          "ci95": [
+            0.999124940221207,
+            1.0005611443263207
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "images",
+      "reps": 17,
+      "signature": [
+        4414798,
+        59755,
+        6586553106680166621,
+        1800956336
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991970437406645,
+          "ci95": [
+            0.9979644652366496,
+            1.000786017732507
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9988228461753759,
+          "ci95": [
+            0.9976510985593072,
+            1.0007307380454258
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9994313161064485,
+          "ci95": [
+            0.9985081575746046,
+            1.0013470768432502
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 17,
+      "signature": [
+        4414798,
+        59755,
+        6586553106680166621,
+        1800956336
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007584510133334,
+          "ci95": [
+            0.9999602813794969,
+            1.0011124243899048
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0003357962408344,
+          "ci95": [
+            0.9985949638799916,
+            1.0007429161202825
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0004512123312699,
+          "ci95": [
+            0.999644084666018,
+            1.0015804547866831
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        2077552,
+        28120,
+        18181879010259129125,
+        879557840
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000598658473042,
+          "ci95": [
+            0.9981375758037097,
+            1.002856296023192
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9987387907713188,
+          "ci95": [
+            0.9979139346129893,
+            1.0001258322158884
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9995738387401265,
+          "ci95": [
+            0.9986851329662263,
+            1.0023134924056483
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        2077552,
+        28120,
+        18181879010259129125,
+        879557840
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996903899271012,
+          "ci95": [
+            0.9992081780990183,
+            1.0007234255004496
+          ]
+        },
+        "existing-plan": {
+          "median": 1.000005122524929,
+          "ci95": [
+            0.9988274174450456,
+            1.0009699049622753
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9987365569825164,
+          "ci95": [
+            0.9974139397298796,
+            1.0004822090249226
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        1298470,
+        17575,
+        18199114599289802973,
+        713942810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996976553799275,
+          "ci95": [
+            0.9983541431053404,
+            1.0011509865209114
+          ]
+        },
+        "existing-plan": {
+          "median": 0.99982320671379,
+          "ci95": [
+            0.9979081515928148,
+            1.0009316249754603
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9987099148247569,
+          "ci95": [
+            0.9971143044525217,
+            1.0004735157729736
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        1298470,
+        17575,
+        18199114599289802973,
+        713942810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996691721885704,
+          "ci95": [
+            0.9990695674503992,
+            1.0017150610583447
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0005789238943943,
+          "ci95": [
+            0.9995736212047203,
+            1.001469290933584
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9995281480600267,
+          "ci95": [
+            0.9981307142936084,
+            1.0006553718829214
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 3,
+      "launch": "images",
+      "reps": 22,
+      "signature": [
+        5713268,
+        77330,
+        7926656586590158629,
+        2330649376
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000387383733676,
+          "ci95": [
+            0.9990681750365139,
+            1.0013712467354383
+          ]
+        },
+        "existing-plan": {
+          "median": 1.000413746112179,
+          "ci95": [
+            0.9996940194444115,
+            1.001056966297426
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0008847755547499,
+          "ci95": [
+            1.0000104837187846,
+            1.001325280377993
+          ]
+        }
+      }
+    },
+    {
+      "case": "putty-64-0.85",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 22,
+      "signature": [
+        5713268,
+        77330,
+        7926656586590158629,
+        2330649376
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999189002492818,
+          "ci95": [
+            0.9996444128366966,
+            1.0005987801131337
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0000627779547056,
+          "ci95": [
+            0.9993956669053439,
+            1.000293388797787
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0001963748516958,
+          "ci95": [
+            0.9994138277365974,
+            1.0004889829180978
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 76,
+      "signature": [
+        1711748,
+        0,
+        16692912633307487333,
+        744314284
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995184993125648,
+          "ci95": [
+            0.9988709113522126,
+            1.000258769221856
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9984678283065842,
+          "ci95": [
+            0.9970937499699961,
+            1.0001837152653559
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9991511085101834,
+          "ci95": [
+            0.9976052876820578,
+            1.001431083830477
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 76,
+      "signature": [
+        1711748,
+        0,
+        16692912633307487333,
+        744314284
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004394841736932,
+          "ci95": [
+            0.9997932242788043,
+            1.0012801892154104
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9983308040642607,
+          "ci95": [
+            0.9975208977441887,
+            0.999001730675366
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9987235479693222,
+          "ci95": [
+            0.9982324348210341,
+            0.9995177845645136
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 54,
+      "signature": [
+        1216242,
+        0,
+        12336137060376721477,
+        662037462
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994073220481723,
+          "ci95": [
+            0.9981593667779523,
+            1.000370386750105
+          ]
+        },
+        "existing-plan": {
+          "median": 0.998717004981952,
+          "ci95": [
+            0.9967219316813666,
+            0.9992053813341868
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9985931335476945,
+          "ci95": [
+            0.9972059804143084,
+            1.0007673164730102
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 54,
+      "signature": [
+        1216242,
+        0,
+        12336137060376721477,
+        662037462
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000828041764822,
+          "ci95": [
+            0.9989935520143132,
+            1.0012235285667987
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0003805118982332,
+          "ci95": [
+            0.9994298554937722,
+            1.0009551847817846
+          ]
+        },
+        "register-pairs": {
+          "median": 1.000167868826527,
+          "ci95": [
+            0.9980212090869944,
+            1.0010861280608043
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 3,
+      "launch": "images",
+      "reps": 218,
+      "signature": [
+        4910014,
+        0,
+        14212760635639579141,
+        2060525754
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9990341749323897,
+          "ci95": [
+            0.9979146186934262,
+            1.000230352552919
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9994073652566925,
+          "ci95": [
+            0.9973504552123695,
+            1.0012783053323593
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9993116672013871,
+          "ci95": [
+            0.9977835010427232,
+            1.000637291224812
+          ]
+        }
+      }
+    },
+    {
+      "case": "amd64-ls",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 212,
+      "signature": [
+        4774876,
+        0,
+        736720464097402341,
+        2003814036
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998650434882869,
+          "ci95": [
+            0.9991395129362528,
+            1.0006039355489365
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9995662875683671,
+          "ci95": [
+            0.9990188785403524,
+            1.0007688064133713
+          ]
+        },
+        "register-pairs": {
+          "median": 1.000023504111723,
+          "ci95": [
+            0.9992518257033085,
+            1.0005473067212796
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "reps": 79,
+      "signature": [
+        1893867,
+        0,
+        11922089456768435235,
+        1021546235
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9964841817034202,
+          "ci95": [
+            0.9921365858958074,
+            0.9998234063805482
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0000249959383098,
+          "ci95": [
+            0.9983287599027167,
+            1.0034606873679366
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9986346206163349,
+          "ci95": [
+            0.994856834333137,
+            1.0045416185484588
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 81,
+      "signature": [
+        1941813,
+        0,
+        5106875434381339571,
+        1047408165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001107827417406,
+          "ci95": [
+            0.9995417048579285,
+            1.0012504465880672
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0009483615961496,
+          "ci95": [
+            0.9997022488333568,
+            1.0029188643534463
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0004317935178049,
+          "ci95": [
+            0.998957646982577,
+            1.0013764126318356
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "images",
+      "reps": 20,
+      "signature": [
+        479460,
+        0,
+        3249027632695025029,
+        265119500
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995168609901162,
+          "ci95": [
+            0.9981911710389315,
+            1.0015361489185621
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9983473715798736,
+          "ci95": [
+            0.9962842016467508,
+            0.9990087677730828
+          ]
+        },
+        "register-pairs": {
+          "median": 0.997888403941015,
+          "ci95": [
+            0.9971313826049129,
+            1.00004451630052
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 20,
+      "signature": [
+        479460,
+        0,
+        3249027632695025029,
+        265119500
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003086020921237,
+          "ci95": [
+            0.998864827686083,
+            1.001150939760542
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9975712725028639,
+          "ci95": [
+            0.9956841010355053,
+            0.998417224001543
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9975815738546443,
+          "ci95": [
+            0.9960224400383393,
+            0.9984282305131696
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "reps": 14,
+      "signature": [
+        335622,
+        0,
+        11317068167998694005,
+        284936190
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.001391226097001,
+          "ci95": [
+            0.9987217984605503,
+            1.004006329708087
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0002015036497447,
+          "ci95": [
+            0.9978181361545827,
+            1.0028103308418503
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9989635847250993,
+          "ci95": [
+            0.9975796881180904,
+            0.9997962733697952
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 14,
+      "signature": [
+        335622,
+        0,
+        11317068167998694005,
+        284936190
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9996454210059289,
+          "ci95": [
+            0.9985786210020462,
+            1.00102732896696
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9993590094540532,
+          "ci95": [
+            0.9983024104729817,
+            1.0005646585954269
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9964194859957998,
+          "ci95": [
+            0.9952495171640396,
+            0.997195162566088
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-sort",
+      "mode": 0,
+      "launch": "images",
+      "reps": 101,
+      "signature": [
+        1862945,
+        0,
+        12216621217837701139,
+        1028901443
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0011512756492245,
+          "ci95": [
+            0.9968396688329031,
+            1.0060328479700131
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0003053300860132,
+          "ci95": [
+            0.9972230516598966,
+            1.0045645315959488
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0010266516540396,
+          "ci95": [
+            0.9947695488805389,
+            1.0060406219176787
+          ]
+        }
+      }
+    },
+    {
+      "case": "arm64-sort",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 100,
+      "signature": [
+        1844500,
+        0,
+        12274099935381861893,
+        1018714300
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004585921760243,
+          "ci95": [
+            0.9994119217841009,
+            1.0022845732078793
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9995481319139525,
+          "ci95": [
+            0.9980782414223262,
+            1.000354362597309
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9994281561725114,
+          "ci95": [
+            0.9986920619951387,
+            1.0010436111396013
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        4304555,
+        3555,
+        15317671955829873631,
+        2582671625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000800041026081,
+          "ci95": [
+            0.9983223241069505,
+            1.001038415064313
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9989153855971575,
+          "ci95": [
+            0.9971464103734783,
+            1.0001508212215513
+          ]
+        },
+        "register-pairs": {
+          "median": 0.999694211437685,
+          "ci95": [
+            0.9977474507442854,
+            1.0008137840960467
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        4304555,
+        3555,
+        15317671955829873631,
+        2582671625
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000429816631223,
+          "ci95": [
+            0.9994159432516486,
+            1.0010527802628517
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0009896357079193,
+          "ci95": [
+            0.9987775796076231,
+            1.0020399251166165
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0016520930449029,
+          "ci95": [
+            1.0002676045752734,
+            1.0024628204039425
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 3,
+      "signature": [
+        2582733,
+        2133,
+        13350051667106787423,
+        1592234040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995879421961673,
+          "ci95": [
+            0.9982935872265782,
+            1.0015286590337102
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9972772309256062,
+          "ci95": [
+            0.9950500687445507,
+            0.9995596154081903
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9979992991041566,
+          "ci95": [
+            0.9963085668527782,
+            0.9990375785830331
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 3,
+      "signature": [
+        2582733,
+        2133,
+        13350051667106787423,
+        1592234040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997276580780152,
+          "ci95": [
+            0.9990920007287458,
+            1.0005296890725144
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9981456751626447,
+          "ci95": [
+            0.997348800397021,
+            0.9989223820452664
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9974336319195108,
+          "ci95": [
+            0.9969128489568373,
+            0.998932942528924
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1362754360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994169667514472,
+          "ci95": [
+            0.9976347371108851,
+            1.0012978395659493
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9982939249475746,
+          "ci95": [
+            0.996691136125188,
+            1.0000778046672822
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9994724768991397,
+          "ci95": [
+            0.9980884810981898,
+            1.0010083660387425
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1721822,
+        1422,
+        14641755784462448293,
+        1362754360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994926284672023,
+          "ci95": [
+            0.9983089691386868,
+            1.0019237366299039
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0002417924568785,
+          "ci95": [
+            0.9973158524161757,
+            1.0014706441666146
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0002779875113947,
+          "ci95": [
+            0.9985560240455319,
+            1.0015119595622572
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 3,
+      "launch": "images",
+      "reps": 7,
+      "signature": [
+        6026377,
+        4977,
+        10215425446401738079,
+        3615740275
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9994731591827193,
+          "ci95": [
+            0.9989800842660344,
+            1.0002878396845993
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9987229841576287,
+          "ci95": [
+            0.9980375418248899,
+            0.9993714597093948
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9995377551356734,
+          "ci95": [
+            0.9982680543010598,
+            1.0004783343185681
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-amd64",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 7,
+      "signature": [
+        6026377,
+        4977,
+        10215425446401738079,
+        3615740275
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000068899795866,
+          "ci95": [
+            0.9995998425813356,
+            1.0007857091943846
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9991313488634673,
+          "ci95": [
+            0.9986774400494824,
+            1.0000196612368883
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9998479157915465,
+          "ci95": [
+            0.9991699773603457,
+            1.0005354893894527
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 49,
+      "signature": [
+        4630647,
+        0,
+        17719176078726474773,
+        2123172254
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0011981216948587,
+          "ci95": [
+            0.9997736683727271,
+            1.0020076936044997
+          ]
+        },
+        "existing-plan": {
+          "median": 1.000772252287578,
+          "ci95": [
+            0.9996812813446139,
+            1.0033100573641114
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0012094437710666,
+          "ci95": [
+            0.9981221300471205,
+            1.0024509494402556
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 48,
+      "signature": [
+        4536144,
+        0,
+        1758934608141460773,
+        2079842208
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0000364233783876,
+          "ci95": [
+            0.9991356867645528,
+            1.0011633182067263
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0004942926862115,
+          "ci95": [
+            0.9992711210702616,
+            1.0016510864225725
+          ]
+        },
+        "register-pairs": {
+          "median": 1.000622848760608,
+          "ci95": [
+            0.9987823927530599,
+            1.0014872434181332
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 19,
+      "signature": [
+        1795557,
+        0,
+        17641028928571029845,
+        854896165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998062844360824,
+          "ci95": [
+            0.9977143594166749,
+            1.000792347590377
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0270925430143223,
+          "ci95": [
+            1.0262054548640127,
+            1.0300130935004723
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0327306425145806,
+          "ci95": [
+            1.0310147897640967,
+            1.0337350309927413
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 19,
+      "signature": [
+        1795557,
+        0,
+        17641028928571029845,
+        854896165
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0007989635576868,
+          "ci95": [
+            1.0003607843137254,
+            1.0015082411655487
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0286652235694893,
+          "ci95": [
+            1.0273729755595036,
+            1.0293344395478887
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0338059657761773,
+          "ci95": [
+            1.0328623714515102,
+            1.034232004853471
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 13,
+      "signature": [
+        1228539,
+        0,
+        14839374833353037205,
+        710624473
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998380106100373,
+          "ci95": [
+            0.9992502061932969,
+            1.001089694885432
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0306344859333556,
+          "ci95": [
+            1.0296607930722323,
+            1.0324881328318511
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0355422842644857,
+          "ci95": [
+            1.0339615609584396,
+            1.0364838330302513
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 13,
+      "signature": [
+        1228539,
+        0,
+        14839374833353037205,
+        710624473
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004388146994851,
+          "ci95": [
+            0.9981478892927034,
+            1.0016777690635268
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0300817455329256,
+          "ci95": [
+            1.028184645333042,
+            1.0323686781700152
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0351232866209028,
+          "ci95": [
+            1.0335613046976542,
+            1.0373185387464714
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 66,
+      "signature": [
+        6237198,
+        0,
+        2223855875749245413,
+        2859783036
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0005540101624244,
+          "ci95": [
+            0.9994288682106399,
+            1.0016458706082079
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9997329721807906,
+          "ci95": [
+            0.9992568630879525,
+            1.000714554548876
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0001250364362628,
+          "ci95": [
+            0.9995771066595307,
+            1.0008309274880038
+          ]
+        }
+      }
+    },
+    {
+      "case": "libjpeg62-turbo-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 68,
+      "signature": [
+        6426204,
+        0,
+        417680769749717157,
+        2946443128
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9993747275241189,
+          "ci95": [
+            0.9988777305921157,
+            1.0004664471947775
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9992388215100356,
+          "ci95": [
+            0.9987933269398982,
+            1.0002715424017117
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9988089216722489,
+          "ci95": [
+            0.9982879664740313,
+            0.9996536115037409
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 5,
+      "signature": [
+        4356560,
+        10650,
+        4613362280357764937,
+        1994508150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997991522668328,
+          "ci95": [
+            0.9981402340342658,
+            1.0006691421268847
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9995689879071596,
+          "ci95": [
+            0.9979099466789546,
+            1.0006718912637613
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9999835463341831,
+          "ci95": [
+            0.9977610343143442,
+            1.0018731128628444
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 5,
+      "signature": [
+        4356560,
+        10650,
+        4613362280357764937,
+        1994508150
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004980793200522,
+          "ci95": [
+            0.9991163186489495,
+            1.0018075021551367
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0004706904608551,
+          "ci95": [
+            0.9993256283170314,
+            1.0013081554460865
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0007335467471021,
+          "ci95": [
+            0.9995347920794246,
+            1.0018593256116635
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 3,
+      "signature": [
+        2613936,
+        6390,
+        14796607081077732657,
+        1234253346
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999803584861624,
+          "ci95": [
+            0.9983618914569181,
+            1.000496974359717
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9991712705220119,
+          "ci95": [
+            0.9974572525197708,
+            1.0000438808196936
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9993443215591609,
+          "ci95": [
+            0.996753861094464,
+            1.001245728045046
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 3,
+      "signature": [
+        2613936,
+        6390,
+        14796607081077732657,
+        1234253346
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995326047700575,
+          "ci95": [
+            0.9982169143417917,
+            1.0005965880427965
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0014659113386082,
+          "ci95": [
+            0.9997479011319612,
+            1.0021841383022847
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9991615726163092,
+          "ci95": [
+            0.9981477832512315,
+            1.0002237254231043
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        951463788
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9984025699648782,
+          "ci95": [
+            0.9977431045333217,
+            0.9999870338154213
+          ]
+        },
+        "existing-plan": {
+          "median": 1.000219105813652,
+          "ci95": [
+            0.9989957910546814,
+            1.0014096124220457
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9997106411605743,
+          "ci95": [
+            0.9984067721256744,
+            1.0011671609680468
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 2,
+      "signature": [
+        1742624,
+        4260,
+        11448850127589711389,
+        951463788
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0001658968461744,
+          "ci95": [
+            0.9989279098304011,
+            1.0014197987892512
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0010158979439248,
+          "ci95": [
+            0.9991233171595476,
+            1.002548383730998
+          ]
+        },
+        "register-pairs": {
+          "median": 1.000032818499628,
+          "ci95": [
+            0.9987553030630112,
+            1.0016185205603776
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 8,
+      "signature": [
+        6970496,
+        17040,
+        2971414651265800773,
+        3191213040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.00008269828795,
+          "ci95": [
+            0.9993140130948892,
+            1.0005817569058557
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0003487386024088,
+          "ci95": [
+            0.9996869317505468,
+            1.0017633945344788
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0000800667994254,
+          "ci95": [
+            0.9993396111518325,
+            1.001233787728326
+          ]
+        }
+      }
+    },
+    {
+      "case": "libssl3t64-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 8,
+      "signature": [
+        6970496,
+        17040,
+        2971414651265800773,
+        3191213040
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0008193261945997,
+          "ci95": [
+            0.9994225908971865,
+            1.002033884719815
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0007241526055886,
+          "ci95": [
+            0.9991692731139747,
+            1.0013562275543784
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0011321303865863,
+          "ci95": [
+            1.0002257314962133,
+            1.0018571413008974
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 24,
+      "signature": [
+        4812000,
+        0,
+        7741572349746978469,
+        1961032704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9993873452378929,
+          "ci95": [
+            0.9981043046647728,
+            1.0012925100394559
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0000876911536674,
+          "ci95": [
+            0.9973962993164265,
+            1.001789448389752
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9993748932612374,
+          "ci95": [
+            0.9975056007631987,
+            1.0012748494052395
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 24,
+      "signature": [
+        4812000,
+        0,
+        7741572349746978469,
+        1961032704
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999860515119583,
+          "ci95": [
+            0.9986386551104656,
+            1.0007200884390308
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9992856382833442,
+          "ci95": [
+            0.9983808126296615,
+            1.0014529271910753
+          ]
+        },
+        "register-pairs": {
+          "median": 1.000113825755138,
+          "ci95": [
+            0.9992611822096724,
+            1.0012182864800658
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 11,
+      "signature": [
+        2205500,
+        0,
+        15163282356743802865,
+        939088359
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003272248868837,
+          "ci95": [
+            0.9989402426094636,
+            1.001095667729432
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9984702739145555,
+          "ci95": [
+            0.997421916040838,
+            0.99932437198774
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9992111492894289,
+          "ci95": [
+            0.9981692808462477,
+            0.9999231106569146
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 11,
+      "signature": [
+        2205500,
+        0,
+        15163282356743802865,
+        939088359
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004987819410716,
+          "ci95": [
+            0.9986860679380074,
+            1.0011492943233777
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9984366961127097,
+          "ci95": [
+            0.997250108267222,
+            1.00021044500057
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9979649450967123,
+          "ci95": [
+            0.9973195089338941,
+            0.9995667414424012
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 7,
+      "signature": [
+        1403500,
+        0,
+        4299453880173547825,
+        686304234
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999880091172907,
+          "ci95": [
+            0.998510703666481,
+            1.0020236352227567
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9976529342792155,
+          "ci95": [
+            0.996619985842341,
+            0.9999843918411069
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9994533795201765,
+          "ci95": [
+            0.9970284951673948,
+            1.0009784671207664
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 7,
+      "signature": [
+        1403500,
+        0,
+        4299453880173547825,
+        686304234
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9991377194837332,
+          "ci95": [
+            0.9971334887479353,
+            1.000814706496762
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9985451981953344,
+          "ci95": [
+            0.9972156030513654,
+            0.9993282089738783
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9985065747733392,
+          "ci95": [
+            0.9973342488254944,
+            0.9992997997946079
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 35,
+      "signature": [
+        7017500,
+        0,
+        14025483590632773233,
+        2859839360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003364792424028,
+          "ci95": [
+            0.9989666456168551,
+            1.0016031285301936
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9996787150565234,
+          "ci95": [
+            0.9988836879748964,
+            1.0003669516187519
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0002789515234716,
+          "ci95": [
+            0.9988244084161908,
+            1.0013995289645052
+          ]
+        }
+      }
+    },
+    {
+      "case": "libzstd1-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 35,
+      "signature": [
+        7017500,
+        0,
+        14025483590632773233,
+        2859839360
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0002946760527789,
+          "ci95": [
+            0.998833948835993,
+            1.0011339047936085
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9999999979649012,
+          "ci95": [
+            0.9990977694566278,
+            1.001090531699532
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0007669337581908,
+          "ci95": [
+            0.999672236905084,
+            1.001328015119057
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "images",
+      "reps": 474,
+      "signature": [
+        2543010,
+        0,
+        15749983166508271951,
+        1364681550
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9981988588134125,
+          "ci95": [
+            0.9965723485825343,
+            1.0007081034831926
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9972608561939101,
+          "ci95": [
+            0.9933452809657186,
+            1.0022457822489907
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9989047719190896,
+          "ci95": [
+            0.9963831948597449,
+            1.001393965907153
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 588,
+      "signature": [
+        3154620,
+        0,
+        8029493348346699009,
+        1692896100
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000249266552998,
+          "ci95": [
+            0.9988588196935115,
+            1.0010677076718615
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9997233388445406,
+          "ci95": [
+            0.9987351835790691,
+            1.001555927635449
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9997618254493151,
+          "ci95": [
+            0.9989080676998026,
+            1.0008101915422924
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 2,
+      "launch": "images",
+      "reps": 352,
+      "signature": [
+        1888480,
+        0,
+        5453177342168167621,
+        1120349472
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0017958215864233,
+          "ci95": [
+            0.9960139643576612,
+            1.0090937747766935
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0024034837216647,
+          "ci95": [
+            0.9959119547279291,
+            1.0080750164822434
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9983089062159192,
+          "ci95": [
+            0.9942456562369186,
+            1.0053311352530956
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar32",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 369,
+      "signature": [
+        1979685,
+        0,
+        15742505096088250910,
+        1174457259
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9995840586906612,
+          "ci95": [
+            0.998811847383217,
+            1.0005066779008733
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9996496468019741,
+          "ci95": [
+            0.9969901754784485,
+            1.0008930348966185
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9984784580123272,
+          "ci95": [
+            0.9978157123541773,
+            0.9995785828995775
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 568,
+      "signature": [
+        1962440,
+        0,
+        16187935432736538861,
+        1048483128
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000345306566072,
+          "ci95": [
+            0.9991965267563752,
+            1.0016379185389186
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9988330671574541,
+          "ci95": [
+            0.9976762952473421,
+            1.0000581907054895
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9992853640428498,
+          "ci95": [
+            0.9979390570460301,
+            1.000953531706749
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 610,
+      "signature": [
+        2107550,
+        0,
+        4361952000728124895,
+        1126011810
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999227888047157,
+          "ci95": [
+            0.9989798158719256,
+            1.0005877782657162
+          ]
+        },
+        "existing-plan": {
+          "median": 0.999024761979255,
+          "ci95": [
+            0.9982826350058485,
+            1.0000506757320102
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9987776816473659,
+          "ci95": [
+            0.9969400814486906,
+            1.0001718875161356
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 383,
+      "signature": [
+        1323265,
+        0,
+        6747746214393902180,
+        937066567
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.00085749390337,
+          "ci95": [
+            0.9987739847473156,
+            1.0030763013564106
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9993999713715037,
+          "ci95": [
+            0.9969305756817284,
+            1.0013549907438453
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9965379777626479,
+          "ci95": [
+            0.994678803676454,
+            0.9986935177364865
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 407,
+      "signature": [
+        1406185,
+        0,
+        17490715116474670476,
+        995786143
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9993797787229525,
+          "ci95": [
+            0.9983415417986674,
+            1.0005322159951422
+          ]
+        },
+        "existing-plan": {
+          "median": 0.998130139035339,
+          "ci95": [
+            0.9961380706993983,
+            0.9995104854221286
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9979427032218324,
+          "ci95": [
+            0.9973004091147675,
+            0.9986492431424305
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 0,
+      "launch": "images",
+      "reps": 952,
+      "signature": [
+        5482568,
+        0,
+        251165688095703277,
+        3387718656
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9981644672300344,
+          "ci95": [
+            0.9956655862143081,
+            1.0005194529216275
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0012220326836414,
+          "ci95": [
+            0.9999027696501367,
+            1.003516881028939
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0000471116836847,
+          "ci95": [
+            0.9980138557545541,
+            1.0018220079495743
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 962,
+      "signature": [
+        5540158,
+        0,
+        625725465912742631,
+        3423303936
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0010549063529846,
+          "ci95": [
+            0.9997323247017748,
+            1.0023899100440186
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0009245977525003,
+          "ci95": [
+            1.000064132496459,
+            1.0023276827796734
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0009506346359023,
+          "ci95": [
+            0.9992162865527147,
+            1.0017153159040124
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "launch": "images",
+      "reps": 433,
+      "signature": [
+        2493647,
+        0,
+        5705753602131740172,
+        1591308774
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.000540346583965,
+          "ci95": [
+            0.9996025465410903,
+            1.0011048158640226
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9952595098768313,
+          "ci95": [
+            0.9941876297051081,
+            0.9970579929190053
+          ]
+        },
+        "register-pairs": {
+          "median": 0.99616473668096,
+          "ci95": [
+            0.995087157585046,
+            0.9969627028404746
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 467,
+      "signature": [
+        2689453,
+        0,
+        16104052216922037830,
+        1716261426
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998285941985706,
+          "ci95": [
+            0.9988265069931768,
+            1.0011821207532012
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9955455666173976,
+          "ci95": [
+            0.9945042333143146,
+            0.997184692862483
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9958419769482535,
+          "ci95": [
+            0.994551255039932,
+            0.9970793100492897
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "launch": "images",
+      "reps": 302,
+      "signature": [
+        1739218,
+        0,
+        12859104286426916083,
+        1431467014
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.998140153253201,
+          "ci95": [
+            0.9955606806558004,
+            1.0013761260696876
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9965680306629041,
+          "ci95": [
+            0.9956190874093527,
+            0.998531791214718
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9955247564462888,
+          "ci95": [
+            0.9924913402822519,
+            0.9976754357060265
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 293,
+      "signature": [
+        1687387,
+        0,
+        7342178892463443352,
+        1388807401
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004104491642067,
+          "ci95": [
+            0.9975680781728752,
+            1.0016927059201464
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9952679358045206,
+          "ci95": [
+            0.9944693775564721,
+            0.9972666606046064
+          ]
+        },
+        "register-pairs": {
+          "median": 0.99504574098689,
+          "ci95": [
+            0.9936944348936588,
+            0.996189017996286
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "launch": "images",
+      "reps": 294,
+      "signature": [
+        2282616,
+        0,
+        3907134353497331109,
+        1972517442
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999569154184338,
+          "ci95": [
+            0.9967877898630241,
+            1.0012905525408522
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0006691765318756,
+          "ci95": [
+            0.9985261606484893,
+            1.001733985835431
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0001568503437994,
+          "ci95": [
+            0.9983742083648164,
+            1.0022908350472604
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "reps": 299,
+      "signature": [
+        2321436,
+        0,
+        6536122304330463905,
+        2006063657
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9999848834724231,
+          "ci95": [
+            0.9993954644756131,
+            1.0009324517425948
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0008913804131105,
+          "ci95": [
+            0.9998542176651745,
+            1.0016021540834061
+          ]
+        },
+        "register-pairs": {
+          "median": 1.0004521675406635,
+          "ci95": [
+            0.9990671528778939,
+            1.0009385158849318
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "launch": "images",
+      "reps": 151,
+      "signature": [
+        1172364,
+        0,
+        5121689491487475105,
+        1037064527
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0003591805400809,
+          "ci95": [
+            0.9992699149265275,
+            1.0022714048221637
+          ]
+        },
+        "existing-plan": {
+          "median": 1.3651006196357018,
+          "ci95": [
+            1.3629217273954115,
+            1.3662736873636936
+          ]
+        },
+        "register-pairs": {
+          "median": 1.4535527060556848,
+          "ci95": [
+            1.4510193084867535,
+            1.4549899857454756
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 1,
+      "launch": "same-file-fixed",
+      "reps": 152,
+      "signature": [
+        1180128,
+        0,
+        12081676311433557285,
+        1043932504
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.999462601836687,
+          "ci95": [
+            0.9983541748244575,
+            1.0003746882716429
+          ]
+        },
+        "existing-plan": {
+          "median": 1.36408868712437,
+          "ci95": [
+            1.3629329848319125,
+            1.36583154979227
+          ]
+        },
+        "register-pairs": {
+          "median": 1.4559477694860115,
+          "ci95": [
+            1.455117153653068,
+            1.4566407091078735
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "launch": "images",
+      "reps": 99,
+      "signature": [
+        768636,
+        0,
+        3543255623836137633,
+        863663328
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9997894619970578,
+          "ci95": [
+            0.9978958224666888,
+            1.0018985238976696
+          ]
+        },
+        "existing-plan": {
+          "median": 1.3727163043289388,
+          "ci95": [
+            1.366794773251345,
+            1.3738965128991727
+          ]
+        },
+        "register-pairs": {
+          "median": 1.4590805520262582,
+          "ci95": [
+            1.4563387313989078,
+            1.460746459729917
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "reps": 102,
+      "signature": [
+        791928,
+        0,
+        2050605979499750821,
+        889834944
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 1.0004619161683292,
+          "ci95": [
+            0.999807666478362,
+            1.0011734928670042
+          ]
+        },
+        "existing-plan": {
+          "median": 1.3758646946578657,
+          "ci95": [
+            1.3724058347651142,
+            1.3781744716448063
+          ]
+        },
+        "register-pairs": {
+          "median": 1.4630724854467902,
+          "ci95": [
+            1.460479741716342,
+            1.4644094573953463
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 3,
+      "launch": "images",
+      "reps": 325,
+      "signature": [
+        2523300,
+        0,
+        11578490678519838497,
+        2180503975
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9985694563898575,
+          "ci95": [
+            0.9971900864384623,
+            1.0011107224305857
+          ]
+        },
+        "existing-plan": {
+          "median": 1.0000552247789143,
+          "ci95": [
+            0.9977508015460965,
+            1.0015175349382175
+          ]
+        },
+        "register-pairs": {
+          "median": 0.999781276177686,
+          "ci95": [
+            0.9974518941151218,
+            1.0014501297612908
+          ]
+        }
+      }
+    },
+    {
+      "case": "jpeg-avx2-i386",
+      "mode": 3,
+      "launch": "same-file-fixed",
+      "reps": 355,
+      "signature": [
+        2756220,
+        0,
+        11003715862608722081,
+        2381781265
+      ],
+      "comparisons": {
+        "base-copy": {
+          "median": 0.9998949633397745,
+          "ci95": [
+            0.9981852839679648,
+            1.001261426474625
+          ]
+        },
+        "existing-plan": {
+          "median": 0.9996444946085379,
+          "ci95": [
+            0.9981182046278227,
+            1.0009052523591317
+          ]
+        },
+        "register-pairs": {
+          "median": 0.9992134530326355,
+          "ci95": [
+            0.9977605459075031,
+            1.0007966400907533
+          ]
+        }
+      }
+    }
+  ],
+  "losses": {
+    "existing-plan": [],
+    "register-pairs": []
+  },
+  "aa_outside_one_percent": [],
+  "cleanup": {
+    "bytes": 1502522218,
+    "removed": true
+  },
+  "raw": "product/product-existing-plan-pairs-ubuntu-24.04-clang",
+  "avx32_corpus": {
+    "provenance": {
+      "package": "libjpeg62-turbo-dev",
+      "version": "1:2.1.5-4",
+      "url": "https://deb.debian.org/debian/pool/main/libj/libjpeg-turbo/libjpeg62-turbo-dev_2.1.5-4_i386.deb",
+      "package_sha256": "7539d7d7a4fe527071f737ce4919887cde17dfc72d6b3fa9d0176b4dacb6e412",
+      "text_sha256": "4d879d6881a2ee0c2e1b48456ef0153149f788674220dfd89ec0da7c60064a1d",
+      "members": {
+        "jccolor-avx2.asm.o": {
+          "sha256": "2e8b1ae43c6d15a5f0bad04857f4db30b599c792ae128ab9fdbf36ffce3d2db5",
+          "functions": 7,
+          "section_bytes": 8384
+        },
+        "jcgray-avx2.asm.o": {
+          "sha256": "a53b3309db8314a3a72b087ef0fc2cd371ce4c55e2d159c1207298620f9dda9c",
+          "functions": 7,
+          "section_bytes": 4800
+        },
+        "jcsample-avx2.asm.o": {
+          "sha256": "ac100c60c2dc894f6be87393c35833a913749c93962bd94c84366ba8cf0dcc3d",
+          "functions": 2,
+          "section_bytes": 672
+        },
+        "jdcolor-avx2.asm.o": {
+          "sha256": "21ab2e5647b6191d3434ca327240c7a3673623a0894cef8b7906af297282d163",
+          "functions": 7,
+          "section_bytes": 5792
+        },
+        "jdmerge-avx2.asm.o": {
+          "sha256": "edc189ef3a3fc43041d718f584ad04bbc942426439f6df003931a6855a2145dd",
+          "functions": 14,
+          "section_bytes": 6464
+        },
+        "jdsample-avx2.asm.o": {
+          "sha256": "4d1c213560ab99f952e12f3f54b1c9743e42a3ecddc38ca0a63bcf668c6903e4",
+          "functions": 4,
+          "section_bytes": 1824
+        },
+        "jfdctint-avx2.asm.o": {
+          "sha256": "ad7dbb14a23fd3fbc5ed3333dc901e2b5dccd24c3862c76a554325d0c9af9e35",
+          "functions": 1,
+          "section_bytes": 832
+        },
+        "jidctint-avx2.asm.o": {
+          "sha256": "edbdc208b82031fccf1caa14b0037792331f84598c18c8cedb3dd8a541c509ed",
+          "functions": 1,
+          "section_bytes": 1344
+        },
+        "jquanti-avx2.asm.o": {
+          "sha256": "c7c2f57f57c5c5c62ae6684fa78e7d96f4cf67fc65486c13b416e75a67b844d3",
+          "functions": 2,
+          "section_bytes": 384
+        }
+      },
+      "selection": "ELF .text in AVX2 i386 libjpeg.a objects, extents bounded by external assembly entry symbols within each object"
+    },
+    "selected_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      25,
+      27,
+      29,
+      31,
+      33,
+      35,
+      37,
+      38,
+      40,
+      41,
+      42,
+      43,
+      44
+    ],
+    "functions": 45,
+    "selected_functions": 37,
+    "selected_instructions": 7764,
+    "selected_bytes": 29664,
+    "intervals_sha256": "9d41a35a2ee1832768ce9d30b0728176d50fa840f339e8c3729095fef75b4429",
+    "executable_was_run": false,
+    "selection": "Same 37 canonical SIMD function extents used in the frozen standalone benchmark."
+  },
+  "original_probe_equivalence": {
+    "checks": [
+      {
+        "case": "mips64el-ls",
+        "mode": 0,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          11803516
+        ]
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 1,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          12242202
+        ]
+      },
+      {
+        "case": "mips64el-ls",
+        "mode": 2,
+        "signature": [
+          29004,
+          0,
+          8860006801696042565,
+          25019836
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 0,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          116594087
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 1,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          120526573
+        ]
+      },
+      {
+        "case": "putty-32-0.85",
+        "mode": 2,
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          140847373
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 0,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          105938608
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 1,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          109944730
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "mode": 2,
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          142788562
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 0,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9451953
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 1,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9793609
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "mode": 2,
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          12259953
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 0,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          12930965
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 1,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          13255975
+        ]
+      },
+      {
+        "case": "arm64-ls",
+        "mode": 2,
+        "signature": [
+          23973,
+          0,
+          8816264938314345267,
+          20352585
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 0,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          1817242
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 1,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          2163438
+        ]
+      },
+      {
+        "case": "arm-cp",
+        "mode": 2,
+        "signature": [
+          25450,
+          35,
+          919594885373331023,
+          5187896
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 0,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          10187143
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 1,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          10435797
+        ]
+      },
+      {
+        "case": "arm64-sort",
+        "mode": 2,
+        "signature": [
+          18445,
+          0,
+          4428522272880934003,
+          15931282
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 0,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          516534325
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 1,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          530744680
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "mode": 2,
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          681377180
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 0,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          43330046
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 1,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          44994535
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "mode": 2,
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          54663421
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 0,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          398901630
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 1,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          411417782
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "mode": 2,
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          475731894
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 0,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          81709696
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 1,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          85371669
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "mode": 2,
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          98043462
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 0,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2823667
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 1,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2879075
+        ]
+      },
+      {
+        "case": "scalar32",
+        "mode": 2,
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          3182811
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 0,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1805727
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 1,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1845921
+        ]
+      },
+      {
+        "case": "scalar64",
+        "mode": 2,
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          2446649
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 0,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3558528
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 1,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3675078
+        ]
+      },
+      {
+        "case": "simd64",
+        "mode": 2,
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          4739957
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 0,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6709243
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 1,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6867977
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "mode": 2,
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          8723872
+        ]
+      }
+    ],
+    "unchanged": true
+  },
+  "batch_probe_equivalence": {
+    "checks": [
+      {
+        "case": "putty-32-0.85",
+        "signature": [
+          282906,
+          3,
+          7225451397909626697,
+          116594087
+        ]
+      },
+      {
+        "case": "putty-64-0.85",
+        "signature": [
+          259694,
+          3515,
+          3307435160057796829,
+          105938608
+        ]
+      },
+      {
+        "case": "amd64-ls",
+        "signature": [
+          22523,
+          0,
+          11761163436424087017,
+          9451953
+        ]
+      },
+      {
+        "case": "libssl3t64-amd64",
+        "signature": [
+          860911,
+          711,
+          6528060278436147935,
+          516534325
+        ]
+      },
+      {
+        "case": "libjpeg62-turbo-i386",
+        "signature": [
+          94503,
+          0,
+          7131687437590387221,
+          43330046
+        ]
+      },
+      {
+        "case": "libssl3t64-i386",
+        "signature": [
+          871312,
+          2130,
+          14076048977032015961,
+          398901630
+        ]
+      },
+      {
+        "case": "libzstd1-i386",
+        "signature": [
+          200500,
+          0,
+          3733692014535413969,
+          81709696
+        ]
+      },
+      {
+        "case": "scalar32",
+        "signature": [
+          5365,
+          0,
+          8537845126210120430,
+          2823667
+        ]
+      },
+      {
+        "case": "scalar64",
+        "signature": [
+          3455,
+          0,
+          1412881932028552554,
+          1805727
+        ]
+      },
+      {
+        "case": "simd64",
+        "signature": [
+          5759,
+          0,
+          14579131296982040540,
+          3558528
+        ]
+      },
+      {
+        "case": "jpeg-avx2-i386",
+        "signature": [
+          7764,
+          0,
+          565079957198679585,
+          6709243
+        ]
+      }
+    ],
+    "unchanged": true,
+    "capacity": 64,
+    "fallback": "Decoder::decodeOneLight"
+  },
+  "publication_authorized_by_report": false,
+  "statistical_scope": "2000 deterministic resamples of 32 interleaved balanced cycles; no outlier removal"
+}
