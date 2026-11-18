@@ -1,13 +1,16 @@
-tree d10943fa32307a2c7383ed457bca5174756c62a1
-parent 413b606f938a39d053fd61ef83a6277eec4e4f6e
-author NeverSightAI <neversightai@gmail.com> 1794933998 +0800
-committer NeverSightAI <neversightai@gmail.com> 1794933998 +0800
+tree 3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9
+parent 7e54e86ca81124be00b978dd00164803a6b1f4b7
+author NeverSightAI <neversightai@gmail.com> 1794952835 +0800
+committer NeverSightAI <neversightai@gmail.com> 1794952835 +0800
 
-X86: project canonical EVEX register scans without operands
+X86: emit canonical EVEX packed memory output on Clang
 
-Derive compact public-ID and length plans from the existing full-decoder
-probes, sharing reserved-field admission with the vector output path.
-Complete unprefixed register forms avoid operand construction when both
-text and detail are disabled; adapters and all misses retain their current
-precedence and fallback. Keep the new code and data in separate sections
-on ELF x86-64 full userspace builds.
+Project unmasked W1 packed moves from the canonical decoder and construct
+complete Intel text and operand details through a separate memory writer.
+Preserve broadcast-first handling and the caller's validated byte extent.
+Share the existing vector-register formatter and retain all output options,
+callbacks, reserved-field checks and fallback behavior. Keep the original
+static broadcast reader on other compilers.
+
+Verify complete records, protected extents, generated-table reproducibility
+and compiler-scoped object identity; include Make, Xcode and MSVC builds.
