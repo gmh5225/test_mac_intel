@@ -1,7 +1,7 @@
-name: Measure optional mapping callbacks with full records and native controls
+name: Screen canonical memory immediate MOV on real and synthetic workloads
 on:
   push:
-    branches: [codex/capstone-optional-mapping-callback]
+    branches: [codex/capstone-mov-memory-immediates]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -45,6 +45,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: optional-mapping-callback-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: mov-memory-immediates-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14

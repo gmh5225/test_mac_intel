@@ -1,12 +1,8 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "hypothesis": "An optional private mapper removes an indirect call and return per instruction for eleven architectures whose default callbacks have empty bodies; ordinary custom callbacks retain their original boundary and order.",
-  "evidence": "R1477 source audit: AArch64_get_insn_id is an empty one-byte return; full-cycle sampling motivates but does not prove causal timing attribution.",
-  "scope": "Change only the nullable private callback contract, default assignments, documentation and callback tests. Do not combine with R1476 initialization.",
-  "qualification": "Local four-backend byte-for-byte ARM/AArch64 records, current callback behavior on baseline and candidate; compiler counts and native real corpus before broader profiles. All eleven backend fixtures and private custom callbacks required before publication.",
-  "risks": [
-    "One extra null branch for required x86 and RISC-V mappers",
-    "Layout changes may affect unrelated decoder timing",
-    "Local four-backend tests do not qualify the other eight default mapper removals"
-  ]
+  "evidence": "../round1480-current-scalar-fallback-census/next-step.json",
+  "hypothesis": "Canonical C6/C7 memory-immediate MOV accounts for roughly 2 percent of the real PE32/PE64 code-section instructions and currently falls back. Extend the canonical MOV output plan with a constant immediate specialization of the existing memory writer.",
+  "semantics": "Only bare or one-REX C6/C7 /0 memory forms; preserve existing address exclusions, options and callbacks. Reuse canonical MOV row fields, bounded address parsing, and unsigned number emission. Validate new operand projection against the ordinary decoder.",
+  "exclusions": "No prefix, address mode, SIB, register or opcode legality is relaxed beyond the new validated /0 memory forms. No optional mapper or initialization prototype is combined.",
+  "qualification": "Generate with baseline and candidate full decoders; exhaustive ModRM/SIB/REX/length matrix, immediate/displacement boundaries, existing x86 units; codegen costs, complete real-record comparisons and native panels still required."
 }

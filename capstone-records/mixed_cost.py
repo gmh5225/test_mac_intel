@@ -11,7 +11,7 @@ def cost_probe(binaries, cases, temporary, evidence, run):
         save('cost-protocol', dict(available=False, reason='No Callgrind counter run on this host architecture'))
         return
     selected = [('arm-ls',0), ('arm-ls',2), ('arm64-ls',0), ('mips64el-ls',2),
-                ('putty-32-0.85',1), ('putty-64-0.85',1), ('putty-32-0.85',2), ('putty-64-0.85',2)]
+                ('putty-32-0.85',1), ('putty-64-0.85',1), ('putty-32-0.85',2), ('putty-64-0.85',2), ('scalar32',1), ('scalar64',1), ('simd64',2)]
     variants = ('base', 'scan')
     symbol = '_ZL3runR7SessionRKSt6vectorIhSaIhEEj'
     payloads = {v: binaries[v].read_bytes() for v in variants}
@@ -49,7 +49,7 @@ def cost_probe(binaries, cases, temporary, evidence, run):
                                 result=result,traversals=3,launch='same-file-fixed'))
             with gzip.open(evidence/(key+'.callgrind.gz'),'wb') as stream:stream.write(raw.read_bytes())
             raw.unlink();save('instruction-costs',records)
-    assert len(records) == 16 and {(x['case'],x['mode'],x['variant']) for x in records} == {
+    assert len(records) == 22 and {(x['case'],x['mode'],x['variant']) for x in records} == {
         (c,m,v) for c,m in selected for v in variants}
     save('cost-protocol',dict(available=True,symbol=symbol,traversals=3,consumer_unchanged=True,
                              fixed_guest_argv=True,inode=control['inode'],fixed_size=maximum))
