@@ -1,0 +1,29 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "c617b0a0de37a6e3390ab3e2eead21ecdcc11a18",
+    "sha256": "8f5c63565d54d2e4b5b5841f7cdd0f42cc818f067679ab9a8526e1c74f488c08"
+  },
+  "reference_source": "168d28e8e91f386e9ed6781fd52869c2cfc04437",
+  "run": {
+    "id": 44259323638,
+    "head_sha": "da09f06323245c7cd4eee0a4f89dbc464d1f36fb",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44259323638",
+    "run_attempt": 1
+  },
+  "profiles": 4,
+  "cost_comparisons": 48,
+  "instructions_increased": 8,
+  "findings": [
+    "Clang14 emits no measured Ir/Dr/Dw change on the real panels. Both GCC variants keep identical runtime objects and binary.",
+    "Clang18 replaces both PUSH opcode memory comparisons with register comparisons, but the surrounding iterator adds stack traffic and other instructions.",
+    "The SSL32 format and detail traces each add 1,028,550 simulated instructions, with 364,132 extra stack writes and 364,132 extra stack reads. Total data reads still fall 64,152; considering only the removed comparisons would miss the overall cost."
+  ],
+  "causal_limit": "The observed lowering is consistent with extending first-byte liveness changing register allocation across the iterator. No particular LLVM pass is identified. Simulated instruction cost is diagnostic, not native throughput.",
+  "decision": "Reject this source expression before native timing; keep the R1466 comparison source as the earlier prototype, which is itself not publication-qualified.",
+  "cleanup_bytes": 7522632412
+}
