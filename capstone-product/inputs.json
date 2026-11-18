@@ -1,58 +1,107 @@
 {
-  "neverd": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
-  "capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "neverd": "abe37f9dcd7edbb83de615c9d7d66620548d4e94",
+  "capstone": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
   "variants": {
-    "small-alias-output": {
-      "source": "round1417-clang-small-alias",
-      "patch": "small-alias-output.patch",
-      "patch_sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
-      "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+    "existing-plan": {
+      "source": "round1446-vex32-archive-order",
+      "patch": "existing-plan.patch",
+      "patch_sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
+      "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
       "changed": [
-        "AArch64Mapping.c.o",
-        "MipsMapping.c.o"
+        "X86OutputIterator.c.o"
       ],
       "added": [
-        "AliasMapping.c.o"
+        "X86Vex32Output.c.o"
+      ]
+    },
+    "register-pairs": {
+      "source": "round1449-vex32-register-pairs",
+      "patch": "register-pairs.patch",
+      "patch_sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
+      "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
+      "changed": [
+        "X86OutputIterator.c.o"
+      ],
+      "added": [
+        "X86Vex32Output.c.o"
       ]
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD dev with the published memory optimization and compact Clang alias parser: retain all 96 comparisons and all 15 real/targeted workloads, complete-state records, existing tests, and latest LLVM fork source with prebuilts disabled.",
+  "scope": "Freeze the latest reviewed NeverD dev head for all three builds. Use latest LLVM main source with prebuilts disabled. Measure both the corrected existing-plan selector and the separate register-pair extension against the same published Capstone baseline and 96 predeclared product observations.",
   "qualification_pending": [
-    "native/mixed timing",
+    "complete native/mixed outcomes",
     "portable builds",
-    "product validation"
+    "pair compiler costs and semantics",
+    "actual product outcomes"
   ],
   "validation_entry": {
-    "source": {
-      "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
-      "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
-      "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
-      "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
-      "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
-      "complete": true,
-      "publication_qualified": false,
-      "mapping_object_unchanged": true
-    },
-    "cost_run": {
-      "id": 44203984817,
-      "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+    "existing_plan_profiles": {
+      "id": 44226294340,
+      "head_sha": "442e1d583a499c20a7db5528a9033390a6e00a89",
       "status": "completed",
       "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44226294340",
       "run_attempt": 1
     },
-    "alternate_profiles": {
-      "id": 44206940403,
-      "head_sha": "eba0ba561972407d427b6e6bc9d902337ab98421",
+    "corrected_archive_order": {
+      "id": 44225231899,
+      "head_sha": "479636501a7cd09038ad13e9738e4e80885feaab",
       "status": "completed",
       "conclusion": "success",
-      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44206940403",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44225231899",
       "run_attempt": 1
     },
-    "prior_failed_alias_evidence": "../round1410-alias-launch-factors/decision.json",
+    "local_pair_source": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
+      "sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
+      "comparison_source": {
+        "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+        "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
+        "sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
+        "runtime_sources_identical_to": {
+          "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+          "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+          "tree": "f8950dad443feefc5cf9a5253613b54f5d93b4ff",
+          "sha256": "84e90f46f73fda452e281e55ae6ecb868bf264910f963e6e77fc7cabb6495e46",
+          "files": [
+            "CMakeLists.txt",
+            "Makefile",
+            "arch/X86/X86GenSimpleOutput.inc",
+            "arch/X86/X86OutputIterator.c",
+            "arch/X86/X86SimpleOutput.h",
+            "arch/X86/X86Vex32Output.c",
+            "suite/synctools/x86_simple_output.cpp",
+            "xcode/Capstone.xcodeproj/project.pbxproj"
+          ]
+        },
+        "build_only_difference": [
+          "CMakeLists.txt",
+          "Makefile",
+          "xcode/Capstone.xcodeproj/project.pbxproj"
+        ]
+      },
+      "files": [
+        "CMakeLists.txt",
+        "Makefile",
+        "arch/X86/X86GenSimpleOutput.inc",
+        "arch/X86/X86GenVex32PairOutput.inc",
+        "arch/X86/X86OutputIterator.c",
+        "arch/X86/X86SimpleOutput.h",
+        "arch/X86/X86VectorOutput.c",
+        "arch/X86/X86VectorRegisterOutput.h",
+        "arch/X86/X86Vex32Output.c",
+        "suite/synctools/x86_simple_output.cpp",
+        "suite/synctools/x86_vector_output.cpp",
+        "tests/unit/x86_simple_output.c",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ]
+    },
+    "source_semantics_verified": true,
+    "independent_experiment": true,
     "publication_qualified": false
   },
   "timing_protocol": {
@@ -62,5 +111,5 @@
     "consumer_unchanged": true,
     "publication_qualified": false
   },
-  "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases."
+  "public_state_scope": "40,068 complete product states per variant plus independent 129,171,462 private/public records and guarded extents on the output implementations. Product build/measurement is not permission to publish and cannot erase prior losses."
 }
