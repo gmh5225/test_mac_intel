@@ -1,0 +1,22 @@
+{
+  "source": {
+    "tree": "42bfcf28c2d8bcff40d0871185fb9ba5f5ac3aaa",
+    "sha256": "0f7b38efaecf91282b24301e0319bbc5d4a939f6213819d8eb460fe0f260b972",
+    "experiment": "round1462-vex32-plan-class-bit",
+    "semantic_and_cost_run": {
+      "id": 44242322055,
+      "head_sha": "4d495ce72b9f5a5748c8c8c68b31f4359e2d8c96",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44242322055",
+      "run_attempt": 1
+    }
+  },
+  "evidence": "../round1467-fixed-launch-memset-control/cost-attribution.json",
+  "observation": "Fixed guest state removes every observed non-x86 instruction/read/write count difference. Intel 6975P-C exposes usable user PMU events after a reversible permission adjustment; AMD 9V45 did not. Native throughput still differs with identical work.",
+  "hypothesis": "Use balanced hardware event comparisons to distinguish instruction/branch work from branch prediction and cache/translation effects of the iterator-induced layout change. Preserve the unchanged frozen consumers and four recombined objects.",
+  "controls": "Original/fixed-image native timings, then same inode/path/length and disabled ASLR for PMU runs. Byte-identical A/A controls included. No source changes.",
+  "gdb_repair": "Break at the executable memset PLT entry using verified link offsets and runtime relocation, rather than depending on unavailable libc private symbol names. Capture actual arguments and resolved target.",
+  "pmu": "Probe each event group. Unsupported events remain unavailable. Restore original perf_event_paranoid in finally. Hardware counts cover the complete unchanged process with 20 timed traversals plus its original warm/setup work.",
+  "publication_qualified": false
+}
