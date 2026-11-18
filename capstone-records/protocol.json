@@ -1,117 +1,51 @@
 {
   "inputs": {
-    "baseline_commit": "8acfcd402e9f5fb7a458faa37552e53d7da3aa9a",
-    "baseline_tree": "d10943fa32307a2c7383ed457bca5174756c62a1",
+    "baseline_commit": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+    "source_parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "variants": {
-      "scan": {
-        "tree": "aa820f275a68a376865ebabebd4679ebb7d7c518",
-        "sha256": "5418c72f9275cc1fb776cec79c5a5745522f5cee08dab5eaace423ad13a50464",
-        "experiment": "round1365-evex-transfer-scan",
-        "semantic_run": {
-          "id": 44126683875,
-          "head_sha": "4f6cd701df3d593d0c50e166cc1017edfaf693fc",
+      "output": {
+        "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
+        "sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
+        "experiment": "round1449-vex32-register-pairs",
+        "semantic_and_cost_run": {
+          "id": 44228074380,
+          "head_sha": "8d11c8cab2183f4944f3ee2860f574bd2a8c62cf",
           "status": "completed",
           "conclusion": "success",
-          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44126683875",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44228074380",
           "run_attempt": 1
-        },
-        "earlier_layout_failures": [
-          {
-            "profile": "evex-transfer-scan-ubuntu-24.04-gcc",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('AArch64PostprocessFlags', 'r', 16946720, 8264), ('AArch64RegDesc', 'r', 14226176, 16872), ('AArch64RegDiffLists', 'r', 14243776, 4976), ('AArch64SubRegIdxLists', 'r', 14243072, 682), ('ACC128', 'r', 16468062, 2), ('ACC128Bits', 'r', 16468000, 62), ('ACC64', 'r', 16469098, 2), ('ACC64Bits', 'r', 16469092, 5), ('ACC64DSP', 'r', 16469824, 8), ('ACC64DSPBits', 'r', 16469816, 5), ('AFGR64', 'r', 16470592, 32), ('AFGR64Bits', 'r', 16470544, 19)], 'changed': [('AArch64PostprocessFlags', 'r', 16950816, 8264), ('AArch64RegDesc', 'r', 14230272, 16872), ('AArch64RegDiffLists', 'r', 14247872, 4976), ('AArch64SubRegIdxLists', 'r', 14247168, 682), ('ACC128', 'r', 16472158, 2), ('ACC128Bits', 'r', 16472096, 62), ('ACC64', 'r', 16473194, 2), ('ACC64Bits', 'r', 16473188, 5), ('ACC64DSP', 'r', 16473920, 8), ('ACC64DSPBits', 'r', 16473912, 5), ('AFGR64', 'r', 16474688, 32), ('AFGR64Bits', 'r', 16474640, 19)]}"
-            }
-          }
-        ]
-      },
-      "merge": {
-        "tree": "59f9eeed7df5f4fda55c4bc8af3b550616e17139",
-        "sha256": "3e160884f4ae567420757430b217159ccb88e3940476cb7d420885db49555756",
-        "experiment": "round1366-evex-transfer-plan",
-        "semantic_run": {
-          "id": 44129341218,
-          "head_sha": "3d89704a7db16bb078cdfd611747ad8d4c54f7a3",
-          "status": "completed",
-          "conclusion": "success",
-          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44129341218",
-          "run_attempt": 1
-        },
-        "earlier_layout_failures": [
-          {
-            "profile": "evex-transfer-plan-ubuntu-22.04-clang",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('evex_scan_index', 'r', 17644064, 256), ('evex_scan_plans', 'r', 17643856, 196)], 'changed': [('evex_scan_index', 'r', 17643856, 256), ('evex_scan_plans', 'r', 17644112, 196)]}"
-            }
-          },
-          {
-            "profile": "evex-transfer-plan-ubuntu-22.04-gcc",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('evex_scan_index', 'r', 17443040, 256), ('evex_scan_plans', 'r', 17443296, 196)], 'changed': [('evex_scan_index', 'r', 17443136, 256), ('evex_scan_plans', 'r', 17443392, 196)]}"
-            }
-          },
-          {
-            "profile": "evex-transfer-plan-ubuntu-24.04-clang",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('evex_scan_index', 'r', 16952736, 256), ('evex_scan_plans', 'r', 16952528, 196)], 'changed': [('evex_scan_index', 'r', 16952528, 256), ('evex_scan_plans', 'r', 16952784, 196)]}"
-            }
-          },
-          {
-            "profile": "evex-transfer-plan-ubuntu-24.04-gcc",
-            "result": {
-              "passed": false,
-              "error": "{'missing': [('AArch64PostprocessFlags', 'r', 16946720, 8264), ('AArch64RegDesc', 'r', 14226176, 16872), ('AArch64RegDiffLists', 'r', 14243776, 4976), ('AArch64SubRegIdxLists', 'r', 14243072, 682), ('ACC128', 'r', 16468062, 2), ('ACC128Bits', 'r', 16468000, 62), ('ACC64', 'r', 16469098, 2), ('ACC64Bits', 'r', 16469092, 5), ('ACC64DSP', 'r', 16469824, 8), ('ACC64DSPBits', 'r', 16469816, 5), ('AFGR64', 'r', 16470592, 32), ('AFGR64Bits', 'r', 16470544, 19)], 'changed': [('AArch64PostprocessFlags', 'r', 16950816, 8264), ('AArch64RegDesc', 'r', 14230272, 16872), ('AArch64RegDiffLists', 'r', 14247872, 4976), ('AArch64SubRegIdxLists', 'r', 14247168, 682), ('ACC128', 'r', 16472158, 2), ('ACC128Bits', 'r', 16472096, 62), ('ACC64', 'r', 16473194, 2), ('ACC64Bits', 'r', 16473188, 5), ('ACC64DSP', 'r', 16473920, 8), ('ACC64DSPBits', 'r', 16473912, 5), ('AFGR64', 'r', 16474688, 32), ('AFGR64Bits', 'r', 16474640, 19)]}"
-            }
-          }
-        ]
+        }
       }
-    },
-    "source_parent": "413b606f938a39d053fd61ef83a6277eec4e4f6e",
-    "baseline_patch_sha256": "f6dd8704d11166de505212ead1a998796dec5dd10ca80ac9b61002cd44840452",
-    "baseline_publication_pending": true
+    }
   },
-  "created_before_any_native_timing": true,
-  "question": "Does either semantic-equivalent EVEX transfer implementation improve real scanning without regressing PE32, formatted/detail output or other architectures, including the observed linker relocation?",
-  "methodology_change": "R1365 and R1366 retain their failed exact-address gates and are not published. Data address equality was a conservative proxy, not a measured performance requirement. This fresh predeclared comparison retains every layout difference and evaluates both implementations, without any timing results having been observed or discarded.",
-  "native": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
-    ],
-    "panels": 7,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 60,
-    "rows_per_variant": 168
-  },
-  "mixed": {
-    "compilers": [
-      "clang14",
-      "gcc11",
-      "clang18",
-      "gcc13"
-    ],
-    "cases": 8,
-    "modes": 3,
-    "cycles": 21,
-    "target_ms": 80,
-    "rows_per_variant": 192
-  },
-  "controls": [
-    "byte-identical A/A",
-    "original images",
-    "same-file-fixed with ASLR disabled"
+  "cycles": 32,
+  "native_target_ms": 80,
+  "mixed_target_ms": 80,
+  "launches": [
+    "images",
+    "same-file-fixed"
   ],
-  "gate": "Preserve every result. Investigate each median candidate loss beyond 1% and every A/A deviation beyond 1%; exclude unstable observations from gain claims. No candidate is qualified by instruction-count reductions or symbol movement alone.",
-  "layout": "Require all unmodified runtime object hashes and text symbol positions unchanged. Record all read-only and writable address moves. The edited EVEX helpers and their own tables are explicit exceptions.",
-  "consumer": "Frozen original consumers, original mode semantics, common instruction-boundary filtering and frozen real PE/ELF corpora; forked iced 8b8d90b benchmark unchanged.",
-  "production_unchanged": true,
+  "native_rows": 84,
+  "mixed_rows": 96,
+  "profiles": [
+    "ubuntu-22.04 clang",
+    "ubuntu-24.04 clang"
+  ],
+  "purpose": "Measure the complete existing-plan plus canonical register-pair implementation against published next, with unchanged frozen consumers and all 180 observations.",
+  "source_identity": null,
+  "cost_evidence": {
+    "id": 44228074380,
+    "head_sha": "8d11c8cab2183f4944f3ee2860f574bd2a8c62cf",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44228074380",
+    "run_attempt": 1
+  },
+  "semantic_scope": "Four compilers verify 129171462 full records and protected extents each. The pair-only change preserves all 40 original runtime objects, including the original vector writer; GCC retains exact linked binaries.",
+  "remaining_cost": "Prior standalone existing-plan native/mixed results retain stable sub-1% losses and one noisy A/A observation. The pair extension moves readonly symbols; no earlier native timings transfer to this combined image.",
+  "gates": "Retain every comparison and A/A flag. Judge this complete source on its own native, mixed, portable and actual-product results, without erasing prior negative observations.",
   "publication_qualified": false,
-  "cleanup": "Remove owned builds and source exports in finally; preserve diagnostics and original observations.",
-  "baseline_assembly": "Reconstruct the exact locally prepared baseline commit from its published parent, frozen patch and verified commit object. Git tree and commit hashes must match before compilation. Baseline product qualification is independent and remains required before production publication."
+  "prior_negative_evidence": "../round1447-vex32-existing-plan-native/decision.json"
 }
