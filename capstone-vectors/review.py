@@ -63,6 +63,7 @@ report = dict(complete=True, run=run, source=source, profiles=profiles, rows=row
     instruction_increases=[x for x in rows if x['ir_change'] > 0], publication_qualified=False,
     parser_sha256=hashlib.sha256(code.encode()).hexdigest(),
     scope='Original frozen consumer, two traversals of four real-library panels per compiler. Instruction counts and compiler inlining are diagnostic evidence, not native throughput.')
+report['layout_criterion_note'] = 'Raw linked-layout artifacts retain an inherited criterion label mentioning exact ordinary text. In this prototype the iterator intentionally changes. The iterator-lowering report and changed-object checks, not that label, define the actual qualification scope; no ordinary-text identity is claimed.'
 (r / 'profile-review.json').write_text(json.dumps(report, indent=2) + '\n')
 for row in rows:
     if row['case'] in ('libssl3t64-amd64','jpeg-avx2-i386') or row['instruction_reduction'] < -.001:
