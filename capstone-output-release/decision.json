@@ -1,0 +1,81 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "a80fb75f404b702117c6f3067d8d81c9b3ef1927",
+    "sha256": "23cde8ce970099d0d3ab14d4a0a497c6e5179c6d5d122feb4ac2def9d836291d",
+    "records": {
+      "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
+    }
+  },
+  "native_run": {
+    "id": 44303996964,
+    "head_sha": "4616d3c85cfc23a3f07bd61f713a6904cbef5768",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44303996964",
+    "run_attempt": 1
+  },
+  "profile_run": {
+    "id": 44304087680,
+    "head_sha": "d2ae6074024bf5a9bb3b54a4b2b6734bc8042e36",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44304087680",
+    "run_attempt": 1
+  },
+  "native_panels": 264,
+  "aa_flags": 2,
+  "losses_over_one_percent": 28,
+  "below_one_descriptive_intervals": 83,
+  "profiles": 9,
+  "unit_executions": 2056,
+  "fixture_executions": 938316,
+  "semantic_review": "semantic-review.json",
+  "helper_call_evidence": "helper-calls.json",
+  "predecessor_comparison": "predecessor-review.json",
+  "cost_attribution": "cost-attribution.json",
+  "finding": "Forcing only the new tag-store helpers inline removes every observed helper transfer. GCC PE32 detail recovers from a 0.955 fixed-image gain to 0.999; PE64 detail reaches 1.006. This is not broad qualification: 28 native panels still lose more than one percent, including GCC AArch64 raw/format/detail and repeated Clang x86 losses. Hold this candidate.",
+  "mechanism": "All three Clang baseline and candidate linked binaries are byte-identical to R1494, so the attribute only changes the GCC image. GCC no longer has the prior 1299 helper-transfer sites or 34287 executed PE32 formatting helper transfers. Nevertheless PE32 still adds 561243 simulated instructions relative to baseline, versus 605439 previously; eliminating those helper calls does not restore all reader/constructor lowering. GCC AArch64 raw still adds 129117 instructions. Native measurements from separate jobs are reported separately, not pooled.",
+  "limits": "Twenty-one-cycle unadjusted descriptive bootstrap intervals; both A/A flags retained. Nine portable profiles include 23-backend Clang/GCC builds and existing fixture coverage, not every possible instruction. Six scheduled x87 hardware executions are skipped on Windows/macOS. No iced or current NeverD product qualification follows this failed native screen.",
+  "skipped": [
+    {
+      "host": "inline-tags-profiles-macos-15-four-normal-clang",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    },
+    {
+      "host": "inline-tags-profiles-windows-2022-four-normal-MD",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    },
+    {
+      "host": "inline-tags-profiles-windows-2022-four-normal-MT",
+      "skipped": {
+        "base": [
+          "unit_x86_x87_environment_hardware"
+        ],
+        "candidate": [
+          "unit_x86_x87_environment_hardware"
+        ]
+      }
+    }
+  ],
+  "cleanup_bytes_removed": 29677085895
+}

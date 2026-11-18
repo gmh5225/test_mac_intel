@@ -1,0 +1,27 @@
+{
+  "iced_revision": "8cfc5f57c08fd2e80a4cec9d3d9d36f642b2de31",
+  "files": {
+    "src/rust/iced-x86/src/decoder.rs": "66ea098f5cb207cb71eb6161d5c3074cdaf16bd9ff906e0a3d57f30966c9d273",
+    "src/rust/iced-x86/src/instruction.rs": "a879ed11c7b135339742dd1ca61ae930c3d8c5fb659e10bc9acd07d47bf96d84"
+  },
+  "findings": [
+    {
+      "source": "src/rust/iced-x86/src/decoder.rs",
+      "lines": [
+        438,
+        1364
+      ],
+      "observation": "Decoder state places reset fields consecutively, deliberately writing vvvv/vvvv_invalid_check and dummy values to allow wider compiler stores."
+    },
+    {
+      "source": "src/rust/iced-x86/src/instruction.rs",
+      "lines": [
+        57,
+        76
+      ],
+      "observation": "Instruction is a compact 40-byte record with separate fixed-size register and operand-kind arrays."
+    }
+  ],
+  "application": "Coalesce Capstone operand tag writes while retaining both compatibility tag values, payload types, capacity guards and public output bytes. Keep the new small primitive inlined after GCC13 emitted physical helper calls.",
+  "limits": "No iced code copied. Compact iced storage cannot be substituted for Capstone public detail or its zero/tail contract. This research suggests a construction strategy, not proof of throughput."
+}
