@@ -1,0 +1,117 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "run": {
+    "id": 44286975042,
+    "head_sha": "0ad86b83fb163b1df0952dc93e7984b240c6e294",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44286975042",
+    "run_attempt": 1
+  },
+  "source": {
+    "dispatch": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+      "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+      "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+    },
+    "scan": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
+      "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
+      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+      "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
+    }
+  },
+  "rows": [
+    {
+      "case": "scalar32",
+      "mode": 1,
+      "changes": {
+        "dispatch": {
+          "X86_trySimpleOutput": [
+            2094,
+            0,
+            0
+          ]
+        },
+        "scan": {
+          "X86_trySimpleOutput": [
+            -27990,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "case": "scalar64",
+      "mode": 1,
+      "changes": {
+        "dispatch": {
+          "X86_trySimpleOutput": [
+            3000,
+            0,
+            0
+          ]
+        },
+        "scan": {
+          "X86_trySimpleOutput": [
+            -14928,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 1,
+      "changes": {
+        "dispatch": {
+          "X86_trySimpleOutput": [
+            16506,
+            0,
+            0
+          ]
+        },
+        "scan": {
+          "X86_trySimpleOutput": [
+            -18048,
+            0,
+            0
+          ]
+        }
+      }
+    },
+    {
+      "case": "simd64",
+      "mode": 2,
+      "changes": {
+        "dispatch": {
+          "X86_trySimpleOutput": [
+            18810,
+            0,
+            0
+          ]
+        },
+        "scan": {
+          "X86_trySimpleOutput": [
+            -15744,
+            0,
+            0
+          ]
+        }
+      }
+    }
+  ],
+  "finding": "The high-bit tag reduces physical iterator instructions on all four old ARM-host scalar/SIMD panels. Its SIMD format throughput still decreases by about 0.7 percent in both native launch controls. Therefore added instruction work is not the remaining ARM-host SIMD cause; native scheduling, branch/front-end behavior and placement require separate hardware evidence.",
+  "scope": "Original named contexts are in native-review.json; address-attribution.json locates physical scalar/SIMD owners. No hardware-performance or passive-ISA conclusion is inferred from simulated cache or branch misses.",
+  "cleanup": {
+    "bytes": 125049305,
+    "removed": true
+  }
+}
