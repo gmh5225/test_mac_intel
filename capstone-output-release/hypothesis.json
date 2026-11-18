@@ -1,12 +1,20 @@
 {
-  "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "basis": [
-    "R1473 Clang retains one extra MIPS dispatch instruction per decode; R1475 eliminates redundant zeroing of tied operand indices.",
-    "R1473 GCC adds one Ir, Dr and Dw per AArch64 decode inside cs_decode_full_insn. The fallback architecture is known, but MCInst_Init remains an external call with a generic SystemZ dialect test. Inline the existing full-initialization owner and test whether this removes the measured call-boundary cost."
-  ],
-  "change": "Use the existing owning full initializer inline with constant CS_ARCH_AARCH64 in the exact four-backend fallback. Continue complete operand clearing for AArch64. Retain R1475 partial-initializer range splitting.",
-  "invariant": "cs_open rejects unavailable architectures. In exact ARM/AArch64/MIPS/X86 builds, X86 and ARM/MIPS have already selected their initializers; only AArch64 can reach the full fallback.",
-  "validation": "ARM records, poisoned operands and read-before-construction observer; AArch64 full public records/cursors/errors across both byte orders, text/detail/skip options and truncated or malformed words; mcinst complete-byte default checks for all enum values. Then codegen gate and native controls.",
-  "publication_qualified": false,
-  "codegen_gate": "Before native timing, no increase in fixed-guest Ir for AArch64 raw, MIPS detail, PE32 format or PE64 format. ARM hosts report unavailable Callgrind and retain native timings."
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "831176f13e781d47703dc07de1724a0d42e0900b",
+    "sha256": "29b129b1726d6d7525892a3ffaa88e93f0ac0be1d2581908e9989b7a94ff6094",
+    "records": "equal ARM public records, cursor and errors for 33554432 inputs",
+    "observer_records": "equal ARM public records, cursor and errors for 33554432 inputs",
+    "poison_records": {
+      "0xa5": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "0x5a": "equal ARM public records, cursor and errors for 33554432 inputs"
+    }
+  },
+  "failed_run": 44262851246,
+  "failed_job": 134660151433,
+  "evidence": "All 143 baseline and 143 candidate units, three observer units, and ARM/AArch64/MIPS fixture executions passed. The final raw object identity assertion reports changes in 21 objects after adding four lines to MCInst.h.",
+  "hypothesis": "UBSan source-location descriptors change after the header edit even when compiled runtime logic is unchanged.",
+  "control": "After testing the original candidate, restore it from the staged exact tree and insert a single #line directive before the unchanged common initialization tail. Rebuild only the library and require every nonowner runtime object to be byte-identical to baseline. Preserve the original raw object differences.",
+  "source_unchanged": true,
+  "publication_qualified": false
 }

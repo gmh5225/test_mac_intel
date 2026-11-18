@@ -77,11 +77,38 @@ try:
  if objects:
   assert objects['base'].keys()==objects['candidate'].keys()
   changed=[k for k,v in objects['base'].items() if objects['candidate'][k]!=v]
+  raw_changed=changed[:]
+  save('raw-runtime-objects',dict(changed=raw_changed))
+  location_control=None
+  if profile=='sanitize':
+   run(['git','restore','--worktree','--','MCInst.h','cs.c'],'restore-semantic-candidate')
+   header=s/'MCInst.h';candidate_header=header.read_text()
+   original_header=sp.check_output(['git','show',meta['parent']+':MCInst.h'],cwd=s,text=True)
+   marker='\t/* All zero-valued defaults are established by the clear above. */'
+   assert candidate_header.count(marker)==original_header.count(marker)==1
+   original_line=original_header[:original_header.index(marker)].count('\n')+1
+   candidate_line=candidate_header[:candidate_header.index(marker)].count('\n')+1
+   directive='#line '+str(original_line)+'\n'
+   adjusted=candidate_header.replace(marker,directive+marker)
+   assert adjusted.replace(directive,'',1)==candidate_header
+   header.write_text(adjusted)
+   location_control=dict(original_line=original_line,candidate_line=candidate_line,directive=directive.strip(),
+      original_header_sha256=hashlib.sha256(original_header.encode()).hexdigest(),
+      candidate_header_sha256=hashlib.sha256(candidate_header.encode()).hexdigest(),
+      control_header_sha256=hashlib.sha256(adjusted.encode()).hexdigest(),
+      semantic_tests_source='Unmodified candidate patch before this diagnostic-only line directive')
+   save('source-location-control',location_control)
+   run(['cmake','--build',b,'--config','Release','--target','capstone_static','--parallel','4'],'location-control-build')
+   normalized={str(f.relative_to(b/'CMakeFiles/capstone.dir')):hashlib.sha256(f.read_bytes()).hexdigest() for f in (b/'CMakeFiles/capstone.dir').rglob('*.o')}
+   assert normalized.keys()==objects['base'].keys()
+   changed=[key for key,h in objects['base'].items() if normalized[key]!=h]
+   save('source-location-object-proof',dict(raw_changed=raw_changed,location_control_changed=changed,
+       all_nonowner_objects_identical=set(changed)<={'cs.c.o'},total=len(normalized)))
   allowed={'cs.c.o'} if archs!='x86' else set()
   if 'RISCV' in architectures:allowed.add('arch/RISCV/RISCVInstPrinter.c.o')
   assert set(changed)<=allowed,changed
   if arm_policy_active:assert 'cs.c.o' in changed
-  save('runtime-objects',dict(changed=changed,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
+  save('runtime-objects',dict(changed=changed,raw_changed=raw_changed,source_location_control=location_control,allowed=sorted(allowed),identical=len(objects['base'])-len(changed),arm_policy_active=arm_policy_active))
  save('complete',dict(profile=profile,compiler=cc,archs=archs,arm_policy_active=arm_policy_active,architectures=architectures,tested_tree=tree,phases=list(tests),observer_executed=arm_policy_active,observer_arm_owner_filtered=arm_policy_active and profile=='diet',test_summaries={k:[line for line in v.splitlines() if 'tests passed' in line] for k,v in tests.items()}))
 finally:
  amount=sum(f.stat().st_size for f in w.rglob('*') if f.is_file())
