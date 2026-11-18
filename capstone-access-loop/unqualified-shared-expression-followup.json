@@ -1,0 +1,7 @@
+{
+  "previous": "../round1433-output-option-inline/failed-identity-review.json",
+  "observed": "GCC13 recovers complete archive identity with always_inline, but GCC11 inlines that helper early and still changes X86_disasmIter from 2755 to 3068 bytes. All 74 GCC11 units pass; machine-code identity does not.",
+  "hypothesis": "A canonical predicate macro avoids the boolean-return helper boundary while keeping one semantic owner. Both actual callers pass a local handle pointer; the field order and short-circuit expression are unchanged.",
+  "gate": "Require every runtime object and complete static archive identical to the original R1429 prototype on Clang14/18 and GCC11/13. Do not transfer the prior cost or record evidence on an identity failure.",
+  "publication_qualified": false
+}
