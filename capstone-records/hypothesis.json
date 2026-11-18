@@ -1,13 +1,8 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "finding": "Hot register/immediate construction writes two compatibility tags separately before its union payload. Both fields remain necessary for the current internal readers.",
-  "change": "Copy a compiler-laid-out constant tag prefix in one operation, then write the correctly typed payload. Share the constructor between counted and scratch-slot forms.",
-  "invariants": [
-    "No public or private struct layout change",
-    "Both tag values and exact union value remain",
-    "Operand capacity guard and count updates remain",
-    "Only unobservable internal padding may become zero instead of retaining prior bytes; complete public records still require comparison"
-  ],
-  "phase": "Code-generation probe before any native speed claim",
-  "publication_qualified": false
+  "predecessor_tree": "313cbfb229a8d3d68c32d09e94f1293e4350c47f",
+  "observed": "GCC13 emits 1299 static direct calls to the new MCOperand_initReg/Imm helpers in the linked R1494 image. PE32/64 real workloads gain executed helper and reader work despite fewer stores.",
+  "change": "Force inline only the new tag-store helpers; keep counted constructors, capacity checks, layout and public semantics unchanged.",
+  "falsifiable_prediction": "No out-of-line MCOperand_initReg/Imm call remains. Determine whether the extra executed GCC work disappears before claiming a native gain.",
+  "limits": "Inlining does not by itself explain or fix all native timing losses. All four-backend timing panels and other-backend semantic profiles still require qualification."
 }
