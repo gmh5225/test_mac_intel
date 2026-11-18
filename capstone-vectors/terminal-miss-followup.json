@@ -1,0 +1,11 @@
+{
+  "previous": "../round1420-vex32-plan-isolation",
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "observed": "Clang14 strict ordinary text/data identity passes after table isolation. AVX32 scan Ir falls 54.98%, but SSL64 scan Ir rises 1.2555%. Exclusive trace differences attribute all 1,697,576 extra instructions, 631,436 reads and 414,084 writes to decodeVex32OrGeneric.",
+  "cause": "The previous wrapper sits after the common fallback and is entered even for already classified 64-bit extension encodings. It therefore pays an extra frame/check cost on paths where its VEX32 plan cannot succeed.",
+  "change": "Call the unchanged VEX32 reader only from the final ordinary miss in getInstructionScanResultAfterInitial. Keep the earlier extension, 64-bit terminal VEX and prefixed instruction routes on their original fallback. The new helper falls back to the original adapter/extension-owning decodeScanResultFallback.",
+  "invariant": "Exact mode eligibility, byte extents, plan values, rejection rules, complete output fields and adapter priority are unchanged. Generated plan and generator bytes are identical to R1420.",
+  "lowering_gate": "Moving the source call may split merged machine-code paths; record all function and symbol changes rather than claiming the prior whole-text identity gate. Require every other runtime object unchanged, original ordinary constant bytes preserved, and GCC complete object/executable identity. Then compare all original costs and native controls.",
+  "native_qualification": false,
+  "publication_qualified": false
+}
