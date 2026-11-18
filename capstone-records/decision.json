@@ -1,0 +1,37 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
+    "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
+  },
+  "native_run": {
+    "id": 44284170539,
+    "head_sha": "be2003ff212dd007a2c583df920aeeda651c2d4e",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44284170539",
+    "run_attempt": 1
+  },
+  "native_panels": 264,
+  "aa_flags": 2,
+  "losses_over_one_percent": 17,
+  "stable_losses": 37,
+  "pe_gain_range": [
+    1.0301497735980494,
+    1.050820668693009
+  ],
+  "semantic_review": "semantic-review.json",
+  "lowering_review": "lowering-review.json",
+  "cost_attribution": "cost-attribution.json",
+  "iterator_attribution": "iterator-attribution.json",
+  "arm_followup": "../round1487-arm-tagged-special-cost",
+  "finding": "Tagging special plans removes the extra Clang jump table. Clang18 scalar32, scalar64 and SIMD detailed output have exactly baseline total instruction counts in the fixed-guest counter run. Clang14 and GCC still add work. PE format/detail throughput improves 3.0\u20135.1 percent across all four hosts, but persistent other-ISA losses and ARM-host SIMD format losses prevent publication.",
+  "limits": "21-cycle screening with unadjusted descriptive bootstrap intervals; smaller stable losses remain visible. Two A/A flags are preserved. Removing the jump table does not explain or cure unrelated-ISA native placement sensitivity. No portable/latest-iced/current-product qualification was run for this failed-performance candidate.",
+  "cleanup_bytes_removed": 1729409813
+}
