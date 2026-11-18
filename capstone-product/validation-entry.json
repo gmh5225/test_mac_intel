@@ -1,117 +1,28 @@
 {
-  "inputs": {
-    "neverd": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
-    "capstone": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
-    "variants": {
-      "small-alias-output": {
-        "source": "round1417-clang-small-alias",
-        "patch": "small-alias-output.patch",
-        "patch_sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
-        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
-        "changed": [
-          "AArch64Mapping.c.o",
-          "MipsMapping.c.o"
-        ],
-        "added": [
-          "AliasMapping.c.o"
-        ]
-      }
-    },
-    "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
-    "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
-    "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-    "scope": "Actual current NeverD dev with the published memory optimization and compact Clang alias parser: retain all 96 comparisons and all 15 real/targeted workloads, complete-state records, existing tests, and latest LLVM fork source with prebuilts disabled.",
-    "qualification_pending": [
-      "native/mixed timing",
-      "portable builds",
-      "product validation"
-    ],
-    "validation_entry": {
-      "source": {
-        "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
-        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
-        "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
-        "records": "equal AArch64/MIPS public records, cursor and errors for 56623104 inputs",
-        "direct_alias_decisions": "769142 original/isolated-trie alias decisions matched across AArch64 and MIPS maps",
-        "complete": true,
-        "publication_qualified": false,
-        "mapping_object_unchanged": true
-      },
-      "cost_run": {
-        "id": 44203984817,
-        "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
-        "status": "completed",
-        "conclusion": "success",
-        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
-        "run_attempt": 1
-      },
-      "alternate_profiles": {
-        "id": 44206940403,
-        "head_sha": "eba0ba561972407d427b6e6bc9d902337ab98421",
-        "status": "completed",
-        "conclusion": "success",
-        "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44206940403",
-        "run_attempt": 1
-      },
-      "prior_failed_alias_evidence": "../round1410-alias-launch-factors/decision.json",
-      "publication_qualified": false
-    },
-    "timing_protocol": {
-      "cycles": 32,
-      "calibration_cpu_ms": 100,
-      "order": "Within each cycle rotate baseline, identical copy and candidate, then reverse; compare equal-sized paired exposures.",
-      "consumer_unchanged": true,
-      "publication_qualified": false
-    },
-    "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases."
-  },
-  "native_run": {
-    "id": 44205691011,
-    "head_sha": "ef6ab0227f5b9cfd45553a60ff313d49687dfec7",
-    "status": "completed",
-    "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205691011",
-    "run_attempt": 1
-  },
-  "mixed_run": {
-    "id": 44205770136,
-    "head_sha": "7ba34a9c0747e65076cdbdc2d673a9cf8ceab8d9",
-    "status": "completed",
-    "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44205770136",
-    "run_attempt": 1
-  },
-  "native_aa": [],
-  "mixed_aa": [],
-  "original_losses_preserved": true,
-  "unresolved_original_loss": {
-    "host": "alias-call-shape-images-four-ubuntu-24.04-clang-44205770136",
-    "case": "arm-cp",
-    "panel": null,
-    "mode": 0,
-    "launch": "images",
-    "aa": 0.9902629799099877,
-    "aa_ci95": [
-      0.9740686653828028,
-      1.0022569465121542
-    ],
-    "variant": "output",
-    "gain": 0.9861372976953441,
-    "ci95": [
-      0.9778193786044265,
-      1.0022328332606363
-    ],
-    "vs_iced": null,
-    "vs_fast": null
-  },
-  "consumer_identity": {
-    "probe.cpp": "347004b8491c4208b0b98bf0934d0f991a623f690ab852bbb835b281ff51f2b4",
-    "original-probe.cpp": "8a8afad3c41436639529c775637b8368ee1d903534ced56ee4a02f1dc93fba5b",
-    "route.cpp": "f3c90fd575ce3dbf18e73c21e90a28ea90bfacd7235968207f3011935ced0a5c",
-    "corpus.py": "6b40cc4dee65b80b46ba16a75009fd528d00ee2c2518987022a2178f4062d4fb",
-    "avx_corpus.py": "ee448a013e8af05ee794ae469c2cab7fd98e33d7921cf33c0a19816fff40895b",
-    "jpeg_archive.py": "df177cf8f99b225ad5b61d768e82354d58cca20dd6c7cda1877171767e654f06"
-  },
-  "publication_qualified": false,
-  "scope": "Independent actual-product evidence while the sole ARM raw image-launch observation is repeated. Its interval includes parity and its fixed-file counterpart is stable, but the original loss is unresolved and blocks publication. This run cannot erase that observation."
+  "before": "64cc5df0cbe55cbc33a3a013c231382b49789bc5",
+  "after": "74fc484595a105a684d865634c22e06d23568781",
+  "changed": [
+    "docs/mips.md",
+    "docs/testing.md",
+    "include/neverd/ir/med/MedCallTarget.h",
+    "include/neverd/loader/ELF/MIPSImageMetadata.h",
+    "lib/ir/high/lower/NdOpCallIndLowering.cpp",
+    "lib/ir/med/CMakeLists.txt",
+    "lib/ir/med/abi/MedABIPass.cpp",
+    "lib/ir/med/abi/MedABIPassSupport.cpp",
+    "lib/ir/med/lower/LowToMed.cpp",
+    "lib/ir/med/lower/MIPS/PICGlobalPointer.cpp",
+    "lib/ir/med/lower/MIPS/PICGlobalPointer.h",
+    "lib/loader/ELF/ELFMIPSDynamic.cpp",
+    "lib/loader/ELF/ELFMIPSProfile.cpp",
+    "unittests/lift/core/MedCachedCallTargetTests.cpp",
+    "unittests/lift/mips/MIPSLoaderTests.cpp",
+    "unittests/lift/mips/MIPSPipelineTests.cpp",
+    "unittests/lift/mips/dynamic-call-roundtrip.py",
+    "unittests/lift/mips/pic-import.S",
+    "unittests/lift/mips/roundtrip.py"
+  ],
+  "hypothesis": "MIPS loader/MedIR PIC changes do not alter the linked decoder benchmark and its complete-state consumers.",
+  "required": "Exact complete ELF identity for both before/after baseline and before/after candidate. Run all 34 existing tests, complete states and all real-input signatures on all four builds. Stop transfer if any binary or dependency identity differs.",
+  "performance": "Retain the original 96 observations. A successful byte-identity proof qualifies their source transfer; this run is not another timing sample."
 }

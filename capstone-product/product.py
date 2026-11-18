@@ -47,6 +47,8 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
   llvm_reference=llvm_identity()
   write('llvm-baseline-identity',llvm_reference)
   products={}
+  integration_binaries={}
+  assert llvm_reference == expected['prior_llvm_identity'], (llvm_reference, expected['prior_llvm_identity'])
   import struct,collections
   def compare(left,right,label):
    with left.open('rb') as a,right.open('rb')as b:
@@ -64,9 +66,15 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
       result[which]=dict(context=ctx,number=len(diffs),ranges=diffs[:160])
     write('record-difference-'+label,dict(layout=layout,states=samples,changed=sum(counts.values()),classes=[dict(count=counts[k],**v)for k,v in result.items()]))
   for label in ['base',*variants]:
+   if label == 'current-base':
+    command(['git', 'fetch', '--depth', '1', 'origin', expected['current_neverd']], 'fetch-current-dev', nd)
+    command(['git', 'switch', '--detach', expected['current_neverd']], 'switch-current-dev', nd)
+   active_head = expected['current_neverd'] if label.startswith('current-') else expected['neverd']
+   assert rev(nd) == active_head
+   write(label+'-neverd-head', active_head)
    ref=expected['capstone']
    assert rev(cs)==ref
-   if label!='base':
+   if label not in ('base', 'current-base'):
     change=r/variants[label]['patch']
     assert hashlib.sha256(change.read_bytes()).hexdigest()==variants[label]['patch_sha256']
     command(['git','apply',change],'apply-'+label,cs)
@@ -87,6 +95,13 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
     rep=t/'repeat.trace';again=sp.check_output([tool,rep],text=True).strip();write('base-repeat-state',again);compare(trace,rep,'base-repeat');rep.unlink()
    else:
     compare(t/'base.trace',trace,label);trace.unlink()
+   binary_hashes = {}
+   for name in ('capstone-product', 'capstone-route', 'NeverDX86DecodeDetailTests', 'NeverDX86MpxEncodingTests'):
+    matches = list(build.rglob(name))
+    assert len(matches) == 1, (name, matches)
+    binary_hashes[name] = hashlib.sha256(matches[0].read_bytes()).hexdigest()
+   integration_binaries[label] = binary_hashes
+   write('integration-binaries', integration_binaries)
    bins=list(build.rglob('capstone-product'));assert len(bins)==1,bins
    prod=t/label;shutil.copy2(bins[0],prod);products[label]=prod
    if label=='base':
@@ -113,6 +128,17 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
      batch_checks.append(dict(case=case['name'],signature=signatures[3]))
     write('batch-probe-equivalence',dict(checks=batch_checks,unchanged=True,capacity=64,fallback='Decoder::decodeOneLight'))
 
+   real_signatures = []
+   for case in cases:
+    selector = case['selector'] if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
+    for mode in ((0,1,2,3) if case['selector'] in (32,64) else (0,1,2)):
+     tail = list(map(str, [case['path'], selector, mode, 1]))
+     if 'intervals' in case: tail.append(case['intervals'])
+     signature = list(map(int, sp.check_output([prod, *tail], text=True).split()))[1:]
+     real_signatures.append(dict(case=case['name'], mode=mode, signature=signature))
+   write(label+'-real-signatures', real_signatures)
+   if label == 'base': reference_signatures = real_signatures
+   else: assert real_signatures == reference_signatures, label
    command(['nm','-S','-C',prod],'timed-symbols-'+label)
    deps=sp.check_output(['ldd',prod],text=True);(out/(label+'-linked.txt')).write_text(deps)
    assert not any(key in deps for key in ('libcapstone','libneverd','libNeverD','not found')),deps
@@ -121,6 +147,7 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    write(label+'-snapshot',snapshot)
    identities={name:{key:value[key] for key in ('repository','branch','commit','sha256')} for name,value in snapshot['sources'].items()}
    write(label+'-managed-source-identity',identities)
+   assert identities == expected['prior_managed_source_identity'], identities
    if label=='base':managed_reference=identities
    else:assert identities==managed_reference,(label,'Managed dependency source changed during comparison')
    roots=list(build.rglob('CMakeFiles/capstone.dir')); assert len(roots)==1,roots
@@ -150,62 +177,18 @@ with tempfile.TemporaryDirectory(dir=os.environ['RUNNER_TEMP']) as temp:
    assert not sp.check_output(['git','status','--porcelain'],cwd=cs)
 
   identities={k:hashlib.sha256(v.read_bytes()).hexdigest() for k,v in products.items()}
-  write('products',identities);assert len(set(identities.values()))==(1+len(variants) if feature_active else 1)
-  if not feature_active:
-   remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-   write('complete',dict(cases=0,active=False,identical_product=True,variants=list(variants),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix']))
-   raise SystemExit(0)
-  products['base-copy']=t/'base-copy';shutil.copy2(products['base'],products['base-copy'])
-  payloads={key:path.read_bytes() for key,path in products.items()}
-  assert payloads['base']==payloads['base-copy']
-  image=t/'same-image';maximum=max(map(len,payloads.values()))
-  padded={key:value+bytes(maximum-len(value)) for key,value in payloads.items()}
-  image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
-  probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
-  launches=['images','same-file-fixed']
-  write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest() for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest() for k,v in padded.items()}))
-  assert probe.returncode==0,probe.stderr
-  os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
-  def measure(name,case,mode,reps,launch):
-   sel=case['selector'] if case['selector'] in (32,64) else {0:'arm64',1:'arm',4:'mips64el'}[case['selector']]
-   tail=list(map(str,[case['path'],sel,mode,reps]))
-   if 'intervals' in case:tail.append(case['intervals'])
-   if launch=='images':args=[str(products[name]),*tail]
-   else:
-    with image.open('r+b')as stream:assert stream.write(padded[name])==maximum
-    assert image.stat().st_ino==inode and image.stat().st_size==maximum
-    args=['setarch',platform.machine(),'-R',str(image),*tail]
-   ticks,*signature=map(int,sp.check_output(args,text=True).split())
-   assert ticks>0 and signature[0]>0
-   if 'expected_instructions' in case:
-    assert signature[:2]==[case['expected_instructions']*reps,0],(case['name'],mode,reps,signature)
-   return ticks,signature
-  results=[]
-  cases_of_interest={'jpeg-avx2-i386':(0,1,2),'libssl3t64-i386':(0,1,2),'libzstd1-i386':(0,1,2),'libssl3t64-amd64':(0,1,2),'libjpeg62-turbo-i386':(0,1,2),'arm-cp':(0,1,2),'arm64-ls':(0,1,2),'arm64-sort':(0,),'mips64el-ls':(0,1,2),'putty-32-0.85':(0,1,2),'simd64':(0,1,2),'putty-64-0.85':(0,1,2),'amd64-ls':(1,2),'scalar32':(1,2),'scalar64':(1,2)}
-  batch_cases=('jpeg-avx2-i386','libssl3t64-i386','libzstd1-i386','libssl3t64-amd64','libjpeg62-turbo-i386','putty-32-0.85','putty-64-0.85','amd64-ls')
-  for name in batch_cases:cases_of_interest[name]=(*cases_of_interest[name],3)
-  for case in sorted(cases,key=lambda c:c['name'] not in ('arm-cp','mips64el-ls')):
-   for mode in (0,1,2,3):
-    if mode not in cases_of_interest.get(case['name'],()):continue
-    for launch in launches:
-     # A long full text and a tiny compiler fixture have very different costs.
-     start,_=measure('base',case,mode,1,launch);reps=max(1,min(20000,round(100000/start)))
-     row=dict(case=case['name'],mode=mode,launch=launch,reps=reps,pairs={});oracle=None
-     labels=['base','base-copy',*variants]
-     plans={label:[] for label in labels[1:]}
-     for cycle in range(expected['timing_protocol']['cycles']):
-      order=labels[cycle%len(labels):]+labels[:cycle%len(labels)]
-      times={label:[] for label in labels}
-      for who in order+order[::-1]:
-       ticks,sig=measure(who,case,mode,reps,launch);times[who].append(ticks)
-       if oracle is None:oracle=sig
-       assert oracle==sig,(case['name'],mode,who,oracle,sig)
-      for label in labels[1:]:
-       plans[label].append(dict(ticks={who:times[who] for who in ('base',label)},gain=sum(times['base'])/sum(times[label])))
-     for label in labels[1:]:
-      row['pairs'][label]=dict(plans=plans[label],median=statistics.median(q['gain'] for q in plans[label]))
-     row['signature']=oracle;results.append(row);write('timings',results);print(case['name'],mode,{who:round(v['median'],4) for who,v in row['pairs'].items()},flush=True)
-  remaining={q.stem:json.loads(q.read_text())['changed']for q in out.glob('record-difference-*.json')};write('residual',remaining);assert not any(remaining.values()),remaining
-  assert {(row["case"],row["mode"]) for row in results}=={(name,mode) for name,modes in cases_of_interest.items() for mode in modes};assert len(results)==48*len(launches);write('complete',dict(active=feature_active,launches=launches,cases=len(results),entrypoints=['Decoder::decodeOneLight','Decoder::decodeOne','Decoder::classifyX86Prefix'],variants=list(variants)))
+  write('products', identities)
+  pairs = [('base', 'current-base'), ('small-alias-output', 'current-alias-output')]
+  for before, after in pairs:
+   assert integration_binaries[before] == integration_binaries[after], (before, after, integration_binaries)
+   assert identities[before] == identities[after]
+  assert identities['base'] != identities['small-alias-output']
+  remaining={q.stem:json.loads(q.read_text())['changed'] for q in out.glob('record-difference-*.json')}
+  write('residual', remaining)
+  assert not any(remaining.values()), remaining
+  write('complete', dict(active=True, linked_binaries_identical_across_heads=True, pairs=pairs,
+      current_neverd=expected['current_neverd'], variants=list(variants), real_input_checks=len(reference_signatures),
+      timing_repeated=False, scope=expected['scope']))
+
  finally:
   size=sum(f.stat().st_size for f in t.rglob('*') if f.is_file());shutil.rmtree(t);write('cleanup',dict(bytes=size,removed=not t.exists()))

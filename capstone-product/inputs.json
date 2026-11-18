@@ -14,16 +14,31 @@
       "added": [
         "AliasMapping.c.o"
       ]
+    },
+    "current-base": {
+      "tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+      "changed": [],
+      "added": []
+    },
+    "current-alias-output": {
+      "patch": "publication.patch",
+      "patch_sha256": "7d1f1e66670faba52be447b58145a9cbe9aa4ae51161319eeb17b3abe4d6a292",
+      "tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+      "changed": [
+        "AArch64Mapping.c.o",
+        "MipsMapping.c.o"
+      ],
+      "added": [
+        "AliasMapping.c.o"
+      ]
     }
   },
   "llvm": "live main fork source; prebuilt disabled; per-variant source identity checked",
   "compiler": "Ubuntu 24.04 x86-64 Clang C/C++",
   "launch_controls": "Retain original image launches and add same inode/argv with ASLR disabled; compare each candidate and byte-identical A/A.",
-  "scope": "Actual current NeverD dev with the published memory optimization and compact Clang alias parser: retain all 96 comparisons and all 15 real/targeted workloads, complete-state records, existing tests, and latest LLVM fork source with prebuilts disabled.",
+  "scope": "Rebuild before and after the incoming MIPS PIC commit using latest LLVM source. Require byte-identical linked timing probes, route probes and both test executables across NeverD heads, and exact old measured alias versus publication source. Preserve old timing observations; no new timing claim.",
   "qualification_pending": [
-    "native/mixed timing",
-    "portable builds",
-    "product validation"
+    "current-head linked binary identity and complete-state verification"
   ],
   "validation_entry": {
     "source": {
@@ -62,5 +77,43 @@
     "consumer_unchanged": true,
     "publication_qualified": false
   },
-  "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases."
+  "public_state_scope": "Seeded complete-state product probe plus separate 56,623,104 public records on each of four compilers, 769,142 direct canonical alias decisions on each active Clang compiler, 301 alternate-profile tests and 168 adapter-priority cases.",
+  "current_neverd": "74fc484595a105a684d865634c22e06d23568781",
+  "prior_llvm_identity": {
+    "revision": "0fc04bcc24c22f759f3dbddaa3bbd202563c01fb",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untracked": {}
+  },
+  "prior_managed_source_identity": {
+    "neverd_highway": {
+      "repository": "https://github.com/NeverSight/highway.git",
+      "branch": "master",
+      "commit": "1693ca7926ed12c5520623564e465cff97d93374",
+      "sha256": "f5149df5acb77cd9730ed8e5160f2deff0b02fe49cc45443fd396fdb5f0519d2"
+    },
+    "neverd_simdutf": {
+      "repository": "https://github.com/NeverSight/simdutf.git",
+      "branch": "master",
+      "commit": "8d82299606e675b50de8dc16fd118aae4b65bfde",
+      "sha256": "48e9c9fc33940bcc81cdaec785ce6e21ea20f7b03b7a26bff56abb41d2cf5126"
+    },
+    "neverd_simdjson": {
+      "repository": "https://github.com/NeverSight/simdjson.git",
+      "branch": "master",
+      "commit": "edb7016c62efbe6155226896cdba5736307190e3",
+      "sha256": "e4e849bbb16878f8555501cc09bf4a6d90d4a06ccfc67a202a3c030486c3823d"
+    },
+    "neverd_tbb": {
+      "repository": "https://github.com/NeverSight/oneTBB.git",
+      "branch": "master",
+      "commit": "d26e0502ca39f888c1266cbbf1e2c2226d31e41b",
+      "sha256": "98300a443e43d047eabae27d3e30232efe7508b20d8e24a92ff2d54ef511761b"
+    },
+    "neverd_mimalloc": {
+      "repository": "https://github.com/NeverSight/mimalloc.git",
+      "branch": "main3",
+      "commit": "e8e7bc41ce904b4c83fe20e87d93f24d5286315a",
+      "sha256": "aea4126df4ada4e8f733e2a0f08642a8aabe6c2afc01886a1a9a259c18231ac3"
+    }
+  }
 }

@@ -1,7 +1,7 @@
-name: Validate compact Clang alias lookup through current NeverD and latest LLVM source
+name: Verify linked decoder identity across the current MIPS PIC merge
 on:
   push:
-    branches: [codex/capstone-small-alias-product]
+    branches: [codex/capstone-alias-current-dev-identity]
     paths: [capstone-product/**, .github/workflows/capstone-production-decoder.yml]
 permissions:
   contents: read
@@ -44,7 +44,7 @@ jobs:
       - name: Initialize source dependencies
         working-directory: neverd
         run: git submodule update --init --depth 1 -- third_party/capstone third_party/unicorn third_party/mimalloc third_party/simdjson third_party/simdutf third_party/oneTBB third_party/highway
-      - name: Build production decoding from source and time real PE, ELF and targeted SIMD
+      - name: Build both NeverD heads and compare exact linked decoders, complete states and real inputs
         env:
           CC: ${{ matrix.cc }}
           CXX: clang++
@@ -55,6 +55,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: product-small-alias-${{ matrix.os }}-${{ matrix.cc }}
+          name: product-alias-current-dev-identity-${{ matrix.os }}-${{ matrix.cc }}
           path: product-evidence/
           retention-days: 14
