@@ -1,0 +1,112 @@
+{
+  "complete": true,
+  "profiles": [
+    {
+      "profile": "clang-small-alias-cost-four-ubuntu-22.04-clang-44203984817",
+      "variants": {
+        "pragma": {
+          "source_sha256": "c293f8b0e8b5750a46f2bd25f02caf322d9e34a6352390a7bc9cd32ed52df839",
+          "symbols": "0000000000000000 0000000000001648 r aarch64_alias_trie\n0000000000000000 000000000000000e T map_set_aarch64_alias_id\n0000000000000010 0000000000000bdb t map_set_alias_id_trie_impl\n0000000000000bf0 0000000000000011 T map_set_mips_alias_id\n0000000000001650 0000000000000bc8 r mips_alias_trie\n",
+          "frontend": {
+            "sha256": "bebc22309e52784195a8f13b4af8b391b815a48ffaeb515f587034f5b757dcdb",
+            "has_unroll_disable": true,
+            "has_minsize": false
+          },
+          "optimized": {
+            "sha256": "f1e9043baf6ce0649c73332bcb5f4aa262a54951ffd4ac6bb34bfdfcd2f9d07d",
+            "has_unroll_disable": false,
+            "has_minsize": false
+          }
+        },
+        "small": {
+          "source_sha256": "b489eeaac414c8e7eaafb923fcbda777416d13af0f2ea9b94d38af1395b79cd7",
+          "symbols": "0000000000000000 0000000000001648 r aarch64_alias_trie\n0000000000000000 000000000000000e T map_set_aarch64_alias_id\n0000000000000010 00000000000000e2 t map_set_alias_id_trie_impl\n0000000000000100 0000000000000011 T map_set_mips_alias_id\n0000000000001650 0000000000000bc8 r mips_alias_trie\n",
+          "frontend": {
+            "sha256": "bb5d217c6bf68186a2cb76107bdc3bf2914d7d6283b46c31773740c7ed807b19",
+            "has_unroll_disable": true,
+            "has_minsize": true
+          },
+          "optimized": {
+            "sha256": "ee49ede39d554251602fc28a15eefd1fe39db5266b28dadc7cea0cc998ab7f7b",
+            "has_unroll_disable": true,
+            "has_minsize": true
+          }
+        }
+      },
+      "common_text_moves": 0,
+      "readonly_moves": 0,
+      "writable_moves": 79,
+      "loop_remarks": {
+        "pragma": [
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:35:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:19:14: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:42:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:14:14: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:19:14: remark: completely unrolled loop with 15 iterations [-Rpass=loop-unroll]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:43:8: remark: completely unrolled loop with 15 iterations [-Rpass=loop-unroll]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:14:14: remark: completely unrolled loop with 15 iterations [-Rpass=loop-unroll]"
+        ],
+        "small": [
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:35:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:42:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]"
+        ]
+      }
+    },
+    {
+      "profile": "clang-small-alias-cost-four-ubuntu-24.04-clang-44203984817",
+      "variants": {
+        "pragma": {
+          "source_sha256": "c293f8b0e8b5750a46f2bd25f02caf322d9e34a6352390a7bc9cd32ed52df839",
+          "symbols": "0000000000000000 0000000000001648 r aarch64_alias_trie\n0000000000000000 000000000000000e T map_set_aarch64_alias_id\n0000000000000010 0000000000000175 t map_set_alias_id_trie_impl\n0000000000000190 0000000000000011 T map_set_mips_alias_id\n0000000000001650 0000000000000bc8 r mips_alias_trie\n",
+          "frontend": {
+            "sha256": "f93901d2446150c02fa930f18d26a80f63831e3463a38ccacdf709da10a72b55",
+            "has_unroll_disable": true,
+            "has_minsize": false
+          },
+          "optimized": {
+            "sha256": "b2b48dcd4d5f16c1994d05af5a76d14f0ec2b47c3082e9dcd59cf392e7d2665d",
+            "has_unroll_disable": true,
+            "has_minsize": false
+          }
+        },
+        "small": {
+          "source_sha256": "b489eeaac414c8e7eaafb923fcbda777416d13af0f2ea9b94d38af1395b79cd7",
+          "symbols": "0000000000000000 0000000000001648 r aarch64_alias_trie\n0000000000000000 000000000000000e T map_set_aarch64_alias_id\n0000000000000010 00000000000000dc t map_set_alias_id_trie_impl\n00000000000000f0 0000000000000011 T map_set_mips_alias_id\n0000000000001650 0000000000000bc8 r mips_alias_trie\n",
+          "frontend": {
+            "sha256": "599c47ebec952bfe7314f749a10bf1bc5c5d9c3157d4da8a3e4a406ddcd07d52",
+            "has_unroll_disable": true,
+            "has_minsize": true
+          },
+          "optimized": {
+            "sha256": "963d04549603ad0e6dd14b4d61a46e3914c5bf2f2927ae7758c686a78fcfd115",
+            "has_unroll_disable": true,
+            "has_minsize": true
+          }
+        }
+      },
+      "common_text_moves": 0,
+      "readonly_moves": 0,
+      "writable_moves": 79,
+      "loop_remarks": {
+        "pragma": [
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:35:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:42:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:42:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:42:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]"
+        ],
+        "small": [
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:35:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]",
+          "/home/runner/work/test_mac_intel/test_mac_intel/source/MappingAlias.h:42:3: remark: loop not vectorized [-Rpass-missed=loop-vectorize]"
+        ]
+      }
+    }
+  ],
+  "observation": "The frontend receives unroll-disable metadata. Clang14 subsequently reports three fully unrolled 15-iteration loops; the minsize parser retains the loop metadata and compact loop. Clang18 retains a compact loop with either source, with minsize smaller still. Both measured consumers retain every existing code and read-only symbol; writable relocations remain and require native timing.",
+  "pass_responsibility": "The exact pass that changed or dropped the loop restriction has not been isolated; do not attribute it to a named pass without additional evidence.",
+  "sources": [
+    "https://clang.llvm.org/docs/AttributeReference.html#minsize",
+    "https://llvm.org/docs/TransformMetadata.html"
+  ],
+  "runtime_warning": "minsize may trade execution work for code size; all actual throughput checks remain required.",
+  "publication_qualified": false
+}

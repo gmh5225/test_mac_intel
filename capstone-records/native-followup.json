@@ -1,0 +1,53 @@
+{
+  "inputs": {
+    "baseline_commit": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_tree": "3abb6e15f5c8013b8cbfe46e604f3cc60d1b8de9",
+    "source_parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+    "baseline_patch_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "variants": {
+      "output": {
+        "tree": "9ea73964b159ef3634afe1f452626cb0e4a2e033",
+        "sha256": "5d7e25f893b623fe856f7cd1cd2ed6ef24f5c7155b9a3c87739aabf3616f0ce5",
+        "experiment": "round1417-clang-small-alias",
+        "semantic_run": {
+          "id": 44203984817,
+          "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+          "status": "completed",
+          "conclusion": "success",
+          "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+          "run_attempt": 1
+        }
+      }
+    }
+  },
+  "cycles": 32,
+  "native_target_ms": 80,
+  "mixed_target_ms": 80,
+  "launches": [
+    "images",
+    "same-file-fixed"
+  ],
+  "native_rows": 84,
+  "mixed_rows": 96,
+  "profiles": [
+    "ubuntu-22.04 clang",
+    "ubuntu-24.04 clang"
+  ],
+  "inactive_compilers": "GCC11 and GCC13 exact released object and executable identity passed in the four-compiler scope run.",
+  "prior_failures_preserved": [
+    "../round1405-alias-call-shape-native/native-review.json",
+    "../round1410-alias-launch-factors/decision.json",
+    "../round1415-clang-rolled-alias/code-size-review.json"
+  ],
+  "purpose": "Measure the compact private Clang alias parser on the published memory-output baseline. The mixed cost consumer keeps every original text and read-only symbol at its original position; verify the actual native consumers independently and retain all writable data movement.",
+  "gates": "Both launch controls, every scalar/SIMD PE32/64 control and ARM/AArch64/MIPS case, complete source and consumer identity, and all A/A flags and losses. Static counts and code size are not actual throughput qualification.",
+  "cost_evidence": {
+    "id": 44203984817,
+    "head_sha": "8fdd25d337bb80a0fb67547b018670adb10c35ea",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44203984817",
+    "run_attempt": 1
+  },
+  "publication_qualified": false
+}
