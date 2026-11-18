@@ -1,32 +1,13 @@
 {
   "source": {
-    "dispatch": {
-      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-      "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
-      "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
-      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
-      "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
-    },
-    "scan": {
-      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-      "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
-      "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
-      "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
-      "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
-    }
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
+    "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
   },
-  "native_evidence": "../round1485-tagged-special-output/native-review.json",
-  "instruction_evidence": "../round1487-arm-tagged-special-cost/address-attribution.json",
-  "hardware_capability": {
-    "id": 44288414135,
-    "head_sha": "ed706c9cb9f7118933dad0f626650d20b9bc4b85",
-    "status": "completed",
-    "conclusion": "success",
-    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44288414135",
-    "run_attempt": 1
-  },
-  "question": "R1485 reduces ARM-host scalar/SIMD instruction work but loses SIMD format and AArch64 native throughput. Measure hardware cycles, retired instructions, branches, branch failures and front/back-end stalls to distinguish changed work from prediction and scheduling effects.",
-  "method": "One ARM64 host; unchanged original mixed-ISA consumer; published baseline, byte-identical A/A, R1481 dense special plans and R1485 high-bit tagged plans. All original-image and fixed-path/inode/size/ASLR native panels retained. Hardware samples use the fixed image, 20 balanced forward/reverse cycles, minimum 20 traversals, three preflighted two-event groups.",
-  "scope": "Seven predeclared case/mode pairs: scalar32 format, scalar64 format, SIMD64 format/detail, AArch64 ls raw/format and PE32 format. Raw counts and zero values remain in evidence. Unsupported events are recorded and never inferred. Whole-process counters include the unchanged setup and output work; native timing is independent.",
-  "publication_qualified": false
+  "consumer_reference": "69d69eb3f354d26e42aca5700918607bef64c2ce",
+  "question": "Does removing only the benchmark NUL-string observation change the relative tagged-plan loss observed in SIMD/AArch64 formatting?",
+  "design": "One shared consumer object and runtime observation flag across baseline, identical A/A and tagged-plan images. Balanced factorial cycles, fixed inode/path/size/ASLR and original-image launches. AArch64 raw is the negative control; PE32 format checks retained algorithmic benefit.",
+  "limits": "The consumer is deliberately changed for diagnosis. This cannot replace frozen benchmark qualification, prove a specific predictor collision, or stand in for current NeverD product testing."
 }

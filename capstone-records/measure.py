@@ -30,7 +30,7 @@ assert meta['dispatch']['parent']==meta['scan']['parent']
 save('environment',dict(cpu=Path('/proc/cpuinfo').read_text(),compiler=sp.check_output(['clang','--version'],text=True),
                         valgrind=sp.check_output(['valgrind','--version'],text=True),
                         platform=platform.platform()))
-w=Path(tempfile.mkdtemp(prefix='capstone-arm-tagged-hardware-'))
+w=Path(tempfile.mkdtemp(prefix='capstone-output-observer-'))
 try:
     cases=corpus.prepare(r,w,e,run)
     run(['clang++','-O3','-DNDEBUG','-std=c++17','-I',s,'-I',s/'include',
@@ -45,7 +45,7 @@ try:
          '-DCAPSTONE_BUILD_MACOS_THIN=ON','-DCAPSTONE_BUILD_LEGACY_TESTS=OFF',
          '-DCAPSTONE_BUILD_CSTOOL=OFF'],'configure')
     binaries,objects={},{ }
-    for key in ('base','dispatch','scan'):
+    for key in ('base','scan'):
         patch=r/(key+'.patch')
         if key!='base':
             assert sha(patch)==meta[key]['sha256']
@@ -83,8 +83,8 @@ try:
     if hasattr(os,'sched_getaffinity'):
         os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
     cost_probe(binaries,cases,w,e,run)
-    save('complete',dict(complete=True,variants=['base','aa','dispatch','scan'],source=meta,
-                         native_timing=True,scope='ARM64 native and whole-process hardware-event diagnosis. Exact candidate sources and the original consumer are preserved; this is not publication qualification.'))
+    save('complete',dict(complete=True,variants=['base','aa','scan'],source=meta,
+                         native_timing=True,scope='Diagnostic observer interaction only. The modified consumer binary retains full library format/detail work; a runtime flag controls only NUL-terminated string observation. Exact baseline and tagged-plan sources are unchanged. Not a frozen-consumer performance qualification or a NeverD product measurement.'))
 finally:
     amount=sum(f.stat().st_size for f in w.rglob('*')if f.is_file())
     shutil.rmtree(w)

@@ -1,7 +1,7 @@
-name: Measure tagged-plan ARM native hardware costs
+name: Diagnose output-observer interaction on ARM64
 on:
   push:
-    branches: [codex/capstone-arm-tagged-hardware]
+    branches: [codex/capstone-output-observer-interaction]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -42,6 +42,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: arm-tagged-hardware-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: output-observer-interaction-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
           path: evidence/
           retention-days: 14
