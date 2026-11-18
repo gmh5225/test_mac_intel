@@ -1,7 +1,7 @@
-name: Time canonical VEX32 register-pair output on published compact alias optimization
+name: Isolate the VEX32 mixed-architecture placement regression with frozen objects
 on:
   push:
-    branches: [codex/capstone-vex32-pairs-integrated-mixed]
+    branches: [codex/capstone-vex32-placement-counterfactual]
     paths: [capstone-records/**, .github/workflows/capstone-records.yml]
 permissions:
   contents: read
@@ -11,8 +11,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-22.04, cc: clang, archs: four }
-          - { host: ubuntu-24.04, cc: clang, archs: four }
+          - { host: ubuntu-24.04, cc: clang, archs: four, replica: 1 }
+          - { host: ubuntu-24.04, cc: clang, archs: four, replica: 2 }
     runs-on: ${{ matrix.host }}
     timeout-minutes: 60
     env:
@@ -41,6 +41,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-pairs-integrated-images-${{ matrix.archs }}-${{ matrix.host }}-${{ matrix.cc }}-${{ github.run_id }}
+          name: vex32-placement-${{ matrix.host }}-${{ matrix.cc }}-${{ matrix.replica }}
           path: evidence/
           retention-days: 14

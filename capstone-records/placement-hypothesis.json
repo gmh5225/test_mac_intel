@@ -1,0 +1,55 @@
+{
+  "candidate": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "956cd702e9822a013e8162e469edbf6afb1e5964",
+    "sha256": "02bf738f0ee4f36a1a87fa3c82bc337235eb2abffd002cea2f0f8c87e0e5af56",
+    "comparison_source": {
+      "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+      "tree": "3a18c8919a21b3a92093dc0ab63586a6281226be",
+      "sha256": "27e119562aa6f457453d722db537d8d01c1f557c77b208a7168a41f6b191c131",
+      "runtime_sources_identical_to": {
+        "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+        "baseline_tree": "d2f2cdc5930b4fbab7d1507085c30f3a5a25068a",
+        "tree": "f8950dad443feefc5cf9a5253613b54f5d93b4ff",
+        "sha256": "84e90f46f73fda452e281e55ae6ecb868bf264910f963e6e77fc7cabb6495e46",
+        "files": [
+          "CMakeLists.txt",
+          "Makefile",
+          "arch/X86/X86GenSimpleOutput.inc",
+          "arch/X86/X86OutputIterator.c",
+          "arch/X86/X86SimpleOutput.h",
+          "arch/X86/X86Vex32Output.c",
+          "suite/synctools/x86_simple_output.cpp",
+          "xcode/Capstone.xcodeproj/project.pbxproj"
+        ]
+      },
+      "build_only_difference": [
+        "CMakeLists.txt",
+        "Makefile",
+        "xcode/Capstone.xcodeproj/project.pbxproj"
+      ]
+    },
+    "files": [
+      "CMakeLists.txt",
+      "Makefile",
+      "arch/X86/X86GenSimpleOutput.inc",
+      "arch/X86/X86GenVex32PairOutput.inc",
+      "arch/X86/X86OutputIterator.c",
+      "arch/X86/X86SimpleOutput.h",
+      "arch/X86/X86VectorOutput.c",
+      "arch/X86/X86VectorRegisterOutput.h",
+      "arch/X86/X86Vex32Output.c",
+      "suite/synctools/x86_simple_output.cpp",
+      "suite/synctools/x86_vector_output.cpp",
+      "tests/unit/x86_simple_output.c",
+      "xcode/Capstone.xcodeproj/project.pbxproj"
+    ]
+  },
+  "evidence": "../round1451-vex32-pairs-integrated-native/decision.json",
+  "observation": "Both mixed runs used AMD EPYC 9V45. Clang18 original ordinary text addresses stay fixed; eight old isolated functions move by 1248 bytes and original AArch64 readonly tables move by 6912 bytes. ARM raw regressions cannot come from executing the new x86 writer.",
+  "hypothesis": "Relocating only added VEX32 code and constant data out of the original image restores original backend positions and removes a layout-dependent component of the regression.",
+  "protocol": "No recompilation of candidate objects; unchanged consumer. Audit every allocated leaf section byte, archive order, symbols, sections and segment permissions. Two independently assigned Clang18 runners, 32 balanced 60ms cycles, original image and same-inode fixed-ASLR launches, byte-identical A/A.",
+  "prior": "R1294 restored only C5 readonly addresses on an older source and did not establish a native mechanism. This tests the exact R1451 source and also restores isolated code placement.",
+  "publication_qualified": false,
+  "production_patch": false
+}

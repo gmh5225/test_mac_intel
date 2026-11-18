@@ -1,6 +1,7 @@
 from pathlib import Path
 import hashlib,itertools,json,os,platform,shutil,statistics as st,subprocess as sp,tempfile
 import corpus
+from placement import relocate
 from layout import object_proof, linked_layout
 r=Path(__file__).resolve().parent;e=r.parent/'evidence';e.mkdir();s=r.parent/'source';cc=os.environ['MEASURE_CC']
 sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest()
@@ -51,6 +52,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-pairs-integrated-mixed-'
    if key!='base':
     write(key+'-object-proof',object_proof(key,t/'baseline-plan.o',objdir/'arch/X86/X86OutputIterator.c.o'))
     write(key+'-linked-layout',linked_layout(e/'base-symbols.txt',e/(key+'-symbols.txt'),key))
+   if key=='output':bins['placed']=relocate(b,t,e,t/'single.o',e/'base-symbols.txt',run)
    libs[key]=t/(key+'-'+libname);shutil.copy2(b/libname,libs[key])
    if key!='base':run(['git','apply','-R',variant],'restore-'+key,s)
   for key in ('output',):
@@ -62,7 +64,7 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-pairs-integrated-mixed-'
    active=bool(changed)
    write('scope',dict(active=active,source_applies=True,policy='Canonical VEX32 register-pair output; all unmodified runtime objects are preserved and every symbol relocation is recorded for native comparison; identical lowering is retained as an object and binary identity control'))
    write('objects-'+key,dict(changed=changed,added=sorted(added),identical=len(objects['base'])-len(changed)))
-  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==2;write('binaries',digests)
+  bins['aa']=t/'aa';shutil.copy2(bins['base'],bins['aa']);digests={k:sha(v)for k,v in bins.items()};assert len(set(digests.values()))==3;write('binaries',digests)
   if not active:
    write('complete',dict(cc=cc,host=platform.platform(),cases=0,active=False,identical_binary=True));raise SystemExit(0)
   payloads={key:path.read_bytes()for key,path in bins.items()}
@@ -71,7 +73,8 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-pairs-integrated-mixed-'
   image=t/'same-image';image.write_bytes(padded['base']);image.chmod(0o755);inode=image.stat().st_ino
   probe=sp.run(['setarch',platform.machine(),'-R','/bin/true'],capture_output=True,text=True)
   launches=['images']
-  if probe.returncode==0:launches.append('same-file-fixed')
+  assert probe.returncode==0,probe.stderr
+  launches.append('same-file-fixed')
   write('launch-controls',dict(launches=launches,aslr_disable_returncode=probe.returncode,aslr_disable_stderr=probe.stderr,inode=inode,fixed_size=maximum,original_sha256={k:hashlib.sha256(v).hexdigest()for k,v in payloads.items()},padded_sha256={k:hashlib.sha256(v).hexdigest()for k,v in padded.items()},semantic_qualification='Canonical VEX32 register-pair output; all unmodified runtime objects are preserved and every symbol relocation is recorded for native comparison; preserve complete records, original images and controlled-image timing panels.'))
   if hasattr(os,'sched_getaffinity'):os.sched_setaffinity(0,{min(os.sched_getaffinity(0))})
   def sample(key,x,mode,reps,launch):
@@ -84,10 +87,11 @@ with tempfile.TemporaryDirectory(prefix='capstone-vex32-pairs-integrated-mixed-'
    return json.loads(sp.check_output(args,text=True))
   data=[]
   for x in cases:
-   for mode in (0,1,2):
+   modes={'arm-ls':(0,), 'arm-sort':(0,1), 'arm-cp':(0,), 'arm64-ls':(0,1,2), 'mips64el-ls':(0,2), 'amd64-ls':(1,), 'putty-32-0.85':(1,), 'putty-64-0.85':(1,)}
+   for mode in modes[x['name']]:
     for launch in launches:
-     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*80e6/warm['cpu_ns'])))
-     runs=[];reference=None;keys=['base','aa','output']
+     warm=sample('base',x,mode,2,launch);n=max(2,min(4000,round(2*60e6/warm['cpu_ns'])))
+     runs=[];reference=None;keys=['base','aa','output','placed']
      for k in range(32):
       seq=keys[k%len(keys):]+keys[:k%len(keys)];ticks={v:[] for v in keys}
       for v in seq+seq[::-1]:
