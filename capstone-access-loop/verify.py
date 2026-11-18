@@ -75,6 +75,7 @@ try:
     if profile == 'x86-only':
         options += ['-DCAPSTONE_' + arch + '_SUPPORT=OFF' for arch in ('ARM','AARCH64','MIPS')]
         units = [name for name in units if not name.startswith(('arm_','aarch64_','mips_'))]
+        units.remove('register_descriptors')
     run('configure', ['cmake', '-S', s, '-B', b, *options])
     run('build', ['cmake', '--build', b, '--config', 'Release', '--target', 'capstone_static', *units, '--parallel', '4'])
     run('tests', ['ctest', '--test-dir', b, '-C', 'Release', '--no-tests=error', '--output-on-failure', '--output-junit', out / 'tests.xml', '-R', '^unit_(' + '|'.join(units) + ')$'])

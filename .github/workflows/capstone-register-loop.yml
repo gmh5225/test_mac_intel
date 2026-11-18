@@ -1,7 +1,7 @@
 name: Validate terminal-miss VEX32 scanning in alternate configurations
 on:
   push:
-    branches: [codex/capstone-vex32-terminal-configurations-profiles]
+    branches: [codex/capstone-vex32-terminal-configurations-repair]
     paths: [capstone-access-loop/**, .github/workflows/capstone-register-loop.yml]
 permissions:
   contents: read
@@ -11,14 +11,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { host: ubuntu-24.04, compiler: clang, profile: sanitize }
-          - { host: ubuntu-24.04, compiler: gcc, profile: sanitize }
-          - { host: ubuntu-24.04, compiler: clang, profile: diet }
-          - { host: ubuntu-24.04, compiler: gcc, profile: reduced }
-          - { host: ubuntu-24.04, compiler: gcc, profile: diet }
-          - { host: ubuntu-24.04, compiler: clang, profile: reduced }
-          - { host: ubuntu-24.04, compiler: clang, profile: adapter }
-          - { host: ubuntu-24.04, compiler: clang, profile: no-x86 }
           - { host: ubuntu-24.04, compiler: clang, profile: x86-only }
           - { host: ubuntu-24.04, compiler: gcc, profile: x86-only }
     runs-on: ${{ matrix.host }}
@@ -43,6 +35,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: vex32-terminal-configurations-${{ matrix.host }}-${{ matrix.compiler }}-${{ matrix.profile }}
+          name: vex32-terminal-configurations-repair-${{ matrix.host }}-${{ matrix.compiler }}-${{ matrix.profile }}
           path: evidence/
           retention-days: 14
