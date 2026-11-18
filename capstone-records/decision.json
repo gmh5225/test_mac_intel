@@ -1,0 +1,37 @@
+{
+  "complete": true,
+  "publication_qualified": false,
+  "production_modified": false,
+  "overall_goal_complete": false,
+  "run": {
+    "id": 44305997882,
+    "head_sha": "79b5fd0344e4e5aeabfe44fc5f415072d3bf58b1",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44305997882",
+    "run_attempt": 1
+  },
+  "source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
+    "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
+  },
+  "native_panels": 16,
+  "hardware_panels": 32,
+  "finding": "String observation amplifies the tagged-plan SIMD loss in this diagnostic: fixed-launch gain is 0.995855 with text scanning and 0.999617 without it. The paired observer interaction is 1.003629 (descriptive CI 1.001208\u20131.006123). Removing the observation loop does not eliminate additional retired branch misses: candidate/base r22 is 1.362 without the loop and 1.517 with it. PE32 retains a gain with both observers; AArch64 results do not support the same observer interaction as the explanation for its earlier regression.",
+  "decision": "Retain the frozen qualification failure. Do not change benchmark scoring or merge the tagged-plan candidate on this evidence. Continue reducing decoder work; actual current NeverD behavior still requires an independent product test.",
+  "limits": "Diagnostic factorial comparison only; paired-cycle unadjusted bootstrap intervals. Runtime observer changes neither library text/detail options nor candidate sources. It changes the consumer code relative to frozen qualification. Hardware ratios are candidate/base whole-process counts, native gains are base/candidate measured-loop CPU time. Different calibrated work between observers and process startup limit direct counter comparisons across observers.",
+  "observation_contract": {
+    "library_options_unchanged": true,
+    "observers": {
+      "1": "Original NUL-string length/last-byte observation",
+      "0": "Skip only the two text_value calls; IDs, boundaries and detail consumers remain"
+    },
+    "raw_mode_first_results_equal": true,
+    "runtime_flag_same_binary": true,
+    "statistical_scope": "Factorial balanced cycles; descriptive unadjusted intervals. No frozen benchmark or product qualification. Whole-process PMU includes startup and all warm/expected/measured traversals."
+  },
+  "cleanup_bytes_removed": 125045073
+}

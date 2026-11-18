@@ -1,0 +1,38 @@
+--- original-single.cpp
++++ single.cpp
+@@ -73,6 +73,7 @@
+   r.values += n + (n ? static_cast<unsigned char>(s[n - 1]) : 0);
+ }
+ 
++static bool observe_text = true;
+ struct Session {
+  const API &api; unsigned bits, mode; csh handle=0; cs_insn *insn=nullptr;
+  Session(const API &a, unsigned b, unsigned m): api(a),bits(b),mode(m) {
+@@ -114,7 +115,7 @@
+       if (!insn->size)
+         throw std::runtime_error("zero instruction length");
+       result.values += insn->id;
+-      if (mode) {
++      if (mode && observe_text) {
+         text_value(result, insn->mnemonic);
+         text_value(result, insn->op_str);
+       }
+@@ -167,7 +168,7 @@
+ static bool equal(const Result&a,const Result&b){return a.instructions==b.instructions&&a.rejected==b.rejected&&a.values==b.values&&a.boundaries==b.boundaries;}
+ int main(int argc, char **argv) {
+   try {
+-    if (argc != 5) throw std::runtime_error("selector mode corpus repeats");
++    if (argc != 6) throw std::runtime_error("selector mode corpus repeats observe_text");
+ #ifdef __APPLE__
+     if (pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0))
+       throw std::runtime_error("QoS");
+@@ -175,6 +176,9 @@
+     const unsigned selector = std::stoul(argv[1]);
+     const unsigned mode = std::stoul(argv[2]);
+     const unsigned repeats = std::stoul(argv[4]);
++    const unsigned observation = std::stoul(argv[5]);
++    if (observation > 1) throw std::runtime_error("observer");
++    observe_text = observation != 0;
+     if (mode > 2 || !repeats) throw std::runtime_error("mode/repeats");
+     API api;
+     Session session(api, selector, mode);
