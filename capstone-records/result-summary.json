@@ -1,0 +1,6480 @@
+{
+  "complete": true,
+  "run": {
+    "id": 44263634502,
+    "head_sha": "c9e62a33ad135374935b2042d61a23d16c987043",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/gmh5225/test_mac_intel/actions/runs/44263634502",
+    "run_attempt": 1
+  },
+  "attempts": [
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "preflight": {
+        "original_setting": "4",
+        "permission_returncode": 0,
+        "cpu": "Intel(R) Xeon(R) 6975P-C",
+        "supported": true,
+        "returncode": 0,
+        "stderr": "425056,,cycles:u,15350740,100.00,,\n199832,,instructions:u,15350740,100.00,,\n44369,,branches:u,15350740,100.00,,\n2493,,branch-misses:u,15350740,100.00,,\n",
+        "events": {
+          "cycles:u": "425056",
+          "instructions:u": "199832",
+          "branches:u": "44369",
+          "branch-misses:u": "2493"
+        },
+        "restore_returncode": 0,
+        "final_setting": "4",
+        "setting_restored": true
+      }
+    },
+    {
+      "host": "layout-fusion-host-2-four-ubuntu-24.04-clang-44263634502",
+      "preflight": {
+        "original_setting": "4",
+        "permission_returncode": 0,
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "supported": false,
+        "returncode": 1,
+        "stderr": "Error:\nNo supported events found.\nThe cycles:u event is not supported.\n",
+        "events": {},
+        "restore_returncode": 0,
+        "final_setting": "4",
+        "setting_restored": true
+      }
+    },
+    {
+      "host": "layout-fusion-host-3-four-ubuntu-24.04-clang-44263634502",
+      "preflight": {
+        "original_setting": "4",
+        "permission_returncode": 0,
+        "cpu": "AMD EPYC 9V45 96-Core Processor",
+        "supported": false,
+        "returncode": 1,
+        "stderr": "Error:\nNo supported events found.\nThe cycles:u event is not supported.\n",
+        "events": {},
+        "restore_returncode": 0,
+        "final_setting": "4",
+        "setting_restored": true
+      }
+    },
+    {
+      "host": "layout-fusion-host-4-four-ubuntu-24.04-clang-44263634502",
+      "preflight": {
+        "original_setting": "4",
+        "permission_returncode": 0,
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "supported": false,
+        "returncode": 1,
+        "stderr": "Error:\nNo supported events found.\nThe cycles:u event is not supported.\n",
+        "events": {},
+        "restore_returncode": 0,
+        "final_setting": "4",
+        "setting_restored": true
+      }
+    }
+  ],
+  "hardware_available": true,
+  "profiles": [
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "cpu": {
+        "model": "Intel(R) Xeon(R) 6975P-C"
+      },
+      "cleanup": {
+        "bytes": 289833681,
+        "removed": true
+      },
+      "pmu": {
+        "original_setting": "4",
+        "permission_returncode": 0,
+        "permission_stdout": "kernel.perf_event_paranoid = -1\n",
+        "permission_stderr": "",
+        "groups": {
+          "core": {
+            "supported": true,
+            "returncode": 0,
+            "stderr": "313640,,cycles:u,14638845,100.00,,\n201635,,instructions:u,14638845,100.00,,\n44866,,branches:u,14638845,100.00,,\n2586,,branch-misses:u,14638845,100.00,,\n",
+            "parsed": {
+              "counts": {
+                "cycles:u": 313640,
+                "instructions:u": 201635,
+                "branches:u": 44866,
+                "branch-misses:u": 2586
+              },
+              "running_percent": {
+                "cycles:u": 100.0,
+                "instructions:u": 100.0,
+                "branches:u": 100.0,
+                "branch-misses:u": 100.0
+              }
+            }
+          },
+          "retired_fusion": {
+            "supported": true,
+            "returncode": 0,
+            "stderr": "298190,,cycles:u,323563,100.00,,\n201634,,instructions:u,323563,100.00,,\n30981,,inst_retired.macro_fused:u,323563,100.00,,\n224816,,uops_retired.slots:u,323563,100.00,,\n",
+            "parsed": {
+              "counts": {
+                "cycles:u": 298190,
+                "instructions:u": 201634,
+                "inst_retired.macro_fused:u": 30981,
+                "uops_retired.slots:u": 224816
+              },
+              "running_percent": {
+                "cycles:u": 100.0,
+                "instructions:u": 100.0,
+                "inst_retired.macro_fused:u": 100.0,
+                "uops_retired.slots:u": 100.0
+              }
+            }
+          },
+          "issued": {
+            "supported": true,
+            "returncode": 0,
+            "stderr": "288585,,cycles:u,320964,100.00,,\n201634,,instructions:u,320964,100.00,,\n420213,,uops_issued.any:u,320964,100.00,,\n289640,,idq.dsb_uops:u,320964,100.00,,\n",
+            "parsed": {
+              "counts": {
+                "cycles:u": 288585,
+                "instructions:u": 201634,
+                "uops_issued.any:u": 420213,
+                "idq.dsb_uops:u": 289640
+              },
+              "running_percent": {
+                "cycles:u": 100.0,
+                "instructions:u": 100.0,
+                "uops_issued.any:u": 100.0,
+                "idq.dsb_uops:u": 100.0
+              }
+            }
+          },
+          "transitions": {
+            "supported": true,
+            "returncode": 0,
+            "stderr": "324756,,cycles:u,342602,100.00,,\n201635,,instructions:u,342602,100.00,,\n9838,,dsb2mite_switches.penalty_cycles:u,342602,100.00,,\n94408,,idq.mite_uops:u,342602,100.00,,\n",
+            "parsed": {
+              "counts": {
+                "cycles:u": 324756,
+                "instructions:u": 201635,
+                "dsb2mite_switches.penalty_cycles:u": 9838,
+                "idq.mite_uops:u": 94408
+              },
+              "running_percent": {
+                "cycles:u": 100.0,
+                "instructions:u": 100.0,
+                "dsb2mite_switches.penalty_cycles:u": 100.0,
+                "idq.mite_uops:u": 100.0
+              }
+            }
+          }
+        },
+        "supported": true,
+        "samples": 1280,
+        "restore_returncode": 0,
+        "restore_stdout": "kernel.perf_event_paranoid = 4\n",
+        "restore_stderr": "",
+        "final_setting": "4",
+        "setting_restored": true
+      },
+      "cycle_sampling": {
+        "preflight_returncode": 0,
+        "preflight_stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.001 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+        "records": [
+          {
+            "variant": "base",
+            "cycle": 0,
+            "position": 0,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404118000,
+              "wall_ns": 404175344,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-0-base.report.txt",
+            "data": "cycles-sampling-0-0-base.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "aa",
+            "cycle": 0,
+            "position": 1,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404284000,
+              "wall_ns": 404323461,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-1-aa.report.txt",
+            "data": "cycles-sampling-0-1-aa.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "iterator",
+            "cycle": 0,
+            "position": 2,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 413122000,
+              "wall_ns": 413132542,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-2-iterator.report.txt",
+            "data": "cycles-sampling-0-2-iterator.perf.data.gz",
+            "image_sha256": "8d4d764581acb146edd5708f5d3a4300391a0e130936ebd2f0b679a8fd9000db"
+          },
+          {
+            "variant": "leaf",
+            "cycle": 0,
+            "position": 3,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404555000,
+              "wall_ns": 404577087,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-3-leaf.report.txt",
+            "data": "cycles-sampling-0-3-leaf.perf.data.gz",
+            "image_sha256": "c261691d60394df7f665370aa2a9493781cf0b35df740d57610e5137398715b3"
+          },
+          {
+            "variant": "candidate",
+            "cycle": 0,
+            "position": 4,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 414132000,
+              "wall_ns": 414187565,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-4-candidate.report.txt",
+            "data": "cycles-sampling-0-4-candidate.perf.data.gz",
+            "image_sha256": "e236b890ec2aebe560f691cf4860082d9c84e2a84a56e1f2fa8e109659d4af3e"
+          },
+          {
+            "variant": "candidate",
+            "cycle": 0,
+            "position": 5,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 414215000,
+              "wall_ns": 414244783,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-5-candidate.report.txt",
+            "data": "cycles-sampling-0-5-candidate.perf.data.gz",
+            "image_sha256": "e236b890ec2aebe560f691cf4860082d9c84e2a84a56e1f2fa8e109659d4af3e"
+          },
+          {
+            "variant": "leaf",
+            "cycle": 0,
+            "position": 6,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404535000,
+              "wall_ns": 404614625,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-6-leaf.report.txt",
+            "data": "cycles-sampling-0-6-leaf.perf.data.gz",
+            "image_sha256": "c261691d60394df7f665370aa2a9493781cf0b35df740d57610e5137398715b3"
+          },
+          {
+            "variant": "iterator",
+            "cycle": 0,
+            "position": 7,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 413233000,
+              "wall_ns": 413277312,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-7-iterator.report.txt",
+            "data": "cycles-sampling-0-7-iterator.perf.data.gz",
+            "image_sha256": "8d4d764581acb146edd5708f5d3a4300391a0e130936ebd2f0b679a8fd9000db"
+          },
+          {
+            "variant": "aa",
+            "cycle": 0,
+            "position": 8,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404744000,
+              "wall_ns": 404798705,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-8-aa.report.txt",
+            "data": "cycles-sampling-0-8-aa.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "base",
+            "cycle": 0,
+            "position": 9,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 403802000,
+              "wall_ns": 403823693,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-0-9-base.report.txt",
+            "data": "cycles-sampling-0-9-base.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "aa",
+            "cycle": 1,
+            "position": 0,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 406439000,
+              "wall_ns": 406466535,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-0-aa.report.txt",
+            "data": "cycles-sampling-1-0-aa.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "iterator",
+            "cycle": 1,
+            "position": 1,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 413563000,
+              "wall_ns": 413572726,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-1-iterator.report.txt",
+            "data": "cycles-sampling-1-1-iterator.perf.data.gz",
+            "image_sha256": "8d4d764581acb146edd5708f5d3a4300391a0e130936ebd2f0b679a8fd9000db"
+          },
+          {
+            "variant": "leaf",
+            "cycle": 1,
+            "position": 2,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 405345000,
+              "wall_ns": 405372017,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-2-leaf.report.txt",
+            "data": "cycles-sampling-1-2-leaf.perf.data.gz",
+            "image_sha256": "c261691d60394df7f665370aa2a9493781cf0b35df740d57610e5137398715b3"
+          },
+          {
+            "variant": "candidate",
+            "cycle": 1,
+            "position": 3,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 413964000,
+              "wall_ns": 414041448,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-3-candidate.report.txt",
+            "data": "cycles-sampling-1-3-candidate.perf.data.gz",
+            "image_sha256": "e236b890ec2aebe560f691cf4860082d9c84e2a84a56e1f2fa8e109659d4af3e"
+          },
+          {
+            "variant": "base",
+            "cycle": 1,
+            "position": 4,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404727000,
+              "wall_ns": 404774200,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-4-base.report.txt",
+            "data": "cycles-sampling-1-4-base.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "base",
+            "cycle": 1,
+            "position": 5,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404870000,
+              "wall_ns": 404932137,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-5-base.report.txt",
+            "data": "cycles-sampling-1-5-base.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          },
+          {
+            "variant": "candidate",
+            "cycle": 1,
+            "position": 6,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 413513000,
+              "wall_ns": 413573085,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-6-candidate.report.txt",
+            "data": "cycles-sampling-1-6-candidate.perf.data.gz",
+            "image_sha256": "e236b890ec2aebe560f691cf4860082d9c84e2a84a56e1f2fa8e109659d4af3e"
+          },
+          {
+            "variant": "leaf",
+            "cycle": 1,
+            "position": 7,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404827000,
+              "wall_ns": 404855912,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-7-leaf.report.txt",
+            "data": "cycles-sampling-1-7-leaf.perf.data.gz",
+            "image_sha256": "c261691d60394df7f665370aa2a9493781cf0b35df740d57610e5137398715b3"
+          },
+          {
+            "variant": "iterator",
+            "cycle": 1,
+            "position": 8,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 413412000,
+              "wall_ns": 413473970,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.094 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-8-iterator.report.txt",
+            "data": "cycles-sampling-1-8-iterator.perf.data.gz",
+            "image_sha256": "8d4d764581acb146edd5708f5d3a4300391a0e130936ebd2f0b679a8fd9000db"
+          },
+          {
+            "variant": "aa",
+            "cycle": 1,
+            "position": 9,
+            "case": "arm64-ls",
+            "mode": 0,
+            "consumer": {
+              "selector": 0,
+              "mode": 0,
+              "repeats": 400,
+              "cpu_ns": 404797000,
+              "wall_ns": 404850335,
+              "first": {
+                "instructions": 23973,
+                "rejected": 0,
+                "boundaries": 3568584732867462848,
+                "values": 12930965
+              },
+              "result": {
+                "instructions": 9589200,
+                "rejected": 0,
+                "boundaries": 10879090948025945141,
+                "values": 5172386000
+              }
+            },
+            "stderr": "[ perf record: Woken up 1 times to write data ]\n[ perf record: Captured and wrote 0.092 MB /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/active.perf.data ]\n",
+            "report_stderr": "",
+            "report": "cycles-sampling-1-9-aa.report.txt",
+            "data": "cycles-sampling-1-9-aa.perf.data.gz",
+            "image_sha256": "9d4f9dc1546676e24d84938cb6a7fa1bc080bedc3068c607b7063f0ba62f6a39"
+          }
+        ]
+      },
+      "native_memset": {
+        "base": {
+          "returncode": 0,
+          "complete": true,
+          "observations": [
+            {
+              "pc": 93824992841984,
+              "target": 93824992841990,
+              "symbol": "memset@plt + 6 in section .plt of /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/same-image",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009784096,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009784096,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009784096,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            }
+          ],
+          "run_link_offset": 613680,
+          "memset_plt_link_offset": 610560
+        },
+        "iterator": {
+          "returncode": 0,
+          "complete": true,
+          "observations": [
+            {
+              "pc": 93824992841984,
+              "target": 93824992841990,
+              "symbol": "memset@plt + 6 in section .plt of /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/same-image",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009784096,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009784096,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009784096,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            }
+          ],
+          "run_link_offset": 613680,
+          "memset_plt_link_offset": 610560
+        },
+        "leaf": {
+          "returncode": 0,
+          "complete": true,
+          "observations": [
+            {
+              "pc": 93824992841984,
+              "target": 93824992841990,
+              "symbol": "memset@plt + 6 in section .plt of /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/same-image",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009796384,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009796384,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009796384,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            }
+          ],
+          "run_link_offset": 613680,
+          "memset_plt_link_offset": 610560
+        },
+        "candidate": {
+          "returncode": 0,
+          "complete": true,
+          "observations": [
+            {
+              "pc": 93824992841984,
+              "target": 93824992841990,
+              "symbol": "memset@plt + 6 in section .plt of /tmp/capstone-iterator-leaf-factorial-i5r9f3ig/same-image",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009796384,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009796384,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488340768,
+              "destination_mod64": 32,
+              "size": 524,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)",
+                "main"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 140737488341296,
+              "destination_mod64": 48,
+              "size": 1024,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "MCInst_Init",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            },
+            {
+              "pc": 93824992841984,
+              "target": 140737347460736,
+              "symbol": "__memset_avx512_unaligned_erms in section .text of /lib/x86_64-linux-gnu/libc.so.6",
+              "destination": 93825009796384,
+              "destination_mod64": 32,
+              "size": 2216,
+              "value": 0,
+              "callers": [
+                "memset@plt",
+                "ARM_getInstruction",
+                "cs_decode_full_insn",
+                "cs_disasm_iter",
+                "run(Session&, std::vector<unsigned char, std::allocator<unsigned char> > const&, unsigned int)"
+              ]
+            }
+          ],
+          "run_link_offset": 613680,
+          "memset_plt_link_offset": 610560
+        }
+      }
+    }
+  ],
+  "rows": [
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "aa",
+      "median": 1.0007197952582376,
+      "ci95": [
+        0.9982508945298281,
+        1.0030881552288895
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "median": 1.0107911728206327,
+      "ci95": [
+        1.0088184375676261,
+        1.0135571394078142
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "median": 0.9987554117364673,
+      "ci95": [
+        0.9956688781771936,
+        1.0009615042199351
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "median": 1.010697019987012,
+      "ci95": [
+        1.0063385900895652,
+        1.0120487356487573
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "aa",
+      "median": 1.00088529263348,
+      "ci95": [
+        0.9982730072818559,
+        1.0021051880396774
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "median": 1.0103632065720527,
+      "ci95": [
+        1.007583381253594,
+        1.0124234234234235
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "median": 0.9992269415318997,
+      "ci95": [
+        0.9986641731231632,
+        1.0025530927236856
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "median": 1.0128522888069724,
+      "ci95": [
+        1.011004335583069,
+        1.013535707195582
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "aa",
+      "median": 0.9999742212674544,
+      "ci95": [
+        0.9973240016467683,
+        1.001659829544966
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "median": 1.0185245113044998,
+      "ci95": [
+        1.0149778735958244,
+        1.0198099364125497
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "median": 0.9978705500506603,
+      "ci95": [
+        0.9959723279260482,
+        1.0005515101900124
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "median": 1.0183611254269267,
+      "ci95": [
+        1.0162647811989267,
+        1.0202703294585527
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "aa",
+      "median": 1.0006608364301102,
+      "ci95": [
+        0.9992627581418076,
+        1.002592860588519
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "median": 1.0205843293492696,
+      "ci95": [
+        1.0188639458770812,
+        1.0230650903177603
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "median": 1.0,
+      "ci95": [
+        0.9972084446683,
+        1.0007569697126095
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "median": 1.0202934392731546,
+      "ci95": [
+        1.0187865477733973,
+        1.0212325038197432
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "aa",
+      "median": 1.0005020122323647,
+      "ci95": [
+        0.9961934336730861,
+        1.0063465393477122
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "iterator",
+      "median": 0.9782082521779524,
+      "ci95": [
+        0.9765176609491325,
+        0.9845091130111951
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "leaf",
+      "median": 1.0009990924909873,
+      "ci95": [
+        0.9985689325235044,
+        1.005140461215933
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "images",
+      "variant": "candidate",
+      "median": 0.976761092596223,
+      "ci95": [
+        0.9730978481526593,
+        0.982529962669461
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "aa",
+      "median": 1.0000342791522765,
+      "ci95": [
+        0.9985909684514399,
+        1.001119203815624
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "median": 0.9778322641319316,
+      "ci95": [
+        0.9762139066219205,
+        0.9795966505484137
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "median": 0.9996129797975455,
+      "ci95": [
+        0.9987803411609091,
+        1.0018018639377193
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 0,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "median": 0.9787868325094529,
+      "ci95": [
+        0.9765730148048453,
+        0.9790615603601479
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "aa",
+      "median": 0.9991638103753746,
+      "ci95": [
+        0.996214552576573,
+        1.0064738314816961
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "iterator",
+      "median": 1.0125100280786201,
+      "ci95": [
+        1.0096014797376829,
+        1.0136605405766486
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "leaf",
+      "median": 0.9994730818945999,
+      "ci95": [
+        0.9943523694601095,
+        1.0029133224325828
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "images",
+      "variant": "candidate",
+      "median": 1.0079969281111223,
+      "ci95": [
+        1.0039100276786608,
+        1.0098569157392687
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "aa",
+      "median": 1.0000330188289872,
+      "ci95": [
+        0.9989360736995769,
+        1.001277276023469
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "iterator",
+      "median": 1.0092891895494536,
+      "ci95": [
+        1.0086979682544968,
+        1.0100022523837728
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "leaf",
+      "median": 0.9959671445737519,
+      "ci95": [
+        0.9956081553429997,
+        0.9971932473799539
+      ]
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "case": "arm64-ls",
+      "mode": 2,
+      "launch": "same-file-fixed",
+      "variant": "candidate",
+      "median": 1.006783573290822,
+      "ci95": [
+        1.0062789654656898,
+        1.0086014206003608
+      ]
+    }
+  ],
+  "hardware": [
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0001866657760476,
+          "ci95": [
+            0.9991286170430003,
+            1.0018614276205395
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000022221214,
+          "ci95": [
+            0.9999999949385011,
+            1.0000000086415837
+          ]
+        },
+        "branches:u": {
+          "median": 1.0000000006096128,
+          "ci95": [
+            0.9999999945134845,
+            1.0000000085345797
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9995336199848677,
+          "ci95": [
+            0.9974223272133188,
+            1.0003165181856681
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 473972,
+          "ci95": [
+            -2212260,
+            4717727
+          ]
+        },
+        "instructions:u": {
+          "median": 18,
+          "ci95": [
+            -41,
+            70
+          ]
+        },
+        "branches:u": {
+          "median": 1,
+          "ci95": [
+            -9,
+            14
+          ]
+        },
+        "branch-misses:u": {
+          "median": -2939,
+          "ci95": [
+            -16289,
+            1994
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9894062715495969,
+          "ci95": [
+            0.9887957715744733,
+            1.1111354243374247
+          ]
+        },
+        "instructions:u": {
+          "median": 1.00000000827123,
+          "ci95": [
+            0.9999999972840737,
+            1.0000000125920216
+          ]
+        },
+        "branches:u": {
+          "median": 0.9999999981711615,
+          "ci95": [
+            0.9999999945134845,
+            1.0000000451113493
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.0048702979586293,
+          "ci95": [
+            0.9973793870242754,
+            1.0078373966395102
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -26896514,
+          "ci95": [
+            -28449165,
+            282149716
+          ]
+        },
+        "instructions:u": {
+          "median": 67,
+          "ci95": [
+            -22,
+            102
+          ]
+        },
+        "branches:u": {
+          "median": -3,
+          "ci95": [
+            -9,
+            74
+          ]
+        },
+        "branch-misses:u": {
+          "median": 30762,
+          "ci95": [
+            -16546,
+            49374
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.998928720506568,
+          "ci95": [
+            0.9985457636817529,
+            0.9999657539772232
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000016048656,
+          "ci95": [
+            0.9999999966668178,
+            1.0000000090119372
+          ]
+        },
+        "branches:u": {
+          "median": 1.0,
+          "ci95": [
+            0.9999999969519359,
+            1.0000000018288384
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9994057185584653,
+          "ci95": [
+            0.9967349276769778,
+            1.0004528116046698
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -2720137,
+          "ci95": [
+            -3690912,
+            -86820
+          ]
+        },
+        "instructions:u": {
+          "median": 13,
+          "ci95": [
+            -27,
+            73
+          ]
+        },
+        "branches:u": {
+          "median": 0,
+          "ci95": [
+            -5,
+            3
+          ]
+        },
+        "branch-misses:u": {
+          "median": -3745,
+          "ci95": [
+            -20623,
+            2854
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9885191991546121,
+          "ci95": [
+            0.9881319934759891,
+            0.9906610528432095
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000016048656,
+          "ci95": [
+            0.9999999976544274,
+            1.0000000097526442
+          ]
+        },
+        "branches:u": {
+          "median": 0.9999999957327103,
+          "ci95": [
+            0.9999999920750332,
+            0.9999999993903872
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.00666651884209,
+          "ci95": [
+            1.0038157912643653,
+            1.0070161581316046
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -29138748,
+          "ci95": [
+            -30134623,
+            -23669254
+          ]
+        },
+        "instructions:u": {
+          "median": 13,
+          "ci95": [
+            -19,
+            79
+          ]
+        },
+        "branches:u": {
+          "median": -7,
+          "ci95": [
+            -13,
+            -1
+          ]
+        },
+        "branch-misses:u": {
+          "median": 42013,
+          "ci95": [
+            24113,
+            44236
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.999721416022513,
+          "ci95": [
+            0.9977141877514167,
+            1.0018020100869574
+          ]
+        },
+        "instructions:u": {
+          "median": 0.999999971079038,
+          "ci95": [
+            0.9999999290121825,
+            1.0000000017527857
+          ]
+        },
+        "branches:u": {
+          "median": 0.9999999851538776,
+          "ci95": [
+            0.9999999604103393,
+            1.0000000098974149
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.000156311906949,
+          "ci95": [
+            0.9997031341640756,
+            1.0006391359139382
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -85128,
+          "ci95": [
+            -699977,
+            550089
+          ]
+        },
+        "instructions:u": {
+          "median": -33,
+          "ci95": [
+            -81,
+            2
+          ]
+        },
+        "branches:u": {
+          "median": -3,
+          "ci95": [
+            -8,
+            2
+          ]
+        },
+        "branch-misses:u": {
+          "median": 389,
+          "ci95": [
+            -739,
+            1592
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.02271036277598,
+          "ci95": [
+            1.0207976579101266,
+            1.0242115914588001
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000026291784,
+          "ci95": [
+            0.9999999833485363,
+            1.000000049954393
+          ]
+        },
+        "branches:u": {
+          "median": 1.0000000049487074,
+          "ci95": [
+            0.9999999752564626,
+            1.0000000247435388
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9914776249537067,
+          "ci95": [
+            0.9906113358176936,
+            0.9922594097644023
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6916785,
+          "ci95": [
+            6355222,
+            7385488
+          ]
+        },
+        "instructions:u": {
+          "median": 3,
+          "ci95": [
+            -19,
+            57
+          ]
+        },
+        "branches:u": {
+          "median": 1,
+          "ci95": [
+            -5,
+            5
+          ]
+        },
+        "branch-misses:u": {
+          "median": -21240,
+          "ci95": [
+            -23370,
+            -19255
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.000531231113371,
+          "ci95": [
+            0.9977799481348835,
+            1.0011224256053757
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999982472144,
+          "ci95": [
+            0.9999999675734661,
+            1.000000016651464
+          ]
+        },
+        "branches:u": {
+          "median": 1.0,
+          "ci95": [
+            0.9999999752564619,
+            1.000000009897415
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9993205837037263,
+          "ci95": [
+            0.9984604035798629,
+            0.9999521822186969
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 161793,
+          "ci95": [
+            -678108,
+            342984
+          ]
+        },
+        "instructions:u": {
+          "median": -2,
+          "ci95": [
+            -37,
+            19
+          ]
+        },
+        "branches:u": {
+          "median": 0,
+          "ci95": [
+            -5,
+            2
+          ]
+        },
+        "branch-misses:u": {
+          "median": -1692,
+          "ci95": [
+            -3834,
+            -119
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0219439860783672,
+          "ci95": [
+            1.0204980972714495,
+            1.0247303871502413
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000043819641,
+          "ci95": [
+            0.9999999649442886,
+            1.0000000534599636
+          ]
+        },
+        "branches:u": {
+          "median": 1.0000000148461226,
+          "ci95": [
+            1.0,
+            1.000000024743539
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9907791607182354,
+          "ci95": [
+            0.9899509000454607,
+            0.9912234169643929
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6705510,
+          "ci95": [
+            6277067,
+            7531945
+          ]
+        },
+        "instructions:u": {
+          "median": 5,
+          "ci95": [
+            -40,
+            61
+          ]
+        },
+        "branches:u": {
+          "median": 3,
+          "ci95": [
+            0,
+            5
+          ]
+        },
+        "branch-misses:u": {
+          "median": -22929,
+          "ci95": [
+            -25045,
+            -21856
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9998724397195972,
+          "ci95": [
+            0.999392062835462,
+            1.0022363658167797
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999980782235,
+          "ci95": [
+            0.9999999923128939,
+            1.0000000036957242
+          ]
+        },
+        "branches:u": {
+          "median": 0.9999999993210015,
+          "ci95": [
+            0.9999999938890128,
+            1.0000000027159943
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9999596945842228,
+          "ci95": [
+            0.9983948849062224,
+            1.0012286355584625
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -272321,
+          "ci95": [
+            -1299329,
+            4776033
+          ]
+        },
+        "instructions:u": {
+          "median": -13,
+          "ci95": [
+            -52,
+            25
+          ]
+        },
+        "branches:u": {
+          "median": -1,
+          "ci95": [
+            -9,
+            4
+          ]
+        },
+        "branch-misses:u": {
+          "median": -203,
+          "ci95": [
+            -8088,
+            6180
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9909774219780975,
+          "ci95": [
+            0.9899659191645339,
+            0.9922134856002719
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999951216442,
+          "ci95": [
+            0.9999999909824332,
+            0.9999999979303945
+          ]
+        },
+        "branches:u": {
+          "median": 0.9999999959260086,
+          "ci95": [
+            0.9999999925310158,
+            0.9999999986420028
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.0042597624358671,
+          "ci95": [
+            1.0021840373081223,
+            1.0055644120655118
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -19268820,
+          "ci95": [
+            -21444737,
+            -16623614
+          ]
+        },
+        "instructions:u": {
+          "median": -33,
+          "ci95": [
+            -61,
+            -14
+          ]
+        },
+        "branches:u": {
+          "median": -6,
+          "ci95": [
+            -11,
+            -2
+          ]
+        },
+        "branch-misses:u": {
+          "median": 21434,
+          "ci95": [
+            11000,
+            28025
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0043960037890474,
+          "ci95": [
+            1.0031872339494865,
+            1.0049419250499985
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000005913159,
+          "ci95": [
+            0.999999995860789,
+            1.000000004139211
+          ]
+        },
+        "branches:u": {
+          "median": 1.000000001357997,
+          "ci95": [
+            0.9999999986420028,
+            1.000000003394993
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.0059202231595616,
+          "ci95": [
+            1.0051110443986988,
+            1.006391013866461
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 9384772,
+          "ci95": [
+            6811166,
+            10549515
+          ]
+        },
+        "instructions:u": {
+          "median": 4,
+          "ci95": [
+            -28,
+            28
+          ]
+        },
+        "branches:u": {
+          "median": 2,
+          "ci95": [
+            -2,
+            5
+          ]
+        },
+        "branch-misses:u": {
+          "median": 29789,
+          "ci95": [
+            25742,
+            32125
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9936943501067217,
+          "ci95": [
+            0.9933011579696299,
+            0.9944495698843421
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999974869076,
+          "ci95": [
+            0.9999999914259201,
+            1.0000000025130924
+          ]
+        },
+        "branches:u": {
+          "median": 1.0,
+          "ci95": [
+            0.9999999945680115,
+            1.00000000475299
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.0016774193548388,
+          "ci95": [
+            0.9992089455651325,
+            1.0035172751511605
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -13460655,
+          "ci95": [
+            -14300967,
+            -11843866
+          ]
+        },
+        "instructions:u": {
+          "median": -17,
+          "ci95": [
+            -58,
+            17
+          ]
+        },
+        "branches:u": {
+          "median": 0,
+          "ci95": [
+            -8,
+            7
+          ]
+        },
+        "branch-misses:u": {
+          "median": 8437,
+          "ci95": [
+            -3985,
+            17698
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9991647936871276,
+          "ci95": [
+            0.9976652635570316,
+            0.9994764276876731
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999983660648,
+          "ci95": [
+            0.9999999953952735,
+            1.000000000297079
+          ]
+        },
+        "branches:u": {
+          "median": 1.0,
+          "ci95": [
+            0.9999999926708785,
+            1.0000000006662837
+          ]
+        },
+        "branch-misses:u": {
+          "median": 1.0000435547000965,
+          "ci95": [
+            0.9991487017004517,
+            1.0007522378867946
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -1543049,
+          "ci95": [
+            -4313456,
+            -967757
+          ]
+        },
+        "instructions:u": {
+          "median": -11,
+          "ci95": [
+            -31,
+            2
+          ]
+        },
+        "branches:u": {
+          "median": 0,
+          "ci95": [
+            -11,
+            1
+          ]
+        },
+        "branch-misses:u": {
+          "median": 156,
+          "ci95": [
+            -3056,
+            2697
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9775932937073882,
+          "ci95": [
+            0.9767751440432331,
+            0.9801240351562213
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999986631439,
+          "ci95": [
+            0.9999999945040361,
+            1.0000000053474243
+          ]
+        },
+        "branches:u": {
+          "median": 0.999999994003446,
+          "ci95": [
+            0.9999999866743244,
+            0.9999999953360136
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9984288645208511,
+          "ci95": [
+            0.9981445975143745,
+            0.999793193841648
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -41411838,
+          "ci95": [
+            -42908224,
+            -36713331
+          ]
+        },
+        "instructions:u": {
+          "median": -9,
+          "ci95": [
+            -37,
+            36
+          ]
+        },
+        "branches:u": {
+          "median": -9,
+          "ci95": [
+            -20,
+            -7
+          ]
+        },
+        "branch-misses:u": {
+          "median": -5637,
+          "ci95": [
+            -6650,
+            -740
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0000991477293388,
+          "ci95": [
+            0.9989282354097552,
+            1.0023649381244149
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999994058417,
+          "ci95": [
+            0.9999999964350504,
+            1.0000000043076473
+          ]
+        },
+        "branches:u": {
+          "median": 1.0000000006662837,
+          "ci95": [
+            0.9999999953360136,
+            1.0000000019988513
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9982616334959283,
+          "ci95": [
+            0.995812905021669,
+            0.9990959217266637
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 183262,
+          "ci95": [
+            -1980824,
+            4369254
+          ]
+        },
+        "instructions:u": {
+          "median": -4,
+          "ci95": [
+            -24,
+            29
+          ]
+        },
+        "branches:u": {
+          "median": 1,
+          "ci95": [
+            -7,
+            3
+          ]
+        },
+        "branch-misses:u": {
+          "median": -6237,
+          "ci95": [
+            -15012,
+            -3235
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "core",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.979753376535736,
+          "ci95": [
+            0.978107474312522,
+            0.9804793425499938
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999991087626,
+          "ci95": [
+            0.9999999928701009,
+            1.0000000005941583
+          ]
+        },
+        "branches:u": {
+          "median": 0.9999999933371622,
+          "ci95": [
+            0.9999999886731757,
+            0.9999999946697298
+          ]
+        },
+        "branch-misses:u": {
+          "median": 0.9988245397485804,
+          "ci95": [
+            0.9979850203600672,
+            0.9996560959160483
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "branches:u": 0,
+        "branch-misses:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -37417241,
+          "ci95": [
+            -40393385,
+            -36077873
+          ]
+        },
+        "instructions:u": {
+          "median": -6,
+          "ci95": [
+            -48,
+            4
+          ]
+        },
+        "branches:u": {
+          "median": -10,
+          "ci95": [
+            -17,
+            -8
+          ]
+        },
+        "branch-misses:u": {
+          "median": -4213,
+          "ci95": [
+            -7235,
+            -1233
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9996235476106479,
+          "ci95": [
+            0.9975509009943392,
+            0.9998998422319386
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999998765489,
+          "ci95": [
+            0.9999999948150499,
+            1.0000000024690239
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 0.9998181931621507,
+          "ci95": [
+            0.9996409285437385,
+            1.0000420720121355
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9996459448524637,
+          "ci95": [
+            0.9993993691218012,
+            1.0004506545319496
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -955579,
+          "ci95": [
+            -6219772,
+            -254018
+          ]
+        },
+        "instructions:u": {
+          "median": -1,
+          "ci95": [
+            -42,
+            20
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": -1513711,
+          "ci95": [
+            -2989671,
+            350289
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -1845045,
+          "ci95": [
+            -3129852,
+            2348224
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9890100106379892,
+          "ci95": [
+            0.9887962228442175,
+            0.9916692255736488
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000016048656,
+          "ci95": [
+            0.9999999976544274,
+            1.0000000062960108
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0012625782037372,
+          "ci95": [
+            1.0009610537856908,
+            1.0015629016549246
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9999349888506104,
+          "ci95": [
+            0.9985093614693047,
+            1.0008629682585655
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -27884931,
+          "ci95": [
+            -28443846,
+            -21114430
+          ]
+        },
+        "instructions:u": {
+          "median": 13,
+          "ci95": [
+            -19,
+            51
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 10512374,
+          "ci95": [
+            8001483,
+            13008977
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -338945,
+          "ci95": [
+            -7767265,
+            4494715
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9987095376812276,
+          "ci95": [
+            0.9986944941763646,
+            1.0003335817835097
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000028393774,
+          "ci95": [
+            0.9999999972840737,
+            1.0000000087650347
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 0.9993844937973663,
+          "ci95": [
+            0.9993375839071584,
+            0.9995795336515299
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9994788533512466,
+          "ci95": [
+            0.9986009772431745,
+            0.9999828971715005
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -3275683,
+          "ci95": [
+            -3315484,
+            846398
+          ]
+        },
+        "instructions:u": {
+          "median": 23,
+          "ci95": [
+            -22,
+            71
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": -5124667,
+          "ci95": [
+            -5515230,
+            -3500160
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -2714359,
+          "ci95": [
+            -7290559,
+            -89119
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.1092408751179903,
+          "ci95": [
+            0.9891759380143675,
+            1.1109021784601392
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000039504382,
+          "ci95": [
+            0.9999999977778785,
+            1.0000000193818375
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0262206087147905,
+          "ci95": [
+            1.000701161194129,
+            1.026715989695495
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 1.040732081261311,
+          "ci95": [
+            0.9994867019106474,
+            1.0420305261082623
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 277429918,
+          "ci95": [
+            -27463923,
+            281555447
+          ]
+        },
+        "instructions:u": {
+          "median": 32,
+          "ci95": [
+            -18,
+            157
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 218305945,
+          "ci95": [
+            5837819,
+            222373362
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 212362578,
+          "ci95": [
+            -2674766,
+            219008316
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.00034417857857,
+          "ci95": [
+            0.997046140933936,
+            1.001779757225121
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999964944286,
+          "ci95": [
+            0.9999999815957513,
+            1.0000000131458926
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0004095585303743,
+          "ci95": [
+            0.999800937704956,
+            1.0006606699480955
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 1.0005019409042708,
+          "ci95": [
+            1.0004153851334772,
+            1.0008914615661546
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 105028,
+          "ci95": [
+            -903008,
+            543089
+          ]
+        },
+        "instructions:u": {
+          "median": -4,
+          "ci95": [
+            -21,
+            15
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 524215,
+          "ci95": [
+            -254981,
+            846453
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 637541,
+          "ci95": [
+            527113,
+            1132314
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.02283902614622,
+          "ci95": [
+            1.0223606041191569,
+            1.0245099493899645
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000175278567,
+          "ci95": [
+            1.0000000078875353,
+            1.0000000473252142
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.011951909959328,
+          "ci95": [
+            1.0114524756841423,
+            1.0135216839305259
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 1.0364518715439437,
+          "ci95": [
+            1.0362455131008215,
+            1.037173948304827
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6981993,
+          "ci95": [
+            6825189,
+            7482106
+          ]
+        },
+        "instructions:u": {
+          "median": 20,
+          "ci95": [
+            9,
+            54
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 15305679,
+          "ci95": [
+            14672958,
+            17296665
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 46256483,
+          "ci95": [
+            46038218,
+            47195605
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9997699835006564,
+          "ci95": [
+            0.9994690231854849,
+            1.001431125562728
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999745846077,
+          "ci95": [
+            0.999999957056753,
+            1.000000005258357
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 0.9997336484734324,
+          "ci95": [
+            0.9991204860731034,
+            1.0014451518029126
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 1.000196330245872,
+          "ci95": [
+            0.9988443268181997,
+            1.0010113634993008
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -70220,
+          "ci95": [
+            -162322,
+            436877
+          ]
+        },
+        "instructions:u": {
+          "median": -29,
+          "ci95": [
+            -49,
+            6
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": -340917,
+          "ci95": [
+            -1127139,
+            1848609
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 249295,
+          "ci95": [
+            -1467229,
+            1283329
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0216718759226853,
+          "ci95": [
+            1.0210584406286964,
+            1.023334114166061
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999991236072,
+          "ci95": [
+            0.9999999938652503,
+            1.0000000271681784
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0122751578847153,
+          "ci95": [
+            1.0101737886353668,
+            1.0125303550107938
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 1.0361247053872875,
+          "ci95": [
+            1.035448040329043,
+            1.036639006016538
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6613293,
+          "ci95": [
+            6437660,
+            7123161
+          ]
+        },
+        "instructions:u": {
+          "median": -1,
+          "ci95": [
+            -7,
+            31
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 15719632,
+          "ci95": [
+            13037366,
+            16038245
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 45870204,
+          "ci95": [
+            45044413,
+            46537089
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0005262164084632,
+          "ci95": [
+            1.0001937588683267,
+            1.00205281323386
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000023652633,
+          "ci95": [
+            0.9999999971912497,
+            1.0000000048783557
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0002235517523266,
+          "ci95": [
+            0.9998551971989107,
+            1.0008273507024514
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.999863470722542,
+          "ci95": [
+            0.9954615026876473,
+            1.0016612143972627
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 1124790,
+          "ci95": [
+            413712,
+            4381549
+          ]
+        },
+        "instructions:u": {
+          "median": 16,
+          "ci95": [
+            -19,
+            33
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1501152,
+          "ci95": [
+            -972473,
+            5555164
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -535626,
+          "ci95": [
+            -17836313,
+            6519272
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9910932355426196,
+          "ci95": [
+            0.9897210153949366,
+            0.9925513068057912
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999954173021,
+          "ci95": [
+            0.9999999929042098,
+            0.9999999983738814
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0027239148215696,
+          "ci95": [
+            1.002372686348117,
+            1.0031711365232951
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.995159584658277,
+          "ci95": [
+            0.9935312346934122,
+            0.9959794992062383
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -19024421,
+          "ci95": [
+            -21971377,
+            -15884206
+          ]
+        },
+        "instructions:u": {
+          "median": -31,
+          "ci95": [
+            -48,
+            -11
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 18288542,
+          "ci95": [
+            15934591,
+            21292676
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -18989654,
+          "ci95": [
+            -25431103,
+            -15773062
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0038014236158963,
+          "ci95": [
+            1.0037057296835141,
+            1.0042626570014623
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999985217104,
+          "ci95": [
+            0.9999999943824994,
+            1.0000000004434868
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0000314290157206,
+          "ci95": [
+            0.9998485894294937,
+            1.0011988357962776
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9908542934823737,
+          "ci95": [
+            0.9901207409357891,
+            0.992236890062929
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 8122939,
+          "ci95": [
+            7912437,
+            9111449
+          ]
+        },
+        "instructions:u": {
+          "median": -10,
+          "ci95": [
+            -38,
+            3
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 211027,
+          "ci95": [
+            -1016674,
+            8051194
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -35879938,
+          "ci95": [
+            -38741719,
+            -30455911
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9944592601587139,
+          "ci95": [
+            0.992855376351347,
+            0.9947828779819561
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999982260525,
+          "ci95": [
+            0.9999999942346705,
+            1.0000000005913159
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0021681469179322,
+          "ci95": [
+            1.001869594543202,
+            1.0022264282447626
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9858351233751412,
+          "ci95": [
+            0.984809274842256,
+            0.9874925393355847
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -11831792,
+          "ci95": [
+            -15271666,
+            -11143522
+          ]
+        },
+        "instructions:u": {
+          "median": -12,
+          "ci95": [
+            -39,
+            4
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 14557080,
+          "ci95": [
+            12555905,
+            14949131
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -55537397,
+          "ci95": [
+            -59699612,
+            -49048266
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9997190014045512,
+          "ci95": [
+            0.9989339941365054,
+            1.0001120444937446
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999979204461,
+          "ci95": [
+            0.9999999962865109,
+            1.0000000060901222
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 0.9999190645697282,
+          "ci95": [
+            0.99981540430614,
+            0.9999906233743707
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 1.0000826305989186,
+          "ci95": [
+            0.9994304553475776,
+            1.000280926311337
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -518415,
+          "ci95": [
+            -1970249,
+            206792
+          ]
+        },
+        "instructions:u": {
+          "median": -14,
+          "ci95": [
+            -25,
+            41
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": -525169,
+          "ci95": [
+            -1198038,
+            -60843
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 383749,
+          "ci95": [
+            -2646581,
+            1305045
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9795728317257488,
+          "ci95": [
+            0.9791738014656124,
+            0.9813447887886463
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999961379713,
+          "ci95": [
+            0.9999999901963887,
+            0.9999999971777482
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 0.9972746660302794,
+          "ci95": [
+            0.9972234138521225,
+            0.9972925410206529
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9756897736682628,
+          "ci95": [
+            0.9744079978767285,
+            0.9761063219105682
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -37686133,
+          "ci95": [
+            -38492093,
+            -34412324
+          ]
+        },
+        "instructions:u": {
+          "median": -26,
+          "ci95": [
+            -66,
+            -19
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": -17684133,
+          "ci95": [
+            -18016982,
+            -17571584
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -112926142,
+          "ci95": [
+            -118921855,
+            -110926419
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0005789328444412,
+          "ci95": [
+            0.9995676469555337,
+            1.0017003697306257
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000013368562,
+          "ci95": [
+            0.9999999906420075,
+            1.0000000060901222
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 1.0003286636913058,
+          "ci95": [
+            1.0001388087954337,
+            1.0004488851147293
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9949931019247192,
+          "ci95": [
+            0.9941318349040366,
+            0.9952300838871907
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 1069505,
+          "ci95": [
+            -799098,
+            3137843
+          ]
+        },
+        "instructions:u": {
+          "median": 9,
+          "ci95": [
+            -63,
+            41
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 2132421,
+          "ci95": [
+            900716,
+            2912699
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -23252792,
+          "ci95": [
+            -27268405,
+            -22157269
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "issued",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9816714063632849,
+          "ci95": [
+            0.9786083491250063,
+            0.9836991532522059
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000019310142,
+          "ci95": [
+            0.9999999904934679,
+            1.0000000057930432
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": 0.9975628685207361,
+          "ci95": [
+            0.9972943390592149,
+            0.9979589535958575
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": 0.9747096966638582,
+          "ci95": [
+            0.9742788735038486,
+            0.975469171776019
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "uops_issued.any:u": 0,
+        "idq.dsb_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -33859752,
+          "ci95": [
+            -39565485,
+            -30085233
+          ]
+        },
+        "instructions:u": {
+          "median": 13,
+          "ci95": [
+            -64,
+            39
+          ]
+        },
+        "uops_issued.any:u": {
+          "median": -15812487,
+          "ci95": [
+            -17557690,
+            -13244566
+          ]
+        },
+        "idq.dsb_uops:u": {
+          "median": -117519910,
+          "ci95": [
+            -119452802,
+            -113828953
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.001402853669926,
+          "ci95": [
+            0.9993186632777423,
+            1.0023343402240985
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999982716833,
+          "ci95": [
+            0.9999999945681476,
+            1.0000000048145965
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.9999997245933218,
+          "ci95": [
+            0.9999981191489314,
+            1.0000020165986798
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0000148954872958,
+          "ci95": [
+            1.0000074527567504,
+            1.0000187475563163
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 3556288,
+          "ci95": [
+            -1730346,
+            5913686
+          ]
+        },
+        "instructions:u": {
+          "median": -14,
+          "ci95": [
+            -44,
+            39
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -211,
+          "ci95": [
+            -1441,
+            1545
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 116710,
+          "ci95": [
+            58394,
+            146892
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9903437520780879,
+          "ci95": [
+            0.9892359833316524,
+            0.9911632887189619
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999988889393,
+          "ci95": [
+            0.9999999932101844,
+            1.0000000045676942
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.996361852363803,
+          "ci95": [
+            0.9963547861998973,
+            0.9963651565562902
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0001005052631882,
+          "ci95": [
+            1.0000933731744672,
+            1.0001181755105304
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -24484180,
+          "ci95": [
+            -27290372,
+            -22394440
+          ]
+        },
+        "instructions:u": {
+          "median": -9,
+          "ci95": [
+            -55,
+            37
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -2787336,
+          "ci95": [
+            -2792755,
+            -2784798
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 787481,
+          "ci95": [
+            731603,
+            925925
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0007394245353887,
+          "ci95": [
+            0.9997417017711621,
+            1.0014318656725671
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000014814143,
+          "ci95": [
+            0.9999999879017831,
+            1.0000000040738894
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.9999979807946817,
+          "ci95": [
+            0.9999962226151115,
+            1.0000057600458334
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0000023435361658,
+          "ci95": [
+            0.9999866358160573,
+            1.0000155773515584
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 1873887,
+          "ci95": [
+            -655983,
+            3630257
+          ]
+        },
+        "instructions:u": {
+          "median": 12,
+          "ci95": [
+            -98,
+            33
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -1547,
+          "ci95": [
+            -2894,
+            4413
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 18362,
+          "ci95": [
+            -104713,
+            122052
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.989856264254498,
+          "ci95": [
+            0.9887164674432642,
+            0.9909634468163222
+          ]
+        },
+        "instructions:u": {
+          "median": 1.000000000740707,
+          "ci95": [
+            0.9999999995061952,
+            1.0000000109871563
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.9963626057008943,
+          "ci95": [
+            0.9963495445217978,
+            0.9963678721392797
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0001048717095748,
+          "ci95": [
+            1.0000997137151204,
+            1.0001118628189773
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -25717753,
+          "ci95": [
+            -28633494,
+            -22912895
+          ]
+        },
+        "instructions:u": {
+          "median": 6,
+          "ci95": [
+            -4,
+            89
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -2786756,
+          "ci95": [
+            -2796759,
+            -2782724
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 821697,
+          "ci95": [
+            781283,
+            876464
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0022071024219634,
+          "ci95": [
+            0.9992287388040866,
+            1.002477644588243
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000122694994,
+          "ci95": [
+            0.9999999702026442,
+            1.0000000604711081
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.0000003857497586,
+          "ci95": [
+            0.9999986206492824,
+            1.0000017767922087
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0000202783642222,
+          "ci95": [
+            0.999954091067963,
+            1.0000265795568708
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 671246,
+          "ci95": [
+            -235542,
+            755247
+          ]
+        },
+        "instructions:u": {
+          "median": 14,
+          "ci95": [
+            -34,
+            69
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 33,
+          "ci95": [
+            -118,
+            152
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 21888,
+          "ci95": [
+            -49555,
+            28690
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0214360220397283,
+          "ci95": [
+            1.019893215972873,
+            1.0240927453737025
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000315501412,
+          "ci95": [
+            1.0000000035055712,
+            1.0000000841337158
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.999659299635964,
+          "ci95": [
+            0.9996578737724652,
+            0.9996622104600552
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 0.9999915879269298,
+          "ci95": [
+            0.9999498600849204,
+            1.0000634598222846
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6538293,
+          "ci95": [
+            6075358,
+            7352843
+          ]
+        },
+        "instructions:u": {
+          "median": 36,
+          "ci95": [
+            4,
+            96
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -29146,
+          "ci95": [
+            -29268,
+            -28897
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": -9080,
+          "ci95": [
+            -54123,
+            68498
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0001502856183138,
+          "ci95": [
+            0.9989061973266536,
+            1.002025856281611
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999719554281,
+          "ci95": [
+            0.9999999640678939,
+            1.0000000166514635
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.0000009936015217,
+          "ci95": [
+            0.9999985972704566,
+            1.0000017183474066
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0000107024700062,
+          "ci95": [
+            0.9999747581939993,
+            1.000031062953584
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 45897,
+          "ci95": [
+            -333826,
+            617142
+          ]
+        },
+        "instructions:u": {
+          "median": -32,
+          "ci95": [
+            -41,
+            19
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 85,
+          "ci95": [
+            -120,
+            147
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 11552,
+          "ci95": [
+            -27247,
+            33529
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0219012043818358,
+          "ci95": [
+            1.0199901507473026,
+            1.0234318567792726
+          ]
+        },
+        "instructions:u": {
+          "median": 1.00000005258357,
+          "ci95": [
+            1.0000000078875353,
+            1.0000000815045376
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.9996590543131961,
+          "ci95": [
+            0.9996574300666848,
+            0.9996610296728088
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 0.9999994172564375,
+          "ci95": [
+            0.9999676187084756,
+            1.000040470594714
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6684196,
+          "ci95": [
+            6108317,
+            7138109
+          ]
+        },
+        "instructions:u": {
+          "median": 60,
+          "ci95": [
+            9,
+            93
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -29167,
+          "ci95": [
+            -29306,
+            -28998
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": -629,
+          "ci95": [
+            -34953,
+            43684
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.000701010832426,
+          "ci95": [
+            0.9992846334803597,
+            1.0012393286561643
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000020696054,
+          "ci95": [
+            0.9999999977825655,
+            1.0000000062088166
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.000002660352013,
+          "ci95": [
+            0.999994055997751,
+            1.000005530389129
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0000018527825296,
+          "ci95": [
+            0.999999193326353,
+            1.0000098872106384
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 1497093,
+          "ci95": [
+            -1528565,
+            2647872
+          ]
+        },
+        "instructions:u": {
+          "median": 14,
+          "ci95": [
+            -15,
+            42
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1878,
+          "ci95": [
+            -4196,
+            3904
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 11716,
+          "ci95": [
+            -5101,
+            62521
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9913606470382618,
+          "ci95": [
+            0.9903531381229567,
+            0.9926758054198744
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999979303945,
+          "ci95": [
+            0.9999999930520387,
+            1.0000000034000662
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.0041986230509135,
+          "ci95": [
+            1.0041894418457857,
+            1.004205768611606
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0005055200740136,
+          "ci95": [
+            1.0004871854259274,
+            1.0005080826756731
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -18458792,
+          "ci95": [
+            -20610881,
+            -15641699
+          ]
+        },
+        "instructions:u": {
+          "median": -14,
+          "ci95": [
+            -47,
+            23
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 2963899,
+          "ci95": [
+            2957423,
+            2968917
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 3196637,
+          "ci95": [
+            3080725,
+            3212848
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0043296495004455,
+          "ci95": [
+            1.0034361863358259,
+            1.0051679138036216
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999977825655,
+          "ci95": [
+            0.9999999948259863,
+            1.0000000059131586
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.9993803898546062,
+          "ci95": [
+            0.9993582191657403,
+            0.9994457457496173
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 0.9999446959872385,
+          "ci95": [
+            0.9999379737389062,
+            0.9999537036835188
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 9250458,
+          "ci95": [
+            7342298,
+            11041735
+          ]
+        },
+        "instructions:u": {
+          "median": -15,
+          "ci95": [
+            -35,
+            40
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -437397,
+          "ci95": [
+            -453043,
+            -391261
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": -349712,
+          "ci95": [
+            -392223,
+            -292753
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9938404625525438,
+          "ci95": [
+            0.993526737604118,
+            0.9962985530877738
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999992608551,
+          "ci95": [
+            0.9999999936433546,
+            1.0000000008869738
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.0041637041625826,
+          "ci95": [
+            1.0041621177837872,
+            1.0041734389603378
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0004173801561447,
+          "ci95": [
+            1.0004060011719123,
+            1.0004288663999636
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -13160082,
+          "ci95": [
+            -13831794,
+            -7893754
+          ]
+        },
+        "instructions:u": {
+          "median": -5,
+          "ci95": [
+            -43,
+            6
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 2939249,
+          "ci95": [
+            2938136,
+            2946095
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 2639303,
+          "ci95": [
+            2567333,
+            2711914
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0008124929074824,
+          "ci95": [
+            0.9977500300422074,
+            1.0030176929535266
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000023766331,
+          "ci95": [
+            0.9999999933157196,
+            1.0000000035649497
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.0000107529937168,
+          "ci95": [
+            0.9999816422147303,
+            1.0000138127528224
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 0.9999832074772368,
+          "ci95": [
+            0.9999758709321785,
+            1.0000108415973301
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 1499113,
+          "ci95": [
+            -4159199,
+            5570647
+          ]
+        },
+        "instructions:u": {
+          "median": 16,
+          "ci95": [
+            -45,
+            24
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 8027,
+          "ci95": [
+            -13704,
+            10311
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": -104201,
+          "ci95": [
+            -149723,
+            67273
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9799937880623726,
+          "ci95": [
+            0.9775943158872816,
+            0.9830587596006835
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999964350504,
+          "ci95": [
+            0.99999998975077,
+            0.9999999986631439
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.0007616947498332,
+          "ci95": [
+            1.0007458079252385,
+            1.000769302146237
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 0.9997876122669287,
+          "ci95": [
+            0.999769443453602,
+            0.999798084897547
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -36922202,
+          "ci95": [
+            -41418197,
+            -31236689
+          ]
+        },
+        "instructions:u": {
+          "median": -24,
+          "ci95": [
+            -69,
+            -9
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 568593,
+          "ci95": [
+            556738,
+            574269
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": -1317924,
+          "ci95": [
+            -1430650,
+            -1252891
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0023491111970502,
+          "ci95": [
+            1.0005659711060466,
+            1.004050937841007
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999998514605,
+          "ci95": [
+            0.9999999959894318,
+            1.000000008169676
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 0.9988867264166175,
+          "ci95": [
+            0.9988733605879198,
+            0.9989125691737009
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 1.0000573556691388,
+          "ci95": [
+            1.000040901472502,
+            1.0000776918021688
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 4334294,
+          "ci95": [
+            1044780,
+            7469222
+          ]
+        },
+        "instructions:u": {
+          "median": -1,
+          "ci95": [
+            -27,
+            55
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": -831041,
+          "ci95": [
+            -841031,
+            -811735
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 355897,
+          "ci95": [
+            253807,
+            482084
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "retired_fusion",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9799936256283972,
+          "ci95": [
+            0.9786439488716362,
+            0.9818300276325407
+          ]
+        },
+        "instructions:u": {
+          "median": 0.999999994206957,
+          "ci95": [
+            0.9999999867799788,
+            0.9999999982175253
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 1.000803422364775,
+          "ci95": [
+            1.0007947221911628,
+            1.0008101980607305
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": 0.9997520841140475,
+          "ci95": [
+            0.9997393128397108,
+            0.9997560663030186
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "inst_retired.macro_fused:u": 0,
+        "uops_retired.slots:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -36931673,
+          "ci95": [
+            -39477890,
+            -33525021
+          ]
+        },
+        "instructions:u": {
+          "median": -39,
+          "ci95": [
+            -89,
+            -12
+          ]
+        },
+        "inst_retired.macro_fused:u": {
+          "median": 599742,
+          "ci95": [
+            593252,
+            604797
+          ]
+        },
+        "uops_retired.slots:u": {
+          "median": -1538340,
+          "ci95": [
+            -1617649,
+            -1513618
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.00090659548118,
+          "ci95": [
+            0.8904143499256845,
+            1.0013705083130562
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999949385011,
+          "ci95": [
+            0.9999999918522213,
+            0.9999999992592928
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 1.0000231527352894,
+          "ci95": [
+            0.9682156080087605,
+            1.005221657291167
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 0.9990580614424779,
+          "ci95": [
+            0.9775074654236137,
+            1.001104908686912
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 2301096,
+          "ci95": [
+            -312925129,
+            3473192
+          ]
+        },
+        "instructions:u": {
+          "median": -41,
+          "ci95": [
+            -66,
+            -6
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 11481,
+          "ci95": [
+            -16362226,
+            2585690
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": -2735291,
+          "ci95": [
+            -66897039,
+            3207241
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9901290897815265,
+          "ci95": [
+            0.879461330963683,
+            1.1109628974848014
+          ]
+        },
+        "instructions:u": {
+          "median": 1.000000003826987,
+          "ci95": [
+            0.9999999939508916,
+            1.0000000067898156
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9606202060593844,
+          "ci95": [
+            0.9264511041850203,
+            0.99728245349907
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0002270939272377,
+          "ci95": [
+            0.9776324733014347,
+            1.027475424058008
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -25021743,
+          "ci95": [
+            -344201805,
+            281703388
+          ]
+        },
+        "instructions:u": {
+          "median": 31,
+          "ci95": [
+            -49,
+            55
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -19527689,
+          "ci95": [
+            -37807323,
+            -1350914
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 659457,
+          "ci95": [
+            -66525242,
+            79739613
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9993451549126371,
+          "ci95": [
+            0.8875459260120209,
+            1.0009459156152385
+          ]
+        },
+        "instructions:u": {
+          "median": 1.000000001975219,
+          "ci95": [
+            0.9999999930867333,
+            1.0000000043207917
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9977038891155476,
+          "ci95": [
+            0.964546188689367,
+            1.0037754139812634
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 0.9995001641507155,
+          "ci95": [
+            0.9759449084747824,
+            1.0037625569969078
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -1659965,
+          "ci95": [
+            -321116000,
+            2401412
+          ]
+        },
+        "instructions:u": {
+          "median": 16,
+          "ci95": [
+            -56,
+            35
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -1141415,
+          "ci95": [
+            -18224797,
+            1869531
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": -1451471,
+          "ci95": [
+            -71544378,
+            10921651
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9882091289969348,
+          "ci95": [
+            0.9862103850626286,
+            0.9905335984562491
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999986420369,
+          "ci95": [
+            0.9999999970371714,
+            1.000000001975219
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9608684617578291,
+          "ci95": [
+            0.9557651481666776,
+            0.9616731624531465
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.00012501335182,
+          "ci95": [
+            0.9972977738392772,
+            1.0014504032083644
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -29933684,
+          "ci95": [
+            -39422747,
+            -23990099
+          ]
+        },
+        "instructions:u": {
+          "median": -11,
+          "ci95": [
+            -24,
+            16
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -19377378,
+          "ci95": [
+            -21989497,
+            -19005548
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 362762,
+          "ci95": [
+            -8074746,
+            4210115
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0004719425341553,
+          "ci95": [
+            0.9998810419356795,
+            1.0019121846839094
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999886068934,
+          "ci95": [
+            0.9999999561803588,
+            1.0000000035055714
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 1.0312340428423843,
+          "ci95": [
+            1.00560384935463,
+            1.107407335617829
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 0.9978869453445242,
+          "ci95": [
+            0.9954764173487556,
+            1.0491301145344811
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 144023,
+          "ci95": [
+            -36409,
+            583668
+          ]
+        },
+        "instructions:u": {
+          "median": -13,
+          "ci95": [
+            -50,
+            4
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 303331,
+          "ci95": [
+            55412,
+            1052840
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": -46965,
+          "ci95": [
+            -100772,
+            1064417
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0235065140591681,
+          "ci95": [
+            1.0194911736996393,
+            1.0250484786987806
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000508307856,
+          "ci95": [
+            1.000000041190466,
+            1.000000077998963
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 2.6487149457627845,
+          "ci95": [
+            2.6000432029965403,
+            2.67077697737829
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.1233277585878898,
+          "ci95": [
+            1.1119094270767567,
+            1.131577400448328
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 7174692,
+          "ci95": [
+            5960564,
+            7644060
+          ]
+        },
+        "instructions:u": {
+          "median": 58,
+          "ci95": [
+            47,
+            89
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 16161215,
+          "ci95": [
+            15858879,
+            16253412
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 2707214,
+          "ci95": [
+            2493010,
+            2802426
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.000499643985383,
+          "ci95": [
+            0.9983221485892176,
+            1.0019549319062269
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999877305007,
+          "ci95": [
+            0.9999999623151082,
+            1.0000000297973572
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 1.0231950187746566,
+          "ci95": [
+            0.9984807148477838,
+            1.043962911883375
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0132415637084724,
+          "ci95": [
+            0.9876560312138515,
+            1.02865230282737
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 152402,
+          "ci95": [
+            -513101,
+            596716
+          ]
+        },
+        "instructions:u": {
+          "median": -14,
+          "ci95": [
+            -43,
+            34
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 230336,
+          "ci95": [
+            -15023,
+            428106
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 286882,
+          "ci95": [
+            -274987,
+            625561
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 0,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0218136399616369,
+          "ci95": [
+            1.0211715986175094,
+            1.022608462499444
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000385612846,
+          "ci95": [
+            1.0000000306737513,
+            1.0000000727406073
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 2.623665513038336,
+          "ci95": [
+            2.611102644231717,
+            2.6566191126422547
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.1310646767655932,
+          "ci95": [
+            1.1048483187594127,
+            1.1582383525778082
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 6664491,
+          "ci95": [
+            6474452,
+            6896060
+          ]
+        },
+        "instructions:u": {
+          "median": 44,
+          "ci95": [
+            35,
+            83
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 15948059,
+          "ci95": [
+            15888631,
+            16123661
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 2825446,
+          "ci95": [
+            2330371,
+            3428276
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0012677700772794,
+          "ci95": [
+            1.0001838304285278,
+            1.0021360416561917
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000026609213,
+          "ci95": [
+            1.0000000020696056,
+            1.0000000094610537
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 1.001613896864878,
+          "ci95": [
+            1.0000737516678517,
+            1.0030659232543038
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.000494504592255,
+          "ci95": [
+            1.000232910764227,
+            1.002224242379193
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 2707604,
+          "ci95": [
+            392742,
+            4560462
+          ]
+        },
+        "instructions:u": {
+          "median": 18,
+          "ci95": [
+            14,
+            64
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 778718,
+          "ci95": [
+            35590,
+            1478611
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1416092,
+          "ci95": [
+            667074,
+            6369767
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9920313538948445,
+          "ci95": [
+            0.9907575188130878,
+            0.9925090385499408
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999992608551,
+          "ci95": [
+            0.9999999914259201,
+            1.0000000011826318
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9834251884430578,
+          "ci95": [
+            0.9829244953799605,
+            0.9858907597427398
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0060795161591494,
+          "ci95": [
+            1.0053567644013548,
+            1.0064111368885247
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -17018810,
+          "ci95": [
+            -19739859,
+            -15994084
+          ]
+        },
+        "instructions:u": {
+          "median": -5,
+          "ci95": [
+            -58,
+            8
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -7990741,
+          "ci95": [
+            -8240047,
+            -6807820
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 17410031,
+          "ci95": [
+            15380128,
+            18360161
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0043588564304782,
+          "ci95": [
+            1.0039286783377468,
+            1.005496105545356
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999988173683,
+          "ci95": [
+            0.9999999948259863,
+            1.0000000107915143
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9993816070921804,
+          "ci95": [
+            0.997787084459184,
+            1.0005670734450027
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0144386630844047,
+          "ci95": [
+            1.0133743362476693,
+            1.0150960043913613
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 9309536,
+          "ci95": [
+            8393371,
+            11727018
+          ]
+        },
+        "instructions:u": {
+          "median": -8,
+          "ci95": [
+            -35,
+            73
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -298234,
+          "ci95": [
+            -1067943,
+            273650
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 41343480,
+          "ci95": [
+            38305108,
+            43231813
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "arm64-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9939620735025566,
+          "ci95": [
+            0.9923848006413817,
+            0.99450680161678
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999949738152,
+          "ci95": [
+            0.9999999924607228,
+            1.0000000023652633
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.978681987795395,
+          "ci95": [
+            0.9781886293569626,
+            0.9811794032674844
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0165348055033903,
+          "ci95": [
+            1.015872297099812,
+            1.0175538228715315
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -12891010,
+          "ci95": [
+            -16274689,
+            -11720815
+          ]
+        },
+        "instructions:u": {
+          "median": -34,
+          "ci95": [
+            -51,
+            16
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -10277445,
+          "ci95": [
+            -10519028,
+            -9082168
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 47350027,
+          "ci95": [
+            45453812,
+            50263388
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "aa",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.0009341717592444,
+          "ci95": [
+            0.9998827819972522,
+            1.001678547137753
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999956923527,
+          "ci95": [
+            0.99999999316718,
+            1.0000000001485396
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 1.001092731203757,
+          "ci95": [
+            1.0007456900551774,
+            1.0015208236026771
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0006226796860644,
+          "ci95": [
+            1.0000313482992935,
+            1.002700604863564
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 1724456,
+          "ci95": [
+            -216203,
+            3093285
+          ]
+        },
+        "instructions:u": {
+          "median": -29,
+          "ci95": [
+            -46,
+            1
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 449309,
+          "ci95": [
+            306846,
+            625194
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1110748,
+          "ci95": [
+            55959,
+            4825726
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "iterator",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9808391613423919,
+          "ci95": [
+            0.9786621223156606,
+            0.9818070285762621
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999985146043,
+          "ci95": [
+            0.9999999943554966,
+            1.0000000059415826
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9769052363619674,
+          "ci95": [
+            0.9756394938164161,
+            0.9780446511329367
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0532574270003234,
+          "ci95": [
+            1.0503995925852594,
+            1.0555167762653366
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -35370394,
+          "ci95": [
+            -39400378,
+            -33526640
+          ]
+        },
+        "instructions:u": {
+          "median": -10,
+          "ci95": [
+            -38,
+            40
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -9498090,
+          "ci95": [
+            -10024170,
+            -9027596
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 95131869,
+          "ci95": [
+            90049952,
+            99033135
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "leaf",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 1.003123885269997,
+          "ci95": [
+            1.0013558358165149,
+            1.0039322435113638
+          ]
+        },
+        "instructions:u": {
+          "median": 1.0000000005941583,
+          "ci95": [
+            0.9999999958408922,
+            1.0000000023766331
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 1.0013991648684655,
+          "ci95": [
+            1.0010046861562527,
+            1.0018378156340166
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0169416633933108,
+          "ci95": [
+            1.0147268398833025,
+            1.0185223330684734
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": 5763712,
+          "ci95": [
+            2503550,
+            7246475
+          ]
+        },
+        "instructions:u": {
+          "median": 4,
+          "ci95": [
+            -28,
+            16
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 574994,
+          "ci95": [
+            413421,
+            755831
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 30220865,
+          "ci95": [
+            26312737,
+            33097661
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    },
+    {
+      "host": "layout-fusion-host-1-four-ubuntu-24.04-clang-44263634502",
+      "group": "transitions",
+      "case": "mips64el-ls",
+      "mode": 2,
+      "variant": "candidate",
+      "event_cost_ratios": {
+        "cycles:u": {
+          "median": 0.9824010273330893,
+          "ci95": [
+            0.98028871803837,
+            0.9825889111592262
+          ]
+        },
+        "instructions:u": {
+          "median": 0.9999999953952735,
+          "ci95": [
+            0.9999999896022305,
+            0.9999999974748274
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": 0.9874919876900239,
+          "ci95": [
+            0.9872308123705462,
+            0.9882317056326939
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 1.0566273529504535,
+          "ci95": [
+            1.0556312866426838,
+            1.0579019269423922
+          ]
+        }
+      },
+      "zero_baseline_pairs": {
+        "cycles:u": 0,
+        "instructions:u": 0,
+        "dsb2mite_switches.penalty_cycles:u": 0,
+        "idq.mite_uops:u": 0
+      },
+      "event_count_deltas": {
+        "cycles:u": {
+          "median": -32470914,
+          "ci95": [
+            -36396870,
+            -32083591
+          ]
+        },
+        "instructions:u": {
+          "median": -31,
+          "ci95": [
+            -70,
+            -17
+          ]
+        },
+        "dsb2mite_switches.penalty_cycles:u": {
+          "median": -5140232,
+          "ci95": [
+            -5249916,
+            -4842567
+          ]
+        },
+        "idq.mite_uops:u": {
+          "median": 101083954,
+          "ci95": [
+            99372211,
+            103287866
+          ]
+        }
+      },
+      "minimum_running_percent": 100.0
+    }
+  ],
+  "publication_qualified": false,
+  "scope": "Native timings are baseline/candidate gains. PMU ratios are candidate/baseline event costs, covering the unchanged whole process. Bootstrap intervals are descriptive, not corrected for multiple comparisons. Unsupported events remain unavailable."
+}
