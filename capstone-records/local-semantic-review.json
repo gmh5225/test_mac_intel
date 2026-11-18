@@ -2,53 +2,45 @@
   "complete": true,
   "source": {
     "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-    "tree": "e7bbf5727654fb516aa1fae997fa96e1b2468145",
-    "sha256": "def7d28fa7d11deb34bf28d4ca4f2c61a02768dcf2c31374ed7ea0205e02d8ba",
-    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
-    "generated_table_sha256": "32d804e60d94bc2c312979675db7ad2103135dc468372d88d39908dc542e7726"
+    "tree": "be46f53cb16387430c33085cfe1aee14acc18ba1",
+    "sha256": "e5b7b04b03b1d58c434c43d19f60003cf223bb164234fd8b257b22867e0c7f7d",
+    "records": {
+      "arm": "equal ARM public records, cursor and errors for 33554432 inputs",
+      "aarch64": "equal AArch64 public records, cursor and errors for 16777216 inputs"
+    }
   },
-  "unit_executions": 7,
-  "canonical_memory_projections": 396,
-  "real_record_comparisons": 2409351,
+  "unit_executions": 8,
+  "arm_aarch64_record_comparisons": 50331648,
+  "x86_record_comparisons": 2409351,
   "guard_page_comparisons": 3092,
-  "same_admission_as_previous": true,
-  "previous_tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
-  "added_fast_instructions": {
-    "putty-32-0.85": 5241,
-    "putty-64-0.85": 4844,
-    "amd64-ls": 473,
-    "scalar32": 0,
-    "scalar64": 0,
-    "simd64": 0,
-    "libjpeg62-turbo-amd64": 1877,
-    "libzstd1-amd64": 1756,
-    "libssl3t64-amd64": 6290,
-    "jpeg-avx2-i386": 0,
-    "libssl3t64-i386": 8394
-  },
+  "callback_cases": "Eleven optional-default backends plus custom x86 and RISC-V mappers; available architectures exercised locally, all affected backends require CI.",
   "object_delta": {
     "changed": [
-      "arch/X86/X86ImmediateOutput.c.o",
-      "arch/X86/X86MemoryOutput.c.o",
-      "arch/X86/X86OutputIterator.c.o"
+      "cs.c.o",
+      "arch/Mips/MipsModule.c.o",
+      "arch/X86/X86DisassemblerDecoder.c.o",
+      "arch/ARM/ARMModule.c.o",
+      "arch/AArch64/AArch64Module.c.o"
     ],
     "allowed": [
-      "arch/X86/X86ImmediateOutput.c.o",
-      "arch/X86/X86MemoryOutput.c.o",
-      "arch/X86/X86OutputIterator.c.o"
+      "arch/AArch64/AArch64Module.c.o",
+      "arch/ARM/ARMModule.c.o",
+      "arch/Mips/MipsModule.c.o",
+      "arch/X86/X86DisassemblerDecoder.c.o",
+      "cs.c.o"
     ],
     "total": 40
   },
   "cleanup": [
     {
-      "bytes": 336579801,
+      "bytes": 302915842,
       "removed": true
     },
     {
-      "bytes": 232876859,
+      "bytes": 232911181,
       "removed": true
     }
   ],
   "publication_qualified": false,
-  "scope": "Canonical generator regenerated identically from baseline and candidate; exhaustive x86 output units, protected bounds and complete real/synthetic records match. Every admission census row matches the preceding C6/C7 prototype exactly. Performance and portable qualification remain separate."
+  "scope": "Local complete records, cursors, errors and callback order match. Performance and portable qualification are separate."
 }

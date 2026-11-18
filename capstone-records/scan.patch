@@ -1,534 +1,355 @@
-diff --git a/arch/X86/X86GenSimpleOutput.inc b/arch/X86/X86GenSimpleOutput.inc
-index a976814e..fcd82169 100644
---- a/arch/X86/X86GenSimpleOutput.inc
-+++ b/arch/X86/X86GenSimpleOutput.inc
-@@ -15,7 +15,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			288, 292, 296, 300, 304, 308, 312, 316, 320, 324, 0, 0, 328, 332, 336, 340,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 344, 0, 0, 0, 0, 0, 348, 0, 352, 356, 0, 0, 360,
-+			0, 65533, 0, 344, 0, 0, 32771, 32771, 0, 348, 0, 352, 356, 0, 0, 360,
- 			0, 0, 0, 0, 0, 0, 0, 364, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 371, 375, 0, 379, 380, 384, 388, 392,
- 			0, 0, 0, 65535, 396, 400, 0, 0, 404, 408, 412, 416, 420, 424, 0, 429,
-@@ -89,7 +89,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			716, 720, 724, 728, 732, 736, 740, 744, 748, 752, 0, 0, 756, 760, 764, 768,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 772, 65535, 65535, 0, 0, 0, 776, 0, 780, 784, 0, 0, 788,
-+			0, 65533, 0, 772, 65535, 65535, 32771, 32771, 0, 776, 0, 780, 784, 0, 0, 788,
- 			0, 0, 0, 0, 0, 0, 0, 792, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 799, 803, 0, 807, 808, 812, 816, 820,
- 			0, 0, 0, 65535, 824, 828, 0, 0, 832, 836, 840, 844, 848, 852, 0, 857,
-@@ -107,7 +107,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 65532, 65532, 65532, 65532, 65532, 65532, 65532, 65532,
--			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 65533, 0, 0, 0, 0, 32771, 32771, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-@@ -125,7 +125,7 @@ static const uint16_t x86_simple_plans[2][4][256] = {
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
--			0, 65533, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-+			0, 65533, 0, 0, 0, 0, 32771, 32771, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
- 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 953,
-diff --git a/arch/X86/X86ImmediateOutput.c b/arch/X86/X86ImmediateOutput.c
-index 44c4930b..a678da72 100644
---- a/arch/X86/X86ImmediateOutput.c
-+++ b/arch/X86/X86ImmediateOutput.c
-@@ -10,23 +10,6 @@
- 	!defined(_WIN32_WCE)
- #include "X86SimpleOutput.h"
- 
--static void writeUnsignedImmediate(char *out, uint64_t value)
--{
--	if (value <= HEX_THRESHOLD) {
--		*out = (char)('0' + value);
--	} else {
--		static const char digits[] = "0123456789abcdef";
--		char temp[16], *end = temp + sizeof(temp), *start = end;
--		uint64_t n = value;
--		do {
--			*--start = digits[n & 15];
--			n >>= 4;
--		} while (n);
--		memcpy(out, "0x", 2);
--		memcpy(out + 2, start, end - start);
--	}
--}
--
- static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 			       const struct X86SimpleOutput *row, bool wide,
- 			       uint16_t *insn_size)
-@@ -51,8 +34,8 @@ static void writePushImmediate(cs_insn *insn, const uint8_t *code,
- 	char *out = insn->op_str;
- 	if (value < 0)
- 		*out++ = '-';
--	writeUnsignedImmediate(out,
--			       value < 0 ? (uint64_t)-value : (uint64_t)value);
-+	X86_writeUnsignedImmediate(out, value < 0 ? (uint64_t)-value :
-+						    (uint64_t)value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, code[0], 0, 0, 0, 0);
- 		cs_x86_op *op = &insn->detail->x86.operands[0];
-@@ -80,7 +63,7 @@ static void writeMovRegImm32(cs_insn *insn, const struct X86SimpleOutput *row,
- 	memcpy(insn->op_str, reg->name, sizeof(reg->name));
- 	char *out = insn->op_str + reg->length;
- 	memcpy(out, ", ", 2);
--	writeUnsignedImmediate(out + 2, value);
-+	X86_writeUnsignedImmediate(out + 2, value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, code[rex != 0], rex, 0,
- 				      reg->reg, 0);
-@@ -134,7 +117,7 @@ static void writeRegisterImmediate(cs_insn *insn,
- 	out += 2;
- 	if (negative)
- 		*out++ = '-';
--	writeUnsignedImmediate(out, value);
-+	X86_writeUnsignedImmediate(out, value);
- 	if (insn->detail) {
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      reg->reg, 0);
-diff --git a/arch/X86/X86MemoryOutput.c b/arch/X86/X86MemoryOutput.c
-index bd0f6c94..a979f4f4 100644
---- a/arch/X86/X86MemoryOutput.c
-+++ b/arch/X86/X86MemoryOutput.c
-@@ -10,10 +10,18 @@
- #include "X86SimpleOutput.h"
- 
- /* No-base SIB and encodings exposing EIZ/RIZ retain the general printer. */
--bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
--			   uint16_t *insn_size,
--			   const struct X86SimpleOutput *row,
--			   const struct X86SimpleRegister regs[4][16])
-+#if defined(_MSC_VER)
-+static __forceinline
-+#elif defined(__GNUC__)
-+static inline __attribute__((always_inline))
-+#else
-+static inline
-+#endif
-+	bool writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
-+			       uint16_t *insn_size,
-+			       const struct X86SimpleOutput *row,
-+			       const struct X86SimpleRegister regs[4][16],
-+			       bool immediate)
+diff --git a/arch/AArch64/AArch64Module.c b/arch/AArch64/AArch64Module.c
+index 2adf7810..8dfae31e 100644
+--- a/arch/AArch64/AArch64Module.c
++++ b/arch/AArch64/AArch64Module.c
+@@ -22,7 +22,7 @@ cs_err AArch64_global_init(cs_struct *ud)
+ 	ud->getinsn_info = mri;
+ 	ud->disasm = AArch64_getInstruction;
+ 	ud->reg_name = AArch64_reg_name;
+-	ud->insn_id = AArch64_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = AArch64_insn_name;
+ 	ud->group_name = AArch64_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/ARC/ARCModule.c b/arch/ARC/ARCModule.c
+index 6999e661..23f9521c 100644
+--- a/arch/ARC/ARCModule.c
++++ b/arch/ARC/ARCModule.c
+@@ -22,7 +22,7 @@ cs_err ARC_global_init(cs_struct *ud)
+ 	ud->printer = ARC_printer;
+ 	ud->printer_info = mri;
+ 	ud->reg_name = ARC_reg_name;
+-	ud->insn_id = ARC_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = ARC_insn_name;
+ 	ud->group_name = ARC_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/ARM/ARMModule.c b/arch/ARM/ARMModule.c
+index 7f124ca8..e2190df4 100644
+--- a/arch/ARM/ARMModule.c
++++ b/arch/ARM/ARMModule.c
+@@ -22,7 +22,7 @@ cs_err ARM_global_init(cs_struct *ud)
+ 	ud->printer = ARM_printer;
+ 	ud->printer_info = mri;
+ 	ud->reg_name = ARM_reg_name;
+-	ud->insn_id = ARM_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = ARM_insn_name;
+ 	ud->group_name = ARM_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/BPF/BPFModule.c b/arch/BPF/BPFModule.c
+index d744b827..e05a2011 100644
+--- a/arch/BPF/BPFModule.c
++++ b/arch/BPF/BPFModule.c
+@@ -12,7 +12,7 @@ cs_err BPF_global_init(cs_struct *ud)
  {
- 	const bool wide = row->address_size == 8;
- 	const uint8_t rex = wide && (code[0] & 0xf0) == 0x40 ? code[0] : 0;
-@@ -23,7 +31,9 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	const bool sib = rm == 4, rip = !mod && rm == 5;
- 	const unsigned offset = lead + 2 + sib;
- 	const unsigned disp_size = mod == 2 || rip ? 4 : mod;
--	const unsigned length = offset + disp_size;
-+	const unsigned imm_size = immediate ? ((opcode & 1) ? 4 : 1) : 0;
-+	const unsigned imm_offset = offset + disp_size;
-+	const unsigned length = imm_offset + imm_size;
- 	if (size < length || (rip && !wide))
- 		return false;
+ 	ud->printer = BPF_printInst;
+ 	ud->reg_name = BPF_reg_name;
+-	ud->insn_id = BPF_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = BPF_insn_name;
+ 	ud->group_name = BPF_group_name;
+ #ifndef CAPSTONE_DIET
+diff --git a/arch/LoongArch/LoongArchModule.c b/arch/LoongArch/LoongArchModule.c
+index fea4271a..f08173b5 100644
+--- a/arch/LoongArch/LoongArchModule.c
++++ b/arch/LoongArch/LoongArchModule.c
+@@ -23,7 +23,7 @@ cs_err LoongArch_global_init(cs_struct *ud)
+ 	ud->printer = LoongArch_printer;
+ 	ud->printer_info = mri;
+ 	ud->reg_name = LoongArch_reg_name;
+-	ud->insn_id = LoongArch_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = LoongArch_insn_name;
+ 	ud->group_name = LoongArch_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/arch/Mips/MipsModule.c b/arch/Mips/MipsModule.c
+index e774efa0..3b12f21e 100644
+--- a/arch/Mips/MipsModule.c
++++ b/arch/Mips/MipsModule.c
+@@ -23,7 +23,7 @@ cs_err Mips_global_init(cs_struct *ud)
+ 	ud->printer_info = mri;
+ 	ud->getinsn_info = mri;
+ 	ud->reg_name = Mips_reg_name;
+-	ud->insn_id = Mips_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = Mips_insn_name;
+ 	ud->group_name = Mips_group_name;
+ 	ud->disasm = Mips_getInstruction;
+diff --git a/arch/PowerPC/PPCModule.c b/arch/PowerPC/PPCModule.c
+index ea0d51ee..c2a375f4 100644
+--- a/arch/PowerPC/PPCModule.c
++++ b/arch/PowerPC/PPCModule.c
+@@ -23,7 +23,7 @@ cs_err PPC_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
  
-@@ -45,7 +55,7 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	}
+ 	ud->reg_name = PPC_reg_name;
+-	ud->insn_id = PPC_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = PPC_insn_name;
+ 	ud->group_name = PPC_group_name;
  
- 	const bool push = opcode == 0xff, lea = opcode == 0x8d;
--	const bool load = !push && (lea || (opcode & 2));
-+	const bool load = !immediate && !push && (lea || (opcode & 2));
- 	const unsigned reg_width = (opcode & 1) ? ((rex & 8) ? 3 : 2) : lead;
- 	const struct X86SimpleRegister *reg =
- 		&regs[reg_width][((rex & 4) << 1) | ((modrm >> 3) & 7)];
-@@ -57,6 +67,16 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	} else if (disp_size == 4) {
- 		displacement = X86_readDisp32(code + offset);
- 	}
-+	uint64_t immediate_value = 0;
-+	if (immediate) {
-+		immediate_value =
-+			imm_size == 1 ?
-+				code[imm_offset] :
-+				(uint32_t)X86_readDisp32(code + imm_offset);
-+		if (row->ops[0].size == 8)
-+			immediate_value =
-+				(uint64_t)(int64_t)(int32_t)immediate_value;
-+	}
- 	insn->id = row->id;
- 	*insn_size = insn->size = (uint16_t)length;
- 	memcpy(insn->bytes, code, length);
-@@ -100,7 +120,10 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 	}
- 	out = X86_writeDisplacement(out, displacement);
- 	*out++ = ']';
--	if (!load && !push) {
-+	if (immediate) {
-+		memcpy(out, ", ", 2);
-+		X86_writeUnsignedImmediate(out + 2, immediate_value);
-+	} else if (!load && !push) {
- 		memcpy(out, ", ", 2);
- 		memcpy(out + 2, reg->name, sizeof(reg->name));
- 	}
-@@ -108,6 +131,13 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		X86_writeSimpleDetail(insn->detail, row, opcode, rex, modrm,
- 				      load ? reg->reg : 0, load ? 0 : reg->reg);
- 		cs_x86 *x = &insn->detail->x86;
-+		if (immediate) {
-+			x->operands[1].type = X86_OP_IMM;
-+			x->operands[1].imm = (int64_t)immediate_value;
-+			x->operands[1].access = 0;
-+			x->encoding.imm_offset = (uint8_t)imm_offset;
-+			x->encoding.imm_size = (uint8_t)imm_size;
-+		}
- 		cs_x86_op *mem = &x->operands[load ? 1 : 0];
- 		mem->type = X86_OP_MEM;
- 		mem->mem.base = rip ? X86_REG_RIP : (x86_reg)base->reg;
-@@ -129,5 +159,21 @@ bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
+diff --git a/arch/Sparc/SparcModule.c b/arch/Sparc/SparcModule.c
+index e3684dd3..89b4a99d 100644
+--- a/arch/Sparc/SparcModule.c
++++ b/arch/Sparc/SparcModule.c
+@@ -23,7 +23,7 @@ cs_err Sparc_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = Sparc_reg_name;
+-	ud->insn_id = Sparc_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = Sparc_insn_name;
+ 	ud->group_name = Sparc_group_name;
+ 
+diff --git a/arch/SystemZ/SystemZModule.c b/arch/SystemZ/SystemZModule.c
+index 2dc87fa2..be63a21d 100644
+--- a/arch/SystemZ/SystemZModule.c
++++ b/arch/SystemZ/SystemZModule.c
+@@ -23,7 +23,7 @@ cs_err SystemZ_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = SystemZ_reg_name;
+-	ud->insn_id = SystemZ_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = SystemZ_insn_name;
+ 	ud->group_name = SystemZ_group_name;
+ 
+diff --git a/arch/TriCore/TriCoreModule.c b/arch/TriCore/TriCoreModule.c
+index 513461c2..4f83ea4a 100644
+--- a/arch/TriCore/TriCoreModule.c
++++ b/arch/TriCore/TriCoreModule.c
+@@ -23,7 +23,7 @@ cs_err TRICORE_global_init(cs_struct *ud)
+ 	ud->post_printer = NULL;
+ 
+ 	ud->reg_name = TriCore_getRegisterName;
+-	ud->insn_id = TriCore_get_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = TriCore_insn_name;
+ 	ud->group_name = TriCore_group_name;
+ 
+diff --git a/arch/Xtensa/XtensaModule.c b/arch/Xtensa/XtensaModule.c
+index c2d5d08d..8699d106 100644
+--- a/arch/Xtensa/XtensaModule.c
++++ b/arch/Xtensa/XtensaModule.c
+@@ -20,7 +20,7 @@ cs_err Xtensa_global_init(cs_struct *ud)
+ 	ud->getinsn_info = mri;
+ 	ud->disasm = Xtensa_disasm;
+ 	ud->reg_name = Xtensa_reg_name;
+-	ud->insn_id = Xtensa_insn_id;
++	ud->insn_id = NULL;
+ 	ud->insn_name = Xtensa_insn_name;
+ 	ud->group_name = Xtensa_group_name;
+ 	ud->post_printer = NULL;
+diff --git a/cs_disasm_internal.h b/cs_disasm_internal.h
+index b883b547..0e3fb0dc 100644
+--- a/cs_disasm_internal.h
++++ b/cs_disasm_internal.h
+@@ -45,10 +45,13 @@ static inline CS_PRESERVE_MOST void map_insn_id(cs_struct *handle,
+ #ifdef CAPSTONE_HAS_X86
+ 	/* The LUT contains only generated 16-bit opcodes; source-owned
+ 	 * feature opcodes exceed its bound and keep the normal mapper. */
+-	if (CS_DECODE_LIKELY(handle->arch == CS_ARCH_X86 &&
+-			     X86_get_insn_id_no_detail(handle, insn, id)))
+-		return;
++	if (CS_DECODE_LIKELY(handle->arch == CS_ARCH_X86)) {
++		if (X86_get_insn_id_no_detail(handle, insn, id))
++			return;
++	} else
+ #endif
++		if (!handle->insn_id)
++		return;
+ 	handle->insn_id(handle, insn, id);
+ }
+ 
+diff --git a/cs_priv.h b/cs_priv.h
+index 95d36ef5..c25ee0ba 100644
+--- a/cs_priv.h
++++ b/cs_priv.h
+@@ -114,7 +114,7 @@ struct cs_struct {
+ 	GetName_t reg_name;
+ 	GetName_t insn_name;
+ 	GetName_t group_name;
+-	GetID_t insn_id;
++	GetID_t insn_id; // NULL for non-x86 backends that already map IDs.
+ 	PostPrinter_t post_printer;
+ 	cs_err errnum;
+ 	ARM_ITBlock ITBlock; // for Arm only
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 8daabd98..7eefb64f 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -157,6 +157,11 @@ all cache offsets/hints/base registers, and MT result fields.
+ 
+ ### Component 2 - Mapping logic
+ 
++The private `cs_struct.insn_id` callback is required for x86. Other backends
++that already map public IDs during decoding leave it `NULL`; the core invokes
++a non-null mapper after successful decoding and before printing, in both
++iterator and batch APIs. The x86 mapping path does not test for an absent mapper.
++
+ The mapping component has three different task:
+ 
+ 1. Serving as programmable interface for the Capstone core to the LLVM code.
+diff --git a/tests/unit/mapping.c b/tests/unit/mapping.c
+index 7f588c14..066778c2 100644
+--- a/tests/unit/mapping.c
++++ b/tests/unit/mapping.c
+@@ -255,6 +255,147 @@ static bool test_full_group_map(void)
  	return true;
  }
  
-+bool X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
-+			   uint16_t *insn_size,
-+			   const struct X86SimpleOutput *row,
-+			   const struct X86SimpleRegister regs[4][16])
++static unsigned callback_stage;
++static unsigned callback_id;
++static bool callback_order;
++
++static bool callback_decode(csh handle, const uint8_t *code, size_t length,
++			    MCInst *mi, uint16_t *size, uint64_t address,
++			    void *info)
 +{
-+	return writeMemoryOutput(code, size, insn, insn_size, row, regs, false);
++	(void)handle;
++	(void)address;
++	(void)info;
++	callback_order &= callback_stage == 0;
++	callback_stage = 1;
++	if (!length || !code[0])
++		return false;
++	mi->flat_insn->id = 42;
++	MCInst_setOpcode(mi, 17);
++	*size = 1;
++	return true;
 +}
 +
-+bool X86_writeMemoryImmediateOutput(const uint8_t *code, size_t size,
-+				    cs_insn *insn, uint16_t *insn_size,
-+				    const struct X86SimpleOutput *row,
-+				    const struct X86SimpleRegister regs[4][16])
++static void callback_map(cs_struct *handle, cs_insn *insn, unsigned id)
 +{
-+	return writeMemoryOutput(code, size, insn, insn_size, row, regs, true);
++	(void)handle;
++	callback_order &= callback_stage == 1 && id == 17 && insn->id == 42 &&
++			  insn->size == 1;
++	callback_stage = 2;
++	insn->id = 57;
 +}
 +
- #endif
- #endif
-diff --git a/arch/X86/X86OutputIterator.c b/arch/X86/X86OutputIterator.c
-index 11e8578a..e2056fe0 100644
---- a/arch/X86/X86OutputIterator.c
-+++ b/arch/X86/X86OutputIterator.c
-@@ -75,7 +75,7 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 	    cs_vsnprintf != cs_default_vsnprintf)
- 		return false;
- 
--	if (plan >= X86_PLAN_PUSH_IMMEDIATE) {
-+	if (plan & X86_PLAN_SPECIAL_FLAG) {
- 		if (plan == X86_PLAN_VECTOR)
- 			return X86_writeVectorOutput(code, size, insn,
- 						     insn_size,
-@@ -94,6 +94,16 @@ bool X86_trySimpleOutput(cs_struct *handle, const uint8_t *code, size_t size,
- 			row = x86_simple_plans[wide][prefix_class][0x8b] >> 2;
- 			reg = &x86_simple_registers[2][((rex & 1) << 3) |
- 						       (opcode & 7)];
-+		} else if (plan == X86_PLAN_MOV_MEMORY_IMMEDIATE) {
-+			if (size < 2u + has_rex || code[1 + has_rex] >= 0xc0 ||
-+			    (code[1 + has_rex] & 0x38))
-+				return false;
-+			row = x86_simple_plans[wide][prefix_class]
-+					      [0x88 | (opcode & 1)] >>
-+			      2;
-+			return X86_writeMemoryImmediateOutput(
-+				code, size, insn, insn_size,
-+				&x86_simple_outputs[row], x86_simple_registers);
- 		} else {
- 			if (size < (opcode == 0x81 ? 6u : 3u) + has_rex)
- 				return false;
-diff --git a/arch/X86/X86SimpleOutput.h b/arch/X86/X86SimpleOutput.h
-index aff17085..85cde1d8 100644
---- a/arch/X86/X86SimpleOutput.h
-+++ b/arch/X86/X86SimpleOutput.h
-@@ -44,6 +44,10 @@ enum X86SimpleForm {
- 	X86_SIMPLE_RELATIVE,
- };
- 
-+/* Normal plans store a row index above two form bits. Bit 15 selects a
-+ * special writer; the generator rejects normal rows that reach that domain. */
-+#define X86_PLAN_SPECIAL_FLAG (1u << 15)
-+
- /* This plan gets its ALU row from ModR/M.reg. Its low bits select the
-  * same register-only operand check as a register pair. */
- #define X86_PLAN_GROUP1_IMMEDIATE ((UINT16_MAX & ~3u) | X86_SIMPLE_REG_RM)
-@@ -53,12 +57,20 @@ enum X86SimpleForm {
- #define X86_PLAN_VECTOR UINT16_MAX
- #define X86_PLAN_SHIFT_IMM8 ((UINT16_MAX & ~3u) | X86_SIMPLE_RM_REG)
- #define X86_PLAN_MOV_REG_IMM32 ((UINT16_MAX & ~3u) | X86_SIMPLE_FIXED)
-+#define X86_PLAN_MOV_MEMORY_IMMEDIATE \
-+	(X86_PLAN_SPECIAL_FLAG | X86_SIMPLE_RELATIVE)
- 
- CAPSTONE_INTERNAL bool
- X86_writeMemoryOutput(const uint8_t *code, size_t size, cs_insn *insn,
- 		      uint16_t *insn_size, const struct X86SimpleOutput *row,
- 		      const struct X86SimpleRegister regs[4][16]);
- 
-+CAPSTONE_INTERNAL bool
-+X86_writeMemoryImmediateOutput(const uint8_t *code, size_t size, cs_insn *insn,
-+			       uint16_t *insn_size,
-+			       const struct X86SimpleOutput *row,
-+			       const struct X86SimpleRegister regs[4][16]);
-+
- CAPSTONE_INTERNAL void X86_writeImmediateOutput(
- 	const uint8_t *code, cs_insn *insn, uint16_t *insn_size, uint8_t rex,
- 	const struct X86SimpleOutput *row, const struct X86SimpleRegister *reg);
-@@ -134,6 +146,23 @@ static inline char *X86_writeDisplacement(char *out, int32_t displacement)
- 	return out + length;
- }
- 
-+static inline void X86_writeUnsignedImmediate(char *out, uint64_t value)
++static void callback_print(MCInst *mi, SStream *stream, void *info)
 +{
-+	if (value <= HEX_THRESHOLD) {
-+		*out = (char)('0' + value);
-+	} else {
-+		static const char digits[] = "0123456789abcdef";
-+		char temp[16], *end = temp + sizeof(temp), *start = end;
-+		uint64_t n = value;
-+		do {
-+			*--start = digits[n & 15];
-+			n >>= 4;
-+		} while (n);
-+		memcpy(out, "0x", 2);
-+		memcpy(out + 2, start, end - start);
-+	}
++	(void)info;
++	callback_order &= callback_stage == (callback_id == 57 ? 2u : 1u) &&
++			  mi->flat_insn->id == callback_id;
++	callback_stage = 3;
++	SStream_concat0(stream, "mapped\tvalue");
 +}
 +
- static inline void X86_writeSimpleDetail(cs_detail *detail,
- 					 const struct X86SimpleOutput *row,
- 					 uint8_t opcode, uint8_t rex,
-diff --git a/suite/synctools/x86_simple_output.cpp b/suite/synctools/x86_simple_output.cpp
-index ccc4f0de..aa2053cb 100644
---- a/suite/synctools/x86_simple_output.cpp
-+++ b/suite/synctools/x86_simple_output.cpp
-@@ -292,6 +292,72 @@ CheckedRow check_pair(Decoder &decoder, unsigned opcode, unsigned prefix_class,
- 	return row;
- }
- 
-+// The memory-immediate form retains the canonical MOV effects and widths.
-+// Only its explicit operand kinds, address and immediate fields differ.
-+void check_memory_immediate_projection(Decoder &decoder, unsigned cls)
++static bool test_mapper_callbacks(void)
 +{
-+	const unsigned start = cls == 0 ? 0 : cls == 1 ? 0x40 : 0x48;
-+	for (unsigned rex = start; rex <= start + (cls ? 7 : 0); ++rex) {
-+		for (unsigned opcode : { 0xc6u, 0xc7u }) {
-+			decode_pair(decoder, rex, 0x88 | (opcode & 1), 0xc0);
-+			const cs_detail reg_detail = *decoder.insn->detail;
-+			for (uint32_t raw :
-+			     { 0u, 1u, 9u, 10u, 0x7fu, 0x80u, 0xffu, 0x100u,
-+			       0x7fffffffu, 0x80000000u, 0xffffffffu }) {
-+				const unsigned width = opcode == 0xc6 ? 1 : 4;
-+				const unsigned lead = rex != 0;
-+				uint8_t bytes[] = { uint8_t(rex),
-+						    uint8_t(opcode),
-+						    0,
-+						    uint8_t(raw),
-+						    uint8_t(raw >> 8),
-+						    uint8_t(raw >> 16),
-+						    uint8_t(raw >> 24) };
-+				decoder.decode(bytes + !rex, lead + 2 + width,
-+					       lead + 2 + width, 0);
-+				const auto &actual = *decoder.insn->detail;
-+				cs_detail expected = reg_detail;
-+				auto &x = expected.x86;
-+				const int64_t immediate =
-+					width == 1 ? (int64_t)(raw & 0xff) :
-+					(rex & 8)  ? (int64_t)(int32_t)raw :
-+						     (int64_t)raw;
-+				x.opcode[0] = uint8_t(opcode);
-+				x.modrm = 0;
-+				x.encoding.imm_offset = uint8_t(lead + 2);
-+				x.encoding.imm_size = uint8_t(width);
-+				const auto first = x.operands[0],
-+					   second = x.operands[1];
-+				x.operands[0] = {};
-+				x.operands[0].type = X86_OP_MEM;
-+				x.operands[0].size = first.size;
-+				x.operands[0].access = first.access;
-+				x.operands[0].mem = actual.x86.operands[0].mem;
-+				x.operands[1] = {};
-+				x.operands[1].type = X86_OP_IMM;
-+				x.operands[1].size = second.size;
-+				x.operands[1].imm = immediate;
-+				std::ostringstream number;
-+				if ((uint64_t)immediate > HEX_THRESHOLD)
-+					number << "0x" << std::hex;
-+				number << (uint64_t)immediate;
-+				const std::string operands =
-+					decoder.insn->op_str;
-+				const auto comma = operands.rfind(", ");
-+				if (decoder.insn->id != X86_INS_MOV ||
-+				    comma == std::string::npos ||
-+				    operands.substr(comma + 2) !=
-+					    number.str() ||
-+				    std::memcmp(&expected, &actual,
-+						offsetof(cs_detail, x86) +
-+							sizeof(cs_x86)))
-+					throw std::runtime_error(
-+						"memory-immediate MOV projection changed");
-+			}
-+		}
-+	}
-+}
-+
- // The register/imm8 form reuses the register row builder. Reconstruct the
- // one varying immediate separately after checking its public value and text.
- CheckedRow check_shift(Decoder &decoder, unsigned cls, unsigned group,
-@@ -512,7 +578,7 @@ void add_rex_stack(Decoder &decoder, const RegisterTable &regs,
- 							  uint8_t(rex), 0,
- 							  nullptr, nullptr));
- 		}
--		if (rows.size() + 1 >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+		if (rows.size() + 1 >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 			throw std::runtime_error(
- 				"too many fixed output records");
- 		const uint16_t plan =
-@@ -606,7 +672,7 @@ int main()
- 					rows.begin());
- 				if (index == rows.size())
- 					rows.push_back(row.fields);
--				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+				if (index >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 					return 1;
- 				plans[wide][cls][op] = static_cast<uint16_t>(
- 					(index << 2) | form);
-@@ -644,6 +710,17 @@ int main()
- 					X86_PLAN_MOV_REG_IMM32;
- 		}
- 	}
-+	for (unsigned wide = 0; wide < 2; ++wide) {
-+		for (unsigned cls = 0; cls < (wide ? 3u : 1u); ++cls) {
-+			check_memory_immediate_projection(wide ? x64 : x86,
-+							  cls);
-+			if (!plans[wide][cls][0x88] || !plans[wide][cls][0x89])
-+				throw std::runtime_error(
-+					"missing memory MOV row");
-+			plans[wide][cls][0xc6] = X86_PLAN_MOV_MEMORY_IMMEDIATE;
-+			plans[wide][cls][0xc7] = X86_PLAN_MOV_MEMORY_IMMEDIATE;
-+		}
-+	}
- 	uint16_t shifts[2][3][8]{};
- 	for (unsigned wide = 0; wide < 2; ++wide) {
- 		Decoder &decoder = wide ? x64 : x86;
-@@ -656,7 +733,7 @@ int main()
- 							 rows.end(),
- 							 row.fields) -
- 					       rows.begin();
--				if (index >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+				if (index >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 					return 1;
- 				if (index == rows.size())
- 					rows.push_back(row.fields);
-@@ -671,7 +748,7 @@ int main()
- 		for (unsigned index = 0; index < 2; ++index) {
- 			const unsigned op = index ? 0x6a : 0x68;
- 			CheckedRow row = check_push_immediate(decoder, op);
--			if (rows.size() >= (X86_PLAN_PUSH_IMMEDIATE >> 2))
-+			if (rows.size() >= (X86_PLAN_SPECIAL_FLAG >> 2))
- 				return 1;
- 			pushes[wide][index] =
- 				static_cast<uint16_t>(rows.size());
-diff --git a/tests/unit/x86_simple_output.c b/tests/unit/x86_simple_output.c
-index a1a212e6..3a0644db 100644
---- a/tests/unit/x86_simple_output.c
-+++ b/tests/unit/x86_simple_output.c
-@@ -792,6 +792,91 @@ static bool check_alu_memory(csh handles[2], cs_mode mode)
- 	return true;
- }
- 
-+static bool check_mov_memory_immediates(csh handles[2], cs_mode mode)
-+{
-+	static const uint32_t values[] = { 0,	       1,	  9,
-+					   10,	       0x7f,	  0x80,
-+					   0xff,       0x100,	  0x7fffffff,
-+					   0x80000000, 0xffffffff };
-+	uint8_t bytes[15];
-+	for (unsigned prefix = 0; prefix < (mode == CS_MODE_64 ? 17u : 1u);
-+	     ++prefix) {
-+		unsigned lead = prefix != 0;
-+		bytes[0] = (uint8_t)(0x3f + prefix);
-+		for (unsigned opcode = 0xc6; opcode <= 0xc7; ++opcode) {
-+			bytes[lead] = (uint8_t)opcode;
-+			for (unsigned mr = 0; mr < 256; ++mr) {
-+				bytes[lead + 1] = (uint8_t)mr;
-+				bool sib = mr < 0xc0 && (mr & 7) == 4;
-+				for (unsigned sb = 0; sb < (sib ? 256u : 1u);
-+				     ++sb) {
-+					unsigned offset = lead + 2;
-+					if (sib)
-+						bytes[offset++] = (uint8_t)sb;
-+					unsigned mod = mr >> 6;
-+					unsigned disp =
-+						mod == 1 ? 1 :
-+						mod == 2 ? 4 :
-+						mod == 0 && ((mr & 7) == 5 ||
-+							     (sib &&
-+							      (sb & 7) == 5)) ?
-+							   4 :
-+							   0;
-+					for (unsigned sample = 0;
-+					     sample <
-+					     sizeof(values) / sizeof(values[0]);
-+					     ++sample) {
-+						uint32_t displacement = values
-+							[(sample + 4) %
-+							 (sizeof(values) /
-+							  sizeof(values[0]))];
-+						for (unsigned i = 0; i < disp;
-+						     ++i)
-+							bytes[offset + i] =
-+								(uint8_t)(displacement >>
-+									  (i *
-+									   8));
-+						unsigned imm_offset =
-+							offset + disp;
-+						unsigned width =
-+							opcode == 0xc6 ? 1 : 4;
-+						for (unsigned i = 0; i < width;
-+						     ++i)
-+							bytes[imm_offset + i] =
-+								(uint8_t)(values[sample] >>
-+									  (i *
-+									   8));
-+						unsigned length =
-+							imm_offset + width;
-+						if (!compare(handles, bytes,
-+							     length,
-+							     sample ^ mr ^ sb))
-+							return false;
-+						if (!sample)
-+							for (unsigned truncated =
-+								     1;
-+							     truncated < length;
-+							     ++truncated)
-+								if (!compare(
-+									    handles,
-+									    bytes,
-+									    truncated,
-+									    mr ^ sb))
-+									return false;
-+					}
-+				}
-+			}
-+		}
-+	}
-+	/* Every byte value, independently of the addressing and boundary matrix. */
-+	for (unsigned imm = 0; imm < 256; ++imm) {
-+		const uint8_t simple[] = { 0xc6, 0x00, (uint8_t)imm };
-+		if (!compare(handles, simple, sizeof(simple), imm))
++	static const struct {
++		cs_arch arch;
++		cs_mode mode;
++	} cases[] = {
++		{ CS_ARCH_X86, CS_MODE_32 },
++		{ CS_ARCH_X86, CS_MODE_64 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV32 },
++		{ CS_ARCH_RISCV, CS_MODE_RISCV64 },
++		{ CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN },
++		{ CS_ARCH_ARM, CS_MODE_ARM },
++		{ CS_ARCH_MIPS, CS_MODE_MIPS32 },
++		{ CS_ARCH_ARC, CS_MODE_LITTLE_ENDIAN },
++		{ CS_ARCH_BPF, CS_MODE_BPF_EXTENDED },
++		{ CS_ARCH_LOONGARCH, CS_MODE_LOONGARCH64 },
++		{ CS_ARCH_PPC, (cs_mode)(CS_MODE_32 | CS_MODE_BIG_ENDIAN) },
++		{ CS_ARCH_SPARC, CS_MODE_BIG_ENDIAN },
++		{ CS_ARCH_SYSTEMZ, CS_MODE_BIG_ENDIAN },
++		{ CS_ARCH_TRICORE, CS_MODE_TRICORE_162 },
++		{ CS_ARCH_XTENSA, CS_MODE_XTENSA_ESP32 },
++	};
++	for (size_t i = 0; i < ARR_SIZE(cases); ++i) {
++		if (!cs_support(cases[i].arch))
++			continue;
++		csh handle;
++		if (cs_open(cases[i].arch, cases[i].mode, &handle) != CS_ERR_OK)
 +			return false;
++		cs_struct *state = (cs_struct *)(uintptr_t)handle;
++		GetID_t original = state->insn_id;
++		state->disasm = callback_decode;
++		state->printer = callback_print;
++		state->post_printer = NULL;
++		bool ok = true;
++		/* Reuse the handle while replacing and restoring the callback. */
++		for (unsigned flags = 0; flags < 32 && ok; ++flags) {
++			/* X86 uses its compact reader and ID lookup without detail.
++			 * Exercise its required mapper at the full-decode boundary. */
++			if (cases[i].arch == CS_ARCH_X86 && !(flags & 4))
++				continue;
++			bool custom = (flags & 1) ||
++				      cases[i].arch == CS_ARCH_X86 ||
++				      cases[i].arch == CS_ARCH_RISCV;
++			bool text = flags & 2;
++			bool detail = flags & 4, batch = flags & 8;
++			bool valid = !(flags & 16);
++			uint8_t byte = valid ? 1 : 0;
++			state->insn_id = custom ? callback_map : original;
++			callback_id = custom ? 57 : 42;
++			callback_stage = 0;
++			callback_order = true;
++			ok = cs_option(handle, CS_OPT_TEXT,
++				       text ? CS_OPT_ON : CS_OPT_OFF) ==
++				     CS_ERR_OK &&
++			     cs_option(handle, CS_OPT_DETAIL,
++				       detail ? CS_OPT_ON : CS_OPT_OFF) ==
++				     CS_ERR_OK;
++			if (batch) {
++				cs_insn *insn = NULL;
++				size_t count = cs_disasm(handle, &byte, 1,
++							 0x1000, 1, &insn);
++				ok &= count == (size_t)valid;
++				if (count)
++					ok &= insn->id == callback_id &&
++					      insn->size == 1;
++				cs_free(insn, count);
++			} else {
++				cs_insn *insn = cs_malloc(handle);
++				if (!insn) {
++					ok = false;
++					break;
++				}
++				const uint8_t *cursor = &byte;
++				size_t left = 1;
++				uint64_t address = 0x1000;
++				ok &= cs_disasm_iter(handle, &cursor, &left,
++						     &address, insn) == valid;
++				ok &= cursor == &byte + valid &&
++				      left == 1u - valid &&
++				      address == 0x1000u + valid;
++				if (valid)
++					ok &= insn->id == callback_id &&
++					      insn->size == 1;
++				cs_free(insn, 1);
++			}
++			ok &= callback_order &&
++			      callback_stage ==
++				      (valid ? (text ? 3u :
++						       (custom ? 2u : 1u)) :
++					       1u);
++		}
++		cs_close(&handle);
++		if (!ok) {
++			fprintf(stderr,
++				"Mapper callback ordering failed: arch=%u\n",
++				(unsigned)cases[i].arch);
++			return false;
++		}
 +	}
 +	return true;
 +}
 +
- static bool check_mode(cs_mode mode)
+ int main(void)
  {
- 	csh handles[2] = { 0 };
-@@ -814,6 +899,7 @@ static bool check_mode(cs_mode mode)
- 		    !check_push_immediates(handles) ||
- 		    !check_shift_immediate(handles, mode) ||
- 		    !check_mov_imm32(handles, mode) ||
-+		    !check_mov_memory_immediates(handles, mode) ||
- 		    !check_sib_base_mov(handles, mode) ||
- 		    !check_indexed_memory(handles, mode) ||
- 		    !check_push_memory(handles, mode) ||
+ #ifdef CAPSTONE_USE_ALIAS_TRIE
+@@ -265,7 +406,8 @@ int main(void)
+ 	if (enum_map_bin_search(NULL, 0, "missing", &found) != UINT64_MAX ||
+ 	    found)
+ 		return 1;
+-	return test_full_group_map() && test_name_lookup() && test_alias_lookup() &&
++	return test_mapper_callbacks() && test_full_group_map() &&
++			       test_name_lookup() && test_alias_lookup() &&
+ 			       test_dense_and_sparse() &&
+ 			       test_duplicate_selection() &&
+ 			       find_cs_id(0, NULL, 0) == UINT_MAX &&

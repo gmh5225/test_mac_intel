@@ -7,9 +7,7 @@ import subprocess as sp
 def cost_probe(binaries, cases, temporary, evidence, run):
     def save(name, value):
         (evidence / (name + '.json')).write_text(json.dumps(value, indent=2) + '\n')
-    if platform.machine() not in ('x86_64', 'amd64'):
-        save('cost-protocol', dict(available=False, reason='No Callgrind counter run on this host architecture'))
-        return
+    assert platform.machine() in ('x86_64', 'amd64', 'aarch64')
     selected = [('arm-ls',0), ('arm-ls',2), ('arm64-ls',0), ('mips64el-ls',2),
                 ('putty-32-0.85',1), ('putty-64-0.85',1), ('putty-32-0.85',2), ('putty-64-0.85',2), ('scalar32',1), ('scalar64',1), ('simd64',2)]
     variants = ('base', 'scan')

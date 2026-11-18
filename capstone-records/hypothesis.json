@@ -1,12 +1,9 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "evidence": [
-    "../round1481-mov-memory-immediates/lowering-review.json",
-    "../round1483-memory-owned-admission/native-run.json"
-  ],
-  "hypothesis": "R1481 adds a fourth nearby special-case value and Clang forms a hot jump table. R1483 moves validity work but increases original scalar/SIMD instruction counts. Keep original opcode admission and use an explicit high-bit domain for special writers, with C6/C7 in that domain outside the existing dense terminal cluster.",
-  "intervention": "Reserve bit 15 in the 16-bit plan, bound generated normal row indices below the tag, and give the memory-immediate special form the tagged relative-form value. Existing special values, output coverage, memory parser, public records and normal two-bit row encoding stay the same. The common special predicate becomes a bit test.",
-  "constraints": "No padding, archive ordering, assembly, wider table or per-compiler semantic branch. Same C6/C7 coverage and canonical row projection as R1481; no memory-owner admission rewrite, nullable mapper or initializer change.",
-  "qualification": "Require identical complete records and admission census. Confirm compiler lowering and dynamic work before accepting any native timing benefit. The tag is not assumed to remove unrelated placement regressions.",
+  "previous": "round1479-optional-mapping-callback",
+  "evidence": "R1479 removed eleven empty default callbacks but introduced a null check on required x86 full-decode mapping; native PE/detail regressions held publication.",
+  "hypothesis": "Split the existing architecture branch before the optional callback check. x86 keeps its generated lookup and required live callback; only other backends test for a missing mapper. This targets the observed x86 null-check work without changing initialization or output coverage.",
+  "semantics": "All original custom callbacks keep their order and are reread per instruction. Eleven audited empty default callbacks become NULL. x86 remains required as in published next; no new permission to install a NULL x86 callback. RISC-V default mapper remains non-null.",
+  "validation": "Test original callback invariants on baseline and candidate, including added x86 and RISC-V custom callbacks. Compare complete ARM/AArch64 records locally; require complete x86 records, unchanged non-owner objects, four-host native controls and all affected backend fixtures before publication.",
   "publication_qualified": false
 }
