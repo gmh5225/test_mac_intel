@@ -1,0 +1,12 @@
+{
+  "parent": "3ea7f5838a88c9f34328dc6d8afb2ed89a30ab62",
+  "evidence": [
+    "../round1423-mode-dispatch-counterfactual/profile-review.json",
+    "../round1393-vex32-plan-dispatch/dispatch-lowering.json",
+    "../round1395-vex32-plan-native/decision.json"
+  ],
+  "cause": "Per-instruction selector work is measured independently of image layout in R1423. R1393 made existing immediate instructions pay a new plan comparison and changed their stack allocation. The new VEX32 cases currently have no simple-output plan, so they can be admitted from the existing zero-plan miss without changing the plan table or adding work on existing plan hits.",
+  "change": "At the existing no-plan return only, try the already qualified low-register W0 VEX32 register writer. Keep every live option/callback check in the miss owner, retain the original vector object and all tables, and leave GCC inactive. All existing unsuccessful plan paths still need cost and native non-regression measurement.",
+  "semantic_scope": "Reuse canonical vector rows and writer; admit only bare C4/C5, 32-bit mode, low register and W0 register forms. LDS/LES, memory and unsupported rows preserve fallback.",
+  "publication_qualified": false
+}
