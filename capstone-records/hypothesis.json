@@ -1,8 +1,19 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "evidence": "../round1480-current-scalar-fallback-census/next-step.json",
-  "hypothesis": "Canonical C6/C7 memory-immediate MOV accounts for roughly 2 percent of the real PE32/PE64 code-section instructions and currently falls back. Extend the canonical MOV output plan with a constant immediate specialization of the existing memory writer.",
-  "semantics": "Only bare or one-REX C6/C7 /0 memory forms; preserve existing address exclusions, options and callbacks. Reuse canonical MOV row fields, bounded address parsing, and unsigned number emission. Validate new operand projection against the ordinary decoder.",
-  "exclusions": "No prefix, address mode, SIB, register or opcode legality is relaxed beyond the new validated /0 memory forms. No optional mapper or initialization prototype is combined.",
-  "qualification": "Generate with baseline and candidate full decoders; exhaustive ModRM/SIB/REX/length matrix, immediate/displacement boundaries, existing x86 units; codegen costs, complete real-record comparisons and native panels still required."
+  "preceding_source": {
+    "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
+    "tree": "ddb760fdee8a7f59836c2d323d309363ccf4fe1b",
+    "sha256": "cd9f390286dce59dec9de2348415ab5ecd7cc5719d1e89ed7f2165d1ed47909f",
+    "generator": "records=334 plans=382 encodings_checked=94404 table_bytes=34344",
+    "generated_table_sha256": "3a93d4f3c4fa7a17427c93c38f858bd2a70634f4309165cf3a3d116d1e42cee5"
+  },
+  "evidence": [
+    "../round1481-mov-memory-immediates/cost-attribution.json",
+    "../round1481-mov-memory-immediates/iterator-attribution.json"
+  ],
+  "hypothesis": "R1481 removes substantial PE output work but adds ordinary iterator instructions and stack references, including on scalar/SIMD samples with no C6/C7 instructions. Reuse canonical MOV plans directly and move memory opcode/group admission into the existing memory writer, where address bounds are already owned.",
+  "intervention": "Remove the new reserved dispatch branch and the public memory-immediate leaf. Move existing memory opcode classification from the common iterator to the memory-only entry. Reject reserved register-immediate plans before reading a row; retain explicit memory-only register rejection. Constant-specialize the shared address writer for immediate and register forms.",
+  "constraints": "Same admission set as R1481, same options/callback fallbacks and complete output records. No padding, assembly, archive reordering or table element widening. No nullable-mapper or initializer prototype is combined.",
+  "prior_distinction": "R1143/R1149 moved admission into new plan bits; this experiment retains the original 16-bit record encoding and moves memory-only validation to the existing memory owner.",
+  "publication_qualified": false
 }
