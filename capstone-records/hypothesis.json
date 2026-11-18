@@ -1,8 +1,12 @@
 {
   "parent": "25da25371c0e19e1cf57b394446e3f705cecd2a9",
-  "evidence": "../round1480-current-scalar-fallback-census/next-step.json",
-  "hypothesis": "Canonical C6/C7 memory-immediate MOV accounts for roughly 2 percent of the real PE32/PE64 code-section instructions and currently falls back. Extend the canonical MOV output plan with a constant immediate specialization of the existing memory writer.",
-  "semantics": "Only bare or one-REX C6/C7 /0 memory forms; preserve existing address exclusions, options and callbacks. Reuse canonical MOV row fields, bounded address parsing, and unsigned number emission. Validate new operand projection against the ordinary decoder.",
-  "exclusions": "No prefix, address mode, SIB, register or opcode legality is relaxed beyond the new validated /0 memory forms. No optional mapper or initialization prototype is combined.",
-  "qualification": "Generate with baseline and candidate full decoders; exhaustive ModRM/SIB/REX/length matrix, immediate/displacement boundaries, existing x86 units; codegen costs, complete real-record comparisons and native panels still required."
+  "evidence": [
+    "../round1481-mov-memory-immediates/lowering-review.json",
+    "../round1483-memory-owned-admission/native-run.json"
+  ],
+  "hypothesis": "R1481 adds a fourth nearby special-case value and Clang forms a hot jump table. R1483 moves validity work but increases original scalar/SIMD instruction counts. Keep original opcode admission and use an explicit high-bit domain for special writers, with C6/C7 in that domain outside the existing dense terminal cluster.",
+  "intervention": "Reserve bit 15 in the 16-bit plan, bound generated normal row indices below the tag, and give the memory-immediate special form the tagged relative-form value. Existing special values, output coverage, memory parser, public records and normal two-bit row encoding stay the same. The common special predicate becomes a bit test.",
+  "constraints": "No padding, archive ordering, assembly, wider table or per-compiler semantic branch. Same C6/C7 coverage and canonical row projection as R1481; no memory-owner admission rewrite, nullable mapper or initializer change.",
+  "qualification": "Require identical complete records and admission census. Confirm compiler lowering and dynamic work before accepting any native timing benefit. The tag is not assumed to remove unrelated placement regressions.",
+  "publication_qualified": false
 }
